@@ -62,15 +62,15 @@ export function verifyRequestSignature(
 }
 
 /**
- * Gets the signing secret from environment
- * Uses dedicated REQUEST_SIGNING_SECRET if available, falls back to ENCRYPTION_KEY
- * Note: In production, use separate secrets for encryption and signing for better security
- * @throws Error if no secret is configured
+ * Gets the signing secret from environment.
+ * Requires a dedicated REQUEST_SIGNING_SECRET (key-separation principle:
+ * never reuse the encryption key for HMAC signing).
+ * @throws Error if REQUEST_SIGNING_SECRET is not configured
  */
 function getSigningSecret(): string {
-  const secret = process.env.REQUEST_SIGNING_SECRET || process.env.ENCRYPTION_KEY;
+  const secret = process.env.REQUEST_SIGNING_SECRET;
   if (!secret) {
-    throw new Error("REQUEST_SIGNING_SECRET or ENCRYPTION_KEY must be configured for request signing");
+    throw new Error("REQUEST_SIGNING_SECRET must be configured for request signing");
   }
   return secret;
 }

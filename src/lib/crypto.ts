@@ -2,17 +2,29 @@
 // src/lib/crypto.ts
 
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/nextjs';
 
 const ALGORITHM = 'aes-256-gcm';
+
+/**
+ * Represents the ciphertext produced by encrypt().
+ *
+ * Always pass this object directly to the decrypt() overload that accepts EncryptedData
+ * rather than destructuring and calling decrypt(result.iv, result.content). The object
+ * form makes it a compile-time error to swap the two fields.
+ */
+export type EncryptedData = { readonly iv: string; readonly content: string };
 
 // Cache for validated encryption key
 let cachedKey: Buffer | null = null;
 
 /**
- * Reset the cached encryption key (useful for testing)
- * @internal
+ * Reset the cached encryption key.
+ * @internal Test helper only — no-op in production to prevent DoS-via-cache-invalidation.
  */
 export function __resetCachedKey(): void {
+  if (process.env.NODE_ENV === 'production') return;
   cachedKey = null;
 }
 
@@ -41,7 +53,7 @@ function getEncryptionKey(): Buffer {
   return cachedKey;
 }
 
-export const encrypt = (text: string) => {
+export const encrypt = (text: string): EncryptedData => {
 
   if (!text || typeof text !== 'string') {
     throw new Error("Invalid input: text must be a non-empty string");
@@ -52,6 +64,17 @@ export const encrypt = (text: string) => {
 
   const KEY = getEncryptionKey();
   const iv = crypto.randomBytes(16);
+  // TODO(security): NIST SP 800-38D recommends a 12-byte (96-bit) IV for AES-GCM for
+  // maximum security margin and performance. The current 16-byte IV is cryptographically
+  // valid but requires an extra GHASH step internally.
+  //
+  // Changing to 12 bytes is a BREAKING CHANGE — all existing ciphertext stored in the
+  // database (ezygo_iv, auth_password_iv columns) uses 16-byte IVs and the decrypt()
+  // function validates exactly 32 hex chars (16 bytes). A migration would be needed to:
+  //   1. Re-encrypt all rows with a 12-byte IV (24 hex chars)
+  //   2. Update the decrypt() regex to accept 24 hex chars
+  //   3. Run a database migration
+  // This is deferred until a scheduled maintenance window.
   const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -63,7 +86,24 @@ export const encrypt = (text: string) => {
   };
 };
 
-export const decrypt = (ivHex: string, content: string) => {
+/**
+ * Decrypts an AES-256-GCM ciphertext.
+ *
+ * **Preferred** – pass the full object returned by encrypt():
+ * ```ts
+ * const data = encrypt(plaintext);
+ * const plain = decrypt(data); // TypeScript enforces correct field order
+ * ```
+ * The two-argument form is still accepted for backward compatibility but is
+ * discouraged because swapping `ivHex` and `content` is a silent runtime error
+ * that only manifests as a decryption failure.
+ */
+export function decrypt(data: EncryptedData): string;
+/** @deprecated Prefer `decrypt(encryptedData)` to prevent iv/content swap. */
+export function decrypt(ivHex: string, content: string): string;
+export function decrypt(ivHexOrData: string | EncryptedData, contentArg?: string): string {
+  const ivHex = typeof ivHexOrData === 'string' ? ivHexOrData : ivHexOrData.iv;
+  const content = typeof ivHexOrData === 'string' ? contentArg! : ivHexOrData.content;
 
   if (!ivHex || !content) {
     throw new Error("Invalid input: IV and content are required");
@@ -85,6 +125,12 @@ export const decrypt = (ivHex: string, content: string) => {
     throw new Error("Invalid content format (non-hex characters)");
   }
 
+  // AES-128-GCM auth tag must be exactly 16 bytes = 32 hex chars.
+  // A shorter tag silently weakens authentication without failing until decipher.final().
+  if (authTagHex.length !== 32) {
+    throw new Error("Invalid auth tag length (must be 32 hex chars)");
+  }
+
   const KEY = getEncryptionKey();
   try {
     const decipher = crypto.createDecipheriv(ALGORITHM, KEY, Buffer.from(ivHex, 'hex'));
@@ -93,6 +139,11 @@ export const decrypt = (ivHex: string, content: string) => {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (_error) {
-    throw new Error("Decryption failed");
+    // Log the original error internally for debugging and crypto-health monitoring.
+    // The sanitized public message intentionally omits detail to avoid leaking key/IV
+    // information to callers.
+    logger.error('[crypto] Decryption failed', _error);
+    Sentry.captureException(_error, { level: 'error', tags: { type: 'decryption_failure', location: 'crypto/decrypt' } });
+    throw new Error('Decryption failed');
   }
-};
+}

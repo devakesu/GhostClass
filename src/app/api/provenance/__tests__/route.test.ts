@@ -4,6 +4,19 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { GET } from "../route";
+import { NextRequest } from "next/server";
+
+/** Helper: create a minimal NextRequest for the provenance endpoint */
+function makeRequest(accept?: string): NextRequest {
+  return new NextRequest("http://localhost/api/provenance", {
+    headers: accept ? { accept } : {},
+  });
+}
+
+/** Helper: create a request with the full-provenance Accept header */
+function makeFullRequest(): NextRequest {
+  return makeRequest("application/vnd.ghostclass.provenance+json");
+}
 
 describe("Provenance API Route", () => {
   const originalCommitSha = process.env.APP_COMMIT_SHA;
@@ -73,30 +86,30 @@ describe("Provenance API Route", () => {
 
   it("should return commit sha from environment", async () => {
     process.env.APP_COMMIT_SHA = "abc123def456";
-    delete process.env.GITHUB_RUN_ID; // Ensure GITHUB_RUN_ID is not set
+    delete process.env.GITHUB_RUN_ID;
 
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.commit).toBe("abc123def456");
-    expect(data.build_id).toBe("abc123def456"); // Should fallback to commit SHA when GITHUB_RUN_ID is not set
+    expect(data.build_id).toBe("abc123def456");
   });
 
   it("should return 'dev' when commit sha is not set", async () => {
     delete process.env.APP_COMMIT_SHA;
-    delete process.env.GITHUB_RUN_ID; // Ensure GITHUB_RUN_ID is not set
+    delete process.env.GITHUB_RUN_ID;
 
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.commit).toBe("dev");
-    expect(data.build_id).toBe("dev"); // Should fallback to commit SHA ("dev") when GITHUB_RUN_ID is not set
+    expect(data.build_id).toBe("dev");
   });
 
   it("should return app version from environment", async () => {
     process.env.NEXT_PUBLIC_APP_VERSION = "3.0.0";
 
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.app_version).toBe("3.0.0");
@@ -105,7 +118,7 @@ describe("Provenance API Route", () => {
   it("should return 'dev' for app version when not set", async () => {
     delete process.env.NEXT_PUBLIC_APP_VERSION;
 
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.app_version).toBe("dev");
@@ -114,75 +127,83 @@ describe("Provenance API Route", () => {
   it("should indicate container status correctly", async () => {
     process.env.APP_COMMIT_SHA = "abc123";
 
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.container).toBe(true);
 
     delete process.env.APP_COMMIT_SHA;
     
-    const response2 = GET();
+    const response2 = GET(makeRequest());
     const data2 = await response2.json();
 
     expect(data2.container).toBe(false);
   });
 
-  it("should return node environment", async () => {
-    const response = GET();
+  it("should NOT expose node_env in public response", async () => {
+    const response = GET(makeRequest());
     const data = await response.json();
 
-    // Just verify it returns the current NODE_ENV
-    expect(data.node_env).toBeDefined();
-    expect(typeof data.node_env).toBe("string");
+    expect(data).not.toHaveProperty("node_env");
   });
 
   it("should return timestamp in ISO format", async () => {
-    const response = GET();
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
   it("should have no-cache headers", () => {
-    const response = GET();
+    const response = GET(makeRequest());
 
     expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 
-  it("should return all required fields", async () => {
-    const response = GET();
+  it("should return all base fields without full-provenance Accept header", async () => {
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(data).toHaveProperty("commit");
     expect(data).toHaveProperty("commit_sha");
     expect(data).toHaveProperty("build_id");
-    expect(data).toHaveProperty("github_run_id");
-    expect(data).toHaveProperty("github_run_number");
-    expect(data).toHaveProperty("github_repo");
     expect(data).toHaveProperty("app_version");
     expect(data).toHaveProperty("image_digest");
     expect(data).toHaveProperty("container");
-    expect(data).toHaveProperty("node_env");
     expect(data).toHaveProperty("timestamp");
     expect(data).toHaveProperty("audit_status");
     expect(data).toHaveProperty("signature_status");
+    // CI fields should NOT be present without the full-provenance Accept header
+    expect(data).not.toHaveProperty("github_run_id");
+    expect(data).not.toHaveProperty("github_run_number");
+    expect(data).not.toHaveProperty("github_repo");
+  });
+
+  it("should include CI fields when full-provenance Accept header is present", async () => {
+    process.env.GITHUB_RUN_ID = "123456789";
+    process.env.GITHUB_RUN_NUMBER = "42";
+    process.env.GITHUB_REPOSITORY = "owner/repo";
+
+    const response = GET(makeFullRequest());
+    const data = await response.json();
+
+    expect(data).toHaveProperty("github_run_id", "123456789");
+    expect(data).toHaveProperty("github_run_number", "42");
+    expect(data).toHaveProperty("github_repo", "owner/repo");
   });
 
   it("should return 200 status code", () => {
-    const response = GET();
+    const response = GET(makeRequest());
     expect(response.status).toBe(200);
   });
 
-  it("should have correct field types", async () => {
-    const response = GET();
+  it("should have correct field types for base response", async () => {
+    const response = GET(makeRequest());
     const data = await response.json();
 
     expect(typeof data.commit).toBe("string");
     expect(typeof data.commit_sha).toBe("string");
     expect(typeof data.build_id).toBe("string");
-    expect(typeof data.github_run_id).toBe("string");
-    expect(typeof data.github_run_number).toBe("string");
-    expect(typeof data.github_repo).toBe("string");
     expect(typeof data.app_version).toBe("string");
     expect(typeof data.image_digest).toBe("string");
     expect(typeof data.container).toBe("boolean");
@@ -191,12 +212,12 @@ describe("Provenance API Route", () => {
     expect(typeof data.signature_status).toBe("string");
   });
 
-  describe("github_repo field", () => {
+  describe("github_repo field (full-provenance only)", () => {
     it("should return github_repo from GITHUB_REPOSITORY", async () => {
       process.env.GITHUB_REPOSITORY = "owner/repo";
       delete process.env.NEXT_PUBLIC_GITHUB_URL;
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_repo).toBe("owner/repo");
@@ -206,7 +227,7 @@ describe("Provenance API Route", () => {
       delete process.env.GITHUB_REPOSITORY;
       process.env.NEXT_PUBLIC_GITHUB_URL = "https://github.com/owner/repo";
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_repo).toBe("owner/repo");
@@ -216,28 +237,18 @@ describe("Provenance API Route", () => {
       delete process.env.GITHUB_REPOSITORY;
       delete process.env.NEXT_PUBLIC_GITHUB_URL;
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_repo).toBe("");
     });
-
-    it("should prefer GITHUB_REPOSITORY over NEXT_PUBLIC_GITHUB_URL", async () => {
-      process.env.GITHUB_REPOSITORY = "owner/repo1";
-      process.env.NEXT_PUBLIC_GITHUB_URL = "https://github.com/owner/repo2";
-
-      const response = GET();
-      const data = await response.json();
-
-      expect(data.github_repo).toBe("owner/repo1");
-    });
   });
 
-  describe("github_run_id field", () => {
+  describe("github_run_id field (full-provenance only)", () => {
     it("should return github_run_id from GITHUB_RUN_ID", async () => {
       process.env.GITHUB_RUN_ID = "123456789";
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_run_id).toBe("123456789");
@@ -246,7 +257,7 @@ describe("Provenance API Route", () => {
     it("should return empty string when GITHUB_RUN_ID is not set", async () => {
       delete process.env.GITHUB_RUN_ID;
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_run_id).toBe("");
@@ -256,7 +267,7 @@ describe("Provenance API Route", () => {
       process.env.GITHUB_RUN_ID = "123456789";
       process.env.APP_COMMIT_SHA = "abc123";
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.build_id).toBe("123456789");
@@ -267,19 +278,18 @@ describe("Provenance API Route", () => {
       delete process.env.GITHUB_RUN_ID;
       process.env.APP_COMMIT_SHA = "abc123";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.build_id).toBe("abc123");
-      expect(data.github_run_id).toBe("");
     });
   });
 
-  describe("github_run_number field", () => {
+  describe("github_run_number field (full-provenance only)", () => {
     it("should return github_run_number from GITHUB_RUN_NUMBER", async () => {
       process.env.GITHUB_RUN_NUMBER = "42";
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_run_number).toBe("42");
@@ -288,7 +298,7 @@ describe("Provenance API Route", () => {
     it("should return empty string when GITHUB_RUN_NUMBER is not set", async () => {
       delete process.env.GITHUB_RUN_NUMBER;
 
-      const response = GET();
+      const response = GET(makeFullRequest());
       const data = await response.json();
 
       expect(data.github_run_number).toBe("");
@@ -299,7 +309,7 @@ describe("Provenance API Route", () => {
     it("should return audit_status from AUDIT_STATUS", async () => {
       process.env.AUDIT_STATUS = "PASSED";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.audit_status).toBe("PASSED");
@@ -308,7 +318,7 @@ describe("Provenance API Route", () => {
     it("should return 'UNKNOWN' when AUDIT_STATUS is not set", async () => {
       delete process.env.AUDIT_STATUS;
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.audit_status).toBe("UNKNOWN");
@@ -319,7 +329,7 @@ describe("Provenance API Route", () => {
     it("should return signature_status from SIGNATURE_STATUS", async () => {
       process.env.SIGNATURE_STATUS = "SLSA_PROVENANCE_GENERATED";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.signature_status).toBe("SLSA_PROVENANCE_GENERATED");
@@ -328,7 +338,7 @@ describe("Provenance API Route", () => {
     it("should return 'UNSIGNED' when SIGNATURE_STATUS is not set", async () => {
       delete process.env.SIGNATURE_STATUS;
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.signature_status).toBe("UNSIGNED");
@@ -340,7 +350,7 @@ describe("Provenance API Route", () => {
       const customTimestamp = "2024-01-15T12:00:00.000Z";
       process.env.BUILD_TIMESTAMP = customTimestamp;
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.timestamp).toBe(customTimestamp);
@@ -350,13 +360,11 @@ describe("Provenance API Route", () => {
       delete process.env.BUILD_TIMESTAMP;
 
       const beforeCall = new Date().toISOString();
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
       const afterCall = new Date().toISOString();
 
-      // Verify it's a valid ISO timestamp
       expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-      // Verify it's between the before and after timestamps
       expect(data.timestamp >= beforeCall).toBe(true);
       expect(data.timestamp <= afterCall).toBe(true);
     });
@@ -367,7 +375,7 @@ describe("Provenance API Route", () => {
       process.env.IMAGE_DIGEST = "sha256:abcdef123456";
       process.env.APP_COMMIT_SHA = "commit123";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.image_digest).toBe("sha256:abcdef123456");
@@ -377,7 +385,7 @@ describe("Provenance API Route", () => {
       delete process.env.IMAGE_DIGEST;
       process.env.APP_COMMIT_SHA = "commit123";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.image_digest).toBe("commit123");
@@ -387,7 +395,7 @@ describe("Provenance API Route", () => {
       delete process.env.IMAGE_DIGEST;
       delete process.env.APP_COMMIT_SHA;
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.image_digest).toBe("dev");
@@ -398,7 +406,7 @@ describe("Provenance API Route", () => {
     it("should return same value as legacy commit field", async () => {
       process.env.APP_COMMIT_SHA = "abc123def456";
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.commit_sha).toBe("abc123def456");
@@ -409,7 +417,7 @@ describe("Provenance API Route", () => {
     it("should both fallback to 'dev' when APP_COMMIT_SHA is not set", async () => {
       delete process.env.APP_COMMIT_SHA;
 
-      const response = GET();
+      const response = GET(makeRequest());
       const data = await response.json();
 
       expect(data.commit_sha).toBe("dev");

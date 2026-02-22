@@ -5,7 +5,9 @@ import { validateCsrfToken } from "@/lib/security/csrf";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
 
-const BASE_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "");
+// .trim() removes accidental leading/trailing whitespace from the env value
+// (common copy-paste mistake in .env files) before stripping trailing slashes.
+const BASE_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
 
 // Runtime validation: ensure NODE_ENV is explicitly set at module load time
 // SECURITY CONSIDERATION: When NODE_ENV is undefined, IS_PRODUCTION will be false,
@@ -19,17 +21,18 @@ if (!process.env.NODE_ENV) {
 }
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
-// PUBLIC_PATHS: Exact endpoints that are exempt from CSRF validation but NOT from origin validation.
+// PUBLIC_PATHS: Exact endpoints that are exempt from CSRF validation AND from origin validation.
 // Uses full path matching (not prefix) to prevent accidentally exposing sensitive sub-paths.
 // 
-// SECURITY MODEL FOR PUBLIC PATHS (Enhanced in this PR):
+// SECURITY MODEL FOR PUBLIC PATHS:
 // These paths are accessible without authentication but still require proper security controls:
 // 
-// 1. Origin Validation (ALWAYS enforced for write operations - enhancement added):
-//    - NOW APPLIES TO ALL state-changing requests including public paths (see line 224)
-//    - Verifies requests originate from allowed domain (NEXT_PUBLIC_APP_DOMAIN)
-//    - Prevents unauthorized sites from making requests to public endpoints
-//    - Protects against cross-origin attacks even before authentication
+// 1. Origin Validation (SKIPPED for public paths; enforced for all non-public paths):
+//    - Non-public paths require a valid Origin header matching NEXT_PUBLIC_APP_DOMAIN for
+//      both read (GET) and write (POST/PUT/PATCH/DELETE) requests.
+//    - Public paths (e.g. login) are exempt because the user has no session yet.
+//    - Verifies requests originate from the allowed domain (NEXT_PUBLIC_APP_DOMAIN)
+//    - Prevents unauthorized sites from making requests even on GET (data-exfiltration protection)
 //    
 //    ⚠️ IMPORTANT: Origin validation restricts access to web browsers from allowed domains.
 //    Non-browser clients (mobile apps, CLI tools, Postman, curl) will be BLOCKED unless they:
@@ -54,11 +57,9 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 // 
 // VERIFICATION: Each path in PUBLIC_PATHS has been reviewed for security:
 // - "login": Pre-authentication endpoint protected by:
-//   * Origin validation (prevents cross-origin attacks, web-only)
 //   * Rate limiting (prevents brute force)
 //   * Input validation (sanitizes username/password)
 //   * Backend authentication logic (validates credentials)
-//   ⚠️ This endpoint is web-browser-only due to origin validation.
 // 
 // SECURITY: Each path must be explicitly listed - sub-paths are NOT automatically included.
 // Example: "login" matches "/api/backend/login" but NOT "/api/backend/login/admin".
@@ -189,33 +190,38 @@ async function readWithLimit(body: ReadableStream<Uint8Array> | null, limit: num
   let received = 0;
   const chunks: Uint8Array[] = [];
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (signal.aborted) {
-      const abortError = new Error("Upstream fetch aborted");
-      abortError.name = "AbortError";
-      throw abortError;
-    }
-    if (value) {
-      received += value.length;
-      if (received > limit) {
-        try {
-          await reader.cancel();
-        } catch (_cancelError) {
-          // Swallow cancellation errors - we're throwing UpstreamResponseTooLargeError anyway
-          // Don't let cancel() rejection prevent the size limit error
-        }
-        throw new UpstreamResponseTooLargeError("Upstream response exceeded safety limit");
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (signal.aborted) {
+        const abortError = new Error("Upstream fetch aborted");
+        abortError.name = "AbortError";
+        throw abortError;
       }
-      chunks.push(value);
+      if (value) {
+        received += value.length;
+        if (received > limit) {
+          throw new UpstreamResponseTooLargeError("Upstream response exceeded safety limit");
+        }
+        chunks.push(value);
+      }
     }
+  } catch (error) {
+    // Cancel the reader to release the stream lock and prevent memory leaks from
+    // half-read streams on all error paths (abort, size limit, network errors).
+    try { await reader.cancel(); } catch { /* ignore cancellation errors */ }
+    throw error;
   }
 
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function forward(req: NextRequest, method: string, path: string[]) {
+// Not exported: the four HTTP handler exports (GET/POST/PUT/PATCH/DELETE) are the
+// Next.js entry points. Exporting forward() directly would allow any server-side
+// module to call it with an arbitrary method and path[], bypassing the PUBLIC_PATHS
+// check, origin validation, and CSRF protection.
+async function forward(req: NextRequest, method: string, path: string[]) {
   if (!BASE_API_URL) {
     logger.error("NEXT_PUBLIC_BACKEND_URL is not configured");
     return NextResponse.json({ message: "Backend URL not configured" }, { status: 500 });
@@ -256,10 +262,14 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
   const fullPath = pathSegments.join("/");
   const isPublic = PUBLIC_PATHS.has(fullPath);
 
-  // Origin validation for ALL state-changing calls (including public paths like login)
-  // This prevents unauthorized sites from making requests, even to public endpoints
+  // Origin validation for ALL non-public requests (reads and writes).
+  // - Writes (POST/PUT/PATCH/DELETE): always enforced to prevent CSRF-style attacks.
+  // - Authenticated GETs (non-public paths): enforced to prevent cross-origin data
+  //   exfiltration (e.g. an attacker forcing a victim's browser to fetch attendance
+  //   records via <img>, <script>, or fetch from a malicious site).
+  // Public paths (e.g. login) are exempt because the user has no session yet.
   // SKIP in development mode for easier local testing with localhost, tunnels, etc.
-  if (isWrite && process.env.NODE_ENV !== "development") {
+  if (!isPublic && process.env.NODE_ENV !== "development") {
     // Validate that NEXT_PUBLIC_APP_DOMAIN is configured
     const allowedHosts = getAllowedHosts();
     if (!allowedHosts) {
@@ -308,17 +318,40 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
 
   const token = isPublic ? undefined : await getAuthTokenServer();
 
+  // Guard: if the EzyGo auth cookie is missing for a non-public path the request
+  // cannot succeed. Return 401 immediately rather than forwarding
+  // `Authorization: Bearer undefined` to the upstream, which would waste a round-trip
+  // and could confuse the upstream into returning a less descriptive error.
+  if (!isPublic && !token) {
+    return NextResponse.json(
+      { message: "No authentication token – please log in again" },
+      { status: 401 }
+    );
+  }
+
   const target = `${BASE_API_URL}/${pathSegments.join("/")}${req.nextUrl.search}`;
 
   const hasBody = method !== "GET" && method !== "HEAD";
   let body: BodyInit | undefined;
 
+  // Track the content-type that corresponds to how the body was actually read,
+  // so we forward a type that precisely matches the payload rather than blindly
+  // trusting the client-supplied header. A malicious client could inject exotic types
+  // or attacker-controlled boundary parameters that the upstream might mishandle.
+  let resolvedContentType = "application/json";
+
   if (hasBody) {
     const contentType = req.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       body = await req.text();
+      resolvedContentType = "application/json";
     } else {
       body = Buffer.from(await req.arrayBuffer());
+      // Forward only the media type ("type/subtype"), stripping all parameters such as
+      // multipart boundaries. This removes the attack surface of attacker-controlled
+      // boundary strings while still telling the upstream what kind of data was sent.
+      const mediaType = contentType.split(";")[0].trim().toLowerCase();
+      resolvedContentType = mediaType || "application/octet-stream";
     }
   }
 
@@ -334,7 +367,7 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
           method,
           headers: {
             ...(isPublic ? {} : { Authorization: `Bearer ${token}` }),
-            "content-type": req.headers.get("content-type") || "application/json",
+            "content-type": resolvedContentType, // derived from how the body was read, not raw client header
             accept: req.headers.get("accept") || "application/json",
           },
           body: hasBody ? body : undefined,
@@ -375,9 +408,11 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
       const sanitizedBody = text.length > MAX_ERROR_BODY_LOG_LENGTH 
         ? text.substring(0, MAX_ERROR_BODY_LOG_LENGTH) + '...' 
         : text;
+      // Log path only — `target` includes the full upstream base URL and any
+      // user-supplied query string; both leak to log aggregators.
       logger.error("Proxy upstream error", { 
         status: res.status, 
-        target, 
+        path: pathSegments.join("/"),
         bodyPreview: sanitizedBody 
       });
       let errorMessage: string = text;
@@ -423,7 +458,6 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
     // Check if circuit breaker is open using instanceof
     if (error instanceof CircuitBreakerOpenError) {
       logger.warn("Circuit breaker is open - EzyGo API may be experiencing issues", { 
-        target,
         path: pathSegments.join("/")
       });
       return NextResponse.json(
@@ -440,13 +474,13 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
       if (is429) {
         logger.warn("Proxy upstream rate limit (429)", { 
           status: error.status, 
-          target,
+          path: pathSegments.join("/"),
           bodyPreview: error.body.substring(0, MAX_ERROR_BODY_LOG_LENGTH)
         });
       } else {
         logger.error("Proxy upstream 5xx error", { 
           status: error.status, 
-          target,
+          path: pathSegments.join("/"),
           bodyPreview: error.body.substring(0, MAX_ERROR_BODY_LOG_LENGTH)
         });
       }
@@ -494,14 +528,14 @@ export async function forward(req: NextRequest, method: string, path: string[]) 
     
     // Check if response was too large
     if (error instanceof UpstreamResponseTooLargeError) {
-      logger.error("Proxy response too large", { target, error: error.message });
+      logger.error("Proxy response too large", { path: pathSegments.join("/"), error: error.message });
       return NextResponse.json(
         { message: "Upstream response too large" },
         { status: 502 }
       );
     }
     
-    logger.error("Proxy fetch failed", { target, error: error?.message });
+    logger.error("Proxy fetch failed", { path: pathSegments.join("/"), error: error?.message });
     const isAbort = error?.name === "AbortError";
     return NextResponse.json({ message: isAbort ? "Upstream timed out" : "Upstream fetch failed" }, { status: 502 });
   }
@@ -526,4 +560,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ path: str
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   return forward(req, "DELETE", path);
+}
+// Export HEAD so Next.js forwards it to the upstream EzyGo API rather than
+// auto-generating a response from GET (which would return no body but also incorrect
+// upstream headers). forward() already handles HEAD correctly: isWrite=false (no CSRF
+// check), hasBody=false (no body read or forwarded).
+export async function HEAD(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  const { path } = await ctx.params;
+  return forward(req, "HEAD", path);
 }

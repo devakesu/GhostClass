@@ -33,7 +33,7 @@ git clone https://github.com/YOUR_USERNAME/GhostClass.git
 cd GhostClass
 
 # 2. Install dependencies
-npm install
+npm install --legacy-peer-deps
 
 # 3. Create feature branch
 git checkout -b feature/your-feature-name

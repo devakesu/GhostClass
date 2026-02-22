@@ -4,11 +4,12 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Section,
   Text,
   Button,
 } from "@react-email/components";
-import { emailStyles, tableStyles, badgeStyles } from "./styles";
+import { emailStyles, tableStyles, badgeStyles, getLogoUrl, headerLogoStyle } from "./styles";
 
 interface AttendanceConflictEmailProps {
   username: string;
@@ -30,7 +31,7 @@ export const AttendanceConflictEmail = ({
     <Body style={emailStyles.main}>
       <Container style={emailStyles.container}>
         <Section style={emailStyles.header}>
-          <Heading style={emailStyles.headerText}>GhostClass 👻</Heading>
+          <Img src={getLogoUrl()} alt="GhostClass" width={180} style={headerLogoStyle} />
         </Section>
 
         <Section style={emailStyles.content}>

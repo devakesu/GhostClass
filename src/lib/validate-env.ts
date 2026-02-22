@@ -35,6 +35,14 @@ export function validateEnvironment() {
     errors.push('❌ CRON_SECRET is required');
   }
 
+  // Request Signing (separate key from ENCRYPTION_KEY for cryptographic key separation)
+  if (!process.env.REQUEST_SIGNING_SECRET) {
+    errors.push('❌ REQUEST_SIGNING_SECRET is required\n' +
+                '   Used for: API request signature validation (anti-tampering)\n' +
+                '   Generate with: openssl rand -hex 32\n' +
+                '   Must be distinct from ENCRYPTION_KEY (key separation principle)');
+  }
+
   // Supabase
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     errors.push('❌ NEXT_PUBLIC_SUPABASE_URL is required');
@@ -125,9 +133,24 @@ export function validateEnvironment() {
 
   if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
     errors.push('❌ NEXT_PUBLIC_BACKEND_URL is required (EzyGo API URL)');
+  } else {
+    try {
+      const backendUrl = new URL(process.env.NEXT_PUBLIC_BACKEND_URL);
+      if (!['https:', 'http:'].includes(backendUrl.protocol)) {
+        errors.push('❌ NEXT_PUBLIC_BACKEND_URL must use http or https protocol');
+      } else if (process.env.NODE_ENV === 'production' && backendUrl.protocol !== 'https:') {
+        errors.push('❌ NEXT_PUBLIC_BACKEND_URL must use https:// in production');
+      }
+    } catch {
+      errors.push('❌ NEXT_PUBLIC_BACKEND_URL must be a valid absolute URL (e.g. https://api.example.com)');
+    }
   }
 
-  if (!process.env.NEXT_PUBLIC_AUTHOR_NAME) {
+  // ============================================================================
+  // OPTIONAL - App works but features may be limited
+  // ============================================================================
+
+    if (!process.env.NEXT_PUBLIC_AUTHOR_NAME) {
     warnings.push('⚠️  NEXT_PUBLIC_AUTHOR_NAME not set');
   }
 
@@ -146,10 +169,6 @@ export function validateEnvironment() {
   if (!process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE) {
     warnings.push('⚠️  NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE not set');
   }
-
-  // ============================================================================
-  // OPTIONAL - App works but features may be limited
-  // ============================================================================
 
   // Sentry (Error Monitoring)
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
@@ -171,9 +190,29 @@ export function validateEnvironment() {
     }
   }
 
+  // Build ID / CI traceability
+  if (!process.env.APP_COMMIT_SHA) {
+    if (process.env.NODE_ENV === 'production') {
+      // Error rather than warn: without a commit SHA the build ID falls back to a random
+      // UUID (see next.config.ts), which prevents stable asset URLs across rolling restarts.
+      // Stable build IDs also make it easier to correlate Sentry errors with deployments.
+      warnings.push(
+        '⚠️  APP_COMMIT_SHA is not set — Next.js will use a random UUID as the build ID.\n' +
+        '   Set APP_COMMIT_SHA to the current git commit SHA in your CI/CD pipeline for\n' +
+        '   stable, traceable build IDs (avoids cache mismatches across rolling restarts).'
+      );
+    }
+  }
+
   // Google Analytics (Server-side Measurement Protocol)
   if (!process.env.NEXT_PUBLIC_GA_ID) {
     warnings.push('ℹ️  NEXT_PUBLIC_GA_ID not set - analytics disabled (optional)');
+  } else if (!/^G-[A-Z0-9]{4,20}$/.test(process.env.NEXT_PUBLIC_GA_ID)) {
+    // GA4 Measurement IDs are always in the form G-XXXXXXXXXX
+    errors.push(
+      '❌ NEXT_PUBLIC_GA_ID appears invalid — GA4 Measurement IDs must match the G-XXXXXXXXXX format.\n' +
+      '   Get from: Google Analytics → Admin → Data Streams → Measurement ID'
+    );
   } else {
     const gaApiSecret = process.env.GA_API_SECRET?.trim() ?? '';
     if (gaApiSecret === '') {

@@ -4,11 +4,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { trackGA4Event } from "@/lib/analytics";
 import { syncRateLimiter } from "@/lib/ratelimit";
-import { getClientIp } from "@/lib/utils";
+import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+
+interface GA4Event {
+  name: string;
+  params?: Record<string, unknown>;
+}
+
+/** Type guard for values already in GA4 user property format { value: string } */
+function isGA4UserProperty(val: unknown): val is { value: string } {
+  return typeof val === 'object' && val !== null && 'value' in val && typeof (val as { value: unknown }).value === 'string';
+}
 
 export async function POST(req: NextRequest) {
   try {
+    // Validate request origin to prevent cross-site analytics pollution.
+    // Parse NEXT_PUBLIC_APP_URL to normalize trailing slashes/paths before comparing.
+    const origin = req.headers.get("origin");
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (origin && (appDomain || appUrl)) {
+      const allowedOrigins = new Set<string>();
+
+      if (appUrl) {
+        try {
+          const parsedAppUrl = new URL(appUrl);
+          allowedOrigins.add(parsedAppUrl.origin);
+        } catch {
+          // Ignore invalid NEXT_PUBLIC_APP_URL for origin comparison
+        }
+      }
+
+      if (appDomain) {
+        allowedOrigins.add(`https://${appDomain}`);
+        allowedOrigins.add(`http://${appDomain}`);
+      }
+
+      // Always allow localhost in development
+      if (process.env.NODE_ENV === "development") {
+        allowedOrigins.add("http://localhost:3000");
+        allowedOrigins.add("https://localhost:3000");
+      }
+
+      if (allowedOrigins.size > 0 && !allowedOrigins.has(origin)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     // Rate limiting per IP (default: 10 requests per 10 seconds, configurable)
     // (via RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW environment variables)
     const ip = getClientIp(req.headers);
@@ -20,12 +63,15 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const rateLimitResult = await syncRateLimiter.limit(ip);
+    const { success: rateLimitSuccess, reset: rateLimitReset } = await syncRateLimiter.limit(ip);
     
-    if (!rateLimitResult.success) {
+    if (!rateLimitSuccess) {
       return NextResponse.json(
         { error: "Rate limit exceeded" },
-        { status: 429 }
+        {
+          status: 429,
+          headers: { 'Retry-After': Math.max(0, Math.ceil((rateLimitReset - Date.now()) / 1000)).toString() },
+        }
       );
     }
 
@@ -68,7 +114,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const sanitizedEvents = events.map((event: any) => {
+    const sanitizedEvents = events.map((event: GA4Event) => {
       if (!event.name || typeof event.name !== 'string') {
         throw new Error('Invalid event name');
       }
@@ -80,7 +126,7 @@ export async function POST(req: NextRequest) {
       }
       
       // Sanitize event parameters
-      const sanitizedParams: Record<string, any> = {};
+      const sanitizedParams: Record<string, string | number | boolean> = {};
       if (event.params && typeof event.params === 'object') {
         for (const [key, value] of Object.entries(event.params)) {
           const sanitizedKey = key.slice(0, maxParamKeyLength);
@@ -122,7 +168,7 @@ export async function POST(req: NextRequest) {
         // Only allow string values for user properties (GA4 requirement)
         if (typeof value === 'string') {
           sanitizedUserProperties[sanitizedKey] = { value: value.slice(0, maxUserPropertyValueLength) };
-        } else if (typeof value === 'object' && value !== null && 'value' in value && typeof value.value === 'string') {
+        } else if (isGA4UserProperty(value)) {
           // Already in GA4 format
           sanitizedUserProperties[sanitizedKey] = { value: value.value.slice(0, maxUserPropertyValueLength) };
         }

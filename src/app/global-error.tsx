@@ -37,131 +37,62 @@ export default function GlobalError({
     window.location.href = "/";
   };
 
-  // Inline styles to avoid CSP issues in error boundary
-  const styles = `
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-            color: #fafafa;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-          }
-          .container {
-            max-width: 600px;
-            text-align: center;
-            padding: 2.5rem;
-            background: #18181b;
-            border-radius: 1rem;
-            border: 1px solid #27272a;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-          }
-          .icon-wrapper {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 80px;
-            height: 80px;
-            background: rgba(239, 68, 68, 0.15);
-            border-radius: 50%;
-            margin-bottom: 1.5rem;
-          }
-          .icon {
-            width: 40px;
-            height: 40px;
-            color: #ef4444;
-          }
-          h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-          }
-          p {
-            color: #a1a1aa;
-            margin-bottom: 2rem;
-            line-height: 1.6;
-          }
-          .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 2rem;
-          }
-          button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 500;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-            width: 100%;
-          }
-          .btn-primary {
-            background: #a855f7;
-            color: white;
-          }
-          .btn-primary:hover {
-            background: #9333ea;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(168, 85, 247, 0.3);
-          }
-          .btn-secondary {
-            background: transparent;
-            border: 1px solid #3f3f46;
-            color: #fafafa;
-          }
-          .btn-secondary:hover {
-            background: #27272a;
-            border-color: #52525b;
-          }
-          .icon-small {
-            width: 18px;
-            height: 18px;
-          }
-          @media (min-width: 640px) {
-            .button-group {
-              flex-direction: row;
-            }
-            button {
-              width: auto;
-              min-width: 140px;
-            }
-          }
-        `;
-
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Error - GhostClass</title>
-        <style dangerouslySetInnerHTML={{__html: styles}} />
       </head>
-      <body>
-        <div className="container">
-          <div className="icon-wrapper">
-            <AlertTriangle className="icon" />
+      <body style={{
+        margin: 0,
+        padding: '1rem',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+        color: '#fafafa',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+      }}>
+        <div style={{
+          maxWidth: '600px',
+          width: '100%',
+          textAlign: 'center',
+          padding: '2.5rem',
+          background: '#18181b',
+          borderRadius: '1rem',
+          border: '1px solid #27272a',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+          boxSizing: 'border-box',
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '80px',
+            height: '80px',
+            background: 'rgba(239, 68, 68, 0.15)',
+            borderRadius: '50%',
+            marginBottom: '1.5rem',
+          }}>
+            <AlertTriangle style={{ width: '40px', height: '40px', color: '#ef4444' }} />
           </div>
-          
-          <h1>Critical Error</h1>
-          
-          <p>
+
+          <h1 style={{
+            margin: '0 0 0.75rem',
+            fontSize: '2rem',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+            Critical Error
+          </h1>
+
+          <p style={{ color: '#a1a1aa', margin: '0 0 2rem', lineHeight: 1.6 }}>
             We encountered a critical error. This has been automatically reported to our team.
             You can try refreshing the page or return to the homepage.
           </p>
@@ -198,14 +129,55 @@ export default function GlobalError({
             </details>
           )}
 
-          <div className="button-group">
-            <button onClick={handleRefresh} className="btn-primary">
-              <RefreshCcw className="icon-small" />
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            marginTop: '2rem',
+            justifyContent: 'center',
+          }}>
+            <button
+              onClick={handleRefresh}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                fontSize: '1rem',
+                fontWeight: 500,
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                border: 'none',
+                minWidth: '140px',
+                background: '#a855f7',
+                color: 'white',
+              }}
+            >
+              <RefreshCcw style={{ width: '18px', height: '18px' }} />
               Try Again
             </button>
-            
-            <button onClick={handleGoHome} className="btn-secondary">
-              <Home className="icon-small" />
+
+            <button
+              onClick={handleGoHome}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                fontSize: '1rem',
+                fontWeight: 500,
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: '1px solid #3f3f46',
+                color: '#fafafa',
+                minWidth: '140px',
+              }}
+            >
+              <Home style={{ width: '18px', height: '18px' }} />
               Go Home
             </button>
           </div>

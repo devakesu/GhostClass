@@ -84,17 +84,27 @@ export default function ProfileClient() {
         toast.info("Compressing large image...", { duration: 2000 });
         try {
           const compressed = await compressImage(originalFile, 0.7);
-          // Recursive check: Compress harder if still > 5MB
-          fileToUpload = compressed.size > 5 * 1024 * 1024 
-            ? await compressImage(originalFile, 0.5) 
-            : compressed;
+          // Compress harder if first pass is still > 5MB
+          const bestCompressed =
+            compressed.size > 5 * 1024 * 1024
+              ? await compressImage(originalFile, 0.5)
+              : compressed;
+          // Final guard: reject cleanly if still over limit after best-effort compression
+          // rather than letting a 50 MB file reach Supabase and get a server error.
+          if (bestCompressed.size > 5 * 1024 * 1024) {
+            throw new Error(
+              "Image is too large to upload even after compression. Please choose a smaller image (under 5 MB)."
+            );
+          }
+          fileToUpload = bestCompressed;
         } catch (error) {
           logger.warn("Compression failed, falling back to original:", error);
           
           // Report non-fatal error to Sentry
           Sentry.captureException(error, { 
               tags: { type: "image_compression", location: "ProfileClient/handleFileChange" },
-              extra: { original_size: originalFile.size, user_id: redact("id", String(user?.id ?? "unknown")), file_name: originalFile.name }
+              // file_name omitted — original filenames are user PII (e.g. "john_doe_photo.jpg").
+              extra: { original_size: originalFile.size, user_id: redact("id", String(user?.id ?? "unknown")) }
           });
           toast.warning("Could not compress image. Uploading original.");
         }
@@ -121,7 +131,8 @@ export default function ProfileClient() {
       // Report fatal error to Sentry
       Sentry.captureException(error, {
           tags: { type: "avatar_upload", location: "ProfileClient/handleFileChange"  },
-          extra: { user_id: redact("id", String(user?.id ?? "unknown")), file_size: originalFile.size, file_name: originalFile.name}
+          // file_name omitted — original filenames are user PII (e.g. "john_doe_photo.jpg").
+          extra: { user_id: redact("id", String(user?.id ?? "unknown")), file_size: originalFile.size }
       });
 
     } finally {
@@ -224,7 +235,8 @@ export default function ProfileClient() {
 
                     {!isUploading && (
                         <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full border-[3px] border-background shadow-sm z-20 flex items-center justify-center">
-                            <Camera className="w-3.5 h-3.5" aria-label="Change avatar" />
+                            {/* Decorative icon — the parent button already has aria-label="Change profile picture". */}
+                            <Camera className="w-3.5 h-3.5" aria-hidden="true" />
                         </div>
                     )}
                   </div>
@@ -232,7 +244,11 @@ export default function ProfileClient() {
 
                 <div className="text-center md:text-left w-full flex flex-col gap-0.5 relative z-10">
                   <h3 className="text-lg md:text-xl font-semibold mt-2">
-                    {profile?.first_name} {profile?.last_name}
+                    {/* Fall back to username when both name fields are null/undefined so the
+                        heading is never empty (layout gap + inaccessible blank heading). */}
+                    {(profile?.first_name || profile?.last_name)
+                      ? `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim()
+                      : (user?.username ?? "Your Name")}
                   </h3>
                   <p className="text-muted-foreground text-sm lowercase font-medium">
                     @{user?.username}

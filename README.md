@@ -160,10 +160,12 @@ src/
 │   └── use-csrf-token.ts     # CSRF token management hook
 ├── lib/                      # Core library code
 │   ├── logic/                # Business logic
-│   │   └── bunk.ts           # Attendance calculation algorithm
+│   │   ├── bunk.ts                      # Attendance calculation algorithm
+│   │   ├── attendance-reconciliation.ts # EzyGo sync reconciliation logic
+│   │   └── index.ts                     # Export barrel
 │   ├── supabase/             # Supabase client configuration
 │   ├── security/             # Security utilities (CSRF, request signing)
-│   ├── email-templates/      # React Email templates
+│   ├── email-templates/      # React Email templates (conflict, mismatch, revision, contact)
 │   ├── __examples__/         # Usage examples
 │   ├── __tests__/            # Library tests
 │   ├── analytics.ts          # GA4 Measurement Protocol
@@ -180,6 +182,7 @@ src/
 │   ├── ratelimit.ts          # Upstash Redis rate limiting
 │   ├── redis.ts              # Redis client configuration
 │   ├── utils.ts              # Utility functions
+│   ├── utils.server.ts       # Server-only utility functions
 │   └── validate-env.ts       # Runtime environment validation
 ├── types/                    # TypeScript type definitions
 │   ├── index.ts              # Export barrel for all types
@@ -196,7 +199,10 @@ src/
 supabase/
 ├── config.toml               # Supabase local config
 └── migrations/               # Database schema migrations
-    └── 20260217174834_remote_schema.sql
+    ├── 20260217174834_remote_schema.sql       # Initial schema
+    ├── 20260221160000_encrypt_pii_fields.sql  # PII field encryption
+    ├── 20260221183457_revoke_anon_grants.sql  # Revoke anon role grants
+    └── README.md
 ```
 
 ## 🧮 Attendance Calculation Algorithm
@@ -459,7 +465,7 @@ This enables the service worker in development mode without requiring a producti
 ### Bundle Optimization
 
 - Tree-shaking for `lucide-react`, `date-fns`, `framer-motion`
-- Console logging preserved in production (keeps log/error/warn)
+- Console logging stripped in production (`log`/`info` removed; `error`/`warn` preserved)
 - Font optimization with `display: swap` (prevents FOIT)
 - Priority loading for critical images (logo, avatar)
 - Blur placeholders for instant image feedback
@@ -620,6 +626,7 @@ GhostClass uses a two-tier secret management strategy:
 
 - `ENCRYPTION_KEY` - AES-256-GCM encryption key
 - `CRON_SECRET` - Cron job authentication
+- `REQUEST_SIGNING_SECRET` - API request signature validation (anti-tampering; must be distinct from `ENCRYPTION_KEY`)
 - `SUPABASE_SERVICE_ROLE_KEY` - Admin database access
 - `UPSTASH_REDIS_REST_*` - Rate limiting credentials
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile validation

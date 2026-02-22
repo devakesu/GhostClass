@@ -42,7 +42,7 @@ export const Footer = ({ className }: { className?: string }) => {
 
   return (
     <footer className={cn(
-      "w-full py-6 mt-12 border-t border-border/40 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60",
+      "w-full pt-6 pb-12 md:pb-10 mt-12 border-t border-border/40 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60",
       className
     )} role="contentinfo" aria-label="Site footer">
       <div className="container px-4 md:px-8 flex flex-col-reverse md:flex-row justify-between items-center gap-y-6 gap-x-4 text-sm">
@@ -110,9 +110,10 @@ export const Footer = ({ className }: { className?: string }) => {
             <div className="flex items-center gap-1.5">
               <span>ver</span>
               <a
-                href={githubUrl ? `${githubUrl}/commit/${commitSha}` : "#"}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={githubUrl && commitSha !== "unknown" ? `${githubUrl}/commit/${commitSha}` : "#"}
+                {...(githubUrl && commitSha !== "unknown"
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
                 className="hover:text-primary transition-colors font-semibold"
                 aria-label={`View commit ${shortSha} on GitHub`}
               >

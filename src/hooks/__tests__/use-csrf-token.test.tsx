@@ -68,7 +68,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf/init')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
     })
 
     // Wait for setCsrfToken to be called with the token
@@ -162,7 +162,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf/init')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
     })
 
     // Wait a bit to ensure error handling completes
@@ -186,7 +186,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf/init')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
     })
 
     // Wait a bit to ensure error handling completes

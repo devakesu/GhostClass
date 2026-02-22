@@ -47,7 +47,7 @@ import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
-import { formatSessionName, generateSlotKey, normalizeSession, toRoman } from "@/lib/utils";
+import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate } from "@/lib/utils";
 
 interface AttendanceCalendarProps {
   attendanceData: AttendanceReport | undefined;
@@ -124,6 +124,15 @@ export function AttendanceCalendar({
   const { data: user } = useUser(); 
   const { refetch: refetchCount } = useTrackingCount(user);
   const { data: trackingData, refetch: refetchTrackData } = useTrackingData(user);
+
+  // Pre-normalize all tracker dates once so find()/some() callbacks are O(1) per item
+  // rather than calling normalizeToISODate() on every trackingData item for every calendar
+  // event on every render. Without this the hot path is O(events × trackingData). (L-D)
+  const normalizedTrackingData = useMemo(
+    () => (trackingData ?? []).map(t => ({ ...t, _isoDate: normalizeToISODate(t.date) })),
+    [trackingData]
+  );
+
   const { data: coursesData } = useFetchCourses(); 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const { data: semesterData } = useFetchSemester();
@@ -347,23 +356,18 @@ export function AttendanceCalendar({
   const getEventStatus = useCallback((date: Date): string | null => {
       const dateEvents = rawEvents.filter((event) => isSameDay(event.date, date));
       const dbDateStr = formatDateForDB(date);
-      const hasExtra = trackingData?.some(t => {
-         let tDate = t.date;
-         if (tDate.includes('T')) tDate = tDate.split('T')[0];
-         if (tDate.includes('/')) { const [d,m,y] = tDate.split('/'); tDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
-         return tDate === dbDateStr && t.status === 'extra' && t.semester === semesterData && t.year === academicYearData;
-      });
+      const hasExtra = normalizedTrackingData.some(t =>
+         t._isoDate === dbDateStr && t.status === 'extra' && t.semester === semesterData && t.year === academicYearData
+      );
 
       let hasAbsent = false;
       let hasLeave = false;
 
       dateEvents.forEach(ev => {
           const key = generateSlotKey(ev.courseId, date, ev.sessionName);
-          const override = trackingData?.find(t => {
-             let tDate = t.date;
-             if (tDate.includes('/')) { const [d,m,y] = tDate.split('/'); tDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
-             return tDate === dbDateStr && generateSlotKey(t.course, dbDateStr, t.session) === key;
-          });
+          const override = normalizedTrackingData.find(t =>
+             t._isoDate === dbDateStr && generateSlotKey(t.course, t._isoDate, t.session) === key
+          );
 
           let finalStatus = ev.status;
           if (override) {
@@ -380,7 +384,7 @@ export function AttendanceCalendar({
       if (hasAbsent) return "absent";
       if (hasLeave) return "dutyLeave";
       return "present";
-  }, [rawEvents, isSameDay, trackingData, semesterData, academicYearData]);
+  }, [rawEvents, isSameDay, normalizedTrackingData, semesterData, academicYearData]);
 
   // --- 2. MERGE LOGIC ---
   const selectedDateEvents = useMemo(() => {
@@ -400,12 +404,9 @@ export function AttendanceCalendar({
     const processedEvents = Array.from(officialsMap.values()).map(ev => {
         const key = generateSlotKey(ev.courseId, selectedDate, ev.sessionName);
 
-        const override = trackingData?.find(t => {
-            let tDate = t.date;
-            if (tDate.includes('/')) { const [d,m,y] = tDate.split('/'); tDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
-            
-            const isDateMatch = tDate === dbDateStr;
-            const isKeyMatch = generateSlotKey(t.course, t.date, t.session) === key;
+        const override = normalizedTrackingData.find(t => {
+            const isDateMatch = t._isoDate === dbDateStr;
+            const isKeyMatch = generateSlotKey(t.course, t._isoDate, t.session) === key;
             return isDateMatch && isKeyMatch;
         });
 
@@ -428,17 +429,14 @@ export function AttendanceCalendar({
     });
 
     // 3. Process Extras
-    if (trackingData) {
-        trackingData.forEach(t => {
+    if (normalizedTrackingData.length > 0) {
+        normalizedTrackingData.forEach(t => {
 
             if (t.semester !== semesterData || t.year !== academicYearData) {
               return;
             }
 
-            let tDate = t.date;
-            if (tDate.includes('/')) { const [d,m,y] = tDate.split('/'); tDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
-            
-            if (tDate === dbDateStr) {
+            if (t._isoDate === dbDateStr) {
                 const key = generateSlotKey(t.course, t.date, t.session);
                 
                 const alreadyMerged = processedEvents.some(ev => 
@@ -481,7 +479,7 @@ export function AttendanceCalendar({
     }
 
     return merged.sort((a, b) => getNormalizedSession(a.sessionName) - getNormalizedSession(b.sessionName));
-  }, [selectedDate, rawEvents, filter, trackingData, attendanceData, coursesData, semesterData, academicYearData, isSameDay]);
+  }, [selectedDate, rawEvents, filter, normalizedTrackingData, attendanceData, coursesData, semesterData, academicYearData, isSameDay]);
   
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const monthNames = useMemo(

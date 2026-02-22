@@ -12,6 +12,10 @@ import { logger } from "@/lib/logger";
 // This constant ensures consistency across different parts of the codebase
 export const DEFAULT_TARGET_PERCENTAGE = 75;
 
+// Shared error message for "no authenticated user" — used in mutationFn throw,
+// retry logic, and onError handler to avoid fragile string duplication.
+const NO_USER_ERROR_MESSAGE = "No user";
+
 // normalizeTarget is defined at module-level (outside the hook) to avoid recreation on every render.
 // This is preferred over useCallback because:
 // 1. The function has no dependencies (pure function with no closure over component state/props)
@@ -278,13 +282,13 @@ export function useUserSettings() {
     // Gate the query itself on a non-null userId so we never fetch for ["userSettings", null].
     enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
 
       const { data, error } = await supabase
         .from("user_settings")
         .select("bunk_calculator_enabled, target_percentage")
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) {
@@ -310,7 +314,7 @@ export function useUserSettings() {
       // currently provide specific error codes for "no user" scenarios, so string matching
       // is the most reliable method available. If Supabase adds error codes in the future,
       // this should be updated to use those instead (e.g., error.code === "NO_USER").
-      const isNoUserError = error instanceof Error && error.message === "No user";
+      const isNoUserError = error instanceof Error && error.message === NO_USER_ERROR_MESSAGE;
       return failureCount < 3 && !isNoUserError;
     }
   });
@@ -318,12 +322,12 @@ export function useUserSettings() {
   // 2. Mutation to update settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: { bunk_calculator_enabled?: boolean; target_percentage?: number }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error("No user");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error(NO_USER_ERROR_MESSAGE);
 
       const { data, error } = await supabase
         .from("user_settings")
-        .upsert({ user_id: session.user.id, ...newSettings })
+        .upsert({ user_id: user.id, ...newSettings })
         .select()
         .single();
 
@@ -335,10 +339,11 @@ export function useUserSettings() {
       // Mark that we're in a mutation window - prevents focus refetch from pulling stale data
       isMutatingRef.current = true;
       
-      // Derive userId from the same source as the mutation (getSession) to ensure
-      // cache updates happen even if currentUserIdRef is stale/null
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserId = session?.user?.id ?? null;
+      // Derive userId from the same source as the mutation (getUser) to ensure
+      // cache updates happen even if currentUserIdRef is stale/null.
+      // getUser() validates the session with the server (unlike getSession() which reads localStorage).
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id ?? null;
       
       // If no userId is available, we shouldn't proceed with cache operations
       if (!currentUserId) {
@@ -405,7 +410,7 @@ export function useUserSettings() {
         queryClient.setQueryData(["userSettings", context.currentUserId], context.previousSettings);
       }
       
-      if (err.message !== "No user") {
+      if (err.message !== NO_USER_ERROR_MESSAGE) {
         toast.error("Failed to save settings");
         Sentry.captureException(err, { tags: { type: "settings_update_error", location: "useUserSettings" } });
       }
@@ -438,10 +443,18 @@ export function useUserSettings() {
       // Check current mount state from closure to prevent race conditions
       if (!isMounted) return false;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        // Verify session exists, user matches, and component is still mounted (re-check after async)
-        return !!(session && session.user.id === expectedUserId && isMounted);
-      } catch {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          // Log at dev level so auth/network issues are diagnosable while still treating them as "no user"
+          logger.dev("Error fetching auth user in validateActiveSession:", error);
+          return false;
+        }
+        const user = data?.user;
+        // Verify user exists, matches, and component is still mounted (re-check after async)
+        return !!(user && user.id === expectedUserId && isMounted);
+      } catch (err) {
+        // Catch any unexpected thrown errors from the Supabase client
+        logger.dev("Unexpected error in validateActiveSession:", err);
         return false;
       }
     };
@@ -452,9 +465,9 @@ export function useUserSettings() {
       if (!isMounted) return;
 
       try {
-        // Get current user ID from auth session
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
+        // Get current user ID from auth (getUser() validates the token server-side)
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const userId = currentUser?.id;
         
         if (!userId) {
           logger.dev("No user ID available for storage sync, skipping");

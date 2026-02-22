@@ -6,8 +6,9 @@
  * 
  * Usage:
  * - logger.dev(): Development-only logs (suppressed in production)
- * - logger.warn(): Warnings (always logged)
- * - logger.error(): Errors (always logged)
+ * - logger.info(): Important production events (always logged via console.info)
+ * - logger.warn(): Warnings (always logged, suppressed in test)
+ * - logger.error(): Errors (always logged, suppressed in test)
  * 
  * NOTE: The isDevelopment check is evaluated once at module load time.
  * If NODE_ENV changes at runtime (uncommon but possible in certain deployment scenarios),
@@ -17,6 +18,9 @@
  */
 
 const isDevelopment = process.env.NODE_ENV === 'development';
+// Detect test environment via the VITEST env var (set automatically by Vitest runner).
+// NOTE: vitest.config.ts sets NODE_ENV='development' (not 'test') so we use VITEST instead.
+const isTest = !!process.env.VITEST;
 
 export const logger = {
   /**
@@ -30,26 +34,26 @@ export const logger = {
   },
 
   /**
-   * Warning messages - always logged
+   * Warning messages - always logged (suppressed in test to avoid noisy CI output)
    * Use for non-critical issues that should be investigated
    */
   warn: (...args: any[]) => {
-    console.warn(...args);
+    if (!isTest) console.warn(...args);
   },
 
   /**
-   * Error messages - always logged
+   * Error messages - always logged (suppressed in test to avoid noisy CI output)
    * Use for errors that need immediate attention
    */
   error: (...args: any[]) => {
-    console.error(...args);
+    if (!isTest) console.error(...args);
   },
 
   /**
-   * Info messages - always logged but less verbose
-   * Use for important production events
+   * Info messages - always logged for important production events
+   * Uses console.info (semantically distinct from logger.dev/console.log)
    */
   info: (...args: any[]) => {
-    console.log(...args);
+    console.info(...args);
   },
 };

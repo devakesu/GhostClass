@@ -186,7 +186,7 @@ describe('CircuitBreaker', () => {
       
       expect(status).toHaveProperty('state');
       expect(status).toHaveProperty('failures');
-      expect(status).toHaveProperty('lastFailTime');
+      expect(status).toHaveProperty('timeUntilReset');
       expect(status).toHaveProperty('successCount');
       expect(status).toHaveProperty('isOpen');
     });
@@ -216,7 +216,6 @@ describe('CircuitBreaker', () => {
       const status = ezygoCircuitBreaker.getStatus();
       expect(status.state).toBe('CLOSED');
       expect(status.failures).toBe(0);
-      expect(status.lastFailTime).toBe(0);
       expect(status.successCount).toBe(0);
     });
   });

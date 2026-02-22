@@ -2,6 +2,26 @@
  * Shared styles for email templates
  */
 
+/**
+ * Absolute URL for the app logo used in email headers.
+ * Email clients cannot resolve relative paths, so it must be a full URL.
+ * Falls back to an empty string for local dev/test where APP_URL may not be set.
+ */
+export const getLogoUrl = (): string => {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
+  if (appUrl) return `${appUrl}/logo.png`;
+  return "";
+};
+
+export const headerLogoStyle = {
+  display: "block",
+  margin: "0 auto",
+  width: "180px",
+  maxWidth: "100%",
+  height: "auto",
+  border: "0",
+} as const;
+
 export const emailStyles = {
   main: {
     fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -24,14 +44,6 @@ export const emailStyles = {
     background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
     padding: "32px 20px",
     textAlign: "center" as const,
-  },
-
-  headerText: {
-    color: "#ffffff",
-    margin: "0",
-    fontSize: "24px",
-    fontWeight: "700",
-    letterSpacing: "-0.5px",
   },
 
   content: {

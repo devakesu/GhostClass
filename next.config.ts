@@ -35,6 +35,21 @@ const withSerwist = withSerwistInit({
   cacheOnNavigation: true,
 });
 
+// Resolve the Supabase storage hostname at build time.
+// Throwing here makes missing NEXT_PUBLIC_SUPABASE_URL a hard build failure rather than
+// silently falling back to 'supabase.co', which would permit Next.js Image Optimization
+// to proxy images from *any* Supabase project.
+const supabaseImageHostname = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error(
+      '[next.config.ts] NEXT_PUBLIC_SUPABASE_URL is required at build time for ' +
+      'images.remotePatterns. Set it in your environment before running next build.'
+    );
+  }
+  return new URL(url).hostname;
+})();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   compress: true, // Enable gzip compression for better performance
@@ -61,7 +76,23 @@ const nextConfig: NextConfig = {
       },
       {
         key: "Permissions-Policy",
-        value: "camera=(), microphone=(), geolocation=()",
+        // Disable all hardware/sensor APIs and privacy-sensitive capabilities.
+        // interest-cohort=() opts the site out of Google's FLoC/Topics API.
+        value: [
+          "camera=()",
+          "microphone=()",
+          "geolocation=()",
+          "payment=()",
+          "usb=()",
+          "serial=()",
+          "bluetooth=()",
+          "accelerometer=()",
+          "gyroscope=()",
+          "magnetometer=()",
+          "autoplay=()",
+          "display-capture=()",
+          "interest-cohort=()",
+        ].join(", "),
       },
     ];
 
@@ -81,6 +112,21 @@ const nextConfig: NextConfig = {
         key: "Cross-Origin-Opener-Policy",
         value: "same-origin",
       });
+      // Prevents this page from loading cross-origin resources that don't opt in via CORP/CORS.
+      // 'credentialless' is chosen over 'require-corp' because Cloudflare Turnstile
+      // (challenges.cloudflare.com) serves its iframe without a CORP header; credentialless
+      // permits it while still enabling Spectre mitigations and completing the COOP/COEP pair.
+      headersList.push({
+        key: "Cross-Origin-Embedder-Policy",
+        value: "credentialless",
+      });
+      // Define the named reporting endpoint consumed by the CSP report-to directive.
+      // The endpoint /api/csp-report receives violation reports sent by the browser.
+      // report-to (Reporting API v1) and report-uri (legacy fallback) both point here.
+      headersList.push({
+        key: "Reporting-Endpoints",
+        value: 'csp-endpoint="/api/csp-report"',
+      });
     }
 
     return [
@@ -88,13 +134,13 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: headersList,
       },
-      // Cache fonts for 30 days (font files are not versioned/hashed, shorter cache prevents stale fonts)
+      // Cache fonts for 7 days with 30-day stale-while-revalidate (fonts are not content-hashed)
       {
         source: "/fonts/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=2592000",
+            value: "public, max-age=604800, stale-while-revalidate=2592000",
           },
         ],
       },
@@ -107,26 +153,61 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Prevent cross-origin reads of API JSON responses.
+      // Complements the existing CORS / origin-validation middleware without breaking
+      // same-origin fetch calls from the Next.js frontend.
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cross-Origin-Resource-Policy",
+            value: "same-origin",
+          },
+        ],
+      },
     ];
   },
 
   experimental: {
-    optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
+    optimizePackageImports: [
+      'lucide-react',
+      'date-fns',
+      'framer-motion',
+      'recharts',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-label',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-progress',
+      '@radix-ui/react-radio-group',
+      '@radix-ui/react-scroll-area',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+    ],
   },
 
   // Performance: Minimize JavaScript bundle
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn', 'log'], // Preserve console.log (used by logger.info()/logger.dev()), warn, and error
+      exclude: ['error', 'warn'], // Preserve console.error and console.warn; strip log/info from production
     } : false,
   },
   
   generateBuildId: async () => {
-    return process.env.APP_COMMIT_SHA ?? "dev";
+    // Prefer the commit SHA injected by CI/CD for stable, traceable build IDs.
+    // Fall back to a random UUID so that two builds without APP_COMMIT_SHA still get
+    // different IDs — preventing Next.js static-asset cache collisions across deployments.
+    return process.env.APP_COMMIT_SHA ?? crypto.randomUUID();
   },
 
   env: {
-    NEXT_PUBLIC_GIT_COMMIT_SHA: process.env.APP_COMMIT_SHA || "dev",
+    NEXT_PUBLIC_GIT_COMMIT_SHA: process.env.APP_COMMIT_SHA || "unknown",
   },
 
   images: {
@@ -134,7 +215,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : 'supabase.co',
+        hostname: supabaseImageHostname,
         port: '',
         pathname: '/storage/v1/object/public/**',
       },

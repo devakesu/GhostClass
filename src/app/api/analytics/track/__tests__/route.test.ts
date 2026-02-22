@@ -17,7 +17,7 @@ vi.mock("@/lib/ratelimit", () => ({
   },
 }));
 
-vi.mock("@/lib/utils", () => ({
+vi.mock("@/lib/utils.server", () => ({
   getClientIp: vi.fn().mockReturnValue("192.168.1.1"),
 }));
 
@@ -277,7 +277,7 @@ describe("Analytics API Route", () => {
 
   describe("IP Handling", () => {
     it("should reject request when IP cannot be determined", async () => {
-      const { getClientIp } = await import("@/lib/utils");
+      const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
 
       const req = createMockRequest({

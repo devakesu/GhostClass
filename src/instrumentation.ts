@@ -9,7 +9,7 @@ export async function register() {
       nextPhase === "phase-production-build" ||
       nextPhase === "phase-development-build";
 
-    if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
+    if (!isBuildPhase) {
       validateEnvironment();
     }
     await import("../sentry.server.config");

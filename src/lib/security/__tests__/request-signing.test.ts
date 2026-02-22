@@ -8,15 +8,15 @@ import {
 } from '../request-signing';
 
 describe('Request Signing', () => {
-  const originalEncryptionKey = process.env.ENCRYPTION_KEY;
+  const originalSigningSecret = process.env.REQUEST_SIGNING_SECRET;
 
   beforeEach(() => {
-    // Set a test encryption key
-    process.env.ENCRYPTION_KEY = 'a'.repeat(64); // 64 hex chars
+    // Set a test signing secret
+    process.env.REQUEST_SIGNING_SECRET = 'a'.repeat(64); // 64 hex chars
   });
 
   afterEach(() => {
-    process.env.ENCRYPTION_KEY = originalEncryptionKey;
+    process.env.REQUEST_SIGNING_SECRET = originalSigningSecret;
     vi.restoreAllMocks();
   });
 
@@ -58,13 +58,12 @@ describe('Request Signing', () => {
       expect(signature1).toBe(signature2);
     });
 
-    it('should throw error if ENCRYPTION_KEY is not set', () => {
-      delete process.env.ENCRYPTION_KEY;
+    it('should throw error if REQUEST_SIGNING_SECRET is not set', () => {
       delete process.env.REQUEST_SIGNING_SECRET;
 
       expect(() => {
         signRequest('payload', 1000);
-      }).toThrow('REQUEST_SIGNING_SECRET or ENCRYPTION_KEY must be configured for request signing');
+      }).toThrow('REQUEST_SIGNING_SECRET must be configured for request signing');
     });
   });
 

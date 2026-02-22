@@ -96,7 +96,7 @@ export async function setCsrfCookie(token: string): Promise<void> {
     name: CSRF_COOKIE_NAME,
     value: token,
     httpOnly: true, // Server-side validation token (not accessible to JavaScript)
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
     sameSite: "strict",
     maxAge: CSRF_COOKIE_MAX_AGE,
     path: "/",
@@ -141,8 +141,15 @@ export async function validateCsrfToken(requestToken: string | null | undefined)
 }
 
 /**
- * Initialize CSRF token - creates new token if none exists
- * WARNING: Can ONLY be called from Route Handlers or Server Actions
+ * Initialize CSRF token - creates new token if none exists.
+ * WARNING: Can ONLY be called from Route Handlers or Server Actions.
+ *
+ * M-δ: This function deliberately reuses an existing token for the session lifetime
+ * (CSRF_COOKIE_MAX_AGE). Callers that represent a significant privilege change
+ * (login, password change) should call regenerateCsrfToken() instead to bind the
+ * token to the new session. The POST /api/csrf endpoint exposes regenerateCsrfToken()
+ * for client-initiated rotation; logout already calls removeCsrfToken().
+ *
  * @returns The token (existing or newly created)
  */
 export async function initializeCsrfToken(): Promise<string> {

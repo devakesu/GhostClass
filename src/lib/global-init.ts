@@ -8,7 +8,8 @@ export function GlobalInit() {
   const { settings } = useUserSettings();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && settings) {
+    if (settings) {
+      // Enrich Sentry error reports with user preferences for better debugging context
       Sentry.setContext("user_preferences", { ...settings });
     }
   }, [settings]);

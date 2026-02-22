@@ -2,130 +2,29 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UserProfile } from "@/types";
-import axiosInstance from "@/lib/axios";
-import { createClient } from "@/lib/supabase/client";
 import * as Sentry from "@sentry/nextjs";
-import { redact } from "@/lib/utils";
-import { logger } from "@/lib/logger";
+import { getCsrfToken } from "@/lib/axios";
+import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 
 interface UpdateProfileData {
-  first_name?: string;
-  last_name?: string;
-  gender?: string;
-  birth_date?: string;
-}
-
-interface EzygoProfileData {
-  user_id: string | number;
-  username?: string;
-  email?: string;
-  mobile?: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  gender?: string;
-  sex?: string;
-  birth_date?: string;
-  dob?: string;
-  user?: {
-    username?: string;
-    email?: string;
-    mobile?: string;
-  };
+  first_name: string;
+  last_name?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
 }
 
 export const useProfile = (options?: { initialData?: UserProfile }) => {
-  const supabase = createClient();
-
   return useQuery<UserProfile | null>({
     queryKey: ["profile"],
     queryFn: async () => {
-      // 1. Get Current Auth User (Required)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // 2. Fetch Existing Supabase Profile (Local Source)
-      const { data: existingUser, error: dbError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-
-      if (dbError) {
-         Sentry.captureException(dbError, { tags: { type: "profile_local_fetch_error", location: "useProfile/queryFn" } });
+      const res = await fetch("/api/profile");
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(
+          json.error ?? "Failed to load profile data from remote source."
+        );
       }
-
-      // 3. Fetch Ezygo Data (Remote Source)
-      let ezygoData: EzygoProfileData | null = null;
-      try {
-        const ezygoRes = await axiosInstance.get<{ data?: EzygoProfileData } | EzygoProfileData>("/myprofile");
-        ezygoData = (ezygoRes.data as { data?: EzygoProfileData })?.data || (ezygoRes.data as EzygoProfileData);
-      } catch (err) {
-        logger.warn("Ezygo profile fetch failed, using local fallback.");
-        // Non-fatal error: Log to Sentry as warning but continue
-        Sentry.captureException(err, { tags: { type: "ezygo_profile_sync_fail", location: "useProfile/queryFn" } });
-      }
-
-      // 4. FALLBACK LOGIC: If Ezygo is down, fail instead of returning potentially stale local data
-      if (!ezygoData) {
-        Sentry.captureMessage("Failed to load fresh profile data from Ezygo; aborting to avoid serving stale data.", {
-          level: "error",
-          tags: { type: "profile_remote_unavailable", location: "useProfile/queryFn" },
-        });
-        throw new Error("Failed to load profile data from remote source.");
-      }
-
-      // 5. "Soft Sync" Logic
-      const resolve = (local: string | null | undefined, remote: string | number | null | undefined): string | null => {
-        if (local && local !== "" && local !== null) return local;
-        return remote ? String(remote) : null;
-      };
-
-      // Parse Names
-      let remoteFirst = ezygoData.first_name;
-      let remoteLast = ezygoData.last_name;
-      if (!remoteFirst && ezygoData.full_name) {
-        const parts = ezygoData.full_name.trim().split(" ");
-        remoteFirst = parts[0];
-        remoteLast = parts.slice(1).join(" ") || "";
-      }
-
-      const mergedData = {
-        // IDs and Auth Links (Hard Sync - Always overwrite)
-        id: ezygoData.user_id, // This links the tables
-        auth_id: user.id,
-        username: ezygoData.username || ezygoData.user?.username,
-        email: ezygoData.email || ezygoData.user?.email,
-        phone: ezygoData.mobile || ezygoData.user?.mobile,
-        
-        // Editable Profile Fields (Soft Sync - Preserve local edits)
-        first_name: resolve(existingUser?.first_name, remoteFirst),
-        last_name: resolve(existingUser?.last_name, remoteLast),
-        gender: resolve(existingUser?.gender, ezygoData.gender || ezygoData.sex),
-        birth_date: resolve(existingUser?.birth_date, ezygoData.birth_date || ezygoData.dob),
-        
-        // Avatar
-        avatar_url: existingUser?.avatar_url || null,
-        
-        // System fields
-        terms_version: existingUser?.terms_version,
-        terms_accepted_at: existingUser?.terms_accepted_at
-      };
-
-      // 6. Upsert to Database (Sync)
-      const { error: upsertError } = await supabase
-        .from("users")
-        .upsert(mergedData, { onConflict: "id" });
-
-      if (upsertError) {
-        logger.error("Profile Sync Error:", upsertError);
-        Sentry.captureException(upsertError, { 
-            tags: { type: "profile_upsert_fail", location: "useProfile/queryFn" },
-            extra: { userId: redact("id", String(mergedData.id)) }
-        });
-      }
-
-      return mergedData as UserProfile;
+      return res.json() as Promise<UserProfile>;
     },
     initialData: options?.initialData,
     // Cache for 5 mins to avoid spamming the sync logic
@@ -137,27 +36,23 @@ export const useProfile = (options?: { initialData?: UserProfile }) => {
 
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
-    mutationFn: async ({ data }: { id: number; data: UpdateProfileData }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data: updated, error } = await supabase
-        .from("users")
-        .update({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          gender: data.gender,
-          birth_date: data.birth_date,
-        })
-        .eq("auth_id", user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return updated;
+    mutationFn: async ({ data }: { data: UpdateProfileData }) => {
+      const csrfToken = getCsrfToken();
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Failed to update profile");
+      }
+      return res.json() as Promise<UpdateProfileData>;
     },
     // Optimistic Update: Update UI instantly
     // 1. SNAPSHOT & OPTIMISTIC UPDATE

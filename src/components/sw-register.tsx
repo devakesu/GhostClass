@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 
 /**
@@ -74,14 +75,42 @@ export function ServiceWorkerRegister() {
               newWorker.state === "installed" &&
               navigator.serviceWorker.controller
             ) {
-              // New service worker is available
+              // New service worker is installed and waiting to activate.
               logger.dev("New service worker available", {
                 context: "ServiceWorkerRegister",
               });
-              
-              // Optionally notify user about update
-              // For now, we use skipWaiting: false in sw.ts to prevent automatic updates
-              // Users can refresh to get the new version
+
+              // Notify the user that an update is ready.
+              // The action sends a SKIP_WAITING message to the waiting SW,
+              // which triggers activation; controllerchange fires when the
+              // new SW takes control, at which point we reload for a clean state.
+              let refreshing = false;
+              navigator.serviceWorker.addEventListener(
+                "controllerchange",
+                () => {
+                  if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                  }
+                },
+                { once: true }
+              );
+
+              toast("App updated — tap to refresh", {
+                description: "A new version of GhostClass is ready.",
+                duration: Infinity,
+                action: {
+                  label: "Refresh",
+                  onClick: () => {
+                    if (registration.waiting) {
+                      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+                    } else {
+                      // Waiting worker already activated; reload directly.
+                      window.location.reload();
+                    }
+                  },
+                },
+              });
             }
           });
         });

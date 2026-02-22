@@ -2,19 +2,20 @@
 //
 // NEXT.JS INLINE SCRIPT HANDLING:
 // Next.js App Router generates inline scripts for hydration and client-side navigation.
-// Without the deprecated middleware pattern, we cannot automatically inject nonces into these scripts.
-// Therefore, we use 'unsafe-inline' in script-src-elem to allow Next.js's internal scripts.
+// The root layout reads the per-request nonce from the x-nonce header (set by middleware)
+// so that Next.js's rendering pipeline can apply it to its own inline bootstrap scripts.
 //
 // CLOUDFLARE ZARAZ CSP INTEGRATION:
 // Cloudflare Zaraz can inject inline scripts for analytics and tracking.
-// Our 'unsafe-inline' directive in script-src-elem allows Zaraz scripts to execute.
+// Zaraz scripts that carry the per-request nonce attribute are permitted by the nonce directive.
 //
 // SECURITY POSTURE:
-// - script-src: Uses nonce + 'strict-dynamic' for dynamically loaded external scripts (strict)
-// - script-src-elem: Uses 'unsafe-inline' for inline scripts (allows Next.js hydration)
+// - script-src:      Uses nonce + 'strict-dynamic' for dynamically loaded external scripts (strict)
+// - script-src-elem: Uses nonce (CSP3) / 'unsafe-inline' CSP2-fallback for inline scripts
 // - External scripts: Restricted to explicitly whitelisted hosts only
-// - This maintains reasonable security while allowing Next.js and Cloudflare to function
+// - This maintains strong XSS protection while allowing Next.js and Cloudflare to function
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export const getCspHeader = (nonce?: string) => {
   // FORCE_STRICT_CSP / NEXT_PUBLIC_FORCE_STRICT_CSP
@@ -34,7 +35,15 @@ export const getCspHeader = (nonce?: string) => {
   const forceStrictCsp = /^(true|1|yes)$/i.test(forceStrictCspValue ?? "");
   const isActualProduction = process.env.NODE_ENV === "production";
   const isDev = !isActualProduction && !forceStrictCsp;
-  const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : "";
+  const supabaseOrigin = (() => {
+    const urlString = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!urlString) return "";
+    try {
+      return new URL(urlString).origin;
+    } catch {
+      return "";
+    }
+  })();
   
   // Supabase WebSocket URL for Realtime features
   const supabaseWsUrl = (() => {
@@ -48,7 +57,10 @@ export const getCspHeader = (nonce?: string) => {
       } else if (url.protocol === "http:") {
         url.protocol = "ws:";
       }
-      return url.toString();
+      // Use .origin (protocol + host + port only) — .toString() would include any
+      // path/query present in the env var, which browsers would not match as a
+      // connect-src WebSocket origin.
+      return url.origin;
     } catch {
       return "";
     }
@@ -66,6 +78,13 @@ export const getCspHeader = (nonce?: string) => {
       '3. Check that getCspHeader is called with the nonce parameter from headers ' +
       '4. Confirm middleware matcher includes the current route (see matcher config in src/proxy.ts)'
     );
+
+    // Alert Sentry so operators are paged — a plain logger.error is invisible
+    // outside the server log stream.
+    Sentry.captureException(
+      new Error('[CSP] Nonce missing in production — degraded to unsafe-inline'),
+      { level: 'fatal', tags: { type: 'csp_degraded', location: 'getCspHeader' } }
+    );
     
     // Fallback CSP for production when nonce is missing (not recommended, but better than crashing)
     // This uses 'unsafe-inline' which is less secure than nonce-based CSP
@@ -75,8 +94,9 @@ export const getCspHeader = (nonce?: string) => {
       style-src 'self' 'unsafe-inline';
       style-src-elem 'self' 'unsafe-inline';
       style-src-attr 'unsafe-inline';
-      img-src 'self' blob: data: ${supabaseOrigin};
+      img-src 'self' blob: data: ${supabaseOrigin} https://www.google-analytics.com https://stats.g.doubleclick.net;
       font-src 'self' data:;
+      object-src 'none';
       object-src 'none';
       base-uri 'self';
       form-action 'self';
@@ -93,6 +113,8 @@ export const getCspHeader = (nonce?: string) => {
         https://stats.g.doubleclick.net
         https://www.google-analytics.com
         https://analytics.google.com;
+      report-to csp-endpoint;
+      report-uri /api/csp-report;
       upgrade-insecure-requests;
     `.replace(/\s{2,}/g, ' ').trim();
   }
@@ -193,20 +215,26 @@ export const getCspHeader = (nonce?: string) => {
   // Here we intentionally avoid 'strict-dynamic' and instead rely on explicit host allowlisting
   // so that third-party scripts from Cloudflare can load.
   //
-  // CRITICAL: The nonce must NOT be placed in script-src-elem. When a nonce (or hash) is present
-  // in a directive, CSP3 browsers silently ignore 'unsafe-inline' in that same directive. Since
-  // Next.js App Router injects inline hydration scripts without nonce attributes, placing the
-  // nonce here would block all those inline scripts. The nonce lives in script-src only, where
-  // 'strict-dynamic' handles propagation to dynamically loaded scripts. script-src-elem uses
-  // 'unsafe-inline' to permit Next.js inline scripts and Cloudflare scripts, with external
-  // origins still restricted to the whitelisted hosts below.
+  // In production we use the same nonce + 'unsafe-inline' pattern as script-src:
+  //   - CSP Level 3 browsers: nonce is enforced; 'unsafe-inline' is silently ignored because
+  //     a nonce is present in the directive. Only scripts whose nonce attribute matches the
+  //     per-request nonce are allowed to execute, providing full XSS protection.
+  //   - CSP Level 2 browsers: 'unsafe-inline' acts as a backward-compatibility fallback.
+  // NOTE: The nonce is not forwarded to any <Script> component in the root layout. In CSP Level 3
+  // browsers this means such inline bootstrap scripts will *not* run unless they are moved to a
+  // location where Next.js applies the nonce or refactored into external files. In older CSP Level 2
+  // user agents, 'unsafe-inline' still acts as a fallback for those non-nonced inline scripts.
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
   const scriptSrcElemParts = isDev
     ? ["'self'", "'unsafe-inline'"]
     : (() => {
         const parts = [
           "'self'",
-          "'unsafe-inline'", // Effective because no nonce is present in this directive
+          `'nonce-${nonce}'`,
+          // 'unsafe-inline' is ignored by CSP3 browsers when a nonce is present.
+          // It remains here only as a CSP Level 2 backward-compatibility fallback,
+          // matching the same pattern used in script-src above.
+          "'unsafe-inline'",
           "https://challenges.cloudflare.com",
           "https://static.cloudflareinsights.com",
         ];
@@ -275,7 +303,7 @@ export const getCspHeader = (nonce?: string) => {
     `style-src ${styleSrcParts.join(" ")}`,
     `style-src-elem ${styleSrcElemParts.join(" ")}`,
     `style-src-attr ${styleSrcAttrParts.join(" ")}`,
-    `img-src ${["'self'", "blob:", "data:", supabaseOrigin].filter(Boolean).join(" ")}`,
+    `img-src ${["'self'", "blob:", "data:", supabaseOrigin, "https://www.google-analytics.com", "https://stats.g.doubleclick.net"].filter(Boolean).join(" ")}`,
     `font-src 'self' data:`,
     `media-src 'none'`,
     `manifest-src 'self'`,
@@ -286,6 +314,10 @@ export const getCspHeader = (nonce?: string) => {
     `frame-ancestors 'none'`,
     `worker-src 'self' blob:`,
     `connect-src ${connectSrcParts.join(" ")}`,
-    ...(isActualProduction ? ["upgrade-insecure-requests"] : []),
+    ...(isActualProduction ? [
+      `report-to csp-endpoint`,
+      `report-uri /api/csp-report`,
+      "upgrade-insecure-requests",
+    ] : []),
   ].join("; ");
 };

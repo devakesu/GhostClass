@@ -15,8 +15,10 @@ export function useTrackingCount(user: User | null | undefined) {
     queryKey: ["count", user?.username, semesterData, academicYearData],
     
     queryFn: async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return 0;
+      // getSession() reads the JWT from local storage — no network call.
+      // RLS on the tracker table validates the JWT server-side.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return 0;
 
       // Explicit null checks to prevent race conditions
       if (!semesterData || !academicYearData) {

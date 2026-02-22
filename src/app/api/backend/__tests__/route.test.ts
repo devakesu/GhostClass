@@ -22,8 +22,28 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
 
 describe('Backend Proxy Route', () => {
-  type ForwardHandler = typeof import('../[...path]/route')['forward'];
-  let forward: ForwardHandler;
+  type RouteModule = typeof import('../[...path]/route');
+  let GET: RouteModule['GET'];
+  let POST: RouteModule['POST'];
+  let PUT: RouteModule['PUT'];
+  let PATCH: RouteModule['PATCH'];
+  let DELETE: RouteModule['DELETE'];
+  let HEAD: RouteModule['HEAD'];
+
+  // Local helper that mirrors the old `forward(request, method, path)` call signature,
+  // routing each call to the corresponding exported HTTP handler.
+  async function forward(request: NextRequest, method: string, path: string[]): Promise<Response> {
+    const ctx = { params: Promise.resolve({ path }) };
+    switch (method.toUpperCase()) {
+      case 'GET':    return GET(request, ctx);
+      case 'POST':   return POST(request, ctx);
+      case 'PUT':    return PUT(request, ctx);
+      case 'PATCH':  return PATCH(request, ctx);
+      case 'DELETE': return DELETE(request, ctx);
+      case 'HEAD':   return HEAD(request, ctx);
+      default: throw new Error(`Unsupported method in test: ${method}`);
+    }
+  }
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -35,9 +55,14 @@ describe('Backend Proxy Route', () => {
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
     
     // Import module in beforeEach to ensure it uses the correct env vars
-    if (!forward) {
+    if (!GET) {
       const routeModule = await import('../[...path]/route');
-      forward = routeModule.forward;
+      GET = routeModule.GET;
+      POST = routeModule.POST;
+      PUT = routeModule.PUT;
+      PATCH = routeModule.PATCH;
+      DELETE = routeModule.DELETE;
+      HEAD = routeModule.HEAD;
     }
   });
 
@@ -99,6 +124,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       await forward(request, 'GET', ['users']);
@@ -209,7 +237,35 @@ describe('Backend Proxy Route', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should skip origin validation for GET requests', async () => {
+    it('should enforce origin validation for authenticated GET requests (SEC-04)', async () => {
+      // GET requests to non-public paths must include a valid Origin header.
+      // This prevents cross-origin data exfiltration (e.g. attendance records).
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        // No origin header
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+    });
+
+    it('should reject GET requests from unauthorized origins', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://evil.com',
+        },
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body.message).toBe('Origin not allowed. This endpoint only accepts requests from authorized domains.');
+    });
+
+    it('should accept GET requests from allowed origins', async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
@@ -217,9 +273,11 @@ describe('Backend Proxy Route', () => {
         })
       );
 
-      // GET request without origin should still work
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users']);
@@ -326,6 +384,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users/123', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users', '123']);
@@ -376,6 +437,9 @@ describe('Backend Proxy Route', () => {
 
         const request = new NextRequest('http://localhost:3000/api/backend/users', {
           method: 'GET',
+          headers: {
+            origin: 'http://localhost',
+          },
         });
 
         const responsePromise = forward(request, 'GET', ['users']);
@@ -402,6 +466,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users']);
@@ -433,6 +500,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users']);
@@ -462,6 +532,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users']);
@@ -490,6 +563,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       const response = await forward(request, 'GET', ['users']);
@@ -517,6 +593,9 @@ describe('Backend Proxy Route', () => {
 
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
       });
 
       await forward(request, 'GET', ['users']);

@@ -182,7 +182,7 @@ export async function fetchEzygoData<T>(
   endpoint: string,
   token: string,
   method: 'GET' | 'POST' = 'GET',
-  body?: any
+  body?: Record<string, unknown> | unknown[] | null
 ): Promise<T> {
   // Normalize endpoint for consistent cache key (remove leading slashes)
   const normalizedEndpoint = endpoint.replace(/^\/+/, '');

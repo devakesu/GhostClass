@@ -2,13 +2,17 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import { headers } from "next/headers";
-import { syncRateLimiter } from "@/lib/ratelimit";
-import { redact, getClientIp } from "@/lib/utils";
+import { contactRateLimiter } from "@/lib/ratelimit";
+import {
+  renderContactAdminEmail,
+  renderContactConfirmationEmail,
+} from "@/lib/email-templates";
+import { redact, getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
 
@@ -37,9 +41,12 @@ const contactSchema = z.object({
   token: z.string()
     .min(20, "Invalid CAPTCHA token"),
   
+  // .optional() removed — the CSRF token is mandatory. Marking it optional would
+  // mislead future readers into thinking omission is acceptable, and would silently pass
+  // Zod validation if the CSRF-check order were ever reversed (Zod-first, then
+  // validateCsrfToken), allowing token-free payloads through schema validation.
   csrf_token: z.string()
-    .min(1, "Missing CSRF token")
-    .optional(),
+    .min(1, "Missing CSRF token"),
 });
 
 // Sanitize HTML to prevent injection attacks while preserving safe formatting
@@ -63,38 +70,7 @@ const escapeHtml = (text: string) => {
     .replace(/'/g, "&#039;");
 };
 
-// --- EMAIL STYLES & COMPONENTS ---
-const BRAND_COLOR = "#7b75ff";
-const BG_COLOR = "#f9fafb";
-const CONTAINER_STYLE = `
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
-  background-color: ${BG_COLOR}; 
-  padding: 40px 20px;
-  line-height: 1.6;
-  color: #374151;
-`;
-const CARD_STYLE = `
-  max-width: 600px; 
-  margin: 0 auto; 
-  background-color: #ffffff; 
-  border-radius: 12px; 
-  overflow: hidden; 
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
-`;
-const HEADER_STYLE = `
-  background-color: ${BRAND_COLOR}; 
-  padding: 30px 40px; 
-  text-align: center;
-`;
-const BODY_STYLE = `padding: 40px;`;
-const FOOTER_STYLE = `
-  background-color: #f3f4f6; 
-  padding: 20px; 
-  text-align: center; 
-  font-size: 12px; 
-  color: #6b7280;
-`;
+
 
 /**
  * Gets the contact email address from environment variable.
@@ -113,7 +89,7 @@ const getContactEmail = () => {
   if (!appEmail) {
     throw new Error('NEXT_PUBLIC_APP_EMAIL is not configured');
   }
-  return 'contact' + appEmail;
+  return 'contact@' + appEmail.replace(/^@/, '');
 };
 
 /**
@@ -152,17 +128,16 @@ const getContactEmail = () => {
  */
 export async function submitContactForm(formData: FormData) {
 
-  // HONEYPOT CHECK (anti-bot)
+  // 1. Honeypot check (anti-bot)
   const honeypot = formData.get("website"); 
   if (honeypot) {
     logger.warn("Honeypot triggered");
     return { error: "Invalid submission" };
   }
 
-  // RATE LIMIT BY IP 
   const headerList = await headers();
 
-  // CSRF PROTECTION
+  // 2. CSRF validation
   // Validate CSRF token from FormData against cookie
   const csrfToken = formData.get("csrf_token") as string | null;
   const csrfValid = await validateCsrfToken(csrfToken);
@@ -175,7 +150,7 @@ export async function submitContactForm(formData: FormData) {
   // The framework automatically validates that requests come from the same origin.
   // We enforce additional origin validation below for defense-in-depth.
   
-  // Enforce origin validation for all requests (skip in development)
+  // 3. Origin validation — enforce for all requests (skip in development)
   if (process.env.NODE_ENV !== "development") {
     const origin = headerList.get("origin");
     const host = headerList.get("host");
@@ -196,6 +171,7 @@ export async function submitContactForm(formData: FormData) {
     }
   }
 
+  // 4. IP extraction and rate limiting
   const ip = getClientIp(headerList);
   if (!ip) {
     const relevantHeaders: Record<string, string | null> = {
@@ -214,7 +190,7 @@ export async function submitContactForm(formData: FormData) {
     return { error: "Unable to determine client IP" };
   }
 
-  const { success } = await syncRateLimiter.limit(`contact:${ip}`);
+  const { success } = await contactRateLimiter.limit(`contact:${ip}`);
   
   if (!success) {
     return { error: "Too many requests. Please try again later." };
@@ -229,7 +205,7 @@ export async function submitContactForm(formData: FormData) {
     csrf_token: formData.get("csrf_token"),
   };
 
-  // 1. Validate Input
+  // 5. Validate Input
   const result = contactSchema.safeParse(rawData);
   if (!result.success) {
     return { error: result.error.issues[0].message };
@@ -237,7 +213,7 @@ export async function submitContactForm(formData: FormData) {
   
   const { name, email, subject, message, token } = result.data;
 
-  // 2. Verify CAPTCHA
+  // 6. Verify CAPTCHA
   const verifyRes = await fetch(
     "https://challenges.cloudflare.com/turnstile/v0/siteverify",
     {
@@ -254,21 +230,20 @@ export async function submitContactForm(formData: FormData) {
     return { error: "CAPTCHA validation failed. Are you a robot?" };
   }
 
-  // 3. Get User Context (Read-Only check)
+  // 7. Get User Context (Read-Only check)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 4. Initialize Admin Client (Bypasses RLS for writing)
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // The contact_messages table has an open INSERT RLS policy ("Anyone can insert contact messages"
+  // WITH CHECK (true)), so no elevated privileges are needed for the insert. The admin client is
+  // only needed for the rollback DELETE, which has no per-user RLS policy.
+  const supabaseAdmin = getAdminClient();
 
   let insertedId: string | null = null;
 
   try {
-    // 5. Save to Database (Using ADMIN Client)
-    const { data: insertedMessage, error: dbError } = await supabaseAdmin
+    // 8. Save to Database (Using regular client — INSERT RLS policy is open to all)
+    const { data: insertedMessage, error: dbError } = await supabase
       .from("contact_messages")
       .insert({
         user_id: user?.id || null,
@@ -292,89 +267,34 @@ export async function submitContactForm(formData: FormData) {
     const safeEmail = escapeHtml(email);
     const userType = user ? "Registered User" : "Guest Visitor";
 
-    // 6. Send Notification to ADMIN
+    // 9. Send Notification to ADMIN
     const adminEmailResult = await sendEmail({
       to: getContactEmail(),
       subject: `[New Inquiry] ${safeSubject}`,
-      html: `
-        <div style="${CONTAINER_STYLE}">
-          <div style="${CARD_STYLE}">
-            <div style="${HEADER_STYLE}">
-              <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">New Contact Submission</h2>
-            </div>
-            <div style="${BODY_STYLE}">
-              <p style="margin-top: 0; color: #6b7280; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">Sender Details</p>
-              <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280; width: 100px;">Name:</td>
-                  <td style="padding: 8px 0; font-weight: 500; color: #111827;">${safeName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">Email:</td>
-                  <td style="padding: 8px 0; font-weight: 500; color: #111827;">
-                    <a href="mailto:${safeEmail}" style="color: ${BRAND_COLOR}; text-decoration: none;">${safeEmail}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">Status:</td>
-                  <td style="padding: 8px 0; font-weight: 500; color: #111827;">${userType}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">ID:</td>
-                  <td style="padding: 8px 0; font-family: monospace; color: #6b7280; font-size: 12px;">${insertedId}</td>
-                </tr>
-              </table>
-              
-              <div style="background-color: #f3f4f6; border-radius: 8px; padding: 25px; border-left: 4px solid ${BRAND_COLOR};">
-                <p style="margin-top: 0; color: #6b7280; font-size: 12px; font-weight: bold; text-transform: uppercase;">Subject: ${safeSubject}</p>
-                <div style="color: #374151; font-size: 16px;">${safeMessage}</div>
-              </div>
-            </div>
-            <div style="${FOOTER_STYLE}">
-              This is an automated notification from GhostClass System.
-            </div>
-          </div>
-        </div>
-      `,
+      html: renderContactAdminEmail({
+        name: safeName,
+        email: safeEmail,
+        subject: safeSubject,
+        message: safeMessage,
+        userType,
+        messageId: String(insertedId),
+      }),
     });
 
     if (!adminEmailResult || !adminEmailResult.success) {
       throw new Error(`Admin email failed: ${adminEmailResult?.error || "Unknown error"}`);
     }
 
-    // 7. Send Confirmation to USER
+    // 9b. Send Confirmation to USER
     try {
       await sendEmail({
         to: email,
         subject: `We received your message: ${safeSubject}`,
-        html: `
-          <div style="${CONTAINER_STYLE}">
-            <div style="${CARD_STYLE}">
-              <div style="${HEADER_STYLE}">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">GhostClass</h1>
-              </div>
-              <div style="${BODY_STYLE}">
-                <h3 style="margin-top: 0; color: #111827; font-size: 20px;">Hi ${safeName},</h3>
-                <p style="color: #4b5563; font-size: 16px;">
-                  Thanks for getting in touch! We've received your message and our team is looking into it. 
-                </p>
-                <p style="color: #4b5563; font-size: 16px;">
-                  We typically respond within 24-48 hours. In the meantime, here's a copy of what you sent:
-                </p>
-                
-                <div style="margin: 30px 0; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
-                  <p style="margin: 0 0 10px 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; font-weight: 600;">Subject: ${safeSubject}</p>
-                  <p style="margin: 0; color: #374151; font-style: italic;">"${safeMessage}"</p>
-                </div>
-
-                <p style="color: #4b5563; font-size: 16px;">Best regards,<br/><strong style="color: #111827;">The GhostClass Team</strong></p>
-              </div>
-              <div style="${FOOTER_STYLE}">
-                &copy; ${new Date().getFullYear()} GhostClass. All rights reserved.
-              </div>
-            </div>
-          </div>
-        `,
+        html: renderContactConfirmationEmail({
+          name: safeName,
+          subject: safeSubject,
+          message: safeMessage,
+        }),
       });
     } catch (confirmationError) {
       logger.warn("Failed to send user confirmation email:", confirmationError);
@@ -397,11 +317,14 @@ export async function submitContactForm(formData: FormData) {
         extra: { 
             email: redact("email", email),
             has_inserted_db: !!insertedId,
-            user_ip_truncated: ip.split('.').slice(0,3).join('.') + '.0',
+            // A truncated /24 prefix (e.g. "203.0.113.0") still PII-identifies a
+            // home broadband subnet. Use the same redact() hash used everywhere else;
+            // it is sufficient for Sentry correlation without exposing the raw IP.
+            user_ip: redact("id", ip),
         }
     });
 
-    // 8. ROLLBACK (Using Admin Client)
+    // ROLLBACK (Using Admin Client)
     if (insertedId) {
       logger.warn(`Rolling back: Deleting message ${insertedId}...`);
       

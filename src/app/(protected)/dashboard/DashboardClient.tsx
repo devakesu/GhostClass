@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { LazyMotion, domAnimation, m as motion } from "framer-motion";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
@@ -17,7 +17,6 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-// AttendanceCalendar is below-the-fold and heavy – load it lazily
 import { CourseCard } from "@/components/attendance/course-card";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useProfile } from "@/hooks/users/profile";
@@ -29,7 +28,7 @@ import {
   useSetSemester,
   useSetAcademicYear,
 } from "@/hooks/users/settings";
-import { generateSlotKey, redact } from "@/lib/utils";
+import { generateSlotKey } from "@/lib/utils";
 import { Loading as CompLoading } from "@/components/loading";
 import { useUser } from "@/hooks/users/user";
 import {
@@ -47,14 +46,14 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { calculateAttendance } from "@/lib/logic/bunk";
+import { ATTENDANCE_STATUS, isPositive } from "@/lib/logic/attendance-reconciliation";
+import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 import type {
   captureException as SentryCaptureException,
-  captureMessage as SentryCaptureMessage,
 } from "@sentry/nextjs";
 
 type CaptureExceptionContext = Parameters<typeof SentryCaptureException>[1];
-type CaptureMessageContext = Parameters<typeof SentryCaptureMessage>[1];
 
 // Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
 const captureSentryException = (error: unknown, context?: CaptureExceptionContext) => {
@@ -63,14 +62,6 @@ const captureSentryException = (error: unknown, context?: CaptureExceptionContex
     .catch((importError) => {
       console.error("[Sentry] Failed to load SDK for captureException:", importError);
       console.error("[Sentry] Original error:", error);
-    });
-};
-const captureSentryMessage = (message: string, context?: CaptureMessageContext) => {
-  void import("@sentry/nextjs")
-    .then(({ captureMessage }) => captureMessage(message, context))
-    .catch((importError) => {
-      console.error("[Sentry] Failed to load SDK for captureMessage:", importError);
-      console.error("[Sentry] Original message:", message);
     });
 };
 
@@ -96,20 +87,11 @@ const AttendanceCalendar = dynamic(
   }
 );
 
-// --- Types & Constants ---
-const ATTENDANCE_STATUS = {
-  PRESENT: 110,
-  ABSENT: 111,
-  DUTY_LEAVE: 225,
-  OTHER_LEAVE: 112,
-};
-
 // --- Helper Functions ---
-const isPositive = (code: number): boolean => {
-  return code === ATTENDANCE_STATUS.PRESENT || code === ATTENDANCE_STATUS.DUTY_LEAVE;
-};
+// ATTENDANCE_STATUS and isPositive are imported from @/lib/logic/attendance-reconciliation.
 
-const getOfficialSessionRaw = (session: any, sessionKey: string | number): string | number => {
+/** Returns the canonical session identifier from an EzyGo session object. */
+const getOfficialSessionRaw = (session: { session?: string | number | null }, sessionKey: string | number): string | number => {
   if (session && session.session != null && session.session !== "") {
     return session.session;
   }
@@ -325,95 +307,34 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     }
   }, [academicYearData, isLoadingAcademicYear, isAcademicYearError, getDefaultDefaults, setAcademicYearMutation, refetchCourses, refetchAttendance]);
   
-  // --- SYNC ---
-  const mountId = useRef(Math.random().toString(36));
-  const lastSyncMountId = useRef<string | null>(null);
-
-  // --- SYNC ---
-  useEffect(() => {
-    // 1. Wait until user is loaded and initial data fetch is complete
-    if (!user?.username || isLoadingAttendance || isLoadingTracking) {
-        return;
-    }
-
-    // 2. Check if sync already ran for THIS mount
-    if (lastSyncMountId.current === mountId.current) {
-        return;
-    }
-
-    const abortController = new AbortController();
-    let isCleanedUp = false;
-
-    const performSync = async () => {
-        try {
-            const res = await fetch(`/api/cron/sync?username=${user.username}`, {
-                signal: abortController.signal
-            });
-
-            const data = await res.json();
-
-            // Only process if not cleaned up
-            if (isCleanedUp) return;
-
-            // Handle different response status codes
-            if (res.status === 207) {
-                toast.warning("Partial Sync Completed", {
-                    description: "Some attendance data couldn't be synced. Your dashboard may be incomplete."
-                });
-                
-                captureSentryMessage("Partial sync failure in dashboard", {
-                    level: "warning",
-                    tags: { type: "dashboard_partial_sync", location: "DashboardClient/useEffect/performSync" },
-                    extra: { userId: redact("id", String(user?.id)), response: data }
-                });
-                
-                await Promise.all([
-                    refetchTracking(),
-                    refetchAttendance(),
-                    queryClient.invalidateQueries({ queryKey: ["notifications"] })
-                ]);
-            } else if (!res.ok) {
-                throw new Error(`Sync API responded with status: ${res.status}`);
-            } else if (data.success && (data.deletions > 0 || data.conflicts > 0 || data.updates > 0)) {
-                toast.info("Attendance Synced", {
-                    description: `Dashboard updated. ${data.deletions + data.updates} records synced.`
-                });
-                
-                await Promise.all([
-                    refetchTracking(),
-                    refetchAttendance(),
-                    queryClient.invalidateQueries({ queryKey: ["notifications"] })
-                ]);
-            }
-        } catch (error: any) {
-            if (error.name === 'AbortError') return;
-
-            logger.error("Background sync failed", error);
-            
-            captureSentryException(error, {
-                tags: { type: "background_sync", location: "DashboardClient/useEffect/performSync" },
-                extra: { userId: redact("id", String(user?.id)) }
-            });
-        } finally {
-            if (!isCleanedUp) {
-                lastSyncMountId.current = mountId.current;
-            }
-        }
-    };
-
-    performSync();
-
-    return () => {
-      isCleanedUp = true;
-      abortController.abort();
-    };
-
-  }, [user?.id, user?.username, isLoadingAttendance, isLoadingTracking, refetchTracking, refetchAttendance, queryClient]);
-
-  // Reset mountId on navigation
-  useEffect(() => {
-    mountId.current = Math.random().toString(36);
-  }, []);
+  // --- SYNC ON MOUNT ---
+  useSyncOnMount({
+    username: user?.username,
+    userId: user?.id,
+    enabled: !isLoadingAttendance && !isLoadingTracking,
+    sentryLocation: "DashboardClient",
+    sentryTag: "background_sync",
+    onPartialSync: async () => {
+      toast.warning("Partial Sync Completed", {
+        description: "Some attendance data couldn't be synced. Your dashboard may be incomplete.",
+      });
+      await Promise.all([
+        refetchTracking(),
+        refetchAttendance(),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+    },
+    onSuccess: async (data) => {
+      toast.info("Attendance Synced", {
+        description: `Dashboard updated. ${(data.deletions ?? 0) + (data.updates ?? 0)} records synced.`,
+      });
+      await Promise.all([
+        refetchTracking(),
+        refetchAttendance(),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+    },
+  });
 
   // CALCULATE ACTIVE COURSES (Courses with at least 1 record)
   const activeCourseCount = useMemo(() => {
@@ -456,14 +377,15 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
   const filteredChartData = useMemo(() => {
     if (!attendanceData) return undefined;
-    const newData = JSON.parse(JSON.stringify(attendanceData));
-    
+    // structuredClone is native and faster than JSON.parse(JSON.stringify()).
+    const newData = structuredClone(attendanceData);
+
     if (newData.studentAttendanceData) {
       Object.keys(newData.studentAttendanceData).forEach(date => {
         const sessions = { ...newData.studentAttendanceData[date] };
         let modified = false;
         Object.keys(sessions).forEach(sessionKey => {
-          if ((sessions[sessionKey] as any).class_type === "Revision") {
+          if (sessions[sessionKey].class_type === "Revision") {
             delete sessions[sessionKey];
             modified = true;
           }
@@ -489,7 +411,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     const officialMap = new Map<string, number>();
     if (attendanceData?.studentAttendanceData) {
       Object.entries(attendanceData.studentAttendanceData).forEach(([dateStr, dateData]) => {
-        Object.entries(dateData as any).forEach(([sessionKey, session]: [string, any]) => {
+        Object.entries(dateData).forEach(([sessionKey, session]) => {
           if (session.course && session.class_type !== "Revision") {
             const cid = String(session.course);
             const status = Number(session.attendance);

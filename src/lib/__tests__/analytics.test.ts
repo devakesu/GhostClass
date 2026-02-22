@@ -5,6 +5,16 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { getOrCreateClientId } from "../analytics";
 
+// Stable mock reference for ga4Collect — defined via vi.hoisted so it is
+// available inside the vi.mock factory and persists across vi.resetModules() calls.
+const mockGa4Collect = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+// Mock ga4-collect so analytics.ts unit tests are decoupled from the GA URL
+// and from GA_API_SECRET. The secret and URL are tested in ga4-collect's own tests.
+vi.mock("@/lib/ga4-collect", () => ({
+  ga4Collect: mockGa4Collect,
+}));
+
 // Mock the logger
 vi.mock("@/lib/logger", () => ({
   logger: {
@@ -80,8 +90,8 @@ describe("Analytics Library", () => {
 
   describe("trackGA4Event", () => {
     beforeEach(() => {
-      // Mock fetch globally
-      global.fetch = vi.fn();
+      mockGa4Collect.mockClear();
+      mockGa4Collect.mockResolvedValue(undefined);
       vi.resetModules();
     });
 
@@ -92,39 +102,31 @@ describe("Analytics Library", () => {
 
     it("should skip tracking when GA_MEASUREMENT_ID is not configured", async () => {
       vi.stubEnv('NEXT_PUBLIC_GA_ID', undefined);
-      vi.stubEnv('GA_API_SECRET', undefined);
 
       // Re-import to get fresh module with updated env vars
       const { trackGA4Event } = await import("../analytics");
       
       await trackGA4Event("test-client-id", [{ name: "test_event" }]);
       
-      expect(global.fetch).not.toHaveBeenCalled();
+      // analytics.ts guards on GA_MEASUREMENT_ID before delegating to ga4Collect
+      expect(mockGa4Collect).not.toHaveBeenCalled();
     });
 
     it("should skip tracking in development environment", async () => {
       vi.stubEnv('NODE_ENV', 'development');
       vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TEST123');
-      vi.stubEnv('GA_API_SECRET', 'test-secret');
 
       // Re-import to get fresh module
       const { trackGA4Event } = await import("../analytics");
       
       await trackGA4Event("test-client-id", [{ name: "test_event" }]);
       
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockGa4Collect).not.toHaveBeenCalled();
     });
 
-    it("should send events to GA4 Measurement Protocol in production", async () => {
+    it("should delegate to ga4Collect with correct measurement ID and payload in production", async () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TEST123');
-      vi.stubEnv('GA_API_SECRET', 'test-secret');
-
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-      });
-      global.fetch = mockFetch;
 
       // Re-import to get fresh module
       const { trackGA4Event } = await import("../analytics");
@@ -135,33 +137,30 @@ describe("Analytics Library", () => {
       
       await trackGA4Event("test-client-id", testEvents, { user_id: { value: "user-123" } });
       
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://www.google-analytics.com/mp/collect?measurement_id=G-TEST123&api_secret=test-secret",
-        expect.objectContaining({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            client_id: "test-client-id",
-            events: testEvents,
-            user_properties: { user_id: { value: "user-123" } },
-          }),
-        })
+      expect(mockGa4Collect).toHaveBeenCalledTimes(1);
+      // analytics.ts must pass the measurement ID and full payload to ga4Collect.
+      // GA_API_SECRET is NOT involved here — it is handled exclusively by ga4-collect.ts.
+      expect(mockGa4Collect).toHaveBeenCalledWith(
+        "G-TEST123",
+        {
+          client_id: "test-client-id",
+          events: testEvents,
+          user_properties: { user_id: { value: "user-123" } },
+        },
+        expect.any(AbortSignal)
       );
     });
 
-    it("should handle fetch errors gracefully", async () => {
+    it("should handle ga4Collect errors gracefully", async () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TEST123');
-      vi.stubEnv('GA_API_SECRET', 'test-secret');
 
-      const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
-      global.fetch = mockFetch;
+      mockGa4Collect.mockRejectedValueOnce(new Error("Network error"));
 
       // Re-import to get fresh module
       const { trackGA4Event } = await import("../analytics");
       
-      // Should not throw
+      // Should not throw — analytics.ts catches errors from ga4Collect
       await expect(
         trackGA4Event("test-client-id", [{ name: "test_event" }])
       ).resolves.not.toThrow();
@@ -170,7 +169,8 @@ describe("Analytics Library", () => {
 
   describe("trackPageView", () => {
     beforeEach(() => {
-      global.fetch = vi.fn();
+      mockGa4Collect.mockClear();
+      mockGa4Collect.mockResolvedValue(undefined);
       vi.resetModules();
     });
 
@@ -182,13 +182,6 @@ describe("Analytics Library", () => {
     it("should format page view event correctly", async () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TEST123');
-      vi.stubEnv('GA_API_SECRET', 'test-secret');
-
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-      });
-      global.fetch = mockFetch;
 
       // Re-import to get fresh module
       const { trackPageView } = await import("../analytics");
@@ -203,29 +196,21 @@ describe("Analytics Library", () => {
         "user-123"
       );
       
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const callArgs = mockFetch.mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      expect(mockGa4Collect).toHaveBeenCalledTimes(1);
+      const [, payload] = mockGa4Collect.mock.calls[0];
       
-      expect(body.client_id).toBe("test-client-id");
-      expect(body.events).toHaveLength(1);
-      expect(body.events[0].name).toBe("page_view");
-      expect(body.events[0].params.page_location).toBe("https://example.com/page");
-      expect(body.events[0].params.page_title).toBe("Test Page");
-      expect(body.events[0].params.page_referrer).toBe("https://example.com/");
-      expect(body.user_properties).toEqual({ user_id: { value: "user-123" } });
+      expect(payload.client_id).toBe("test-client-id");
+      expect(payload.events).toHaveLength(1);
+      expect(payload.events[0].name).toBe("page_view");
+      expect(payload.events[0].params.page_location).toBe("https://example.com/page");
+      expect(payload.events[0].params.page_title).toBe("Test Page");
+      expect(payload.events[0].params.page_referrer).toBe("https://example.com/");
+      expect(payload.user_properties).toEqual({ user_id: { value: "user-123" } });
     });
 
     it("should omit user properties when userId is not provided", async () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TEST123');
-      vi.stubEnv('GA_API_SECRET', 'test-secret');
-
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-      });
-      global.fetch = mockFetch;
 
       // Re-import to get fresh module
       const { trackPageView } = await import("../analytics");
@@ -234,10 +219,8 @@ describe("Analytics Library", () => {
         page_location: "https://example.com/page",
       });
       
-      const callArgs = mockFetch.mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
-      
-      expect(body.user_properties).toBeUndefined();
+      const [, payload] = mockGa4Collect.mock.calls[0];
+      expect(payload.user_properties).toBeUndefined();
     });
   });
 });

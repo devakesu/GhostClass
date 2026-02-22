@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, toRoman, normalizeSession, generateSlotKey, formatSessionName, getSessionNumber, formatCourseCode, normalizeDate, redact, getClientIp } from '@/lib/utils'
+import { cn, toRoman, normalizeSession, generateSlotKey, formatSessionName, getSessionNumber, formatCourseCode, normalizeDate, redact, normalizeToISODate } from '@/lib/utils'
 
 describe('Utils', () => {
   describe('cn', () => {
@@ -107,6 +107,37 @@ describe('Utils', () => {
     })
   })
 
+  describe('normalizeToISODate', () => {
+    it('should strip time part from ISO datetime strings', () => {
+      expect(normalizeToISODate('2024-01-15T10:30:00Z')).toBe('2024-01-15')
+      expect(normalizeToISODate('2024-01-15T00:00:00.000Z')).toBe('2024-01-15')
+    })
+
+    it('should convert DD/MM/YYYY to YYYY-MM-DD', () => {
+      expect(normalizeToISODate('15/01/2024')).toBe('2024-01-15')
+      expect(normalizeToISODate('01/02/2026')).toBe('2026-02-01')
+    })
+
+    it('should pad single-digit day and month', () => {
+      expect(normalizeToISODate('5/3/2024')).toBe('2024-03-05')
+    })
+
+    it('should return already-normalized YYYY-MM-DD strings unchanged', () => {
+      expect(normalizeToISODate('2024-01-15')).toBe('2024-01-15')
+    })
+
+    it('should return empty string for empty input', () => {
+      expect(normalizeToISODate('')).toBe('')
+    })
+
+    it('should return the original string unchanged for malformed slash-separated input', () => {
+      // Only two parts — not DD/MM/YYYY
+      expect(normalizeToISODate('15/01')).toBe('15/01')
+      // Empty part
+      expect(normalizeToISODate('15//2024')).toBe('15//2024')
+    })
+  })
+
   describe('normalizeDate', () => {
     it('should format Date objects to YYYYMMDD', () => {
       const date = new Date(2026, 0, 27) // January 27, 2026
@@ -181,60 +212,6 @@ describe('Utils', () => {
       
       // Different values should produce different hashes
       expect(hash1).not.toBe(hash2)
-    })
-  })
-
-  describe('getClientIp', () => {
-    it('should return IP from cf-connecting-ip header', () => {
-      const headers = new Headers()
-      headers.set('cf-connecting-ip', '1.2.3.4')
-      
-      expect(getClientIp(headers)).toBe('1.2.3.4')
-    })
-
-    it('should return IP from x-real-ip header when cf-connecting-ip is not present', () => {
-      const headers = new Headers()
-      headers.set('x-real-ip', '5.6.7.8')
-      
-      expect(getClientIp(headers)).toBe('5.6.7.8')
-    })
-
-    it('should return IP from x-forwarded-for header when others are not present', () => {
-      const headers = new Headers()
-      headers.set('x-forwarded-for', '9.10.11.12, 192.168.1.1')
-      
-      expect(getClientIp(headers)).toBe('9.10.11.12')
-    })
-
-    it('should prioritize cf-connecting-ip over other headers', () => {
-      const headers = new Headers()
-      headers.set('cf-connecting-ip', '1.2.3.4')
-      headers.set('x-real-ip', '5.6.7.8')
-      headers.set('x-forwarded-for', '9.10.11.12')
-      
-      expect(getClientIp(headers)).toBe('1.2.3.4')
-    })
-
-    it('should prioritize x-real-ip over x-forwarded-for', () => {
-      const headers = new Headers()
-      headers.set('x-real-ip', '5.6.7.8')
-      headers.set('x-forwarded-for', '9.10.11.12')
-      
-      expect(getClientIp(headers)).toBe('5.6.7.8')
-    })
-
-    it('should trim whitespace from IP addresses', () => {
-      const headers = new Headers()
-      headers.set('cf-connecting-ip', '  1.2.3.4  ')
-      
-      expect(getClientIp(headers)).toBe('1.2.3.4')
-    })
-
-    it('should handle x-forwarded-for with multiple IPs and trim', () => {
-      const headers = new Headers()
-      headers.set('x-forwarded-for', ' 9.10.11.12 , 192.168.1.1 ')
-      
-      expect(getClientIp(headers)).toBe('9.10.11.12')
     })
   })
 })

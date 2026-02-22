@@ -5,7 +5,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 1.8.7
+  version: 1.9.0
   description: |
     **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
     

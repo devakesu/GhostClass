@@ -45,9 +45,6 @@ export async function GET() {
       state: circuitBreakerStatus.state,
       failures: circuitBreakerStatus.failures,
       isOpen: circuitBreakerStatus.isOpen,
-      lastFailTime: circuitBreakerStatus.lastFailTime 
-        ? new Date(circuitBreakerStatus.lastFailTime).toISOString() 
-        : null,
     },
   } : basePayload;
   

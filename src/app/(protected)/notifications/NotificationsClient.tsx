@@ -7,6 +7,7 @@ import { useUser } from "@/hooks/users/user";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { CaptureContext } from "@sentry/core";
+
 // Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
 const captureSentryException = (error: unknown, context?: CaptureContext) => {
   void import("@sentry/nextjs")
@@ -14,14 +15,6 @@ const captureSentryException = (error: unknown, context?: CaptureContext) => {
     .catch((importError) => {
       console.error("[Sentry] Failed to load SDK for captureException:", importError);
       console.error("[Sentry] Original error:", error);
-    });
-};
-const captureSentryMessage = (message: string, context?: CaptureContext) => {
-  void import("@sentry/nextjs")
-    .then(({ captureMessage }) => captureMessage(message, context))
-    .catch((importError) => {
-      console.error("[Sentry] Failed to load SDK for captureMessage:", importError);
-      console.error("[Sentry] Original message:", message);
     });
 };
 import { toast } from "sonner";
@@ -34,6 +27,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { cn, redact } from "@/lib/utils";
 import { Loading } from "@/components/loading";
+import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 const getNotificationIcon = (topic?: string) => {
   if (topic?.includes("sync")) return { icon: RefreshCcw, color: "text-green-500", bg: "bg-green-500/10" };
@@ -103,9 +97,7 @@ export default function NotificationsPage() {
   const { data: user } = useUser();
   const parentRef = useRef<HTMLDivElement>(null);
   
-  // Use mountId-based sync logic
-  const mountId = useRef(Math.random().toString(36));
-  const lastSyncMountId = useRef<string | null>(null);
+  // Use mountId-based sync logic (now managed inside useSyncOnMount)
 
   const { 
     actionNotifications, 
@@ -120,8 +112,24 @@ export default function NotificationsPage() {
   } = useNotifications(true);
 
   const [readingId, setReadingId] = useState<number | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncCompleted, setSyncCompleted] = useState(false);
+
+  // Sync attendance data on mount; deduplication handled by the hook.
+  const { isSyncing, syncCompleted } = useSyncOnMount({
+    username: user?.username,
+    userId: user?.id,
+    sentryLocation: "NotificationsClient",
+    sentryTag: "notification_sync",
+    onPartialSync: async () => {
+      toast.warning("Partial Sync Completed", {
+        description: "Some notifications couldn't be synced. Your notification list may be incomplete.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onSuccess: async () => {
+      toast.info("Notifications Updated", { description: "New attendance data found." });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
 
   // BUILD VIRTUAL LIST WITH HEADERS
   const virtualItems = useMemo<VirtualItem[]>(() => {
@@ -204,98 +212,6 @@ export default function NotificationsPage() {
     rowVirtualizer,
   ]);
 
-  // SYNC ON MOUNT (with mountId-based deduplication)
-  useEffect(() => {
-    if (!user?.username) {
-      // User is loaded but has no username – skip sync so page can render
-      if (user?.id) setSyncCompleted(true);
-      return;
-    }
-
-    // Check if sync already ran for THIS mount
-    if (lastSyncMountId.current === mountId.current) {
-      logger.dev('[Notifications] Sync already completed for this mount, skipping');
-      setSyncCompleted(true);
-      return;
-    }
-
-    const abortController = new AbortController();
-    let isCleanedUp = false;
-
-    const syncNotifications = async () => {
-      logger.dev('[Notifications] Starting sync for mount:', mountId.current);
-      setIsSyncing(true);
-
-      try {
-        const res = await fetch(`/api/cron/sync?username=${user.username}`, {
-          signal: abortController.signal
-        });
-
-        const data = await res.json();
-
-        // Only process if not cleaned up
-        if (isCleanedUp) return;
-
-        // Handle different response status codes
-        if (res.status === 207) {
-          // Partial failure: Some records synced, some failed
-          toast.warning("Partial Sync Completed", {
-            description: "Some notifications couldn't be synced. Your notification list may be incomplete."
-          });
-          
-          captureSentryMessage("Partial sync failure in notifications", {
-            level: "warning",
-            tags: { type: "notification_partial_sync", location: "NotificationsClient/useEffect/syncNotifications" },
-            extra: { userId: redact("id", String(user?.id)), response: data }
-          });
-          
-          // Still invalidate queries as partial sync may have updated some records
-          queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        } else if (!res.ok) {
-          // Complete failure (500 or other error codes)
-          throw new Error(`Sync failed with status: ${res.status}`);
-        } else if (data.success && (data.deletions > 0 || data.conflicts > 0 || data.updates > 0)) {
-          // Success with changes
-          toast.info("Notifications Updated", { description: "New attendance data found." });
-          queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          logger.dev('[Notifications] Sync request aborted');
-          return;
-        }
-        
-        if (process.env.NODE_ENV === 'development') {
-          logger.error("Notification background sync failed", error);
-        }
-        captureSentryException(error, {
-          tags: { type: "notification_sync", location: "NotificationsClient/useEffect/syncNotifications" },
-          extra: { userId: redact("id", String(user?.id)) }
-        });
-      } finally {
-        if (!isCleanedUp) {
-          logger.dev('[Notifications] Sync completed for mount:', mountId.current);
-          lastSyncMountId.current = mountId.current;
-          setIsSyncing(false);
-          setSyncCompleted(true);
-        }
-      }
-    };
-
-    syncNotifications();
-    
-    // Cleanup
-    return () => {
-      isCleanedUp = true;
-      abortController.abort();
-    };
-  }, [user?.id, user?.username, queryClient]);
-
-  // Reset mountId on true navigation
-  useEffect(() => {
-    mountId.current = Math.random().toString(36);
-  }, []);
-
   // MARK READ HANDLER
   const handleMarkRead = useCallback(async (id: number) => {
       if (readingId === id) return;
@@ -335,7 +251,7 @@ export default function NotificationsPage() {
   return (
     <div ref={parentRef} className="min-h-screen bg-background relative overflow-auto">
       <header className="sticky top-0 z-20 w-full backdrop-blur-xl bg-background/80 border-b border-border/40">
-        <div className="container mx-auto max-w-2xl p-4 flex items-center justify-between">
+        <div className="container mx-auto max-w-2xl px-4 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight">Notifications 
               {unreadCount > 0 && <span className="ml-2 bg-primary/10 text-primary text-[11px] font-bold px-1.5 py-0.5 rounded-full" aria-label={`${unreadCount} unread notifications`}>{unreadCount}</span>}

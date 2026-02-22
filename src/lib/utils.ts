@@ -3,8 +3,10 @@
 
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import crypto from "crypto";
-import { logger } from "./logger";
+// utils.ts intentionally does NOT import from logger.ts to avoid a latent
+// circular-dependency risk. If logger.ts ever imports any util (cn, redact, etc.),
+// Node.js would deliver a partially-initialised module, potentially causing 'undefined'
+// exports. Use console.warn / console.error here instead.
 
 /**
  * Combines and merges Tailwind CSS classes with proper precedence handling.
@@ -23,102 +25,34 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Lazy initialization of SENTRY_HASH_SALT to avoid validation during Next.js build.
- * The secret is retrieved on first use (at runtime) rather than module load time.
- * 
- * LAZY EVALUATION RATIONALE:
- * - Next.js build evaluates server code at compile time
- * - Module-level validation would fail during build (SENTRY_HASH_SALT unavailable)
- * - Lazy getter defers validation until actual runtime usage
- * - Caches result after first access for performance
- * 
- * IMPORTANT: This module is also used in client bundles. In the browser,
- * non-NEXT_PUBLIC env vars like SENTRY_HASH_SALT are not available and
- * process.env.NODE_ENV is inlined as "production". To avoid breaking the
- * client runtime, we must not throw during module evaluation in the browser.
- */
-let SECRET: string | null = null;
-let secretWarningShown = false;
-
-function getSecret(): string {
-  // Return cached value if already initialized
-  if (SECRET !== null) {
-    return SECRET;
-  }
-
-  const isBrowser = typeof window !== "undefined";
-
-  if (process.env.SENTRY_HASH_SALT) {
-    SECRET = process.env.SENTRY_HASH_SALT;
-    return SECRET;
-  }
-
-  // Additional safety check: explicitly verify we're not in production before using fallback
-  // This prevents silent fallback usage if NODE_ENV is misconfigured
-  if (process.env.NODE_ENV === "production" && !isBrowser) {
-    throw new Error("SENTRY_HASH_SALT is required in production");
-  }
-
-  // In development (server) or any browser bundle, fall back to a fixed
-  // non-secret salt so we do not crash the client runtime.
-  if (process.env.NODE_ENV === "development" || isBrowser) {
-    // Log warning in development server context (not browser) about using fallback salt
-    // This helps developers understand that production logs will be different
-    if (!isBrowser && process.env.NODE_ENV === "development" && !secretWarningShown) {
-      logger.warn(
-        "[SECURITY WARNING] Using fallback salt for redaction. " +
-        "Set SENTRY_HASH_SALT environment variable for production-like hashing. " +
-        "Development logs with this salt will produce different hashes than production logs."
-      );
-      secretWarningShown = true;
-    }
-    SECRET = "dev-salt-only";
-    return SECRET;
-  }
-
-  // Final safety net: if we reach here, we're in an unexpected environment
-  throw new Error("SENTRY_HASH_SALT is required in production");
-}
-
-/**
- * Redacts sensitive data (email, ID) for safe logging using deterministic hashing.
- * 
- * INTENTIONAL DESIGN: DETERMINISTIC HASHING
- * This function uses HMAC-SHA256 to create a deterministic hash, which means:
- * - The same input always produces the same hash
- * - Useful for correlating issues for the same user across logs
- * - Enables debugging patterns like "user X had this issue 5 times"
- * 
- * SECURITY CONSIDERATIONS:
- * - An attacker with log access and one known value could correlate other occurrences
- * - The 12-character truncation reduces collision resistance but is acceptable for logging:
- *   * 16^12 = ~281 trillion possible hashes
- *   * Collision probability is negligible for user bases under 1 million users
- *   * Birthday paradox: ~50% collision chance at ~16 million unique values
- * - This is acceptable for logging/debugging but NOT for security-critical operations
- * - SALT ROTATION: If SENTRY_HASH_SALT is compromised and an attacker gains log access,
- *   they could build rainbow tables to reverse-engineer user identifiers. Consider:
- *   * Rotating the salt periodically (e.g., quarterly) as a security best practice
- *   * Implementing salt versioning (e.g., SENTRY_HASH_SALT_V2) so old logs remain valid
- *   * Treating the salt with the same security as database credentials
- * 
- * ALTERNATIVE APPROACHES (if needed):
- * - For maximum privacy: Use a random salt per session (cannot correlate across sessions)
- * - For non-deterministic: Add timestamp to hash (each call produces different output)
- * 
- * The current implementation prioritizes debugging utility over perfect privacy,
- * which is an acceptable trade-off for logged data that should already be access-controlled.
- * 
- * @param type - Type of data being redacted ('email' or 'id')
+ * Redacts sensitive data (email, ID) for safe client-side logging using a
+ * deterministic FNV-1a hash.
+ *
+ * Server callers (API routes, server actions) should use the `redact` export from
+ * @/lib/utils.server which uses HMAC-SHA256 keyed on SENTRY_HASH_SALT instead.
+ * This implementation is intentionally crypto-import-free so it does not pull
+ * Node.js's `crypto` module into browser bundles.
+ *
+ * Since SENTRY_HASH_SALT is a non-NEXT_PUBLIC_ variable it is never shipped to the
+ * browser, so a keyed HMAC would provide no additional security here anyway.
+ *
+ * @param type  - Type of data being redacted ('email' or 'id')
  * @param value - The sensitive value to redact
- * @returns A 12-character deterministic hash for safe logging
+ * @returns A 12-character deterministic hex string safe for logging
  */
-export const redact = (type: "email" | "id", value: string) =>
-  crypto
-    .createHmac("sha256", getSecret())
-    .update(`${type}:${value}`)
-    .digest("hex")
-    .slice(0, 12);
+export const redact = (type: "email" | "id", value: string): string => {
+  const input = `${type}:${value}`;
+  // FNV-1a 32-bit — two independent passes with different seeds for 64 bits of output
+  let h1 = 2166136261; // FNV-1a 32-bit offset basis
+  let h2 = 0x811c9dc5; // second independent offset
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = Math.imul(h2 ^ (c + i + 1), 16777619) >>> 0;
+  }
+  return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 12);
+};
+
 
 /**
  * Converts a number to Roman numeral representation (1-12).
@@ -163,6 +97,13 @@ export const normalizeSession = (session: string | number): string => {
   s = s.replace(/session|lecture|lec|lab|hour|hr|period/g, '').trim();
   s = s.replace(/(st|nd|rd|th)$/, '').trim(); // Remove ordinals
 
+  // Collapse internal multi-spaces left by noise removal (e.g. "vii  extra" after
+  // stripping "session"), then take only the first word if any remain so that
+  // "vii extra" → "vii" → "7" rather than falling through to the uppercase fallback
+  // and producing "VII EXTRA", which would generate a permanently wrong slot key.
+  s = s.replace(/\s+/g, ' ').trim();
+  if (s.includes(' ')) s = s.split(' ')[0];
+
   // 2. Roman to Number Map
   const romans: Record<string, string> = {
       'viii': '8', 'vii': '7', 'vi': '6', 'v': '5',
@@ -181,45 +122,112 @@ export const normalizeSession = (session: string | number): string => {
 };
 
 /**
- * Standardizes date to YYYYMMDD format.
- * Handles Date objects, ISO strings, and "DD-MM-YYYY" formats.
- * 
- * @param date - Date in various formats (Date object, ISO string, DD-MM-YYYY)
- * @returns Date string in YYYYMMDD format
+ * @internal
+ * Parses a date string into { y, m, d } string parts.
+ * Returns null for unrecognised formats so callers can handle the failure explicitly.
+ *
+ * E-I: Single authoritative parsing core shared by normalizeToISODate and normalizeDate,
+ * eliminating the duplicated branch logic that previously existed in both functions.
+ *
+ * Supported formats:
+ *   • ISO 8601 with time  — "2024-01-15T10:30:00Z" (time component stripped)
+ *   • ISO date            — "2024-01-15"  (YYYY-MM-DD)
+ *   • Dash-separated DMY  — "15-01-2024"  (DD-MM-YYYY)
+ *   • Slash-separated DMY — "15/01/2024"  (DD/MM/YYYY)
+ */
+function parseDateParts(str: string): { y: string; m: string; d: string } | null {
+  // Strip time component from ISO 8601 strings before further parsing.
+  const base = str.includes('T') ? str.split('T')[0] : str;
+
+  // YYYYMMDD (no separator) — e.g. "20251201" returned by EzyGo API
+  if (/^\d{8}$/.test(base)) {
+    return { y: base.slice(0, 4), m: base.slice(4, 6), d: base.slice(6, 8) };
+  }
+
+  if (base.includes('-')) {
+    const parts = base.split('-');
+    if (parts.length === 3) {
+      const [a, b, c] = parts.map((p) => p.trim());
+      if (a.length === 4) {
+        // YYYY-MM-DD
+        return { y: a, m: b.padStart(2, '0'), d: c.padStart(2, '0') };
+      }
+      if (c.length === 4) {
+        // DD-MM-YYYY
+        return { y: c, m: b.padStart(2, '0'), d: a.padStart(2, '0') };
+      }
+    }
+  }
+
+  if (base.includes('/')) {
+    const parts = base.split('/');
+    if (parts.length === 3) {
+      const [rawD, rawM, rawY] = parts.map((p) => p.trim());
+      if (rawD && rawM && rawY) {
+        // DD/MM/YYYY
+        return { y: rawY, m: rawM.padStart(2, '0'), d: rawD.padStart(2, '0') };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Normalizes a date string to ISO date format (YYYY-MM-DD).
+ * Handles ISO datetime strings (with T), DD/MM/YYYY, DD-MM-YYYY, and YYYY-MM-DD.
+ *
+ * @param str - Date string in any of the supported formats
+ * @returns Date string in YYYY-MM-DD format, or the original string if unrecognised
  * @example
  * ```ts
- * normalizeDate(new Date(2024, 0, 15)) // Returns "20240115"
+ * normalizeToISODate("2024-01-15T10:30:00Z") // Returns "2024-01-15"
+ * normalizeToISODate("15/01/2024")            // Returns "2024-01-15"
+ * normalizeToISODate("2024-01-15")            // Returns "2024-01-15"
+ * ```
+ */
+export function normalizeToISODate(str: string): string {
+  if (!str) return '';
+  // delegate to shared parser; pass through original string if format is unrecognised
+  // (matches the previous fallback `return str` behaviour).
+  const parts = parseDateParts(str);
+  if (parts) return `${parts.y}-${parts.m}-${parts.d}`;
+  return str;
+}
+
+/**
+ * Standardizes date to YYYYMMDD format.
+ * Handles Date objects, ISO strings, YYYYMMDD, DD-MM-YYYY, and DD/MM/YYYY.
+ *
+ * @param date - Date in various formats (Date object, ISO string, YYYYMMDD, DD-MM-YYYY)
+ * @returns Date string in YYYYMMDD format, or "" for unrecognised string formats
+ * @example
+ * ```ts
+ * normalizeDate(new Date(2024, 0, 15))   // Returns "20240115"
  * normalizeDate("2024-01-15T10:30:00Z") // Returns "20240115"
- * normalizeDate("15-01-2024") // Returns "20240115"
+ * normalizeDate("20240115")              // Returns "20240115"
+ * normalizeDate("15-01-2024")           // Returns "20240115"
  * ```
  */
 export const normalizeDate = (date: string | Date): string => {
   if (!date) return "";
-  
+
   if (date instanceof Date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}${m}${d}`;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}${m}${d}`;
   }
 
-  const dateStr = String(date).trim();
-  
-  // Handle ISO "2023-01-01T..."
-  if (dateStr.includes("T")) {
-      return dateStr.split("T")[0].replace(/-/g, "");
-  }
-  
-  // Handle "YYYY-MM-DD" or "DD-MM-YYYY"
-  if (dateStr.includes("-")) {
-    const parts = dateStr.split("-");
-    // If first part is year (4 digits)
-    if (parts[0].length === 4) return parts.join(""); 
-    // Assume DD-MM-YYYY -> YYYYMMDD
-    return `${parts[2]}${parts[1]}${parts[0]}`;
-  }
-  
-  return dateStr.replace(/[^0-9]/g, "");
+  // delegate to shared parser.
+  const parts = parseDateParts(String(date).trim());
+  if (parts) return `${parts.y}${parts.m}${parts.d}`;
+
+  // Unrecognised format — silently stripping non-digit chars could produce
+  // a plausible-looking but wrong YYYYMMDD string, poisoning slot-key lookups.
+  // console.warn used deliberately — see logger import note at top of file.
+  console.warn(`[normalizeDate] Unrecognised date format "${String(date).trim()}". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Returning "" to avoid incorrect slot keys.`);
+  return "";
 };
 
 /**
@@ -267,9 +275,13 @@ export function formatSessionName(sessionName: string): string {
   
   // Handle Roman numerals (case-insensitive)
   const lower = clean.toLowerCase();
+  // Extended to xii so that session identifiers produced by toRoman() or
+  // normalizeSession() beyond "viii" (e.g. "ix", "x") do not fall through to
+  // parseInt() → NaN → ugly "Session ix" fallback instead of "9th Hour".
   const romanMap: Record<string, string> = {
-    "i": "1st Hour", "ii": "2nd Hour", "iii": "3rd Hour", "iv": "4th Hour",
-    "v": "5th Hour", "vi": "6th Hour", "vii": "7th Hour", "viii": "8th Hour"
+    "i": "1st Hour",  "ii": "2nd Hour",  "iii": "3rd Hour",  "iv": "4th Hour",
+    "v": "5th Hour",  "vi": "6th Hour",  "vii": "7th Hour",  "viii": "8th Hour",
+    "ix": "9th Hour", "x": "10th Hour", "xi": "11th Hour", "xii": "12th Hour",
   };
   if (romanMap[lower]) return romanMap[lower];
 
@@ -304,10 +316,15 @@ export function formatSessionName(sessionName: string): string {
  */
 export function getSessionNumber(name: string): number {
   if (!name) return 999;
-  const clean = name.toString().toLowerCase().replace(/session|hour/g, "").replace(/hour/g, "").trim();
+  // Removed redundant second .replace(/hour/g, "") — "hour" is already
+  // eliminated by the combined /session|hour/g regex in the first pass.
+  const clean = name.toString().toLowerCase().replace(/session|hour/g, "").trim();
   
+  // Extended to xii to match the formatSessionName romanMap.
   const romanMap: Record<string, number> = { 
-    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8 
+    "i": 1, "ii": 2,  "iii": 3,  "iv": 4,
+    "v": 5, "vi": 6, "vii": 7, "viii": 8,
+    "ix": 9, "x": 10, "xi": 11, "xii": 12,
   };
   if (romanMap[clean]) return romanMap[clean];
   
@@ -336,85 +353,6 @@ export const formatCourseCode = (code: string): string => {
   return code.replace(/[\s\u00A0]/g, "");
 };
 
-// Track if we've already logged the development IP warning to avoid spam
-// This flag persists across hot module reloads and will only log once per server restart
-let hasLoggedDevIpWarning = false;
-
-/**
- * Extracts the client IP address from request headers.
- * 
- * DEPLOYMENT ARCHITECTURE ASSUMPTIONS:
- * This function prioritizes headers in the following order, which assumes a specific deployment setup:
- * 1. cf-connecting-ip (Cloudflare CDN) - Most trusted when behind Cloudflare
- * 2. x-real-ip (nginx/Apache reverse proxy) - Common for traditional reverse proxies
- * 3. x-forwarded-for (various proxies/load balancers) - Takes first IP in chain
- * 
- * CONFIGURATION NOTES:
- * - If NOT behind Cloudflare: Consider prioritizing x-real-ip or x-forwarded-for
- * - Behind AWS ALB/ELB: x-forwarded-for is the standard header
- * - Behind Google Cloud Load Balancer: x-forwarded-for is used
- * - Behind Azure Front Door: x-azure-clientip or x-forwarded-for
- * 
- * The current order assumes Cloudflare as the primary CDN. If your deployment differs,
- * adjust the priority order or make it configurable via environment variables.
- * 
- * SECURITY WARNING:
- * These headers can be spoofed if not properly configured at the reverse proxy level.
- * Ensure your reverse proxy strips/overwrites these headers from client requests.
- * 
- * DEVELOPMENT TESTING:
- * In development mode, set TEST_CLIENT_IP environment variable to test IP-based logic
- * with a specific IP address (e.g., TEST_CLIENT_IP=203.0.113.45).
- * 
- * @param headerList - The Headers object from the request
- * @returns The client IP address or null if it cannot be determined
- */
-export function getClientIp(headerList: Headers): string | null {
-  const cf = headerList.get("cf-connecting-ip")?.trim();
-  if (cf) return cf;
-
-  const realIp = headerList.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  const forwarded = headerList.get("x-forwarded-for");
-  const forwardedIp = forwarded?.split(",")[0]?.trim();
-  if (forwardedIp) return forwardedIp;
-
-  // In development, allow testing with a specific IP via environment variable
-  if (process.env.NODE_ENV === "development") {
-    const testIp = process.env.TEST_CLIENT_IP;
-    
-    // Log warning once per server start to make it prominent but avoid spam
-    if (!hasLoggedDevIpWarning) {
-      hasLoggedDevIpWarning = true;
-      logger.warn(
-        "\n" +
-        "═══════════════════════════════════════════════════════════════════════\n" +
-        "⚠️  DEVELOPMENT MODE: Client IP Detection\n" +
-        "═══════════════════════════════════════════════════════════════════════\n" +
-        "No IP forwarding headers found. This affects IP-based security features\n" +
-        "such as rate limiting, geolocation, and audit logging.\n\n" +
-        "To test real IP logic in development:\n" +
-        "  1. Set TEST_CLIENT_IP environment variable (e.g., TEST_CLIENT_IP=203.0.113.45)\n" +
-        "  2. Or send x-real-ip or cf-connecting-ip headers in your requests\n" +
-        `\nCurrent fallback: ${testIp || "127.0.0.1"}\n` +
-        "═══════════════════════════════════════════════════════════════════════\n"
-      );
-    }
-    
-    return testIp || "127.0.0.1";
-  }
-
-  // In production, return null to signal that IP extraction failed
-  // Callers must handle this null case appropriately (e.g., by rejecting the request)
-  logger.warn(
-    "[getClientIp] No IP forwarding headers found in production. " +
-    "Ensure reverse proxy is configured to set x-forwarded-for, x-real-ip, or cf-connecting-ip headers. " +
-    "Request will be rejected if IP is required for security checks."
-  );
-  return null;
-}
-
 /**
  * Compresses an image file to JPEG format with quality control.
  * Automatically resizes images larger than 1920px width while maintaining aspect ratio.
@@ -431,6 +369,14 @@ export function getClientIp(headerList: Headers): string | null {
  * ```
  */
 export const compressImage = (file: File, quality = 0.7): Promise<File> => {
+  // Fail fast for out-of-range quality values. canvas.toBlob() silently clamps
+  // quality in most browsers, but quality=0 produces a near-unreadable image and
+  // values outside [0,1] or NaN produce browser-specific undefined behaviour.
+  if (!Number.isFinite(quality) || quality < 0 || quality > 1) {
+    return Promise.reject(
+      new RangeError(`compressImage: quality must be a finite number in [0, 1], got ${quality}`)
+    );
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -535,8 +481,15 @@ export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string 
   const isProduction = process.env.NODE_ENV === "production";
   let appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
   
-  // Only use window.location.hostname in development for convenience
-  // In production, this is a security risk and should never be used
+  // Only use window.location.hostname in development for convenience.
+  // In production, this is a security risk and should never be used.
+  //
+  // NOTE: process.env.NODE_ENV is inlined at build time by Next.js in ALL
+  // environments. Next.js always produces a compiled bundle with NODE_ENV="production"
+  // at build time, so `isProduction` is always true in the compiled client output and
+  // `!isProduction` is always false — this block is effectively dead code in any built
+  // Next.js client bundle. It is preserved for non-Next.js contexts (tests, scripts)
+  // and for documentation purposes.
   if (!appDomain && typeof window !== "undefined" && !isProduction) {
     const hostname = window.location.hostname;
     
@@ -554,8 +507,9 @@ export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string 
   const defaultDomain = process.env.NEXT_PUBLIC_DEFAULT_DOMAIN || fallbackDomain;
   
   // Security check: warn if using fallback in production
+  // console.warn used deliberately — see logger import note at top of file.
   if (isProduction && !process.env.NEXT_PUBLIC_APP_DOMAIN && !process.env.NEXT_PUBLIC_DEFAULT_DOMAIN) {
-    logger.warn(
+    console.warn(
       '[SECURITY] getAppDomain: NEXT_PUBLIC_APP_DOMAIN and NEXT_PUBLIC_DEFAULT_DOMAIN are not set in production. ' +
       `Using hardcoded fallback domain '${defaultDomain}'. This could be a security risk for error reporting. ` +
       'Please configure these environment variables.'
@@ -564,4 +518,34 @@ export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string 
   
   // Final fallback
   return appDomain ?? defaultDomain;
+}
+
+/**
+ * Type-guard that narrows a raw avatar_url from the DB to a known-safe string
+ * suitable for use as a Next.js <Image> src.
+ *
+ * profile.avatar_url is stored as `text` in Supabase and is read back verbatim.
+ * If the row was ever directly modified, or if NEXT_PUBLIC_SUPABASE_URL was
+ * mis-configured at the time of upload, the stored URL could point to a
+ * different Supabase project or a non-Supabase domain entirely. Passing such a
+ * URL to <Image> would throw a Next.js optimisation error at runtime. This guard
+ * ensures the URL is valid, is served over HTTPS, and originates from the
+ * configured Supabase project before it reaches the Image component.
+ *
+ * @param url - Value read from `UserProfile.avatar_url`
+ */
+export function isValidAvatarUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // If the env var is absent at runtime (should not happen in production due to
+    // validate-env.ts), fall through and allow any HTTPS URL rather than blocking
+    // all avatars — a broken avatar is worse UX than a permissive fallback.
+    if (!supabaseUrl) return true;
+    return parsed.hostname === new URL(supabaseUrl).hostname;
+  } catch {
+    return false;
+  }
 }

@@ -1,5 +1,4 @@
 // src/lib/email.ts
-import axios from "axios";
 import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { redact } from "./utils";
@@ -8,7 +7,7 @@ import { logger } from "./logger";
 /**
  * Email sending configuration parameters.
  */
-interface SendEmailProps {
+export interface SendEmailProps {
   /** Recipient email address */
   to: string;
   /** Email subject line */
@@ -54,24 +53,28 @@ const getSenderEmail = () => {
     Sentry.captureException(err, { tags: { type: "config_error", location: "getSenderEmail" } });
     throw err;
   }
-  return 'admin' + appEmail;
+  return 'admin@' + appEmail.replace(/^@/, '');
 };
 
 // Configuration
 const CONFIG = {
-  sender: {
-    name: process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass',
-    email: getSenderEmail(),
+  // Lazy getter: evaluated only when sending email, not at module load time.
+  // This prevents a crash on cold start if NEXT_PUBLIC_APP_EMAIL is not yet set.
+  get sender() {
+    return {
+      name: process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass',
+      email: getSenderEmail(),
+    };
   },
   brevo: {
     url: "https://api.brevo.com/v3/smtp/email",
-    key: process.env.BREVO_API_KEY,
+    get key() { return process.env.BREVO_API_KEY; },
   },
   sendpulse: {
     authUrl: "https://api.sendpulse.com/oauth/access_token",
     emailUrl: "https://api.sendpulse.com/smtp/emails",
-    clientId: process.env.SENDPULSE_CLIENT_ID,
-    clientSecret: process.env.SENDPULSE_CLIENT_SECRET,
+    get clientId() { return process.env.SENDPULSE_CLIENT_ID; },
+    get clientSecret() { return process.env.SENDPULSE_CLIENT_SECRET; },
   },
 };
 
@@ -86,12 +89,18 @@ async function getSendPulseToken() {
   if (!hasSendPulse) throw new Error("SendPulse credentials not configured");
   
   try {
-    const res = await axios.post(CONFIG.sendpulse.authUrl, {
-      grant_type: "client_credentials",
-      client_id: CONFIG.sendpulse.clientId,
-      client_secret: CONFIG.sendpulse.clientSecret,
+    const res = await fetch(CONFIG.sendpulse.authUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: CONFIG.sendpulse.clientId,
+        client_secret: CONFIG.sendpulse.clientSecret,
+      }),
     });
-    return res.data.access_token;
+    if (!res.ok) throw new Error(`SendPulse auth HTTP ${res.status}`);
+    const data = await res.json();
+    return data.access_token;
   } catch (error) {
     logger.error("Failed to get SendPulse token", error);
     throw new Error("SendPulse Auth Failed");
@@ -122,15 +131,24 @@ async function sendViaSendPulse({ to, subject, html, text }: SendEmailProps): Pr
       },
     };
 
-    const { data } = await axios.post(CONFIG.sendpulse.emailUrl, payload, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(CONFIG.sendpulse.emailUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(err.message || `SendPulse API error: ${res.status}`);
+    }
+    const data = await res.json() as { id?: string };
 
     return { success: true, provider: "SendPulse", id: data.id };
   } catch (error: unknown) {
-    const err = error as { response?: { data?: { message?: string } }; message?: string };
-    const msg = err.response?.data?.message || err.message || 'Unknown error';
-    throw new Error(msg);
+    const err = error as { message?: string };
+    throw new Error(err.message || 'Unknown error');
   }
 }
 
@@ -149,26 +167,32 @@ async function sendViaBrevo({ to, subject, html, text }: SendEmailProps): Promis
       textContent: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
     };
 
-    const { data } = await axios.post(CONFIG.brevo.url, payload, {
+    const res = await fetch(CONFIG.brevo.url, {
+      method: 'POST',
       headers: {
-        "api-key": CONFIG.brevo.key,
+        "api-key": CONFIG.brevo.key!,
         "content-type": "application/json",
         accept: "application/json",
       },
+      body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(err.message || `Brevo API error: ${res.status}`);
+    }
+    const data = await res.json() as { messageId?: string };
 
     return { success: true, provider: "Brevo", id: data.messageId };
   } catch (error: unknown) {
-    const err = error as { response?: { data?: { message?: string } }; message?: string };
-    const msg = err.response?.data?.message || err.message || 'Unknown error';
-    throw new Error(msg);
+    const err = error as { message?: string };
+    throw new Error(err.message || 'Unknown error');
   }
 }
 
 /**
  * Main Controller (Load Balancer & Failover)
  */
-export async function sendEmail(props: SendEmailProps) {
+export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
   let primary: typeof sendViaSendPulse | typeof sendViaBrevo;
   let secondary: typeof sendViaSendPulse | typeof sendViaBrevo | null = null;
   let primaryName: string;
@@ -219,9 +243,9 @@ export async function sendEmail(props: SendEmailProps) {
       try {
         return await secondary(props);
       } catch (secondaryError: unknown) {
-        const primaryErr = primaryError as Error;
+        const outerErr = primaryError as Error;
         const secondaryErr = secondaryError as Error;
-        const errorMsg = `All email providers failed. Primary: ${primaryErr.message} | Secondary: ${secondaryErr.message}`;
+        const errorMsg = `All email providers failed. Primary: ${outerErr.message} | Secondary: ${secondaryErr.message}`;
         logger.error(errorMsg);
         
         // Report CRITICAL total failure
@@ -237,7 +261,6 @@ export async function sendEmail(props: SendEmailProps) {
         };
       }
     } else {
-      const primaryErr = primaryError as Error;
       Sentry.captureException(primaryError, {
          tags: { type: "email_delivery_fail_no_backup", location: "sendEmail" },
          extra: { provider: primaryName }

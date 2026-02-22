@@ -1,15 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { CaptureContext } from "@sentry/core";
 // Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
 const captureSentryException = (error: unknown, context?: CaptureContext) => {
   void import("@sentry/nextjs").then(({ captureException }) => captureException(error, context));
 };
-const captureSentryMessage = (message: string, context?: CaptureContext) => {
-  void import("@sentry/nextjs").then(({ captureMessage }) => captureMessage(message, context));
-};
-import { logger } from "@/lib/logger";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useUser } from "@/hooks/users/user";
@@ -34,6 +30,7 @@ import { formatSessionName, generateSlotKey, getSessionNumber, redact } from "@/
 import { createClient } from "@/lib/supabase/client";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import { getOfficialSessionRaw } from "@/lib/logic/attendance-reconciliation";
+import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 // --- Helper Functions ---
 
@@ -88,16 +85,12 @@ export default function TrackingClient() {
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [enabled, setEnabled] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncCompleted, setSyncCompleted] = useState(false);
   
   // Per-course record limits (for performance with 100+ records)
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
   const recordsPerCourseInitial = 10;
   
-  // Use a unique ID per mount to detect Strict Mode remounts
-  const mountId = useRef(Math.random().toString(36));
-  const lastSyncMountId = useRef<string | null>(null);
+  // Use a unique ID per mount to detect Strict Mode remounts (now managed inside useSyncOnMount)
 
   const coursesPerPage = 3; 
 
@@ -111,103 +104,24 @@ export default function TrackingClient() {
   useEffect(() => { if (user) setEnabled(true); }, [user]);
 
   // --- AUTO SYNC ---
-  useEffect(() => {
-    // Guard: ensure both user ID and username exist before attempting sync
-    // Username is required for the sync API call
-    if (!user?.id || !user?.username) {
-      // User is loaded but has no username – skip sync so page can render
-      if (user?.id && !user?.username) setSyncCompleted(true);
-      return;
-    }
-
-    // Check if sync already ran for THIS mount
-    // In Strict Mode, the remount will have the SAME mountId, so we skip
-    // On real navigation, mountId changes, so sync runs
-    if (lastSyncMountId.current === mountId.current) {
-      logger.dev('[Tracking] Sync already completed for this mount, skipping');
-      setSyncCompleted(true);
-      return;
-    }
-
-    const abortController = new AbortController();
-    let isCleanedUp = false;
-
-    const runSync = async () => {
-      logger.dev('[Tracking] Starting sync for mount:', mountId.current);
-      setIsSyncing(true);
-
-      try {
-        const res = await fetch(`/api/cron/sync?username=${user.username}`, {
-          signal: abortController.signal
-        });
-
-        const data = await res.json();
-
-        // Only process if not cleaned up
-        if (isCleanedUp) return;
-
-        // Handle different response status codes
-        if (res.status === 207) {
-          // Partial failure: Some records synced, some failed
-          toast.warning("Partial Sync Completed", {
-            description: "Some tracking records couldn't be synced. Your data may be incomplete."
-          });
-          
-          captureSentryMessage("Partial sync failure in tracking", {
-            level: "warning",
-            tags: { type: "tracking_partial_sync", location: "TrackingClient/useEffect/runSync" },
-            extra: { userId: redact("id", String(user?.id)), response: data }
-          });
-          
-          // Still refetch data as partial sync may have updated some records
-          await Promise.all([refetchTrackingData(), refetchCount()]);
-        } else if (!res.ok) {
-          // Complete failure (500 or other error codes)
-          throw new Error(`Sync failed with status: ${res.status}`);
-        } else if (data.success && (data.deletions > 0 || data.conflicts > 0)) {
-          // Success with changes
-          toast.info("Data Synced", {
-            description: `${data.deletions} outdated records removed.`
-          });
-          await Promise.all([refetchTrackingData(), refetchCount()]);
-        }
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
-          logger.dev('[Tracking] Sync request aborted');
-          return;
-        }
-
-        logger.error("Tracking sync error", err);
-        
-        captureSentryException(err, {
-          tags: { type: "tracking_sync", location: "TrackingClient/useEffect/runSync" },
-          extra: { userId: redact("id", String(user?.id)) }
-        });
-      } finally {
-        // Only update state if not cleaned up
-        if (!isCleanedUp) {
-          logger.dev('[Tracking] Sync completed for mount:', mountId.current);
-          lastSyncMountId.current = mountId.current;
-          setIsSyncing(false);
-          setSyncCompleted(true);
-        }
-      }
-    };
-
-    runSync();
-
-    // Cleanup
-    return () => {
-      isCleanedUp = true;
-      abortController.abort();
-    };
-  }, [user?.id, user?.username, refetchTrackingData, refetchCount]); // Re-sync when user identity or refetch functions change
-
-  // Reset mountId on real navigation (when component truly remounts with new state)
-  useEffect(() => {
-    // Generate new mount ID for each true navigation
-    mountId.current = Math.random().toString(36);
-  }, []);
+  const { isSyncing, syncCompleted } = useSyncOnMount({
+    username: user?.username,
+    userId: user?.id,
+    sentryLocation: "TrackingClient",
+    sentryTag: "tracking_sync",
+    onPartialSync: async () => {
+      toast.warning("Partial Sync Completed", {
+        description: "Some tracking records couldn't be synced. Your data may be incomplete.",
+      });
+      await Promise.all([refetchTrackingData(), refetchCount()]);
+    },
+    onSuccess: async (data) => {
+      toast.info("Data Synced", {
+        description: `${data.deletions ?? 0} outdated records removed.`,
+      });
+      await Promise.all([refetchTrackingData(), refetchCount()]);
+    },
+  });
 
   // --- 1. GROUP AND SORT DATA ---
   const groupedAllData = useMemo(() => {

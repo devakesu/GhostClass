@@ -44,7 +44,15 @@ export function AnalyticsTracker() {
                   params: {
                     page_location: url,
                     page_title: document.title,
-                    page_referrer: document.referrer,
+                    page_referrer: (() => {
+                      if (!document.referrer) return "";
+                      try {
+                        const ref = new URL(document.referrer);
+                        return ref.origin + ref.pathname;
+                      } catch {
+                        return "";
+                      }
+                    })(),
                   },
                 },
               ],
@@ -148,23 +156,29 @@ export function AnalyticsTracker() {
 
       const formData = formInteractions.current.get(form) || { focused: false, submitted: false };
       
+      // Use getAttribute to avoid HTMLFormElement named-element getter returning a
+      // child <input name="name"> / <input name="action"> instead of the string attribute.
+      const formId = form.getAttribute("id") || "unknown";
+      const formName = form.getAttribute("name") || formId;
+      const formAction = form.getAttribute("action") || window.location.href;
+
       if (e.type === "focusin" && !formData.focused) {
         // First interaction with form
         formData.focused = true;
         formInteractions.current.set(form, formData);
         trackEvent("form_start", {
-          form_id: form.id || "unknown",
-          form_name: form.name || form.id || "unknown",
-          form_destination: form.action || window.location.href,
+          form_id: formId,
+          form_name: formName,
+          form_destination: formAction,
         });
       } else if (e.type === "submit") {
         // Form submitted
         formData.submitted = true;
         formInteractions.current.set(form, formData);
         trackEvent("form_submit", {
-          form_id: form.id || "unknown",
-          form_name: form.name || form.id || "unknown",
-          form_destination: form.action || window.location.href,
+          form_id: formId,
+          form_name: formName,
+          form_destination: formAction,
         });
       }
     };
@@ -245,14 +259,25 @@ export async function trackEvent(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    // Guard against circular references (e.g. DOM nodes accidentally passed as params)
+    const seen = new WeakSet();
+    const safeReplacer = (_key: string, value: unknown) => {
+      if (value instanceof Node) return undefined;
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return undefined;
+        seen.add(value);
+      }
+      return value;
+    };
+
     try {
       await fetch("/api/analytics/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId,
-          events: [{ name: eventName, params: eventParams }],
-        }),
+        body: JSON.stringify(
+          { clientId, events: [{ name: eventName, params: eventParams }] },
+          safeReplacer,
+        ),
         signal: controller.signal,
       });
     } finally {

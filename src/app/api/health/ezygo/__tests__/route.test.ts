@@ -20,7 +20,7 @@ vi.mock("@/lib/circuit-breaker", () => ({
       state: "CLOSED",
       failures: 0,
       isOpen: false,
-      lastFailTime: 0,
+      timeUntilReset: 0,
       successCount: 0,
     })),
   },
@@ -80,7 +80,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "CLOSED",
         failures: 0,
         isOpen: false,
-        lastFailTime: 0,
+        timeUntilReset: 0,
         successCount: 0,
       });
 
@@ -116,7 +116,6 @@ describe("EzyGo Health Check API Route", () => {
       expect(data.circuitBreaker).toHaveProperty("state");
       expect(data.circuitBreaker).toHaveProperty("failures");
       expect(data.circuitBreaker).toHaveProperty("isOpen");
-      expect(data.circuitBreaker).toHaveProperty("lastFailTime");
     });
 
     it("should calculate utilization percentage correctly", async () => {
@@ -158,7 +157,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "OPEN",
         failures: 5,
         isOpen: true,
-        lastFailTime: Date.now(),
+        timeUntilReset: 30,
         successCount: 0,
       });
 
@@ -180,7 +179,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "CLOSED",
         failures: 0,
         isOpen: false,
-        lastFailTime: 0,
+        timeUntilReset: 0,
         successCount: 0,
       });
       
@@ -212,7 +211,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "OPEN",
         failures: 3,
         isOpen: true,
-        lastFailTime: Date.now(),
+        timeUntilReset: 30,
         successCount: 0,
       });
       
@@ -230,7 +229,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "OPEN",
         failures: 3,
         isOpen: true,
-        lastFailTime: Date.now(),
+        timeUntilReset: 30,
         successCount: 0,
       });
       
@@ -262,7 +261,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "OPEN",
         failures: 5,
         isOpen: true,
-        lastFailTime: Date.now(),
+        timeUntilReset: 30,
         successCount: 0,
       });
 
@@ -284,7 +283,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "CLOSED",
         failures: 0,
         isOpen: false,
-        lastFailTime: 0,
+        timeUntilReset: 0,
         successCount: 0,
       });
       
@@ -313,7 +312,7 @@ describe("EzyGo Health Check API Route", () => {
         state: "CLOSED",
         failures: 0,
         isOpen: false,
-        lastFailTime: 0,
+        timeUntilReset: 0,
         successCount: 0,
       });
       

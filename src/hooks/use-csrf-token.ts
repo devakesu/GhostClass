@@ -97,7 +97,7 @@ export function useCSRFToken() {
           // 
           // SECURITY: Token storage in sessionStorage is protected by CSP (see src/lib/csp.ts)
           // which prevents unauthorized script execution and XSS attacks.
-          const response = await fetch("/api/csrf/init");
+          const response = await fetch("/api/csrf");
           if (response.ok && isMounted) {
             const data = await response.json();
             // Store token in sessionStorage for use in subsequent requests

@@ -4,7 +4,7 @@ import { Ring2 } from "ldrs/react";
 import "ldrs/react/Ring2.css";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { handleLogout } from "@/lib/security/auth";
 
 /**
@@ -18,12 +18,17 @@ import { handleLogout } from "@/lib/security/auth";
  * - Logout button for stuck states
  * - Humorous loading message
  * 
+ * @param minimal - When true, hides the timeout warning and action buttons.
+ *                  Use this when Loading is embedded inside a component (e.g. a chart)
+ *                  rather than as a full-page loader.
+ *
  * @example
  * ```tsx
- * <Loading />
+ * <Loading />           // full-page with logout/refresh buttons after 15s
+ * <Loading minimal />   // spinner + message only, no buttons
  * ```
  */
-export function Loading() {
+export function Loading({ minimal = false }: { minimal?: boolean }) {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
@@ -57,7 +62,7 @@ export function Loading() {
         </div>
       </div>
 
-      {showWarning && (
+      {showWarning && !minimal && (
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-500">
           {/* Text Group with gap */}
           <div className="flex flex-col gap-20">
@@ -69,6 +74,16 @@ export function Loading() {
             </div>
           </div>
           
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+            className="gap-2"
+            aria-label="Refresh the page"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Page
+          </Button>
           <Button 
             variant="outline" 
             size="sm" 

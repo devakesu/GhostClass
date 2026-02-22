@@ -63,6 +63,7 @@ npm run docs:validate # Validate OpenAPI spec with Redocly
 Copy `.example.env` to `.env` and populate. Key variables:
 
 - `ENCRYPTION_KEY` – 64 hex chars (AES-256-GCM key). Generate: `openssl rand -hex 32`
+- `REQUEST_SIGNING_SECRET` – 64 hex chars. Generate: `openssl rand -hex 32`. Must be **distinct** from `ENCRYPTION_KEY` (key-separation; required)
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (use test keys `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` locally)

@@ -48,7 +48,8 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import DashboardPage, { DashboardDataLoader } from '../page';
+import DashboardPage from '../page';
+import { DashboardDataLoader } from '../DashboardDataLoader';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { fetchDashboardData } from '@/lib/ezygo-batch-fetcher';

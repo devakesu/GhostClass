@@ -1,11 +1,17 @@
 /**
  * Represents session-level attendance data for a specific course.
+ * Matches the shape of a single session entry in EzyGo studentAttendanceData.
+ * course and attendance are string | number because the EzyGo API may return either.
  */
 interface SessionData {
-  /** Course identifier */
-  course: number;
-  /** Attendance count for this session */
-  attendance: number;
+  /** Course identifier (may be numeric or string-encoded) */
+  course: string | number;
+  /** Attendance status code (e.g. 110 = Present, 111 = Absent, 225 = Duty Leave) */
+  attendance: string | number;
+  /** Canonical session identifier; may differ from the key in the outer record */
+  session?: string | number;
+  /** Class type as reported by EzyGo (e.g. "Revision", "Lecture") */
+  class_type?: string | null;
 }
 
 /**

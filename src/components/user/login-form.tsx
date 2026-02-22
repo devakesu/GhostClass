@@ -16,7 +16,6 @@ import { useCSRFToken } from "@/hooks/use-csrf-token";
 
 import { Loading } from "@/components/loading";
 import { PasswordResetForm } from "./password-reset-form";
-import NProgress from "nprogress";
 import { motion, HTMLMotionProps, Variants } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
@@ -164,14 +163,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    NProgress.start();
 
     try {
       const passwordError = validatePassword(formData.password);
       if (passwordError) {
         setError(passwordError);
         setIsLoading(false);
-        NProgress.done();
         return;
       }
 
@@ -312,7 +309,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     } catch (error) {
       const err = error as AxiosError<ErrorResponse>;
-      NProgress.done();
       setIsLoading(false);
       
       let errorMsg = "An unexpected error occurred";

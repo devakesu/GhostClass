@@ -1,6 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
 import axios, { isAxiosError } from "axios";
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -10,12 +9,13 @@ import { createServerClient } from "@supabase/ssr";
 import crypto from "crypto";
 import { z } from "zod";
 import { redis } from "@/lib/redis";
-import { redact, getClientIp } from "@/lib/utils";
+import { redact, getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { TERMS_VERSION } from "@/app/config/legal";
 import { setTermsVersionCookie } from "@/app/actions/user";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = 'force-dynamic';
 
@@ -33,17 +33,6 @@ const EzygoUserSchema = z.object({
   email: z.email(),
   mobile: z.string().optional(),
 });
-
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!url || !key) {
-    throw new Error("Missing Supabase Admin credentials");
-  }
-  
-  return createClient(url, key);
-}
 
 // Lock TTL in seconds - configurable via environment variable
 const AUTH_LOCK_TTL = (() => {
@@ -152,7 +141,10 @@ export async function POST(req: Request) {
 
   // 2. Origin/Host Validation
   // Note: Rate limiting is performed later in this handler after client IP extraction.
-  // SKIP origin validation in development mode for easier local testing
+  // SKIP origin validation in development mode for easier local testing.
+  // This is safe in dev because: (1) the CSRF token still validates the request,
+  // (2) rate limiting is still applied, and (3) there is no production traffic
+  // in development. Never set NODE_ENV=development in a publicly accessible deployment.
   if (process.env.NODE_ENV !== "development") {
     const origin = headerList.get("origin");
     const host = headerList.get("host");
@@ -231,17 +223,18 @@ export async function POST(req: Request) {
   const { success, limit, reset, remaining } = await authRateLimiter.limit(ip);
 
   if (!success) {
-    return new Response(JSON.stringify({ 
-        error: "Too many requests. Slow down!",
-        retryAfter: reset 
-    }), {
-      status: 429,
-      headers: {
-        "X-RateLimit-Limit": limit.toString(),
-        "X-RateLimit-Remaining": remaining.toString(),
-        "X-RateLimit-Reset": reset.toString(),
-      },
-    });
+    return NextResponse.json(
+      { error: "Too many requests. Slow down!", retryAfter: reset },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
   }
 
   let verifieduserId = "";

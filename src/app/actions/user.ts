@@ -84,7 +84,7 @@ export async function setTermsVersionCookie(version: string): Promise<void> {
     path: "/",
     maxAge: 31536000, // 1 year
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
     httpOnly: true, // Secure cookie - checked server-side in proxy.ts
   });
 }
@@ -102,7 +102,7 @@ export async function clearTermsVersionCookie() {
     path: "/",
     maxAge: 0,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
     httpOnly: true,
   });
 }

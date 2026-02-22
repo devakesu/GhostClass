@@ -40,20 +40,31 @@ const profileFormSchema = z.object({
   gender: z.string().min(1, {
     message: "Please select a gender.",
   }),
-  birth_date: z.string().optional().nullable().refine((val) => {
-    if (!val) return true;
+  birth_date: z
+    .string()
+    .optional()
+    .nullable()
+    // Guard against non-standard date strings stored in legacy records.
+    // HTML <input type="date"> enforces YYYY-MM-DD but this makes it explicit at
+    // the Zod layer so API submissions and legacy data are also validated.
+    .refine(
+      (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      "Birth date must be in YYYY-MM-DD format",
+    )
+    .refine((val) => {
+      if (!val) return true;
 
-    // Normalize both the birth date and today's date to UTC midnight to avoid timezone issues
-    const [year, month, day] = val.split("-").map(Number);
-    const birthDate = new Date(Date.UTC(year, month - 1, day));
+      // Normalize both the birth date and today's date to UTC midnight to avoid timezone issues
+      const [year, month, day] = val.split("-").map(Number);
+      const birthDate = new Date(Date.UTC(year, month - 1, day));
 
-    const today = new Date();
-    const todayUtc = new Date(
-      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-    );
+      const today = new Date();
+      const todayUtc = new Date(
+        Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+      );
 
-    return birthDate.getTime() <= todayUtc.getTime();
-  }, "Birth date cannot be in the future"),
+      return birthDate.getTime() <= todayUtc.getTime();
+    }, "Birth date cannot be in the future"),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -134,12 +145,11 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
   function onSubmit(formValues: ProfileFormValues) {
     updateProfileMutation.mutate(
       { 
-        id: profile.id,
         data: {
           first_name: formValues.first_name,
           last_name: formValues.last_name,
-          gender: formValues.gender,
-          birth_date: formValues.birth_date || undefined,
+          gender: formValues.gender || null,
+          birth_date: formValues.birth_date || null,
         } 
       },
       {

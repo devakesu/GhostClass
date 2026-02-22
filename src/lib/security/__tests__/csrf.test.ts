@@ -96,20 +96,49 @@ describe("CSRF Protection", () => {
         name: "csrf_token",
         value: token,
         httpOnly: true, // XSS-safe: token not accessible to JavaScript
-        secure: false, // In test environment
+        secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
         sameSite: "strict",
         maxAge: 86400, // 24 hours
         path: "/",
       });
     });
 
-    it("should set secure flag based on NODE_ENV", async () => {
-      // In test environment (not production), secure should be false
-      const token = "test-token-789";
-      await setCsrfCookie(token);
-      
+    it("should set secure=true when NODE_ENV is production", async () => {
+      const original = process.env.NODE_ENV;
+      const originalHttps = process.env.HTTPS;
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("HTTPS", "");
+
+      await setCsrfCookie("tok");
       const callArg = mockCookieStore.set.mock.calls[0][0] as any;
-      expect(callArg.secure).toBe(process.env.NODE_ENV === "production");
+      expect(callArg.secure).toBe(true);
+
+      vi.stubEnv("NODE_ENV", original);
+      vi.stubEnv("HTTPS", originalHttps ?? "");
+    });
+
+    it("should set secure=true when HTTPS env var is 'true'", async () => {
+      const original = process.env.NODE_ENV;
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("HTTPS", "true");
+
+      await setCsrfCookie("tok");
+      const callArg = mockCookieStore.set.mock.calls[0][0] as any;
+      expect(callArg.secure).toBe(true);
+
+      vi.stubEnv("NODE_ENV", original);
+      vi.stubEnv("HTTPS", "");
+    });
+
+    it("should set secure=false when neither NODE_ENV=production nor HTTPS=true", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("HTTPS", "false");
+
+      await setCsrfCookie("tok");
+      const callArg = mockCookieStore.set.mock.calls[0][0] as any;
+      expect(callArg.secure).toBe(false);
+
+      vi.stubEnv("HTTPS", "");
     });
   });
 

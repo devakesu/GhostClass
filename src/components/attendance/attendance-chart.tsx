@@ -14,6 +14,7 @@ import { AttendanceReport, TrackAttendance, Course } from "@/types";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
 import { generateSlotKey } from "@/lib/utils";
 import { BarChart3 } from "lucide-react";
+import { ATTENDANCE_STATUS } from "@/lib/logic/attendance-reconciliation";
 
 // --- HELPERS ---
 const formatCourseCode = (code: string | undefined, fallback?: string) => {
@@ -21,7 +22,16 @@ const formatCourseCode = (code: string | undefined, fallback?: string) => {
   return val.length > 10 ? val.substring(0, 10) + "..." : val;
 };
 
-const isPresent = (code: number) => [110, 225, 112].includes(Number(code));
+// OTHER_LEAVE (112) is also counted as present for chart display totals,
+// matching the semantic used in this component before the ATTENDANCE_STATUS refactor.
+const isPresent = (code: number) => {
+  const n = Number(code);
+  return (
+    n === ATTENDANCE_STATUS.PRESENT ||
+    n === ATTENDANCE_STATUS.DUTY_LEAVE ||
+    n === ATTENDANCE_STATUS.OTHER_LEAVE
+  );
+};
 
 const normalize = (s: string | undefined) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
 
@@ -229,10 +239,14 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
           const key = generateSlotKey(sessionData.course.toString(), dateStr, sessionName);
           officialSessionMap.set(key, status);
 
-          if ([110, 225, 112].includes(status)) {
+          if (
+            status === ATTENDANCE_STATUS.PRESENT ||
+            status === ATTENDANCE_STATUS.DUTY_LEAVE ||
+            status === ATTENDANCE_STATUS.OTHER_LEAVE
+          ) {
             stats.present += 1;
             stats.total += 1;
-          } else if (status === 111) {
+          } else if (status === ATTENDANCE_STATUS.ABSENT) {
             stats.absent += 1;
             stats.total += 1;
           }

@@ -23,7 +23,10 @@ const axiosInstance = axios.create({
  */
 export function getCookie(name: string) {
   if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`${name}=([^;]+)`));
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${escapedName}=([^;]*)`)
+  );
   return match ? decodeURIComponent(match[1]) : null;
 }
 
@@ -216,13 +219,34 @@ export function setCsrfToken(token: string | null): void {
   }
 }
 
-/**
- * Legacy function name for backward compatibility.
- * @deprecated Use getCsrfToken() instead
- */
-export function ensureCsrfToken(): string | null {
-  return getCsrfToken();
-}
+// Global 401 response interceptor — handles two race conditions:
+// 1. Supabase session is valid but the EzyGo httpOnly cookie has been cleared/expired
+//    (the backend proxy returns 401 explicitly in that case — see /api/backend/[...path]/route.ts)
+// 2. The EzyGo token stored in the DB has become invalid (EzyGo rejects it with 401)
+// In either case the user's state is irrecoverably inconsistent and a clean logout is the
+// correct recovery path. A singleton flag prevents concurrent logout calls when multiple
+// in-flight requests all receive 401 simultaneously.
+let isLoggingOut401 = false;
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (
+      !isLoggingOut401 &&
+      error?.response?.status === 401 &&
+      typeof window !== "undefined"
+    ) {
+      isLoggingOut401 = true;
+      logger.warn("[axios] 401 received — session/token inconsistency detected, logging out");
+      try {
+        const { handleLogout } = await import("@/lib/security/auth");
+        await handleLogout();
+      } catch {
+        // handleLogout already redirects even on failure; ignore any throw here
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Attach CSRF token from memory (Synchronizer Token Pattern)
 axiosInstance.interceptors.request.use((config) => {

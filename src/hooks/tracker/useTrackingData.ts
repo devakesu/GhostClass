@@ -38,13 +38,16 @@ export function useTrackingData(user: User | null | undefined, options?: { enabl
     queryKey: [
       "track_data",
       user?.username ?? "",
-      JSON.stringify(semesterData),
-      JSON.stringify(academicYearData),
+      semesterData,
+      academicYearData,
     ],
     
     queryFn: async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return [];
+      // getSession() reads the JWT from local storage — no network call.
+      // The actual Supabase query below is RLS-protected, so an expired/invalid
+      // JWT will be rejected by Postgres regardless.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return [];
 
       // Explicit null checks to prevent race conditions
       if (!semesterData || !academicYearData) {

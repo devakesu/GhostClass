@@ -12,7 +12,7 @@ export default async function LoginPage() {
       </div>
 
       {/* Footer */}
-      <Footer className="mt-0 py-4 border-t-0 bg-transparent" />
+      <Footer className="mt-0 pt-4 border-t-0 bg-transparent" />
     </>
   );
 }
