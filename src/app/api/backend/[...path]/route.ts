@@ -177,7 +177,18 @@ function normalizeHost(value: string | null): string | null {
     }
   }
 
-  // Strip optional :port suffix for consistent hostname comparison
+  // Detect unbracketed IPv6 literals. All compressed IPv6 addresses (the common case)
+  // contain '::'. Full-form addresses (e.g. "2001:db8:0:0:0:0:0:1") contain multiple
+  // colons but no '::'. Guard the latter with a character-set check (hex digits,
+  // colons, dots) to avoid a false positive for malformed values like "host:port:extra".
+  const isUnbracketedIPv6 =
+    first.includes("::") ||
+    (/^[\da-fA-F:.]+$/.test(first) && first.indexOf(":") !== first.lastIndexOf(":"));
+  if (isUnbracketedIPv6) {
+    return first.toLowerCase();
+  }
+
+  // Strip optional :port suffix for consistent hostname comparison (IPv4 / hostname only)
   const portSeparatorIndex = first.indexOf(":");
   return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first).toLowerCase();
 }
