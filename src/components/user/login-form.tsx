@@ -14,7 +14,6 @@ import axios, { AxiosError } from "axios";
 import { getCsrfToken } from "@/lib/axios";
 import { useCSRFToken } from "@/hooks/use-csrf-token"; 
 
-import { Loading } from "@/components/loading";
 import { PasswordResetForm } from "./password-reset-form";
 import { motion, HTMLMotionProps, Variants } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
@@ -23,6 +22,7 @@ import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
 import { isAuthSessionMissingError } from "@/lib/security/auth";
 import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
+import NProgress from "nprogress";
 
 interface LoginFormProps extends HTMLMotionProps<"div"> {
   className?: string;
@@ -163,6 +163,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    NProgress.start();
 
     try {
       const passwordError = validatePassword(formData.password);
@@ -309,6 +310,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     } catch (error) {
       const err = error as AxiosError<ErrorResponse>;
+      NProgress.done();
       setIsLoading(false);
       
       let errorMsg = "An unexpected error occurred";
@@ -364,8 +366,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     },
   };
 
-  // Show loading only when the page is in a loading state
-  if (isLoadingPage) return <Loading />;
+  // Return null during the initial auth check so the page stays blank rather
+  // than flashing a full-screen spinner. NextTopLoader handles the visual
+  // feedback automatically when router.push("/dashboard") fires.
+  if (isLoadingPage) return null;
 
   if (showPasswordResetForm) {
     return (

@@ -45,11 +45,11 @@ describe("HelpClient", () => {
   });
 
   describe("FAQ accordion", () => {
-    it("renders all six FAQ questions collapsed by default", () => {
+    it("renders all FAQ questions collapsed by default", () => {
       render(<HelpClient />);
       const faqSection = screen.getByTestId("faq-section");
       const buttons = within(faqSection).getAllByRole("button");
-      expect(buttons.length).toBe(6);
+      expect(buttons.length).toBe(9);
       buttons.forEach((btn) => {
         expect(btn).toHaveAttribute("aria-expanded", "false");
       });

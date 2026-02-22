@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 
 export default function LegalClient() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-300 p-6 md:p-12">
+    <div className="bg-zinc-950 text-zinc-300 px-6 md:px-12 pt-6 md:pt-12">
       <div className="max-w-3xl mx-auto space-y-12">
         
         {/* Header */}

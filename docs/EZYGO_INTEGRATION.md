@@ -12,6 +12,7 @@ Complete documentation for EzyGo API rate limiting, batch fetcher implementation
 - [Implementation Coverage](#implementation-coverage)
 - [Configuration](#configuration)
 - [Optimization for Single-IP Deployment](#optimization-for-single-ip-deployment)
+- [Known Limitations & Trade-offs](#known-limitations--trade-offs)
 
 ---
 
@@ -422,6 +423,44 @@ const MAX_CONCURRENT = 15;
 - Reduce cache TTL
 - Implement cache invalidation on user actions
 - Use React Query refetch strategies
+
+---
+
+## Known Limitations & Trade-offs
+
+### Why calls route through the server instead of directly from the browser
+
+The original [Bunkr](https://github.com/ABHAY-100/Bunkr/) fork sent the EzyGo bearer token directly from client-side JavaScript, making browser → EzyGo API calls. This is fast—one fewer network hop—but it exposes the token in the browser's Network tab and in JavaScript memory, where it can be trivially extracted by any script running on the page (XSS, browser extensions, or even a user inspecting DevTools).
+
+GhostClass stores the EzyGo token in an **httpOnly cookie** (AES-256-GCM encrypted at rest in the database). All EzyGo requests flow through the Next.js server at `/api/backend/*`, so the raw token never appears in browser-visible traffic.
+
+| | Original fork (direct client calls) | GhostClass (server proxy) |
+| --- | --- | --- |
+| Token visible in browser DevTools | ✅ Yes | ❌ No |
+| Vulnerable to XSS token theft | ✅ Yes | ❌ No |
+| Extra network hop per request | ❌ No | ✅ Yes (~10–50 ms) |
+| EzyGo sees one IP for all users | ❌ No (each user's IP) | ✅ Yes (server IP) |
+| Rate limit scope | Per-user IP | Entire deployment |
+
+### Shared outbound IP & rate limit risk
+
+Because every user's EzyGo request originates from the same server IP, the deployment acts as a single client from EzyGo's perspective. If many users load the dashboard simultaneously, GhostClass could collectively hit EzyGo's rate limits even though each individual user generates only 6 calls.
+
+The three-layer protection system (LRU cache → rate limiter → circuit breaker) exists specifically to manage this constraint:
+
+- The **LRU cache** deduplicates identical requests within the TTL window — common for users in the same institution.
+- The **`MAX_CONCURRENT` cap** (default: 3) throttles outbound requests to EzyGo to a predictable rate.
+- The **circuit breaker** stops all requests if EzyGo starts returning errors, preventing a thundering-herd retry storm.
+
+### Latency impact
+
+The server-proxy adds one extra round-trip per API call. On a well-hosted server co-located with users (e.g., a regional VPS or edge deployment), this is typically **10–50 ms** per call. On a distant server, it can reach 100–200 ms. SSR mitigates this for the initial dashboard load — data is fetched server-side and streamed as HTML before the client hydrates.
+
+If latency is unacceptable for your deployment region:
+
+1. Deploy the Next.js server closer to your institution's geography.
+2. Increase the cache TTL (`CACHE_TTL` in `ezygo-batch-fetcher.ts`) to serve more requests from cache.
+3. Increase `MAX_CONCURRENT` cautiously — higher values reduce queue wait time but increase rate-limit risk.
 
 ---
 

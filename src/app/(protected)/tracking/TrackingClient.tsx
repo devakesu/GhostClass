@@ -260,7 +260,7 @@ export default function TrackingClient() {
 
   return isProcessing ? ( <div className="h-screen flex items-center justify-center"><Loading /></div> ) : (
     <LazyMotion features={domAnimation}>
-      <div className="flex flex-1 flex-col flex-wrap gap-4 h-full p-4 md:p-6 min-h-[70vh] text-center relative">
+      <div className="flex flex-1 flex-col flex-wrap gap-4 h-full p-4 md:p-6 text-center relative">
         {trackingData && allCourseKeys.length > 0 ? (
           <>
             <div className="mb-2 pb-4 mt-10">

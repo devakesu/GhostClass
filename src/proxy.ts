@@ -85,10 +85,13 @@ export async function proxy(request: NextRequest) {
     const redirectRes = NextResponse.redirect(url);
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
-    // Clear orphaned EzyGo token cookie — the Supabase session may have expired while
-    // the custom cookie persisted. Deleting it here prevents stale-token issues on
-    // the next login attempt.
+    // No valid Supabase session — wipe all custom session cookies so stale state from
+    // a previous user cannot be inherited by the next user on the same device.
+    // (Supabase's own sb-* cookies are managed by @supabase/ssr and untouched here.)
     redirectRes.cookies.delete('ezygo_access_token');
+    redirectRes.cookies.delete('terms_version');
+    redirectRes.cookies.delete('csrf_token');
+    redirectRes.cookies.delete('terms_redirect_count');
     return redirectRes;
   }
 

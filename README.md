@@ -691,6 +691,26 @@ For more details, see [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md#versioning--r
 9. ✅ Configure legal terms version and effective date
 10. ✅ Set up GPG signing and Bot PAT for automated workflows (see [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md))
 
+## ❓ Frequently Asked Questions
+
+**Why is the dashboard sometimes slow to load for the first few users when many people log in at once?**
+
+All EzyGo API calls are queued through a server-side rate limiter (default: 3 concurrent requests). This protects against hitting EzyGo's rate limits when many users hit the dashboard simultaneously. Early users get sub-2 s loads; later users in the same burst may wait a few extra seconds in the queue. See [EZYGO_INTEGRATION.md](docs/EZYGO_INTEGRATION.md) for tuning options.
+
+**Why doesn't GhostClass call the EzyGo API directly from the browser, like the original Bunkr fork?**
+
+The original fork exposed the EzyGo bearer token in client-side JavaScript and the browser's Network tab, making it trivially stealable by XSS or DevTools inspection. GhostClass stores the token in an `httpOnly` cookie (AES-256-GCM encrypted at rest) and proxies all EzyGo requests through the Next.js server, so the raw token is never visible in the browser. The trade-off is a small extra network hop (~10–50 ms) per request. See the [Known Limitations & Trade-offs](docs/EZYGO_INTEGRATION.md#known-limitations--trade-offs) section for the full comparison.
+
+**Can GhostClass get rate-limited by EzyGo?**
+
+Yes — since all users share the server's outbound IP, EzyGo sees a single client. The batch fetcher, LRU cache, and `MAX_CONCURRENT` cap are designed to keep outbound request volume low. If you run a large deployment (hundreds of concurrent users), consider increasing the cache TTL or deploying multiple instances behind different IPs.
+
+**Is my EzyGo password stored anywhere?**
+
+No. Your password is used once to authenticate with EzyGo and is never persisted. Only the resulting bearer token is stored (encrypted) in Supabase.
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! GhostClass uses an **automatic version bumping system** that handles versioning for you.

@@ -249,7 +249,7 @@ export default function NotificationsPage() {
   const isEmpty = virtualItems.length === 0;
 
   return (
-    <div ref={parentRef} className="min-h-screen bg-background relative overflow-auto">
+    <div ref={parentRef} className="bg-background relative overflow-auto">
       <header className="sticky top-0 z-20 w-full backdrop-blur-xl bg-background/80 border-b border-border/40">
         <div className="container mx-auto max-w-2xl px-4 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

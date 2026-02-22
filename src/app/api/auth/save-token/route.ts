@@ -14,7 +14,7 @@ import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { TERMS_VERSION } from "@/app/config/legal";
-import { setTermsVersionCookie } from "@/app/actions/user";
+import { setTermsVersionCookie, clearTermsVersionCookie } from "@/app/actions/user";
 import { getAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = 'force-dynamic';
@@ -787,10 +787,14 @@ export async function POST(req: Request) {
     if (dbError) throw dbError;
     await setAuthCookie(token);
 
-    // If user has already accepted the current terms version in DB, set the cookie
-    // This prevents redirect to /accept-terms when the user has already accepted
+    // If user has already accepted the current terms version in DB, set the cookie.
+    // Otherwise, explicitly clear any stale cookie that may have been left by a previous
+    // user on the same device (e.g. User A accepted → logged out without CSRF → User B
+    // logs in and inherits the cookie without ever accepting themselves).
     if (existingUser?.terms_version === TERMS_VERSION && existingUser?.terms_accepted_at) {
       await setTermsVersionCookie(TERMS_VERSION);
+    } else {
+      await clearTermsVersionCookie();
     }
 
     // Fetch user settings to return to client for immediate localStorage population

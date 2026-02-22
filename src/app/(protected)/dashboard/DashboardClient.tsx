@@ -535,12 +535,12 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
   return (
     <LazyMotion features={domAnimation}>
-    <div className="flex flex-col min-h-screen bg-background font-manrope">
-      <main className="flex-1 container mx-auto p-4 md:p-6">
+    <div className="flex flex-col bg-background font-manrope">
+      <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
         <div className="mb-6 flex flex-col lg:flex-row gap-6 lg:items-end justify-between">
           <div className="flex flex-col gap-4 flex-1">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold mb-2 w-full">Welcome back, <span className="gradient-name w-full pr-2">{profile?.first_name} {profile?.last_name}</span></h1>
+              <h1 className="text-2xl font-bold mb-2 w-full">Welcome back, <span className="gradient-name w-full pr-2">{profile?.first_name} {profile?.last_name}!</span></h1>
               <p className="text-muted-foreground font-normal italic">{"Track your classes, manage attendance, and stay ahead of the game!"}</p>
             </div>
             <div className="flex gap-4 items-center font-normal">
