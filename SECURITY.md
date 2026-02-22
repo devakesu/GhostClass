@@ -91,7 +91,7 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by ESLint and Redocly CLI)
 - **Status**: ✅ Patched
 
-#### glob: ^13.0.4
+#### glob: ^13.0.6
 
 - **Reason**: Performance improvements and security hardening in v13+
 - **Scope**: Dev-only (used by build tools: Sentry, Serwist)
@@ -109,7 +109,7 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **CVEs**: CVE-2025-69873 / [GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6)
 - **Scope**: Dev-only (Redocly CLI for OpenAPI validation)
 - **Status**: ✅ Patched via selective overrides
-- **Note**: ESLint dependencies retain older ajv versions to maintain compatibility (see Known Issues)
+- **Note**: ESLint's internal ajv (v6) is no longer flagged by `npm audit` — the advisory was resolved without requiring a global override or ESLint upgrade
 
 ### Maintenance Policy
 
@@ -120,28 +120,16 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 ## Known Issues
 
-### Development Dependencies
+No active known issues. `npm audit` reports **0 vulnerabilities** across all dependencies.
 
-#### ajv <8.18.0 ReDoS vulnerability (CVE-2025-69873 / GHSA-2g4f-4pwh-qvx6) in ESLint dependencies
+All previously tracked issues have been resolved:
 
-- **Status**: ⚠️ Accepted (dev-only trade-off)
-- **Severity**: Moderate (CVSS 5.3)
-- **Affected packages**: `eslint` (internal ajv v6), `@eslint/eslintrc`, `@typescript-eslint/*`
-- **Scope**: Dev tooling only — not present in the Docker image or production runtime
-- **Decision Rationale**:
-  - A global `ajv` override to v8 breaks ESLint because ajv v6→v8 has breaking API changes; ESLint v9 requires ajv v6 for internal configuration schema validation
-  - ESLint 10 was released but cannot be adopted yet: `typescript-eslint` v8 (latest: v8.56.0) does not support the new scope manager API introduced in ESLint 10; `typescript-eslint` v9 has not been released
-  - Selective `@redocly/*` overrides already patch the same CVE in the Redocly CLI dependency tree
-- **Mitigation**:
-  - ✅ @redocly packages patched via selective overrides (`eslint-config-next` ajv kept separate)
-  - ✅ ESLint runs only in isolated CI/dev environments, never in production
-  - ✅ No user-controlled input is processed by ESLint's internal ajv usage
-  - ✅ `$data` option is not enabled in this project's ESLint or typescript-eslint configuration
-  - 📊 Tracking typescript-eslint v9 release for ESLint 10 adoption
-- **Production Impact**: **None** — ESLint and devDependencies are excluded from the Docker image (`npm ci` in a multi-stage build; standalone output omits devDeps from the runtime layer)
-- **Exploitability**: Requires `$data: true` in an ajv schema with attacker-controlled JSON Schema input — not present in any linting or validation workflow here
-- **Alternatives Considered**: Global ajv override to v8 (rejected — breaks ESLint entirely); downgrading ESLint below v9 (rejected — loses security and flat-config features)
-- **Expected Resolution**: Will upgrade to ESLint 10 once `typescript-eslint` v9 is released with ESLint 10 support
+| Issue | Resolution |
+| --- | --- |
+| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. `@redocly/*` selective overrides remain as defence-in-depth. |
+| `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.2` override in `package.json`. |
+
+See [Dependency Security Overrides](#dependency-security-overrides) for the current override list.
 
 ## GitHub Actions Security
 

@@ -164,6 +164,33 @@ function getAllowedHosts(): Set<string> | null {
   return cachedAllowedHosts;
 }
 
+function normalizeHost(value: string | null): string | null {
+  if (!value) return null;
+  const first = value.split(",")[0]?.trim();
+  if (!first) return null;
+
+  // IPv6 hosts are commonly bracketed in Host/X-Forwarded-Host headers, e.g. [::1]:3000
+  if (first.startsWith("[")) {
+    const closingBracketIndex = first.indexOf("]");
+    if (closingBracketIndex > 0) {
+      return first.slice(1, closingBracketIndex).toLowerCase();
+    }
+  }
+
+  // Strip optional :port suffix for consistent hostname comparison
+  const portSeparatorIndex = first.indexOf(":");
+  return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first).toLowerCase();
+}
+
+function resolveRequestHostname(req: NextRequest): string | null {
+  // Prefer forwarded host when behind proxies/CDNs
+  return (
+    normalizeHost(req.headers.get("x-forwarded-host")) ??
+    normalizeHost(req.headers.get("host")) ??
+    normalizeHost(req.nextUrl.hostname)
+  );
+}
+
 // Maximum response size limit (3MB). This accommodates bulk data exports and large
 // institutional datasets while preventing memory exhaustion from unbounded responses.
 // Responses exceeding this limit will be rejected with an error.
@@ -282,28 +309,44 @@ async function forward(req: NextRequest, method: string, path: string[]) {
 
     const origin = req.headers.get("origin");
     if (!origin) {
-      // Provide helpful error message for non-browser clients
-      return NextResponse.json({ 
-        message: "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication." 
-      }, { status: 400 });
-    }
-    try {
-      // Use .hostname (not .host) to exclude port and properly handle IPv6 addresses
-      const originHostname = new URL(origin).hostname.toLowerCase();
-      // Strict allowlist - don't fall back to Host header which can be spoofed
-      if (!allowedHosts.has(originHostname)) {
-        // Log for monitoring potential attacks or misconfigured clients
-        logger.warn("Origin validation failed", { 
-          origin: originHostname, 
-          path: fullPath,
-          method 
-        });
-        return NextResponse.json({ 
-          message: "Origin not allowed. This endpoint only accepts requests from authorized domains." 
-        }, { status: 403 });
+      // Some same-origin browser GET/HEAD requests can omit Origin.
+      // Allow these only when browser fetch metadata marks the request as same-origin
+      // and the effective request host is explicitly allowlisted.
+      const isRead = method === "GET" || method === "HEAD";
+      const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
+      const requestHostname = resolveRequestHostname(req);
+      const isAllowedSameOriginRead =
+        isRead &&
+        secFetchSite === "same-origin" &&
+        !!requestHostname &&
+        allowedHosts.has(requestHostname);
+
+      if (!isAllowedSameOriginRead) {
+        // Provide helpful error message for non-browser clients
+        return NextResponse.json({
+          message: "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication."
+        }, { status: 400 });
       }
-    } catch {
-      return NextResponse.json({ message: "Invalid origin header format" }, { status: 400 });
+    }
+    if (origin) {
+      try {
+        // Use .hostname (not .host) to exclude port and properly handle IPv6 addresses
+        const originHostname = new URL(origin).hostname.toLowerCase();
+        // Strict allowlist - don't fall back to Host header which can be spoofed
+        if (!allowedHosts.has(originHostname)) {
+          // Log for monitoring potential attacks or misconfigured clients
+          logger.warn("Origin validation failed", {
+            origin: originHostname,
+            path: fullPath,
+            method
+          });
+          return NextResponse.json({
+            message: "Origin not allowed. This endpoint only accepts requests from authorized domains."
+          }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ message: "Invalid origin header format" }, { status: 400 });
+      }
     }
   }
 

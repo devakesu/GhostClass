@@ -726,8 +726,9 @@ Credits: [Bunkr](https://github.com/ABHAY-100/Bunkr/)
 ## 📧 Contact
 
 For any questions, feel free to reach out to me via email at
-[contact@ghostclass.devakesu.com](mailto:contact@ghostclass.devakesu.com)
-[fusion@devakesu.com](mailto:fusion@devakesu.com)
+
+- [contact@ghostclass.devakesu.com](mailto:contact@ghostclass.devakesu.com)
+- [fusion@devakesu.com](mailto:fusion@devakesu.com)
 
 ## 📄 License
 

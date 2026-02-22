@@ -192,7 +192,6 @@ jobs:
       attestations: write
     outputs:
       digest: ${{ steps.build-push.outputs.digest }}
-      image_name: ${{ steps.prep.outputs.image_name }}
       platforms: ${{ steps.prep.outputs.platforms }}
     steps:
       - name: Checkout
@@ -540,7 +539,6 @@ jobs:
 
       - name: Generate verification instructions
         env:
-          IMAGE_NAME: ${{ needs.build-and-release.outputs.image_name }}
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           VERSION_TAG: ${{ needs.calculate-version.outputs.version_tag }}
           DIGEST: ${{ needs.build-and-release.outputs.digest }}
@@ -628,7 +626,6 @@ jobs:
 
       - name: Create GitHub Release
         env:
-          IMAGE_NAME: ${{ needs.build-and-release.outputs.image_name }}
           DIGEST: ${{ needs.build-and-release.outputs.digest }}
           VERSION_TAG: ${{ needs.calculate-version.outputs.version_tag }}
           REPOSITORY: ${{ github.repository }}
