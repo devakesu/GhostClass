@@ -546,14 +546,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
-          # Use IMAGE_NAME from job output with fallback to repo name
-          if [ -z "${IMAGE_NAME}" ]; then
-            # Fallback: extract repo name and convert to lowercase
-            IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
-            echo "⚠️  IMAGE_NAME from job output is empty, using fallback: ${IMAGE_NAME}"
-          else
-            echo "✓ Using IMAGE_NAME from job output: ${IMAGE_NAME}"
-          fi
+          # Derive image name from repository name
+          IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
 
           # Convert platforms to readable format (same transformation as release notes)
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
