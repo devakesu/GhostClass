@@ -228,7 +228,7 @@ WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
-    apk add --no-cache wget
+    apk add --no-cache curl
 
 # Core Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -252,6 +252,6 @@ USER nextjs
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/api/health || exit 1
+  CMD curl --fail --silent --show-error http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["node", "server.js"]

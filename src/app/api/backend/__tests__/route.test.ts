@@ -284,6 +284,41 @@ describe('Backend Proxy Route', () => {
       expect(response.status).toBe(200);
     });
 
+    it('should allow same-origin GET without origin header when sec-fetch-site is same-origin', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          'sec-fetch-site': 'same-origin',
+          host: 'localhost:3000',
+        },
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(200);
+    });
+
+    it('should reject GET without origin header when sec-fetch-site is cross-site', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          'sec-fetch-site': 'cross-site',
+          host: 'localhost:3000',
+        },
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+    });
+
     it('should handle invalid origin URLs', async () => {
       const request = new NextRequest('http://localhost:3000/api/backend/users', {
         method: 'POST',

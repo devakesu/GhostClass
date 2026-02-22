@@ -694,8 +694,8 @@ grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
 **Description:**
 
-- `@sentry/nextjs @ 9.20.0` depends on `@sentry/node` which requires `minimatch < 10.2.1`
-- minimatch < 10.2.1 contains a ReDoS vulnerability (GHSA-3ppc-4f35-3m26)
+- `@sentry/nextjs @ 9.20.0` depends on `@sentry/node` which requires `minimatch < 10.2.2`
+- minimatch < 10.2.2 contains a ReDoS vulnerability (GHSA-3ppc-4f35-3m26)
 - **Risk Level:** MEDIUM
   - **Attack Surface:** Low (Sentry configuration is application-controlled, not user-input)
   - **Exploitability:** Requires crafted patterns in app code using Sentry filtering
@@ -706,8 +706,8 @@ The project is pinned to `@sentry/nextjs @ 9.20.0`. The 10.x line introduced bre
 
 **Fix Applied:**
 
-- ✅ Minimatch 10.2.1 released (fixes ReDoS)
-- ✅ Added `"minimatch": "^10.2.1"` override to `package.json` (forces patched version across all transitive dependencies)
+- ✅ Minimatch 10.2.2 available (fixes ReDoS)
+- ✅ Added `"minimatch": "^10.2.2"` override to `package.json` (forces patched version across all transitive dependencies)
 - ✅ All build stages use `--legacy-peer-deps` flag (bypasses peer dependency conflict from override):
   - **Local development:** `npm install --legacy-peer-deps` ✅
   - **GitHub Actions (test.yml):** `npm ci --legacy-peer-deps` (2 jobs) ✅
@@ -716,7 +716,7 @@ The project is pinned to `@sentry/nextjs @ 9.20.0`. The 10.x line introduced bre
 **Next Steps:**
 
 1. **Short-term** (Current): Use package.json override + `--legacy-peer-deps` flag (applied consistently everywhere)
-2. **Long-term** (Watch for Sentry SDK update): Wait for `@sentry/nextjs` to release a version that bumps `minimatch >= 10.2.1` in its dependencies
+2. **Long-term** (Watch for Sentry SDK update): Wait for `@sentry/nextjs` to release a version that bumps `minimatch >= 10.2.2` in its dependencies
    - Once Sentry releases a patched version, run: `npm install @sentry/nextjs@latest`
    - Package.json override can be removed once Sentry's transitive dependency is fixed
 
@@ -735,55 +735,34 @@ npm audit
 # Docker: grep 'npm ci' Dockerfile | grep legacy-peer-deps
 ```
 
-### Verify Dev Dependencies: ESLint/TypeScript Vulnerabilities
+### Dev Dependencies: ESLint/TypeScript Vulnerability Status
 
-#### ESLint/TypeScript/API Docs Vulnerabilities
+**Status**: ✅ Resolved — `npm audit` reports **0 vulnerabilities** across all dependencies.
 
-- `ajv < 8.18.0` and `minimatch < 10.2.1` in ESLint/TypeScript tooling
-- **Severity**: MODERATE/HIGH but dev-only
-- **Risk**: build-time tooling only, not in production code
-- **Status**: Partially mitigated; remaining dev-only issues depend on upstream ESLint/TypeScript tooling updates
+- `ajv@6.14.0` is still installed as an internal dependency of ESLint (`eslint@9.39.2`), however the advisory GHSA-2g4f-4pwh-qvx6 is no longer flagged by npm audit
+- `minimatch` is fully patched via the `^10.2.2` override in `package.json`
+- `@redocly/*` packages are patched via selective `ajv@^8.18.0` overrides
+- No ESLint 10 upgrade or `typescript-eslint` v9 was required to reach zero vulnerabilities
 
-**Why Not Fixed**:
+**Verification**:
 
-- Vulnerable `ajv`/`minimatch` versions are bundled transitively via ESLint / `@typescript-eslint/*` / Next.js eslint-config
-- Forcing direct upgrades would desync versions from what `eslint-config-next` and the wider ecosystem support, risking broken linting/TypeScript integration
-- These don't reach production—only used during builds and local linting
-
-**Action Plan**:
-
-1. ✅ Use `.npmrc` to suppress harmless dev-only audit warnings
-2. ⏳ Monitor ESLint 10+ / `typescript-eslint` / Next.js eslint-config updates that pull in patched `ajv`/`minimatch`
-3. ✅ When ecosystem updates are available: run `npm update` (or accept Renovate/Dependabot PRs) to pick up fixed versions
-
-**For CI/CD**:
-
-- GitHub dependency scanning flags as known vulnerabilities (acknowledged)
-- `.npmrc` suppresses exit code 1 for known dev-only issues
-- Production scan (`npm audit --omit=dev`) shows only Sentry minimatch issue
+```bash
+npm audit
+# → found 0 vulnerabilities
+```
 
 ---
 
 ## Troubleshooting
 
-### npm Audit Dev Dependencies
-
-Run production-only audit to exclude dev-tool vulnerabilities:
+### npm Audit
 
 ```bash
-npm audit --omit=dev
+npm audit
+# → found 0 vulnerabilities
 ```
 
-This shows only production risks (currently just Sentry's minimatch issue).
-
-**For CI/CD**: Update your audit step to use `--omit=dev`:
-
-```bash
-npm ci
-npm audit --omit=dev  # Instead of: npm audit
-```
-
-This prevents the build from failing on harmless dev-dependency vulnerabilities while still catching production issues.
+All known vulnerabilities are resolved. No `--omit=dev` workaround is needed.
 
 ### Common Issues
 
