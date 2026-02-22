@@ -48,6 +48,10 @@ jobs:
       BREVO_API_KEY: "test-brevo-key"
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x000000000000000000000AA"
       TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
+      REQUEST_SIGNING_SECRET: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210" # test-only; must differ from ENCRYPTION_KEY (key-separation)
+      NEXT_PUBLIC_APP_NAME: "GhostClass"
+      NEXT_PUBLIC_APP_VERSION: "1.9.0"
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:8080"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       NEXT_PUBLIC_APP_DOMAIN: "localhost"
       NEXT_PUBLIC_APP_EMAIL: "@localhost.com"
