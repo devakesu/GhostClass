@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         path: "/",
         expires: new Date(0),
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.HTTPS === "true" || process.env.NODE_ENV === "production",
       });
       // @supabase/ssr may also write a chunked variant: sb-{ref}-auth-token.0, .1 …
       // Clear any chunks present in the current request cookies.
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
             path: "/",
             expires: new Date(0),
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: process.env.HTTPS === "true" || process.env.NODE_ENV === "production",
           });
         }
       }

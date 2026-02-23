@@ -21,11 +21,14 @@ import { handleLogout } from "@/lib/security/auth";
  * @param minimal - When true, hides the timeout warning and action buttons.
  *                  Use this when Loading is embedded inside a component (e.g. a chart)
  *                  rather than as a full-page loader.
+ * @param message - Optional caption rendered below the spinner when `minimal={true}`.
+ *                  Has no effect when `minimal` is false or omitted.
  *
  * @example
  * ```tsx
- * <Loading />           // full-page with logout/refresh buttons after 15s
- * <Loading minimal />   // spinner + message only, no buttons
+ * <Loading />                                  // full-page with logout/refresh buttons after 15s
+ * <Loading minimal />                          // spinner only, no caption, no buttons
+ * <Loading minimal message="Loading data…" />  // spinner + caption, no buttons
  * ```
  */
 export function Loading({ minimal = false, message }: { minimal?: boolean; message?: string }) {

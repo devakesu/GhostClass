@@ -5,6 +5,34 @@ import { TERMS_VERSION } from "./app/config/legal";
 import { logger } from "./lib/logger";
 
 /**
+ * Clears all session-related cookies on a redirect response.
+ * Deletes custom app cookies plus the Supabase SSR auth cookie (including
+ * any chunked variants) derived from NEXT_PUBLIC_SUPABASE_URL.
+ * Call this on every logout/unauthenticated-redirect path so that adding a
+ * new session cookie only requires a change here, not in every branch.
+ */
+function clearSessionCookies(res: NextResponse, request: NextRequest) {
+  res.cookies.delete('ezygo_access_token');
+  res.cookies.delete('terms_version');
+  res.cookies.delete('csrf_token');
+  res.cookies.delete('terms_redirect_count');
+  try {
+    const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
+    if (projectRef) {
+      const sbCookieName = `sb-${projectRef}-auth-token`;
+      res.cookies.delete(sbCookieName);
+      for (const c of request.cookies.getAll()) {
+        if (c.name.startsWith(`${sbCookieName}.`)) {
+          res.cookies.delete(c.name);
+        }
+      }
+    }
+  } catch {
+    // Non-critical: cookie expiry handles it naturally
+  }
+}
+
+/**
  * Creates a cryptographically secure nonce for CSP.
  * Uses Web Crypto API for compatibility with both Node.js and Edge runtimes.
  */
@@ -88,28 +116,7 @@ export async function proxy(request: NextRequest) {
     redirectRes.headers.set("x-nonce", nonce);
     // No valid Supabase session — wipe all session cookies so stale state from
     // a previous user cannot be inherited by the next user on the same device.
-    redirectRes.cookies.delete('ezygo_access_token');
-    redirectRes.cookies.delete('terms_version');
-    redirectRes.cookies.delete('csrf_token');
-    redirectRes.cookies.delete('terms_redirect_count');
-    // Also clear the Supabase SSR auth cookie (sb-{project-ref}-auth-token).
-    // supabase.auth.getUser() already confirmed no valid session, but the cookie
-    // may still be present (expired/invalid token). Derive the name from the URL.
-    try {
-      const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
-      if (projectRef) {
-        const sbCookieName = `sb-${projectRef}-auth-token`;
-        redirectRes.cookies.delete(sbCookieName);
-        // Clear any chunked variants (@supabase/ssr may split large tokens)
-        for (const c of request.cookies.getAll()) {
-          if (c.name.startsWith(`${sbCookieName}.`)) {
-            redirectRes.cookies.delete(c.name);
-          }
-        }
-      }
-    } catch {
-      // Non-critical: cookie expiry handles it naturally
-    }
+    clearSessionCookies(redirectRes, request);
     return redirectRes;
   }
 
@@ -142,24 +149,7 @@ export async function proxy(request: NextRequest) {
       const logoutRes = NextResponse.redirect(homeUrl);
       logoutRes.headers.set('Content-Security-Policy', cspHeader);
       logoutRes.headers.set("x-nonce", nonce);
-      logoutRes.cookies.delete('ezygo_access_token');
-      logoutRes.cookies.delete('terms_version');
-      logoutRes.cookies.delete('csrf_token');
-      logoutRes.cookies.delete('terms_redirect_count');
-      try {
-        const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
-        if (projectRef) {
-          const sbCookieName = `sb-${projectRef}-auth-token`;
-          logoutRes.cookies.delete(sbCookieName);
-          for (const c of request.cookies.getAll()) {
-            if (c.name.startsWith(`${sbCookieName}.`)) {
-              logoutRes.cookies.delete(c.name);
-            }
-          }
-        }
-      } catch {
-        // Non-critical
-      }
+      clearSessionCookies(logoutRes, request);
       return logoutRes;
     }
     
