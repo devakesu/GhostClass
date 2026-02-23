@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearAuthCookie } from "@/lib/security/auth-cookie";
 import { removeCsrfToken, validateCsrfToken } from "@/lib/security/csrf";
-import { clearTermsVersionCookie } from "@/app/actions/user";
+import { clearTermsVersionCookie, clearTermsRedirectCountCookie } from "@/app/actions/user";
 
 export async function POST(req: NextRequest) {
   // CSRF protection: Prevent unauthorized logout attacks
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   await clearAuthCookie();
   await removeCsrfToken();
   await clearTermsVersionCookie();
+  await clearTermsRedirectCountCookie();
 
   // Clear the Supabase SSR session cookie (@supabase/ssr sets this as
   // sb-{project-ref}-auth-token). On account deletion supabase.auth.signOut()

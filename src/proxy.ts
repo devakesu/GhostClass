@@ -135,7 +135,7 @@ export async function proxy(request: NextRequest) {
     if (redirectCount >= 3) {
       // Too many redirect attempts — force-clear all session cookies and send to login.
       // Redirecting to a non-existent /logout page would 404; we clear state here directly
-      // instead. Client-side storage (localStorage) will be cleared by handleLogout when
+      // instead. Client-side storage (localStorage and sessionStorage) will be cleared by handleLogout when
       // ProtectedLayout detects the missing session on the next protected-route visit.
       logger.warn('Terms acceptance redirect loop detected. Logging user out.', {
         redirectCount,
