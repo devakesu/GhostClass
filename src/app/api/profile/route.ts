@@ -113,12 +113,17 @@ export async function GET() {
     logger.warn("Failed to decrypt phone:", e);
   }
 
-  // Fast path: DB row already exists → return it immediately so the UI (including
-  // the avatar) renders without waiting for the EzyGo network round-trip.
-  // avatar_url is always read from DB (EzyGo never provides it), so it is already
-  // correct. The EzyGo sync (name / email / phone refresh) runs after the response
-  // is sent so the next load picks up any upstream changes.
-  if (existingUser) {
+  // Fast path: DB row exists AND has a first_name (i.e. EzyGo has synced at least
+  // once) → return immediately so the UI renders without blocking on a fresh EzyGo
+  // round-trip. The background after() keeps names/email/phone fresh for subsequent
+  // loads.
+  //
+  // Guard on first_name: save-token only writes id/username/token/auth_id — it never
+  // writes email or first_name. Stub rows (created on first signup before the profile
+  // route has run the slow path) will have first_name = null. Without this guard the
+  // fast path returns all-null fields, React Query caches them for 5 min (staleTime),
+  // and the name never appears on the dashboard until a manual refresh.
+  if (existingUser && existingUser.first_name) {
     after(async () => {
       const syncToken = await getAuthTokenServer();
       if (!syncToken || !BASE_API_URL) return;
@@ -183,12 +188,12 @@ export async function GET() {
         ? encrypt(syncMergedBirthDate)
         : null;
 
+      // Use UPDATE (not upsert) so this background sync can never recreate a row
+      // that was legitimately deleted (e.g. account deletion racing with an in-flight
+      // after() callback). If the row no longer exists the update is a harmless no-op.
       const { error: bgUpsertError } = await supabaseAdmin
         .from("users")
-        .upsert(
-          {
-            id: existingUser.id,
-            auth_id: user.id,
+        .update({
             username:
               syncEzygoData.username ??
               syncEzygoData.user?.username ??
@@ -208,12 +213,12 @@ export async function GET() {
             avatar_url: existingUser.avatar_url ?? null,
             terms_version: existingUser.terms_version ?? null,
             terms_accepted_at: existingUser.terms_accepted_at ?? null,
-          },
-          { onConflict: "id" }
-        );
+        })
+        .eq("id", existingUser.id)
+        .eq("auth_id", user.id);
 
       if (bgUpsertError) {
-        logger.error("[background] Profile sync upsert failed:", bgUpsertError);
+        logger.error("[background] Profile sync update failed:", bgUpsertError);
         Sentry.captureException(bgUpsertError, {
           tags: {
             type: "profile_upsert_fail",

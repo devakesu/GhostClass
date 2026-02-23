@@ -346,27 +346,27 @@ export const Navbar = () => {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigateTo("/dashboard")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/dashboard")} className="cursor-pointer py-2" role="menuitem">
                 <Layers2 className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Dashboard</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigateTo("/tracking")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/tracking")} className="cursor-pointer py-2" role="menuitem">
                 <SquareAsterisk className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Tracking</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigateTo("/scores")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/scores")} className="cursor-pointer py-2" role="menuitem">
                 <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Scores</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigateTo("/profile")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/profile")} className="cursor-pointer py-2" role="menuitem">
                 <UserRound className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigateTo("/help")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/help")} className="cursor-pointer py-2" role="menuitem">
                 <HelpCircle className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Help & FAQ</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigateTo("/contact")} className="cursor-pointer" role="menuitem">
+              <DropdownMenuItem onClick={() => navigateTo("/contact")} className="cursor-pointer py-2" role="menuitem">
                 <Contact className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Contact Us</span>
               </DropdownMenuItem>

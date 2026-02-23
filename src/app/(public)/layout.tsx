@@ -87,7 +87,7 @@ export default function PublicLayout({
           <PublicNavbar />
         </motion.div>
 
-        <main className="w-full pt-20">
+        <main className="flex-1 w-full pt-20">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>

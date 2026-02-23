@@ -64,6 +64,17 @@ npm run dev
 npm run dev:https
 ```
 
+### Development URLs
+
+| URL | Description |
+| --- | --- |
+| `http://localhost:3000` | App root |
+| `http://localhost:3000/api-docs` | Scalar API reference (available in all environments) |
+| `http://localhost:3000/api/docs` | Scalar API reference shortcut — **development only**, returns 404 in production |
+| `http://localhost:3000/api/health` | Basic health check |
+| `http://localhost:3000/api/health/ezygo` | EzyGo integration health (includes rate-limiter + circuit-breaker metrics in dev) |
+| `http://localhost:3000/build-info` | Build provenance and version metadata |
+
 ### Optional Environment Variables
 
 These variables are **not required** for local development but enable additional behaviour when set.

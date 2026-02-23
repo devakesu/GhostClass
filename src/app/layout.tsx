@@ -121,13 +121,13 @@ export default async function RootLayout({
             color="#a855f7"
             initialPosition={0.08}
             crawlSpeed={200}
-            height={3}
+            height={5}
             crawl={true}
             showSpinner={false}
             easing="ease"
             speed={200}
             shadow={false}
-            zIndex={99999}
+            zIndex={2147483647}
           />
           <GlobalInit />
           <ServiceWorkerRegister />

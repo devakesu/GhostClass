@@ -28,7 +28,7 @@ describe('crypto', () => {
 
       expect(result).toHaveProperty('iv')
       expect(result).toHaveProperty('content')
-      expect(result.iv).toMatch(/^[a-f0-9]{32}$/i)
+      expect(result.iv).toMatch(/^[a-f0-9]{24}$/i)
       expect(result.content).toContain(':')
     })
 
@@ -100,7 +100,7 @@ describe('crypto', () => {
     })
 
     it('should throw error for missing content', () => {
-      expect(() => decrypt('0123456789abcdef0123456789abcdef', '')).toThrow('Invalid input')
+      expect(() => decrypt('0123456789abcdef01234567', '')).toThrow('Invalid input')
     })
 
     it('should throw error for invalid IV format', () => {
@@ -108,17 +108,17 @@ describe('crypto', () => {
     })
 
     it('should throw error for content without separator', () => {
-      const validIV = '0123456789abcdef0123456789abcdef'
+      const validIV = '0123456789abcdef01234567'
       expect(() => decrypt(validIV, 'noseparator')).toThrow('Invalid content format (missing separator)')
     })
 
     it('should throw error for content with multiple separators', () => {
-      const validIV = '0123456789abcdef0123456789abcdef'
+      const validIV = '0123456789abcdef01234567'
       expect(() => decrypt(validIV, 'tag:content:extra')).toThrow('Invalid content format (unexpected separators)')
     })
 
     it('should throw error for non-hex content', () => {
-      const validIV = '0123456789abcdef0123456789abcdef'
+      const validIV = '0123456789abcdef01234567'
       expect(() => decrypt(validIV, 'zzz:abc')).toThrow('Invalid content format (non-hex characters)')
     })
 
@@ -133,7 +133,7 @@ describe('crypto', () => {
 
     it('should throw error when using wrong IV', () => {
       const { content } = encrypt('test')
-      const wrongIV = '0123456789abcdef0123456789abcdef'
+      const wrongIV = '0123456789abcdef01234567'
       
       expect(() => decrypt(wrongIV, content)).toThrow('Decryption failed')
     })

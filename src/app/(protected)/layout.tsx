@@ -165,7 +165,7 @@ export default function ProtectedLayout({
             </motion.div>
             </LazyMotion>
             
-            <main className="w-full bg-background pt-20">
+            <main className="flex-1 w-full bg-background pt-20">
               <ErrorBoundary>
                 {children}
               </ErrorBoundary>

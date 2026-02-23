@@ -248,8 +248,17 @@ body:has(#nprogress):not(:has(.login-page)) > * {
   transition: filter 0.2s ease;
 }
 
+/* Ensure the NProgress bar always renders above headers and other stacked elements.
+ * body > * gets filter:blur(3px) during transitions which creates a new stacking
+ * context for each child. Explicitly setting filter:none on #nprogress prevents it
+ * from becoming a containing-block for its fixed-position .bar child, and the
+ * !important z-index override guarantees .bar beats any competing stacking context. */
 body:has(#nprogress) #nprogress {
-  filter: none;
+  filter: none !important;
+}
+
+#nprogress .bar {
+  z-index: 2147483647 !important;
 }
 
 /* Toast customizations to work with tracking prevention issues */

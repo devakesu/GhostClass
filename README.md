@@ -30,7 +30,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Real-time Updates** ⚡ - Get instant updates on your attendance status and skip calculations
 - **Track Status Changes** 📝 – Get notified when your attendance is updated
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
-- **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs`
+- **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs` (or `/api/docs` in development)
 - **Build Transparency** 🔍 - View complete build provenance and SLSA attestations at `/build-info`
 
 ## 🛠️ Tech Stack
@@ -117,8 +117,9 @@ src/
 │   │   ├── cron/             # Scheduled jobs (sync, cleanup)
 │   │   ├── health/           # Health check endpoint
 │   │   ├── analytics/        # GA4 server-side tracking
+│   │   ├── docs/             # Dev-only Scalar API viewer (404 in production)
 │   │   └── provenance/       # Build provenance information
-│   ├── api-docs/             # Scalar API documentation viewer
+│   ├── api-docs/             # Scalar API documentation viewer (production)
 │   ├── config/               # App configuration files
 │   ├── __tests__/            # App-level tests (robots, sitemap)
 │   ├── error.tsx             # Error boundary page
@@ -429,10 +430,11 @@ GhostClass is optimized for maximum performance:
 - **Development**: Webpack bundler via `--webpack` flag (Serwist compatibility)
 - Manifest file for installable web app experience
 - Intelligent caching strategies:
-  - Static assets: StaleWhileRevalidate for CSS/JS/workers
-  - Images: CacheFirst with 30-day expiration (trusted sources only)
-  - API requests: NetworkFirst (no explicit timeout; serves cache if network request fails)
-  - Note: Only `/api/public/*` and `/api/static/*` API endpoints are cached; all other API endpoints, including `/api/user-settings` and `/api/attendance`, always use the network to ensure fresh user data
+  - Static assets: `StaleWhileRevalidate` for CSS/JS/workers (30-day max age)
+  - Images: `CacheFirst` with 30-day expiration (CDN-trusted sources only)
+  - Allowlisted public APIs (`/api/public/*`, `/api/static/*`): `NetworkFirst`, 10 s timeout
+  - **Attendance data** (`/api/backend/**`, `/api/profile`): `NetworkFirst`, 10 s timeout, 6 h expiry, max 50 entries — enables offline reading of previously loaded attendance and course data
+  - All other API endpoints always hit the network (no caching) to avoid serving stale user-specific data
 
 ### Testing PWA Features Locally
 

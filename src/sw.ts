@@ -85,6 +85,42 @@ const serwist = new Serwist({
         networkTimeoutSeconds: 10,
       }),
     },
+    {
+      // Offline-capable attendance data caching.
+      // Caches GET responses from the EzyGo backend proxy (/api/backend/...) and
+      // the user profile endpoint (/api/profile) so attendance records and course
+      // data remain readable when the device is offline or the upstream is slow.
+      //
+      // Strategy: NetworkFirst with a 10 s timeout.
+      //   - Online: always serves fresh data; cache is updated in the background.
+      //   - Offline / timeout: falls back to the last cached response so the UI
+      //     can still render attendance cards instead of showing an error screen.
+      //
+      // Security notes:
+      //   - Only GET is matched, so mutations always hit the network.
+      //   - Responses are scoped to the same origin (service worker boundary),
+      //     so no cross-origin data leakage is possible.
+      //   - ExpirationPlugin caps cached entries at 50 and purges them after 6 h,
+      //     preventing stale session data surviving across multiple school days.
+      matcher: ({ request, url }) => {
+        if (request.method !== "GET") return false;
+        return (
+          url.pathname.startsWith("/api/backend/") ||
+          url.pathname === "/api/profile"
+        );
+      },
+      handler: new NetworkFirst({
+        cacheName: "attendance-data",
+        networkTimeoutSeconds: 10,
+        plugins: [
+          new CacheableResponsePlugin({ statuses: [200] }),
+          new ExpirationPlugin({
+            maxEntries: 50,
+            maxAgeSeconds: 60 * 60 * 6, // 6 hours
+          }),
+        ],
+      }),
+    },
   ],
 });
 

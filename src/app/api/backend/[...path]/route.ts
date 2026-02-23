@@ -72,12 +72,12 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 // Review carefully before adding new paths to ensure no sensitive endpoints are exposed.
 const PUBLIC_PATHS = new Set([
   "login",
-  // Add additional public paths here with explicit full paths
-  // Each path must have its own security measures (rate limiting, validation, etc.)
-  // Examples:
-  // "health",              // would match /api/backend/health
-  // "status/check",        // would match /api/backend/status/check
-  // "login/refresh",       // would match /api/backend/login/refresh
+  // Password reset flow – user has no EzyGo token yet; these endpoints accept
+  // unauthenticated requests. Rate limiting + OTP expiry are the upstream guards.
+  "login/lookup",           // POST – resolve username/email/phone to a username
+  "password/reset/options", // POST – list available OTP delivery channels
+  "password/reset/request", // POST – trigger OTP send to chosen channel
+  "password/reset",         // POST – submit OTP + new password
 ]);
 
 // Memoized allowed hosts computation for performance
