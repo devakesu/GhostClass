@@ -33,7 +33,22 @@ export function DeleteAccount() {
     
     setIsDeleting(true);
     try {
-      // Delete account data from database
+      // 1. Delete storage objects (avatars) using the Storage API.
+      // Direct deletion from storage.objects is blocked by Supabase; the JS client
+      // is the correct way to remove files before the account RPC runs.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: files } = await supabase.storage
+          .from('avatars')
+          .list(user.id, { limit: 100 });
+
+        if (files && files.length > 0) {
+          const paths = files.map((f) => `${user.id}/${f.name}`);
+          await supabase.storage.from('avatars').remove(paths);
+        }
+      }
+
+      // 2. Delete account data from database (public tables + auth user)
       const { error } = await supabase.rpc('delete_user_account');
 
       if (error) throw error;

@@ -28,7 +28,7 @@ import { handleLogout } from "@/lib/security/auth";
  * <Loading minimal />   // spinner + message only, no buttons
  * ```
  */
-export function Loading({ minimal = false }: { minimal?: boolean }) {
+export function Loading({ minimal = false, message }: { minimal?: boolean; message?: string }) {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
@@ -57,6 +57,10 @@ export function Loading({ minimal = false }: { minimal?: boolean }) {
       {/* Spinner + Text Container */}
       <div className="flex flex-col items-center gap-6 text-center max-w-md">
         <Ring2 size="45" stroke="4" speed="1" color="#3b82f6" aria-hidden="true" />
+
+        {minimal && message && (
+          <p className="text-sm text-muted-foreground">{message}</p>
+        )}
 
         {!minimal && (
           <div className="space-y-2">

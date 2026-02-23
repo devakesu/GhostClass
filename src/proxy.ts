@@ -86,13 +86,30 @@ export async function proxy(request: NextRequest) {
     const redirectRes = NextResponse.redirect(url);
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
-    // No valid Supabase session — wipe all custom session cookies so stale state from
+    // No valid Supabase session — wipe all session cookies so stale state from
     // a previous user cannot be inherited by the next user on the same device.
-    // (Supabase's own sb-* cookies are managed by @supabase/ssr and untouched here.)
     redirectRes.cookies.delete('ezygo_access_token');
     redirectRes.cookies.delete('terms_version');
     redirectRes.cookies.delete('csrf_token');
     redirectRes.cookies.delete('terms_redirect_count');
+    // Also clear the Supabase SSR auth cookie (sb-{project-ref}-auth-token).
+    // supabase.auth.getUser() already confirmed no valid session, but the cookie
+    // may still be present (expired/invalid token). Derive the name from the URL.
+    try {
+      const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
+      if (projectRef) {
+        const sbCookieName = `sb-${projectRef}-auth-token`;
+        redirectRes.cookies.delete(sbCookieName);
+        // Clear any chunked variants (@supabase/ssr may split large tokens)
+        for (const c of request.cookies.getAll()) {
+          if (c.name.startsWith(`${sbCookieName}.`)) {
+            redirectRes.cookies.delete(c.name);
+          }
+        }
+      }
+    } catch {
+      // Non-critical: cookie expiry handles it naturally
+    }
     return redirectRes;
   }
 
@@ -109,22 +126,40 @@ export async function proxy(request: NextRequest) {
     const redirectCount = (raw && /^\d+$/.test(raw)) ? parseInt(raw, 10) : 0;
     
     if (redirectCount >= 3) {
-      // Too many redirect attempts - log user out to break the loop
-      // Use logger to avoid exposing sensitive user information in production logs
+      // Too many redirect attempts — force-clear all session cookies and send to login.
+      // Redirecting to a non-existent /logout page would 404; we clear state here directly
+      // instead. Client-side storage (localStorage) will be cleared by handleLogout when
+      // ProtectedLayout detects the missing session on the next protected-route visit.
       logger.warn('Terms acceptance redirect loop detected. Logging user out.', {
         redirectCount,
         termsVersion: termsVersion || 'none',
         expectedVersion: TERMS_VERSION
       });
-      
-      const logoutUrl = url.clone();
-      logoutUrl.pathname = '/logout';
-      logoutUrl.searchParams.set('reason', 'terms_redirect_loop');
-      const logoutRes = NextResponse.redirect(logoutUrl);
+
+      const homeUrl = url.clone();
+      homeUrl.pathname = '/';
+      homeUrl.search = '';
+      const logoutRes = NextResponse.redirect(homeUrl);
       logoutRes.headers.set('Content-Security-Policy', cspHeader);
       logoutRes.headers.set("x-nonce", nonce);
-      // Clear the redirect count cookie
+      logoutRes.cookies.delete('ezygo_access_token');
+      logoutRes.cookies.delete('terms_version');
+      logoutRes.cookies.delete('csrf_token');
       logoutRes.cookies.delete('terms_redirect_count');
+      try {
+        const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
+        if (projectRef) {
+          const sbCookieName = `sb-${projectRef}-auth-token`;
+          logoutRes.cookies.delete(sbCookieName);
+          for (const c of request.cookies.getAll()) {
+            if (c.name.startsWith(`${sbCookieName}.`)) {
+              logoutRes.cookies.delete(c.name);
+            }
+          }
+        }
+      } catch {
+        // Non-critical
+      }
       return logoutRes;
     }
     
