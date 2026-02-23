@@ -38,13 +38,20 @@ export function DeleteAccount() {
       // is the correct way to remove files before the account RPC runs.
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: files } = await supabase.storage
+        const { data: files, error: listError } = await supabase.storage
           .from('avatars')
-          .list(user.id, { limit: 100 });
+          .list(user.id, { limit: 100 }, { signal: AbortSignal.timeout(5000) });
 
-        if (files && files.length > 0) {
+        if (listError) {
+          // Log but don't block account deletion if storage listing fails.
+          console.error("Failed to list avatar files during account deletion:", listError);
+        } else if (files && files.length > 0) {
           const paths = files.map((f) => `${user.id}/${f.name}`);
-          await supabase.storage.from('avatars').remove(paths);
+          const { error: removeError } = await supabase.storage.from('avatars').remove(paths);
+          if (removeError) {
+            // Log but still proceed with account deletion even if removal fails.
+            console.error("Failed to remove avatar files during account deletion:", removeError);
+          }
         }
       }
 
