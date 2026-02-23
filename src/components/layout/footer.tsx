@@ -20,6 +20,7 @@ const isValidUrl = (urlString: string | undefined): boolean => {
 export const Footer = ({ className }: { className?: string }) => {
   const commitSha = process.env.NEXT_PUBLIC_GIT_COMMIT_SHA ?? "unknown";
   const shortSha = commitSha === "unknown" ? "dev-build" : commitSha.substring(0, 7);
+  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
   
   // Validate all external URLs from environment variables
   const donateUrlRaw = process.env.NEXT_PUBLIC_DONATE_URL;
@@ -42,7 +43,7 @@ export const Footer = ({ className }: { className?: string }) => {
 
   return (
     <footer className={cn(
-      "w-full pt-6 pb-12 md:pb-10 mt-12 border-t border-border/40 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60",
+      "w-full pt-6 pb-12 md:pb-10 mt-6 border-t border-border/40 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60",
       className
     )} role="contentinfo" aria-label="Site footer">
       <div className="container px-4 md:px-8 flex flex-col-reverse md:flex-row justify-between items-center gap-y-6 gap-x-4 text-sm">
@@ -108,7 +109,7 @@ export const Footer = ({ className }: { className?: string }) => {
             </div>
             
             <div className="flex items-center gap-1.5">
-              <span>ver</span>
+              <span>v{appVersion}</span>
               <a
                 href={githubUrl && commitSha !== "unknown" ? `${githubUrl}/commit/${commitSha}` : "#"}
                 {...(githubUrl && commitSha !== "unknown"

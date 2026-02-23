@@ -69,8 +69,8 @@ export default function BuildInfoPage() {
   const validCommitSha = isValidCommitSha(meta.commit_sha);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="container max-w-5xl mx-auto px-4 py-12">
+    <div className="bg-background text-foreground">
+      <div className="container max-w-5xl mx-auto px-4 pt-12 pb-6">
         {/* Header */}
         <div className="mb-8">
           <Link href="/">

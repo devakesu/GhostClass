@@ -371,10 +371,25 @@ export default function HelpClient() {
       answer:
         "The instructor hasn't updated attendance records yet for that course in EzyGo.",
     },
+    {
+      question: "Why is the dashboard sometimes slow when many people log in at once?",
+      answer:
+        "All EzyGo API calls are queued through a server-side rate limiter (default: 3 concurrent requests) to avoid hitting EzyGo's rate limits. Early users in a burst get sub-2 s loads; later users in the same burst may wait a few extra seconds in the queue.",
+    },
+    {
+      question: "Why doesn't GhostClass call the EzyGo API directly from the browser?",
+      answer:
+        "The original approach exposed the EzyGo bearer token in the browser's Network tab and JavaScript memory — trivially stealable via DevTools or XSS. GhostClass stores the token in an httpOnly cookie (AES-256-GCM encrypted) and proxies all EzyGo requests through the server, so the raw token is never visible in the browser. The trade-off is a small extra network hop (~10–50 ms) per request.",
+    },
+    {
+      question: "Is my EzyGo password stored anywhere?",
+      answer:
+        "No. Your password is used once to authenticate with EzyGo and is never persisted. Only the resulting bearer token is stored (encrypted) in the database.",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-300 p-6 md:p-12">
+    <div className="bg-zinc-950 text-zinc-300 px-6 md:px-12 pt-6 md:pt-12">
       <div className="max-w-3xl mx-auto space-y-12">
         {/* ── Header ── */}
         <div className="flex items-center gap-4 border-b border-zinc-800 pb-6">
