@@ -106,3 +106,21 @@ export async function clearTermsVersionCookie() {
     httpOnly: true,
   });
 }
+
+/**
+ * Server action to clear the terms_redirect_count cookie.
+ * Should be called during logout to reset the redirect loop protection
+ * counter so a subsequent user on the same browser starts from zero.
+ */
+export async function clearTermsRedirectCountCookie() {
+  const cookieStore = await cookies();
+  cookieStore.set({
+    name: "terms_redirect_count",
+    value: "",
+    path: "/",
+    maxAge: 0,
+    sameSite: "strict",
+    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    httpOnly: true,
+  });
+}
