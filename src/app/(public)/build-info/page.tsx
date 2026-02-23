@@ -3,6 +3,15 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { CopyButton, InlineCopyButton } from "./copy-button";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Build Info",
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 interface BuildMeta {
   commit_sha: string;

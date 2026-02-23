@@ -32,6 +32,27 @@ export const isAuthSessionMissingError = (error: unknown): boolean => {
 };
 
 /**
+ * Detects Supabase browser lock manager timeout errors.
+ * These can occur on some devices/browsers when another tab/process holds
+ * the auth lock too long; callers can treat this as a recoverable client state issue.
+ */
+export const isSupabaseLockTimeoutError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  if (!('message' in error) || typeof error.message !== 'string') {
+    return false;
+  }
+
+  const lowerMessage = error.message.toLowerCase();
+  return (
+    lowerMessage.includes("navigator lockmanager") ||
+    lowerMessage.includes("exclusive navigator lockmanager lock") ||
+    (lowerMessage.includes("timed out") && lowerMessage.includes("auth-token"))
+  );
+};
+
+/**
  * Performs comprehensive logout with cleanup of all authentication state.
  * Handles Supabase session, local storage, cookies, and redirects to home.
  * 

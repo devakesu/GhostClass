@@ -162,11 +162,6 @@ export function useUserSettings() {
     return loadPrefetchedSettings(userId);
   }, [userId]);
   
-  // Track mutation window to prevent focus refetch from overwriting optimistic updates
-  // When user toggles a setting, we set this to true during onMutate
-  // and clear it after onSuccess/onError to prevent stale data from overwriting changes
-  const isMutatingRef = useRef(false);
-  
   // Track if we've attempted initialization to prevent redundant mutation calls
   // This prevents duplicate initialization during rapid refetches before mutation completes
   const hasAttemptedInitializationRef = useRef(false);
@@ -207,8 +202,11 @@ export function useUserSettings() {
           if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
             hasAttemptedInitializationRef.current = false;
           }
-          // Only invalidate queries for a valid user ID to avoid inconsistent cache operations
-          if (newUserId) {
+          // Only invalidate on SIGNED_IN (fresh login may have different settings).
+          // TOKEN_REFRESHED is Supabase's hourly auto-refresh — the user's settings haven't
+          // changed, so invalidating would fire a needless DB round-trip every hour.
+          // INITIAL_SESSION is handled naturally: `enabled: !!userId` activates the query.
+          if (newUserId && event === "SIGNED_IN") {
             queryClient.invalidateQueries({ queryKey: ["userSettings", newUserId] });
           }
           // Also remove any queries that might have been created with null userId during initial mount
@@ -282,13 +280,15 @@ export function useUserSettings() {
     // Gate the query itself on a non-null userId so we never fetch for ["userSettings", null].
     enabled: !!userId,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      // userId is guaranteed non-null here because `enabled: !!userId` gates this fn.
+      // Using the ref-tracked value avoids a redundant /auth/v1/user network call —
+      // the userId was already server-validated when onAuthStateChange fired.
+      if (!userId) return null;
 
       const { data, error } = await supabase
         .from("user_settings")
         .select("bunk_calculator_enabled, target_percentage")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (error) {
@@ -299,11 +299,13 @@ export function useUserSettings() {
 
       return data as UserSettings | null;
     },
-    staleTime: 30 * 1000, // 30 seconds - reduces API load while keeping data reasonably fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep cache for reasonable time to avoid unnecessary refetches
-    // Enable window focus refetch for cross-device sync, but block during mutations
-    // The mutation lifecycle is responsible for keeping isMutatingRef in sync
-    refetchOnWindowFocus: () => !isMutatingRef.current,
+    staleTime: 5 * 60 * 1000,  // 5 minutes — settings change rarely; no need to re-fetch on every focus
+    gcTime: 30 * 60 * 1000,       // 30 minutes — keep cache long to avoid cold-start fetches on re-mount
+    // Settings don't change on another device mid-session, so window-focus refetch adds no value
+    // and only burns API quota. Mutations (save settings) already update the cache directly.
+    refetchOnWindowFocus: false,
+    // Override the global 15-min refetchInterval — user settings don't need periodic polling
+    refetchInterval: false,
     retry: (failureCount, error) => {
       // Retry on network errors, but not on auth errors
       // This allows initial fetch attempts while auth is pending to fail gracefully
@@ -322,12 +324,15 @@ export function useUserSettings() {
   // 2. Mutation to update settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: { bunk_calculator_enabled?: boolean; target_percentage?: number }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error(NO_USER_ERROR_MESSAGE);
+      // currentUserIdRef is populated by onAuthStateChange (server-validated).
+      // The Supabase DB call will itself reject an expired session, so no extra
+      // getUser() round-trip is needed here.
+      const mutationUserId = currentUserIdRef.current;
+      if (!mutationUserId) throw new Error(NO_USER_ERROR_MESSAGE);
 
       const { data, error } = await supabase
         .from("user_settings")
-        .upsert({ user_id: user.id, ...newSettings })
+        .upsert({ user_id: mutationUserId, ...newSettings })
         .select()
         .single();
 
@@ -336,19 +341,13 @@ export function useUserSettings() {
     },
     // Optimistic update: update cache before server responds
     onMutate: async (newSettings): Promise<{ previousSettings: UserSettings | undefined; currentUserId: string | null }> => {
-      // Mark that we're in a mutation window - prevents focus refetch from pulling stale data
-      isMutatingRef.current = true;
-      
-      // Derive userId from the same source as the mutation (getUser) to ensure
-      // cache updates happen even if currentUserIdRef is stale/null.
-      // getUser() validates the session with the server (unlike getSession() which reads localStorage).
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id ?? null;
+      // Read from the ref that onAuthStateChange keeps up-to-date.
+      // Avoids a redundant /auth/v1/user call — the value was already validated server-side
+      // when the INITIAL_SESSION / SIGNED_IN event was received.
+      const currentUserId = currentUserIdRef.current;
       
       // If no userId is available, we shouldn't proceed with cache operations
       if (!currentUserId) {
-        // Reset mutation window flag since we're aborting optimistic update
-        isMutatingRef.current = false;
         logger.dev("Mutation attempted without userId - session not available");
         return { previousSettings: undefined, currentUserId: null };
       }
@@ -399,9 +398,6 @@ export function useUserSettings() {
       // DO NOT write to localStorage here - already done in onMutate
       // This prevents redundant writes and event dispatches that cause glitches
       // Server response only validates the optimistic update was correct
-      
-      // Clear mutation window flag - safe to refetch on focus now
-      isMutatingRef.current = false;
     },
     onError: (err, _variables, context) => {
       // Rollback to previous data on error
@@ -414,9 +410,6 @@ export function useUserSettings() {
         toast.error("Failed to save settings");
         Sentry.captureException(err, { tags: { type: "settings_update_error", location: "useUserSettings" } });
       }
-      
-      // Clear mutation window flag - safe to refetch on focus now
-      isMutatingRef.current = false;
     }
   });
 
@@ -437,26 +430,11 @@ export function useUserSettings() {
     // Track if effect is still mounted to prevent state updates after unmount
     let isMounted = true;
 
-    // Helper to validate session is still active and belongs to the expected user
-    // Returns true if session is valid, matches the expected userId, and component is still mounted
-    const validateActiveSession = async (expectedUserId: string): Promise<boolean> => {
-      // Check current mount state from closure to prevent race conditions
-      if (!isMounted) return false;
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error) {
-          // Log at dev level so auth/network issues are diagnosable while still treating them as "no user"
-          logger.dev("Error fetching auth user in validateActiveSession:", error);
-          return false;
-        }
-        const user = data?.user;
-        // Verify user exists, matches, and component is still mounted (re-check after async)
-        return !!(user && user.id === expectedUserId && isMounted);
-      } catch (err) {
-        // Catch any unexpected thrown errors from the Supabase client
-        logger.dev("Unexpected error in validateActiveSession:", err);
-        return false;
-      }
+    // Verify the component is still mounted and the expected user is still the active user.
+    // Synchronous check using currentUserIdRef (kept up-to-date by onAuthStateChange).
+    // Replaces the previous async getUser() call — no extra /auth/v1/user round-trip needed.
+    const validateActiveSession = (expectedUserId: string): boolean => {
+      return isMounted && currentUserIdRef.current === expectedUserId;
     };
 
     // Async IIFE to perform storage synchronization operations
@@ -465,10 +443,9 @@ export function useUserSettings() {
       if (!isMounted) return;
 
       try {
-        // Get current user ID from auth (getUser() validates the token server-side)
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const userId = currentUser?.id;
-        
+        // Use the ref kept up-to-date by onAuthStateChange — no extra network call.
+        const userId = currentUserIdRef.current;
+
         if (!userId) {
           logger.dev("No user ID available for storage sync, skipping");
           return;
@@ -484,12 +461,11 @@ export function useUserSettings() {
             sessionStorage.removeItem(legacyKey);
           }
           
-          // Validate session is still active and belongs to the same user before performing localStorage operations
-          // This prevents race condition where user logs out while this promise is pending
-          if (!(await validateActiveSession(userId))) {
+          // Validate the session is still active and belongs to the same user.
+          if (!validateActiveSession(userId)) {
             return;
           }
-          
+
           const localBunkKey = `showBunkCalc_${userId}`;
           const localBunk = localStorage.getItem(localBunkKey);
           const dbBunk = (settings.bunk_calculator_enabled ?? true).toString();
@@ -529,9 +505,8 @@ export function useUserSettings() {
             return;
           }
 
-          // Validate session is still active and belongs to the same user before calling mutateSettings
-          // This prevents race condition where user logs out while this promise is pending
-          if (!(await validateActiveSession(userId))) {
+          // Validate the session is still active and belongs to the same user.
+          if (!validateActiveSession(userId)) {
             return;
           }
 
@@ -605,9 +580,10 @@ export function useUserSettings() {
     return () => {
       isMounted = false;
     };
-    // mutateSettings is stable - it's the mutate function from useMutation and doesn't change between renders
+    // mutateSettings is stable - it's the mutate function from useMutation and doesn't change between renders.
+    // supabase.auth removed from deps: the sync effect no longer calls getUser() so doesn't need it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, isLoading, isFetching, updateSettingsMutation.isPending, supabase.auth]);
+  }, [settings, isLoading, isFetching, updateSettingsMutation.isPending]);
 
   return {
     settings,

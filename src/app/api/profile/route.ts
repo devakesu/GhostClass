@@ -5,7 +5,7 @@
 // in the database (PRIV-02).  All encryption/decryption happens here, on the
 // server.  The client never receives ciphertext or IV values.
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { encrypt, decrypt } from "@/lib/crypto";
@@ -102,6 +102,148 @@ export async function GET() {
   } catch (e) {
     logger.warn("Failed to decrypt birth_date:", e);
   }
+
+  // Also decrypt phone (needed for the fast-path response)
+  let decryptedPhone: string | null = null;
+  try {
+    if (existingUser?.phone && existingUser?.phone_iv) {
+      decryptedPhone = decrypt(existingUser.phone_iv, existingUser.phone);
+    }
+  } catch (e) {
+    logger.warn("Failed to decrypt phone:", e);
+  }
+
+  // Fast path: DB row already exists → return it immediately so the UI (including
+  // the avatar) renders without waiting for the EzyGo network round-trip.
+  // avatar_url is always read from DB (EzyGo never provides it), so it is already
+  // correct. The EzyGo sync (name / email / phone refresh) runs after the response
+  // is sent so the next load picks up any upstream changes.
+  if (existingUser) {
+    after(async () => {
+      const syncToken = await getAuthTokenServer();
+      if (!syncToken || !BASE_API_URL) return;
+
+      let syncEzygoData: EzygoProfileResponse | null = null;
+      try {
+        const ezygoRes = await fetch(`${BASE_API_URL}/myprofile`, {
+          headers: { Authorization: `Bearer ${syncToken}` },
+          cache: "no-store",
+        });
+        if (ezygoRes.ok) {
+          const json = (await ezygoRes.json()) as
+            | { data?: EzygoProfileResponse }
+            | EzygoProfileResponse;
+          syncEzygoData =
+            (json as { data?: EzygoProfileResponse }).data ??
+            (json as EzygoProfileResponse);
+        } else {
+          logger.warn(
+            "[background] EzyGo profile sync returned non-OK:",
+            ezygoRes.status
+          );
+        }
+      } catch (err) {
+        logger.warn("[background] EzyGo profile sync failed.");
+        Sentry.captureException(err, {
+          tags: {
+            type: "ezygo_profile_sync_fail",
+            location: "GET /api/profile background",
+          },
+        });
+      }
+
+      if (!syncEzygoData) return;
+
+      let syncRemoteFirst = syncEzygoData.first_name;
+      let syncRemoteLast = syncEzygoData.last_name;
+      if (!syncRemoteFirst && syncEzygoData.full_name) {
+        const parts = syncEzygoData.full_name.trim().split(" ");
+        syncRemoteFirst = parts[0];
+        syncRemoteLast = parts.slice(1).join(" ") || "";
+      }
+
+      const syncMergedFirst = resolve(existingUser.first_name, syncRemoteFirst);
+      const syncMergedLast = resolve(existingUser.last_name, syncRemoteLast);
+      const syncMergedPhone =
+        syncEzygoData.mobile ?? syncEzygoData.user?.mobile ?? null;
+      const syncMergedGender = resolve(
+        decryptedGender,
+        syncEzygoData.gender ?? syncEzygoData.sex
+      );
+      const syncMergedBirthDate = resolve(
+        decryptedBirthDate,
+        syncEzygoData.birth_date ?? syncEzygoData.dob
+      );
+
+      const syncEncPhone = syncMergedPhone ? encrypt(syncMergedPhone) : null;
+      const syncEncGender = syncMergedGender
+        ? encrypt(syncMergedGender)
+        : null;
+      const syncEncBirthDate = syncMergedBirthDate
+        ? encrypt(syncMergedBirthDate)
+        : null;
+
+      const { error: bgUpsertError } = await supabaseAdmin
+        .from("users")
+        .upsert(
+          {
+            id: existingUser.id,
+            auth_id: user.id,
+            username:
+              syncEzygoData.username ??
+              syncEzygoData.user?.username ??
+              existingUser.username,
+            email:
+              syncEzygoData.email ??
+              syncEzygoData.user?.email ??
+              existingUser.email,
+            first_name: syncMergedFirst,
+            last_name: syncMergedLast,
+            phone: syncEncPhone?.content ?? null,
+            phone_iv: syncEncPhone?.iv ?? null,
+            gender: syncEncGender?.content ?? null,
+            gender_iv: syncEncGender?.iv ?? null,
+            birth_date: syncEncBirthDate?.content ?? null,
+            birth_date_iv: syncEncBirthDate?.iv ?? null,
+            avatar_url: existingUser.avatar_url ?? null,
+            terms_version: existingUser.terms_version ?? null,
+            terms_accepted_at: existingUser.terms_accepted_at ?? null,
+          },
+          { onConflict: "id" }
+        );
+
+      if (bgUpsertError) {
+        logger.error("[background] Profile sync upsert failed:", bgUpsertError);
+        Sentry.captureException(bgUpsertError, {
+          tags: {
+            type: "profile_upsert_fail",
+            location: "GET /api/profile background",
+          },
+          extra: { userId: redact("id", String(existingUser.id)) },
+        });
+      }
+    });
+
+    return NextResponse.json(
+      {
+        id: existingUser.id,
+        username: existingUser.username,
+        email: existingUser.email,
+        first_name: existingUser.first_name,
+        last_name: existingUser.last_name,
+        phone: decryptedPhone,
+        gender: decryptedGender,
+        birth_date: decryptedBirthDate,
+        avatar_url: existingUser.avatar_url,
+        terms_version: existingUser.terms_version,
+        terms_accepted_at: existingUser.terms_accepted_at,
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
+  }
+
+  // Slow path: no DB row yet (first login). EzyGo is required to provide the
+  // user_id needed to seed the record — must block here.
 
   // 4. Fetch fresh profile data from EzyGo
   const token = await getAuthTokenServer();

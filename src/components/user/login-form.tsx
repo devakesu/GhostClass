@@ -20,7 +20,7 @@ import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
-import { isAuthSessionMissingError } from "@/lib/security/auth";
+import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
 import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
 import NProgress from "nprogress";
 
@@ -132,18 +132,20 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       setIsLoadingPage(true);
   
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { data: { session }, error } = await supabase.auth.getSession();
         // Ignore auth session missing errors - they're expected when not logged in
-        if (error && !isAuthSessionMissingError(error)) {
+        if (error && !isAuthSessionMissingError(error) && !isSupabaseLockTimeoutError(error)) {
           throw error;
         }
-        if (user && isMounted) {
+        if (session?.user && isMounted) {
           router.push("/dashboard");
           return;
         }
       } catch (err) {
-        if (err instanceof Error && !isAuthSessionMissingError(err)) {
+        if (err instanceof Error && !isAuthSessionMissingError(err) && !isSupabaseLockTimeoutError(err)) {
           logger.error("Unexpected error checking user session:", err);
+        } else if (err instanceof Error && isSupabaseLockTimeoutError(err)) {
+          logger.dev("Supabase auth lock timeout during page-load session check; continuing without redirect");
         }
       } finally {
         if (isMounted) {

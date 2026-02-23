@@ -1,5 +1,14 @@
 import { Footer } from "@/components/layout/footer";
 import { LoginForm } from "@/components/user/login-form";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Login",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function LoginPage() {
   return (
