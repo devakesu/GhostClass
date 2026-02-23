@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { handleLogout } from "@/lib/security/auth";
+import { logger } from "@/lib/logger";
 
 export function DeleteAccount() {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,19 +39,43 @@ export function DeleteAccount() {
       // is the correct way to remove files before the account RPC runs.
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: files, error: listError } = await supabase.storage
-          .from('avatars')
-          .list(user.id, { limit: 100 }, { signal: AbortSignal.timeout(5000) });
+        const limit = 100;
+        const maxIterations = 20; // Safety cap to avoid infinite loops in case of unexpected behavior.
+        const allPaths: string[] = [];
+        let offset = 0;
 
-        if (listError) {
-          // Log but don't block account deletion if storage listing fails.
-          console.error("Failed to list avatar files during account deletion:", listError);
-        } else if (files && files.length > 0) {
-          const paths = files.map((f) => `${user.id}/${f.name}`);
-          const { error: removeError } = await supabase.storage.from('avatars').remove(paths);
+        for (let i = 0; i < maxIterations; i++) {
+          const { data: files, error: listError } = await supabase.storage
+            .from('avatars')
+            .list(user.id, { limit, offset }, { signal: AbortSignal.timeout(5000) });
+
+          if (listError) {
+            // Log but don't block account deletion if storage listing fails.
+            logger.error("Failed to list avatar files during account deletion:", listError);
+            break;
+          }
+
+          if (!files || files.length === 0) {
+            break;
+          }
+
+          allPaths.push(...files.map((f) => `${user.id}/${f.name}`));
+
+          // If we received fewer than `limit` files, we've reached the last page.
+          if (files.length < limit) {
+            break;
+          }
+
+          offset += files.length;
+        }
+
+        if (allPaths.length > 0) {
+          const { error: removeError } = await supabase.storage
+            .from('avatars')
+            .remove(allPaths);
           if (removeError) {
             // Log but still proceed with account deletion even if removal fails.
-            console.error("Failed to remove avatar files during account deletion:", removeError);
+            logger.error("Failed to remove avatar files during account deletion:", removeError);
           }
         }
       }

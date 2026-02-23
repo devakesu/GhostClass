@@ -78,6 +78,7 @@ vi.mock("@/lib/logger", () => ({
 // --- auth helper ---
 vi.mock("@/lib/security/auth", () => ({
   isAuthSessionMissingError: vi.fn().mockReturnValue(false),
+  isSupabaseLockTimeoutError: vi.fn().mockReturnValue(false),
 }));
 
 // --- Password-reset form ---

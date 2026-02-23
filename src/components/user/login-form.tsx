@@ -149,12 +149,16 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         // We only clear localStorage and the prefetchedSettings sessionStorage key;
         // the CSRF token (csrf_token_memory) is freshly initialized by useCSRFToken()
         // earlier in this render and must not be removed.
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.clear();
-            sessionStorage.removeItem("prefetchedSettings");
-          } catch {
-            // Ignore restricted-storage environments (e.g. private browsing with blocked storage)
+        // Important: skip storage cleanup when Supabase returned a lock-timeout error,
+        // because the user may still have a valid session and we treat that error as recoverable.
+        if (!session?.user && (!error || isAuthSessionMissingError(error)) && !isSupabaseLockTimeoutError(error)) {
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.clear();
+              sessionStorage.removeItem("prefetchedSettings");
+            } catch {
+              // Ignore restricted-storage environments (e.g. private browsing with blocked storage)
+            }
           }
         }
       } catch (err) {
