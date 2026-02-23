@@ -81,11 +81,14 @@ export const useSetSemester = () => {
       queryClient.setQueryData(["semester"], variables.default_semester);
 
       // 2. Refresh ALL Dependent Data
-      // This ensures courses, attendance, and manual tracking data all switch to the new semester
+      // This ensures courses, attendance, tracking, and scores all switch to the new semester
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] }); // Refetch tracking data
       queryClient.invalidateQueries({ queryKey: ["count"] });      // Refetch stats
+      queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
+      queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
+      queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
     },
     onError: (error) => {
       logger.error("Error setting semester:", error);
@@ -116,6 +119,9 @@ export const useSetAcademicYear = () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] });
       queryClient.invalidateQueries({ queryKey: ["count"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
+      queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
+      queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
     },
     onError: (error) => {
       logger.error("Error setting academic year:", error);

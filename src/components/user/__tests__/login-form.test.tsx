@@ -4,7 +4,7 @@ import React from "react";
 
 // vi.mock factories are hoisted to the top of the file, so variables used inside
 // them must also be hoisted via vi.hoisted().
-const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter } = vi.hoisted(() => {
+const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter, mockGetSession } = vi.hoisted(() => {
   const push = vi.fn();
   return {
     mockNProgressStart: vi.fn(),
@@ -13,6 +13,8 @@ const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter } = vi.
     // A single stable router object prevents useEffect([router, supabase]) from
     // re-running on every render (which would cause an infinite loop in tests).
     mockRouter: { push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() },
+    // Hoisted so it can be used inside the vi.mock factory for @/lib/supabase/client.
+    mockGetSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
   };
 });
 
@@ -25,6 +27,26 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
+}));
+
+// --- Supabase client mock (overrides vitest.setup.ts global) ---
+// Uses the hoisted mockGetSession so individual tests can control getSession behavior.
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getSession: mockGetSession,
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    })),
+  })),
 }));
 
 // --- NProgress mock ---
@@ -78,6 +100,7 @@ vi.mock("@/lib/logger", () => ({
 // --- auth helper ---
 vi.mock("@/lib/security/auth", () => ({
   isAuthSessionMissingError: vi.fn().mockReturnValue(false),
+  isSupabaseLockTimeoutError: vi.fn().mockReturnValue(false),
 }));
 
 // --- Password-reset form ---
@@ -96,6 +119,7 @@ vi.mock("@/lib/security/csrf-constants", () => ({
 }));
 
 import { LoginForm } from "../login-form";
+import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -124,6 +148,11 @@ function fillValidForm(passwordInput: HTMLElement) {
 describe("LoginForm – NProgress integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mockGetSession to default (no session, no error) before each test.
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    // Reset auth helpers to default (both return false).
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
   });
 
   it("calls NProgress.start() when the form is submitted", async () => {
@@ -152,5 +181,61 @@ describe("LoginForm – NProgress integration", () => {
     });
 
     await waitFor(() => expect(mockNProgressDone).toHaveBeenCalled());
+  });
+});
+
+describe("LoginForm – mount-time storage cleanup", () => {
+  // Replace the global Storage objects with mocks so we can reliably track calls.
+  // vi.spyOn on the Storage prototype can fail silently in jsdom.
+  let mockLocalStorage: { clear: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn>; getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; key: ReturnType<typeof vi.fn>; length: number };
+  let mockSessionStorage: { clear: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn>; getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; key: ReturnType<typeof vi.fn>; length: number };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset auth helpers and session mock to clean defaults.
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    mockLocalStorage = { clear: vi.fn(), removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), key: vi.fn(), length: 0 };
+    mockSessionStorage = { clear: vi.fn(), removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), key: vi.fn(), length: 0 };
+    Object.defineProperty(global, "localStorage", { writable: true, configurable: true, value: mockLocalStorage });
+    Object.defineProperty(global, "sessionStorage", { writable: true, configurable: true, value: mockSessionStorage });
+  });
+
+  it("clears localStorage and sessionStorage when there is no session and no error", async () => {
+    // Default: getSession returns { session: null, error: null }.
+    // isAuthSessionMissingError and isSupabaseLockTimeoutError both return false.
+    render(<LoginForm />);
+    // Use waitFor because checkUser() is async: render() resolves immediately on the
+    // initial (pre-loading) frame, before the useEffect async session check completes.
+    await waitFor(() => expect(mockLocalStorage.clear).toHaveBeenCalled());
+    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("prefetchedSettings");
+  });
+
+  it("clears localStorage and sessionStorage when there is no session and the error is a session-missing error", async () => {
+    const sessionError = new Error("Auth session missing");
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: sessionError });
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(true);
+
+    render(<LoginForm />);
+    await waitFor(() => expect(mockLocalStorage.clear).toHaveBeenCalled());
+    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("prefetchedSettings");
+  });
+
+  it("does not clear storage when getSession returns a lock-timeout error", async () => {
+    const lockError = new Error(
+      "Exclusive Navigator LockManager lock timed out on auth-token",
+    );
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: lockError });
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(true);
+
+    render(<LoginForm />);
+    // Wait for the session check to have run (mockGetSession called), then flush
+    // remaining async work so the effect has fully completed before asserting.
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalled());
+    await act(async () => {});
+    expect(mockLocalStorage.clear).not.toHaveBeenCalled();
+    expect(mockSessionStorage.removeItem).not.toHaveBeenCalledWith("prefetchedSettings");
   });
 });

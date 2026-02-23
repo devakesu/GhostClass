@@ -141,6 +141,26 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           router.push("/dashboard");
           return;
         }
+
+        // No active session — clear any stale user data left by a previous session.
+        // This handles the case where the proxy force-redirected to "/" server-side
+        // (e.g. expired Supabase token, terms redirect loop) without client JS having
+        // run handleLogout(), so localStorage/sessionStorage were never cleared.
+        // We only clear localStorage and the prefetchedSettings sessionStorage key;
+        // the CSRF token (csrf_token_memory) is freshly initialized by useCSRFToken()
+        // earlier in this render and must not be removed.
+        // Important: skip storage cleanup when Supabase returned a lock-timeout error,
+        // because the user may still have a valid session and we treat that error as recoverable.
+        if (!session?.user && (!error || isAuthSessionMissingError(error)) && !isSupabaseLockTimeoutError(error)) {
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.clear();
+              sessionStorage.removeItem("prefetchedSettings");
+            } catch {
+              // Ignore restricted-storage environments (e.g. private browsing with blocked storage)
+            }
+          }
+        }
       } catch (err) {
         if (err instanceof Error && !isAuthSessionMissingError(err) && !isSupabaseLockTimeoutError(err)) {
           logger.error("Unexpected error checking user session:", err);

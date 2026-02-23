@@ -5,6 +5,34 @@ import { TERMS_VERSION } from "./app/config/legal";
 import { logger } from "./lib/logger";
 
 /**
+ * Clears all session-related cookies on a redirect response.
+ * Deletes custom app cookies plus the Supabase SSR auth cookie (including
+ * any chunked variants) derived from NEXT_PUBLIC_SUPABASE_URL.
+ * Call this on every logout/unauthenticated-redirect path so that adding a
+ * new session cookie only requires a change here, not in every branch.
+ */
+function clearSessionCookies(res: NextResponse, request: NextRequest) {
+  res.cookies.delete('ezygo_access_token');
+  res.cookies.delete('terms_version');
+  res.cookies.delete('csrf_token');
+  res.cookies.delete('terms_redirect_count');
+  try {
+    const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
+    if (projectRef) {
+      const sbCookieName = `sb-${projectRef}-auth-token`;
+      res.cookies.delete(sbCookieName);
+      for (const c of request.cookies.getAll()) {
+        if (c.name.startsWith(`${sbCookieName}.`)) {
+          res.cookies.delete(c.name);
+        }
+      }
+    }
+  } catch {
+    // Non-critical: cookie expiry handles it naturally
+  }
+}
+
+/**
  * Creates a cryptographically secure nonce for CSP.
  * Uses Web Crypto API for compatibility with both Node.js and Edge runtimes.
  */
@@ -86,13 +114,9 @@ export async function proxy(request: NextRequest) {
     const redirectRes = NextResponse.redirect(url);
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
-    // No valid Supabase session — wipe all custom session cookies so stale state from
+    // No valid Supabase session — wipe all session cookies so stale state from
     // a previous user cannot be inherited by the next user on the same device.
-    // (Supabase's own sb-* cookies are managed by @supabase/ssr and untouched here.)
-    redirectRes.cookies.delete('ezygo_access_token');
-    redirectRes.cookies.delete('terms_version');
-    redirectRes.cookies.delete('csrf_token');
-    redirectRes.cookies.delete('terms_redirect_count');
+    clearSessionCookies(redirectRes, request);
     return redirectRes;
   }
 
@@ -109,22 +133,23 @@ export async function proxy(request: NextRequest) {
     const redirectCount = (raw && /^\d+$/.test(raw)) ? parseInt(raw, 10) : 0;
     
     if (redirectCount >= 3) {
-      // Too many redirect attempts - log user out to break the loop
-      // Use logger to avoid exposing sensitive user information in production logs
+      // Too many redirect attempts — force-clear all session cookies and send to login.
+      // Redirecting to a non-existent /logout page would 404; we clear state here directly
+      // instead. Client-side storage (localStorage and sessionStorage) will be cleared by handleLogout when
+      // ProtectedLayout detects the missing session on the next protected-route visit.
       logger.warn('Terms acceptance redirect loop detected. Logging user out.', {
         redirectCount,
         termsVersion: termsVersion || 'none',
         expectedVersion: TERMS_VERSION
       });
-      
-      const logoutUrl = url.clone();
-      logoutUrl.pathname = '/logout';
-      logoutUrl.searchParams.set('reason', 'terms_redirect_loop');
-      const logoutRes = NextResponse.redirect(logoutUrl);
+
+      const homeUrl = url.clone();
+      homeUrl.pathname = '/';
+      homeUrl.search = '';
+      const logoutRes = NextResponse.redirect(homeUrl);
       logoutRes.headers.set('Content-Security-Policy', cspHeader);
       logoutRes.headers.set("x-nonce", nonce);
-      // Clear the redirect count cookie
-      logoutRes.cookies.delete('terms_redirect_count');
+      clearSessionCookies(logoutRes, request);
       return logoutRes;
     }
     

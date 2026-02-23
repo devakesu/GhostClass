@@ -525,7 +525,7 @@ function ExamDetailDrawer({
           {/* Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-12">
-              <Loading minimal />
+              <Loading minimal message="Waiting on Ezygo to stop ghosting us 👻" />
             </div>
           )}
 
@@ -764,7 +764,7 @@ export default function ScoresClient() {
   if (isLoading || (!exams && !isError)) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
-        <Loading minimal />
+        <Loading minimal message="Waiting on Ezygo to stop ghosting us 👻" />
       </div>
     );
   }

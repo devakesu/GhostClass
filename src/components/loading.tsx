@@ -21,14 +21,17 @@ import { handleLogout } from "@/lib/security/auth";
  * @param minimal - When true, hides the timeout warning and action buttons.
  *                  Use this when Loading is embedded inside a component (e.g. a chart)
  *                  rather than as a full-page loader.
+ * @param message - Optional caption rendered below the spinner when `minimal={true}`.
+ *                  Has no effect when `minimal` is false or omitted.
  *
  * @example
  * ```tsx
- * <Loading />           // full-page with logout/refresh buttons after 15s
- * <Loading minimal />   // spinner + message only, no buttons
+ * <Loading />                                  // full-page with logout/refresh buttons after 15s
+ * <Loading minimal />                          // spinner only, no caption, no buttons
+ * <Loading minimal message="Loading data…" />  // spinner + caption, no buttons
  * ```
  */
-export function Loading({ minimal = false }: { minimal?: boolean }) {
+export function Loading({ minimal = false, message }: { minimal?: boolean; message?: string }) {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
@@ -57,6 +60,10 @@ export function Loading({ minimal = false }: { minimal?: boolean }) {
       {/* Spinner + Text Container */}
       <div className="flex flex-col items-center gap-6 text-center max-w-md">
         <Ring2 size="45" stroke="4" speed="1" color="#3b82f6" aria-hidden="true" />
+
+        {minimal && message && (
+          <p className="text-sm text-muted-foreground">{message}</p>
+        )}
 
         {!minimal && (
           <div className="space-y-2">

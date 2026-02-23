@@ -249,7 +249,7 @@ export default function NotificationsPage() {
   const isEmpty = virtualItems.length === 0;
 
   return (
-    <div ref={parentRef} className="bg-background relative overflow-auto">
+    <div ref={parentRef} className="bg-background relative overflow-auto flex flex-col">
       <header className="sticky top-0 z-20 w-full backdrop-blur-xl bg-background/80 border-b border-border/40">
         <div className="container mx-auto max-w-2xl px-4 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -265,9 +265,9 @@ export default function NotificationsPage() {
         </div>
       </header>
 
-      <main className="container mx-auto max-w-2xl">
+      <main className="container mx-auto max-w-2xl flex-1 flex flex-col">
         {isEmpty ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
             <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
               <BellOff className="h-9 w-9 text-muted-foreground/50" aria-hidden="true"/>
             </div>
