@@ -90,6 +90,58 @@ const CSRF_STORAGE_KEY = "csrf_token_memory";
 const CSRF_TOKEN_MIN_LENGTH = 64;
 const CSRF_TOKEN_HEX_PATTERN = /^[0-9a-f]+$/;
 
+type RetryableRequestConfig = {
+  _csrfRetried?: boolean;
+};
+
+let csrfRefreshPromise: Promise<string | null> | null = null;
+
+async function refreshCsrfToken(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (csrfRefreshPromise) {
+    return csrfRefreshPromise;
+  }
+
+  csrfRefreshPromise = (async () => {
+    try {
+      const response = await fetch("/api/csrf", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        logger.warn("[axios] Failed to refresh CSRF token", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return null;
+      }
+
+      const data = await response.json().catch(() => null);
+      const token = typeof data?.token === "string" ? data.token : null;
+
+      if (!token) {
+        logger.warn("[axios] CSRF refresh response missing token");
+        return null;
+      }
+
+      setCsrfToken(token);
+      return token;
+    } catch (error) {
+      logger.warn("[axios] Error refreshing CSRF token", error);
+      return null;
+    } finally {
+      csrfRefreshPromise = null;
+    }
+  })();
+
+  return csrfRefreshPromise;
+}
+
 /**
  * Check for CSP meta tag in the document.
  * 
@@ -230,6 +282,33 @@ let isLoggingOut401 = false;
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalConfig = (error?.config ?? {}) as RetryableRequestConfig & {
+      headers?: {
+        set?: (name: string, value: string) => void;
+      };
+    };
+    const responseData = error?.response?.data as { message?: string; error?: string } | undefined;
+    const csrfMessage = responseData?.message || responseData?.error || "";
+
+    if (
+      !originalConfig._csrfRetried &&
+      error?.response?.status === 403 &&
+      typeof csrfMessage === "string" &&
+      csrfMessage.toLowerCase().includes("invalid csrf token") &&
+      typeof window !== "undefined"
+    ) {
+      originalConfig._csrfRetried = true;
+      const freshToken = await refreshCsrfToken();
+
+      if (freshToken) {
+        if (originalConfig.headers?.set) {
+          originalConfig.headers.set(CSRF_HEADER, freshToken);
+        }
+        logger.info("[axios] Retrying request after CSRF token refresh");
+        return axiosInstance.request(originalConfig as never);
+      }
+    }
+
     if (
       !isLoggingOut401 &&
       error?.response?.status === 401 &&

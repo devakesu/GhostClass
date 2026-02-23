@@ -18,6 +18,13 @@ vi.hoisted(() => {
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 });
 
+// --- Mock next/server: preserve all real exports, stub `after` as no-op ---
+// `after()` requires a Next.js request context which is not available in Vitest.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: vi.fn() };
+});
+
 // --- Mock server Supabase client (async) ---
 const mockGetUser = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({

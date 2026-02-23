@@ -71,9 +71,9 @@ describe("sitemap.xml", () => {
     expect(helpPage?.priority).toBe(0.7);
   });
 
-  it("should have 4 URLs total", () => {
+  it("should have 5 URLs total", () => {
     const urls = sitemap();
-    expect(urls).toHaveLength(4);
+    expect(urls).toHaveLength(5);
   });
 
   it("should set lastModified to Date when BUILD_TIMESTAMP is set", () => {
@@ -147,12 +147,15 @@ describe("sitemap.xml", () => {
     // Help page at 0.7 (useful but lower than core)
     expect(find("/help")?.priority).toBe(0.7);
 
-    // /login and /build-info should not be present
-    expect(find("/login")).toBeUndefined();
-    expect(find("/build-info")).toBeUndefined();
+    // build-info is present at 0.4 (transparency page, low crawl priority)
+    expect(find("/build-info")?.priority).toBe(0.4);
 
-    // Ordering: homepage > core (0.8) > help (0.7)
+    // /login should not be present
+    expect(find("/login")).toBeUndefined();
+
+    // Ordering: homepage > core (0.8) > help (0.7) > build-info (0.4)
     expect((find("")?.priority ?? 0)).toBeGreaterThan(find("/contact")?.priority ?? 0);
     expect((find("/contact")?.priority ?? 0)).toBeGreaterThan(find("/help")?.priority ?? 0);
+    expect((find("/help")?.priority ?? 0)).toBeGreaterThan(find("/build-info")?.priority ?? 0);
   });
 });

@@ -4,13 +4,12 @@ import React from "react";
 
 // vi.mock factories are hoisted to the top of the file, so variables used inside
 // them must also be hoisted via vi.hoisted().
-const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockPush, mockRouter } = vi.hoisted(() => {
+const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter } = vi.hoisted(() => {
   const push = vi.fn();
   return {
     mockNProgressStart: vi.fn(),
     mockNProgressDone: vi.fn(),
     mockAxiosPost: vi.fn(),
-    mockPush: push,
     // A single stable router object prevents useEffect([router, supabase]) from
     // re-running on every render (which would cause an infinite loop in tests).
     mockRouter: { push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() },

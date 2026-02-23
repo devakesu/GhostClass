@@ -33,6 +33,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Building2,
+  GraduationCap,
   Layers2,
   LogOut,
   UserRound,
@@ -65,7 +66,9 @@ export const Navbar = () => {
   const selectedInstitution = defaultInstitutionUser?.toString() ?? "";
 
   const pathname = usePathname();
-  const { unreadCount } = useNotifications(true);
+  // countOnly=true: skips the action-conflict query and infinite feed query (both with
+  // 30 s polling) — the navbar only ever needs the badge number.
+  const { unreadCount } = useNotifications(true, true);
 
   // Handle Bunk Calc Toggle 
   const handleBunkCalcToggle = (checked: boolean) => {
@@ -174,6 +177,19 @@ export const Navbar = () => {
               >
                 <SquareAsterisk className="h-4 w-4" />
                 Tracking
+              </Button>
+            </div>
+          )}
+
+          {pathname !== "/scores" && (
+            <div className="max-lg:hidden text-white/85">
+              <Button
+                variant={"outline"}
+                className="custom-button cursor-pointer"
+                onClick={() => navigateTo("/scores")}
+              >
+                <GraduationCap className="h-4 w-4" />
+                Scores
               </Button>
             </div>
           )}
@@ -337,6 +353,10 @@ export const Navbar = () => {
               <DropdownMenuItem onClick={() => navigateTo("/tracking")} className="cursor-pointer" role="menuitem">
                 <SquareAsterisk className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Tracking</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigateTo("/scores")} className="cursor-pointer" role="menuitem">
+                <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
+                <span>Scores</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigateTo("/profile")} className="cursor-pointer" role="menuitem">
                 <UserRound className="mr-2 h-4 w-4" aria-hidden="true" />

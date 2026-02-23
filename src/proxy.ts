@@ -72,11 +72,12 @@ export async function proxy(request: NextRequest) {
   const isProfileRoute = request.nextUrl.pathname.startsWith("/profile");
   const isNotificationsRoute = request.nextUrl.pathname.startsWith("/notifications");
   const isTrackingRoute = request.nextUrl.pathname.startsWith("/tracking");
+  const isScoresRoute = request.nextUrl.pathname.startsWith("/scores");
   const isAuthRoute = request.nextUrl.pathname === "/";
   const isAcceptTermsRoute = request.nextUrl.pathname === "/accept-terms";
 
   // Protected routes that require authentication and terms acceptance
-  const isProtectedRoute = isDashboardRoute || isProfileRoute || isNotificationsRoute || isTrackingRoute;
+  const isProtectedRoute = isDashboardRoute || isProfileRoute || isNotificationsRoute || isTrackingRoute || isScoresRoute;
 
   // Scenario A: Unauthenticated users cannot access protected routes or accept-terms page
   if (!user && (isProtectedRoute || isAcceptTermsRoute)) {

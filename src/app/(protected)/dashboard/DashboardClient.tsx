@@ -67,7 +67,7 @@ const captureSentryException = (error: unknown, context?: CaptureExceptionContex
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
-    <CompLoading />
+    <CompLoading minimal />
   </div>
 );
 
@@ -541,7 +541,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
           <div className="flex flex-col gap-4 flex-1">
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-bold mb-2 w-full">Welcome back, <span className="gradient-name w-full pr-2">{profile?.first_name} {profile?.last_name}!</span></h1>
-              <p className="text-muted-foreground font-normal italic">{"Track your classes, manage attendance, and stay ahead of the game!"}</p>
+              <p className="text-muted-foreground font-normal italic">{"Track your classes, manage attendance, view your scores, and stay ahead of the game!"}</p>
             </div>
             <div className="flex gap-4 items-center font-normal">
               <p className="flex flex-wrap items-center gap-2.5 max-sm:text-md text-muted-foreground">

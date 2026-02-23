@@ -14,8 +14,8 @@ FROM ${NODE_IMAGE} AS base
 # so overwriting that directory via tar achieves the same result with no unpinned npm invocation.
 # The tarball is verified by SHA-256 before extraction.
 RUN apk add --no-cache wget && \
-  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-11.10.0.tgz && \
-  echo "43c653384c39617756846ad405705061a78fb6bbddb2ced57ab79fb92e8af2a7  /tmp/npm.tgz" | sha256sum -c - && \
+  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-11.10.1.tgz && \
+  echo "2190945151842685142f5085b3c5dd356b1021ab390d7d02c2bb2c580f0c4840  /tmp/npm.tgz" | sha256sum -c - && \
   rm -rf /usr/local/lib/node_modules/npm && \
   mkdir -p /usr/local/lib/node_modules/npm && \
   tar -xz --strip-components=1 -C /usr/local/lib/node_modules/npm -f /tmp/npm.tgz && \

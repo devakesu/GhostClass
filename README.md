@@ -24,6 +24,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **The Bunk Calc** 🧮: Know exactly how many classes you can miss before the threshold comes for your neck.
 - **Visual Receipts** 📊: Performance charts and a detailed calendar history so you can see your attendance glow-up in real-time.
 - **Anti-Ghosting Tracker** 👻: A personalized list to watch wrongly marked absences like a hawk until they get updated.
+- **Scores Viewer** 📋: Browse all your exam and assignment results grouped by course, with a stats summary and a per-question breakdown drawer showing individual answer scores and max marks.
 - **Ezygo Integration** 🔄 - Use your existing ezygo credentials - no new accounts needed
 - **Multi-Device Support** 🔐 - Login from multiple devices simultaneously without losing sessions
 - **Real-time Updates** ⚡ - Get instant updates on your attendance status and skip calculations
@@ -97,10 +98,11 @@ src/
 ├── sw.ts                     # Service worker with runtime caching
 ├── app/                      # Next.js app router pages and layouts
 │   ├── (auth)/               # Authentication routes (login, signup)
-│   ├── (protected)/          # Login-restricted routes (dashboard, profile, tracking)
+│   ├── (protected)/          # Login-restricted routes (dashboard, profile, tracking, scores)
 │   │   ├── dashboard/        # Main dashboard with attendance overview
 │   │   ├── profile/          # User profile and settings
 │   │   ├── tracking/         # Manual attendance tracking interface
+│   │   ├── scores/           # Exam & assignment scores viewer with per-question breakdown drawer
 │   │   └── notifications/    # Notification center
 │   ├── (public)/             # Public routes (home, contact, legal, build-info, help)
 │   │   ├── build-info/       # Build provenance and transparency page
@@ -133,6 +135,8 @@ src/
 │   │   ├── attendance-chart.tsx    # Performance charts
 │   │   ├── AddAttendanceDialog.tsx # Dialog for adding manual attendance records
 │   │   └── AddRecordTrigger.tsx    # Trigger button for the add-record dialog
+│   │   # Scores UI is colocated in app/(protected)/scores/ScoresClient.tsx
+│   │   # (ScoreCard + ExamDetailDrawer sub-components inline in that file)
 │   ├── layout/               # Layout components (navbar, footer, sidebar)
 │   ├── legal/                # Legal content components
 │   ├── user/                 # User-related components
@@ -152,7 +156,10 @@ src/
 │   ├── react-query.tsx       # TanStack Query provider
 │   └── user-settings.ts      # User settings context
 ├── hooks/                    # Custom React hooks
-│   ├── courses/              # Course data fetching hooks
+│   ├── courses/              # Course and exam data fetching hooks
+│   │   │                     # courses.ts — attendance/course queries
+│   │   │                     # exams.ts  — useExams, useExamAnswers, useExamQuestions,
+│   │   │                     #             useAllExamAnswers, useAllExamQuestions
 │   ├── tracker/              # Tracking data hooks
 │   ├── users/                # User data hooks
 │   ├── notifications/        # Notification subscription hooks
@@ -499,11 +506,16 @@ GhostClass uses **Vitest** for unit/component tests and **Playwright** for E2E t
 
 ```text
 src/
+├── app/(protected)/scores/__tests__/
+│   └── ScoresClient.test.tsx        # Scores page component tests (loading, error, stats, drawer)
 ├── components/__tests__/
 │   └── error-boundary.test.tsx      # Error boundary component tests
 ├── hooks/
 │   ├── __tests__/useUser.test.tsx   # User hook tests
-│   └── courses/__tests__/courses.test.tsx  # Course hook tests
+│   └── courses/__tests__/
+│       ├── courses.test.tsx         # Course hook tests
+│       └── exams.test.tsx           # Exam data hook tests (useExams, useExamAnswers, useExamQuestions,
+│                                    #   useAllExamAnswers, useAllExamQuestions)
 └── lib/
     ├── __tests__/
     │   ├── utils.test.ts            # Utility function tests
@@ -544,6 +556,8 @@ Current test suite includes:
 - ✅ **Utility Functions** (`utils.test.ts`) - Helper function validation
 - ✅ **Error Boundaries** (`error-boundary.test.tsx`) - Error handling UI
 - ✅ **Custom Hooks** - User and course data fetching
+- ✅ **Exam Data Hooks** (`exams.test.tsx`) - All 5 exam hooks: fetching, parallel queries, error isolation, stale-time config
+- ✅ **Scores Page** (`ScoresClient.test.tsx`) - Loading/error/empty states, stats strip, course grouping, score display, visibility rules, per-question drawer, accessibility (ARIA roles, focus management)
 - ✅ **E2E Smoke Tests** - Critical user flows
 
 **Coverage Goals:**

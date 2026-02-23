@@ -26,6 +26,10 @@ interface FetchResponse {
  * Implements infinite scroll pagination for the general feed.
  * 
  * @param enabled - Whether queries should run (default: true)
+ * @param countOnly - When true, only the lightweight unread-count query runs; the action
+ *   conflict query and infinite feed query (both with 30 s polling) are skipped. Use this
+ *   in contexts that only need the badge number (e.g. the navbar) to avoid firing two
+ *   unnecessary Supabase requests on every protected page.
  * @returns Object containing action notifications, paginated feed, and utility functions
  * 
  * Features:
@@ -37,10 +41,13 @@ interface FetchResponse {
  * 
  * @example
  * ```tsx
+ * // Full notifications page
  * const { actionNotifications, allNotifications, markAsRead } = useNotifications();
+ * // Navbar badge only — skips action + feed queries and their 30 s polling
+ * const { unreadCount } = useNotifications(true, true);
  * ```
  */
-export function useNotifications(enabled = true) {
+export function useNotifications(enabled = true, countOnly = false) {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const PAGE_SIZE = 15;
@@ -68,7 +75,7 @@ export function useNotifications(enabled = true) {
       }
       return data as Notification[];
     },
-    enabled: enabled,
+    enabled: enabled && !countOnly,
     refetchInterval: 30000,
   });
 
@@ -108,7 +115,7 @@ export function useNotifications(enabled = true) {
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
-    enabled: enabled,
+    enabled: enabled && !countOnly,
     refetchInterval: 30000,
   });
 

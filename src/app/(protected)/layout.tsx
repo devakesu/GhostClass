@@ -59,7 +59,13 @@ export default function ProtectedLayout({
     };
   }, [scrollY, isHidden]);
 
-  const { error: institutionError, isLoading: institutionLoading } = useInstitutions();
+  // useInstitutions is also called inside <Navbar>; React Query deduplicates the
+  // network request so there is no extra fetch here. We only subscribe to it at
+  // the layout level so that React Query starts pre-fetching institutions during
+  // the auth-check phase, giving the Navbar data sooner. The layout itself does
+  // NOT gate on institution loading/error — a failed institution fetch should
+  // never make the entire protected area inaccessible.
+  useInstitutions();
 
   useEffect(() => {
     let active = true;
@@ -67,20 +73,21 @@ export default function ProtectedLayout({
     const checkUser = async () => {
       try {
         const { data: { user }, error } = await supabaseRef.current.auth.getUser();
-        // Handle auth session missing errors - redirect to login
+        // Handle auth session missing errors — force full logout to clear cookies/storage
         if (error) {
           if (isAuthSessionMissingError(error)) {
             active = false;
-            router.replace("/");
+            await handleLogout();
             return;
           }
           throw error;
         }
 
-        // If no Supabase user, redirect to public landing
+        // No Supabase user means the session is gone — force full logout so httpOnly
+        // cookies (ezygo_access_token, CSRF) and client storage are properly cleared
         if (!user) {
           active = false;
-          router.replace("/");
+          await handleLogout();
           return;
         }
 
@@ -115,7 +122,7 @@ export default function ProtectedLayout({
 
   // Determine if we should show content or loading
   const isAuthorized = authState === 'authorized';
-  const showLoading = authState === 'checking' || !isAuthorized || institutionLoading || institutionError;
+  const showLoading = authState === 'checking' || !isAuthorized;
 
   return (
     <ErrorBoundary>
