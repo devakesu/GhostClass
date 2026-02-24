@@ -34,7 +34,7 @@ interface ErrorResponse {
 }
 
 const PASSWORD_VALIDATION = {
-  MIN_LENGTH: 8,
+  MIN_LENGTH: 6,
   MAX_LENGTH: 128,
 } as const;
 
@@ -119,9 +119,6 @@ export function PasswordResetForm({
         });
         setResetOptions(response.data);
 
-        // Clear loading state BEFORE changing step so the option form renders
-        // with isLoading=false immediately — prevents brief unclickable state
-        setIsLoading(false);
         NProgress.done();
         setStep("option");
       } else {
@@ -190,24 +187,8 @@ export function PasswordResetForm({
       });
       const token = response.data.access_token;
 
-      // POST /api/csrf calls regenerateCsrfToken() which always issues a new token,
-      // binding it to the new session after the privilege change (password reset).
-      // This avoids the stale sessionStorage token that caused silent 403s on first
-      // post-reset login.
-      const csrfRefreshRes = await fetch("/api/csrf", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!csrfRefreshRes.ok) {
-        throw new Error("CSRF token refresh failed – please reload the page and try again.");
-      }
-      const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
-      if (typeof csrfData?.token === "string") {
-        setCsrfToken(csrfData.token); // keep sessionStorage in sync
-      }
       const csrfToken = getCsrfToken();
-      // CSRF token is required for save-token; abort if still missing after refresh
+      // CSRF token is required for save-token; abort if missing
       if (!csrfToken) {
         throw new Error("CSRF token unavailable – please reload the page and try again.");
       }
@@ -218,6 +199,22 @@ export function PasswordResetForm({
         { token },
         { headers: { [CSRF_HEADER]: csrfToken } }
       );
+
+      // POST /api/csrf calls regenerateCsrfToken() which always issues a new token.
+      // Done AFTER save-token so the new CSRF token is bound to the authenticated
+      // session (not the pre-login unauthenticated one). Non-fatal if this fails
+      // since the user is already logged in and will get a fresh CSRF on dashboard load.
+      const csrfRefreshRes = await fetch("/api/csrf", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (csrfRefreshRes.ok) {
+        const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+        if (typeof csrfData?.token === "string") {
+          setCsrfToken(csrfData.token); // keep sessionStorage in sync
+        }
+      }
 
       // Pre-populate settings from save-token response for immediate availability
       // Eliminates the 5-10 second delay showing defaults on first post-reset load
@@ -298,7 +295,6 @@ export function PasswordResetForm({
       router.push("/dashboard");
     } catch (error: unknown) {
       NProgress.done();
-      setIsLoading(false);
 
       const err = error as AxiosError<ErrorResponse>;
       let errorMsg = "An unexpected error occurred";

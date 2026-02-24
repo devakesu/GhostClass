@@ -34,5 +34,5 @@ export function GET() {
     },
   });
 
-  return scalarHandler();
+  return scalarHandler;
 }
