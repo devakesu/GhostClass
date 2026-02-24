@@ -432,7 +432,7 @@ GhostClass is optimized for maximum performance:
 - Intelligent caching strategies:
   - Static assets: `StaleWhileRevalidate` for CSS/JS/workers (30-day max age)
   - Images: `CacheFirst` with 30-day expiration (CDN-trusted sources only)
-  - Allowlisted public APIs (`/api/public/*`, `/api/static/*`): `NetworkFirst`, 10 s timeout
+  - Selected public API responses that are safe to cache: `NetworkFirst`, 10 s timeout
   - **Attendance data** (`/api/backend/**`, `/api/profile`): `NetworkFirst`, 10 s timeout, 6 h expiry, max 50 entries — enables offline reading of previously loaded attendance and course data
   - All other API endpoints always hit the network (no caching) to avoid serving stale user-specific data
 
