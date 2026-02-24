@@ -40,7 +40,8 @@ const serwist = new Serwist({
       matcher: ({ request }) =>
         request.destination === "style" ||
         request.destination === "script" ||
-        request.destination === "worker",
+        request.destination === "worker" ||
+        request.destination === "font",
       handler: new StaleWhileRevalidate({
         cacheName: "assets",
         plugins: [
@@ -62,35 +63,6 @@ const serwist = new Serwist({
             maxAgeSeconds: 60 * 60 * 24 * 30,
           }),
         ],
-      }),
-    },
-    {
-      // API caching strategy: NetworkFirst for explicitly safe-to-cache GET /api requests.
-      // - Mutation endpoints (POST/PUT/PATCH/DELETE) are excluded by the GET check
-      //   and will always go through the network without caching.
-      // - Use an allowlist approach to only cache static/public API endpoints that are
-      //   guaranteed safe to cache, avoiding stale data for dynamic/user-specific endpoints.
-      // - networkTimeoutSeconds: 10 ensures a hanging request (e.g. slow EzyGo/Supabase
-      //   response) falls back to cached data instead of leaving the user waiting indefinitely.
-      matcher: ({ request, url }) => {
-        if (request.method !== "GET") {
-          return false;
-        }
-        if (!url.pathname.startsWith("/api/")) {
-          return false;
-        }
-        // Only cache API responses for explicitly allowlisted, safe-to-cache prefixes
-        // to avoid serving stale data for user-specific or real-time endpoints.
-        const cacheablePrefixes = ["/api/public/", "/api/static/"];
-        if (cacheablePrefixes.some((path) => url.pathname.startsWith(path))) {
-          return true;
-        }
-        // All other /api/ endpoints are treated as non-cacheable by this strategy.
-        return false;
-      },
-      handler: new NetworkFirst({
-        cacheName: "api",
-        networkTimeoutSeconds: 10,
       }),
     },
   ],
