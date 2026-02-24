@@ -43,7 +43,7 @@ const validatePassword = (password: string): string | null => {
   if (password.length < PASSWORD_VALIDATION.MIN_LENGTH)
     return `Password must be at least ${PASSWORD_VALIDATION.MIN_LENGTH} characters`;
   if (password.length > PASSWORD_VALIDATION.MAX_LENGTH)
-    return `Password must be less than ${PASSWORD_VALIDATION.MAX_LENGTH} characters`;
+    return `Password must be at most ${PASSWORD_VALIDATION.MAX_LENGTH} characters long`;
   return null;
 };
 
