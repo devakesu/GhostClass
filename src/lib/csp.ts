@@ -189,7 +189,9 @@ export const getCspHeader = (nonce?: string) => {
   //
   // - 'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='
   //   → Inline styles injected at runtime (observed in production CSP violation)
-  //   → Update/remove if the source is identified and migrated to static CSS
+  //
+  // - 'sha256-wiog7aClo6fLAZmHb/tPNxWHoZlb/gI0ju+YaSxXMrI='
+  //   → Inline styles injected at runtime (observed in production CSP violation)
   // IMPORTANT: 'unsafe-inline' is silently ignored by CSP3 browsers when a nonce or hash is
   // also present in the directive. Therefore, mixing nonce + 'unsafe-inline' does NOT work.
   // For non-production environments (including FORCE_STRICT_CSP dev mode), Next.js dev tooling
@@ -207,7 +209,8 @@ export const getCspHeader = (nonce?: string) => {
         "'sha256-AMd96FJ0GSrxFtEVT53SsztnJlpK57ZkVSOwhrM6Jjg='", // Next.js/React hydration
         "'sha256-DnU2FixQA4mFSjGuLz5b9dJ5ARj46/zX6IW2U4X4iIs='", // Animation libraries
         "'sha256-nzTgYzXYDNe6BAHiiI7NNlfK8n/auuOAhh2t92YvuXo='", // Login/auth inline styles
-        "'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='"   // Runtime inline styles
+        "'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='", // Runtime inline styles
+        "'sha256-wiog7aClo6fLAZmHb/tPNxWHoZlb/gI0ju+YaSxXMrI='"  // Runtime inline styles
       ];
   
   // script-src-elem: Controls <script> elements specifically
@@ -267,7 +270,8 @@ export const getCspHeader = (nonce?: string) => {
         "'sha256-AMd96FJ0GSrxFtEVT53SsztnJlpK57ZkVSOwhrM6Jjg='", // Next.js/React hydration
         "'sha256-DnU2FixQA4mFSjGuLz5b9dJ5ARj46/zX6IW2U4X4iIs='", // Animation libraries
         "'sha256-nzTgYzXYDNe6BAHiiI7NNlfK8n/auuOAhh2t92YvuXo='", // Login/auth inline styles
-        "'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='"   // Runtime inline styles
+        "'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='", // Runtime inline styles
+        "'sha256-wiog7aClo6fLAZmHb/tPNxWHoZlb/gI0ju+YaSxXMrI='"  // Runtime inline styles (new)
       ];
 
   // Build connect-src parts, filtering out empty values from unset env vars

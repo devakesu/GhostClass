@@ -481,6 +481,27 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
+  // Structured audit log: record which fields were mutated (field names only, never values).
+  // PII field values (gender, birth_date) are NOT included here to avoid leaking
+  // plaintext into stdout / Sentry payloads — the encrypted values are already in the DB.
+  const changedFields = [
+    "first_name",
+    ...(typeof last_name !== "undefined" ? ["last_name"] : []),
+    ...(typeof gender !== "undefined" ? ["gender"] : []),
+    ...(typeof birth_date !== "undefined" ? ["birth_date"] : []),
+  ];
+  logger.info("[audit] profile.update", {
+    action: "profile.update",
+    auth_user_id: redact("id", user.id),
+    changed_fields: changedFields,
+  });
+  Sentry.addBreadcrumb({
+    category: "audit",
+    message: "profile.update",
+    level: "info",
+    data: { changed_fields: changedFields },
+  });
+
   // Return the plaintext values that were saved
   return NextResponse.json({ first_name, last_name, gender, birth_date });
 }

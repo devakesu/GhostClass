@@ -429,26 +429,78 @@ export function PasswordResetForm({
             value={selectedOption}
             onValueChange={setSelectedOption}
             disabled={isLoading}
-            className="flex justify-center flex-col gap-3"
+            className="flex flex-col gap-2"
           >
             {resetOptions.options.emails.map((email) => (
               <label
                 key={email}
-                htmlFor={email}
-                className="flex items-center space-x-2 custom-input justify-between px-4 pr-2 cursor-pointer"
+                htmlFor={`mail:${email}`}
+                className={cn(
+                  "flex items-center gap-3 rounded-[12px] border px-4 py-3 cursor-pointer transition-all duration-150",
+                  selectedOption === `mail:${email}`
+                    ? "border-purple-500/60 bg-purple-500/10"
+                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20"
+                )}
               >
-                <span className="text-sm font-medium">{email}</span>
-                <RadioGroupItem value={`mail:${email}`} id={email} aria-label={`Send reset code to email ${email}`} />
+                <div className={cn(
+                  "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
+                  selectedOption === `mail:${email}`
+                    ? "bg-purple-500/20 text-purple-400"
+                    : "bg-secondary/30 text-muted-foreground"
+                )}>
+                  <Mail className="h-4 w-4" aria-hidden="true" />
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Email</span>
+                  <span className="text-sm font-medium truncate">{email}</span>
+                </div>
+                <RadioGroupItem value={`mail:${email}`} id={`mail:${email}`} className="sr-only" aria-label={`Send reset code to email ${email}`} />
+                <div className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
+                  selectedOption === `mail:${email}`
+                    ? "border-purple-500 bg-purple-500"
+                    : "border-white/30"
+                )}>
+                  {selectedOption === `mail:${email}` && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                  )}
+                </div>
               </label>
             ))}
             {resetOptions.options.mobiles.map((mobile) => (
               <label
                 key={mobile}
-                htmlFor={mobile}
-                className="flex items-center space-x-2 custom-input justify-between pl-4 pr-2 cursor-pointer"
+                htmlFor={`sms:${mobile}`}
+                className={cn(
+                  "flex items-center gap-3 rounded-[12px] border px-4 py-3 cursor-pointer transition-all duration-150",
+                  selectedOption === `sms:${mobile}`
+                    ? "border-purple-500/60 bg-purple-500/10"
+                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20"
+                )}
               >
-                <span className="text-sm font-medium">{mobile}</span>
-                <RadioGroupItem value={`sms:${mobile}`} id={mobile} aria-label={`Send reset code to phone ${mobile}`} />
+                <div className={cn(
+                  "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
+                  selectedOption === `sms:${mobile}`
+                    ? "bg-purple-500/20 text-purple-400"
+                    : "bg-secondary/30 text-muted-foreground"
+                )}>
+                  <Phone className="h-4 w-4" aria-hidden="true" />
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">SMS</span>
+                  <span className="text-sm font-medium truncate">{mobile}</span>
+                </div>
+                <RadioGroupItem value={`sms:${mobile}`} id={`sms:${mobile}`} className="sr-only" aria-label={`Send reset code to phone ${mobile}`} />
+                <div className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
+                  selectedOption === `sms:${mobile}`
+                    ? "border-purple-500 bg-purple-500"
+                    : "border-white/30"
+                )}>
+                  {selectedOption === `sms:${mobile}` && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                  )}
+                </div>
               </label>
             ))}
           </RadioGroup>
