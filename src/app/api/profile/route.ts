@@ -191,7 +191,7 @@ export async function GET() {
       // Use UPDATE (not upsert) so this background sync can never recreate a row
       // that was legitimately deleted (e.g. account deletion racing with an in-flight
       // after() callback). If the row no longer exists the update is a harmless no-op.
-      const { error: bgUpsertError } = await supabaseAdmin
+      const { error: bgUpdateError } = await supabaseAdmin
         .from("users")
         .update({
             username:
@@ -217,9 +217,9 @@ export async function GET() {
         .eq("id", existingUser.id)
         .eq("auth_id", user.id);
 
-      if (bgUpsertError) {
-        logger.error("[background] Profile sync update failed:", bgUpsertError);
-        Sentry.captureException(bgUpsertError, {
+      if (bgUpdateError) {
+        logger.error("[background] Profile sync update failed:", bgUpdateError);
+        Sentry.captureException(bgUpdateError, {
           tags: {
             type: "profile_upsert_fail",
             location: "GET /api/profile background",

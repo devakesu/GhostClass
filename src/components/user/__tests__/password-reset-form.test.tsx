@@ -71,7 +71,11 @@ vi.mock("@/lib/axios", () => ({
 }));
 
 vi.mock("axios", () => ({
-  default: { post: mockAxiosPost },
+  default: {
+    post: mockAxiosPost,
+    isAxiosError: (err: unknown) =>
+      typeof err === "object" && err !== null && (err as Record<string, unknown>).isAxiosError === true,
+  },
   AxiosError: class AxiosError extends Error {
     isAxiosError = true;
     config: Record<string, unknown> = {};
@@ -555,7 +559,8 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     await reachOtpStep();
     mockEzygoPost.mockResolvedValueOnce({ data: { access_token: "token" } });
 
-    const err: { config: { url: string } } = {
+    const err: { isAxiosError: boolean; config: { url: string } } = {
+      isAxiosError: true,
       config: { url: "/api/auth/save-token" },
     };
     mockAxiosPost.mockRejectedValueOnce(err);
@@ -573,6 +578,7 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
   it("shows upstream EzyGo error message when reset fails with response", async () => {
     await reachOtpStep();
     mockEzygoPost.mockRejectedValueOnce({
+      isAxiosError: true,
       response: { data: { message: "Invalid OTP" } },
     });
 
@@ -588,7 +594,7 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
 
   it("shows network error message when ERR_NETWORK", async () => {
     await reachOtpStep();
-    mockEzygoPost.mockRejectedValueOnce({ code: "ERR_NETWORK" });
+    mockEzygoPost.mockRejectedValueOnce({ isAxiosError: true, code: "ERR_NETWORK" });
 
     fillOtpForm();
     await act(async () => {
@@ -610,10 +616,10 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
       fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
     });
 
-    // The CSRF error is a plain Error; the catch block normalises it to the
-    // generic message because it doesn't match any AxiosError-specific branch.
+    // The CSRF error is a plain Error; the catch block now surfaces its message
+    // directly to give the user an actionable reload prompt.
     await waitFor(() =>
-      expect(screen.getByText("An unexpected error occurred")).toBeInTheDocument()
+      expect(screen.getByText("CSRF token unavailable – please reload the page and try again.")).toBeInTheDocument()
     );
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
