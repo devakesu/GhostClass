@@ -561,6 +561,63 @@ docker pull ghcr.io/devakesu/ghostclass:latest
 - `checksums.txt` - SHA256 checksums for all artifacts
 - `VERIFY.md` - Detailed verification instructions
 
+### GitHub Actions Configuration
+
+The release workflow requires values to be configured in **Settings → Secrets and variables → Actions** on your repository. Build-time values are split into two categories:
+
+#### Variables (non-sensitive, publicly visible in build logs)
+
+Navigate to the **Variables** tab and create the following:
+
+| Variable | Example value | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_NAME` | `GhostClass` | App name shown in UI and emails |
+| `NEXT_PUBLIC_APP_DOMAIN` | `ghostclass.devakesu.com` | Production domain (no `https://`) |
+| `NEXT_PUBLIC_APP_URL` | *(derived by pipeline)* | Auto-constructed from domain |
+| `NEXT_PUBLIC_BACKEND_URL` | `https://…/api/v1/…/` | EzyGo API base URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://xyz.supabase.co` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbG…` | Supabase anonymous key (public, in JS bundle) |
+| `NEXT_PUBLIC_GITHUB_URL` | `https://github.com/…` | Public repository URL |
+| `NEXT_PUBLIC_SENTRY_DSN` | `https://…@…ingest…` | Sentry DSN (compiled into JS bundle) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `0x4AAAA…` | Cloudflare Turnstile site key (in HTML) |
+| `NEXT_PUBLIC_GA_ID` | `G-XXXXXXXXXX` | Google Analytics measurement ID |
+| `NEXT_PUBLIC_AUTHOR_NAME` | `@handle` | Author display name |
+| `NEXT_PUBLIC_AUTHOR_URL` | `https://example.com` | Author URL |
+| `NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE` | `January 1, 2026` | Legal docs effective date |
+| `SENTRY_ORG` | `devakesu` | Sentry organisation slug |
+| `SENTRY_PROJECT` | `ghostclass` | Sentry project slug |
+
+Optional Variables (omit to use defaults):
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SENTRY_REPLAY_RATE` | `0` | Session replay sample rate (0.0–1.0) |
+| `NEXT_PUBLIC_GA_ID` | *(blank)* | Omit to disable Google Analytics |
+| `NEXT_PUBLIC_ATTENDANCE_TARGET_MIN` | `75` | Minimum attendance target users can set |
+| `NEXT_PUBLIC_DONATE_URL` | *(blank)* | Donation link shown in footer |
+| `NEXT_PUBLIC_DEFAULT_DOMAIN` | *(blank)* | Fallback domain used by `getAppDomain()` when `NEXT_PUBLIC_APP_DOMAIN` is not set |
+| `NEXT_PUBLIC_FORCE_STRICT_CSP` | *(blank)* | Set `"true"` to force strict CSP in production builds |
+| `ENABLE_PUBLIC_BROWSER_SOURCEMAPS` | *(blank)* | Set `"true"` to serve JS source maps publicly in the build |
+
+> **Why Variables and not Secrets?** All values above are non-sensitive and already embedded in the browser JavaScript bundle or HTML. Storing them as Secrets causes GitHub Actions log masking to redact their values from build output, making logs unreadable (e.g. the package name becomes `***@1.9.5`).
+
+#### Secrets (sensitive — masked in logs)
+
+Navigate to the **Secrets** tab and create the following:
+
+| Secret | Description |
+| --- | --- |
+| `SENTRY_AUTH_TOKEN` | Sentry auth token for source map upload during Docker build (`sntrys_…`) |
+| `BOT_PAT` | Classic PAT with `repo` + `workflow` scopes for auto-version-bump commits |
+| `GPG_PRIVATE_KEY` | Armoured GPG private key for commit/tag signing |
+| `GPG_PASSPHRASE` | GPG key passphrase (omit secret if key uses `%no-protection`) |
+| `COOLIFY_BASE_URL` | Coolify instance URL for deployment trigger |
+| `COOLIFY_APP_ID` | App UUID in Coolify |
+| `COOLIFY_API_TOKEN` | Coolify API bearer token |
+
+> **`NEXT_PUBLIC_APP_VERSION` is not a Variable** — the pipeline derives it automatically from the git tag via the `calculate-version` job. Setting it manually would cause it to go stale after every auto-bump.
+> **`SOURCE_DATE_EPOCH` is not a Variable** — the pipeline derives it from the git commit timestamp (`git log -1 --format=%ct`) in the `prep` step. This guarantees the same tag always produces the same image digest (reproducible builds) without any manual sync needed.
+
 ### Release Workflow Details
 
 **Automated Release Process:**

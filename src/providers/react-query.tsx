@@ -16,8 +16,10 @@ import { AttendanceSettingsProvider } from "./attendance-settings";
  * - Stale time: 3 minutes
  * - Garbage collection: 10 minutes
  * - Retry: 2 attempts
- * - Window focus refetch: Disabled globally, but can be enabled per-query for cross-device sync
- * - Auto refetch interval: 15 minutes
+ * - Window focus refetch: Disabled globally; enabled per-query for time-sensitive data
+ * - Reconnect refetch: Enabled globally (covers PWA offline→online transitions)
+ * - Refetch interval: Disabled globally; time-sensitive queries (courses, attendance,
+ *   tracking) set their own 60 s interval explicitly
  * 
  * @param children - Child components to wrap
  * @returns Configured React Query provider with attendance settings
@@ -38,10 +40,17 @@ export default function ReactQueryProvider({ children }: PropsWithChildren) {
             staleTime: 3 * 60 * 1000,
             gcTime: 10 * 60 * 1000,
             retry: 2,
-            // Disable global window focus refetch to avoid performance issues
-            // Enable it per-query for critical queries that need cross-device sync
+            // Disable global window focus refetch to avoid performance issues.
+            // Enable per-query for data that needs cross-device sync.
             refetchOnWindowFocus: false,
-            refetchInterval: 15 * 60 * 1000,
+            // Always refetch when network reconnects (page coming back online).
+            // Critical for PWA offline→online transitions.
+            refetchOnReconnect: true,
+            // No global background poll — each time-sensitive query (courses,
+            // attendance, tracking) sets its own refetchInterval explicitly.
+            // This avoids draining battery on slow-changing data (user, profile,
+            // institutions, settings) that don't need frequent background refresh.
+            refetchInterval: false,
           },
         },
       })
