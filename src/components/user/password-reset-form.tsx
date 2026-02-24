@@ -34,7 +34,7 @@ interface ErrorResponse {
 }
 
 const PASSWORD_VALIDATION = {
-  MIN_LENGTH: 6,
+  MIN_LENGTH: 8,
   MAX_LENGTH: 128,
 } as const;
 
@@ -199,11 +199,12 @@ export function PasswordResetForm({
         credentials: "same-origin",
         cache: "no-store",
       });
-      if (csrfRefreshRes.ok) {
-        const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
-        if (typeof csrfData?.token === "string") {
-          setCsrfToken(csrfData.token); // keep sessionStorage in sync
-        }
+      if (!csrfRefreshRes.ok) {
+        throw new Error("CSRF token refresh failed – please reload the page and try again.");
+      }
+      const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+      if (typeof csrfData?.token === "string") {
+        setCsrfToken(csrfData.token); // keep sessionStorage in sync
       }
       const csrfToken = getCsrfToken();
       // CSRF token is required for save-token; abort if still missing after refresh
