@@ -2,8 +2,8 @@
 --
 -- Aligns database CHECK constraints with the application-level IV validation
 -- in src/lib/crypto.ts.  The decrypt() function rejects IVs that are not
--- exactly 24 lowercase hex characters, matching the 96-bit (12-byte) IV
--- recommended by NIST SP 800-38D §8.2.1 for AES-GCM.
+-- exactly 24 hex characters (case-insensitive), matching the 96-bit (12-byte)
+-- IV recommended by NIST SP 800-38D §8.2.1 for AES-GCM.
 --
 -- Previous IV columns stored 32-hex-char (16-byte) IVs.  If any such legacy
 -- rows exist this migration will abort with an error.  In that case all
