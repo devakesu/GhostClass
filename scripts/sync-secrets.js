@@ -124,8 +124,7 @@ function setSecret(repo, name, value) {
 // Set GitHub Actions variable (non-sensitive — not masked in logs)
 function setVariable(repo, name, value) {
   try {
-    const command = `gh variable set ${name} --repo ${repo} --body "${value.replace(/"/g, '\\"')}"`;
-    execSync(command, {
+    execSync('gh', ['variable', 'set', name, '--repo', repo, '--body', value], {
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf8',
     });
