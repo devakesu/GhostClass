@@ -405,6 +405,27 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
       expect(screen.getByText("Password is required")).toBeInTheDocument()
     );
   });
+
+  it("shows error when password exceeds maximum length", async () => {
+    await reachOtpStep();
+
+    const longPassword = "a".repeat(129);
+
+    fireEvent.change(screen.getByPlaceholderText("Enter your new password"), {
+      target: { value: longPassword },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm your new password"), {
+      target: { value: longPassword },
+    });
+    fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Password must be at most 128 characters long")
+      ).toBeInTheDocument()
+    );
+    expect(mockEzygoPost).not.toHaveBeenCalled();
+  });
 });
 
 describe("PasswordResetForm – handleResetSubmit success", () => {
