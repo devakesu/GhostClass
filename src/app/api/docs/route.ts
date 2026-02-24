@@ -17,21 +17,22 @@ export const dynamic = "force-dynamic";
 
 const isDev = process.env.NODE_ENV === "development";
 
-const scalarHandler = ApiReference({
-  url: "/api-docs/openapi.yaml",
-  theme: "purple",
-  layout: "modern",
-  darkMode: true,
-  showSidebar: true,
-  defaultOpenAllTags: true,
-  authentication: {
-    preferredSecurityScheme: "SupabaseAuth",
-  },
-});
-
 export function GET() {
   if (!isDev) {
     return new NextResponse(null, { status: 404 });
   }
+
+  const scalarHandler = ApiReference({
+    url: "/api-docs/openapi.yaml",
+    theme: "purple",
+    layout: "modern",
+    darkMode: true,
+    showSidebar: true,
+    defaultOpenAllTags: true,
+    authentication: {
+      preferredSecurityScheme: "SupabaseAuth",
+    },
+  });
+
   return scalarHandler();
 }
