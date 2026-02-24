@@ -221,7 +221,7 @@ export async function GET() {
         logger.error("[background] Profile sync update failed:", bgUpdateError);
         Sentry.captureException(bgUpdateError, {
           tags: {
-            type: "profile_upsert_fail",
+            type: "profile_update_fail",
             location: "GET /api/profile background",
           },
           extra: { userId: redact("id", String(existingUser.id)) },
