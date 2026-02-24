@@ -978,7 +978,7 @@ paths:
                     commit: "a1b2c3d"
                     commit_sha: "a1b2c3d"
                     build_id: "123456789"
-                    app_version: "1.9.4"
+                    app_version: "1.9.5"
                     image_digest: "sha256:abc123..."
                     container: true
                     timestamp: "2026-02-01T10:00:00.000Z"

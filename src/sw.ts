@@ -86,29 +86,21 @@ const serwist = new Serwist({
       }),
     },
     {
-      // Offline-capable attendance data caching.
-      // Caches GET responses from the EzyGo backend proxy (/api/backend/...) and
-      // the user profile endpoint (/api/profile) so attendance records and course
-      // data remain readable when the device is offline or the upstream is slow.
+      // Attendance data caching (disabled for authenticated endpoints).
       //
-      // Strategy: NetworkFirst with a 10 s timeout.
-      //   - Online: always serves fresh data; cache is updated in the background.
-      //   - Offline / timeout: falls back to the last cached response so the UI
-      //     can still render attendance cards instead of showing an error screen.
+      // Originally this rule cached GET responses from the EzyGo backend proxy
+      // (/api/backend/...) and the user profile endpoint (/api/profile) so that
+      // attendance records remained available offline. However, those endpoints
+      // return user-specific, authenticated data, and the cache keys were based
+      // only on the request URL. This can result in cached PII being served to a
+      // different user on the same device (e.g. after logout + login as another
+      // account, or when offline).
       //
-      // Security notes:
-      //   - Only GET is matched, so mutations always hit the network.
-      //   - Responses are scoped to the same origin (service worker boundary),
-      //     so no cross-origin data leakage is possible.
-      //   - ExpirationPlugin caps cached entries at 50 and purges them after 6 h,
-      //     preventing stale session data surviving across multiple school days.
-      matcher: ({ request, url }) => {
-        if (request.method !== "GET") return false;
-        return (
-          url.pathname.startsWith("/api/backend/") ||
-          url.pathname === "/api/profile"
-        );
-      },
+      // To avoid leaking user-specific data across sessions, this matcher now
+      // returns false, effectively disabling this runtime cache for authenticated
+      // endpoints. If offline support is reintroduced in the future, it must use
+      // a per-user cache key and/or clear the cache on auth changes.
+      matcher: () => false,
       handler: new NetworkFirst({
         cacheName: "attendance-data",
         networkTimeoutSeconds: 10,
