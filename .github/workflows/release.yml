@@ -219,6 +219,11 @@ jobs:
           REPO: ${{ github.repository }}
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
+          # Set APP_DOMAIN with fallback to localhost if not set
+          APP_DOMAIN="${{ vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" == "null" ]; then
+            APP_DOMAIN="localhost"
+          fi
           IMAGE_NAME=$(echo "$REPO" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
 
@@ -248,7 +253,6 @@ jobs:
           echo "platforms=${PLATFORMS}" >> $GITHUB_OUTPUT
           echo "  Build platforms: ${PLATFORMS}"
 
-          APP_DOMAIN="${{ secrets.NEXT_PUBLIC_APP_DOMAIN }}"
           echo "app_url=https://${APP_DOMAIN}" >> $GITHUB_OUTPUT
           echo "sitemap_url=https://${APP_DOMAIN}/sitemap.xml" >> $GITHUB_OUTPUT
           echo "app_email=@${APP_DOMAIN}" >> $GITHUB_OUTPUT
@@ -265,6 +269,15 @@ jobs:
             TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           fi
           echo "created=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+          # SOURCE_DATE_EPOCH: use the Unix timestamp of the checked-out commit.
+          # This makes Docker layer timestamps deterministic per commit:
+          # same tag → same epoch → same image digest (reproducible builds).
+          # Using push/build time would produce a different digest on every rebuild
+          # of the same tag, defeating reproducibility.
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
+          echo "🕒 SOURCE_DATE_EPOCH: ${SOURCE_DATE_EPOCH}"
 
       - name: Build & push Docker image
         id: build-push
@@ -285,26 +298,32 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             APP_COMMIT_SHA=${{ github.sha }}
-            SOURCE_DATE_EPOCH=${{ secrets.SOURCE_DATE_EPOCH }}
-            NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
-            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            NEXT_PUBLIC_GITHUB_URL=${{ secrets.NEXT_PUBLIC_GITHUB_URL }}
-            NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-            NEXT_PUBLIC_GA_ID=${{ secrets.NEXT_PUBLIC_GA_ID }}
-            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
-            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}
-            NEXT_PUBLIC_APP_NAME=${{ secrets.NEXT_PUBLIC_APP_NAME }}
+            SOURCE_DATE_EPOCH=${{ steps.prep.outputs.source_date_epoch }}
+            NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_GITHUB_URL=${{ vars.NEXT_PUBLIC_GITHUB_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+            NEXT_PUBLIC_APP_NAME=${{ vars.NEXT_PUBLIC_APP_NAME }}
             NEXT_PUBLIC_APP_VERSION=${{ needs.calculate-version.outputs.version }}
-            NEXT_PUBLIC_APP_DOMAIN=${{ secrets.NEXT_PUBLIC_APP_DOMAIN }}
-            NEXT_PUBLIC_AUTHOR_NAME=${{ secrets.NEXT_PUBLIC_AUTHOR_NAME }}
-            NEXT_PUBLIC_AUTHOR_URL=${{ secrets.NEXT_PUBLIC_AUTHOR_URL }}
-            NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE=${{ secrets.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE }}
+            NEXT_PUBLIC_APP_DOMAIN=${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+            NEXT_PUBLIC_AUTHOR_NAME=${{ vars.NEXT_PUBLIC_AUTHOR_NAME }}
+            NEXT_PUBLIC_AUTHOR_URL=${{ vars.NEXT_PUBLIC_AUTHOR_URL }}
+            NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE=${{ vars.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE }}
             NEXT_PUBLIC_APP_URL=${{ steps.prep.outputs.app_url }}
             NEXT_PUBLIC_SITEMAP_URL=${{ steps.prep.outputs.sitemap_url }}
             NEXT_PUBLIC_APP_EMAIL=${{ steps.prep.outputs.app_email }}
             NEXT_PUBLIC_LEGAL_EMAIL=${{ steps.prep.outputs.legal_email }}
+            NEXT_PUBLIC_DONATE_URL=${{ vars.NEXT_PUBLIC_DONATE_URL }}
+            NEXT_PUBLIC_DEFAULT_DOMAIN=${{ vars.NEXT_PUBLIC_DEFAULT_DOMAIN }}
+            NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
+            NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
+            NEXT_PUBLIC_FORCE_STRICT_CSP=${{ vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
+            ENABLE_PUBLIC_BROWSER_SOURCEMAPS=${{ vars.ENABLE_PUBLIC_BROWSER_SOURCEMAPS }}
             GITHUB_REPOSITORY=${{ github.repository }}
             GITHUB_RUN_ID=${{ github.run_id }}
             GITHUB_RUN_NUMBER=${{ github.run_number }}

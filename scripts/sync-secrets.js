@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * sync-secrets.js - Push local .env values to GitHub Secrets
+ * sync-secrets.js - Push local .env values to GitHub Actions Secrets and Variables
  * Works on Windows, macOS, and Linux
  *
  * Run manually: SYNC_SECRETS=1 node scripts/sync-secrets.js
  *
+ * Non-sensitive build-time values (NEXT_PUBLIC_*, SOURCE_DATE_EPOCH, SENTRY_ORG,
+ * SENTRY_PROJECT) are synced as GitHub Actions Variables so they are visible in
+ * build logs. Only truly sensitive values are synced as Secrets.
+ *
  * NOTE: NEXT_PUBLIC_APP_VERSION is intentionally NOT synced here.
  * The release workflow derives the version directly from the git tag
  * (calculate-version job → needs.calculate-version.outputs.version),
- * so a GitHub Secret for it would always be stale after an auto-bump.
+ * so a GitHub Variable/Secret for it would always be stale after an auto-bump.
  */
 
 const { execSync } = require('child_process');
@@ -117,9 +121,32 @@ function setSecret(repo, name, value) {
   }
 }
 
+// Set GitHub Actions variable (non-sensitive — not masked in logs)
+function setVariable(repo, name, value) {
+  try {
+    const command = `gh variable set ${name} --repo ${repo} --body "${value.replace(/"/g, '\\"')}"`;
+    execSync(command, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf8',
+    });
+    return { success: true };
+  } catch (error) {
+    let message;
+    if (error instanceof Error) {
+      const stderr = error.stderr
+        ? String(error.stderr).trim()
+        : '';
+      message = stderr ? `${error.message}: ${stderr}` : error.message;
+    } else {
+      message = String(error);
+    }
+    return { success: false, error: message };
+  }
+}
+
 // Main function
 function main() {
-  log.info('🚀 GitHub Secrets Sync\n');
+  log.info('🚀 GitHub Actions Sync (Variables + Secrets)\n');
 
   // Auto-skip in CI environments
   if (process.env.CI) {
@@ -161,18 +188,19 @@ function main() {
     process.exit(1);
   }
 
-  log.success(`🔄 Syncing secrets to: ${repo}\n`);
+  log.success(`🔄 Syncing to: ${repo}\n`);
 
-  // List of secrets to sync (BUILD-TIME ONLY)
-  const secretsToSync = [
-    'SOURCE_DATE_EPOCH',
+  // ── GitHub Actions VARIABLES (non-sensitive; visible in build logs) ──────────
+  const variablesToSync = [
+    // SOURCE_DATE_EPOCH is intentionally excluded: the release workflow derives
+    // it from the git commit timestamp (git log -1 --format=%ct) so it is always
+    // accurate per tag without any manual sync needed.
     'SENTRY_ORG',
     'SENTRY_PROJECT',
-    'SENTRY_AUTH_TOKEN',
     'NEXT_PUBLIC_APP_NAME',
     // NEXT_PUBLIC_APP_VERSION is intentionally excluded: the release workflow derives
-    // it from the git tag (calculate-version job), not from GitHub Secrets.
-    // Syncing it here would leave the secret stale after every auto-version bump.
+    // it from the git tag (calculate-version job), not from a GitHub Variable.
+    // Syncing it here would leave the variable stale after every auto-version bump.
     'NEXT_PUBLIC_APP_DOMAIN',
     'NEXT_PUBLIC_AUTHOR_NAME',
     'NEXT_PUBLIC_AUTHOR_URL',
@@ -186,6 +214,17 @@ function main() {
     'NEXT_PUBLIC_SENTRY_DSN',
     'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
     'NEXT_PUBLIC_GA_ID',
+    // Optional overrides (skipped gracefully if not set in .env)
+    'NEXT_PUBLIC_ATTENDANCE_TARGET_MIN',
+    'NEXT_PUBLIC_SENTRY_REPLAY_RATE',
+    'NEXT_PUBLIC_FORCE_STRICT_CSP',
+    'ENABLE_PUBLIC_BROWSER_SOURCEMAPS',
+    'NEXT_PUBLIC_ENABLE_SW_IN_DEV',
+  ];
+
+  // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────
+  const secretsToSync = [
+    'SENTRY_AUTH_TOKEN',
     'COOLIFY_BASE_URL',
     'COOLIFY_APP_ID',
     'COOLIFY_API_TOKEN',
@@ -197,7 +236,34 @@ function main() {
   const errors = [];
   const missing = [];
 
-  // Sync each secret
+  // Sync variables
+  log.info('📋 Syncing Variables (non-sensitive)...');
+  for (const varName of variablesToSync) {
+    const varValue = envConfig[varName];
+
+    if (varValue === undefined || varValue === null || varValue === '') {
+      log.warning(`⊘ Skipping ${varName} (not set in .env)`);
+      missing.push(varName);
+      skipCount++;
+      continue;
+    }
+
+    const result = setVariable(repo, varName, varValue);
+
+    if (result.success) {
+      log.success(`✓ Variable: ${varName}`);
+      successCount++;
+    } else {
+      log.error(`✗ Failed to set variable ${varName}`);
+      log.error(`  Error: ${result.error}`);
+      errors.push({ name: varName, error: result.error });
+      errorCount++;
+    }
+  }
+
+  // Sync secrets
+  console.log();
+  log.info('🔐 Syncing Secrets (sensitive)...');
   for (const secretName of secretsToSync) {
     const secretValue = envConfig[secretName];
 
@@ -209,12 +275,12 @@ function main() {
     }
 
     const result = setSecret(repo, secretName, secretValue);
-    
+
     if (result.success) {
-      log.success(`✓ Synced ${secretName}`);
+      log.success(`✓ Secret:   ${secretName}`);
       successCount++;
     } else {
-      log.error(`✗ Failed to sync ${secretName}`);
+      log.error(`✗ Failed to sync secret ${secretName}`);
       log.error(`  Error: ${result.error}`);
       errors.push({ name: secretName, error: result.error });
       errorCount++;
@@ -225,7 +291,7 @@ function main() {
   console.log('\n' + colors.cyan + '═══════════════════════════════════════' + colors.reset);
   log.info('📊 Sync Summary');
   console.log(colors.cyan + '═══════════════════════════════════════' + colors.reset);
-  log.success(`  ✓ Successfully synced: ${successCount}`);
+  log.success(`  ✓ Successfully synced: ${successCount} (${variablesToSync.length} variables + ${secretsToSync.length} secrets possible)`);
   
   if (skipCount > 0) {
     log.warning(`  ⊘ Skipped (not in .env): ${skipCount}`);
@@ -263,7 +329,7 @@ function main() {
   }
 
   // Success!
-  log.success('\n✅ All secrets synced successfully!\n');
+  log.success('\n✅ All variables and secrets synced successfully!\n');
   process.exit(0);
 }
 

@@ -22,7 +22,7 @@ export function GET() {
     return new NextResponse(null, { status: 404 });
   }
 
-  return ApiReference({
+  const handler = ApiReference({
     url: "/api-docs/openapi.yaml",
     theme: "purple",
     layout: "modern",
@@ -33,4 +33,6 @@ export function GET() {
       preferredSecurityScheme: "SupabaseAuth",
     },
   });
+
+  return typeof handler === "function" ? handler() : handler;
 }

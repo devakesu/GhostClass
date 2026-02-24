@@ -83,6 +83,7 @@ export function useTrackingData(user: User | null | undefined, options?: { enabl
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
-    refetchInterval: 60 * 1000, 
+    refetchOnReconnect: true,
+    refetchInterval: 60 * 1000,
   });
 }

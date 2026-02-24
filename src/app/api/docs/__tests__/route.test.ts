@@ -4,9 +4,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ApiReference must be mocked before importing the route module
+// ApiReference must be mocked before importing the route module.
+// The real library returns `() => Response`; our route calls it when it's a function.
 vi.mock("@scalar/nextjs-api-reference", () => ({
-  ApiReference: vi.fn(() => new Response("scalar ui", { status: 200 })),
+  ApiReference: vi.fn(() => () => new Response("scalar ui", { status: 200 })),
 }));
 
 describe("GET /api/docs", () => {
@@ -24,7 +25,7 @@ describe("GET /api/docs", () => {
   it("returns 200 from ApiReference in development", async () => {
     vi.stubEnv("NODE_ENV", "development");
     const { ApiReference } = await import("@scalar/nextjs-api-reference");
-    vi.mocked(ApiReference).mockReturnValue(new Response("scalar ui", { status: 200 }));
+    vi.mocked(ApiReference).mockReturnValue(() => new Response("scalar ui", { status: 200 }));
     const { GET } = await import("../route");
     const response = GET();
     expect(response.status).toBe(200);

@@ -49,6 +49,10 @@ export function useTrackingCount(user: User | null | undefined) {
       return count ?? 0;
     },
     enabled: !!user?.username,
-    staleTime: 1000 * 60, 
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 60 * 1000,
   });
 }

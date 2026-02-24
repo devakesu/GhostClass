@@ -301,16 +301,16 @@ To enable automated workflows and deployments, maintainers need:
    - See [DEVELOPER_GUIDE.md → Bot PAT Configuration](DEVELOPER_GUIDE.md#bot-pat-configuration)
    - Required secret: `BOT_PAT`
 
-3. **Deployment Secrets** - For production builds and releases
-   - See [.example.env](.example.env) GITHUB SECRETS CONFIGURATION section
-   - Includes: Sentry, Coolify, build variables, etc.
+3. **Deployment Variables & Secrets** - For production builds and releases
+   - See [DEVELOPER_GUIDE.md → GitHub Actions Configuration](DEVELOPER_GUIDE.md#github-actions-configuration)
+   - Non-sensitive build vars (NEXT_PUBLIC_*, etc.) live in the **Variables** tab; sensitive keys in the **Secrets** tab
 
 ### Maintainer Tools
 
-**Sync Secrets Script** (`npm run sync-secrets`)
+**Sync Script** (`npm run sync-secrets`)
 
-- Syncs `.env` values to GitHub repository secrets
-- Only needed when updating build-time environment variables
+- Syncs `.env` values to GitHub Actions: non-sensitive build values as **Variables**, sensitive values as **Secrets**
+- Only needed when updating build-time environment values
 - Requires GitHub CLI (`gh`) with authentication
 - External contributors don't need this
 
