@@ -203,16 +203,33 @@ export function PasswordResetForm({
       // Done AFTER save-token so the new CSRF token is bound to the authenticated
       // session (not the pre-login unauthenticated one). Non-fatal if this fails
       // since the user is already logged in and will get a fresh CSRF on dashboard load.
-      const csrfRefreshRes = await fetch("/api/csrf", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (csrfRefreshRes.ok) {
-        const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
-        if (typeof csrfData?.token === "string") {
-          setCsrfToken(csrfData.token); // keep sessionStorage in sync
+      try {
+        const csrfRefreshRes = await fetch("/api/csrf", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (csrfRefreshRes.ok) {
+          const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+          if (typeof csrfData?.token === "string") {
+            setCsrfToken(csrfData.token); // keep sessionStorage in sync
+          }
+        } else {
+          logger.error("CSRF refresh after password reset returned non-OK status", {
+            context: "PasswordResetForm/handleResetSubmit",
+            status: csrfRefreshRes.status,
+          });
+          // Clear potentially stale pre-auth CSRF token to avoid silent 403s
+          setCsrfToken(null);
         }
+      } catch (csrfError) {
+        logger.error("CSRF refresh after password reset threw an error", {
+          context: "PasswordResetForm/handleResetSubmit",
+          error: csrfError instanceof Error ? csrfError.message : String(csrfError),
+        });
+        Sentry.captureException(csrfError);
+        // Clear potentially stale pre-auth CSRF token to avoid silent 403s
+        setCsrfToken(null);
       }
 
       // Pre-populate settings from save-token response for immediate availability

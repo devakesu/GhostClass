@@ -123,7 +123,7 @@ export async function GET() {
   // route has run the slow path) will have first_name = null. Without this guard the
   // fast path returns all-null fields, React Query caches them for 5 min (staleTime),
   // and the name never appears on the dashboard until a manual refresh.
-  if (existingUser && existingUser.first_name) {
+  if (existingUser && typeof existingUser.first_name === "string" && existingUser.first_name.trim().length > 0) {
     after(async () => {
       const syncToken = await getAuthTokenServer();
       if (!syncToken || !BASE_API_URL) return;
@@ -191,7 +191,7 @@ export async function GET() {
       // Use UPDATE (not upsert) so this background sync can never recreate a row
       // that was legitimately deleted (e.g. account deletion racing with an in-flight
       // after() callback). If the row no longer exists the update is a harmless no-op.
-      const { error: bgUpdateError } = await supabaseAdmin
+      const { data: bgUpdatedRows, error: bgUpdateError } = await supabaseAdmin
         .from("users")
         .update({
             username:
@@ -215,7 +215,8 @@ export async function GET() {
             terms_accepted_at: existingUser.terms_accepted_at ?? null,
         })
         .eq("id", existingUser.id)
-        .eq("auth_id", user.id);
+        .eq("auth_id", user.id)
+        .select("id");
 
       if (bgUpdateError) {
         logger.error("[background] Profile sync update failed:", bgUpdateError);
@@ -225,6 +226,12 @@ export async function GET() {
             location: "GET /api/profile background",
           },
           extra: { userId: redact("id", String(existingUser.id)) },
+        });
+      } else if (bgUpdatedRows?.length === 0) {
+        // 0 rows matched: the row was deleted between the fast-path read and this
+        // background update (possible race condition with account deletion).
+        logger.warn("[background] Profile sync update matched 0 rows (possible race condition)", {
+          userId: redact("id", String(existingUser.id)),
         });
       }
     });
