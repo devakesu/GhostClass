@@ -287,8 +287,7 @@ export function PasswordResetForm({
       let errorMsg = "An unexpected error occurred";
 
       if (axios.isAxiosError<ErrorResponse>(error)) {
-        const err = error;
-        if (err.config?.url?.includes("save-token")) {
+        if (error.config?.url?.includes("save-token")) {
           errorMsg = "Secure session setup failed. Please try again.";
           Sentry.captureException(error, {
             tags: {
@@ -296,9 +295,9 @@ export function PasswordResetForm({
               location: "PasswordResetForm/handleResetSubmit",
             },
           });
-        } else if (err.response?.data?.message) {
-          errorMsg = `Ezygo: ${err.response.data.message}`;
-        } else if (err.code === "ERR_NETWORK") {
+        } else if (error.response?.data?.message) {
+          errorMsg = `Ezygo: ${error.response.data.message}`;
+        } else if (error.code === "ERR_NETWORK") {
           errorMsg = "Network error. Please check your connection.";
         }
       } else if (error instanceof Error) {
