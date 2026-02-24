@@ -125,6 +125,7 @@ export function PasswordResetForm({
         NProgress.done();
         setStep("option");
       } else {
+        NProgress.done();
         setError("Ezygo: No user found with this username/email/phone.");
       }
     } catch (error: unknown) {
