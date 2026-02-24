@@ -219,9 +219,20 @@ jobs:
           REPO: ${{ github.repository }}
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
-          # Set APP_DOMAIN with fallback to localhost if not set
+          # Set APP_DOMAIN with validation; avoid silent localhost fallback for real releases
           APP_DOMAIN="${{ vars.NEXT_PUBLIC_APP_DOMAIN }}"
-          if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" == "null" ]; then
+          if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
+            # For tag-push releases, require NEXT_PUBLIC_APP_DOMAIN to be configured
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "::error::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured for this release tag push. Configure vars.NEXT_PUBLIC_APP_DOMAIN to the production domain before releasing."
+              exit 1
+            fi
+
+            # For non-push events, allow localhost fallback only with explicit opt-in
+            if [ "${{ vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
+              echo "::warning::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured. Falling back to APP_DOMAIN=localhost."
+              echo "::warning::To explicitly allow this fallback without warnings, set vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK=true."
+            fi
             APP_DOMAIN="localhost"
           fi
           IMAGE_NAME=$(echo "$REPO" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')

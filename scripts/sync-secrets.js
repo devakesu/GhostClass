@@ -16,7 +16,7 @@
  * so a GitHub Variable/Secret for it would always be stale after an auto-bump.
  */
 
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -123,24 +123,22 @@ function setSecret(repo, name, value) {
 
 // Set GitHub Actions variable (non-sensitive — not masked in logs)
 function setVariable(repo, name, value) {
-  try {
-    execSync('gh', ['variable', 'set', name, '--repo', repo, '--body', value], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf8',
-    });
+  const result = spawnSync('gh', ['variable', 'set', name, '--repo', repo, '--body', value], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    encoding: 'utf8',
+  });
+  if (result.status === 0 && !result.error) {
     return { success: true };
-  } catch (error) {
-    let message;
-    if (error instanceof Error) {
-      const stderr = error.stderr
-        ? String(error.stderr).trim()
-        : '';
-      message = stderr ? `${error.message}: ${stderr}` : error.message;
-    } else {
-      message = String(error);
-    }
-    return { success: false, error: message };
   }
+  let message;
+  if (result.error instanceof Error) {
+    const stderr = result.stderr ? String(result.stderr).trim() : '';
+    message = stderr ? `${result.error.message}: ${stderr}` : result.error.message;
+  } else {
+    const stderr = result.stderr ? String(result.stderr).trim() : '';
+    message = stderr || `Process exited with code ${result.status}`;
+  }
+  return { success: false, error: message };
 }
 
 // Main function
