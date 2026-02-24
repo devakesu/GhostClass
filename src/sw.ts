@@ -26,6 +26,14 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "pages",
         networkTimeoutSeconds: 15,
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 50,
+            // Expire cached pages after 7 days so offline users are never served
+            // content that is more than a week stale.
+            maxAgeSeconds: 60 * 60 * 24 * 7,
+          }),
+        ],
       }),
     },
     {
@@ -85,38 +93,20 @@ const serwist = new Serwist({
         networkTimeoutSeconds: 10,
       }),
     },
-    {
-      // Attendance data caching (disabled for authenticated endpoints).
-      //
-      // Originally this rule cached GET responses from the EzyGo backend proxy
-      // (/api/backend/...) and the user profile endpoint (/api/profile) so that
-      // attendance records remained available offline. However, those endpoints
-      // return user-specific, authenticated data, and the cache keys were based
-      // only on the request URL. This can result in cached PII being served to a
-      // different user on the same device (e.g. after logout + login as another
-      // account, or when offline).
-      //
-      // To avoid leaking user-specific data across sessions, this matcher now
-      // returns false, effectively disabling this runtime cache for authenticated
-      // endpoints. If offline support is reintroduced in the future, it must use
-      // a per-user cache key and/or clear the cache on auth changes.
-      matcher: () => false,
-      handler: new NetworkFirst({
-        cacheName: "attendance-data",
-        networkTimeoutSeconds: 10,
-        plugins: [
-          new CacheableResponsePlugin({ statuses: [200] }),
-          new ExpirationPlugin({
-            maxEntries: 50,
-            maxAgeSeconds: 60 * 60 * 6, // 6 hours
-          }),
-        ],
-      }),
-    },
   ],
 });
 
 serwist.addEventListeners();
+
+// On activation, purge the deprecated "attendance-data" runtime cache.
+// Previous SW versions cached authenticated, user-specific responses in that
+// cache using URL-only keys. Those entries must be removed to prevent PII from
+// a previous user session being accessible to a different user on the same device.
+self.addEventListener("activate", (event) => {
+  (event as ExtendableEvent).waitUntil(
+    caches.delete("attendance-data")
+  );
+});
 
 // Allow manual skip waiting via postMessage for user-initiated updates
 // This enables a "New version available - Click to refresh" UI pattern
