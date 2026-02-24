@@ -354,7 +354,8 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
 
     await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com"); fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
+    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
+    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() => screen.getByLabelText("Reset Code"));
@@ -428,7 +429,8 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
     fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
 
     await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com"); fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
+    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
+    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() => screen.getByLabelText("Reset Code"));
@@ -508,7 +510,8 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
 
     await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com"); fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
+    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
+    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() => screen.getByLabelText("Reset Code"));
@@ -531,7 +534,7 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     await reachOtpStep();
     mockEzygoPost.mockResolvedValueOnce({ data: { access_token: "token" } });
 
-    const err: { config: { url: string }; response?: undefined; code?: undefined } = {
+    const err: { config: { url: string } } = {
       config: { url: "/api/auth/save-token" },
     };
     mockAxiosPost.mockRejectedValueOnce(err);
