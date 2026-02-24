@@ -148,7 +148,6 @@ export function PasswordResetForm({
         option: deliveryMethod,
       });
 
-      setIsLoading(false);
       NProgress.done();
       setStep("otp");
     } catch (error: unknown) {
