@@ -26,13 +26,22 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "pages",
         networkTimeoutSeconds: 15,
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 50,
+            // Expire cached pages after 7 days so offline users are never served
+            // content that is more than a week stale.
+            maxAgeSeconds: 60 * 60 * 24 * 7,
+          }),
+        ],
       }),
     },
     {
       matcher: ({ request }) =>
         request.destination === "style" ||
         request.destination === "script" ||
-        request.destination === "worker",
+        request.destination === "worker" ||
+        request.destination === "font",
       handler: new StaleWhileRevalidate({
         cacheName: "assets",
         plugins: [
@@ -56,75 +65,20 @@ const serwist = new Serwist({
         ],
       }),
     },
-    {
-      // API caching strategy: NetworkFirst for explicitly safe-to-cache GET /api requests.
-      // - Mutation endpoints (POST/PUT/PATCH/DELETE) are excluded by the GET check
-      //   and will always go through the network without caching.
-      // - Use an allowlist approach to only cache static/public API endpoints that are
-      //   guaranteed safe to cache, avoiding stale data for dynamic/user-specific endpoints.
-      // - networkTimeoutSeconds: 10 ensures a hanging request (e.g. slow EzyGo/Supabase
-      //   response) falls back to cached data instead of leaving the user waiting indefinitely.
-      matcher: ({ request, url }) => {
-        if (request.method !== "GET") {
-          return false;
-        }
-        if (!url.pathname.startsWith("/api/")) {
-          return false;
-        }
-        // Only cache API responses for explicitly allowlisted, safe-to-cache prefixes
-        // to avoid serving stale data for user-specific or real-time endpoints.
-        const cacheablePrefixes = ["/api/public/", "/api/static/"];
-        if (cacheablePrefixes.some((path) => url.pathname.startsWith(path))) {
-          return true;
-        }
-        // All other /api/ endpoints are treated as non-cacheable by this strategy.
-        return false;
-      },
-      handler: new NetworkFirst({
-        cacheName: "api",
-        networkTimeoutSeconds: 10,
-      }),
-    },
-    {
-      // Offline-capable attendance data caching.
-      // Caches GET responses from the EzyGo backend proxy (/api/backend/...) and
-      // the user profile endpoint (/api/profile) so attendance records and course
-      // data remain readable when the device is offline or the upstream is slow.
-      //
-      // Strategy: NetworkFirst with a 10 s timeout.
-      //   - Online: always serves fresh data; cache is updated in the background.
-      //   - Offline / timeout: falls back to the last cached response so the UI
-      //     can still render attendance cards instead of showing an error screen.
-      //
-      // Security notes:
-      //   - Only GET is matched, so mutations always hit the network.
-      //   - Responses are scoped to the same origin (service worker boundary),
-      //     so no cross-origin data leakage is possible.
-      //   - ExpirationPlugin caps cached entries at 50 and purges them after 6 h,
-      //     preventing stale session data surviving across multiple school days.
-      matcher: ({ request, url }) => {
-        if (request.method !== "GET") return false;
-        return (
-          url.pathname.startsWith("/api/backend/") ||
-          url.pathname === "/api/profile"
-        );
-      },
-      handler: new NetworkFirst({
-        cacheName: "attendance-data",
-        networkTimeoutSeconds: 10,
-        plugins: [
-          new CacheableResponsePlugin({ statuses: [200] }),
-          new ExpirationPlugin({
-            maxEntries: 50,
-            maxAgeSeconds: 60 * 60 * 6, // 6 hours
-          }),
-        ],
-      }),
-    },
   ],
 });
 
 serwist.addEventListeners();
+
+// On activation, purge the deprecated "attendance-data" runtime cache.
+// Previous SW versions cached authenticated, user-specific responses in that
+// cache using URL-only keys. Those entries must be removed to prevent PII from
+// a previous user session being accessible to a different user on the same device.
+self.addEventListener("activate", (event) => {
+  (event as ExtendableEvent).waitUntil(
+    caches.delete("attendance-data")
+  );
+});
 
 // Allow manual skip waiting via postMessage for user-initiated updates
 // This enables a "New version available - Click to refresh" UI pattern

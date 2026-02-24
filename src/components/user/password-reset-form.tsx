@@ -143,9 +143,11 @@ export function PasswordResetForm({
     setError(null);
 
     try {
+      // selectedOption is "mail:<address>" or "sms:<number>"; extract the method
+      const deliveryMethod = selectedOption.split(":")[0] || selectedOption;
       await ezygoClient.post("/password/reset/request", {
         username: actualUsername,
-        option: selectedOption,
+        option: deliveryMethod,
       });
 
       setIsLoading(false);
@@ -187,11 +189,12 @@ export function PasswordResetForm({
       });
       const token = response.data.access_token;
 
-      // Always call GET /api/csrf before save-token to ensure the httpOnly cookie
-      // is present and fresh. The useCSRFToken hook exits early when sessionStorage
-      // has a token, so the cookie may have expired while sessionStorage still holds
-      // a stale value. This one-shot fetch re-creates the cookie unconditionally.
+      // POST /api/csrf calls regenerateCsrfToken() which always issues a new token,
+      // binding it to the new session after the privilege change (password reset).
+      // This avoids the stale sessionStorage token that caused silent 403s on first
+      // post-reset login.
       const csrfRefreshRes = await fetch("/api/csrf", {
+        method: "POST",
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -202,12 +205,16 @@ export function PasswordResetForm({
         }
       }
       const csrfToken = getCsrfToken();
+      // CSRF token is required for save-token; abort if still missing after refresh
+      if (!csrfToken) {
+        throw new Error("CSRF token unavailable – please reload the page and try again.");
+      }
 
       // Use plain axios for internal auth endpoint (not proxied through /api/backend/)
       const saveTokenResponse = await axios.post(
         "/api/auth/save-token",
         { token },
-        { headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : {} }
+        { headers: { [CSRF_HEADER]: csrfToken } }
       );
 
       // Pre-populate settings from save-token response for immediate availability
@@ -425,7 +432,7 @@ export function PasswordResetForm({
                 className="flex items-center space-x-2 custom-input justify-between px-4 pr-2 cursor-pointer"
               >
                 <span className="text-sm font-medium">{email}</span>
-                <RadioGroupItem value="mail" id={email} aria-label={`Send reset code to email ${email}`} />
+                <RadioGroupItem value={`mail:${email}`} id={email} aria-label={`Send reset code to email ${email}`} />
               </label>
             ))}
             {resetOptions.options.mobiles.map((mobile) => (
@@ -435,7 +442,7 @@ export function PasswordResetForm({
                 className="flex items-center space-x-2 custom-input justify-between pl-4 pr-2 cursor-pointer"
               >
                 <span className="text-sm font-medium">{mobile}</span>
-                <RadioGroupItem value="sms" id={mobile} aria-label={`Send reset code to phone ${mobile}`} />
+                <RadioGroupItem value={`sms:${mobile}`} id={mobile} aria-label={`Send reset code to phone ${mobile}`} />
               </label>
             ))}
           </RadioGroup>
