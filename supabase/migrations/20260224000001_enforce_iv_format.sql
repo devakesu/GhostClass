@@ -5,12 +5,29 @@
 -- exactly 24 lowercase hex characters, matching the 96-bit (12-byte) IV
 -- recommended by NIST SP 800-38D §8.2.1 for AES-GCM.
 --
--- Previous IV columns stored 32-hex-char (16-byte) IVs.  Since this is a
--- fresh deployment with no existing encrypted rows, these constraints can be
--- added immediately without a re-encryption step.  If existing encrypted rows
--- are ever present before this migration runs, those rows must be re-encrypted
--- (decrypt with old key, re-encrypt with new IV length) before applying this
--- migration.
+-- Previous IV columns stored 32-hex-char (16-byte) IVs.  If any such legacy
+-- rows exist this migration will abort with an error.  In that case all
+-- encrypted rows must be re-encrypted (decrypt with old key, re-encrypt with
+-- 12-byte IVs producing 24-char hex) before re-running this migration.
+
+DO $$
+BEGIN
+  -- Fail fast if any legacy 32-hex-char IVs are present in existing data.
+  IF EXISTS (
+    SELECT 1
+    FROM "public"."users"
+    WHERE ("ezygo_iv"        ~ '^[a-f0-9]{32}$')
+       OR ("auth_password_iv" ~ '^[a-f0-9]{32}$')
+       OR ("phone_iv"         ~ '^[a-f0-9]{32}$')
+       OR ("gender_iv"        ~ '^[a-f0-9]{32}$')
+       OR ("birth_date_iv"    ~ '^[a-f0-9]{32}$')
+  ) THEN
+    RAISE EXCEPTION
+      'PRIV-04 migration aborted: legacy 32-hex-char IVs found in "public"."users". '
+      'Re-encrypt all existing rows with 24-char (12-byte) IVs before applying this migration.';
+  END IF;
+END
+$$;
 
 ALTER TABLE "public"."users"
   ADD CONSTRAINT "check_ezygo_iv_format"

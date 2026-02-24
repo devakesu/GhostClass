@@ -340,6 +340,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
   // when the initial fetch fires (EzyGo background sync hasn't completed yet). Once
   // the cron sync finishes (syncCompleted flips to true) the DB is fully populated,
   // so force a profile refetch if names are still missing.
+  // refetchProfile is a stable reference from React Query (safe in the dependency array).
   useEffect(() => {
     if (syncCompleted && !profile?.first_name) {
       void refetchProfile();
