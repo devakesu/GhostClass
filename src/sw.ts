@@ -74,6 +74,11 @@ serwist.addEventListeners();
 // Previous SW versions cached authenticated, user-specific responses in that
 // cache using URL-only keys. Those entries must be removed to prevent PII from
 // a previous user session being accessible to a different user on the same device.
+//
+// Note: No API endpoints (/api/backend/**, /api/profile, etc.) are added to
+// runtimeCaching. Attendance and profile data are always fetched from the
+// network — caching user-specific authenticated responses would risk PII leakage
+// across sessions on shared devices.
 self.addEventListener("activate", (event) => {
   (event as ExtendableEvent).waitUntil(
     caches.delete("attendance-data")
