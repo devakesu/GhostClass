@@ -226,49 +226,38 @@ export function PasswordResetForm({
           error: getUserError,
         });
       } else if (settings) {
-        const responseUserId =
-          saveTokenResponse.data?.user?.id ?? saveTokenResponse.data?.user_id;
-        if (responseUserId && user.id !== responseUserId) {
-          logger.error("User ID mismatch between reset response and Supabase session", {
+        const bunkEnabled =
+          typeof settings.bunk_calculator_enabled === "boolean"
+            ? settings.bunk_calculator_enabled
+            : true;
+        const rawTarget = settings.target_percentage;
+
+        let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
+        if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
+          const normalizedTarget = Math.round(rawTarget);
+          if (normalizedTarget >= 1 && normalizedTarget <= 100) {
+            targetPercentage = normalizedTarget;
+          }
+        }
+
+        try {
+          sessionStorage.setItem(
+            "prefetchedSettings",
+            JSON.stringify({
+              userId: user.id,
+              settings: {
+                bunk_calculator_enabled: bunkEnabled,
+                target_percentage: targetPercentage,
+              },
+            })
+          );
+          localStorage.setItem(`showBunkCalc_${user.id}`, bunkEnabled.toString());
+          localStorage.setItem(`targetPercentage_${user.id}`, targetPercentage.toString());
+        } catch (storageError) {
+          logger.dev("Failed to write settings to storage after password reset", {
             context: "PasswordResetForm/handleResetSubmit",
-            responseUserId,
-            sessionUserId: user.id,
+            error: storageError instanceof Error ? storageError.message : String(storageError),
           });
-          // Skip storing settings to avoid data corruption
-        } else {
-          const bunkEnabled =
-            typeof settings.bunk_calculator_enabled === "boolean"
-              ? settings.bunk_calculator_enabled
-              : true;
-          const rawTarget = settings.target_percentage;
-
-          let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
-          if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
-            const normalizedTarget = Math.round(rawTarget);
-            if (normalizedTarget >= 1 && normalizedTarget <= 100) {
-              targetPercentage = normalizedTarget;
-            }
-          }
-
-          try {
-            sessionStorage.setItem(
-              "prefetchedSettings",
-              JSON.stringify({
-                userId: user.id,
-                settings: {
-                  bunk_calculator_enabled: bunkEnabled,
-                  target_percentage: targetPercentage,
-                },
-              })
-            );
-            localStorage.setItem(`showBunkCalc_${user.id}`, bunkEnabled.toString());
-            localStorage.setItem(`targetPercentage_${user.id}`, targetPercentage.toString());
-          } catch (storageError) {
-            logger.dev("Failed to write settings to storage after password reset", {
-              context: "PasswordResetForm/handleResetSubmit",
-              error: storageError instanceof Error ? storageError.message : String(storageError),
-            });
-          }
         }
       } else {
         // No settings returned — write defaults to localStorage only
