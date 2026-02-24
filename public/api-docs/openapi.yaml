@@ -5,7 +5,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 1.9.4
+  version: 1.9.5
   description: |
     **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
     
@@ -66,6 +66,14 @@ tags:
     description: Endpoints for synchronizing attendance data with EzyGo
   - name: Health
     description: System health and status endpoints
+  - name: Analytics
+    description: Server-side analytics event forwarding
+  - name: Reporting
+    description: Browser-generated violation and telemetry reports
+  - name: Profile
+    description: User profile management
+  - name: Provenance
+    description: Build provenance and version metadata
 
 paths:
   /api/auth/save-token:
@@ -268,40 +276,30 @@ paths:
                   value:
                     token: "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
                     message: "CSRF token initialized successfully"
-
-  /api/csrf/init:
+    
     post:
       tags:
         - Security
-      summary: Initialize or regenerate CSRF token
+      summary: Regenerate CSRF token
       security: []  # No authentication required
       description: |
-        Initializes a new CSRF token or regenerates an existing one. Used for security rotation.
-        
-        **What it does:**
-        - Generates a new CSRF token
-        - Invalidates any existing token
-        - Sets the new token as a cookie
-        - Returns the new token value
+        Explicitly regenerates the CSRF token, replacing any existing one.
+        Useful after privilege escalation or when extra rotation is desired.
         
         **Authentication:** None required
         
-        **Rate Limiting:** Standard rate limiting applies
-        
-        **Use Cases:**
-        - Force token regeneration for security
-        - Initialize CSRF protection on app load
+        **Rate Limiting:** Configured via AUTH_RATE_LIMIT_REQUESTS / AUTH_RATE_LIMIT_WINDOW
       
-      operationId: initCsrfToken
+      operationId: regenerateCsrfToken
       
       responses:
         '200':
-          description: CSRF token initialized successfully
+          description: New CSRF token generated
           headers:
             Set-Cookie:
               schema:
                 type: string
-              description: New CSRF token cookie
+              description: Updated CSRF token cookie
           content:
             application/json:
               schema:
@@ -315,10 +313,22 @@ paths:
                     description: Success message
               examples:
                 success:
-                  summary: Token initialized
+                  summary: Token regenerated
                   value:
                     token: "new123abc456def789..."
-                    message: "CSRF token regenerated successfully"
+                    message: "CSRF token refreshed successfully"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '500':
+          description: Unable to determine client IP or internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/logout:
     post:
@@ -511,6 +521,142 @@ paths:
                   value:
                     error: "Server configuration error: NEXT_PUBLIC_APP_URL is not set"
 
+  /api/analytics/track:
+    post:
+      tags:
+        - Analytics
+      summary: Track a server-side analytics event
+      security: []
+      description: |
+        Proxies GA4 Measurement Protocol events through the server so ad blockers
+        do not suppress them. Validates event shapes, sanitises values to GA4 limits,
+        and enforces origin and rate-limit guards before forwarding to GA4.
+        
+        **Authentication:** None required
+        
+        **Rate Limiting:** Configured via RATE_LIMIT_REQUESTS / RATE_LIMIT_WINDOW
+      
+      operationId: trackAnalyticsEvent
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clientId
+                - events
+              properties:
+                clientId:
+                  type: string
+                  maxLength: 100
+                  description: GA4 client ID in `timestamp.randomhex` format
+                  example: "1706108400.a1b2c3d4"
+                events:
+                  type: array
+                  maxItems: 25
+                  description: Up to 25 GA4 events per request
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        maxLength: 40
+                        description: Event name (lowercase, underscores, digits only)
+                      params:
+                        type: object
+                        description: Arbitrary GA4 event parameters
+                        additionalProperties:
+                          oneOf:
+                            - type: string
+                            - type: number
+                            - type: boolean
+                userProperties:
+                  type: object
+                  description: Optional GA4 user properties (key → string value)
+                  additionalProperties:
+                    type: string
+      
+      responses:
+        '200':
+          description: Events forwarded to GA4
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Validation error (bad clientId, malformed events, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden – request origin not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/csp-report:
+    post:
+      tags:
+        - Reporting
+      summary: Receive CSP violation reports
+      security: []
+      description: |
+        Browser endpoint for Content-Security-Policy violation reports.
+        Accepts both legacy `application/csp-report` (report-uri directive) and
+        modern `application/reports+json` (Reporting API v1) payloads.
+        Always returns **204 No Content** so the browser does not retry.
+        Body is capped at **8 KB** to prevent abuse on this unauthenticated endpoint.
+        
+        **Authentication:** None required (reports are sent automatically by browsers)
+      
+      operationId: receiveCspReport
+      
+      requestBody:
+        required: true
+        content:
+          application/csp-report:
+            schema:
+              type: object
+              description: 'Legacy CSP report wrapped in a csp-report envelope object'
+          application/reports+json:
+            schema:
+              type: array
+              description: Reporting API v1 array of report objects
+              items:
+                type: object
+      
+      responses:
+        '204':
+          description: Report received and logged (browser should not retry)
+        '400':
+          description: Invalid Content-Length header value
+        '413':
+          description: Payload too large (exceeds 8 KB limit)
+        '415':
+          description: Unsupported content type
+
   /api/health:
     get:
       tags:
@@ -566,8 +712,325 @@ paths:
                     version: "1.0.0"
                     timestamp: "2026-01-24T20:52:27.674Z"
 
+  /api/health/ezygo:
+    get:
+      tags:
+        - Health
+      summary: EzyGo integration health check
+      security: []
+      description: |
+        Returns health status of the EzyGo API integration including circuit breaker
+        and rate-limiter state. In **development/test** environments the response
+        includes detailed metrics (active requests, queue length, CB state).
+        In **production** only `status` and `timestamp` are returned.
+        
+        Returns HTTP **503** when the circuit breaker is open.
+      
+      operationId: healthCheckEzygo
+      
+      responses:
+        '200':
+          description: EzyGo integration healthy or degraded
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: "no-store, max-age=0"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+              examples:
+                healthy:
+                  summary: Circuit closed, no queue backlog
+                  value:
+                    status: healthy
+                    timestamp: "2026-02-01T12:00:00.000Z"
+                degraded:
+                  summary: Requests queuing up
+                  value:
+                    status: degraded
+                    timestamp: "2026-02-01T12:00:00.000Z"
+        '503':
+          description: Circuit breaker open – upstream EzyGo unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/profile:
+    get:
+      tags:
+        - Profile
+      summary: Fetch user profile
+      security:
+        - SupabaseAuth: []
+      description: |
+        Returns the current user's profile data from the local database, soft-synced
+        with EzyGo. PII fields (`phone`, `gender`, `birth_date`) are AES-256-GCM
+        encrypted at rest; the server decrypts them before responding.
+        
+        **Fast path:** If a seeded local row exists the response is immediate, with a
+        background job quietly refreshing EzyGo fields for the next call.
+        
+        **Slow path:** First-time after login — EzyGo is called inline to seed the row.
+      
+      operationId: getProfile
+      
+      responses:
+        '200':
+          description: Profile returned successfully
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: "no-store, max-age=0"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: EzyGo API unavailable during slow-path sync
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    patch:
+      tags:
+        - Profile
+      summary: Update user profile
+      security:
+        - SupabaseAuth: []
+      description: |
+        Updates user-editable profile fields. PII values (`gender`, `birth_date`) are
+        AES-256-GCM encrypted before being written to the database.
+        
+        **CSRF:** Requires the `x-csrf-token` request header.
+        
+        **Validation:** `first_name` is required (min 2 chars). All other fields
+        are optional; omitting an optional field does **not** clear it.
+      
+      operationId: updateProfile
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+              properties:
+                first_name:
+                  type: string
+                  minLength: 2
+                  example: "Aditya"
+                last_name:
+                  type: string
+                  nullable: true
+                  example: "Kumar"
+                gender:
+                  type: string
+                  enum: [male, female, other]
+                  nullable: true
+                birth_date:
+                  type: string
+                  format: date
+                  nullable: true
+                  example: "2003-08-15"
+      
+      responses:
+        '200':
+          description: Profile updated; returns saved plaintext values
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  first_name:
+                    type: string
+                  last_name:
+                    type: string
+                    nullable: true
+                  gender:
+                    type: string
+                    nullable: true
+                  birth_date:
+                    type: string
+                    nullable: true
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Invalid CSRF token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Validation failed"
+                  details:
+                    type: object
+        '500':
+          description: Database update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/provenance:
+    get:
+      tags:
+        - Provenance
+      summary: Build provenance and version metadata
+      security: []
+      description: |
+        Returns build provenance metadata: commit SHA, app version, image digest,
+        audit and signature status, and build timestamp.
+        
+        Extended CI metadata (`github_run_id`, `github_run_number`, `github_repo`)
+        is included only when the request presents
+        `Accept: application/vnd.ghostclass.provenance+json`.
+        
+        Responses are **never cached** (`Cache-Control: no-store`).
+      
+      operationId: getProvenance
+      
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          description: |
+            Pass `application/vnd.ghostclass.provenance+json` to receive extended
+            CI/build metadata in addition to the base payload.
+          schema:
+            type: string
+      
+      responses:
+        '200':
+          description: Provenance metadata
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: "no-store, max-age=0"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  commit:
+                    type: string
+                    description: Commit SHA (legacy alias for commit_sha)
+                  commit_sha:
+                    type: string
+                  build_id:
+                    type: string
+                  app_version:
+                    type: string
+                  image_digest:
+                    type: string
+                  container:
+                    type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+                  audit_status:
+                    type: string
+                  signature_status:
+                    type: string
+              examples:
+                base:
+                  summary: Standard production payload
+                  value:
+                    commit: "a1b2c3d"
+                    commit_sha: "a1b2c3d"
+                    build_id: "123456789"
+                    app_version: "1.9.5"
+                    image_digest: "sha256:abc123..."
+                    container: true
+                    timestamp: "2026-02-01T10:00:00.000Z"
+                    audit_status: "PASSED"
+                    signature_status: "SIGNED"
+
 components:
   schemas:
+    UserProfile:
+      type: object
+      description: Decrypted user profile data (PII fields returned as plaintext)
+      properties:
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+          description: EzyGo user ID
+        username:
+          type: string
+          example: "student123"
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          description: Decrypted phone number (AES-256-GCM at rest)
+        gender:
+          type: string
+          nullable: true
+          description: Decrypted gender (AES-256-GCM at rest)
+        birth_date:
+          type: string
+          nullable: true
+          description: Decrypted birth date in YYYY-MM-DD format (AES-256-GCM at rest)
+        avatar_url:
+          type: string
+          nullable: true
+        terms_version:
+          type: string
+          nullable: true
+        terms_accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+    
     Error:
       type: object
       properties:

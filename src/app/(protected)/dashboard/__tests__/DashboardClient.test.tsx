@@ -27,7 +27,7 @@ vi.mock('ldrs/react/Ring2.css', () => ({}));
 
 // Mock all the hooks
 vi.mock('@/hooks/users/profile', () => ({
-  useProfile: () => ({ data: null, isLoading: false }),
+  useProfile: () => ({ data: null, isLoading: false, refetch: vi.fn().mockResolvedValue({}) }),
 }));
 
 vi.mock('@/hooks/users/user', () => ({

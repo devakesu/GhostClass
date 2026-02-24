@@ -12,10 +12,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Eye, EyeOff, Mail, Phone, User } from "lucide-react";
 
 import ezygoClient from "@/lib/axios";
-import axios from "axios";
-import { getCsrfToken } from "@/lib/axios";
+import axios, { AxiosError } from "axios";
+import { getCsrfToken, setCsrfToken } from "@/lib/axios";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { useCSRFToken } from "@/hooks/use-csrf-token";
+import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
+import NProgress from "nprogress";
 
 import { motion } from "framer-motion";
 
@@ -23,6 +28,24 @@ interface PasswordResetFormProps {
   className?: string;
   onCancel: () => void;
 }
+
+interface ErrorResponse {
+  message: string;
+}
+
+const PASSWORD_VALIDATION = {
+  MIN_LENGTH: 6,
+  MAX_LENGTH: 128,
+} as const;
+
+const validatePassword = (password: string): string | null => {
+  if (!password || password.trim().length === 0) return "Password is required";
+  if (password.length < PASSWORD_VALIDATION.MIN_LENGTH)
+    return `Password must be at least ${PASSWORD_VALIDATION.MIN_LENGTH} characters`;
+  if (password.length > PASSWORD_VALIDATION.MAX_LENGTH)
+    return `Password must be at most ${PASSWORD_VALIDATION.MAX_LENGTH} characters long`;
+  return null;
+};
 
 const loginMethodProps = {
   username: {
@@ -55,6 +78,7 @@ export function PasswordResetForm({
   onCancel,
 }: PasswordResetFormProps) {
   const router = useRouter();
+  const supabase = createClient();
   const [step, setStep] = useState<"username" | "option" | "otp">("username");
   const [username, setUsername] = useState("");
   const [actualUsername, setActualUsername] = useState("");
@@ -75,8 +99,9 @@ export function PasswordResetForm({
   // Initialize CSRF token
   useCSRFToken();
 
-  const handleUsernameSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUsernameSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    NProgress.start();
     setIsLoading(true);
     setError(null);
 
@@ -93,40 +118,64 @@ export function PasswordResetForm({
           username: usernameToUse,
         });
         setResetOptions(response.data);
+
+        NProgress.done();
         setStep("option");
       } else {
+        NProgress.done();
         setError("Ezygo: No user found with this username/email/phone.");
-        return;
       }
-    } catch (error: any) {
-      setError(`Ezygo: ${error.response?.data?.message || "Failed to fetch reset options."}`);
+    } catch (error: unknown) {
+      NProgress.done();
+      const err = error as AxiosError<ErrorResponse>;
+      setError(`Ezygo: ${err.response?.data?.message ?? "Failed to fetch reset options."}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOptionSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleOptionSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    NProgress.start();
     setIsLoading(true);
     setError(null);
 
     try {
+      // selectedOption is "mail:<address>" or "sms:<number>"; extract the method
+      const deliveryMethod = selectedOption.split(":")[0] || selectedOption;
       await ezygoClient.post("/password/reset/request", {
         username: actualUsername,
-        option: selectedOption,
+        option: deliveryMethod,
       });
+
+      NProgress.done();
       setStep("otp");
-    } catch (error: any) {
-      setError(`Ezygo: ${error.response?.data?.message || "Failed to request password reset."}`);
+    } catch (error: unknown) {
+      NProgress.done();
+      const err = error as AxiosError<ErrorResponse>;
+      setError(`Ezygo: ${err.response?.data?.message ?? "Failed to request password reset."}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResetSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleResetSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
+
+    // Validate password client-side before making any requests
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (password !== passwordConfirmation) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    NProgress.start();
+    setIsLoading(true);
 
     try {
       const response = await ezygoClient.post("/password/reset", {
@@ -136,20 +185,142 @@ export function PasswordResetForm({
         password_confirmation: passwordConfirmation,
       });
       const token = response.data.access_token;
-      
-      // Use plain axios for internal auth endpoint (not proxied through /api/backend/)
-      // Add CSRF token for the save-token call
+
       const csrfToken = getCsrfToken();
-      await axios.post("/api/auth/save-token", 
+      // CSRF token is required for save-token; abort if missing
+      if (!csrfToken) {
+        throw new Error("CSRF token unavailable – please reload the page and try again.");
+      }
+
+      // Use plain axios for internal auth endpoint (not proxied through /api/backend/)
+      const saveTokenResponse = await axios.post(
+        "/api/auth/save-token",
         { token },
-        {
-          headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : {}
-        }
+        { headers: { [CSRF_HEADER]: csrfToken } }
       );
-      
+
+      // POST /api/csrf calls regenerateCsrfToken() which always issues a new token.
+      // Done AFTER save-token so the new CSRF token is bound to the authenticated
+      // session (not the pre-login unauthenticated one). Non-fatal if this fails
+      // since the user is already logged in and will get a fresh CSRF on dashboard load.
+      try {
+        const csrfRefreshRes = await fetch("/api/csrf", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (csrfRefreshRes.ok) {
+          const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+          if (typeof csrfData?.token === "string") {
+            setCsrfToken(csrfData.token); // keep sessionStorage in sync
+          }
+        } else {
+          logger.error("CSRF refresh after password reset returned non-OK status", {
+            context: "PasswordResetForm/handleResetSubmit",
+            status: csrfRefreshRes.status,
+          });
+          // Clear potentially stale pre-auth CSRF token to avoid silent 403s
+          setCsrfToken(null);
+        }
+      } catch (csrfError) {
+        logger.error("CSRF refresh after password reset threw an error", {
+          context: "PasswordResetForm/handleResetSubmit",
+          error: csrfError instanceof Error ? csrfError.message : String(csrfError),
+        });
+        Sentry.captureException(csrfError);
+        // Clear potentially stale pre-auth CSRF token to avoid silent 403s
+        setCsrfToken(null);
+      }
+
+      // Pre-populate settings from save-token response for immediate availability
+      // Eliminates the 5-10 second delay showing defaults on first post-reset load
+      const settings = saveTokenResponse.data?.settings;
+
+      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+      if (getUserError || !user) {
+        logger.error("User session not available after password reset; skipping settings prefetch", {
+          context: "PasswordResetForm/handleResetSubmit",
+          error: getUserError,
+        });
+      } else if (settings) {
+        const bunkEnabled =
+          typeof settings.bunk_calculator_enabled === "boolean"
+            ? settings.bunk_calculator_enabled
+            : true;
+        const rawTarget = settings.target_percentage;
+
+        let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
+        if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
+          const normalizedTarget = Math.round(rawTarget);
+          if (normalizedTarget >= 1 && normalizedTarget <= 100) {
+            targetPercentage = normalizedTarget;
+          }
+        }
+
+        try {
+          sessionStorage.setItem(
+            "prefetchedSettings",
+            JSON.stringify({
+              userId: user.id,
+              settings: {
+                bunk_calculator_enabled: bunkEnabled,
+                target_percentage: targetPercentage,
+              },
+            })
+          );
+          localStorage.setItem(`showBunkCalc_${user.id}`, bunkEnabled.toString());
+          localStorage.setItem(`targetPercentage_${user.id}`, targetPercentage.toString());
+        } catch (storageError) {
+          logger.dev("Failed to write settings to storage after password reset", {
+            context: "PasswordResetForm/handleResetSubmit",
+            error: storageError instanceof Error ? storageError.message : String(storageError),
+          });
+        }
+      } else {
+        // No settings returned — write defaults to localStorage only
+        // (not sessionStorage.prefetchedSettings so the settings provider creates the DB row)
+        try {
+          if (user) {
+            localStorage.setItem(`showBunkCalc_${user.id}`, "true");
+            localStorage.setItem(`targetPercentage_${user.id}`, DEFAULT_TARGET_PERCENTAGE.toString());
+          }
+        } catch (storageError) {
+          logger.dev("Failed to write default settings to storage after password reset", {
+            context: "PasswordResetForm/handleResetSubmit",
+            error: storageError instanceof Error ? storageError.message : String(storageError),
+          });
+        }
+        logger.dev(
+          "No settings returned from /api/auth/save-token; applied default settings for new user.",
+          { context: "PasswordResetForm/handleResetSubmit" }
+        );
+      }
+
+      // Navigate to dashboard — NProgress finishes via NextTopLoader on navigation
       router.push("/dashboard");
-    } catch (error: any) {
-      setError(`Ezygo: ${error.response?.data?.message || "Failed to complete login after password reset."}`);
+    } catch (error: unknown) {
+      NProgress.done();
+
+      let errorMsg = "An unexpected error occurred";
+
+      if (axios.isAxiosError<ErrorResponse>(error)) {
+        if (error.config?.url?.includes("save-token")) {
+          errorMsg = "Secure session setup failed. Please try again.";
+          Sentry.captureException(error, {
+            tags: {
+              type: "auth_bridge_client_error",
+              location: "PasswordResetForm/handleResetSubmit",
+            },
+          });
+        } else if (error.response?.data?.message) {
+          errorMsg = `Ezygo: ${error.response.data.message}`;
+        } else if (error.code === "ERR_NETWORK") {
+          errorMsg = "Network error. Please check your connection.";
+        }
+      } else if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -257,25 +428,28 @@ export function PasswordResetForm({
           <RadioGroup
             value={selectedOption}
             onValueChange={setSelectedOption}
+            disabled={isLoading}
             className="flex justify-center flex-col gap-3"
           >
             {resetOptions.options.emails.map((email) => (
-              <div
+              <label
                 key={email}
-                className="flex items-center space-x-2 custom-input justify-between px-4 pr-2"
+                htmlFor={email}
+                className="flex items-center space-x-2 custom-input justify-between px-4 pr-2 cursor-pointer"
               >
-                <Label htmlFor={email}>{email}</Label>
-                <RadioGroupItem value="mail" id={email} aria-label={`Send reset code to email ${email}`} />
-              </div>
+                <span className="text-sm font-medium">{email}</span>
+                <RadioGroupItem value={`mail:${email}`} id={email} aria-label={`Send reset code to email ${email}`} />
+              </label>
             ))}
             {resetOptions.options.mobiles.map((mobile) => (
-              <div
+              <label
                 key={mobile}
-                className="flex items-center space-x-2 custom-input justify-between pl-4 pr-2"
+                htmlFor={mobile}
+                className="flex items-center space-x-2 custom-input justify-between pl-4 pr-2 cursor-pointer"
               >
-                <Label htmlFor={mobile}>{mobile}</Label>
-                <RadioGroupItem value="sms" id={mobile} aria-label={`Send reset code to phone ${mobile}`} />
-              </div>
+                <span className="text-sm font-medium">{mobile}</span>
+                <RadioGroupItem value={`sms:${mobile}`} id={mobile} aria-label={`Send reset code to phone ${mobile}`} />
+              </label>
             ))}
           </RadioGroup>
           <div className="flex gap-2">

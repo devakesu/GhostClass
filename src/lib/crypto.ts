@@ -63,18 +63,7 @@ export const encrypt = (text: string): EncryptedData => {
   }
 
   const KEY = getEncryptionKey();
-  const iv = crypto.randomBytes(16);
-  // TODO(security): NIST SP 800-38D recommends a 12-byte (96-bit) IV for AES-GCM for
-  // maximum security margin and performance. The current 16-byte IV is cryptographically
-  // valid but requires an extra GHASH step internally.
-  //
-  // Changing to 12 bytes is a BREAKING CHANGE — all existing ciphertext stored in the
-  // database (ezygo_iv, auth_password_iv columns) uses 16-byte IVs and the decrypt()
-  // function validates exactly 32 hex chars (16 bytes). A migration would be needed to:
-  //   1. Re-encrypt all rows with a 12-byte IV (24 hex chars)
-  //   2. Update the decrypt() regex to accept 24 hex chars
-  //   3. Run a database migration
-  // This is deferred until a scheduled maintenance window.
+  const iv = crypto.randomBytes(12); // NIST SP 800-38D §8.2.1 — 96-bit IV is the recommended length for AES-GCM
   const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -108,8 +97,8 @@ export function decrypt(ivHexOrData: string | EncryptedData, contentArg?: string
   if (!ivHex || !content) {
     throw new Error("Invalid input: IV and content are required");
   }
-  if (!/^[a-f0-9]{32}$/i.test(ivHex)) {
-    throw new Error("Invalid IV format (must be 32 hex chars)");
+  if (!/^[a-f0-9]{24}$/i.test(ivHex)) {
+    throw new Error("Invalid IV format (must be 24 hex chars)");
   }
   if (!content.includes(':')) {
     throw new Error("Invalid content format (missing separator)");

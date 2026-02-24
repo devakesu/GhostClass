@@ -181,7 +181,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     // supabase is memoized with empty deps, so including it here is safe and stable
   }, [router, supabase]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);

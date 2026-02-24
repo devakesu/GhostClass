@@ -94,7 +94,7 @@ vi.mock("axios", async (importOriginal) => {
 });
 
 // --- Crypto ---
-const MOCK_IV = "aabbccddeeff00112233445566778899";
+const MOCK_IV = "aabbccddeeff001122334455";
 vi.mock("@/lib/crypto", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {

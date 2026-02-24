@@ -106,7 +106,7 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ initialData }: DashboardClientProps) {
-  const { data: profile } = useProfile();
+  const { data: profile, refetch: refetchProfile } = useProfile();
   const { data: user } = useUser();
   const queryClient = useQueryClient();
 
@@ -308,7 +308,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
   }, [academicYearData, isLoadingAcademicYear, isAcademicYearError, getDefaultDefaults, setAcademicYearMutation, refetchCourses, refetchAttendance]);
   
   // --- SYNC ON MOUNT ---
-  useSyncOnMount({
+  const { syncCompleted } = useSyncOnMount({
     username: user?.username,
     userId: user?.id,
     enabled: !isLoadingAttendance && !isLoadingTracking,
@@ -335,6 +335,17 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
       ]);
     },
   });
+
+  // On first signup the profile row exists in DB but names/phone/gender may be null
+  // when the initial fetch fires (EzyGo background sync hasn't completed yet). Once
+  // the cron sync finishes (syncCompleted flips to true) the DB is fully populated,
+  // so force a profile refetch if names are still missing.
+  // refetchProfile is a stable reference from React Query (safe in the dependency array).
+  useEffect(() => {
+    if (syncCompleted && !profile?.first_name) {
+      void refetchProfile();
+    }
+  }, [syncCompleted, profile?.first_name, refetchProfile]);
 
   // CALCULATE ACTIVE COURSES (Courses with at least 1 record)
   const activeCourseCount = useMemo(() => {

@@ -26,13 +26,22 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "pages",
         networkTimeoutSeconds: 15,
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 50,
+            // Expire cached pages after 7 days so offline users are never served
+            // content that is more than a week stale.
+            maxAgeSeconds: 60 * 60 * 24 * 7,
+          }),
+        ],
       }),
     },
     {
       matcher: ({ request }) =>
         request.destination === "style" ||
         request.destination === "script" ||
-        request.destination === "worker",
+        request.destination === "worker" ||
+        request.destination === "font",
       handler: new StaleWhileRevalidate({
         cacheName: "assets",
         plugins: [
@@ -56,39 +65,25 @@ const serwist = new Serwist({
         ],
       }),
     },
-    {
-      // API caching strategy: NetworkFirst for explicitly safe-to-cache GET /api requests.
-      // - Mutation endpoints (POST/PUT/PATCH/DELETE) are excluded by the GET check
-      //   and will always go through the network without caching.
-      // - Use an allowlist approach to only cache static/public API endpoints that are
-      //   guaranteed safe to cache, avoiding stale data for dynamic/user-specific endpoints.
-      // - networkTimeoutSeconds: 10 ensures a hanging request (e.g. slow EzyGo/Supabase
-      //   response) falls back to cached data instead of leaving the user waiting indefinitely.
-      matcher: ({ request, url }) => {
-        if (request.method !== "GET") {
-          return false;
-        }
-        if (!url.pathname.startsWith("/api/")) {
-          return false;
-        }
-        // Only cache API responses for explicitly allowlisted, safe-to-cache prefixes
-        // to avoid serving stale data for user-specific or real-time endpoints.
-        const cacheablePrefixes = ["/api/public/", "/api/static/"];
-        if (cacheablePrefixes.some((path) => url.pathname.startsWith(path))) {
-          return true;
-        }
-        // All other /api/ endpoints are treated as non-cacheable by this strategy.
-        return false;
-      },
-      handler: new NetworkFirst({
-        cacheName: "api",
-        networkTimeoutSeconds: 10,
-      }),
-    },
   ],
 });
 
 serwist.addEventListeners();
+
+// On activation, purge the deprecated "attendance-data" runtime cache.
+// Previous SW versions cached authenticated, user-specific responses in that
+// cache using URL-only keys. Those entries must be removed to prevent PII from
+// a previous user session being accessible to a different user on the same device.
+//
+// Note: No API endpoints (/api/backend/**, /api/profile, etc.) are added to
+// runtimeCaching. Attendance and profile data are always fetched from the
+// network — caching user-specific authenticated responses would risk PII leakage
+// across sessions on shared devices.
+self.addEventListener("activate", (event) => {
+  (event as ExtendableEvent).waitUntil(
+    caches.delete("attendance-data")
+  );
+});
 
 // Allow manual skip waiting via postMessage for user-initiated updates
 // This enables a "New version available - Click to refresh" UI pattern

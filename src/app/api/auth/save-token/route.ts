@@ -725,7 +725,7 @@ export async function POST(req: Request) {
     const { iv, content } = encrypt(token);
     
     // Validate Encryption
-    if (!iv || !content || !/^[a-f0-9]{32}$/i.test(iv)) {
+    if (!iv || !content || !/^[a-f0-9]{24}$/i.test(iv)) {
       Sentry.captureException(new Error("Encryption failed during token save"), {
           extra: { userId: redact("id", String(userId)) }
       });
