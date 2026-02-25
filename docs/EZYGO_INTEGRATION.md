@@ -456,14 +456,21 @@ The three-layer protection system (LRU cache → rate limiter → circuit breake
 
 To help EzyGo's rate limiter distinguish between users even when all requests share the same server outbound IP, the proxy layer (`src/app/api/backend/[...path]/route.ts`) extracts the original client identity from the incoming Next.js request and injects it into every outbound EzyGo request:
 
-| Outgoing header | Source (priority order) |
+| Outgoing header | Source (priority order via `getClientIp()`) |
 | --- | --- |
-| `X-Forwarded-For` | `req.ip` → `X-Forwarded-For` first entry → `X-Real-IP` |
+| `X-Forwarded-For` | `cf-connecting-ip` → `X-Real-IP` → `X-Forwarded-For` (first entry) |
 | `X-Real-IP` | same value as `X-Forwarded-For` above |
 | `User-Agent` | `User-Agent` from the browser request |
 
 These headers are omitted when the corresponding value cannot be determined (e.g., no forwarding headers set by the reverse proxy). If EzyGo respects these headers for per-IP rate limiting, each user's requests are counted against their own IP instead of the shared server IP.
 
+> **Security note:** `X-Forwarded-For` and `X-Real-IP` **must be treated as trusted-only headers**. They are trivially spoofable by clients unless a reverse proxy (e.g., Traefik, nginx, Cloudflare) is configured to **strip any incoming `X-Forwarded-For` / `X-Real-IP` from the client request and rebuild them based on the actual connection**. Do not assume that the left‑most entry in `X-Forwarded-For` is authentic unless it was populated by a trusted proxy; otherwise an attacker can control the value you forward to EzyGo and defeat the purpose of "original client identity".
+>
+> In practice, you should:
+> - Run GhostClass behind a trusted reverse proxy that normalizes `X-Forwarded-For` / `X-Real-IP`.
+> - Configure that proxy to overwrite these headers on ingress rather than passing client-supplied values through.
+> - Disable or ignore this forwarding mechanism if the app is exposed directly to the internet without such a proxy.
+>
 > **Note:** Whether EzyGo actually uses `X-Forwarded-For` / `X-Real-IP` for rate limiting is unverified. If EzyGo ignores these headers, the shared-IP constraint remains and the three-layer protection system is the primary mitigation.
 
 ### Latency impact

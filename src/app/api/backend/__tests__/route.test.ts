@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+// Must be hoisted before any module imports that transitively import server-only
+vi.mock('server-only', () => ({}));
+
 // Set environment variables BEFORE any imports using vi.hoisted
 // This ensures they're available when the route module's top-level constants are initialized
 vi.hoisted(() => {
@@ -693,6 +696,32 @@ describe('Backend Proxy Route', () => {
 
       expect(mockFetch).toHaveBeenCalledOnce();
       const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['x-forwarded-for']).toBe('5.6.7.8');
+      expect(fetchHeaders['x-real-ip']).toBe('5.6.7.8');
+    });
+
+    it('should prefer x-real-ip over x-forwarded-for when both are present (getClientIp priority)', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+          'x-real-ip': '5.6.7.8',
+          'x-forwarded-for': '1.2.3.4, 10.0.0.1',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      // x-real-ip wins over x-forwarded-for (getClientIp priority: cf-connecting-ip → x-real-ip → x-forwarded-for)
       expect(fetchHeaders['x-forwarded-for']).toBe('5.6.7.8');
       expect(fetchHeaders['x-real-ip']).toBe('5.6.7.8');
     });

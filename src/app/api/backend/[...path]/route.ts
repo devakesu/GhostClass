@@ -4,6 +4,7 @@ import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
+import { getClientIp } from "@/lib/utils.server";
 
 // .trim() removes accidental leading/trailing whitespace from the env value
 // (common copy-paste mistake in .env files) before stripping trailing slashes.
@@ -410,16 +411,14 @@ async function forward(req: NextRequest, method: string, path: string[]) {
   }
 
   // Extract client IP for proxy header forwarding to EzyGo.
-  // Priority: req.ip (Next.js built-in, set by edge runtime/middleware) →
-  //           x-forwarded-for first entry → x-real-ip
-  // These are injected into outgoing EzyGo requests so EzyGo sees the
-  // original client IP rather than the server's shared outbound IP,
-  // which helps avoid hitting EzyGo's per-IP rate limits.
-  const clientIp: string | null =
-    (req.ip ?? null) ||
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    null;
+  // Uses getClientIp() so priority matches the rest of the codebase:
+  //   cf-connecting-ip → x-real-ip → x-forwarded-for (first entry)
+  // Injecting these headers into outgoing EzyGo requests allows EzyGo to
+  // see the original client IP rather than the shared server outbound IP,
+  // which may help avoid hitting EzyGo's per-IP rate limits.
+  // In production getClientIp() returns null when no IP header is present;
+  // the headers are omitted in that case (not forwarded as empty).
+  const clientIp = getClientIp(req.headers);
   const clientUserAgent = req.headers.get("user-agent");
 
   try {
