@@ -4,6 +4,7 @@ import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
+import { getClientIp } from "@/lib/utils.server";
 
 // .trim() removes accidental leading/trailing whitespace from the env value
 // (common copy-paste mistake in .env files) before stripping trailing slashes.
@@ -409,6 +410,17 @@ async function forward(req: NextRequest, method: string, path: string[]) {
     }
   }
 
+  // Extract client IP for proxy header forwarding to EzyGo.
+  // Uses getClientIp() so priority matches the rest of the codebase:
+  //   cf-connecting-ip → x-real-ip → x-forwarded-for (first entry)
+  // Injecting these headers into outgoing EzyGo requests allows EzyGo to
+  // see the original client IP rather than the shared server outbound IP,
+  // which may help avoid hitting EzyGo's per-IP rate limits.
+  // In production getClientIp() returns null when no IP header is present;
+  // the headers are omitted in that case (not forwarded as empty).
+  const clientIp = getClientIp(req.headers);
+  const clientUserAgent = req.headers.get("user-agent");
+
   try {
     // Wrap fetch in circuit breaker for automatic failure handling
     // This protects against cascading failures when EzyGo API is down
@@ -423,6 +435,10 @@ async function forward(req: NextRequest, method: string, path: string[]) {
             ...(isPublic ? {} : { Authorization: `Bearer ${token}` }),
             "content-type": resolvedContentType, // derived from how the body was read, not raw client header
             accept: req.headers.get("accept") || "application/json",
+            // Forward original client IP and User-Agent so EzyGo sees per-user
+            // identifiers rather than the shared server outbound IP.
+            ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
+            ...(clientUserAgent ? { "user-agent": clientUserAgent } : {}),
           },
           body: hasBody ? body : undefined,
           // duplex is required for streaming request bodies
