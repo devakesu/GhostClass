@@ -196,6 +196,28 @@ describe('AcceptTermsForm', () => {
       });
     });
 
+    it('should keep loading state after successful navigation', async () => {
+      const user = userEvent.setup();
+      mockAcceptTermsAction.mockResolvedValue(undefined);
+
+      render(<AcceptTermsForm />);
+
+      const checkbox = screen.getByRole('checkbox');
+      const button = screen.getByRole('button', { name: /Enter GhostClass/i });
+
+      await user.click(checkbox);
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      });
+
+      // Button should remain in loading state (loading=true) after navigation,
+      // since the component stays mounted until the page transition completes
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(button).toBeDisabled();
+    });
+
     it('should disable button during submission', async () => {
       const user = userEvent.setup();
       mockAcceptTermsAction.mockImplementation(
