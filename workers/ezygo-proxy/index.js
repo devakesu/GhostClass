@@ -38,12 +38,51 @@
  * 5. Set CF_PROXY_SECRET in your Coolify/Next.js env to the same value as PROXY_SECRET above.
  */
 
+/**
+ * Constant-time HMAC-based comparison to prevent timing side-channel attacks.
+ * Uses the Web Crypto API available in Cloudflare Workers.
+ * Both strings are signed with a common random key so the output length is fixed
+ * regardless of input, and the byte-by-byte comparison uses bitwise accumulation
+ * (no early return) to keep timing consistent.
+ */
+async function constantTimeEqual(a, b) {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  const aKey = await crypto.subtle.importKey(
+    "raw",
+    aBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const bKey = await crypto.subtle.importKey(
+    "raw",
+    bBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const aSig = await crypto.subtle.sign("HMAC", aKey, bBytes);
+  const bSig = await crypto.subtle.sign("HMAC", bKey, aBytes);
+  const aView = new Uint8Array(aSig);
+  const bView = new Uint8Array(bSig);
+  if (aView.length !== bView.length) return false;
+  let isEqual = true;
+  for (let i = 0; i < aView.length; i++) {
+    // Use bitwise accumulation to avoid early return and keep timing consistent.
+    isEqual &&= aView[i] === bView[i];
+  }
+  return isEqual;
+}
+
 export default {
   async fetch(request, env) {
     // ── 1. Authentication ─────────────────────────────────────────────────────
     // Only the GhostClass Next.js server knows this secret; browsers never see it.
     const incomingSecret = request.headers.get("x-proxy-secret");
-    if (!incomingSecret || incomingSecret !== env.PROXY_SECRET) {
+    if (!incomingSecret || !(await constantTimeEqual(incomingSecret, env.PROXY_SECRET))) {
       return new Response("Forbidden", { status: 403 });
     }
 
