@@ -409,6 +409,19 @@ async function forward(req: NextRequest, method: string, path: string[]) {
     }
   }
 
+  // Extract client IP for proxy header forwarding to EzyGo.
+  // Priority: req.ip (Next.js built-in, set by edge runtime/middleware) →
+  //           x-forwarded-for first entry → x-real-ip
+  // These are injected into outgoing EzyGo requests so EzyGo sees the
+  // original client IP rather than the server's shared outbound IP,
+  // which helps avoid hitting EzyGo's per-IP rate limits.
+  const clientIp: string | null =
+    (req.ip ?? null) ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    null;
+  const clientUserAgent = req.headers.get("user-agent");
+
   try {
     // Wrap fetch in circuit breaker for automatic failure handling
     // This protects against cascading failures when EzyGo API is down
@@ -423,6 +436,10 @@ async function forward(req: NextRequest, method: string, path: string[]) {
             ...(isPublic ? {} : { Authorization: `Bearer ${token}` }),
             "content-type": resolvedContentType, // derived from how the body was read, not raw client header
             accept: req.headers.get("accept") || "application/json",
+            // Forward original client IP and User-Agent so EzyGo sees per-user
+            // identifiers rather than the shared server outbound IP.
+            ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
+            ...(clientUserAgent ? { "user-agent": clientUserAgent } : {}),
           },
           body: hasBody ? body : undefined,
           // duplex is required for streaming request bodies

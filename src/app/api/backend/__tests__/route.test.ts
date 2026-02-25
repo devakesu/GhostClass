@@ -647,4 +647,151 @@ describe('Backend Proxy Route', () => {
       warnSpy.mockRestore();
     });
   });
+
+  describe('Proxy Header Forwarding', () => {
+    it('should forward x-forwarded-for and x-real-ip from incoming x-forwarded-for header', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+          'x-forwarded-for': '1.2.3.4, 10.0.0.1',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['x-forwarded-for']).toBe('1.2.3.4');
+      expect(fetchHeaders['x-real-ip']).toBe('1.2.3.4');
+    });
+
+    it('should forward x-forwarded-for and x-real-ip from incoming x-real-ip header when x-forwarded-for is absent', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+          'x-real-ip': '5.6.7.8',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['x-forwarded-for']).toBe('5.6.7.8');
+      expect(fetchHeaders['x-real-ip']).toBe('5.6.7.8');
+    });
+
+    it('should forward user-agent header to EzyGo', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+          'user-agent': 'Mozilla/5.0 (Test Browser)',
+          'x-forwarded-for': '1.2.3.4',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['user-agent']).toBe('Mozilla/5.0 (Test Browser)');
+    });
+
+    it('should omit x-forwarded-for and x-real-ip when no IP headers are present', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['x-forwarded-for']).toBeUndefined();
+      expect(fetchHeaders['x-real-ip']).toBeUndefined();
+    });
+
+    it('should omit user-agent when not present in incoming request', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: {
+          origin: 'http://localhost',
+          'x-forwarded-for': '1.2.3.4',
+        },
+      });
+
+      await forward(request, 'GET', ['users']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['user-agent']).toBeUndefined();
+    });
+
+    it('should forward proxy headers for public paths (login)', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response(JSON.stringify({ token: 'abc' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/backend/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '9.10.11.12',
+          'user-agent': 'TestAgent/1.0',
+        },
+        body: JSON.stringify({ username: 'user', password: 'pass' }),
+      });
+
+      await forward(request, 'POST', ['login']);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(fetchHeaders['x-forwarded-for']).toBe('9.10.11.12');
+      expect(fetchHeaders['x-real-ip']).toBe('9.10.11.12');
+      expect(fetchHeaders['user-agent']).toBe('TestAgent/1.0');
+    });
+  });
 });

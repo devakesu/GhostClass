@@ -439,8 +439,8 @@ GhostClass stores the EzyGo token in an **httpOnly cookie** (AES-256-GCM encrypt
 | Token visible in browser DevTools | ✅ Yes | ❌ No |
 | Vulnerable to XSS token theft | ✅ Yes | ❌ No |
 | Extra network hop per request | ❌ No | ✅ Yes (~10–50 ms) |
-| EzyGo sees one IP for all users | ❌ No (each user's IP) | ✅ Yes (server IP) |
-| Rate limit scope | Per-user IP | Entire deployment |
+| EzyGo sees one IP for all users | ❌ No (each user's IP) | ⚠️ Server IP (original forwarded via headers) |
+| Rate limit scope | Per-user IP | Entire deployment (mitigated by proxy headers) |
 
 ### Shared outbound IP & rate limit risk
 
@@ -451,6 +451,20 @@ The three-layer protection system (LRU cache → rate limiter → circuit breake
 - The **LRU cache** deduplicates identical requests within the TTL window — common for users in the same institution.
 - The **`MAX_CONCURRENT` cap** (default: 3) throttles outbound requests to EzyGo to a predictable rate.
 - The **circuit breaker** stops all requests if EzyGo starts returning errors, preventing a thundering-herd retry storm.
+
+### Proxy header forwarding
+
+To help EzyGo's rate limiter distinguish between users even when all requests share the same server outbound IP, the proxy layer (`src/app/api/backend/[...path]/route.ts`) extracts the original client identity from the incoming Next.js request and injects it into every outbound EzyGo request:
+
+| Outgoing header | Source (priority order) |
+| --- | --- |
+| `X-Forwarded-For` | `req.ip` → `X-Forwarded-For` first entry → `X-Real-IP` |
+| `X-Real-IP` | same value as `X-Forwarded-For` above |
+| `User-Agent` | `User-Agent` from the browser request |
+
+These headers are omitted when the corresponding value cannot be determined (e.g., no forwarding headers set by the reverse proxy). If EzyGo respects these headers for per-IP rate limiting, each user's requests are counted against their own IP instead of the shared server IP.
+
+> **Note:** Whether EzyGo actually uses `X-Forwarded-For` / `X-Real-IP` for rate limiting is unverified. If EzyGo ignores these headers, the shared-IP constraint remains and the three-layer protection system is the primary mitigation.
 
 ### Latency impact
 
