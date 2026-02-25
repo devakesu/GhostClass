@@ -45,6 +45,7 @@ vi.mock("@/lib/ratelimit", () => ({
 vi.mock("@/lib/utils.server", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
   redact: vi.fn((_: string, v: unknown) => `***${String(v).slice(-4)}`),
+  egressAxios: { get: mockAxiosGet },
 }));
 
 // --- Sentry ---

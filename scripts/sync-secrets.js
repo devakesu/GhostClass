@@ -217,6 +217,10 @@ function main() {
     'NEXT_PUBLIC_FORCE_STRICT_CSP',
     'ENABLE_PUBLIC_BROWSER_SOURCEMAPS',
     'NEXT_PUBLIC_ENABLE_SW_IN_DEV',
+    // Egress proxy deployment config (non-sensitive; used as vars.* in workflow)
+    'CF_WORKER_NAME',
+    'AWS_REGION',
+    'AWS_LAMBDA_FUNCTION_NAME',
   ];
 
   // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────
@@ -225,6 +229,14 @@ function main() {
     'COOLIFY_BASE_URL',
     'COOLIFY_APP_ID',
     'COOLIFY_API_TOKEN',
+    // Egress proxy secrets — same name in both .env (Coolify runtime) and GitHub Actions
+    // so the workflow can inject the correct PROXY_SECRET into each worker.
+    'CF_PROXY_SECRET',         // Cloudflare Worker PROXY_SECRET
+    'AWS_SECONDARY_SECRET',    // AWS Lambda PROXY_SECRET
+    'CLOUDFLARE_API_TOKEN',
+    'CLOUDFLARE_ACCOUNT_ID',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
   ];
 
   let successCount = 0;

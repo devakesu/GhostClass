@@ -250,8 +250,14 @@ describe("LoginForm – EzyGo credential error message override", () => {
 
   it("overrides the EzyGo 'our records' message with 'EzyGo records'", async () => {
     const err = new (vi.mocked(await import("axios")).AxiosError)("Wrong password");
-    err.config = { url: "/api/backend/login" };
-    err.response = { status: 422, data: { message: "These credentials do not match our records." } };
+    err.config = { url: "/api/backend/login", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    err.response = {
+      status: 422,
+      statusText: "Unprocessable Entity",
+      headers: {},
+      config: err.config,
+      data: { message: "These credentials do not match our records." },
+    } as unknown as import("axios").AxiosResponse;
     mockAxiosPost.mockRejectedValue(err);
 
     const passwordInput = await renderAndWaitForForm();
@@ -268,8 +274,14 @@ describe("LoginForm – EzyGo credential error message override", () => {
 
   it("passes through unrelated EzyGo error messages unchanged", async () => {
     const err = new (vi.mocked(await import("axios")).AxiosError)("Other error");
-    err.config = { url: "/api/backend/login" };
-    err.response = { status: 422, data: { message: "Some other error from EzyGo." } };
+    err.config = { url: "/api/backend/login", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    err.response = {
+      status: 422,
+      statusText: "Unprocessable Entity",
+      headers: {},
+      config: err.config,
+      data: { message: "Some other error from EzyGo." },
+    } as unknown as import("axios").AxiosResponse;
     mockAxiosPost.mockRejectedValue(err);
 
     const passwordInput = await renderAndWaitForForm();

@@ -6,7 +6,7 @@ import { decrypt } from "@/lib/crypto";
 import { headers } from "next/headers";
 import { syncRateLimiter } from "@/lib/ratelimit";
 import { toRoman, normalizeSession } from "@/lib/utils"; 
-import { redact, getClientIp } from "@/lib/utils.server";
+import { redact, getClientIp, egressFetch } from "@/lib/utils.server";
 import { Course } from "@/types";
 import { sendEmail } from "@/lib/email";
 import type { SendEmailProps } from "@/lib/email";
@@ -32,11 +32,7 @@ const BATCH_SIZE = 10;
 // CONCURRENCY_LIMIT=2 processes 2 users in parallel, limiting peak to 4 concurrent API calls.
 const CONCURRENCY_LIMIT = 2;
 
-// Normalize NEXT_PUBLIC_BACKEND_URL once here (trim whitespace, strip trailing
-// slashes, then add exactly one) so path concatenation is always correct regardless
-// of whether the env value ends with "/" or not. The proxy route does the same via
-// BASE_API_URL; keeping the pattern consistent prevents broken URLs in the cron path.
-const BACKEND_BASE_URL = `${(process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "") ?? "")}/`;
+
 
 // Validation schemas
 const UsernameSchema = z.string()
@@ -288,8 +284,8 @@ export async function GET(req: Request) {
                 const courseTimeout = setTimeout(() => courseController.abort(), 8000);
                 let courseRes: Response;
                 try {
-                    courseRes = await fetch(
-                        `${BACKEND_BASE_URL}institutionuser/courses/withusers`,
+                    courseRes = await egressFetch(
+                        "institutionuser/courses/withusers",
                         { headers: { Authorization: `Bearer ${decryptedToken}` }, signal: courseController.signal }
                     );
                 } finally {
@@ -310,8 +306,8 @@ export async function GET(req: Request) {
                 const attTimeout = setTimeout(() => attController.abort(), 15000);
                 let attRes: Response;
                 try {
-                    attRes = await fetch(
-                        `${BACKEND_BASE_URL}attendancereports/student/detailed`,
+                    attRes = await egressFetch(
+                        "attendancereports/student/detailed",
                         {
                             method: "POST",
                             headers: { Authorization: `Bearer ${decryptedToken}`, "content-type": "application/json" },

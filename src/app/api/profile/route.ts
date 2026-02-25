@@ -15,9 +15,8 @@ import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { redact } from "@/lib/utils";
+import { egressFetch } from "@/lib/utils.server";
 import { z } from "zod";
-
-const BASE_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "");
 
 interface EzygoProfileResponse {
   user_id: string | number;
@@ -126,11 +125,11 @@ export async function GET() {
   if (existingUser && typeof existingUser.first_name === "string" && existingUser.first_name.trim().length > 0) {
     after(async () => {
       const syncToken = await getAuthTokenServer();
-      if (!syncToken || !BASE_API_URL) return;
+      if (!syncToken) return;
 
       let syncEzygoData: EzygoProfileResponse | null = null;
       try {
-        const ezygoRes = await fetch(`${BASE_API_URL}/myprofile`, {
+        const ezygoRes = await egressFetch("myprofile", {
           headers: { Authorization: `Bearer ${syncToken}` },
           cache: "no-store",
         });
@@ -261,9 +260,9 @@ export async function GET() {
   const token = await getAuthTokenServer();
   let ezygoData: EzygoProfileResponse | null = null;
 
-  if (token && BASE_API_URL) {
+  if (token) {
     try {
-      const ezygoRes = await fetch(`${BASE_API_URL}/myprofile`, {
+      const ezygoRes = await egressFetch("myprofile", {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });

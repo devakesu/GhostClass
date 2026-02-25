@@ -42,6 +42,10 @@ describe('EzyGo Batch Fetcher', () => {
     
     // Set required environment variable
     process.env.NEXT_PUBLIC_BACKEND_URL = 'https://api.example.com';
+    delete process.env.CF_PROXY_URL;
+    delete process.env.CF_PROXY_SECRET;
+    delete process.env.AWS_SECONDARY_URL;
+    delete process.env.AWS_SECONDARY_SECRET;
   });
 
   afterEach(() => {
@@ -386,6 +390,77 @@ describe('EzyGo Batch Fetcher', () => {
           headers: expect.objectContaining({
             'Authorization': 'Bearer test-token',
             'Content-Type': 'application/json',
+          }),
+        })
+      );
+    });
+
+    it('should prefer CF proxy URL and include CF secret header when configured', async () => {
+      process.env.CF_PROXY_URL = 'https://cf-proxy.example.com/';
+      process.env.CF_PROXY_SECRET = 'cf-secret';
+
+      (global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: 'test' }),
+      });
+
+      await fetchEzygoData('/myprofile', 'test-token', 'GET');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://cf-proxy.example.com/myprofile',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+            'x-proxy-secret': 'cf-secret',
+          }),
+        })
+      );
+    });
+
+    it('should fall back to AWS secondary URL and include AWS secret header when CF is absent', async () => {
+      process.env.AWS_SECONDARY_URL = 'https://aws-proxy.example.com/';
+      process.env.AWS_SECONDARY_SECRET = 'aws-secret';
+
+      (global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: 'test' }),
+      });
+
+      await fetchEzygoData('/myprofile', 'test-token', 'GET');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://aws-proxy.example.com/myprofile',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+            'x-proxy-secret': 'aws-secret',
+          }),
+        })
+      );
+    });
+
+    it('should prefer CF over AWS when both egress tiers are configured', async () => {
+      process.env.CF_PROXY_URL = 'https://cf-proxy.example.com/';
+      process.env.CF_PROXY_SECRET = 'cf-secret';
+      process.env.AWS_SECONDARY_URL = 'https://aws-proxy.example.com/';
+      process.env.AWS_SECONDARY_SECRET = 'aws-secret';
+
+      (global.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: 'test' }),
+      });
+
+      await fetchEzygoData('/myprofile', 'test-token', 'GET');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://cf-proxy.example.com/myprofile',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+            'x-proxy-secret': 'cf-secret',
           }),
         })
       );

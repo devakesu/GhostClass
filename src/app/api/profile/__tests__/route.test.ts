@@ -12,6 +12,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { __resetCachedKey } from "@/lib/crypto";
 
+// Mock server-only to allow tests to run in jsdom / Node environments.
+// Without this, importing any server-only module (e.g. @/lib/utils.server)
+// throws "This module cannot be imported from a Client Component module".
+vi.mock("server-only", () => ({}));
+
 // --- Environment setup (must be before module imports) ---
 vi.hoisted(() => {
   vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://ezygo.example.com");

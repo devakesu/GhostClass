@@ -15,6 +15,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+// Must be hoisted before any module imports that transitively import server-only
+vi.mock('server-only', () => ({}));
+
 // Pre-configure the app domain to an IPv6 address BEFORE importing the route
 // module so that the module-level allowedHosts cache is populated correctly.
 vi.hoisted(() => {
