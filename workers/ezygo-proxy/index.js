@@ -38,12 +38,54 @@
  * 5. Set CF_PROXY_SECRET in your Coolify/Next.js env to the same value as PROXY_SECRET above.
  */
 
+/**
+ * Constant-time HMAC-based comparison to prevent timing side-channel attacks.
+ * Uses the Web Crypto API available in Cloudflare Workers.
+ *
+ * Each input is used as its own HMAC-SHA-256 key to sign the other input.
+ * This produces fixed-length 32-byte digests regardless of the secret length,
+ * so the byte loop always runs exactly 32 iterations.  The loop accumulates
+ * differences with XOR/OR — it never short-circuits — so execution time is
+ * independent of where (or whether) the values diverge.
+ */
+async function constantTimeEqual(a, b) {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  const aKey = await crypto.subtle.importKey(
+    "raw",
+    aBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const bKey = await crypto.subtle.importKey(
+    "raw",
+    bBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const aSig = await crypto.subtle.sign("HMAC", aKey, bBytes);
+  const bSig = await crypto.subtle.sign("HMAC", bKey, aBytes);
+  const aView = new Uint8Array(aSig);
+  const bView = new Uint8Array(bSig);
+  // XOR accumulates all byte differences without short-circuiting.
+  // diff === 0 iff every byte pair is identical.
+  let diff = 0;
+  for (let i = 0; i < aView.length; i++) {
+    diff |= aView[i] ^ bView[i];
+  }
+  return diff === 0;
+}
+
 export default {
   async fetch(request, env) {
     // ── 1. Authentication ─────────────────────────────────────────────────────
     // Only the GhostClass Next.js server knows this secret; browsers never see it.
     const incomingSecret = request.headers.get("x-proxy-secret");
-    if (!incomingSecret || incomingSecret !== env.PROXY_SECRET) {
+    if (!incomingSecret || !(await constantTimeEqual(incomingSecret, env.PROXY_SECRET))) {
       return new Response("Forbidden", { status: 403 });
     }
 
