@@ -239,3 +239,48 @@ describe("LoginForm – mount-time storage cleanup", () => {
     expect(mockSessionStorage.removeItem).not.toHaveBeenCalledWith("prefetchedSettings");
   });
 });
+
+describe("LoginForm – EzyGo credential error message override", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
+  });
+
+  it("overrides the EzyGo 'our records' message with 'EzyGo records'", async () => {
+    const err = new (vi.mocked(await import("axios")).AxiosError)("Wrong password");
+    err.config = { url: "/api/backend/login" };
+    err.response = { status: 422, data: { message: "These credentials do not match our records." } };
+    mockAxiosPost.mockRejectedValue(err);
+
+    const passwordInput = await renderAndWaitForForm();
+    fillValidForm(passwordInput);
+
+    await act(async () => {
+      fireEvent.submit(passwordInput.closest("form")!);
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByText("These credentials do not match EzyGo records.").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("passes through unrelated EzyGo error messages unchanged", async () => {
+    const err = new (vi.mocked(await import("axios")).AxiosError)("Other error");
+    err.config = { url: "/api/backend/login" };
+    err.response = { status: 422, data: { message: "Some other error from EzyGo." } };
+    mockAxiosPost.mockRejectedValue(err);
+
+    const passwordInput = await renderAndWaitForForm();
+    fillValidForm(passwordInput);
+
+    await act(async () => {
+      fireEvent.submit(passwordInput.closest("form")!);
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Some other error from EzyGo.").length).toBeGreaterThan(0)
+    );
+  });
+});
