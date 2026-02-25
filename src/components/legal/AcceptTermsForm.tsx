@@ -36,7 +36,6 @@ export function AcceptTermsForm() {
         extra: { version: TERMS_VERSION }
       });
       toast.error("Failed to accept terms. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
