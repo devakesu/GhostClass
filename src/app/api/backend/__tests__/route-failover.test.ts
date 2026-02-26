@@ -76,7 +76,7 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
 
   it('should failover from CF (503) to AWS and return 200', async () => {
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.startsWith('https://cf.proxy.example.com')) {
+      if (new URL(url).origin === 'https://cf.proxy.example.com') {
         return new Response('Service Unavailable', {
           status: 503,
           headers: { 'content-type': 'text/plain' },
@@ -98,7 +98,7 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
 
   it('should failover from CF (network error) to AWS and return 200', async () => {
     mockFetch.mockImplementation(async (url: string) => {
-      if (url.startsWith('https://cf.proxy.example.com')) {
+      if (new URL(url).origin === 'https://cf.proxy.example.com') {
         throw new Error('Network connection failed');
       }
       return new Response(JSON.stringify({ data: [] }), {
@@ -150,8 +150,8 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
   it('should set x-egress-target to "direct" when CF and AWS both fail but direct succeeds', async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (
-        url.startsWith('https://cf.proxy.example.com') ||
-        url.startsWith('https://aws.proxy.example.com')
+        new URL(url).origin === 'https://cf.proxy.example.com' ||
+        new URL(url).origin === 'https://aws.proxy.example.com'
       ) {
         return new Response('Bad Gateway', {
           status: 502,
