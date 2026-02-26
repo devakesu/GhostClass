@@ -11,9 +11,21 @@
 -- This explicit deny-all policy makes the intent machine-readable and
 -- satisfies automated RLS scanners without changing actual access semantics.
 
-CREATE POLICY "audit_log_no_access"
-  ON "public"."audit_log"
-  AS RESTRICTIVE
-  FOR ALL
-  TO public
-  USING (false);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'audit_log'
+      AND policyname = 'audit_log_no_access'
+  ) THEN
+    CREATE POLICY "audit_log_no_access"
+      ON "public"."audit_log"
+      AS RESTRICTIVE
+      FOR ALL
+      TO public
+      USING (false);
+  END IF;
+END
+$$;

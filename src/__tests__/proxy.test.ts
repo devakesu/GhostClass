@@ -4,10 +4,16 @@ import { NextRequest } from "next/server";
 // --- Mocks (must be hoisted before imports) ---
 
 const mockGetUser = vi.fn();
+const mockSingle = vi.fn();
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: mockSingle,
+    })),
   })),
 }));
 
@@ -89,5 +95,79 @@ describe("proxy – redirect status for non-GET requests", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("location")).toBeNull();
+  });
+});
+
+describe("proxy – cross-device terms sync", () => {
+  beforeEach(() => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-456" } },
+      error: null,
+    });
+  });
+
+  it("sets terms_version cookie and allows through when DB has current version but cookie is missing", async () => {
+    mockSingle.mockResolvedValue({
+      data: { terms_version: "2.1" },
+      error: null,
+    });
+
+    const request = new NextRequest("http://localhost/dashboard");
+    // No terms_version cookie
+
+    const response = await proxy(request);
+
+    // Should allow through (200), not redirect to accept-terms
+    expect(response.status).toBe(200);
+
+    // Should set the terms_version cookie
+    const setCookies = response.headers.getSetCookie();
+    const termsCookie = setCookies.find((h) =>
+      h.toLowerCase().startsWith("terms_version="),
+    );
+    expect(termsCookie).toBeDefined();
+    expect(termsCookie).toContain("2.1");
+  });
+
+  it("sets terms_version cookie and allows through when DB has current version but cookie is stale", async () => {
+    mockSingle.mockResolvedValue({
+      data: { terms_version: "2.1" },
+      error: null,
+    });
+
+    const request = new NextRequest("http://localhost/dashboard", {
+      headers: {
+        cookie: "terms_version=1.0",
+      },
+    });
+
+    const response = await proxy(request);
+
+    // Should allow through (200), not redirect to accept-terms
+    expect(response.status).toBe(200);
+
+    // Should set the updated terms_version cookie
+    const setCookies = response.headers.getSetCookie();
+    const termsCookie = setCookies.find((h) =>
+      h.toLowerCase().startsWith("terms_version="),
+    );
+    expect(termsCookie).toBeDefined();
+    expect(termsCookie).toContain("2.1");
+  });
+
+  it("falls back to redirect when DB query returns an error", async () => {
+    mockSingle.mockResolvedValue({
+      data: null,
+      error: { message: "connection refused", code: "PGRST000" },
+    });
+
+    const request = new NextRequest("http://localhost/dashboard");
+    // No terms_version cookie
+
+    const response = await proxy(request);
+
+    // Should redirect to accept-terms
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/accept-terms");
   });
 });
