@@ -40,6 +40,8 @@ jobs:
             echo "::warning::Skipping Cloudflare deploy because required credentials/vars are missing."
             echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, secrets.CF_PROXY_SECRET, vars.CF_WORKER_NAME, vars.NEXT_PUBLIC_BACKEND_URL"
             echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Install Wrangler
