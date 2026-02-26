@@ -32,8 +32,6 @@ const BATCH_SIZE = 10;
 // CONCURRENCY_LIMIT=2 processes 2 users in parallel, limiting peak to 4 concurrent API calls.
 const CONCURRENCY_LIMIT = 2;
 
-
-
 // Validation schemas
 const UsernameSchema = z.string()
   .min(3)
