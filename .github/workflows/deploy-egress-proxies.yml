@@ -49,7 +49,10 @@ jobs:
           fi
 
       - name: Install Wrangler
-        run: npm install --no-save wrangler@4
+        # workers/package-lock.json pins wrangler@4.57.0 with full dependency
+        # integrity hashes (SHA-512 SRI). npm ci verifies all hashes before
+        # installation, preventing supply-chain substitution attacks.
+        run: npm ci --prefix workers
 
       - name: Update Cloudflare Worker secret (PROXY_SECRET)
         env:
@@ -63,7 +66,7 @@ jobs:
             echo "Skipping Cloudflare secret update (missing credentials/vars)."
             exit 0
           fi
-          printf "%s" "${CF_PROXY_SECRET}" | npx wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}" --non-interactive
+          printf "%s" "${CF_PROXY_SECRET}" | ./workers/node_modules/.bin/wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}" --non-interactive
 
       - name: Deploy Cloudflare Worker
         env:
@@ -77,10 +80,10 @@ jobs:
             echo "Skipping Cloudflare deploy (missing credentials/vars)."
             exit 0
           fi
-          npx wrangler deploy workers/ezygo-proxy/index.js \
+          ./workers/node_modules/.bin/wrangler deploy workers/ezygo-proxy/index.js \
             --name "${CF_WORKER_NAME}" \
             --var "EZYGO_API_URL:${NEXT_PUBLIC_BACKEND_URL}" \
-            --compatibility-date "$(date +%F)"
+            --compatibility-date "2026-02-26"
 
   deploy-aws-lambda:
     name: Deploy AWS Lambda Proxy

@@ -44,7 +44,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const EZYGO_API_URL  = (process.env.EZYGO_API_URL  ?? "").replace(/\/+$/, "");
+const EZYGO_API_URL  = (process.env.EZYGO_API_URL  ?? "").trim().replace(/\/+$/, "");
 // Trim to guard against accidental whitespace in environment configuration.
 const PROXY_SECRET   = (process.env.PROXY_SECRET   ?? "").trim();
 
@@ -97,7 +97,15 @@ export const handler = async (event) => {
   // ── 2. Build target URL ───────────────────────────────────────────────────
   const rawPath        = event.rawPath        ?? "/";
   const rawQueryString = event.rawQueryString ?  `?${event.rawQueryString}` : "";
-  const upstreamBase   = new URL(EZYGO_API_URL);
+  if (!EZYGO_API_URL) {
+    return { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is empty or only whitespace" };
+  }
+  let upstreamBase;
+  try {
+    upstreamBase = new URL(EZYGO_API_URL);
+  } catch {
+    return { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is not a valid URL" };
+  }
   const basePath       = upstreamBase.pathname.replace(/\/+$/, "");
   const incomingPath   = rawPath;
 

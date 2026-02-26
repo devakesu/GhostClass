@@ -202,12 +202,13 @@ export function egressFetch(
   const { baseUrl, proxyHeaders } = getEgressConfig();
   const cleanEndpoint = endpoint.replace(/^\/+/, "");
   const url = `${baseUrl}/${cleanEndpoint}`;
+  const headers = new Headers(init?.headers);
+  for (const [key, value] of Object.entries(proxyHeaders)) {
+    headers.set(key, value);
+  }
   return fetch(url, {
     ...init,
-    headers: {
-      ...(init?.headers as Record<string, string> | undefined),
-      ...proxyHeaders,
-    },
+    headers,
   });
 }
 
@@ -225,7 +226,9 @@ const _egressAxios = axios.create({ timeout: 15000 });
 _egressAxios.interceptors.request.use((config) => {
   const { baseUrl, proxyHeaders } = getEgressConfig();
   config.baseURL = baseUrl;
-  Object.assign(config.headers, proxyHeaders);
+  for (const [key, value] of Object.entries(proxyHeaders)) {
+    config.headers.set(key, value);
+  }
   return config;
 });
 export { _egressAxios as egressAxios };
