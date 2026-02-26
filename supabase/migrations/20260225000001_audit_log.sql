@@ -70,6 +70,14 @@ REVOKE ALL ON TABLE "public"."audit_log" FROM "authenticated";
 -- No RLS policies are created; the table is write-only for SECURITY DEFINER
 -- functions (which run as the table owner, bypassing RLS) and read-only for
 -- the service_role (which also bypasses RLS).
+-- An explicit deny-all RESTRICTIVE policy is added to satisfy automated RLS
+-- scanners without changing access semantics.
+CREATE POLICY "audit_log_no_access"
+  ON "public"."audit_log"
+  AS RESTRICTIVE
+  FOR ALL
+  TO public
+  USING (false);
 
 -- ============================================================================
 -- 3.  Trigger function: audit_tracker_changes

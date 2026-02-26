@@ -176,6 +176,7 @@ select:focus-visible {
 
   html {
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   body {

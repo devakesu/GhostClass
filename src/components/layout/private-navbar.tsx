@@ -135,7 +135,7 @@ export const Navbar = () => {
     : true;
 
   return (
-    <header className="top-0 z-10 flex h-20 items-center justify-between gap-4 border-b-2 bg-background px-4 md:px-6 text-white mr-0.5 border-white/5">
+    <header className="top-0 z-10 flex h-20 items-center justify-between gap-4 border-b-2 bg-background px-4 md:px-6 text-white border-white/5">
       <div className="flex items-center gap-2">
         <Link href="/" className="group text-3xl sm:text-4xl lg:text-[2.50rem] font-semibold gradient-logo font-klick tracking-wide">
           <div className="relative w-40 sm:w-48 md:w-52 lg:w-60 h-20 overflow-hidden">

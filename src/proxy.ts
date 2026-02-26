@@ -126,6 +126,33 @@ export async function proxy(request: NextRequest) {
   // Note: /accept-terms requires authentication (handled in Scenario A.1), but is accessible with outdated/missing terms
   // Explicitly check for null/undefined termsVersion or version mismatch
   if (user && (!termsVersion || termsVersion !== TERMS_VERSION) && isProtectedRoute) {
+    // Before redirecting, check the DB — the user may have accepted terms on another device.
+    // This query is only reached when the cookie is missing or stale, so it doesn't add
+    // overhead to normal authenticated requests.
+    try {
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("terms_version")
+        .eq("auth_id", user.id)
+        .single();
+
+      if (userProfile?.terms_version === TERMS_VERSION) {
+        // Accepted elsewhere — sync cookie to this device and allow through.
+        response.cookies.set("terms_version", TERMS_VERSION, {
+          httpOnly: true,
+          secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+          sameSite: "lax",
+          path: "/",
+          maxAge: 31536000, // 1 year
+        });
+        response.cookies.delete("terms_redirect_count");
+        return response;
+      }
+    } catch (dbError) {
+      // Non-fatal: if the DB check fails, fall through to the normal redirect flow.
+      logger.warn("Failed to check terms_version from DB in proxy; falling back to cookie check.", { dbError });
+    }
+
     const url = request.nextUrl.clone();
     
     // Redirect loop protection: use httpOnly cookie to track redirect attempts

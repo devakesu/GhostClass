@@ -80,13 +80,27 @@ export default async function RootLayout({
   // of opting the layout out of static rendering.
   // If this layout is ever refactored, verify nonce delivery end-to-end before merging.
    
-  void (await headers());
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
   const hasGoogleAnalytics = !!gaId && gaId !== 'undefined' && gaId.startsWith('G-');
   
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
+        {/* Blocking script: executes synchronously before any CSS or content is
+            painted. Measures the real scrollbar track width by creating a hidden
+            div with forced scrollbar (offsetWidth - clientWidth), then sets
+            --scrollbar-width on :root. This is independent of CSS load order
+            and of scrollbar-gutter, unlike calc(100vw - 100%) tricks.
+            A ResizeObserver keeps the value current on zoom / display changes.
+            CSP nonce is required for strict-CSP compliance. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px');new ResizeObserver(function(){var d2=document.createElement('div');d2.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d2);document.documentElement.style.setProperty('--scrollbar-width',(d2.offsetWidth-d2.clientWidth)+'px');d2.remove()}).observe(document.documentElement)})();`,
+          }}
+        />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" href="/logo.png" />
