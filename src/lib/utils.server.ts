@@ -159,20 +159,22 @@ export function getEgressConfig(): {
 } {
   const cfProxyUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
   if (cfProxyUrl) {
+    const cfProxySecret = process.env.CF_PROXY_SECRET?.trim();
     return {
       baseUrl: cfProxyUrl,
-      proxyHeaders: process.env.CF_PROXY_SECRET
-        ? { "x-proxy-secret": process.env.CF_PROXY_SECRET }
+      proxyHeaders: cfProxySecret
+        ? { "x-proxy-secret": cfProxySecret }
         : {},
     };
   }
 
   const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
   if (awsUrl) {
+    const awsSecondarySecret = process.env.AWS_SECONDARY_SECRET?.trim();
     return {
       baseUrl: awsUrl,
-      proxyHeaders: process.env.AWS_SECONDARY_SECRET
-        ? { "x-proxy-secret": process.env.AWS_SECONDARY_SECRET }
+      proxyHeaders: awsSecondarySecret
+        ? { "x-proxy-secret": awsSecondarySecret }
         : {},
     };
   }

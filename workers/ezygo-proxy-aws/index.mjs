@@ -42,8 +42,21 @@
  * diversity compared to the single fixed Coolify VPS IP.
  */
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 const EZYGO_API_URL  = (process.env.EZYGO_API_URL  ?? "").replace(/\/+$/, "");
-const PROXY_SECRET   =  process.env.PROXY_SECRET   ?? "";
+// Trim to guard against accidental whitespace in environment configuration.
+const PROXY_SECRET   = (process.env.PROXY_SECRET   ?? "").trim();
+
+// Pre-compute the HMAC key and expected digest once at module load.
+// Both depend only on PROXY_SECRET, so there is no benefit in recomputing
+// them per request.  The digest is used with timingSafeEqual inside the
+// handler so the comparison always operates on fixed-length 32-byte buffers,
+// avoiding timing side-channels based on value or length differences.
+const AUTH_KEY             = PROXY_SECRET ? Buffer.from(PROXY_SECRET) : null;
+const EXPECTED_AUTH_DIGEST = AUTH_KEY
+  ? createHmac("sha256", AUTH_KEY).update(PROXY_SECRET).digest()
+  : null;
 
 // Headers injected by AWS / API Gateway that must not be forwarded to EzyGo.
 const STRIP_REQUEST_HEADERS = new Set([
@@ -72,12 +85,12 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
 
 export const handler = async (event) => {
   // ── 1. Authenticate ───────────────────────────────────────────────────────
-  // Constant-time comparison is not available in pure JS here, but since
-  // PROXY_SECRET is long (≥32 chars) and not guessable, a simple equality
-  // check is acceptable. The API GW + WAF rate limiting provides an additional
-  // brute-force guard.
+  // Both inputs are HMAC-SHA-256 digested with a key derived from PROXY_SECRET so
+  // the comparison always operates on fixed-length 32-byte buffers, avoiding
+  // timing side-channels based on value or length differences.
   const incomingSecret = (event.headers?.["x-proxy-secret"] ?? "").trim();
-  if (!PROXY_SECRET || incomingSecret !== PROXY_SECRET) {
+  const actualDigest   = AUTH_KEY ? createHmac("sha256", AUTH_KEY).update(incomingSecret).digest() : null;
+  if (!PROXY_SECRET || !EXPECTED_AUTH_DIGEST || !actualDigest || !timingSafeEqual(EXPECTED_AUTH_DIGEST, actualDigest)) {
     return { statusCode: 403, body: "Forbidden" };
   }
 

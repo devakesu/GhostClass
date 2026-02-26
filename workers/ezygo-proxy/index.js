@@ -47,12 +47,17 @@
  * so the byte loop always runs exactly 32 iterations.  The loop accumulates
  * differences with XOR/OR — it never short-circuits — so execution time is
  * independent of where (or whether) the values diverge.
+ *
+ * NOTE: The length check is intentionally omitted here. Different-length inputs
+ * produce different HMAC-SHA-256 digests (the cross-signing means the digest
+ * encodes the full byte sequence of each input), so the 32-iteration XOR loop
+ * reliably returns non-zero for unequal inputs of any length — without leaking
+ * the secret length through an early return.
  */
 async function constantTimeEqual(a, b) {
   const encoder = new TextEncoder();
   const aBytes = encoder.encode(a);
   const bBytes = encoder.encode(b);
-  if (aBytes.length !== bBytes.length) return false;
   const aKey = await crypto.subtle.importKey(
     "raw",
     aBytes,

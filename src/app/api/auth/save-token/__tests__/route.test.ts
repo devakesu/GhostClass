@@ -20,6 +20,9 @@ vi.hoisted(() => {
   vi.stubEnv("NODE_ENV", "development");
 });
 
+// --- Hoist shared mock functions so they are defined before vi.mock() factories run ---
+const mockAxiosGet = vi.hoisted(() => vi.fn());
+
 // --- server-only shim ---
 vi.mock("server-only", () => ({}));
 
@@ -82,7 +85,6 @@ vi.mock("@/lib/redis", () => ({
 }));
 
 // --- Axios (EzyGo token verification) ---
-const mockAxiosGet = vi.fn();
 vi.mock("axios", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -257,7 +259,7 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
         eq: vi.fn().mockReturnValue({
           maybeSingle: vi.fn().mockResolvedValue({
             data: {
-              terms_version: "2.1",
+              terms_version: "2.2",
               terms_accepted_at: "2026-01-29T00:00:00Z",
             },
             error: null,
@@ -269,7 +271,7 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
-    expect(mockSetTermsVersionCookie).toHaveBeenCalledWith("2.1");
+    expect(mockSetTermsVersionCookie).toHaveBeenCalledWith("2.2");
     expect(mockClearTermsVersionCookie).not.toHaveBeenCalled();
   });
 });

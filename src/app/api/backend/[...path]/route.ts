@@ -44,7 +44,7 @@ function buildEgressTargets(): EgressTarget[] {
   // Tier 1: Cloudflare Worker egress (optional — set CF_PROXY_URL in Coolify to enable)
   const cfProxyUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
   if (cfProxyUrl) {
-    targets.push({ baseUrl: cfProxyUrl, secret: process.env.CF_PROXY_SECRET || undefined, name: "primary (CF Worker)", timeoutMs: UPSTREAM_TIMEOUT_MS });
+    targets.push({ baseUrl: cfProxyUrl, secret: process.env.CF_PROXY_SECRET?.trim() || undefined, name: "primary (CF Worker)", timeoutMs: UPSTREAM_TIMEOUT_MS });
   }
 
   // Tier 2: AWS Lambda egress (optional — set AWS_SECONDARY_URL in Coolify to enable)
@@ -52,7 +52,7 @@ function buildEgressTargets(): EgressTarget[] {
   if (awsSecondaryUrl) {
     targets.push({
       baseUrl:   awsSecondaryUrl,
-      secret:    process.env.AWS_SECONDARY_SECRET || undefined,
+      secret:    process.env.AWS_SECONDARY_SECRET?.trim() || undefined,
       name:      "secondary (AWS)",
       timeoutMs: FAILOVER_TIMEOUT_MS,
     });
