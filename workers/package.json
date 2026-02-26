@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "wrangler": "4.57.0"
+    "wrangler": "4.59.1"
+  },
+  "overrides": {
+    "undici": "7.18.2"
   }
 }
