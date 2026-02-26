@@ -763,9 +763,7 @@ export default function ScoresClient() {
 
   if (isLoading || (!exams && !isError)) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <Loading minimal message="Waiting on Ezygo to stop ghosting us 👻" />
-      </div>
+      <Loading />
     );
   }
 

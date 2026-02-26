@@ -362,6 +362,19 @@ export async function POST(req: Request) {
     // to coordinate concurrent login attempts without persisting per-device sessions here.
     let userId: string | undefined;
     let isFirstLogin = false;
+    // Cached DB lookup result for the existing user — populated in the "already registered" branch
+    // so the password retrieval and terms check later can re-use it instead of making extra round-trips.
+    let cachedUserData: {
+      auth_id?: string | null;
+      auth_password?: string | null;
+      auth_password_iv?: string | null;
+      terms_version?: string | null;
+      terms_accepted_at?: string | null;
+    } | null = null;
+    // Settings prefetch started early for returning users (CASE 2) so it runs concurrently
+    // with signInWithPassword instead of sequentially after it (~50–150 ms saving per login).
+    // Null for new users — they use the inline fetch inside the final Promise.all.
+    let earlySettingsFetch: Promise<{ bunk_calculator_enabled: boolean | null; target_percentage: number | null } | null> | null = null;
 
     // Acquire lock to prevent concurrent operations
     try {
@@ -397,13 +410,15 @@ export async function POST(req: Request) {
     if (createError) {
       // B. If User Exists -> Reuse existing password (do NOT update)
       if (createError.message?.toLowerCase().includes("already registered") || createError.status === 422) {
-        // Let's use the 'users' table to resolve the Auth UUID
+        // Let's use the 'users' table to resolve the Auth UUID.
+        // Fetch all fields needed later (password, terms) in one query to avoid extra round-trips.
         const { data: existingMap } = await supabaseAdmin
             .from("users")
-            .select("auth_id")
+            .select("auth_id, auth_password, auth_password_iv, terms_version, terms_accepted_at")
             .eq("id", verifieduserId)
             .single();
 
+        cachedUserData = existingMap ?? null;
         const targetAuthId = existingMap?.auth_id;
 
         if (!targetAuthId) {
@@ -480,6 +495,21 @@ export async function POST(req: Request) {
           // This preserves existing sessions from other devices by keeping
           // the canonical password (and auth lock) stable across logins.
           userId = targetAuthId;
+          // Start the settings fetch now — it only needs userId and is independent of
+          // signInWithPassword. Overlapping them trims ~50–150 ms from the login RTT.
+          earlySettingsFetch = (async () => {
+            try {
+              const { data } = await supabaseAdmin
+                .from("user_settings")
+                .select("bunk_calculator_enabled, target_percentage")
+                .eq("user_id", userId!)
+                .maybeSingle();
+              return data ?? null;
+            } catch (settingsError) {
+              logger.warn("Failed to prefetch settings (non-critical):", settingsError);
+              return null;
+            }
+          })();
         }
         
       } else {
@@ -514,12 +544,16 @@ export async function POST(req: Request) {
     let passwordToUse = canonicalPassword;
     
     if (!isFirstLogin) {
-      // Retrieve the encrypted canonical password from the users table
-      const { data: userData, error: userDataError } = await supabaseAdmin
-        .from("users")
-        .select("auth_password, auth_password_iv")
-        .eq("id", verifieduserId)
-        .single();
+      // Re-use data already fetched in the CASE 2 lookup to avoid a redundant round-trip.
+      // Fall back to a fresh query only if cachedUserData is unavailable (e.g. CASE 1 orphan retry).
+      const fetchResult = !cachedUserData
+        ? await supabaseAdmin
+            .from("users")
+            .select("auth_password, auth_password_iv")
+            .eq("id", verifieduserId)
+            .single()
+        : { data: cachedUserData, error: null };
+      const { data: userData, error: userDataError } = fetchResult;
 
       if (userDataError) {
         logger.error("Failed to retrieve stored password for multi-device login (Supabase error):", userDataError);
@@ -732,22 +766,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Encryption failed" }, { status: 500 });
     }
 
-    // First, check if user has already accepted terms in the database
-    const { data: existingUser, error: termsReadError } = await supabaseAdmin
-      .from("users")
-      .select("terms_version, terms_accepted_at")
-      .eq("id", verifieduserId)
-      .maybeSingle();
-
-    if (termsReadError) {
-      logger.error("Failed to read existing terms acceptance during auth save-token flow:", termsReadError);
-      Sentry.captureException(termsReadError, {
-        tags: { type: "terms_precheck_read_failure", location: "save_token" },
-        extra: { userId: redact("id", String(verifieduserId)) },
-      });
-      // Continue without setting the terms cookie; behavior remains the same,
-      // but the failure is now visible for debugging and monitoring.
-    }
+    // Re-use the data already fetched from the users table — no extra DB round-trip needed.
+    // For new users (isFirstLogin=true) cachedUserData is null → existingUser is null →
+    // the cookie is cleared, which is correct (new users must go through the accept-terms flow).
+    const existingUser = !isFirstLogin ? cachedUserData : null;
 
     // Encrypt the canonical password on first login
     let encryptedPassword: { iv: string; content: string } | null = null;
@@ -767,22 +789,46 @@ export async function POST(req: Request) {
       }
     }
 
-    const { error: dbError } = await supabaseAdmin
-      .from("users")
-      .upsert({ 
-        id: verifieduserId,
-        username: verifiedUsername,
-        ezygo_token: content,
-        ezygo_iv: iv,
-        auth_id: userId,
-        // Store encrypted canonical password on first login; subsequent logins don't update it
-        // This allows all devices to use the same password without invalidating other sessions
-        ...(isFirstLogin && encryptedPassword && { 
-          auth_password: encryptedPassword.content,
-          auth_password_iv: encryptedPassword.iv
-        }),
-        updated_at: new Date().toISOString()
-      }, { onConflict: "id" });
+    // Run the DB upsert and settings prefetch in parallel — they are independent and
+    // the settings query does not depend on the upsert result.
+    // For returning users earlySettingsFetch is already in-flight (started alongside signIn);
+    // for new users / orphan retries the inline fetch runs here instead.
+    let userSettings = null;
+    const [upsertResult, settingsFetchResult] = await Promise.all([
+      supabaseAdmin
+        .from("users")
+        .upsert({
+          id: verifieduserId,
+          username: verifiedUsername,
+          ezygo_token: content,
+          ezygo_iv: iv,
+          auth_id: userId,
+          // Store encrypted canonical password on first login; subsequent logins don't update it
+          // This allows all devices to use the same password without invalidating other sessions
+          ...(isFirstLogin && encryptedPassword && {
+            auth_password: encryptedPassword.content,
+            auth_password_iv: encryptedPassword.iv,
+          }),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" }),
+      earlySettingsFetch ?? (async () => {
+        try {
+          const { data: settings } = await supabaseAdmin
+            .from("user_settings")
+            .select("bunk_calculator_enabled, target_percentage")
+            .eq("user_id", userId!)
+            .maybeSingle();
+          return settings;
+        } catch (settingsError) {
+          // Non-critical: settings will load via normal flow if this fails
+          logger.warn("Failed to prefetch settings (non-critical):", settingsError);
+          return null;
+        }
+      })(),
+    ]);
+
+    const { error: dbError } = upsertResult;
+    userSettings = settingsFetchResult;
 
     if (dbError) throw dbError;
     await setAuthCookie(token);
@@ -797,22 +843,7 @@ export async function POST(req: Request) {
       await clearTermsVersionCookie();
     }
 
-    // Fetch user settings to return to client for immediate localStorage population
-    // This eliminates the 5-10 second delay showing defaults on fresh login
-    let userSettings = null;
-    try {
-      const { data: settings } = await supabaseAdmin
-        .from("user_settings")
-        .select("bunk_calculator_enabled, target_percentage")
-        .eq("user_id", userId)
-        .maybeSingle();
-      userSettings = settings;
-    } catch (settingsError) {
-      // Non-critical: settings will load via normal flow if this fails
-      logger.warn("Failed to prefetch settings (non-critical):", settingsError);
-    }
-
-    return NextResponse.json({ success: true, settings: userSettings });
+    return NextResponse.json({ success: true, userId: userId ?? null, settings: userSettings });
 
   } catch (error: any) {
     logger.error("Auth Bridge Failed:", error);

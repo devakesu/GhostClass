@@ -262,7 +262,7 @@ Enable workflows to trigger after automated version bump commits.
 
 ### Why is This Needed?
 
-By default, when a GitHub Actions workflow creates a commit using `GITHUB_TOKEN`, that commit **does not trigger other workflows** (intentional GitHub behavior to prevent infinite loops).
+By default, when a GitHub Actions workflow creates a commit using `GITHUB_TOKEN`, that commit **does not trigger other workflows** (intentional GitHub behaviour to prevent infinite loops).
 
 For GhostClass:
 
@@ -460,8 +460,8 @@ docs: update installation instructions
 We follow [Semantic Versioning 2.0.0](https://semver.org/):
 
 - **MAJOR** version (x.0.0): Breaking changes or major features
-- **MINOR** version (0.x.0): New features, backward-compatible
-- **PATCH** version (0.0.x): Bug fixes, backward-compatible
+- **MINOR** version (x.y.0): New features, backward-compatible
+- **PATCH** version (x.y.z): Bug fixes, backward-compatible
 
 ### Automated Version Bumping
 
@@ -762,7 +762,7 @@ grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
 **Description:**
 
-- `@sentry/nextjs @ 9.20.0` depends on `@sentry/node` which requires `minimatch < 10.2.2`
+- `@sentry/nextjs@9.20.0` depends on `@sentry/node` which requires `minimatch < 10.2.2`
 - minimatch < 10.2.2 contains a ReDoS vulnerability (GHSA-3ppc-4f35-3m26)
 - **Risk Level:** MEDIUM
   - **Attack Surface:** Low (Sentry configuration is application-controlled, not user-input)
@@ -770,7 +770,7 @@ grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
 **Version note (Sentry downgrade 10.x → 9.x):**
 
-The project is pinned to `@sentry/nextjs @ 9.20.0`. The 10.x line introduced breaking changes with the Next.js 16 App Router + edge runtime integration, causing instability in error reporting. Until the Sentry configuration can be safely migrated, we remain on 9.20.0 with the `minimatch` override below.
+The project is pinned to `@sentry/nextjs@9.20.0`. The 10.x line introduced breaking changes with the Next.js 16 App Router + edge runtime integration, causing instability in error reporting. Until the Sentry configuration can be safely migrated, we remain on 9.20.0 with the `minimatch` override below.
 
 **Fix Applied:**
 

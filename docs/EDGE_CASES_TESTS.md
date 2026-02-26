@@ -83,7 +83,7 @@ Result: NO deduplication across users
 
 ## Edge Case 5: Login During Circuit Open
 
-**Scenario:** User tries to login while circuit is OPEN
+**Scenario:** User tries to log in while the circuit is OPEN
 
 **Flow:**
 

@@ -214,12 +214,8 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
       error: null,
     });
 
-    // Terms check: no existing row
-    mockUsersTable.select.mockReturnValueOnce({
-      eq: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-    });
+    // No users-table SELECT happens for first-time users (cachedUserData stays null);
+    // the default table mock is sufficient.
 
     const { POST } = await import("../route");
     const response = await POST(makeRequest());
@@ -236,29 +232,15 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
       error: { message: "User already registered", status: 422 },
     });
 
-    // Resolve auth_id from users table (CASE 2 – normal user)
+    // CASE 2: single combined query returns auth_id, password fields, and terms fields.
     mockUsersTable.select
       .mockReturnValueOnce({
         eq: vi.fn().mockReturnValue({
-          single: vi
-            .fn()
-            .mockResolvedValue({ data: { auth_id: "auth-uuid-existing" }, error: null }),
-        }),
-      })
-      // Retrieve stored canonical password
-      .mockReturnValueOnce({
-        eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: { auth_password: "enc-pw", auth_password_iv: MOCK_IV },
-            error: null,
-          }),
-        }),
-      })
-      // Terms check: user HAS accepted the current version
-      .mockReturnValueOnce({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({
             data: {
+              auth_id: "auth-uuid-existing",
+              auth_password: "enc-pw",
+              auth_password_iv: MOCK_IV,
               terms_version: "2.2",
               terms_accepted_at: "2026-01-29T00:00:00Z",
             },

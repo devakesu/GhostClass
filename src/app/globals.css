@@ -227,25 +227,11 @@ select:focus-visible {
   }
 }
 
-/* Page blur effect during route transitions */
-body {
-  transition: backdrop-filter 0.2s ease;
-}
-
 html:has(#nprogress):not(:has(.login-page)),
 body:has(#nprogress):not(:has(.login-page)) {
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
-}
-
-body:has(#nprogress):not(:has(.login-page)) {
-  backdrop-filter: blur(4px);
-}
-
-body:has(#nprogress):not(:has(.login-page)) > * {
-  filter: blur(3px);
-  transition: filter 0.2s ease;
 }
 
 /* Ensure the NProgress bar always renders above headers and other stacked elements.

@@ -1,3 +1,5 @@
+# GhostClass
+
 ![GhostClass](public/logo.png)
 
 [![Version](https://img.shields.io/github/v/release/devakesu/GhostClass?label=Version)](https://github.com/devakesu/GhostClass/releases/latest)
@@ -9,15 +11,15 @@
 [![Build Status](https://img.shields.io/badge/Build-Passing-success)](.github/workflows/pipeline.yml)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?logo=next.js)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19.2.3-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![React](https://img.shields.io/badge/React-19.2.4-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Node.js](https://img.shields.io/badge/Node.js-20.19.2%2B%20%7C%2022.12.0%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-20.19.0%2B%20%7C%2022.12.0%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Tests](https://img.shields.io/badge/Tests-Vitest%20%2B%20Playwright-green)](https://vitest.dev/)
 
 ## Overview
 
-GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek dashboard with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in "bunk calculator" to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built as a better alternative to Ezygo, it presents your attendance data with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!
+GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek dashboard with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in "bunk calculator" to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built as a better alternative to EzyGo, it presents your attendance data with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!
 
 ## 🎯 Key "Vibe" Features
 
@@ -25,8 +27,8 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Visual Receipts** 📊: Performance charts and a detailed calendar history so you can see your attendance glow-up in real-time.
 - **Anti-Ghosting Tracker** 👻: A personalized list to watch wrongly marked absences like a hawk until they get updated.
 - **Scores Viewer** 📋: Browse all your exam and assignment results grouped by course, with a stats summary and a per-question breakdown drawer showing individual answer scores and max marks.
-- **Ezygo Integration** 🔄 - Use your existing ezygo credentials - no new accounts needed
-- **Multi-Device Support** 🔐 - Login from multiple devices simultaneously without losing sessions
+- **EzyGo Integration** 🔄 - Use your existing EzyGo credentials - no new accounts needed
+- **Multi-Device Support** 🔐 - Log in from multiple devices simultaneously without losing sessions
 - **Real-time Updates** ⚡ - Get instant updates on your attendance status and skip calculations
 - **Track Status Changes** 📝 – Get notified when your attendance is updated
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
@@ -107,7 +109,7 @@ src/
 │   ├── (public)/             # Public routes (home, contact, legal, build-info, help)
 │   │   ├── build-info/       # Build provenance and transparency page
 │   │   ├── contact/          # Contact form
-│   │   ├── help/             # Help centre and FAQ
+│   │   ├── help/             # Help center and FAQ
 │   │   └── legal/            # Legal pages (privacy, terms, cookies)
 │   ├── accept-terms/         # Terms acceptance page (authenticated)
 │   ├── actions/              # Server actions (contact, user operations)
