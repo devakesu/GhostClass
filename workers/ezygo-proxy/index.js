@@ -33,8 +33,9 @@
  * 3. Settings → Variables → Secrets:
  *      EZYGO_API_URL  – e.g. "https://production.api.ezygo.app/api/v1/Xcr45_salt"
  *      PROXY_SECRET   – same value as CF_PROXY_SECRET in your Next.js env; click Encrypt
- * 4. Update NEXT_PUBLIC_BACKEND_URL in your server/Next.js env to:
- *      https://ezygo-proxy.<your-cf-username>.workers.dev/api/v1/Xcr45_salt
+ * 4. Set CF_PROXY_URL in your server/Next.js env to the Worker URL:
+ *      https://ezygo-proxy.<your-cf-username>.workers.dev
+ *    Leave NEXT_PUBLIC_BACKEND_URL pointing at the direct EzyGo API (tier 3 fallback) — do NOT change it.
  * 5. Set CF_PROXY_SECRET in your server/Next.js env to the same value as PROXY_SECRET above.
  */
 
