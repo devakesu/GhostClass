@@ -224,7 +224,7 @@ export function egressFetch(
 const _egressAxios = axios.create({ timeout: 15000 });
 _egressAxios.interceptors.request.use((config) => {
   const { baseUrl, proxyHeaders } = getEgressConfig();
-  config.baseURL = `${baseUrl}/`;
+  config.baseURL = baseUrl;
   Object.assign(config.headers, proxyHeaders);
   return config;
 });
