@@ -102,10 +102,16 @@ export default {
     // env.EZYGO_API_URL should be the EzyGo base URL (path prefix allowed), e.g.
     // "https://production.api.ezygo.app/api/v1/Xcr45_salt".
     // No trailing slash.
-    if (!env.EZYGO_API_URL) {
-      return new Response("Misconfigured: EZYGO_API_URL is not set", { status: 500 });
+    const rawBase = (env.EZYGO_API_URL || "").trim();
+    if (!rawBase) {
+      return new Response("Misconfigured: EZYGO_API_URL is empty or only whitespace", { status: 500 });
     }
-    const upstreamBase = new URL(env.EZYGO_API_URL);
+    let upstreamBase;
+    try {
+      upstreamBase = new URL(rawBase);
+    } catch {
+      return new Response("Misconfigured: EZYGO_API_URL is not a valid URL", { status: 500 });
+    }
     const basePath = upstreamBase.pathname.replace(/\/+$/, "");
     const incomingPath = url.pathname;
 
