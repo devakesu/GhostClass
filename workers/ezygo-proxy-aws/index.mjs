@@ -42,8 +42,11 @@
  * diversity compared to the single fixed Coolify VPS IP.
  */
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 const EZYGO_API_URL  = (process.env.EZYGO_API_URL  ?? "").replace(/\/+$/, "");
-const PROXY_SECRET   =  process.env.PROXY_SECRET   ?? "";
+// Trim to guard against accidental whitespace in environment configuration.
+const PROXY_SECRET   = (process.env.PROXY_SECRET   ?? "").trim();
 
 // Headers injected by AWS / API Gateway that must not be forwarded to EzyGo.
 const STRIP_REQUEST_HEADERS = new Set([
@@ -72,12 +75,15 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
 
 export const handler = async (event) => {
   // ── 1. Authenticate ───────────────────────────────────────────────────────
-  // Constant-time comparison is not available in pure JS here, but since
-  // PROXY_SECRET is long (≥32 chars) and not guessable, a simple equality
-  // check is acceptable. The API GW + WAF rate limiting provides an additional
-  // brute-force guard.
+  // Constant-time HMAC comparison using Node.js built-in crypto.timingSafeEqual.
+  // Both inputs are HMAC-SHA-256 digested with a per-request ephemeral key so
+  // the comparison always operates on fixed-length 32-byte buffers — preventing
+  // both content and length timing side-channels.
   const incomingSecret = (event.headers?.["x-proxy-secret"] ?? "").trim();
-  if (!PROXY_SECRET || incomingSecret !== PROXY_SECRET) {
+  const ephemeralKey   = Buffer.from(PROXY_SECRET);
+  const expectedDigest = createHmac("sha256", ephemeralKey).update(PROXY_SECRET).digest();
+  const actualDigest   = createHmac("sha256", ephemeralKey).update(incomingSecret).digest();
+  if (!PROXY_SECRET || !timingSafeEqual(expectedDigest, actualDigest)) {
     return { statusCode: 403, body: "Forbidden" };
   }
 
