@@ -48,6 +48,8 @@ export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  const isNavigationRequest = request.method === "GET" || request.method === "HEAD";
+  const redirectStatus = isNavigationRequest ? 307 : 303;
 
   // 1. Get CSP Header
   const cspHeader = getCspHeader(nonce);
@@ -111,7 +113,7 @@ export async function proxy(request: NextRequest) {
   if (!user && (isProtectedRoute || isAcceptTermsRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    const redirectRes = NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
     // No valid Supabase session — wipe all session cookies so stale state from
@@ -146,7 +148,7 @@ export async function proxy(request: NextRequest) {
       const homeUrl = url.clone();
       homeUrl.pathname = '/';
       homeUrl.search = '';
-      const logoutRes = NextResponse.redirect(homeUrl);
+      const logoutRes = NextResponse.redirect(homeUrl, { status: redirectStatus });
       logoutRes.headers.set('Content-Security-Policy', cspHeader);
       logoutRes.headers.set("x-nonce", nonce);
       clearSessionCookies(logoutRes, request);
@@ -154,7 +156,7 @@ export async function proxy(request: NextRequest) {
     }
     
     url.pathname = "/accept-terms";
-    const redirectRes = NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
     // Increment redirect count in httpOnly cookie (secure, non-manipulable)
@@ -169,10 +171,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Scenario C: Terms accepted but on accept-terms page -> Redirect to Dashboard
-  if (user && termsVersion === TERMS_VERSION && isAcceptTermsRoute) {
+  if (user && termsVersion === TERMS_VERSION && isAcceptTermsRoute && isNavigationRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    const redirectRes = NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
     // Clear the redirect count cookie after successful terms acceptance
@@ -184,7 +186,7 @@ export async function proxy(request: NextRequest) {
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    const redirectRes = NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
     return redirectRes;
