@@ -339,7 +339,7 @@ export function PasswordResetForm({
 
   return (
     <motion.div
-      className={cn("flex flex-col gap-8", className)}
+      className={cn("flex flex-col gap-8 login-page", className)}
       initial="hidden"
       animate="visible"
       variants={containerVariants}

@@ -211,91 +211,63 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         }
       );
 
-      // 3. Pre-populate settings from save-token response for immediate availability
-      // This eliminates the 5-10 second delay showing defaults on fresh login
+      // 3. Pre-populate settings from save-token response for immediate availability.
+      // Use the Supabase auth user ID returned by the server — avoids an extra getUser() round-trip.
       const settings = saveTokenResponse.data?.settings;
-      
-      // Get user ID first - this is important before storing user-bound settings
-      // If this fails, we will skip settings prefetch but still allow navigation
-      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-      if (getUserError || !user) {
-        // User cannot be retrieved after successful login; log and continue without
-        // user-bound settings prefetch. The dashboard will fetch settings from DB.
-        const errorMsg = "User session not available after successful login; skipping settings prefetch";
-        logger.error(errorMsg, {
+      const supabaseUserId: string | null = saveTokenResponse.data?.userId ?? null;
+
+      if (!supabaseUserId) {
+        // Server did not return a user ID (unexpected); skip settings prefetch.
+        // The dashboard will fetch settings from DB on next load.
+        logger.error("User ID not returned from save-token; skipping settings prefetch", {
           context: "LoginForm/handleSubmit",
-          error: getUserError,
         });
       } else if (settings) {
-        // Validate user ID matches between login response and Supabase session
-        // This prevents storing settings under an incorrect user ID.
-        //
-        // API RESPONSE SCHEMAS:
-        // - Current schema (preferred):   { user: { id: string, ... }, settings: ... }
-        // - Legacy schema (back-compat):  { user_id: string, settings: ... }
-        //
-        // We first try the current nested user.id shape and only fall back to the
-        // legacy top-level user_id field to support older backend responses while
-        // the authentication/bridge services are being fully migrated.
-        //
-        // Once all callers and services have been updated to return the current
-        // schema, the user_id fallback can be safely removed to simplify this code.
-        const responseUserId = saveTokenResponse.data?.user?.id ?? saveTokenResponse.data?.user_id;
-        if (responseUserId && user.id !== responseUserId) {
-          logger.error("User ID mismatch between login response and Supabase session", {
-            context: "LoginForm/handleSubmit",
-            responseUserId,
-            sessionUserId: user.id,
-          });
-          // Skip storing settings to avoid data corruption
-          // Settings will be fetched from DB on the dashboard, so this is non-blocking
-        } else {
-          // Validate and normalize settings values before using them to prevent
-          // prototype pollution or injection attacks
-          const bunkEnabled =
-            typeof settings.bunk_calculator_enabled === "boolean"
-              ? settings.bunk_calculator_enabled
-              : true;
-          const rawTarget = settings.target_percentage;
-          
-          // Normalize target percentage using the same logic as normalizeTarget in user-settings.ts
-          // This handles decimal percentages (e.g., 75.5) by rounding, and ensures values are
-          // within valid range [1-100]. If the value is invalid, falls back to DEFAULT_TARGET_PERCENTAGE.
-          let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
-          
-          if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
-            const normalizedTarget = Math.round(rawTarget);
-            if (normalizedTarget >= 1 && normalizedTarget <= 100) {
-              targetPercentage = normalizedTarget;
+        // Validate and normalize settings values before using them to prevent
+        // prototype pollution or injection attacks
+        const bunkEnabled =
+          typeof settings.bunk_calculator_enabled === "boolean"
+            ? settings.bunk_calculator_enabled
+            : true;
+        const rawTarget = settings.target_percentage;
+
+        // Normalize target percentage using the same logic as normalizeTarget in user-settings.ts
+        // This handles decimal percentages (e.g., 75.5) by rounding, and ensures values are
+        // within valid range [1-100]. If the value is invalid, falls back to DEFAULT_TARGET_PERCENTAGE.
+        let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
+
+        if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
+          const normalizedTarget = Math.round(rawTarget);
+          if (normalizedTarget >= 1 && normalizedTarget <= 100) {
+            targetPercentage = normalizedTarget;
+          }
+        }
+
+        const bunkValue = bunkEnabled.toString();
+        const targetValue = targetPercentage.toString();
+
+        try {
+          // Store settings with user ID to ensure they belong to the current user.
+          // Use sessionStorage for reliable cross-navigation transfer.
+          // Include userId to prevent cross-user leakage if the hook stays mounted.
+          sessionStorage.setItem("prefetchedSettings", JSON.stringify({
+            userId: supabaseUserId,
+            settings: {
+              bunk_calculator_enabled: bunkEnabled,
+              target_percentage: targetPercentage
             }
-          }
-          
-          const bunkValue = bunkEnabled.toString();
-          const targetValue = targetPercentage.toString();
-          
-          try {
-            // Store settings with user ID to ensure they belong to the current user
-            // Use sessionStorage for reliable cross-navigation transfer
-            // Include userId in the stored data to prevent cross-user leakage if hook stays mounted
-            sessionStorage.setItem("prefetchedSettings", JSON.stringify({
-              userId: user.id,
-              settings: {
-                bunk_calculator_enabled: bunkEnabled,
-                target_percentage: targetPercentage
-              }
-            }));
-            
-            // Also update localStorage for persistence across sessions
-            localStorage.setItem(`showBunkCalc_${user.id}`, bunkValue);
-            localStorage.setItem(`targetPercentage_${user.id}`, targetValue);
-          } catch (storageError) {
-            // Storage errors are non-critical - log but continue
-            // Storage can fail in private browsing mode or when storage is disabled
-            logger.dev("Failed to write returned settings to storage after login", {
-              context: "LoginForm/handleSubmit",
-              error: storageError instanceof Error ? storageError.message : String(storageError),
-            });
-          }
+          }));
+
+          // Also update localStorage for persistence across sessions
+          localStorage.setItem(`showBunkCalc_${supabaseUserId}`, bunkValue);
+          localStorage.setItem(`targetPercentage_${supabaseUserId}`, targetValue);
+        } catch (storageError) {
+          // Storage errors are non-critical - log but continue
+          // Storage can fail in private browsing mode or when storage is disabled
+          logger.dev("Failed to write returned settings to storage after login", {
+            context: "LoginForm/handleSubmit",
+            error: storageError instanceof Error ? storageError.message : String(storageError),
+          });
         }
       } else {
         // Fallback: apply default settings when none are returned from save-token
@@ -310,8 +282,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           // We intentionally do NOT write to sessionStorage.prefetchedSettings here so
           // that the settings provider will still create a user_settings row in the DB.
           // Writing prefetchedSettings would cause the provider to skip DB initialization.
-          localStorage.setItem(`showBunkCalc_${user.id}`, defaultSettings.bunk_calculator_enabled.toString());
-          localStorage.setItem(`targetPercentage_${user.id}`, defaultSettings.target_percentage.toString());
+          localStorage.setItem(`showBunkCalc_${supabaseUserId}`, defaultSettings.bunk_calculator_enabled.toString());
+          localStorage.setItem(`targetPercentage_${supabaseUserId}`, defaultSettings.target_percentage.toString());
         } catch (storageError) {
           // Storage errors are non-critical - log but continue
           logger.dev("Failed to write default settings to storage after login", {

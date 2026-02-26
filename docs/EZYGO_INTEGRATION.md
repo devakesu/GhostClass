@@ -139,7 +139,7 @@ Client-side hydration:
 
 - ✅ Significantly reduces risk of rate limiting
 - ✅ Maintains fast UX for early users
-- ✅ Graceful queueing for later users
+- ✅ Graceful queuing for later users
 - ✅ Automatic recovery from API issues
 
 ### Request Flow
