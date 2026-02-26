@@ -20,7 +20,7 @@
  *                   "https://production.api.ezygo.app/api/v1/Xcr45_salt"
  *                   No trailing slash. Path prefix is allowed/expected when your
  *                   EzyGo deployment requires it (this project does).
- *   PROXY_SECRET    Same value as AWS_SECONDARY_SECRET in your Next.js Coolify env.
+ *   PROXY_SECRET    Same value as AWS_SECONDARY_SECRET in your Next.js server env.
  *                   Store this as an AWS Secrets Manager secret and inject via a Lambda
  *                   extension for better security (not required for initial setup).
  *
@@ -39,7 +39,7 @@
  * `x-real-ip` before sending to this Lambda.  These headers are passed through
  * unchanged — EzyGo sees the real client IP regardless of the egress path.
  * If no IP was injected, EzyGo uses the Lambda outbound IP — still providing IP
- * diversity compared to the single fixed Coolify VPS IP.
+ * diversity compared to the single fixed server VPS IP.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";

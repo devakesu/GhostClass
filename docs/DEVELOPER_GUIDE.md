@@ -611,9 +611,9 @@ Navigate to the **Secrets** tab and create the following:
 | `BOT_PAT` | Classic PAT with `repo` + `workflow` scopes for auto-version-bump commits |
 | `GPG_PRIVATE_KEY` | Armoured GPG private key for commit/tag signing |
 | `GPG_PASSPHRASE` | GPG key passphrase (omit secret if key uses `%no-protection`) |
-| `COOLIFY_BASE_URL` | Coolify instance URL for deployment trigger |
-| `COOLIFY_APP_ID` | App UUID in Coolify |
-| `COOLIFY_API_TOKEN` | Coolify API bearer token |
+| `COOLIFY_BASE_URL` | Deployment server base URL for deployment trigger |
+| `COOLIFY_APP_ID` | App UUID on deployment server |
+| `COOLIFY_API_TOKEN` | Deployment server API bearer token |
 
 > **`NEXT_PUBLIC_APP_VERSION` is not a Variable** — the pipeline derives it automatically from the git tag via the `calculate-version` job. Setting it manually would cause it to go stale after every auto-bump.
 > **`SOURCE_DATE_EPOCH` is not a Variable** — the pipeline derives it from the git commit timestamp (`git log -1 --format=%ct`) in the `prep` step. This guarantees the same tag always produces the same image digest (reproducible builds) without any manual sync needed.
@@ -630,7 +630,7 @@ Navigate to the **Secrets** tab and create the following:
 6. **Sign**: Signs images with Sigstore cosign (keyless OIDC)
 7. **Attestations**: Generates build provenance and SBOM attestations
 8. **GitHub Release**: Creates release with all artifacts
-9. **Deploy**: Automatically deploys to production via Coolify
+9. **Deploy**: Automatically deploys to production via the server
 
 **Key Benefits:**
 
@@ -847,9 +847,9 @@ All known vulnerabilities are resolved. No `--omit=dev` workaround is needed.
 
 #### Problem: Docker image not deploying
 
-- Verify Coolify webhook is configured
+- Verify server webhook is configured
 - Check release workflow completed successfully
-- Review deployment logs in Coolify
+- Review deployment logs on the server
 
 #### Problem: GPG signature verification failing
 

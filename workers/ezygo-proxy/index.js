@@ -4,7 +4,7 @@
  * PURPOSE
  * -------
  * Routes all GhostClass → EzyGo API requests through Cloudflare's global edge
- * network so EzyGo sees diverse CF egress IPs rather than the single Coolify VPS
+ * network so EzyGo sees diverse CF egress IPs rather than the single server VPS
  * IP, naturally avoiding per-IP rate-limit blocks.
  *
  * SECURITY MODEL
@@ -24,7 +24,7 @@
  * unchanged so EzyGo always sees the original client IP (first priority).
  * If no IP was injected by Next.js the CF worker's outbound IP is used as a
  * natural fallback (second priority) — still far better than the single fixed
- * Coolify server IP.
+ * server VPS IP.
  *
  * SETUP (Cloudflare Dashboard)
  * ----------------------------
@@ -33,9 +33,10 @@
  * 3. Settings → Variables → Secrets:
  *      EZYGO_API_URL  – e.g. "https://production.api.ezygo.app/api/v1/Xcr45_salt"
  *      PROXY_SECRET   – same value as CF_PROXY_SECRET in your Next.js env; click Encrypt
- * 4. Update NEXT_PUBLIC_BACKEND_URL in your Coolify/Next.js env to:
- *      https://ezygo-proxy.<your-cf-username>.workers.dev/api/v1/Xcr45_salt
- * 5. Set CF_PROXY_SECRET in your Coolify/Next.js env to the same value as PROXY_SECRET above.
+ * 4. Set CF_PROXY_URL in your server/Next.js env to the Worker URL:
+ *      https://ezygo-proxy.<your-cf-username>.workers.dev
+ *    Leave NEXT_PUBLIC_BACKEND_URL pointing at the direct EzyGo API (tier 3 fallback) — do NOT change it.
+ * 5. Set CF_PROXY_SECRET in your server/Next.js env to the same value as PROXY_SECRET above.
  */
 
 /**
@@ -142,9 +143,9 @@ export default {
 
     // Strip Cloudflare-injected infrastructure headers.
     // These reveal that the request passed through Cloudflare and expose
-    // metadata (ray IDs, connecting IP of the Coolify VPS, etc.) that EzyGo
+    // metadata (ray IDs, connecting IP of the server VPS, etc.) that EzyGo
     // should not see.
-    outHeaders.delete("cf-connecting-ip");   // Coolify VPS IP — hide from EzyGo
+    outHeaders.delete("cf-connecting-ip");   // Server VPS IP — hide from EzyGo
     outHeaders.delete("cf-ipcountry");
     outHeaders.delete("cf-ray");
     outHeaders.delete("cf-visitor");

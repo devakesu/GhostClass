@@ -146,7 +146,7 @@ export function validateEnvironment() {
     }
   }
 
-  // Cloudflare Worker egress — optional tier 1. Set CF_PROXY_URL in Coolify to enable.
+  // Cloudflare Worker egress — optional tier 1. Set CF_PROXY_URL in your server env to enable.
   const cfProxyUrl = process.env.CF_PROXY_URL?.trim();
   if (cfProxyUrl) {
     try {
@@ -175,7 +175,7 @@ export function validateEnvironment() {
     }
   }
 
-  // AWS Lambda egress — optional tier 2. Set AWS_SECONDARY_URL in Coolify to enable.
+  // AWS Lambda egress — optional tier 2. Set AWS_SECONDARY_URL in your server env to enable.
   const awsSecondaryUrl = process.env.AWS_SECONDARY_URL?.trim();
   if (awsSecondaryUrl) {
     try {
@@ -253,7 +253,7 @@ export function validateEnvironment() {
         '❌ SENTRY_HASH_SALT is required in production\n' +
         '   Used for: Redacting sensitive data (emails, IDs) in logs and error reports\n' +
         '   Generate with: openssl rand -base64 32\n' +
-        '   Set in: Deployment environment variables (e.g., Coolify, Vercel, Docker)\n' +
+        '   Set in: Deployment environment variables (e.g., your server, Vercel, Docker)\n' +
         '   Treat with the same security as database credentials'
       );
     } else {
