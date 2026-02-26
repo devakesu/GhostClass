@@ -41,13 +41,13 @@ interface EgressTarget {
 function buildEgressTargets(): EgressTarget[] {
   const targets: EgressTarget[] = [];
 
-  // Tier 1: Cloudflare Worker egress (optional — set CF_PROXY_URL in Coolify to enable)
+  // Tier 1: Cloudflare Worker egress (optional — set CF_PROXY_URL in your server env to enable)
   const cfProxyUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
   if (cfProxyUrl) {
     targets.push({ baseUrl: cfProxyUrl, secret: process.env.CF_PROXY_SECRET?.trim() || undefined, name: "primary (CF Worker)", timeoutMs: UPSTREAM_TIMEOUT_MS });
   }
 
-  // Tier 2: AWS Lambda egress (optional — set AWS_SECONDARY_URL in Coolify to enable)
+  // Tier 2: AWS Lambda egress (optional — set AWS_SECONDARY_URL in your server env to enable)
   const awsSecondaryUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
   if (awsSecondaryUrl) {
     targets.push({

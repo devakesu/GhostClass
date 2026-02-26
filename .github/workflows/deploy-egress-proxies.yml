@@ -28,6 +28,7 @@ jobs:
           node-version: '20'
 
       - name: Validate Cloudflare deploy secrets
+        id: validate
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -35,20 +36,21 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
           CF_PROXY_SECRET: ${{ secrets.CF_PROXY_SECRET }}
         run: |
-          set -euo pipefail
           if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${CF_PROXY_SECRET}" ]; then
             echo "::warning::Skipping Cloudflare deploy because required credentials/vars are missing."
             echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, secrets.CF_PROXY_SECRET, vars.CF_WORKER_NAME, vars.NEXT_PUBLIC_BACKEND_URL"
-            exit 0
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Install Wrangler
+        if: steps.validate.outputs.skip != 'true'
         # workers/package-lock.json pins wrangler@4.59.1 with full dependency
         # integrity hashes (SHA-512 SRI). npm ci verifies all hashes before
         # installation, preventing supply-chain substitution attacks.
         run: npm ci --prefix workers
 
       - name: Update Cloudflare Worker secret (PROXY_SECRET)
+        if: steps.validate.outputs.skip != 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -56,13 +58,10 @@ jobs:
           CF_PROXY_SECRET: ${{ secrets.CF_PROXY_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_WORKER_NAME}" ] || [ -z "${CF_PROXY_SECRET}" ]; then
-            echo "Skipping Cloudflare secret update (missing credentials/vars)."
-            exit 0
-          fi
-          printf "%s" "${CF_PROXY_SECRET}" | ./workers/node_modules/.bin/wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}" --non-interactive
+          printf "%s" "${CF_PROXY_SECRET}" | ./workers/node_modules/.bin/wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}"
 
       - name: Deploy Cloudflare Worker
+        if: steps.validate.outputs.skip != 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -70,14 +69,11 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ]; then
-            echo "Skipping Cloudflare deploy (missing credentials/vars)."
-            exit 0
-          fi
+          COMPAT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d' "${{ github.sha }}")
           ./workers/node_modules/.bin/wrangler deploy workers/ezygo-proxy/index.js \
             --name "${CF_WORKER_NAME}" \
             --var "EZYGO_API_URL:${NEXT_PUBLIC_BACKEND_URL}" \
-            --compatibility-date "2026-02-26"
+            --compatibility-date "${COMPAT_DATE}"
 
   deploy-aws-lambda:
     name: Deploy AWS Lambda Proxy
@@ -88,6 +84,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Validate AWS deploy secrets
+        id: validate
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
@@ -96,15 +93,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_SECONDARY_SECRET: ${{ secrets.AWS_SECONDARY_SECRET }}
         run: |
-          set -euo pipefail
           if [ -z "${AWS_REGION}" ] || [ -z "${AWS_LAMBDA_FUNCTION_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ] || [ -z "${AWS_SECONDARY_SECRET}" ]; then
             echo "::warning::Skipping AWS deploy because required credentials/vars are missing."
             echo "Required: vars.AWS_REGION, vars.AWS_LAMBDA_FUNCTION_NAME, vars.NEXT_PUBLIC_BACKEND_URL, secrets.AWS_ACCESS_KEY_ID, secrets.AWS_SECRET_ACCESS_KEY, secrets.AWS_SECONDARY_SECRET"
-            exit 0
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Configure AWS credentials
-        if: vars.AWS_REGION != '' && vars.AWS_LAMBDA_FUNCTION_NAME != ''
+        if: steps.validate.outputs.skip != 'true'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -112,16 +108,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Update Lambda environment variables
+        if: steps.validate.outputs.skip != 'true'
         env:
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
           AWS_SECONDARY_SECRET: ${{ secrets.AWS_SECONDARY_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${AWS_LAMBDA_FUNCTION_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${AWS_SECONDARY_SECRET}" ]; then
-            echo "Skipping Lambda env update (missing config)."
-            exit 0
-          fi
 
           CURRENT_VARS_JSON=$(aws lambda get-function-configuration \
             --function-name "${AWS_LAMBDA_FUNCTION_NAME}" \
@@ -141,22 +134,20 @@ jobs:
           aws lambda wait function-updated --function-name "${AWS_LAMBDA_FUNCTION_NAME}"
 
       - name: Package Lambda source
+        if: steps.validate.outputs.skip != 'true'
         run: |
           set -euo pipefail
           cd workers/ezygo-proxy-aws
-          zip -q -r ../../ezygo-proxy-aws.zip index.mjs
+          zip -q -r "${GITHUB_WORKSPACE}/ezygo-proxy-aws.zip" index.mjs
 
       - name: Deploy Lambda function code
+        if: steps.validate.outputs.skip != 'true'
         env:
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
         run: |
           set -euo pipefail
-          if [ -z "${AWS_LAMBDA_FUNCTION_NAME}" ]; then
-            echo "Skipping AWS deploy (missing function name)."
-            exit 0
-          fi
 
           aws lambda update-function-code \
             --function-name "${AWS_LAMBDA_FUNCTION_NAME}" \
-            --zip-file fileb://ezygo-proxy-aws.zip \
+            --zip-file "fileb://${GITHUB_WORKSPACE}/ezygo-proxy-aws.zip" \
             --publish
