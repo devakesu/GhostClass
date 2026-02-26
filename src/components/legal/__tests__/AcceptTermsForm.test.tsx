@@ -3,6 +3,11 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { AcceptTermsForm } from '../AcceptTermsForm';
 
+const { mockNProgressStart, mockNProgressDone } = vi.hoisted(() => ({
+  mockNProgressStart: vi.fn(),
+  mockNProgressDone: vi.fn(),
+}));
+
 // Mock next/navigation
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -45,11 +50,20 @@ vi.mock('react-markdown', () => ({
   default: ({ children }: any) => <div>{children}</div>,
 }));
 
+vi.mock('nprogress', () => ({
+  default: {
+    start: mockNProgressStart,
+    done: mockNProgressDone,
+  },
+}));
+
 describe('AcceptTermsForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockClear();
     mockAcceptTermsAction.mockClear();
+    mockNProgressStart.mockClear();
+    mockNProgressDone.mockClear();
     mockAcceptTermsAction.mockResolvedValue(undefined);
   });
 
@@ -57,6 +71,8 @@ describe('AcceptTermsForm', () => {
     vi.clearAllMocks();
     mockPush.mockClear();
     mockAcceptTermsAction.mockClear();
+    mockNProgressStart.mockClear();
+    mockNProgressDone.mockClear();
   });
 
   describe('Form Rendering', () => {
@@ -140,6 +156,8 @@ describe('AcceptTermsForm', () => {
 
       await user.click(checkbox);
       await user.click(button);
+
+      expect(mockNProgressStart).toHaveBeenCalled();
 
       await waitFor(() => {
         expect(mockAcceptTermsAction).toHaveBeenCalledWith(expect.any(String));
@@ -277,6 +295,8 @@ describe('AcceptTermsForm', () => {
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Failed to accept terms. Please try again.');
       });
+
+      expect(mockNProgressDone).toHaveBeenCalled();
 
       // Button should be re-enabled after error
       await waitFor(() => {

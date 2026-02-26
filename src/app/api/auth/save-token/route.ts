@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -9,7 +9,7 @@ import { createServerClient } from "@supabase/ssr";
 import crypto from "crypto";
 import { z } from "zod";
 import { redis } from "@/lib/redis";
-import { redact, getClientIp } from "@/lib/utils.server";
+import { redact, getClientIp, egressAxios } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
@@ -261,8 +261,8 @@ export async function POST(req: Request) {
     let verifiedUsername = "";
     
     try {
-      const ezygoRes = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}user`,
+      const ezygoRes = await egressAxios.get(
+        "user",
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 15000, // Increased from 5s to 15s to handle slow backends and network latency

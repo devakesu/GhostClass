@@ -345,7 +345,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
          // User error (wrong password) - No Sentry needed
          errorMsg = "Invalid credentials. Please check your password.";
       } else if (err.response?.data?.message) {
-         errorMsg = err.response.data.message;
+         const msg = err.response.data.message;
+         errorMsg = msg === "These credentials do not match our records."
+           ? "These credentials do not match EzyGo records."
+           : msg;
       } else if (err.code === "ERR_NETWORK") {
          errorMsg = "Network error. Please check your connection.";
       }

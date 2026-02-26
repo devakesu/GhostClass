@@ -68,6 +68,8 @@ Copy `.example.env` to `.env` and populate. Key variables:
 - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (use test keys `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` locally)
 - `NEXT_PUBLIC_BACKEND_URL` – EzyGo API base URL (do not change)
+- `CF_PROXY_URL` / `CF_PROXY_SECRET` – Optional Cloudflare Worker egress proxy (Tier 1)
+- `AWS_SECONDARY_URL` / `AWS_SECONDARY_SECRET` – Optional AWS Lambda egress proxy (Tier 2)
 
 `NEXT_PUBLIC_*` variables are client-safe. All others are server-only runtime secrets.
 
@@ -120,6 +122,7 @@ import { createClient } from '@/lib/supabase/client';
 - CSRF tokens managed via `src/lib/security/` and `src/hooks/use-csrf-token.ts`.
 - `SUPABASE_SERVICE_ROLE_KEY` must never be used client-side.
 - Sensitive tokens are AES-256-GCM encrypted at rest (`src/lib/crypto.ts`).
+- **Server-side EzyGo calls** must use `egressFetch()` or `egressAxios` from `src/lib/utils.server.ts` — never call EzyGo URLs directly. These helpers resolve the CF → AWS → Direct egress tier automatically and inject `x-proxy-secret` headers.
 
 ---
 
@@ -154,6 +157,7 @@ GhostClass uses an automated version bump workflow (`.github/workflows/auto-vers
 | `pipeline.yml` | PR / push / merge_group to main | Guard + auto-tag on merge |
 | `auto-version-bump.yml` | PR opened/updated | Auto-bump version, comment on PR |
 | `release.yml` | `repository_dispatch: release_requested` | Build multi-arch Docker, sign, attest, deploy |
+| `deploy-egress-proxies.yml` | After Release / manual | Deploy CF Worker + AWS Lambda egress proxies |
 | `deploy-supabase.yaml` | Manual | Push Supabase migrations |
 | `provenance.yml` | Release / artifact publication | Generate and publish build provenance attestations |
 | `scorecard.yml` | Scheduled / on push to main | Run OpenSSF Scorecard security checks |

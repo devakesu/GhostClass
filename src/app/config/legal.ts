@@ -1,4 +1,4 @@
-export const TERMS_VERSION = "2.1";
+export const TERMS_VERSION = "2.2";
 const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-01-29";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
@@ -46,6 +46,16 @@ We use trusted third-party infrastructure to operate GhostClass. By using the Se
     * *Data:* User IP addresses, web traffic metadata, and security cookies.
     * *Location:* Global (Edge Network). [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
 
+* **Cloudflare Workers (Egress Proxy):**
+    * *Purpose:* Tier-1 outbound proxy for EzyGo API requests to improve resiliency.
+    * *Data:* Request metadata (including source IP/User-Agent forwarding headers) and proxied EzyGo request/response payloads processed in transit.
+    * *Location:* Global (Cloudflare network). [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
+
+* **Amazon Web Services - Lambda + API Gateway (Egress Proxy):**
+    * *Purpose:* Tier-2 outbound proxy fallback for EzyGo API requests when primary egress is unavailable.
+    * *Data:* Request metadata (including source IP/User-Agent forwarding headers) and proxied EzyGo request/response payloads processed in transit.
+    * *Location:* Configured AWS region (set by deployment). [Privacy Policy](https://aws.amazon.com/privacy/)
+
 * **Hetzner Online GmbH (Compute Infrastructure):**
     * *Purpose:* Hosts the application servers (VPS) that run the GhostClass logic and proxy requests to EzyGo.
     * *Data:* Ephemeral processing of encrypted tokens and API responses.
@@ -64,7 +74,7 @@ We use trusted third-party infrastructure to operate GhostClass. By using the Se
     * *Purpose:* Anonymized usage statistics.
 
 **4. International Data Transfers**
-By using GhostClass, you acknowledge that your data may be transferred to and processed in servers located in **Germany (Hetzner)**, **The United States (Supabase/AWS)**, and globally via **Cloudflare's Edge**, regardless of your own physical location or the location of your university.
+By using GhostClass, you acknowledge that your data may be transferred to and processed in servers located in **Germany (Hetzner)**, **The United States / configured AWS regions (Supabase/AWS Lambda/API Gateway)**, and globally via **Cloudflare's Edge/Workers**, regardless of your own physical location or the location of your university.
 
 **5. Data Retention & Your Rights**
 You retain full ownership and control over your data.

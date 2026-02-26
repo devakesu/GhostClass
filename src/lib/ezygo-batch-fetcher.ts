@@ -15,6 +15,7 @@ import { LRUCache } from 'lru-cache';
 import { logger } from './logger';
 import { ezygoCircuitBreaker, NonBreakerError } from './circuit-breaker';
 import { createHash } from 'crypto';
+import { getEgressConfig } from './utils.server';
 
 /**
  * Create an AbortSignal with a timeout.
@@ -238,20 +239,22 @@ export async function fetchEzygoData<T>(
     }
     
     try {
-      // Validate backend URL before circuit breaker to avoid counting config errors as breaker failures
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) {
+      // Resolve best available egress tier (CF -> AWS -> direct) and validate URL
+      // before circuit breaker to avoid counting config errors as breaker failures.
+      const { baseUrl, proxyHeaders } = getEgressConfig();
+      if (!baseUrl) {
         throw new NonBreakerError('NEXT_PUBLIC_BACKEND_URL is not configured');
       }
 
-      // Remove trailing slash from base URL and leading slash from endpoint to avoid double slashes
-      const baseUrl = backendUrl.replace(/\/+$/, '');
+      // baseUrl from getEgressConfig() is already normalized without trailing slash.
+      // Remove leading slash from endpoint to avoid double slashes.
       const cleanEndpoint = endpoint.replace(/^\/+/, '');
       const url = `${baseUrl}/${cleanEndpoint}`;
       
       const result = await ezygoCircuitBreaker.execute(async () => {
         const headers: Record<string, string> = {
           'Authorization': `Bearer ${token}`,
+          ...proxyHeaders,
         };
         
         // Only include Content-Type and body for POST requests with a body

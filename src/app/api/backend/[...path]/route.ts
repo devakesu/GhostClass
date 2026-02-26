@@ -4,10 +4,73 @@ import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
+import { getClientIp } from "@/lib/utils.server";
 
 // .trim() removes accidental leading/trailing whitespace from the env value
 // (common copy-paste mistake in .env files) before stripping trailing slashes.
 const BASE_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+const UPSTREAM_TIMEOUT_MS = 15_000;
+
+// ── Egress failover chain ────────────────────────────────────────────────────
+// Requests are attempted against each target in order. A 429 / 5xx response or
+// a network/timeout error on a non-last target triggers a transparent failover to
+// the next tier. 4xx responses are NEVER retried — they represent upstream
+// rejections of valid requests (auth, not found, etc.) that won't change on a
+// different egress path. The circuit breaker wraps the entire chain; it only trips
+// when the last target fails.
+//
+// Tier 1 — Primary   (CF_PROXY_URL)              : Cloudflare Worker (optional)
+// Tier 2 — Secondary (AWS_SECONDARY_URL)          : AWS Lambda + API Gateway (optional)
+// Tier 3 — Direct    (NEXT_PUBLIC_BACKEND_URL)    : EzyGo API (always present)
+
+/** Per-egress timeout for secondary/fallback attempts (shorter than primary). */
+const FAILOVER_TIMEOUT_MS = 10_000;
+// Strict retry matrix:
+// - Retry/failover only on explicit transient statuses.
+// - Do not retry opaque 500/501-style errors because some upstreams misuse those
+//   codes for intentional business rejections with custom messages.
+const RETRYABLE_UPSTREAM_STATUSES = new Set([429, 502, 503, 504]);
+
+interface EgressTarget {
+  readonly baseUrl:   string;
+  readonly secret:    string | undefined;
+  readonly name:      string;
+  readonly timeoutMs: number;
+}
+
+function buildEgressTargets(): EgressTarget[] {
+  const targets: EgressTarget[] = [];
+
+  // Tier 1: Cloudflare Worker egress (optional — set CF_PROXY_URL in Coolify to enable)
+  const cfProxyUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
+  if (cfProxyUrl) {
+    targets.push({ baseUrl: cfProxyUrl, secret: process.env.CF_PROXY_SECRET?.trim() || undefined, name: "primary (CF Worker)", timeoutMs: UPSTREAM_TIMEOUT_MS });
+  }
+
+  // Tier 2: AWS Lambda egress (optional — set AWS_SECONDARY_URL in Coolify to enable)
+  const awsSecondaryUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
+  if (awsSecondaryUrl) {
+    targets.push({
+      baseUrl:   awsSecondaryUrl,
+      secret:    process.env.AWS_SECONDARY_SECRET?.trim() || undefined,
+      name:      "secondary (AWS)",
+      timeoutMs: FAILOVER_TIMEOUT_MS,
+    });
+  }
+
+  // Tier 3: Direct EzyGo (always present — final fallback, no proxy secret)
+  if (BASE_API_URL) {
+    targets.push({ baseUrl: BASE_API_URL, secret: undefined, name: "direct", timeoutMs: UPSTREAM_TIMEOUT_MS });
+  }
+
+  return targets;
+}
+
+// Resolved once at module load — env vars are immutable at runtime.
+const EGRESS_TARGETS = buildEgressTargets();
+const MISCONFIGURED_EGRESS_TARGET = EGRESS_TARGETS.find(
+  (target) => target.name !== "direct" && target.secret === undefined,
+);
 
 // Runtime validation: ensure NODE_ENV is explicitly set at module load time
 // SECURITY CONSIDERATION: When NODE_ENV is undefined, IS_PRODUCTION will be false,
@@ -206,7 +269,6 @@ function resolveRequestHostname(req: NextRequest): string | null {
 // institutional datasets while preventing memory exhaustion from unbounded responses.
 // Responses exceeding this limit will be rejected with an error.
 const MAX_RESPONSE_BYTES = 3_000_000;
-const UPSTREAM_TIMEOUT_MS = 15_000;
 // Maximum length of error body to log. Truncate longer error bodies to prevent
 // exposing sensitive information in server logs (database errors, internal paths, etc.)
 const MAX_ERROR_BODY_LOG_LENGTH = 500;
@@ -219,6 +281,29 @@ class UpstreamResponseTooLargeError extends NonBreakerError {
   constructor(message: string) {
     super(message);
     this.name = 'UpstreamResponseTooLargeError';
+  }
+}
+
+function resolveSafeUpstreamErrorMessage(rawBody: string, status: number): string {
+  try {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    const parsedMessage = typeof parsed?.message === "string" ? parsed.message.trim() : "";
+    const hasDebugInternals =
+      typeof parsed?.exception === "string" ||
+      Array.isArray(parsed?.trace) ||
+      typeof parsed?.file === "string";
+
+    // Some upstreams return framework exception payloads (file paths + stack traces)
+    // even for 4xx errors. Never reflect those internals to the client.
+    if (hasDebugInternals) {
+      if (status === 404) return "Requested resource was not found";
+      if (status === 401 || status === 403) return "Request was rejected by upstream";
+      return "Upstream request failed";
+    }
+
+    return parsedMessage || rawBody;
+  } catch {
+    return rawBody;
   }
 }
 
@@ -383,8 +468,6 @@ async function forward(req: NextRequest, method: string, path: string[]) {
     );
   }
 
-  const target = `${BASE_API_URL}/${pathSegments.join("/")}${req.nextUrl.search}`;
-
   const hasBody = method !== "GET" && method !== "HEAD";
   let body: BodyInit | undefined;
 
@@ -409,51 +492,142 @@ async function forward(req: NextRequest, method: string, path: string[]) {
     }
   }
 
+  // Extract client IP for proxy header forwarding to EzyGo.
+  // Uses getClientIp() so priority matches the rest of the codebase:
+  //   cf-connecting-ip → x-real-ip → x-forwarded-for (first entry)
+  // Injecting these headers into outgoing EzyGo requests allows EzyGo to
+  // see the original client IP rather than the shared server outbound IP,
+  // which may help avoid hitting EzyGo's per-IP rate limits.
+  // In production getClientIp() returns null when no IP header is present;
+  // the headers are omitted in that case (not forwarded as empty).
+  const clientIp = getClientIp(req.headers);
+  const clientUserAgent = req.headers.get("user-agent");
+
+  // Runtime guard: EGRESS_TARGETS is built from BASE_API_URL which is already
+  // validated above, but guard here as a safety net.
+  if (EGRESS_TARGETS.length === 0) {
+    logger.error("No egress targets configured");
+    return NextResponse.json({ message: "Backend URL not configured" }, { status: 500 });
+  }
+
+  // Runtime guard: proxy mode requires the secret to actually be present so
+  // requests aren't silently rejected with 403 by the upstream Worker/Lambda.
+  // (validate-env catches this at startup; this is a defense-in-depth check.)
+  if (MISCONFIGURED_EGRESS_TARGET) {
+    logger.error(
+      `Egress target "${MISCONFIGURED_EGRESS_TARGET.name}" requires a proxy secret but none is configured`,
+      { baseUrl: MISCONFIGURED_EGRESS_TARGET.baseUrl },
+    );
+    return NextResponse.json({ message: "Proxy secret not configured" }, { status: 500 });
+  }
+
   try {
-    // Wrap fetch in circuit breaker for automatic failure handling
-    // This protects against cascading failures when EzyGo API is down
+    // Wrap fetch in circuit breaker for automatic failure handling.
+    // The circuit breaker wraps the ENTIRE failover chain; it only trips when
+    // every available egress target has failed.
     const result = await ezygoCircuitBreaker.execute(async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+      // Path suffix appended to each target's base URL (same across all tiers).
+      const pathSuffix = `${pathSegments.join("/")}${req.nextUrl.search}`;
 
-      try {
-        const res = await fetch(target, {
-          method,
-          headers: {
-            ...(isPublic ? {} : { Authorization: `Bearer ${token}` }),
-            "content-type": resolvedContentType, // derived from how the body was read, not raw client header
-            accept: req.headers.get("accept") || "application/json",
-          },
-          body: hasBody ? body : undefined,
-          // duplex is required for streaming request bodies
-          // See: https://github.com/nodejs/undici/issues/1583
-          ...(hasBody ? { duplex: "half" as const } : {}),
-          signal: controller.signal,
-        });
+      // Shared headers across all egress attempts (egress-specific secret added per-attempt).
+      const baseHeaders: Record<string, string> = {
+        ...(isPublic ? {} : { Authorization: `Bearer ${token}` }),
+        "content-type": resolvedContentType,
+        accept: req.headers.get("accept") || "application/json",
+        // Forward original client IP and User-Agent so EzyGo sees per-user identifiers
+        // rather than the shared server outbound IP. All egress proxies (CF Worker and
+        // AWS Lambda) are instructed to preserve these headers unchanged.
+        ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
+        ...(clientUserAgent ? { "user-agent": clientUserAgent } : {}),
+      };
 
-        const text = await readWithLimit(res.body, MAX_RESPONSE_BYTES, controller.signal);
+      let lastError: Error | null = null;
 
-        // Check for server errors (5xx) and rate limiting (429) and throw to trip circuit breaker
-        // Use UpstreamServerError to preserve response details for proper proxying
-        // 429 is treated as a breaker-worthy error to prevent retry storms during upstream rate limiting
-        if (res.status >= 500 || res.status === 429) {
-          throw new UpstreamServerError(
-            `Upstream server error: ${res.status} ${res.statusText}`,
-            res.status,
-            res.statusText,
-            text,
-            res.headers
-          );
+      for (let i = 0; i < EGRESS_TARGETS.length; i++) {
+        const egress    = EGRESS_TARGETS[i];
+        const isLastTier = i === EGRESS_TARGETS.length - 1;
+        const egressTarget = `${egress.baseUrl}/${pathSuffix}`;
+        const controller   = new AbortController();
+        const timeout      = setTimeout(() => controller.abort(), egress.timeoutMs);
+
+        try {
+          const res = await fetch(egressTarget, {
+            method,
+            headers: {
+              ...baseHeaders,
+              // Attach per-egress proxy secret (CF Worker secret or AWS Lambda secret).
+              // Omitted for direct EzyGo backends (secret is undefined in that case).
+              ...(egress.secret ? { "x-proxy-secret": egress.secret } : {}),
+            },
+            body: hasBody ? body : undefined,
+            // duplex is required for streaming request bodies
+            // See: https://github.com/nodejs/undici/issues/1583
+            ...(hasBody ? { duplex: "half" as const } : {}),
+            signal: controller.signal,
+          });
+
+          const text = await readWithLimit(res.body, MAX_RESPONSE_BYTES, controller.signal);
+
+          const isRetryableStatus = RETRYABLE_UPSTREAM_STATUSES.has(res.status);
+
+          // Retryable status on non-last tier: failover transparently.
+          // Non-retryable statuses (including most 4xx and 500/501) are returned
+          // immediately and not retried on other egress paths.
+          if (isRetryableStatus && !isLastTier) {
+            logger.warn(`[egress-failover] ${egress.name} returned ${res.status} — failing over to next tier`, {
+              path: pathSegments.join("/"),
+              status: res.status,
+            });
+            // Preserve for re-throw if all remaining tiers also fail.
+            lastError = new UpstreamServerError(
+              `Upstream error on ${egress.name}: ${res.status} ${res.statusText}`,
+              res.status, res.statusText, text, res.headers
+            );
+            continue;
+          }
+
+          // Last tier retryable status: throw so circuit breaker can account for
+          // transient upstream instability. Non-retryable statuses are returned
+          // directly and handled by the standard !res.ok response path below.
+          if (isRetryableStatus) {
+            throw new UpstreamServerError(
+              `Upstream server error: ${res.status} ${res.statusText}`,
+              res.status, res.statusText, text, res.headers
+            );
+          }
+
+          return { res, text, egressName: egress.name };
+
+        } catch (err) {
+          const error = err as Error;
+
+          // Let UpstreamServerError bubble up — it's already a structured failure
+          // from the last tier and should not be retried further.
+          if (error instanceof UpstreamServerError) throw error;
+
+          // Network / timeout error on a non-last tier: log and try next.
+          if (!isLastTier) {
+            logger.warn(`[egress-failover] ${egress.name} failed (${error.name}: ${error.message}) — failing over to next tier`, {
+              path: pathSegments.join("/"),
+            });
+            lastError = error;
+            continue;
+          }
+
+          // Last tier also failed via exception — rethrow.
+          throw error;
+
+        } finally {
+          clearTimeout(timeout);
         }
-        
-        // Always return consistent shape
-        return { res, text };
-      } finally {
-        clearTimeout(timeout);
       }
+
+      // All tiers exhausted (only reached if EGRESS_TARGETS is non-empty but loop
+      // consumed them all via `continue`). Re-throw the last captured error.
+      throw lastError ?? new Error("All egress targets failed");
     });
 
-    const { res, text } = result;
+    const { res, text, egressName } = result;
     const contentType = res.headers.get("content-type") || "application/json";
 
     if (!res.ok) {
@@ -469,14 +643,7 @@ async function forward(req: NextRequest, method: string, path: string[]) {
         path: pathSegments.join("/"),
         bodyPreview: sanitizedBody 
       });
-      let errorMessage: string = text;
-      try {
-        // Try to parse JSON error message from upstream
-        const parsed = JSON.parse(text);
-        errorMessage = parsed.message || text;
-      } catch {
-        // Not JSON, use raw text as error message
-      }
+      const errorMessage = resolveSafeUpstreamErrorMessage(text, res.status);
       
       // ERROR SANITIZATION STRATEGY:
       // In production (NODE_ENV=production), sanitize 5xx server errors to prevent
@@ -502,10 +669,19 @@ async function forward(req: NextRequest, method: string, path: string[]) {
         ? "An error occurred while processing your request" 
         : errorMessage;
       
-      return NextResponse.json({ message: clientMessage, status: res.status }, { status: res.status });
+      return NextResponse.json(
+        { message: clientMessage, status: res.status },
+        { status: res.status, headers: { "x-egress-target": egressName } }
+      );
     }
 
-    return new NextResponse(text, { status: res.status, headers: { "content-type": contentType } });
+    return new NextResponse(text, {
+      status: res.status,
+      headers: {
+        "content-type": contentType,
+        "x-egress-target": egressName,
+      },
+    });
   } catch (err) {
     const error = err as Error;
     
@@ -539,14 +715,7 @@ async function forward(req: NextRequest, method: string, path: string[]) {
         });
       }
       
-      let errorMessage: string = error.body;
-      try {
-        // Try to parse JSON error message from upstream
-        const parsed = JSON.parse(error.body);
-        errorMessage = parsed.message || error.body;
-      } catch {
-        // Not JSON, use raw text as error message
-      }
+      const errorMessage = resolveSafeUpstreamErrorMessage(error.body, error.status);
       
       // Preserve 429 rate-limit messages even in production as they contain actionable info
       // Only sanitize 5xx errors which may expose internal implementation details

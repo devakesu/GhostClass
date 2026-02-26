@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { toast } from "sonner";
+import NProgress from "nprogress";
 
 export function AcceptTermsForm() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export function AcceptTermsForm() {
   const handleAgree = async () => {
     if (!checked) return;
     setLoading(true);
+    NProgress.start();
     try {
       await acceptTermsAction(TERMS_VERSION);
       // Small delay to ensure cookie propagation and cache revalidation complete
@@ -30,6 +32,7 @@ export function AcceptTermsForm() {
       // Redirect to dashboard after successful acceptance
       router.push("/dashboard");
     } catch (error) {
+      NProgress.done();
       logger.error("Failed to accept terms", error);
       Sentry.captureException(error, {
         tags: { type: "terms_acceptance_failure", location: "AcceptTermsForm/handleAgree" },

@@ -146,6 +146,77 @@ export function validateEnvironment() {
     }
   }
 
+  // Cloudflare Worker egress — optional tier 1. Set CF_PROXY_URL in Coolify to enable.
+  const cfProxyUrl = process.env.CF_PROXY_URL?.trim();
+  if (cfProxyUrl) {
+    try {
+      const cfParsed = new URL(cfProxyUrl);
+      if (!['https:', 'http:'].includes(cfParsed.protocol)) {
+        errors.push('❌ CF_PROXY_URL must use http or https protocol');
+      } else if (process.env.NODE_ENV === 'production' && cfParsed.protocol !== 'https:') {
+        errors.push('❌ CF_PROXY_URL must use https:// in production');
+      }
+    } catch {
+      errors.push('❌ CF_PROXY_URL must be a valid absolute URL (e.g. https://ezygo-proxy.<username>.workers.dev/api/v1/Xcr45_salt)');
+    }
+
+    if (!process.env.CF_PROXY_SECRET) {
+      errors.push(
+        '❌ CF_PROXY_SECRET is required when CF_PROXY_URL is set.\n' +
+        '   The CF Worker will reject requests with 403 without this secret.\n' +
+        '   Generate with: openssl rand -hex 32\n' +
+        '   Set the same value as the PROXY_SECRET encrypted secret in your CF Worker settings.'
+      );
+    } else if (process.env.CF_PROXY_SECRET.trim().length < 32) {
+      errors.push(
+        '❌ CF_PROXY_SECRET is too short (minimum 32 characters).\n' +
+        '   Recommended: openssl rand -hex 32 (64 characters).'
+      );
+    }
+  }
+
+  // AWS Lambda egress — optional tier 2. Set AWS_SECONDARY_URL in Coolify to enable.
+  const awsSecondaryUrl = process.env.AWS_SECONDARY_URL?.trim();
+  if (awsSecondaryUrl) {
+    try {
+      const awsParsed = new URL(awsSecondaryUrl);
+      if (!['https:', 'http:'].includes(awsParsed.protocol)) {
+        errors.push('❌ AWS_SECONDARY_URL must use http or https protocol');
+      } else if (process.env.NODE_ENV === 'production' && awsParsed.protocol !== 'https:') {
+        errors.push('❌ AWS_SECONDARY_URL must use https:// in production');
+      }
+    } catch {
+      errors.push('❌ AWS_SECONDARY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)');
+    }
+
+    if (!process.env.AWS_SECONDARY_SECRET) {
+      errors.push(
+        '❌ AWS_SECONDARY_SECRET is required when AWS_SECONDARY_URL is set.\n' +
+        '   The AWS Lambda proxy will reject requests with 403 without this secret.\n' +
+        '   Generate with: openssl rand -hex 32\n' +
+        '   Set the same value as the PROXY_SECRET env var in your AWS Lambda function.'
+      );
+    } else if (process.env.AWS_SECONDARY_SECRET.trim().length < 32) {
+      errors.push(
+        '❌ AWS_SECONDARY_SECRET is too short (minimum 32 characters).\n' +
+        '   Recommended: openssl rand -hex 32 (64 characters).'
+      );
+    }
+  }
+
+  // Key-separation: CF and AWS secrets must not be the same value.
+  if (
+    process.env.CF_PROXY_SECRET?.trim() &&
+    process.env.AWS_SECONDARY_SECRET?.trim() &&
+    process.env.CF_PROXY_SECRET.trim() === process.env.AWS_SECONDARY_SECRET.trim()
+  ) {
+    errors.push(
+      '❌ CF_PROXY_SECRET and AWS_SECONDARY_SECRET must be different values (key separation).\n' +
+      '   Reusing the same secret means a compromise of one proxy compromises both tiers.\n' +
+      '   Generate two distinct secrets: openssl rand -hex 32 (run twice).'
+    );
+  }
+
   // ============================================================================
   // OPTIONAL - App works but features may be limited
   // ============================================================================
