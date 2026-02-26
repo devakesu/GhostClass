@@ -54,3 +54,40 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
     expect(isDeleted("terms_redirect_count")).toBe(true);
   });
 });
+
+describe("proxy – redirect status for non-GET requests", () => {
+  beforeEach(() => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+  });
+
+  it("redirects GET /accept-terms to /dashboard when terms are already accepted", async () => {
+    const request = new NextRequest("http://localhost/accept-terms", {
+      method: "GET",
+      headers: {
+        cookie: "terms_version=2.1",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/dashboard");
+  });
+
+  it("does not redirect POST /accept-terms when terms are already accepted", async () => {
+    const request = new NextRequest("http://localhost/accept-terms", {
+      method: "POST",
+      headers: {
+        cookie: "terms_version=2.1",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+  });
+});
