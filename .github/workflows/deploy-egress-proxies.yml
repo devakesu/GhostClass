@@ -49,7 +49,7 @@ jobs:
           fi
 
       - name: Install Wrangler
-        run: npm install --no-save wrangler@4
+        run: npm install --no-save wrangler@4.57.0
 
       - name: Update Cloudflare Worker secret (PROXY_SECRET)
         env:
@@ -80,7 +80,7 @@ jobs:
           npx wrangler deploy workers/ezygo-proxy/index.js \
             --name "${CF_WORKER_NAME}" \
             --var "EZYGO_API_URL:${NEXT_PUBLIC_BACKEND_URL}" \
-            --compatibility-date "$(date +%F)"
+            --compatibility-date "2026-02-26"
 
   deploy-aws-lambda:
     name: Deploy AWS Lambda Proxy

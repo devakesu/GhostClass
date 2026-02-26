@@ -97,6 +97,9 @@ export const handler = async (event) => {
   // ── 2. Build target URL ───────────────────────────────────────────────────
   const rawPath        = event.rawPath        ?? "/";
   const rawQueryString = event.rawQueryString ?  `?${event.rawQueryString}` : "";
+  if (!EZYGO_API_URL) {
+    return { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is not set" };
+  }
   const upstreamBase   = new URL(EZYGO_API_URL);
   const basePath       = upstreamBase.pathname.replace(/\/+$/, "");
   const incomingPath   = rawPath;

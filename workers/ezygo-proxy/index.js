@@ -89,6 +89,9 @@ export default {
   async fetch(request, env) {
     // ── 1. Authentication ─────────────────────────────────────────────────────
     // Only the GhostClass Next.js server knows this secret; browsers never see it.
+    if (!env.PROXY_SECRET) {
+      return new Response("Misconfigured: PROXY_SECRET is not set", { status: 500 });
+    }
     const incomingSecret = request.headers.get("x-proxy-secret");
     if (!incomingSecret || !(await constantTimeEqual(incomingSecret, env.PROXY_SECRET))) {
       return new Response("Forbidden", { status: 403 });
@@ -99,6 +102,9 @@ export default {
     // env.EZYGO_API_URL should be the EzyGo base URL (path prefix allowed), e.g.
     // "https://production.api.ezygo.app/api/v1/Xcr45_salt".
     // No trailing slash.
+    if (!env.EZYGO_API_URL) {
+      return new Response("Misconfigured: EZYGO_API_URL is not set", { status: 500 });
+    }
     const upstreamBase = new URL(env.EZYGO_API_URL);
     const basePath = upstreamBase.pathname.replace(/\/+$/, "");
     const incomingPath = url.pathname;
