@@ -130,11 +130,15 @@ export async function proxy(request: NextRequest) {
     // This query is only reached when the cookie is missing or stale, so it doesn't add
     // overhead to normal authenticated requests.
     try {
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: userProfileError } = await supabase
         .from("users")
         .select("terms_version")
         .eq("auth_id", user.id)
         .single();
+
+      if (userProfileError) {
+        throw userProfileError;
+      }
 
       if (userProfile?.terms_version === TERMS_VERSION) {
         // Accepted elsewhere — sync cookie to this device and allow through.
