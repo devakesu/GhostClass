@@ -48,6 +48,7 @@ import dynamic from "next/dynamic";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { ATTENDANCE_STATUS, isPositive } from "@/lib/logic/attendance-reconciliation";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
+import { PWAInstallBanner } from "@/components/pwa-install-banner";
 
 import type {
   captureException as SentryCaptureException,
@@ -769,6 +770,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
         </AlertDialog>
       </main>
     </div>
+    <PWAInstallBanner />
     </LazyMotion>
   );
 }
