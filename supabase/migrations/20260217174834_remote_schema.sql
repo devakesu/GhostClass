@@ -75,6 +75,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 CREATE OR REPLACE FUNCTION "public"."check_225_attendance_limit"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SET search_path = public, pg_temp
     AS $$
 DECLARE
   attendance_225_count INTEGER;
@@ -87,7 +88,7 @@ BEGIN
   -- Count existing 225 attendance records for this course in this semester/year
   SELECT COUNT(*)
   INTO attendance_225_count
-  FROM tracker
+  FROM public.tracker
   WHERE auth_user_id = NEW.auth_user_id
     AND course = NEW.course
     AND semester = NEW.semester

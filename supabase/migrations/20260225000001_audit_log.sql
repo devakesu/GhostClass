@@ -67,9 +67,29 @@ ALTER TABLE "public"."audit_log" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE "public"."audit_log" FROM "anon";
 REVOKE ALL ON TABLE "public"."audit_log" FROM "authenticated";
 
--- No RLS policies are created; the table is write-only for SECURITY DEFINER
--- functions (which run as the table owner, bypassing RLS) and read-only for
--- the service_role (which also bypasses RLS).
+-- No RLS policies granting access are created; the table is write-only for
+-- SECURITY DEFINER functions (which run as the table owner, bypassing RLS)
+-- and read-only for the service_role (which also bypasses RLS).
+-- An explicit deny-all RESTRICTIVE policy is added so automated RLS scanners
+-- see a policy without changing the effective access semantics.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'audit_log'
+      AND policyname = 'audit_log_no_access'
+  ) THEN
+    CREATE POLICY "audit_log_no_access"
+      ON "public"."audit_log"
+      AS RESTRICTIVE
+      FOR ALL
+      TO public
+      USING (false);
+  END IF;
+END
+$$;
 
 -- ============================================================================
 -- 3.  Trigger function: audit_tracker_changes

@@ -154,9 +154,9 @@ export function DeleteAccount() {
               <Input
                 id="confirm"
                 value={confirmation}
-                onChange={(e) => setConfirmation(e.target.value)}
+                onChange={(e) => setConfirmation(e.target.value.toUpperCase())}
                 placeholder="DELETE"
-                className="font-mono uppercase"
+                className="font-mono"
               />
             </div>
 

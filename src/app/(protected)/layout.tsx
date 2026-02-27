@@ -150,6 +150,7 @@ export default function ProtectedLayout({
                 "fixed top-0 left-0 right-0 z-50",
                 isHidden ? "pointer-events-none" : "pointer-events-auto"
               )}
+              style={{ paddingRight: "var(--scrollbar-width, 0px)" }}
               // The inert attribute disables keyboard/screen reader interaction with hidden elements
               // Browser support: Chrome 102+, Safari 15.5+, Firefox 112+ (March 2023+)
               // Feature detection ensures graceful degradation on older browsers
