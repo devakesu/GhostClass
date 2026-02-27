@@ -71,9 +71,24 @@ export function usePWAInstall(): UsePWAInstallReturn {
 
     window.addEventListener("appinstalled", handleAppInstalled);
 
+    // Listen for display-mode transitions reactively. When the user adds the
+    // app via the browser menu (not via beforeinstallprompt), the 'appinstalled'
+    // event does not always fire. A matchMedia listener ensures isInstalled
+    // updates correctly in those cases too.
+    const standaloneQuery = window.matchMedia("(display-mode: standalone)");
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+        _earlyPrompt = null;
+      }
+    };
+    standaloneQuery.addEventListener("change", handleDisplayModeChange);
+
     return () => {
       _promptSubscribers.delete(handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      standaloneQuery.removeEventListener("change", handleDisplayModeChange);
     };
   }, []);
 
