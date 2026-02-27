@@ -181,4 +181,58 @@ describe('PWAInstallBanner', () => {
     expect(stored).toBeGreaterThanOrEqual(before);
     expect(store[STORAGE_KEY]).not.toBe('installed');
   });
+
+  it('does not show banner when localStorage.getItem throws (shouldShowBanner catch)', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('storage denied'); },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    // shouldShowBanner catches the error and returns false → banner stays hidden
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('hides banner gracefully when localStorage.setItem throws during accepted install', async () => {
+    mockTriggerInstall.mockResolvedValue('accepted');
+    const getStore: Record<string, string> = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => getStore[key] ?? null,
+      setItem: () => { throw new Error('storage denied'); },
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+
+    vi.useRealTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
+    });
+    // Banner hides despite the storage error
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('hides banner gracefully when localStorage.setItem throws during dismiss', async () => {
+    const getStore: Record<string, string> = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => getStore[key] ?? null,
+      setItem: () => { throw new Error('storage denied'); },
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+
+    vi.useRealTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
+    });
+    // Banner hides despite the storage error
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
 });
