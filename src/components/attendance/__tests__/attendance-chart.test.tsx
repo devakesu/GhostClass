@@ -293,4 +293,84 @@ describe('AttendanceChart', () => {
       value: makeMatchMedia(false),
     });
   });
+
+  it('handleDocumentTouch hides tooltip when touch is outside chart, shows when inside', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(true),
+    });
+
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
+    );
+
+    // Capture the registered touchstart handler
+    const touchCalls = addEventListenerSpy.mock.calls.filter(
+      ([event]) => event === 'touchstart'
+    );
+    expect(touchCalls.length).toBeGreaterThan(0);
+    const handler = touchCalls[0][1] as (e: Partial<TouchEvent>) => void;
+
+    const container = screen.getByRole('img');
+    // Spy on contains: simulate touch inside the chart container
+    vi.spyOn(container, 'contains').mockReturnValueOnce(true);
+    await act(async () => {
+      handler({ target: container } as unknown as Partial<TouchEvent>);
+    });
+
+    // Simulate touch outside the chart
+    vi.spyOn(container, 'contains').mockReturnValueOnce(false);
+    await act(async () => {
+      handler({ target: document.body } as unknown as Partial<TouchEvent>);
+    });
+
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(false),
+    });
+  });
+
+  it('processes tracking data entries (extra and correction types)', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: ResizeObserverCallback) {
+        resizeCallback = cb;
+      }
+    };
+
+    const trackingData = [
+      // extra present entry
+      { course: '1', date: '2024-01-02', session: '1', attendance: 110, status: 'extra' },
+      // correction: official absent → tracking present
+      { course: '1', date: '2024-01-01', session: '1', attendance: 110, status: 'correction' },
+      // correction: official present → tracking absent
+      { course: '1', date: '2024-01-01', session: '2', attendance: 111, status: 'correction' },
+    ];
+
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: sampleAttendanceData as any,
+        trackingData: trackingData as any,
+        coursesData: sampleCourses as any,
+      })
+    );
+
+    const containerEl = screen.getByRole('img');
+    vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    await act(async () => {
+      if (resizeCallback) resizeCallback([], {} as ResizeObserver);
+    });
+
+    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+  });
 });

@@ -66,6 +66,38 @@ describe('usePWAInstall', () => {
     });
   });
 
+  it('detects installed state via iOS Safari navigator.standalone', async () => {
+    vi.resetModules();
+    // matchMedia returns false; iOS Safari standalone flag is true
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    Object.defineProperty(window.navigator, 'standalone', {
+      writable: true,
+      configurable: true,
+      value: true,
+    });
+    const { usePWAInstall: hook } = await import('@/hooks/usePWAInstall');
+    const { result } = renderHook(() => hook());
+    expect(result.current.isInstalled).toBe(true);
+    expect(result.current.canInstall).toBe(false);
+
+    // Restore
+    Object.defineProperty(window.navigator, 'standalone', {
+      writable: true,
+      configurable: true,
+      value: undefined,
+    });
+  });
+
   it('returns canInstall=true after beforeinstallprompt fires post-mount', async () => {
     const { result } = renderHook(() => usePWAInstall());
     expect(result.current.canInstall).toBe(false);
