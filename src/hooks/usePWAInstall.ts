@@ -23,12 +23,17 @@ let _earlyPrompt: BeforeInstallPromptEvent | null = null;
 // up on hook unmount to avoid stale references.
 const _promptSubscribers = new Set<(e: BeforeInstallPromptEvent) => void>();
 
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeinstallprompt", (e: Event) => {
+// Store a stable module-level listener reference so we don't register
+// duplicate listeners during HMR in development.
+let _moduleListener: ((e: Event) => void) | null = null;
+
+if (typeof window !== "undefined" && !_moduleListener) {
+  _moduleListener = (e: Event) => {
     e.preventDefault();
     _earlyPrompt = e as BeforeInstallPromptEvent;
     _promptSubscribers.forEach((fn) => fn(_earlyPrompt!));
-  });
+  };
+  window.addEventListener("beforeinstallprompt", _moduleListener);
 }
 
 export function usePWAInstall(): UsePWAInstallReturn {
