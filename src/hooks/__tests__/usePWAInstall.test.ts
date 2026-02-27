@@ -186,6 +186,19 @@ describe('usePWAInstall', () => {
     expect(result.current.canInstall).toBe(false);
   });
 
+  it('returns canInstall=true immediately when beforeinstallprompt fired before mount', async () => {
+    vi.resetModules();
+    // Import the module first so the module-level listener is registered,
+    // then fire the event before any hook has rendered. This simulates the
+    // production race where the browser emits the event during hydration
+    // before React has called useState for the first time.
+    const { usePWAInstall: hook } = await import('@/hooks/usePWAInstall');
+    window.dispatchEvent(makeFakePrompt('accepted'));
+    const { result } = renderHook(() => hook());
+    // useState is seeded from _earlyPrompt so canInstall must be true immediately
+    expect(result.current.canInstall).toBe(true);
+  });
+
   it('receives re-emitted beforeinstallprompt after previous prompt was consumed', async () => {
     const { result } = renderHook(() => usePWAInstall());
 
