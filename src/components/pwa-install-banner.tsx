@@ -69,7 +69,6 @@ export function PWAInstallBanner() {
             role="complementary"
             aria-label="Install GhostClass app"
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-max max-w-[calc(100vw-2rem)]"
-            style={{ paddingRight: "var(--scrollbar-width, 0px)" }}
           >
             <div className="custom-container flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg font-manrope">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 shrink-0">
