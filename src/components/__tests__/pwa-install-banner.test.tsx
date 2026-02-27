@@ -178,6 +178,9 @@ describe('PWAInstallBanner', () => {
 
     expect(screen.queryByRole('complementary')).toBeNull();
     expect(store[STORAGE_KEY]).toBe('installed');
+
+    // Drain the 300ms window.close() timer so it doesn't leak into the next test.
+    await new Promise((r) => setTimeout(r, 350));
   });
 
   it('calls window.close() and shows success toast when install is accepted', async () => {
@@ -203,9 +206,10 @@ describe('PWAInstallBanner', () => {
       expect.objectContaining({ description: 'Open it from your home screen.' }),
     );
 
-    // window.close is scheduled after a 300ms delay — advance fake timers
-    vi.useFakeTimers();
-    await act(async () => { vi.advanceTimersByTime(300); });
+    // window.close is scheduled after a 300ms real-timer delay — stay on real
+    // timers and wait for it to fire (switching to fake timers would not affect
+    // the already-scheduled real setTimeout).
+    await act(async () => { await new Promise((r) => setTimeout(r, 350)); });
     expect(window.close).toHaveBeenCalledTimes(1);
   });
 
