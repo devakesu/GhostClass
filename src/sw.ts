@@ -20,11 +20,19 @@ const serwist = new Serwist({
   // User-initiated updates are handled via the SKIP_WAITING postMessage flow
   // in sw-register.tsx (the "App updated — tap to refresh" toast).
   skipWaiting: false,
-  // Claim all open clients immediately on activation so the new SW is in
-  // control before the next navigation. This is safe because navigation
-  // requests are handled by the NetworkOnly rule below — the SW never serves
-  // cached HTML, so claiming mid-session cannot produce a stale page.
-  clientsClaim: true,
+  // Do NOT claim clients on activation.
+  //
+  // clientsClaim: true was re-introduced in v2.1.2 to attempt to fix a
+  // blank-page issue, but it causes a different blank page: on subsequent
+  // standalone PWA launches the SW is already installed and activates
+  // mid-stream of Next.js Suspense SSR streaming (DashboardDataLoader),
+  // aborting the in-flight response and producing a blank page.
+  //
+  // The NetworkOnly navigation handler below ensures SSR pages always load
+  // from the network, so clientsClaim: false is safe — the SW never serves
+  // stale cached HTML. Manual refresh always works because the SW is
+  // already active by the time the user navigates.
+  clientsClaim: false,
   // Disable navigation preload: Next.js uses streaming SSR (Suspense), and
   // navigation preload can produce duplicate or interleaved response streams
   // that interfere with chunk delivery.
