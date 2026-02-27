@@ -93,11 +93,11 @@ export function ServiceWorkerRegister() {
 
                 // Notify the user that an update is ready.
                 // The action sends a SKIP_WAITING message to the waiting SW,
-                // which triggers activation. With clientsClaim: false the
-                // controllerchange event may not fire (the new SW activates but
-                // does not claim existing tabs), so we also watch the waiting
-                // worker's statechange and reload once it reaches 'activated'
-                // as a guaranteed fallback.
+                // which triggers activation. With clientsClaim: true the
+                // controllerchange event fires when the new SW claims all clients.
+                // The statechange → activated listener below is an extra safety
+                // net in case controllerchange fires before the reload completes.
+                // The `refreshing` guard prevents a double-reload if both fire.
                 let refreshing = false;
                 navigator.serviceWorker.addEventListener(
                   "controllerchange",
@@ -118,9 +118,10 @@ export function ServiceWorkerRegister() {
                     onClick: () => {
                       if (registration.waiting) {
                         const waitingWorker = registration.waiting;
-                        // Fallback: with clientsClaim: false the controllerchange
-                        // event won't fire after skipWaiting, so reload explicitly
-                        // once the new SW reaches 'activated'.
+                        // Safety net: reload once the new SW reaches 'activated'
+                        // in case the controllerchange event was already handled
+                        // (or fires after this click). The `refreshing` guard
+                        // prevents a double-reload if both events fire.
                         waitingWorker.addEventListener(
                           "statechange",
                           function onActivated() {
