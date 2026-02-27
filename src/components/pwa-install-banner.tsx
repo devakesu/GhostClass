@@ -39,9 +39,16 @@ export function PWAInstallBanner() {
   }, [canInstall, isInstalled]);
 
   const handleInstall = async () => {
-    await triggerInstall();
+    const outcome = await triggerInstall();
     try {
-      localStorage.setItem(STORAGE_KEY, "installed");
+      if (outcome === "accepted") {
+        // Permanently hide — the app is now installed.
+        localStorage.setItem(STORAGE_KEY, "installed");
+      } else {
+        // User cancelled the native dialog or it was unavailable — snooze
+        // so the banner can re-appear after the snooze period.
+        localStorage.setItem(STORAGE_KEY, Date.now().toString());
+      }
     } catch {
       // Ignore storage errors (e.g., private browsing, storage disabled)
     }
