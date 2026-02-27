@@ -10,7 +10,11 @@ const STORAGE_KEY = "ghostclass_pwa_install_dismissed";
 const SNOOZE_DURATION_MS = 21 * 24 * 60 * 60 * 1000; // 3 weeks
 const SHOW_DELAY_MS = 2500;
 
-function shouldShowBanner(): boolean {
+function shouldShowBanner(isInstalled: boolean): boolean {
+  // Never show the install banner when the app is already running in standalone
+  // mode — handles the case where localStorage was cleared while the app was
+  // already installed (defense-in-depth guard).
+  if (isInstalled) return false;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return true;
@@ -28,8 +32,14 @@ export function PWAInstallBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isInstalled || !canInstall) return;
-    if (!shouldShowBanner()) return;
+    if (isInstalled) {
+      // Hide immediately if the app transitions to standalone mid-session
+      // (e.g. user installs via browser menu while the banner is showing).
+      setVisible(false);
+      return;
+    }
+    if (!canInstall) return;
+    if (!shouldShowBanner(isInstalled)) return;
 
     const timer = setTimeout(() => {
       setVisible(true);

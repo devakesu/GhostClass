@@ -2,7 +2,7 @@
 
 import { Serwist } from "serwist";
 // Strategy classes for different caching behaviors
-import { CacheFirst, StaleWhileRevalidate } from "serwist";
+import { CacheFirst, NetworkOnly, StaleWhileRevalidate } from "serwist";
 // Plugins used specifically for the image runtime caching strategy
 import { CacheableResponsePlugin, ExpirationPlugin } from "serwist";
 
@@ -20,17 +20,34 @@ const serwist = new Serwist({
   // User-initiated updates are handled via the SKIP_WAITING postMessage flow
   // in sw-register.tsx (the "App updated — tap to refresh" toast).
   skipWaiting: false,
-  // Do NOT claim clients on activation. clientsClaim: true was found to abort
-  // in-flight SSR streaming responses when the SW claims a navigating tab
-  // mid-stream (Next.js force-dynamic + Suspense), producing a blank page on
-  // fresh install. Manual refresh always works because the SW is already active.
-  clientsClaim: false,
+  // Claim all open clients immediately on activation so the new SW is in
+  // control before the next navigation. This is safe because navigation
+  // requests are handled by the NetworkOnly rule below — the SW never serves
+  // cached HTML, so claiming mid-session cannot produce a stale page.
+  clientsClaim: true,
+  // Disable navigation preload: Next.js uses streaming SSR (Suspense), and
+  // navigation preload can produce duplicate or interleaved response streams
+  // that interfere with chunk delivery.
+  navigationPreload: false,
   runtimeCaching: [
-    // NOTE: No document/navigation handler here intentionally.
+    // CRITICAL — NetworkOnly for all navigation (document) requests.
+    //
+    // All protected pages use `export const dynamic = 'force-dynamic'`, which
+    // means every page response is a fresh server-render. Without this rule,
+    // Serwist's precache router intercepts the navigation fetch on standalone
+    // PWA launches, finds no precache entry for the dynamic route, and falls
+    // through with undefined — producing a blank page. Explicitly routing
+    // navigations to the network ensures SSR pages always load correctly,
+    // regardless of SW lifecycle state or precache contents.
+    {
+      matcher: ({ request }) => request.mode === "navigate",
+      handler: new NetworkOnly(),
+    },
+    // NOTE: No NetworkFirst/CacheFirst document handler below intentionally.
     //
     // All protected pages use `export const dynamic = 'force-dynamic'`, which means
     // every page response is a fresh server-render with no cacheable HTML.
-    // Adding a NetworkFirst (or any) handler for documents breaks Next.js
+    // Adding a NetworkFirst (or any caching) handler for documents breaks Next.js
     // streaming SSR: the SW buffers the full response before caching, so
     // the Suspense streaming chunks (sent after the initial shell) never
     // arrive in the browser — resulting in a blank content area that only

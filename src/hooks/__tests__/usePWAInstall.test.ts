@@ -161,6 +161,51 @@ describe('usePWAInstall', () => {
     });
   });
 
+  it('updates isInstalled reactively when display-mode changes to standalone', async () => {
+    vi.resetModules();
+    // Capture the addEventListener callbacks so we can trigger them manually.
+    const changeListeners: Array<(e: Partial<MediaQueryListEvent>) => void> = [];
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false, // starts as non-standalone
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn((event: string, listener: (e: Partial<MediaQueryListEvent>) => void) => {
+          if (event === 'change') changeListeners.push(listener);
+        }),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    const { usePWAInstall: hook } = await import('@/hooks/usePWAInstall');
+    const { result } = renderHook(() => hook());
+
+    expect(result.current.isInstalled).toBe(false);
+
+    // Simulate display-mode changing to standalone (app added to home screen)
+    await act(async () => {
+      changeListeners.forEach((listener) => listener({ matches: true }));
+    });
+
+    expect(result.current.isInstalled).toBe(true);
+    expect(result.current.canInstall).toBe(false);
+
+    // Restore default matchMedia mock
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  });
+
   it('notifies all mounted hook instances when beforeinstallprompt fires', async () => {
     const { result: result1 } = renderHook(() => usePWAInstall());
     const { result: result2 } = renderHook(() => usePWAInstall());

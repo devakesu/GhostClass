@@ -113,6 +113,36 @@ describe('PWAInstallBanner', () => {
     expect(screen.queryByRole('complementary')).toBeNull();
   });
 
+  it('does not show banner when isInstalled=true even if localStorage is cleared (standalone mode)', async () => {
+    // Simulates: user clears site data while app is already installed in standalone mode.
+    // shouldShowBanner(isInstalled=true) must short-circuit and return false.
+    mockIsInstalled.mockReturnValue(true);
+    mockCanInstall.mockReturnValue(true); // canInstall=true would normally allow the banner
+    setupLocalStorage(null); // localStorage has been cleared
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('hides visible banner when isInstalled transitions to true mid-session', async () => {
+    // Simulates: banner is showing, then the app transitions to standalone
+    // (user adds via browser menu). The banner should hide immediately.
+    vi.resetModules();
+    const { PWAInstallBanner } = await import('@/components/pwa-install-banner');
+    const { rerender } = render(React.createElement(PWAInstallBanner));
+
+    // Banner shows after delay with canInstall=true, isInstalled=false
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+
+    // App transitions to standalone — isInstalled becomes true
+    mockIsInstalled.mockReturnValue(true);
+    rerender(React.createElement(PWAInstallBanner));
+
+    // Banner must now be hidden
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
   it('does not show banner when dismissed recently (within snooze period)', async () => {
     setupLocalStorage(String(Date.now() - 1000)); // 1 second ago
     await importAndRender();
