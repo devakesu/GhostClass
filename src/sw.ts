@@ -20,10 +20,11 @@ const serwist = new Serwist({
   // User-initiated updates are handled via the SKIP_WAITING postMessage flow
   // in sw-register.tsx (the "App updated — tap to refresh" toast).
   skipWaiting: false,
-  // Claim all open clients immediately on SW activation.
-  // Without this, the SW-controlled PWA window opened right after install
-  // is not claimed by the new SW, causing a blank page on first open.
-  clientsClaim: true,
+  // Do NOT claim clients on activation. clientsClaim: true was found to abort
+  // in-flight SSR streaming responses when the SW claims a navigating tab
+  // mid-stream (Next.js force-dynamic + Suspense), producing a blank page on
+  // fresh install. Manual refresh always works because the SW is already active.
+  clientsClaim: false,
   runtimeCaching: [
     // NOTE: No document/navigation handler here intentionally.
     //
