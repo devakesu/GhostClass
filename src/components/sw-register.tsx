@@ -150,7 +150,12 @@ export function ServiceWorkerRegister() {
       }, 3000);
     };
 
-    window.addEventListener("load", handleLoad);
+    if (document.readyState === "complete") {
+      // If the page has already finished loading, run registration logic immediately.
+      handleLoad();
+    } else {
+      window.addEventListener("load", handleLoad);
+    }
 
     // Cleanup function
     return () => {
