@@ -29,9 +29,12 @@ const withSerwist = withSerwistInit({
   // 2. The dev SW flag is NOT set to true
   // This ensures production builds ALWAYS generate the service worker
   disable: process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV !== "true",
-  // Ensure service worker is accessible at the root path for proper scope
-  // This is critical for standalone builds where static files need explicit handling
-  reloadOnOnline: false,
+  // Must be false: caching navigation (document) responses breaks Next.js streaming SSR.
+  // All protected pages use `export const dynamic = 'force-dynamic'`. When this is true,
+  // Serwist wraps the response in a NetworkFirst/StaleWhileRevalidate strategy that buffers
+  // the full response before caching — preventing Suspense streaming chunks from reaching
+  // the browser and causing a blank content area on first open. Navigations are handled by
+  // the explicit NetworkOnly rule in src/sw.ts instead.
   cacheOnNavigation: false,
 });
 
