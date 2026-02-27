@@ -170,8 +170,6 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    // Use real timers for the async interaction so act/waitFor work correctly
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -190,9 +188,6 @@ describe('PWAInstallBanner', () => {
 
     await act(async () => { vi.advanceTimersByTime(2500); });
 
-    // Use real timers for async interaction, then fake timers again to
-    // advance through the window.close() setTimeout(300).
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -203,8 +198,7 @@ describe('PWAInstallBanner', () => {
       expect.objectContaining({ description: 'Open it from your home screen.' }),
     );
 
-    // window.close is scheduled after a 300ms delay — advance fake timers
-    vi.useFakeTimers();
+    // window.close is scheduled as a fake timer — advance to trigger it deterministically.
     await act(async () => { vi.advanceTimersByTime(300); });
     expect(window.close).toHaveBeenCalledTimes(1);
   });
@@ -217,7 +211,6 @@ describe('PWAInstallBanner', () => {
 
     await act(async () => { vi.advanceTimersByTime(2500); });
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -235,7 +228,6 @@ describe('PWAInstallBanner', () => {
 
     await act(async () => { vi.advanceTimersByTime(2500); });
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
     });
@@ -272,7 +264,6 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -292,7 +283,6 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
     });
