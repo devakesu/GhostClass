@@ -1,6 +1,6 @@
 "use client";
 
-import { BUNK_DISCLAIMER, TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY } from "@/app/config/legal";
+import { BUNK_DISCLAIMER, TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY, TERMS_VERSION, LEGAL_EFFECTIVE_DATE } from "@/app/config/legal";
 import ReactMarkdown from "react-markdown";
 
 export default function LegalClient() {
