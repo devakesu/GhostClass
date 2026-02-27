@@ -3,6 +3,12 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+// Side-effect import: ensures the usePWAInstall module-level listener is
+// registered before `beforeinstallprompt` can fire, even on pages where
+// PWAInstallBanner (the component that uses the hook) hasn't mounted yet.
+// This preserves the deferred prompt so the custom install banner works
+// even when Chrome fires the event on a public/login page.
+import "@/hooks/usePWAInstall";
 
 /**
  * Service Worker Registration Component
@@ -47,14 +53,6 @@ export function ServiceWorkerRegister() {
     registrationInProgressRef.current = true;
     let isMounted = true;
 
-    // Suppress Chrome's native install mini-bar/bottom-sheet on ALL pages.
-    // sw-register is mounted in the root layout so this runs everywhere,
-    // including login and other public pages where usePWAInstall is not imported.
-    const suppressNativePrompt = (e: Event) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeinstallprompt", suppressNativePrompt);
-
     // Delay SW registration 3 seconds after window.load to ensure all SSR
     // streaming chunks (Next.js Suspense) have fully flushed to the browser
     // before the SW installs and potentially claims the tab mid-stream.
@@ -95,8 +93,11 @@ export function ServiceWorkerRegister() {
 
                 // Notify the user that an update is ready.
                 // The action sends a SKIP_WAITING message to the waiting SW,
-                // which triggers activation; controllerchange fires when the
-                // new SW takes control, at which point we reload for a clean state.
+                // which triggers activation. With clientsClaim: false the
+                // controllerchange event may not fire (the new SW activates but
+                // does not claim existing tabs), so we also watch the waiting
+                // worker's statechange and reload once it reaches 'activated'
+                // as a guaranteed fallback.
                 let refreshing = false;
                 navigator.serviceWorker.addEventListener(
                   "controllerchange",
@@ -116,7 +117,23 @@ export function ServiceWorkerRegister() {
                     label: "Refresh",
                     onClick: () => {
                       if (registration.waiting) {
-                        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+                        const waitingWorker = registration.waiting;
+                        // Fallback: with clientsClaim: false the controllerchange
+                        // event won't fire after skipWaiting, so reload explicitly
+                        // once the new SW reaches 'activated'.
+                        waitingWorker.addEventListener(
+                          "statechange",
+                          function onActivated() {
+                            if (waitingWorker.state === "activated") {
+                              waitingWorker.removeEventListener("statechange", onActivated);
+                              if (!refreshing) {
+                                refreshing = true;
+                                window.location.reload();
+                              }
+                            }
+                          }
+                        );
+                        waitingWorker.postMessage({ type: "SKIP_WAITING" });
                       } else {
                         // Waiting worker already activated; reload directly.
                         window.location.reload();
@@ -162,7 +179,6 @@ export function ServiceWorkerRegister() {
       isMounted = false;
       registrationInProgressRef.current = false;
       window.removeEventListener("load", handleLoad);
-      window.removeEventListener("beforeinstallprompt", suppressNativePrompt);
       if (registrationTimeoutId) {
         clearTimeout(registrationTimeoutId);
       }
