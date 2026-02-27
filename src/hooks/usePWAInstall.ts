@@ -18,14 +18,16 @@ export interface UsePWAInstallReturn {
 // hook mounts after the browser has already fired `beforeinstallprompt`.
 // This runs once when the module is first imported (client-side only).
 let _earlyPrompt: BeforeInstallPromptEvent | null = null;
-let _earlyPromptListeners: Array<(e: BeforeInstallPromptEvent) => void> = [];
+// Persistent subscriber set: notified on every `beforeinstallprompt` firing
+// (including re-emissions after a previous prompt was consumed), and cleaned
+// up on hook unmount to avoid stale references.
+const _promptSubscribers = new Set<(e: BeforeInstallPromptEvent) => void>();
 
 if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e: Event) => {
     e.preventDefault();
     _earlyPrompt = e as BeforeInstallPromptEvent;
-    _earlyPromptListeners.forEach((fn) => fn(_earlyPrompt!));
-    _earlyPromptListeners = [];
+    _promptSubscribers.forEach((fn) => fn(_earlyPrompt!));
   });
 }
 
@@ -51,12 +53,10 @@ export function usePWAInstall(): UsePWAInstallReturn {
       setDeferredPrompt(e);
     };
 
-    if (_earlyPrompt) {
-      // Already captured before mount — nothing more to do, state is already seeded.
-    } else {
-      // Register for a future fire.
-      _earlyPromptListeners.push(handleBeforeInstallPrompt);
-    }
+    // Always register as a persistent subscriber so we receive any future
+    // firings too (e.g. after a previous prompt was consumed and the browser
+    // re-emits the event).
+    _promptSubscribers.add(handleBeforeInstallPrompt);
 
     const handleAppInstalled = () => {
       setIsInstalled(true);
@@ -67,7 +67,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
     window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
-      _earlyPromptListeners = _earlyPromptListeners.filter((fn) => fn !== handleBeforeInstallPrompt);
+      _promptSubscribers.delete(handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
