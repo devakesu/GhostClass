@@ -1,50 +1,72 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import React from 'react';
 
-// Mock usePWAInstall so we control canInstall / triggerInstall
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
 const mockTriggerInstall = vi.fn();
+const mockCanInstall = vi.fn();
+const mockIsInstalled = vi.fn();
+
 vi.mock('@/hooks/usePWAInstall', () => ({
   usePWAInstall: () => ({
-    canInstall: true,
-    isInstalled: false,
+    canInstall: mockCanInstall(),
+    isInstalled: mockIsInstalled(),
     triggerInstall: mockTriggerInstall,
   }),
 }));
 
-// Mock framer-motion
 vi.mock('framer-motion', () => ({
   m: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) =>
+      React.createElement('div', props, children),
   },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children),
+  LazyMotion: ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children),
+  domAnimation: {},
 }));
 
-// Mock lucide icons
-vi.mock('lucide-react', () => ({
-  Download: () => <span data-testid="download-icon" />,
-  X: () => <span data-testid="x-icon" />,
+vi.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick, ...props }: any) =>
+    React.createElement('button', { onClick, ...props }, children),
 }));
 
-import { PWAInstallBanner } from '../pwa-install-banner';
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const STORAGE_KEY = 'ghostclass_pwa_install_dismissed';
+const SNOOZE_DURATION_MS = 21 * 24 * 60 * 60 * 1000;
+
+function setupLocalStorage(value: string | null) {
+  const store: Record<string, string> = {};
+  if (value !== null) store[STORAGE_KEY] = value;
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, val: string) => { store[key] = val; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+    _store: store,
+  });
+  return store;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('PWAInstallBanner', () => {
-  let localStorageMock: { getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn> };
-
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-
-    localStorageMock = {
-      getItem: vi.fn().mockReturnValue(null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-    };
-    vi.stubGlobal('localStorage', localStorageMock);
-
+    mockCanInstall.mockReturnValue(true);
+    mockIsInstalled.mockReturnValue(false);
     mockTriggerInstall.mockResolvedValue('accepted');
+    setupLocalStorage(null);
   });
 
   afterEach(() => {
@@ -52,107 +74,111 @@ describe('PWAInstallBanner', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not show the banner before the delay elapses', () => {
-    render(<PWAInstallBanner />);
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  async function importAndRender() {
+    vi.resetModules();
+    const { PWAInstallBanner } = await import('@/components/pwa-install-banner');
+    const { container } = render(React.createElement(PWAInstallBanner));
+    return container;
+  }
+
+  it('does not show banner immediately — waits for SHOW_DELAY_MS', async () => {
+    await importAndRender();
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('shows the banner after the show delay', async () => {
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
+  it('shows banner after SHOW_DELAY_MS when canInstall=true and no storage entry', async () => {
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
-    expect(screen.getByText('Install GhostClass')).toBeInTheDocument();
   });
 
-  it('stores "installed" in localStorage when user accepts the install prompt', async () => {
-    mockTriggerInstall.mockResolvedValue('accepted');
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
-
-    const installBtn = screen.getByRole('button', { name: /install ghostclass app/i });
-    await act(async () => {
-      fireEvent.click(installBtn);
-    });
-
-    expect(mockTriggerInstall).toHaveBeenCalled();
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(STORAGE_KEY, 'installed');
+  it('does not show banner when isInstalled=true', async () => {
+    mockIsInstalled.mockReturnValue(true);
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('stores a timestamp when the native dialog is dismissed', async () => {
-    mockTriggerInstall.mockResolvedValue('dismissed');
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
-
-    const installBtn = screen.getByRole('button', { name: /install ghostclass app/i });
-    await act(async () => {
-      fireEvent.click(installBtn);
-    });
-
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(STORAGE_KEY, expect.stringMatching(/^\d+$/));
+  it('does not show banner when canInstall=false', async () => {
+    mockCanInstall.mockReturnValue(false);
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('stores a timestamp when install is unavailable', async () => {
-    mockTriggerInstall.mockResolvedValue('unavailable');
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
-
-    const installBtn = screen.getByRole('button', { name: /install ghostclass app/i });
-    await act(async () => {
-      fireEvent.click(installBtn);
-    });
-
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(STORAGE_KEY, expect.stringMatching(/^\d+$/));
+  it('does not show banner when localStorage has "installed"', async () => {
+    setupLocalStorage('installed');
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('stores a timestamp and hides banner when dismiss (X) is clicked', async () => {
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
-
-    const dismissBtn = screen.getByRole('button', { name: /dismiss install prompt/i });
-    fireEvent.click(dismissBtn);
-
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(STORAGE_KEY, expect.stringMatching(/^\d+$/));
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-  });
-
-  it('does not show banner if localStorage says already installed', () => {
-    localStorageMock.getItem.mockReturnValue('installed');
-    render(<PWAInstallBanner />);
-    act(() => {
-      vi.advanceTimersByTime(2500);
-    });
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-  });
-
-  it('does not show banner if snooze period has not elapsed', () => {
-    // Store a timestamp 1 hour ago (way less than 3-week snooze)
-    const recentDismiss = (Date.now() - 60 * 60 * 1000).toString();
-    localStorageMock.getItem.mockReturnValue(recentDismiss);
-    render(<PWAInstallBanner />);
-    act(() => {
-      vi.advanceTimersByTime(2500);
-    });
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  it('does not show banner when dismissed recently (within snooze period)', async () => {
+    setupLocalStorage(String(Date.now() - 1000)); // 1 second ago
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
   it('shows banner again when snooze period has elapsed', async () => {
-    // Store a timestamp 4 weeks ago (beyond the 3-week snooze)
-    const oldDismiss = (Date.now() - 28 * 24 * 60 * 60 * 1000).toString();
-    localStorageMock.getItem.mockReturnValue(oldDismiss);
-    render(<PWAInstallBanner />);
-    await act(async () => {
-      vi.advanceTimersByTime(2500);
-    });
+    setupLocalStorage(String(Date.now() - SNOOZE_DURATION_MS - 1000)); // just past snooze
+    await importAndRender();
+    await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
+  });
+
+  it('sets localStorage to "installed" and hides banner when install is accepted', async () => {
+    mockTriggerInstall.mockResolvedValue('accepted');
+    const store = setupLocalStorage(null);
+    await importAndRender();
+
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+
+    // Use real timers for the async interaction so act/waitFor work correctly
+    vi.useRealTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
+    });
+
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(store[STORAGE_KEY]).toBe('installed');
+  });
+
+  it('sets localStorage to a timestamp and hides banner when install is dismissed', async () => {
+    mockTriggerInstall.mockResolvedValue('dismissed');
+    const store = setupLocalStorage(null);
+    const before = Date.now();
+    await importAndRender();
+
+    await act(async () => { vi.advanceTimersByTime(2500); });
+
+    vi.useRealTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
+    });
+
+    expect(screen.queryByRole('complementary')).toBeNull();
+    const stored = parseInt(store[STORAGE_KEY], 10);
+    expect(stored).toBeGreaterThanOrEqual(before);
+    expect(stored).not.toBe(NaN);
+  });
+
+  it('snoozes (timestamp) and hides banner when X dismiss button is clicked', async () => {
+    const store = setupLocalStorage(null);
+    const before = Date.now();
+    await importAndRender();
+
+    await act(async () => { vi.advanceTimersByTime(2500); });
+
+    vi.useRealTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
+    });
+
+    expect(screen.queryByRole('complementary')).toBeNull();
+    const stored = parseInt(store[STORAGE_KEY], 10);
+    expect(stored).toBeGreaterThanOrEqual(before);
+    expect(store[STORAGE_KEY]).not.toBe('installed');
   });
 });

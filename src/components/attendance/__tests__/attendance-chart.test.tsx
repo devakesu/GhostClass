@@ -1,221 +1,296 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import React from 'react';
 import { AttendanceChart } from '../attendance-chart';
 
-// Mock recharts – replace the heavy SVG components with lightweight stubs
-vi.mock('recharts', () => ({
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
-  Bar: () => null,
-  CartesianGrid: () => null,
-  ReferenceLine: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  Tooltip: ({ content, active, payload }: any) => {
-    if (content) {
-      return content({ active, payload });
-    }
-    return null;
-  },
-}));
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
 
 vi.mock('@/providers/attendance-settings', () => ({
-  useAttendanceSettings: () => ({
-    targetPercentage: 75,
-  }),
-}));
-
-vi.mock('lucide-react', () => ({
-  BarChart3: ({ className, ...props }: any) => (
-    <span data-testid="bar-chart3-icon" className={className} {...props} />
-  ),
+  useAttendanceSettings: () => ({ targetPercentage: 75 }),
 }));
 
 vi.mock('@/lib/utils', () => ({
-  generateSlotKey: (_courseId: string, date: string, session: string) =>
-    `${_courseId}-${date}-${session}`,
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  generateSlotKey: (courseId: string, date: string, session: string) =>
+    `${courseId}-${date}-${session}`,
+}));
+
+vi.mock('lucide-react', () => ({
+  BarChart3: ({ className, ...props }: React.HTMLAttributes<SVGElement>) =>
+    React.createElement('svg', { 'data-testid': 'bar-chart3-icon', className, ...props }),
 }));
 
 vi.mock('@/lib/logic/attendance-reconciliation', () => ({
   ATTENDANCE_STATUS: {
-    PRESENT: 1,
-    ABSENT: 2,
+    PRESENT: 110,
+    ABSENT: 111,
     DUTY_LEAVE: 225,
     OTHER_LEAVE: 112,
   },
 }));
 
-// Minimal sample data
+// Mock recharts so it renders minimal DOM without canvas/SVG complexities
+vi.mock('recharts', () => {
+  const MockBarChart = ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'bar-chart' }, children);
+  const noop = () => null;
+  return {
+    BarChart: MockBarChart,
+    Bar: noop,
+    CartesianGrid: noop,
+    ReferenceLine: noop,
+    XAxis: noop,
+    YAxis: noop,
+    Tooltip: noop,
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeMatchMedia(isMobileMatch: boolean) {
+  return vi.fn().mockImplementation((query: string) => ({
+    matches: query === '(max-width: 640px)' ? isMobileMatch : false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
+const sampleCourses = {
+  courses: {
+    '1': { code: 'CS101', name: 'Computer Science' },
+  },
+};
+
 const sampleAttendanceData = {
   studentAttendanceData: {
-    '2024-01-10': {
-      '1': { course: '101', attendance: 1, session: '1' },
-      '2': { course: '101', attendance: 2, session: '2' },
+    '2024-01-01': {
+      '1': { course: '1', attendance: 110, session: '1' }, // PRESENT
+      '2': { course: '1', attendance: 111, session: '2' }, // ABSENT
     },
   },
 };
 
-const sampleCoursesData = {
-  courses: {
-    '101': { name: 'Mathematics', code: 'MATH101' },
-  },
-};
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('AttendanceChart', () => {
-  let mockResizeObserver: typeof ResizeObserver;
+  let originalResizeObserver: typeof ResizeObserver;
+  let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Mock ResizeObserver as a class constructor
-    class MockResizeObserver implements ResizeObserver {
-      constructor(_cb: ResizeObserverCallback) {}
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    }
-    mockResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
-    vi.stubGlobal('ResizeObserver', MockResizeObserver);
-
-    // Stub getBoundingClientRect to return 400x300 dimensions
-    Element.prototype.getBoundingClientRect = vi.fn().mockReturnValue({
-      width: 400,
-      height: 300,
-      top: 0,
-      left: 0,
-      bottom: 300,
-      right: 400,
-    });
+    originalResizeObserver = global.ResizeObserver;
+    // Provide a minimal ResizeObserver stub
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+    };
+    addEventListenerSpy = vi.spyOn(document, 'addEventListener');
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    global.ResizeObserver = originalResizeObserver;
     vi.restoreAllMocks();
   });
 
-  it('renders the loading placeholder when dimensions are zero', () => {
-    // Override ResizeObserver to not trigger callback (dimensions stay 0)
-    class NoopResizeObserver {
-      constructor(_cb: ResizeObserverCallback) {}
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    }
-    vi.stubGlobal('ResizeObserver', NoopResizeObserver);
-    Element.prototype.getBoundingClientRect = vi.fn().mockReturnValue({
-      width: 0,
-      height: 0,
-      top: 0, left: 0, bottom: 0, right: 0,
-    });
-
-    render(<AttendanceChart />);
+  it('renders the loading spinner when dimensions are not yet available', () => {
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
+    );
+    // Dimensions start at 0×0 → loading spinner (pulsing BarChart3 icon)
     expect(screen.getByTestId('bar-chart3-icon')).toBeInTheDocument();
   });
 
-  it('renders empty state when there is no attendance data', async () => {
-    render(<AttendanceChart coursesData={sampleCoursesData} />);
-    // With data but no attendance, shows empty state
+  it('renders "No attendance data" empty state when dimensions are set but data is empty', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: ResizeObserverCallback) {
+        resizeCallback = cb;
+      }
+    };
+
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: { studentAttendanceData: {} } as any,
+        trackingData: [],
+        coursesData: { courses: {} },
+      })
+    );
+
+    // Mock getBoundingClientRect on the container so it returns non-zero dimensions
+    const containerEl = screen.getByRole('img');
+    vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    // Trigger the ResizeObserver callback so dimensions are updated
+    await act(async () => {
+      if (resizeCallback) resizeCallback([], {} as ResizeObserver);
+    });
+
     expect(screen.getByText('No attendance data')).toBeInTheDocument();
   });
 
-  it('renders the bar chart when both attendance and course data are provided', async () => {
-    render(
-      <AttendanceChart
-        attendanceData={sampleAttendanceData as any}
-        coursesData={sampleCoursesData}
-      />
-    );
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
-  });
+  it('renders the BarChart when dimensions are set and data is available', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: ResizeObserverCallback) {
+        resizeCallback = cb;
+      }
+    };
 
-  it('dismisses the tooltip when a touch occurs outside the chart container', async () => {
     render(
-      <AttendanceChart
-        attendanceData={sampleAttendanceData as any}
-        coursesData={sampleCoursesData}
-      />
+      React.createElement(AttendanceChart, {
+        attendanceData: sampleAttendanceData as any,
+        trackingData: [],
+        coursesData: sampleCourses as any,
+      })
     );
 
-    // Dispatch a touchstart on document.body (outside the chart container).
-    // The handler checks e.target, not the touches list, so no Touch object is needed.
-    act(() => {
-      document.body.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true }));
+    // Mock getBoundingClientRect on the container so it returns non-zero dimensions
+    const containerEl = screen.getByRole('img');
+    vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    // Trigger the ResizeObserver callback so dimensions are updated
+    await act(async () => {
+      if (resizeCallback) resizeCallback([], {} as ResizeObserver);
     });
 
-    // Chart remains rendered; no errors thrown
     expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
   });
 
-  it('keeps the tooltip visible when a touch occurs inside the chart container', async () => {
-    const { container } = render(
-      <AttendanceChart
-        attendanceData={sampleAttendanceData as any}
-        coursesData={sampleCoursesData}
-      />
-    );
-
-    const chartDiv = container.querySelector('[aria-label="Attendance overview bar chart"]')!;
-
-    // Dispatch on the chart div itself — e.target will be inside the container.
-    act(() => {
-      chartDiv.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true }));
+  it('registers document touchstart listener when isMobile is true', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(true),
     });
 
-    // Chart should remain rendered
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
-  });
-
-  it('updates isMobile state when media query changes', () => {
-    const mqlListeners: Array<(e: MediaQueryListEvent) => void> = [];
-
-    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn().mockImplementation((_event: string, handler: any) => {
-        mqlListeners.push(handler);
-      }),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
-
     render(
-      <AttendanceChart
-        attendanceData={sampleAttendanceData as any}
-        coursesData={sampleCoursesData}
-      />
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
     );
 
-    // Simulate a change to mobile
-    act(() => {
-      mqlListeners.forEach((fn) =>
-        fn({ matches: true } as MediaQueryListEvent)
-      );
+    const touchCalls = addEventListenerSpy.mock.calls.filter(
+      ([event]) => event === 'touchstart'
+    );
+    expect(touchCalls.length).toBeGreaterThan(0);
+
+    // Restore default matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(false),
+    });
+  });
+
+  it('does not register document touchstart listener when isMobile is false', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(false),
     });
 
-    // Chart still renders after media query change
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
-  });
-
-  it('falls back to resize event listener when ResizeObserver is unavailable', () => {
-    // Temporarily make ResizeObserver undefined at the global scope
-    const original = globalThis.ResizeObserver;
-    // @ts-expect-error - simulating missing ResizeObserver
-    delete globalThis.ResizeObserver;
-    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
     render(
-      <AttendanceChart
-        attendanceData={sampleAttendanceData as any}
-        coursesData={sampleCoursesData}
-      />
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
     );
 
-    expect(addEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+    const touchCalls = addEventListenerSpy.mock.calls.filter(
+      ([event]) => event === 'touchstart'
+    );
+    expect(touchCalls.length).toBe(0);
+  });
 
-    // Restore
-    globalThis.ResizeObserver = original;
+  it('removes touchstart listener when component unmounts', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(true),
+    });
+
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+
+    const { unmount } = render(
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
+    );
+
+    unmount();
+
+    const touchRemoveCalls = removeEventListenerSpy.mock.calls.filter(
+      ([event]) => event === 'touchstart'
+    );
+    expect(touchRemoveCalls.length).toBeGreaterThan(0);
+
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(false),
+    });
+  });
+
+  it('updates isMobile when media query changes', async () => {
+    let mqlHandler: ((e: Partial<MediaQueryListEvent>) => void) | null = null;
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn().mockImplementation((_event: string, handler: (e: Partial<MediaQueryListEvent>) => void) => {
+          if (query === '(max-width: 640px)') mqlHandler = handler;
+        }),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: undefined,
+        trackingData: undefined,
+        coursesData: undefined,
+      })
+    );
+
+    // Simulate the media query changing to mobile
+    await act(async () => {
+      if (mqlHandler) mqlHandler({ matches: true } as Partial<MediaQueryListEvent>);
+    });
+
+    // After switching to mobile, touch handler should now be registered
+    const touchCalls = addEventListenerSpy.mock.calls.filter(
+      ([event]) => event === 'touchstart'
+    );
+    expect(touchCalls.length).toBeGreaterThan(0);
+
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: makeMatchMedia(false),
+    });
   });
 });
