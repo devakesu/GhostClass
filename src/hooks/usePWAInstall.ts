@@ -19,8 +19,12 @@ export function usePWAInstall(): UsePWAInstallReturn {
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if already running in standalone (installed) mode
-    if (window.matchMedia("(display-mode: standalone)").matches) {
+    // Check if already running in standalone (installed) mode.
+    // Chrome/Edge use the display-mode media query; iOS Safari uses navigator.standalone.
+    if (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    ) {
       setIsInstalled(true);
     }
 

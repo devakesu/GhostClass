@@ -11,12 +11,16 @@ const SNOOZE_DURATION_MS = 21 * 24 * 60 * 60 * 1000; // 3 weeks
 const SHOW_DELAY_MS = 2500;
 
 function shouldShowBanner(): boolean {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return true;
-  if (stored === "installed") return false;
-  const dismissedAt = parseInt(stored, 10);
-  if (isNaN(dismissedAt)) return true;
-  return Date.now() - dismissedAt >= SNOOZE_DURATION_MS;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return true;
+    if (stored === "installed") return false;
+    const dismissedAt = parseInt(stored, 10);
+    if (isNaN(dismissedAt)) return true;
+    return Date.now() - dismissedAt >= SNOOZE_DURATION_MS;
+  } catch {
+    return false;
+  }
 }
 
 export function PWAInstallBanner() {
@@ -36,12 +40,20 @@ export function PWAInstallBanner() {
 
   const handleInstall = async () => {
     await triggerInstall();
-    localStorage.setItem(STORAGE_KEY, "installed");
+    try {
+      localStorage.setItem(STORAGE_KEY, "installed");
+    } catch {
+      // Ignore storage errors (e.g., private browsing, storage disabled)
+    }
     setVisible(false);
   };
 
   const handleDismiss = () => {
-    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    try {
+      localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    } catch {
+      // Ignore storage errors (e.g., private browsing, storage disabled)
+    }
     setVisible(false);
   };
 
