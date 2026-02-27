@@ -125,6 +125,7 @@ const CustomTargetLabel = (props: LabelProps) => {
 export function AttendanceChart({ attendanceData, trackingData, coursesData }: AttendanceChartProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltipHidden, setTooltipHidden] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 640px)").matches;
@@ -183,6 +184,30 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, []);
+
+  // On mobile, touching outside the chart should dismiss the tooltip.
+  // Recharts has no built-in outside-touch-dismiss behavior: the last
+  // hovered bar stays "active" until a mouseleave fires, which never
+  // happens on touch devices. We gate the Tooltip's `active` prop:
+  // false → always hidden; undefined → Recharts manages internally.
+  // The effect is gated on `isMobile` so that touch-enabled desktops
+  // (hybrid devices) are not affected and mouse hover continues to work.
+  useEffect(() => {
+    if (typeof window === "undefined" || !isMobile) return;
+
+    const handleDocumentTouch = (e: TouchEvent) => {
+      if (containerRef.current?.contains(e.target as Node)) {
+        // Touch is inside the chart — let Recharts handle it normally.
+        setTooltipHidden(false);
+      } else {
+        // Touch is outside the chart — force dismiss the tooltip.
+        setTooltipHidden(true);
+      }
+    };
+
+    document.addEventListener("touchstart", handleDocumentTouch, { passive: true });
+    return () => document.removeEventListener("touchstart", handleDocumentTouch);
+  }, [isMobile]);
 
   const data = useMemo(() => {
     if (!coursesData?.courses || !attendanceData?.studentAttendanceData) {
@@ -424,6 +449,7 @@ return (
           />
           <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "#888" }} axisLine={false} tickLine={false} />
           <Tooltip
+            active={isMobile && tooltipHidden ? false : undefined}
             contentStyle={{ backgroundColor: "rgba(20, 20, 20, 0.95)", border: "1px solid #333", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)" }}
             itemStyle={{ color: "#ffffff", padding: 0 }} labelStyle={{ color: "#a1a1aa", marginBottom: '0.5rem' }} cursor={{ fill: "rgba(255, 255, 255, 0.05)" }} formatter={() => null} 
             content={({ active, payload }) => {
