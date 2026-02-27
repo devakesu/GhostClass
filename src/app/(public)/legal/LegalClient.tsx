@@ -1,6 +1,6 @@
 "use client";
 
-import { BUNK_DISCLAIMER, TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY } from "@/app/config/legal";
+import { BUNK_DISCLAIMER, TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY, TERMS_VERSION, LEGAL_EFFECTIVE_DATE } from "@/app/config/legal";
 import ReactMarkdown from "react-markdown";
 
 export default function LegalClient() {
@@ -13,6 +13,9 @@ export default function LegalClient() {
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight">Legal Policies</h1>
             <p className="text-zinc-400 text-sm mt-1">Transparency is our only policy.</p>
+            <p className="text-zinc-500 text-xs mt-1">
+              Terms v{TERMS_VERSION}&nbsp;&nbsp;·&nbsp;&nbsp;Effective {LEGAL_EFFECTIVE_DATE}
+            </p>
           </div>
         </div>
 
