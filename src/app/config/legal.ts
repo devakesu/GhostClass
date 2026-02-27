@@ -1,5 +1,5 @@
 export const TERMS_VERSION = "2.2";
-const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-01-29";
+export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-01-29";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
 // ------------------------------------------------------------------
