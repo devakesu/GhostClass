@@ -79,7 +79,8 @@ describe('usePWAInstall', () => {
 
   it('triggerInstall returns "unavailable" when no prompt is available', async () => {
     const { result } = renderHook(() => usePWAInstall());
-    const outcome = await act(async () => result.current.triggerInstall());
+    let outcome!: 'accepted' | 'dismissed' | 'unavailable';
+    await act(async () => { outcome = await result.current.triggerInstall(); });
     expect(outcome).toBe('unavailable');
   });
 
@@ -90,7 +91,8 @@ describe('usePWAInstall', () => {
       window.dispatchEvent(makeFakePrompt('accepted'));
     });
 
-    const outcome = await act(async () => result.current.triggerInstall());
+    let outcome!: 'accepted' | 'dismissed' | 'unavailable';
+    await act(async () => { outcome = await result.current.triggerInstall(); });
     expect(outcome).toBe('accepted');
     // After install, canInstall should be false (prompt consumed)
     expect(result.current.canInstall).toBe(false);
@@ -103,7 +105,8 @@ describe('usePWAInstall', () => {
       window.dispatchEvent(makeFakePrompt('dismissed'));
     });
 
-    const outcome = await act(async () => result.current.triggerInstall());
+    let outcome!: 'accepted' | 'dismissed' | 'unavailable';
+    await act(async () => { outcome = await result.current.triggerInstall(); });
     expect(outcome).toBe('dismissed');
   });
 

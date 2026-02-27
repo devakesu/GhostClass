@@ -112,7 +112,17 @@ describe('AttendanceChart', () => {
     expect(screen.getByTestId('bar-chart3-icon')).toBeInTheDocument();
   });
 
-  it('renders "No attendance data" message when there is no course data', () => {
+  it('renders "No attendance data" empty state when dimensions are set but data is empty', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: ResizeObserverCallback) {
+        resizeCallback = cb;
+      }
+    };
+
     render(
       React.createElement(AttendanceChart, {
         attendanceData: { studentAttendanceData: {} } as any,
@@ -120,8 +130,19 @@ describe('AttendanceChart', () => {
         coursesData: { courses: {} },
       })
     );
-    // Initially shows spinner (0 dimensions), which is acceptable
-    expect(screen.getByTestId('bar-chart3-icon')).toBeInTheDocument();
+
+    // Mock getBoundingClientRect on the container so it returns non-zero dimensions
+    const containerEl = screen.getByRole('img');
+    vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    // Trigger the ResizeObserver callback so dimensions are updated
+    await act(async () => {
+      if (resizeCallback) resizeCallback([], {} as ResizeObserver);
+    });
+
+    expect(screen.getByText('No attendance data')).toBeInTheDocument();
   });
 
   it('renders the BarChart when dimensions are set and data is available', async () => {
