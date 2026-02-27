@@ -2,7 +2,7 @@
 
 import { Serwist } from "serwist";
 // Strategy classes for different caching behaviors
-import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from "serwist";
+import { CacheFirst, StaleWhileRevalidate } from "serwist";
 // Plugins used specifically for the image runtime caching strategy
 import { CacheableResponsePlugin, ExpirationPlugin } from "serwist";
 
@@ -15,27 +15,27 @@ declare const self: ServiceWorkerGlobalScope & {
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  // Wait for all clients to close before activating new service worker
-  // This prevents breaking changes from affecting active users
+  // Wait for all clients to close before activating new service worker.
+  // This prevents breaking changes from affecting active users mid-session.
+  // User-initiated updates are handled via the SKIP_WAITING postMessage flow
+  // in sw-register.tsx (the "App updated — tap to refresh" toast).
   skipWaiting: false,
-  // Don't take control immediately to allow graceful updates
-  clientsClaim: false,
+  // Claim all open clients immediately on SW activation.
+  // Without this, the SW-controlled PWA window opened right after install
+  // is not claimed by the new SW, causing a blank page on first open.
+  clientsClaim: true,
   runtimeCaching: [
-    {
-      matcher: ({ request }) => request.destination === "document",
-      handler: new NetworkFirst({
-        cacheName: "pages",
-        networkTimeoutSeconds: 15,
-        plugins: [
-          new ExpirationPlugin({
-            maxEntries: 50,
-            // Expire cached pages after 7 days so offline users are never served
-            // content that is more than a week stale.
-            maxAgeSeconds: 60 * 60 * 24 * 7,
-          }),
-        ],
-      }),
-    },
+    // NOTE: No document/navigation handler here intentionally.
+    //
+    // All protected pages use `export const dynamic = 'force-dynamic'`, which means
+    // every page response is a fresh server-render with no cacheable HTML.
+    // Adding a NetworkFirst (or any) handler for documents breaks Next.js
+    // streaming SSR: the SW buffers the full response before caching, so
+    // the Suspense streaming chunks (sent after the initial shell) never
+    // arrive in the browser — resulting in a blank content area that only
+    // resolves on manual refresh.
+    //
+    // Navigations go straight to the network; only static assets are cached.
     {
       matcher: ({ request }) =>
         request.destination === "style" ||
@@ -81,7 +81,14 @@ serwist.addEventListeners();
 // across sessions on shared devices.
 self.addEventListener("activate", (event) => {
   (event as ExtendableEvent).waitUntil(
-    caches.delete("attendance-data")
+    Promise.all([
+      // Purge deprecated "attendance-data" runtime cache (PII leak prevention)
+      caches.delete("attendance-data"),
+      // Purge the "pages" cache — document caching was removed because it
+      // broke Next.js streaming SSR. Any previously cached page HTML is now
+      // stale and should be cleared so users don't get stuck.
+      caches.delete("pages"),
+    ])
   );
 });
 
