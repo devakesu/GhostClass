@@ -34,6 +34,20 @@ import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 // --- Helper Functions ---
 
+const STATUS_ORDER = ["Present", "Duty Leave", "Absent"] as const;
+type StatusKey = (typeof STATUS_ORDER)[number];
+const STATUS_STYLES: Record<StatusKey, { dot: string; text: string; border: string }> = {
+  Present:     { dot: "bg-green-500",  text: "text-green-400",  border: "border-green-500/20" },
+  "Duty Leave": { dot: "bg-orange-500", text: "text-orange-400", border: "border-orange-500/20" },
+  Absent:      { dot: "bg-red-500",    text: "text-red-400",    border: "border-red-500/20" },
+};
+
+function getStatusKey(attendanceCode: number | undefined): StatusKey {
+  if (attendanceCode === 225) return "Duty Leave";
+  if (attendanceCode === 111) return "Absent";
+  return "Present";
+}
+
 const normalizeDate = (dateStr: string): string => {
   if (!dateStr) return "";
   const raw = String(dateStr).trim();
@@ -291,6 +305,13 @@ export default function TrackingClient() {
                     const isExpanded = expandedCourses.has(courseName);
                     const visibleItems = isExpanded ? items : items.slice(0, recordsPerCourseInitial);
                     const hasMore = items.length > recordsPerCourseInitial;
+
+                    // Group visible items by final/corrected status
+                    const statusGroups: Record<StatusKey, typeof items> = { Present: [], "Duty Leave": [], Absent: [] };
+                    visibleItems.forEach(item => {
+                      statusGroups[getStatusKey(item.attendance)].push(item);
+                    });
+                    const activeStatusLabels = STATUS_ORDER.filter(s => statusGroups[s].length > 0);
                     
                     return (
                       <div key={courseName} className="flex flex-col gap-3">
@@ -300,79 +321,97 @@ export default function TrackingClient() {
                           <Badge variant="outline" className="ml-auto text-xs">{items.length}</Badge>
                         </div>
 
-                        <div className="flex flex-col gap-3">
-                          {visibleItems.map((trackingItem) => {
-                            const trackingId = `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
-                            
-                            // Status Logic
-                            const isCorrection = trackingItem.status === 'correction';
-                            const attCode = Number(trackingItem.attendance);
-                            let userLabel = "Present", userColor = "green";
-                            if (attCode === 225) { userLabel = "Duty Leave"; userColor = "orange"; }
-                            else if (attCode === 111) { userLabel = "Absent"; userColor = "red"; }
-
-                            let statusText = userLabel;
-                            if (isCorrection) {
-                                const itemKey = generateSlotKey(trackingItem.course, trackingItem.date, trackingItem.session);
-                                const officialSession = officialSessionsMap.get(itemKey);
-                                let officialLabel = "Absent"; 
-                                if (officialSession) {
-                                    const offCode = Number(officialSession.attendance);
-                                    if (offCode === 110) officialLabel = "Present";
-                                    else if (offCode === 111) officialLabel = "Absent";
-                                    else if (offCode === 225) officialLabel = "Duty Leave";
-                                }
-                                statusText = `${officialLabel} → ${userLabel}`;
-                            }
-
-                            const typeLabel = isCorrection ? "Correction" : "Extra";
-                            const typeColorClass = isCorrection 
-                                ? "bg-purple-500/10 text-purple-400 border-purple-500/20" 
-                                : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
-
-                            let statusBadgeClass = "bg-green-500/20 text-green-400";
-                            let cardBgClass = "bg-green-500/5 border-green-500/20";
-
-                            if (isCorrection) {
-                                if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; }
-                                else if (userColor === "red") { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
-                                else { cardBgClass = "bg-green-500/5 border-green-500/20"; statusBadgeClass = "bg-green-500/20 text-green-400"; }
-                            } else {
-                                if (userColor === "green") { statusBadgeClass = "bg-green-500/20 text-green-400"; cardBgClass = "bg-green-500/5 border-green-500/20"; } 
-                                else if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; } 
-                                else { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
-                            }
-
+                        <div className="flex flex-col gap-5">
+                          {activeStatusLabels.map(statusLabel => {
+                            const groupItems = statusGroups[statusLabel];
+                            const { dot, text, border } = STATUS_STYLES[statusLabel];
                             return (
-                              <m.div 
-                                key={trackingId} 
-                                variants={cardVariants}
-                                className={`p-4 text-left rounded-xl border hover:bg-opacity-20 transition-all w-full ${cardBgClass}`}
-                              >
-                                <div className="flex justify-between items-start mb-2 gap-4">
-                                  <div className="font-medium text-sm text-foreground/70">
-                                    Session: <span className="text-foreground capitalize">{formatSessionName(trackingItem.session)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className={`text-[10px] px-1.5 h-5 ${typeColorClass}`}>{typeLabel}</Badge>
-                                    <Badge className={statusBadgeClass}>
-                                      {statusText}
-                                    </Badge>
-                                  </div>
+                              <div key={statusLabel} className="flex flex-col gap-2">
+                                {/* Status sub-header */}
+                                <div className={`flex items-center gap-2 px-2 py-1 rounded-md border ${border} bg-background/40`}>
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                                  <span className={`text-xs font-semibold uppercase tracking-wide ${text}`}>{statusLabel}</span>
+                                  <Badge variant="outline" className={`ml-auto text-[10px] px-1.5 h-4 ${text} border-current`}>{groupItems.length}</Badge>
                                 </div>
-                                <div className="text-xs text-muted-foreground flex items-center justify-between mt-2">
-                                  <span className="font-medium">{formatDisplayDate(trackingItem.date)}</span>
-                                  <m.button 
-                                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} 
-                                    disabled={deleteId === trackingId}
-                                    onClick={() => setDeleteConfirmOpen(trackingId)} 
-                                    aria-label={`Remove tracking entry for ${formatSessionName(trackingItem.session)} session on ${formatDisplayDate(trackingItem.date)}`}
-                                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 rounded-lg font-medium text-yellow-600 disabled:opacity-50"
-                                  >
-                                    {deleteId === trackingId ? "Deleting..." : <><span className="max-md:hidden">Remove</span><Trash2 size={15} aria-hidden="true" /></>}
-                                  </m.button>
+
+                                {/* Items for this status */}
+                                <div className="flex flex-col gap-3">
+                                  {groupItems.map((trackingItem) => {
+                                    const trackingId = `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
+                                    
+                                    // Status Logic
+                                    const isCorrection = trackingItem.status === 'correction';
+                                    const attCode = Number(trackingItem.attendance);
+                                    let userLabel = "Present", userColor = "green";
+                                    if (attCode === 225) { userLabel = "Duty Leave"; userColor = "orange"; }
+                                    else if (attCode === 111) { userLabel = "Absent"; userColor = "red"; }
+
+                                    let statusText = userLabel;
+                                    if (isCorrection) {
+                                        const itemKey = generateSlotKey(trackingItem.course, trackingItem.date, trackingItem.session);
+                                        const officialSession = officialSessionsMap.get(itemKey);
+                                        let officialLabel = "Absent"; 
+                                        if (officialSession) {
+                                            const offCode = Number(officialSession.attendance);
+                                            if (offCode === 110) officialLabel = "Present";
+                                            else if (offCode === 111) officialLabel = "Absent";
+                                            else if (offCode === 225) officialLabel = "Duty Leave";
+                                        }
+                                        statusText = `${officialLabel} → ${userLabel}`;
+                                    }
+
+                                    const typeLabel = isCorrection ? "Correction" : "Extra";
+                                    const typeColorClass = isCorrection 
+                                        ? "bg-purple-500/10 text-purple-400 border-purple-500/20" 
+                                        : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
+
+                                    let statusBadgeClass = "bg-green-500/20 text-green-400";
+                                    let cardBgClass = "bg-green-500/5 border-green-500/20";
+
+                                    if (isCorrection) {
+                                        if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; }
+                                        else if (userColor === "red") { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
+                                        else { cardBgClass = "bg-green-500/5 border-green-500/20"; statusBadgeClass = "bg-green-500/20 text-green-400"; }
+                                    } else {
+                                        if (userColor === "green") { statusBadgeClass = "bg-green-500/20 text-green-400"; cardBgClass = "bg-green-500/5 border-green-500/20"; } 
+                                        else if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; } 
+                                        else { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
+                                    }
+
+                                    return (
+                                      <m.div 
+                                        key={trackingId} 
+                                        variants={cardVariants}
+                                        className={`p-4 text-left rounded-xl border hover:bg-opacity-20 transition-all w-full ${cardBgClass}`}
+                                      >
+                                        <div className="flex justify-between items-start mb-2 gap-4">
+                                          <div className="font-medium text-sm text-foreground/70">
+                                            Session: <span className="text-foreground capitalize">{formatSessionName(trackingItem.session)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className={`text-[10px] px-1.5 h-5 ${typeColorClass}`}>{typeLabel}</Badge>
+                                            <Badge className={statusBadgeClass}>
+                                              {statusText}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground flex items-center justify-between mt-2">
+                                          <span className="font-medium">{formatDisplayDate(trackingItem.date)}</span>
+                                          <m.button 
+                                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} 
+                                            disabled={deleteId === trackingId}
+                                            onClick={() => setDeleteConfirmOpen(trackingId)} 
+                                            aria-label={`Remove tracking entry for ${formatSessionName(trackingItem.session)} session on ${formatDisplayDate(trackingItem.date)}`}
+                                            className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 rounded-lg font-medium text-yellow-600 disabled:opacity-50"
+                                          >
+                                            {deleteId === trackingId ? "Deleting..." : <><span className="max-md:hidden">Remove</span><Trash2 size={15} aria-hidden="true" /></>}
+                                          </m.button>
+                                        </div>
+                                      </m.div>
+                                    );
+                                  })}
                                 </div>
-                              </m.div>
+                              </div>
                             );
                           })}
                         </div>
