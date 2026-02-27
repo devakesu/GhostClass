@@ -47,93 +47,107 @@ export function ServiceWorkerRegister() {
     registrationInProgressRef.current = true;
     let isMounted = true;
 
-    // Wait for page to load before registering to avoid impacting initial page load performance
-    const handleLoad = async () => {
-      // Check if component is still mounted
+    // Suppress Chrome's native install mini-bar/bottom-sheet on ALL pages.
+    // sw-register is mounted in the root layout so this runs everywhere,
+    // including login and other public pages where usePWAInstall is not imported.
+    const suppressNativePrompt = (e: Event) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeinstallprompt", suppressNativePrompt);
+
+    // Delay SW registration 3 seconds after window.load to ensure all SSR
+    // streaming chunks (Next.js Suspense) have fully flushed to the browser
+    // before the SW installs and potentially claims the tab mid-stream.
+    let registrationTimeoutId: NodeJS.Timeout | null = null;
+    const handleLoad = () => {
       if (!isMounted) return;
-
-      try {
-        const registration = await navigator.serviceWorker.register("/sw.js", {
-          scope: "/",
-        });
-
-        // Check again after async operation
+      registrationTimeoutId = setTimeout(async () => {
+        // Check if component is still mounted
         if (!isMounted) return;
 
-        logger.dev("Service worker registered successfully", {
-          context: "ServiceWorkerRegister",
-          scope: registration.scope,
-        });
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
+          });
 
-        // Listen for updates to the service worker
-        registration.addEventListener("updatefound", () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
+          // Check again after async operation
+          if (!isMounted) return;
 
-          newWorker.addEventListener("statechange", () => {
-            if (
-              newWorker.state === "installed" &&
-              navigator.serviceWorker.controller
-            ) {
-              // New service worker is installed and waiting to activate.
-              logger.dev("New service worker available", {
-                context: "ServiceWorkerRegister",
-              });
+          logger.dev("Service worker registered successfully", {
+            context: "ServiceWorkerRegister",
+            scope: registration.scope,
+          });
 
-              // Notify the user that an update is ready.
-              // The action sends a SKIP_WAITING message to the waiting SW,
-              // which triggers activation; controllerchange fires when the
-              // new SW takes control, at which point we reload for a clean state.
-              let refreshing = false;
-              navigator.serviceWorker.addEventListener(
-                "controllerchange",
-                () => {
-                  if (!refreshing) {
-                    refreshing = true;
-                    window.location.reload();
-                  }
-                },
-                { once: true }
-              );
+          // Listen for updates to the service worker
+          registration.addEventListener("updatefound", () => {
+            const newWorker = registration.installing;
+            if (!newWorker) return;
 
-              toast("App updated — tap to refresh", {
-                description: "A new version of GhostClass is ready.",
-                duration: Infinity,
-                action: {
-                  label: "Refresh",
-                  onClick: () => {
-                    if (registration.waiting) {
-                      registration.waiting.postMessage({ type: "SKIP_WAITING" });
-                    } else {
-                      // Waiting worker already activated; reload directly.
+            newWorker.addEventListener("statechange", () => {
+              if (
+                newWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                // New service worker is installed and waiting to activate.
+                logger.dev("New service worker available", {
+                  context: "ServiceWorkerRegister",
+                });
+
+                // Notify the user that an update is ready.
+                // The action sends a SKIP_WAITING message to the waiting SW,
+                // which triggers activation; controllerchange fires when the
+                // new SW takes control, at which point we reload for a clean state.
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener(
+                  "controllerchange",
+                  () => {
+                    if (!refreshing) {
+                      refreshing = true;
                       window.location.reload();
                     }
                   },
-                },
-              });
-            }
-          });
-        });
+                  { once: true }
+                );
 
-        // Check for updates periodically (every hour)
-        // Only create interval if one doesn't already exist
-        if (!updateIntervalIdRef.current) {
-          updateIntervalIdRef.current = setInterval(() => {
-            if (!isMounted) return;
-            registration.update().catch((error) => {
-              logger.dev("Service worker update check failed", {
-                context: "ServiceWorkerRegister",
-                error,
-              });
+                toast("App updated — tap to refresh", {
+                  description: "A new version of GhostClass is ready.",
+                  duration: Infinity,
+                  action: {
+                    label: "Refresh",
+                    onClick: () => {
+                      if (registration.waiting) {
+                        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+                      } else {
+                        // Waiting worker already activated; reload directly.
+                        window.location.reload();
+                      }
+                    },
+                  },
+                });
+              }
             });
-          }, 60 * 60 * 1000);
+          });
+
+          // Check for updates periodically (every hour)
+          // Only create interval if one doesn't already exist
+          if (!updateIntervalIdRef.current) {
+            updateIntervalIdRef.current = setInterval(() => {
+              if (!isMounted) return;
+              registration.update().catch((error) => {
+                logger.dev("Service worker update check failed", {
+                  context: "ServiceWorkerRegister",
+                  error,
+                });
+              });
+            }, 60 * 60 * 1000);
+          }
+        } catch (error) {
+          logger.error("Service worker registration failed", {
+            context: "ServiceWorkerRegister",
+            error,
+          });
         }
-      } catch (error) {
-        logger.error("Service worker registration failed", {
-          context: "ServiceWorkerRegister",
-          error,
-        });
-      }
+      }, 3000);
     };
 
     window.addEventListener("load", handleLoad);
@@ -143,6 +157,10 @@ export function ServiceWorkerRegister() {
       isMounted = false;
       registrationInProgressRef.current = false;
       window.removeEventListener("load", handleLoad);
+      window.removeEventListener("beforeinstallprompt", suppressNativePrompt);
+      if (registrationTimeoutId) {
+        clearTimeout(registrationTimeoutId);
+      }
       if (updateIntervalIdRef.current) {
         clearInterval(updateIntervalIdRef.current);
         updateIntervalIdRef.current = null;
