@@ -170,4 +170,20 @@ describe("proxy – cross-device terms sync", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/accept-terms");
   });
+
+  it("redirects to accept-terms when DB has outdated terms_version", async () => {
+    mockSingle.mockResolvedValue({
+      data: { terms_version: "2.1" },
+      error: null,
+    });
+
+    const request = new NextRequest("http://localhost/dashboard");
+    // No terms_version cookie; DB version is stale compared to TERMS_VERSION
+
+    const response = await proxy(request);
+
+    // Should redirect to accept-terms because DB terms_version is outdated
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/accept-terms");
+  });
 });
