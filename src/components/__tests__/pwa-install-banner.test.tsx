@@ -18,6 +18,10 @@ vi.mock('@/hooks/usePWAInstall', () => ({
   }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { success: vi.fn() }),
+}));
+
 vi.mock('framer-motion', () => ({
   m: {
     div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) =>
@@ -67,6 +71,7 @@ describe('PWAInstallBanner', () => {
     mockIsInstalled.mockReturnValue(false);
     mockTriggerInstall.mockResolvedValue('accepted');
     setupLocalStorage(null);
+    vi.stubGlobal('close', vi.fn());
   });
 
   afterEach(() => {
@@ -165,14 +170,37 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    // Use real timers for the async interaction so act/waitFor work correctly
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
 
     expect(screen.queryByRole('complementary')).toBeNull();
     expect(store[STORAGE_KEY]).toBe('installed');
+  });
+
+  it('calls window.close() and shows success toast when install is accepted', async () => {
+    mockTriggerInstall.mockResolvedValue('accepted');
+    setupLocalStorage(null);
+    // importAndRender calls vi.resetModules() — import sonner after that so
+    // we share the same mock instance as the component.
+    await importAndRender();
+    const { toast } = await import('sonner');
+
+    await act(async () => { vi.advanceTimersByTime(2500); });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
+    });
+
+    // Toast fires immediately (before the close delay)
+    expect((toast as unknown as { success: ReturnType<typeof vi.fn> }).success).toHaveBeenCalledWith(
+      'GhostClass installed!',
+      expect.objectContaining({ description: 'Open it from your home screen.' }),
+    );
+
+    // window.close is scheduled as a fake timer — advance to trigger it deterministically.
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(window.close).toHaveBeenCalledTimes(1);
   });
 
   it('sets localStorage to a timestamp and hides banner when install is dismissed', async () => {
@@ -183,7 +211,6 @@ describe('PWAInstallBanner', () => {
 
     await act(async () => { vi.advanceTimersByTime(2500); });
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -201,7 +228,6 @@ describe('PWAInstallBanner', () => {
 
     await act(async () => { vi.advanceTimersByTime(2500); });
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
     });
@@ -238,7 +264,6 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
@@ -258,7 +283,6 @@ describe('PWAInstallBanner', () => {
     await act(async () => { vi.advanceTimersByTime(2500); });
     expect(screen.getByRole('complementary')).toBeInTheDocument();
 
-    vi.useRealTimers();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /dismiss install prompt/i }));
     });

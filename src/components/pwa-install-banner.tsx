@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { Download, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 
@@ -54,6 +55,17 @@ export function PWAInstallBanner() {
       if (outcome === "accepted") {
         // Permanently hide — the app is now installed.
         localStorage.setItem(STORAGE_KEY, "installed");
+        // Show the success toast first so the user sees the instruction
+        // before the tab potentially closes.
+        toast.success("GhostClass installed!", {
+          description: "Open it from your home screen.",
+        });
+        // Best-effort: close the browser tab after a brief delay so the
+        // toast renders before the tab disappears.
+        // window.close() only works for tabs opened via window.open(); on
+        // user-opened tabs it silently fails — the toast above serves as
+        // the fallback instruction in that case.
+        setTimeout(() => window.close(), 300);
       } else {
         // User cancelled the native dialog or it was unavailable — snooze
         // so the banner can re-appear after the snooze period.
