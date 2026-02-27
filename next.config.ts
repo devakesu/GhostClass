@@ -31,8 +31,8 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV !== "true",
   // Ensure service worker is accessible at the root path for proper scope
   // This is critical for standalone builds where static files need explicit handling
-  reloadOnOnline: true,
-  cacheOnNavigation: true,
+  reloadOnOnline: false,
+  cacheOnNavigation: false,
 });
 
 // Resolve the Supabase storage hostname at build time.
