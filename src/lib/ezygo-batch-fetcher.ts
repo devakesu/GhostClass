@@ -241,8 +241,14 @@ export async function fetchEzygoData<T>(
     try {
       // Validate that at least one egress target is configured before entering the
       // circuit breaker (avoids counting config errors as breaker failures).
-      if (!process.env.NEXT_PUBLIC_BACKEND_URL?.trim()) {
-        throw new NonBreakerError('NEXT_PUBLIC_BACKEND_URL is not configured');
+      const hasAnyEgressTarget =
+        !!process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
+        !!process.env.CF_PROXY_URL?.trim() ||
+        !!process.env.AWS_SECONDARY_URL?.trim();
+      if (!hasAnyEgressTarget) {
+        throw new NonBreakerError(
+          'No egress target configured: set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL'
+        );
       }
 
       const result = await ezygoCircuitBreaker.execute(async () => {
