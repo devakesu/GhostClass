@@ -193,6 +193,11 @@ export function getEgressConfig(): {
 // On these statuses the next configured egress tier is tried transparently.
 const RETRYABLE_EGRESS_STATUSES = new Set([429, 502, 503, 504]);
 
+// Per-tier fetch timeout: if a tier does not respond within this window we fail
+// over to the next tier. Chosen to be shorter than typical caller budgets (8–15 s)
+// so failover can occur within the overall request budget.
+const PER_TIER_TIMEOUT_MS = 10_000;
+
 interface EgressTarget {
   readonly baseUrl: string;
   readonly proxyHeaders: Record<string, string>;
@@ -237,6 +242,12 @@ function buildEgressTargets(): EgressTarget[] {
  * errors. Non-retryable statuses (most 4xx) are returned immediately without
  * retrying on other tiers. Callers supply only the endpoint path and their own
  * headers (e.g. Authorization); proxy secrets are injected automatically per tier.
+ *
+ * Each tier is given its own PER_TIER_TIMEOUT_MS budget via a fresh AbortController
+ * combined with the caller's signal (AbortSignal.any). This prevents a slow tier
+ * from consuming the entire caller budget, and prevents an already-aborted caller
+ * signal from being shared across retries (which would make every retry fail
+ * immediately). When the caller's own signal fires, failover is halted immediately.
  */
 export async function egressFetch(
   endpoint: string,
@@ -244,10 +255,13 @@ export async function egressFetch(
 ): Promise<Response> {
   const targets = buildEgressTargets();
   if (targets.length === 0) {
-    throw new Error("No egress targets configured — NEXT_PUBLIC_BACKEND_URL is not set");
+    throw new Error("No egress targets configured — set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL");
   }
 
   const cleanEndpoint = endpoint.replace(/^\/+/, "");
+  // Preserve the caller's signal to distinguish deliberate cancellation from
+  // per-tier timeouts when deciding whether to fail over.
+  const callerSignal = init?.signal ?? null;
 
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
@@ -260,8 +274,21 @@ export async function egressFetch(
       headers.set(key, value);
     }
 
+    // Create a per-tier AbortController + timeout so that:
+    //   a) A slow/hung tier is abandoned after PER_TIER_TIMEOUT_MS and we fail over.
+    //   b) The caller's signal is combined into this tier's signal so deliberate
+    //      cancellation (e.g. overall request budget exhausted) is still honoured.
+    // AbortSignal.any() is available in Node.js ≥ 20.3 (required env: ≥ 20.19).
+    const tierController = new AbortController();
+    const tierTimeout = setTimeout(() => tierController.abort(), PER_TIER_TIMEOUT_MS);
+    const tierSignal: AbortSignal =
+      callerSignal !== null
+        ? AbortSignal.any([callerSignal, tierController.signal])
+        : tierController.signal;
+
     try {
-      const res = await fetch(url, { ...init, headers });
+      const res = await fetch(url, { ...init, headers, signal: tierSignal });
+      clearTimeout(tierTimeout);
 
       if (RETRYABLE_EGRESS_STATUSES.has(res.status) && !isLast) {
         // console.warn used deliberately — see logger import note at top of utils.server.ts.
@@ -275,6 +302,12 @@ export async function egressFetch(
 
       return res;
     } catch (err) {
+      clearTimeout(tierTimeout);
+      // If the caller's own signal was aborted (not the per-tier timeout), propagate
+      // immediately — the overall request budget is exhausted and failover won't help.
+      if (callerSignal?.aborted && err instanceof Error && err.name === "AbortError") {
+        throw err;
+      }
       if (isLast) throw err;
       // console.warn used deliberately — see logger import note at top of utils.server.ts.
       console.warn(

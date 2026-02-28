@@ -338,8 +338,9 @@ describe('EzyGo Batch Fetcher', () => {
           fetchEzygoData('/endpoint3', token),
         ]);
         
-        // clearTimeout should be called for each request
-        expect(clearTimeoutSpy).toHaveBeenCalledTimes(3);
+        // clearTimeout should be called for each request: once for the batch-fetcher's
+        // own createTimeoutSignal fallback, and once for egressFetch's per-tier timeout.
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(6);
         
         clearTimeoutSpy.mockRestore();
       } finally {
