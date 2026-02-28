@@ -248,7 +248,6 @@ export async function egressFetch(
   }
 
   const cleanEndpoint = endpoint.replace(/^\/+/, "");
-  let lastResponse: Response | undefined;
 
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
@@ -271,7 +270,6 @@ export async function egressFetch(
         );
         // Drain the body to release the connection before trying the next tier.
         await res.body?.cancel?.();
-        lastResponse = res;
         continue;
       }
 
@@ -287,9 +285,8 @@ export async function egressFetch(
     }
   }
 
-  // Only reached when every non-last tier returned a retryable status.
-  // Return the last captured response so the caller can inspect its status.
-  return lastResponse!;
+  // This line is unreachable: the last iteration always returns or throws.
+  throw new Error("[egress-failover] unreachable: exhausted all egress tiers without returning");
 }
 
 // ---------------------------------------------------------------------------
