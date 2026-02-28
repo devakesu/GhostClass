@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { __resetCachedKey } from "@/lib/crypto";
+import { __resetAllowedHostsCache } from "@/lib/security/origin-validation";
 
 // Mock server-only to allow tests to run in jsdom / Node environments.
 // Without this, importing any server-only module (e.g. @/lib/utils.server)
@@ -122,6 +123,8 @@ describe("GET /api/profile", () => {
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
     __resetCachedKey();
+    // Reset the origin-validation module cache so each test reads the current env vars
+    __resetAllowedHostsCache();
 
     mockGetUser.mockResolvedValue({
       data: { user: MOCK_USER },
@@ -143,6 +146,7 @@ describe("GET /api/profile", () => {
 
   afterEach(() => {
     __resetCachedKey();
+    __resetAllowedHostsCache();
     vi.restoreAllMocks();
   });
 

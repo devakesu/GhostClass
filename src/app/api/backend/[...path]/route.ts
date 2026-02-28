@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "buffer";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
+import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
 import { getClientIp } from "@/lib/utils.server";
@@ -142,128 +143,6 @@ const PUBLIC_PATHS = new Set([
   "password/reset/request", // POST – trigger OTP send to chosen channel
   "password/reset",         // POST – submit OTP + new password
 ]);
-
-// Memoized allowed hosts computation for performance
-// Computed lazily on first call, then cached for subsequent requests
-// CACHE BEHAVIOR: The allowed hosts are computed once during application lifetime
-// and never updated. If NEXT_PUBLIC_APP_DOMAIN changes (e.g., during hot reload
-// in development), the application must be restarted for the cache to refresh.
-// This is acceptable in production where environment variables are immutable,
-// but developers should be aware of this limitation in development.
-let cachedAllowedHosts: Set<string> | null = null;
-let allowedHostsComputed = false;
-let cachedAppDomain: string | undefined = undefined;
-
-function getAllowedHosts(): Set<string> | null {
-  const currentAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim();
-  
-  // In development, invalidate cache if NEXT_PUBLIC_APP_DOMAIN changes
-  // This allows hot reload to pick up environment variable changes without restart
-  if (process.env.NODE_ENV === "development" && allowedHostsComputed && cachedAppDomain !== currentAppDomain) {
-    logger.dev(
-      "[backend-proxy] NEXT_PUBLIC_APP_DOMAIN changed in development. Invalidating cache.",
-      { previous: cachedAppDomain, current: currentAppDomain }
-    );
-    allowedHostsComputed = false;
-    cachedAllowedHosts = null;
-  }
-  
-  if (!allowedHostsComputed) {
-    allowedHostsComputed = true;
-    cachedAppDomain = currentAppDomain;
-    
-    if (!currentAppDomain) {
-      cachedAllowedHosts = null;
-    } else {
-      // SECURITY: NEXT_PUBLIC_APP_DOMAIN format requirements
-      // ====================================================
-      // REQUIRED FORMAT: Hostname only, WITHOUT protocol prefix
-      //   ✓ Correct: "example.com", "app.example.com", "localhost"
-      //   ✗ Wrong:   "https://example.com", "http://localhost:3000"
-      //
-      // PORTS: If your domain includes a non-standard port (e.g., "localhost:3000"),
-      // it will be automatically stripped for origin validation. This is intentional
-      // to match standard browser behavior where Origin headers contain ports but
-      // hostname comparisons typically exclude them.
-      //
-      // This format is enforced in .example.env and must be consistent across all
-      // environment files. Inconsistent formats can cause security validation failures.
-      //
-      // Extract hostname without port for consistent comparison
-      cachedAllowedHosts = new Set(
-        [currentAppDomain].map((host) => {
-          // Validate that host doesn't include protocol (common misconfiguration)
-          if (host.includes("://")) {
-            logger.error(
-              "[backend-proxy] Invalid NEXT_PUBLIC_APP_DOMAIN configuration: value must not include protocol",
-              { appDomain: host }
-            );
-            throw new Error(
-              "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only (e.g., 'example.com', not 'https://example.com')"
-            );
-          }
-          
-          try {
-            // Parse as URL to extract hostname (strips port if present)
-            return new URL(`https://${host}`).hostname.toLowerCase();
-          } catch {
-            // Fallback: assume it's already a hostname
-            return host.toLowerCase();
-          }
-        })
-      );
-      
-      // In development, log cache information to help developers understand behavior
-      if (process.env.NODE_ENV === "development") {
-        logger.dev(
-          "[backend-proxy] Allowed hosts computed and cached. " +
-          "Cache will be invalidated automatically if NEXT_PUBLIC_APP_DOMAIN changes.",
-          { allowedHosts: Array.from(cachedAllowedHosts) }
-        );
-      }
-    }
-  }
-  
-  return cachedAllowedHosts;
-}
-
-function normalizeHost(value: string | null): string | null {
-  if (!value) return null;
-  const first = value.split(",")[0]?.trim();
-  if (!first) return null;
-
-  // IPv6 hosts are commonly bracketed in Host/X-Forwarded-Host headers, e.g. [::1]:3000
-  if (first.startsWith("[")) {
-    const closingBracketIndex = first.indexOf("]");
-    if (closingBracketIndex > 0) {
-      return first.slice(1, closingBracketIndex).toLowerCase();
-    }
-  }
-
-  // Detect unbracketed IPv6 literals. All compressed IPv6 addresses (the common case)
-  // contain '::'. Full-form addresses (e.g. "2001:db8:0:0:0:0:0:1") contain multiple
-  // colons but no '::'. Guard the latter with a character-set check (hex digits,
-  // colons, dots) to avoid a false positive for malformed values like "host:port:extra".
-  const isUnbracketedIPv6 =
-    first.includes("::") ||
-    (/^[\da-fA-F:.]+$/.test(first) && first.indexOf(":") !== first.lastIndexOf(":"));
-  if (isUnbracketedIPv6) {
-    return first.toLowerCase();
-  }
-
-  // Strip optional :port suffix for consistent hostname comparison (IPv4 / hostname only)
-  const portSeparatorIndex = first.indexOf(":");
-  return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first).toLowerCase();
-}
-
-function resolveRequestHostname(req: NextRequest): string | null {
-  // Prefer forwarded host when behind proxies/CDNs
-  return (
-    normalizeHost(req.headers.get("x-forwarded-host")) ??
-    normalizeHost(req.headers.get("host")) ??
-    normalizeHost(req.nextUrl.hostname)
-  );
-}
 
 // Maximum response size limit (3MB). This accommodates bulk data exports and large
 // institutional datasets while preventing memory exhaustion from unbounded responses.
