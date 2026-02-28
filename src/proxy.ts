@@ -234,8 +234,8 @@ export const config = {
   // This simplified matcher pattern uses a negative lookahead regex to exclude specific paths.
   // Any new routes will automatically have CSP headers and Supabase session refresh applied.
   // 
-  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|robots.txt).*)
-  // - Matches all paths that DON'T START with: api, _next/static, _next/image, favicon.ico, or robots.txt
+  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|robots.txt|monitoring).*)
+  // - Matches all paths that DON'T START with: api, _next/static, _next/image, favicon.ico, robots.txt, or monitoring
   // - The negative lookahead (?!...) is evaluated at match time to exclude specific paths
   // 
   // This ensures middleware runs on all page routes for proper security headers and auth handling.
@@ -243,6 +243,12 @@ export const config = {
   // Static files in /public are served directly and don't go through middleware.
   // If you need to add more exclusions (e.g., /sitemap.xml), add them to the pattern below.
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt).*)",
+    // Exclude monitoring (Sentry tunnel) from middleware processing.
+    // The Sentry SDK can burst 100+ POST requests/sec to /monitoring;
+    // running the full middleware (supabase.auth.getUser(), CSP generation,
+    // routing logic) for each one overwhelms the server and blocks SSR
+    // streaming for actual page navigations — especially on Android PWA
+    // standalone launch where the burst compounds with SW lifecycle events.
+    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|monitoring).*)",
   ],
 };

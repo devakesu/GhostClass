@@ -71,7 +71,6 @@ describe('PWAInstallBanner', () => {
     mockIsInstalled.mockReturnValue(false);
     mockTriggerInstall.mockResolvedValue('accepted');
     setupLocalStorage(null);
-    vi.stubGlobal('close', vi.fn());
   });
 
   afterEach(() => {
@@ -178,7 +177,7 @@ describe('PWAInstallBanner', () => {
     expect(store[STORAGE_KEY]).toBe('installed');
   });
 
-  it('calls window.close() and shows success toast when install is accepted', async () => {
+  it('shows success toast and hides banner when install is accepted', async () => {
     mockTriggerInstall.mockResolvedValue('accepted');
     setupLocalStorage(null);
     // importAndRender calls vi.resetModules() — import sonner after that so
@@ -192,15 +191,11 @@ describe('PWAInstallBanner', () => {
       fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
     });
 
-    // Toast fires immediately (before the close delay)
+    // Toast is shown after the install prompt is accepted
     expect((toast as unknown as { success: ReturnType<typeof vi.fn> }).success).toHaveBeenCalledWith(
-      'GhostClass installed!',
-      expect.objectContaining({ description: 'Open it from your home screen.' }),
+      'GhostClass is installing!',
+      expect.objectContaining({ description: 'Next time, open it from your home screen.' }),
     );
-
-    // window.close is scheduled as a fake timer — advance to trigger it deterministically.
-    await act(async () => { vi.advanceTimersByTime(300); });
-    expect(window.close).toHaveBeenCalledTimes(1);
   });
 
   it('sets localStorage to a timestamp and hides banner when install is dismissed', async () => {

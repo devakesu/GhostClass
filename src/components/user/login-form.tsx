@@ -78,7 +78,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordResetForm, setShowPasswordResetForm] = useState(false);
   const [loginMethod, setLoginMethod] = useState<
@@ -129,8 +128,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     let isMounted = true;
     
     const checkUser = async () => {
-      setIsLoadingPage(true);
-  
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         // Ignore auth session missing errors - they're expected when not logged in
@@ -166,10 +163,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           logger.error("Unexpected error checking user session:", err);
         } else if (err instanceof Error && isSupabaseLockTimeoutError(err)) {
           logger.dev("Supabase auth lock timeout during page-load session check; continuing without redirect");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingPage(false);
         }
       }
     };
@@ -362,11 +355,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       transition: { type: "spring", stiffness: 400, damping: 10, duration: 0.6 },
     },
   };
-
-  // Return null during the initial auth check so the page stays blank rather
-  // than flashing a full-screen spinner. NextTopLoader handles the visual
-  // feedback automatically when router.push("/dashboard") fires.
-  if (isLoadingPage) return null;
 
   if (showPasswordResetForm) {
     return (

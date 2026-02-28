@@ -2,7 +2,7 @@
  * Tests for auth-cookie.ts
  *
  * [SEC-02] ezygo_access_token must always be written with HttpOnly, Secure (in
- * production), and SameSite=Strict flags.  The save-token route is the sole
+ * production), and SameSite=Lax flags.  The save-token route is the sole
  * writer — this file asserts those security attributes so a future accidental
  * change to the cookie flags is caught by CI.
  */
@@ -33,10 +33,10 @@ describe("auth-cookie security attributes (SEC-02)", () => {
       expect(opts.httpOnly).toBe(true);
     });
 
-    it("sets the cookie with sameSite: 'strict'", async () => {
+    it("sets the cookie with sameSite: 'lax'", async () => {
       await setAuthCookie("test-token");
       const [, , opts] = mockSet.mock.calls[0];
-      expect(opts.sameSite).toBe("strict");
+      expect(opts.sameSite).toBe("lax");
     });
 
     it("sets the cookie with path: '/'", async () => {
@@ -89,10 +89,10 @@ describe("auth-cookie security attributes (SEC-02)", () => {
       expect(opts.httpOnly).toBe(true);
     });
 
-    it("sets the cookie with sameSite: 'strict'", async () => {
+    it("sets the cookie with sameSite: 'lax'", async () => {
       await clearAuthCookie();
       const [, , opts] = mockSet.mock.calls[0];
-      expect(opts.sameSite).toBe("strict");
+      expect(opts.sameSite).toBe("lax");
     });
 
     it("uses the cookie name 'ezygo_access_token'", async () => {

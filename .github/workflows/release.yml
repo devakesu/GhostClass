@@ -417,12 +417,15 @@ jobs:
           output-file: sbom.json
 
       # Attest SBOM
+      # actions/attest-sbom is deprecated; use actions/attest with predicate-type instead.
+      # https://github.com/actions/attest-sbom?tab=readme-ov-file#deprecation-notice
       - name: Attest SBOM
-        uses: actions/attest-sbom@07e74fc4e78d1aad915e867f9a094073a9f71527 # v4.0.0
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
-          sbom-path: sbom.json
+          predicate-type: 'https://cyclonedx.org/bom'
+          predicate-path: sbom.json
           push-to-registry: true
 
       # Sign image with cosign (keyless signing using OIDC)

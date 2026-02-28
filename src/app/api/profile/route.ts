@@ -50,7 +50,36 @@ function resolve(
 // GET – fetch profile
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // 0. Origin validation (defence-in-depth)
+  // Prevents a cross-site top-level navigation from triggering a profile sync
+  // upsert via the slow path. Response is already protected by CORS/SOP, but
+  // Origin validation closes the gap consistently with /api/backend/[...path].
+  // Skipped in development so localhost / tunnels work without extra config.
+  if (process.env.NODE_ENV !== "development") {
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim();
+    if (appDomain) {
+      const origin = req.headers.get("origin");
+      if (!origin) {
+        // Some same-origin GET requests omit Origin — allow when Sec-Fetch-Site says same-origin.
+        const secFetchSite = req.headers.get("sec-fetch-site");
+        if (secFetchSite !== "same-origin") {
+          return NextResponse.json({ error: "Origin header required" }, { status: 400 });
+        }
+      } else {
+        try {
+          const originHostname = new URL(origin).hostname.toLowerCase();
+          const allowedHostname = new URL(`https://${appDomain}`).hostname.toLowerCase();
+          if (originHostname !== allowedHostname) {
+            return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
+          }
+        } catch {
+          return NextResponse.json({ error: "Invalid origin header" }, { status: 400 });
+        }
+      }
+    }
+  }
+
   const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
 

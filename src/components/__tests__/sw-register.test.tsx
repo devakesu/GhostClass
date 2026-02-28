@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act } from '@testing-library/react';
-import React from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks — use vi.hoisted() so factory closures can reference these fns,

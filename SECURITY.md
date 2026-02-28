@@ -27,7 +27,7 @@ GhostClass implements multiple layers of security:
 
 ### Data Protection
 
-- **HttpOnly Cookies** - Sensitive tokens stored in secure, HttpOnly cookies
+- **HttpOnly Cookies** - Session token stored in a `httpOnly`, `SameSite=Lax` cookie. `Lax` is used instead of `Strict` to allow the cookie on PWA standalone launches (top-level navigations); all mutations remain protected by CSRF tokens.
 - **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 - **Input Validation** - Zod schemas validate all user input
 - **Origin Validation** - Strict origin checking in production

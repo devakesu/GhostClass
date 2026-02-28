@@ -31,17 +31,25 @@ function scrubGaApiSecret(url: string): string {
   return url;
 }
 
+const isProd = process.env.NODE_ENV === "production";
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
+  // Enable Sentry Logs feature (forwards console.* to Sentry Log Explorer).
+  // Only in development to avoid sending verbose output in production.
+  enableLogs: !isProd,
 
   // Set sample rate (usually lower in production, e.g., 0.1)
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+  tracesSampleRate: isProd ? 0.1 : 1.0,
 
-  // Only enable debug logs in development
-  debug: process.env.NODE_ENV === "development",
+  // Only enable SDK debug output in development.
+  // CAUTION: debug:true prints extremely verbose OpenTelemetry span
+  // lifecycle logs ("Sentry Logger [log]") for every HTTP request,
+  // which floods the dev terminal and makes real app logs hard to read.
+  // Set to `false` while debugging app-level issues; re-enable only
+  // when specifically troubleshooting Sentry SDK behaviour.
+  debug: false,
 
   // Security: Handle PII carefully
   sendDefaultPii: false,

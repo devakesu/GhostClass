@@ -110,6 +110,13 @@ function makeEzygoFetchFail() {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/profile", () => {
+  // Helper: build a NextRequest that passes Origin validation.
+  // Tests run with NODE_ENV=test and NEXT_PUBLIC_APP_DOMAIN=localhost (vitest.setup.ts).
+  const makeGetReq = (overrideHeaders?: Record<string, string>) =>
+    new NextRequest("http://localhost/api/profile", {
+      headers: { origin: "http://localhost", ...overrideHeaders },
+    });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
@@ -139,10 +146,28 @@ describe("GET /api/profile", () => {
     vi.restoreAllMocks();
   });
 
+  it("returns 403 when Origin is not from the allowed domain", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile", {
+      headers: { origin: "https://evil.example.com" },
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when Origin header is absent and Sec-Fetch-Site is not same-origin", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile");
+    const res = await GET(req);
+    expect(res.status).toBe(400);
+  });
+
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     expect(res.status).toBe(401);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Unauthorized");
@@ -151,7 +176,7 @@ describe("GET /api/profile", () => {
   it("returns 502 when EzyGo is unavailable", async () => {
     makeEzygoFetchFail();
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     expect(res.status).toBe(502);
     const body = await res.json() as { error: string };
     expect(body.error).toContain("remote source");
@@ -160,7 +185,7 @@ describe("GET /api/profile", () => {
   it("returns plaintext PII fields (not ciphertext) on success", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
 
@@ -174,7 +199,7 @@ describe("GET /api/profile", () => {
   it("never exposes IV columns in the response", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     const body = await res.json() as Record<string, unknown>;
 
     expect(body).not.toHaveProperty("phone_iv");
@@ -185,7 +210,7 @@ describe("GET /api/profile", () => {
   it("writes encrypted PII (not plaintext) to the database", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    await GET();
+    await GET(makeGetReq());
 
     expect(mockAdminUpsert).toHaveBeenCalledOnce();
     const [upsertPayload] = mockAdminUpsert.mock.calls[0] as [Record<string, unknown>];
@@ -224,7 +249,7 @@ describe("GET /api/profile", () => {
     makeEzygoFetchOk(); // EzyGo returns gender:"male", birth_date:"2000-01-15"
 
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     const body = await res.json() as { gender: string; birth_date: string };
 
     // Local user-edited values must take precedence
@@ -235,7 +260,7 @@ describe("GET /api/profile", () => {
   it("falls back to EzyGo value when no local DB value exists", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET();
+    const res = await GET(makeGetReq());
     const body = await res.json() as { gender: string; birth_date: string };
 
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
