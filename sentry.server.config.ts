@@ -37,8 +37,8 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Enable Sentry Logs feature (forwards console.* to Sentry Log Explorer).
-  // Only in development to avoid sending verbose output in production.
-  enableLogs: !isProd,
+  // Only in development — not in test or other non-production environments.
+  enableLogs: process.env.NODE_ENV === "development",
 
   // Set sample rate (usually lower in production, e.g., 0.1)
   tracesSampleRate: isProd ? 0.1 : 1.0,
