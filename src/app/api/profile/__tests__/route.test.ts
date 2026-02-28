@@ -146,6 +146,19 @@ describe("GET /api/profile", () => {
     vi.restoreAllMocks();
   });
 
+  it("returns 500 when NEXT_PUBLIC_APP_DOMAIN is missing in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile", {
+      headers: { origin: "http://localhost" },
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe("Server misconfiguration");
+  });
+
   it("returns 403 when Origin is not from the allowed domain", async () => {
     vi.stubEnv("NODE_ENV", "production");
     const { GET } = await import("../route");

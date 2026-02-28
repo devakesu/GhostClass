@@ -57,25 +57,33 @@ export async function GET(req: NextRequest) {
   // Origin validation closes the gap consistently with /api/backend/[...path].
   // Skipped in development so localhost / tunnels work without extra config.
   if (process.env.NODE_ENV !== "development") {
-    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim();
-    if (appDomain) {
-      const origin = req.headers.get("origin");
-      if (!origin) {
-        // Some same-origin GET requests omit Origin — allow when Sec-Fetch-Site says same-origin.
-        const secFetchSite = req.headers.get("sec-fetch-site");
-        if (secFetchSite !== "same-origin") {
-          return NextResponse.json({ error: "Origin header required" }, { status: 400 });
+    const appDomainRaw = process.env.NEXT_PUBLIC_APP_DOMAIN;
+    const appDomain = appDomainRaw?.trim();
+
+    if (!appDomain) {
+      logger.error("GET /api/profile: NEXT_PUBLIC_APP_DOMAIN is missing or blank in production");
+      Sentry.captureMessage("Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing for /api/profile", {
+        level: "error",
+      });
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+    }
+
+    const origin = req.headers.get("origin");
+    if (!origin) {
+      // Some same-origin GET requests omit Origin — allow when Sec-Fetch-Site says same-origin.
+      const secFetchSite = req.headers.get("sec-fetch-site");
+      if (secFetchSite !== "same-origin") {
+        return NextResponse.json({ error: "Origin header required" }, { status: 400 });
+      }
+    } else {
+      try {
+        const originHostname = new URL(origin).hostname.toLowerCase();
+        const allowedHostname = new URL(`https://${appDomain}`).hostname.toLowerCase();
+        if (originHostname !== allowedHostname) {
+          return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
         }
-      } else {
-        try {
-          const originHostname = new URL(origin).hostname.toLowerCase();
-          const allowedHostname = new URL(`https://${appDomain}`).hostname.toLowerCase();
-          if (originHostname !== allowedHostname) {
-            return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
-          }
-        } catch {
-          return NextResponse.json({ error: "Invalid origin header" }, { status: 400 });
-        }
+      } catch {
+        return NextResponse.json({ error: "Invalid origin header" }, { status: 400 });
       }
     }
   }
