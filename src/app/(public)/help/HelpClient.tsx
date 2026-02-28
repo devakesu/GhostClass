@@ -359,7 +359,7 @@ export default function HelpClient() {
     {
       question: "How do I set my target attendance?",
       answer:
-        "Go to your profile / settings and update the target percentage. The default is 75%.",
+        "Update the target percentage from the header bar or the user profile dialog. The default is 75%.",
     },
     {
       question: "What does 'syncing' mean?",
@@ -369,7 +369,7 @@ export default function HelpClient() {
     {
       question: "Why does a course card show 'No attendance data'?",
       answer:
-        "The instructor hasn't updated attendance records yet for that course in EzyGo.",
+        "The instructor hasn't updated attendance records yet for that course in EzyGo. However, you can still manually add records.",
     },
     {
       question: "Why is the dashboard sometimes slow when many people log in at once?",

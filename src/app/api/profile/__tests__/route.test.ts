@@ -69,9 +69,13 @@ vi.mock("@/lib/security/auth-cookie", () => ({
   getAuthTokenServer: mockGetAuthToken,
 }));
 
-// --- Mock global fetch (for EzyGo calls) ---
-const mockFetch = vi.fn();
-global.fetch = mockFetch as unknown as typeof fetch;
+// --- Mock egressFetch (for EzyGo calls) ---
+const mockEgressFetch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/utils.server", () => ({
+  getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
+  redact: vi.fn((_: string, v: unknown) => `***${String(v).slice(-4)}`),
+  egressFetch: mockEgressFetch,
+}));
 
 // ---------------------------------------------------------------------------
 // Helper builders
@@ -93,7 +97,7 @@ const MOCK_EZYGO_PROFILE = {
 };
 
 function makeEzygoFetchOk(profile = MOCK_EZYGO_PROFILE) {
-  mockFetch.mockResolvedValueOnce(
+  mockEgressFetch.mockResolvedValueOnce(
     new Response(JSON.stringify({ data: profile }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -102,7 +106,7 @@ function makeEzygoFetchOk(profile = MOCK_EZYGO_PROFILE) {
 }
 
 function makeEzygoFetchFail() {
-  mockFetch.mockRejectedValueOnce(new Error("network error"));
+  mockEgressFetch.mockRejectedValueOnce(new Error("network error"));
 }
 
 // ---------------------------------------------------------------------------

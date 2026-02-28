@@ -821,7 +821,7 @@ The original fork exposed the EzyGo bearer token in client-side JavaScript and t
 
 **Can GhostClass get rate-limited by EzyGo?**
 
-Unlikely in normal deployments. EzyGo API calls are routed through the egress proxy chain (Cloudflare Worker → AWS Lambda → direct), so EzyGo sees the proxy's IP rather than the server's IP. The batch fetcher, LRU cache, and `MAX_CONCURRENT` cap further reduce outbound request volume. If you experience rate limiting, consider increasing the cache TTL or rotating proxy credentials.
+Unlikely in normal deployments. EzyGo API calls are routed through the egress proxy chain (Cloudflare Worker → AWS Lambda → direct), so EzyGo sees the proxy's IP rather than the server's IP. The batch fetcher, LRU cache, and `MAX_CONCURRENT` cap further reduce outbound request volume.
 
 **Is my EzyGo password stored anywhere?**
 

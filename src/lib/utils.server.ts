@@ -186,30 +186,110 @@ export function getEgressConfig(): {
 }
 
 // ---------------------------------------------------------------------------
-// egressFetch — thin fetch wrapper that auto-applies egress URL + proxy headers
+// egressFetch — multi-tier fetch wrapper with automatic failover
 // ---------------------------------------------------------------------------
 
+// Retryable upstream statuses — mirrors the backend proxy route.
+// On these statuses the next configured egress tier is tried transparently.
+const RETRYABLE_EGRESS_STATUSES = new Set([429, 502, 503, 504]);
+
+interface EgressTarget {
+  readonly baseUrl: string;
+  readonly proxyHeaders: Record<string, string>;
+  readonly name: string;
+}
+
 /**
- * Fetch wrapper for server-side EzyGo calls. Resolves the highest-priority
- * egress tier, builds the full request URL, and injects the proxy secret header
- * automatically. Callers supply only the endpoint path and their own headers
- * (e.g. Authorization). All other `RequestInit` options are forwarded as-is.
+ * Returns the ordered list of configured egress targets:
+ *   Tier 1 — CF_PROXY_URL      (Cloudflare Worker, optional)
+ *   Tier 2 — AWS_SECONDARY_URL (AWS Lambda, optional)
+ *   Tier 3 — NEXT_PUBLIC_BACKEND_URL (direct EzyGo, always present when set)
+ * Each tier is included only when its URL env var is non-empty.
  */
-export function egressFetch(
+function buildEgressTargets(): EgressTarget[] {
+  const targets: EgressTarget[] = [];
+
+  const cfUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
+  if (cfUrl) {
+    const secret = process.env.CF_PROXY_SECRET?.trim();
+    targets.push({ baseUrl: cfUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "primary (CF Worker)" });
+  }
+
+  const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
+  if (awsUrl) {
+    const secret = process.env.AWS_SECONDARY_SECRET?.trim();
+    targets.push({ baseUrl: awsUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "secondary (AWS)" });
+  }
+
+  const directUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+  if (directUrl) {
+    targets.push({ baseUrl: directUrl, proxyHeaders: {}, name: "direct" });
+  }
+
+  return targets;
+}
+
+/**
+ * Fetch wrapper for server-side EzyGo calls with multi-tier egress failover.
+ *
+ * Loops through the configured tiers (CF Worker → AWS Lambda → direct EzyGo)
+ * and transparently fails over on 429 / 502 / 503 / 504 responses or network
+ * errors. Non-retryable statuses (most 4xx) are returned immediately without
+ * retrying on other tiers. Callers supply only the endpoint path and their own
+ * headers (e.g. Authorization); proxy secrets are injected automatically per tier.
+ */
+export async function egressFetch(
   endpoint: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const { baseUrl, proxyHeaders } = getEgressConfig();
-  const cleanEndpoint = endpoint.replace(/^\/+/, "");
-  const url = `${baseUrl}/${cleanEndpoint}`;
-  const headers = new Headers(init?.headers);
-  for (const [key, value] of Object.entries(proxyHeaders)) {
-    headers.set(key, value);
+  const targets = buildEgressTargets();
+  if (targets.length === 0) {
+    throw new Error("No egress targets configured — NEXT_PUBLIC_BACKEND_URL is not set");
   }
-  return fetch(url, {
-    ...init,
-    headers,
-  });
+
+  const cleanEndpoint = endpoint.replace(/^\/+/, "");
+  let lastResponse: Response | undefined;
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const isLast = i === targets.length - 1;
+    const url = `${target.baseUrl}/${cleanEndpoint}`;
+
+    // Merge caller headers then apply per-tier proxy headers (proxy secret takes precedence).
+    const headers = new Headers(init?.headers);
+    for (const [key, value] of Object.entries(target.proxyHeaders)) {
+      headers.set(key, value);
+    }
+
+    try {
+      const res = await fetch(url, { ...init, headers });
+
+      if (RETRYABLE_EGRESS_STATUSES.has(res.status) && !isLast) {
+        // console.warn used deliberately — see logger import note at top of utils.server.ts.
+        console.warn(
+          `[egress-failover] ${target.name} returned ${res.status} for ${cleanEndpoint} — failing over to next tier`
+        );
+        // Drain the body to release the connection before trying the next tier.
+        await res.body?.cancel?.();
+        lastResponse = res;
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      if (isLast) throw err;
+      // console.warn used deliberately — see logger import note at top of utils.server.ts.
+      console.warn(
+        `[egress-failover] ${target.name} failed for ${cleanEndpoint} — failing over to next tier:`,
+        err instanceof Error ? err.message : String(err)
+      );
+      continue;
+    }
+  }
+
+  // Only reached when every non-last tier returned a retryable status.
+  // Return the last captured response so the caller can inspect its status.
+  return lastResponse!;
 }
 
 // ---------------------------------------------------------------------------

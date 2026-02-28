@@ -22,6 +22,7 @@ vi.hoisted(() => {
 
 // --- Hoist shared mock functions so they are defined before vi.mock() factories run ---
 const mockAxiosGet = vi.hoisted(() => vi.fn());
+const mockEgressFetch = vi.hoisted(() => vi.fn());
 
 // --- server-only shim ---
 vi.mock("server-only", () => ({}));
@@ -48,7 +49,7 @@ vi.mock("@/lib/ratelimit", () => ({
 vi.mock("@/lib/utils.server", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
   redact: vi.fn((_: string, v: unknown) => `***${String(v).slice(-4)}`),
-  egressAxios: { get: mockAxiosGet },
+  egressFetch: mockEgressFetch,
 }));
 
 // --- Sentry ---
@@ -181,7 +182,12 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
     mockValidateCsrf.mockResolvedValue(true);
 
     // EzyGo returns a valid user
-    mockAxiosGet.mockResolvedValue({ status: 200, data: EZYGO_USER });
+    mockEgressFetch.mockResolvedValue(
+      new Response(JSON.stringify(EZYGO_USER), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
 
     // Supabase sign-in always succeeds
     mockSignInWithPassword.mockResolvedValue({ error: null });
