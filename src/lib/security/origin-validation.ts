@@ -46,9 +46,6 @@ export function getAllowedHosts(): Set<string> | null {
   }
 
   if (!allowedHostsComputed) {
-    allowedHostsComputed = true;
-    cachedAppDomain = currentAppDomain;
-
     if (!currentAppDomain) {
       cachedAllowedHosts = null;
     } else {
@@ -79,6 +76,11 @@ export function getAllowedHosts(): Set<string> | null {
         );
       }
     }
+    // Only mark as computed after successful execution so a throw (e.g. protocol
+    // misconfiguration) leaves the cache in a retryable state rather than permanently
+    // "computed" with a stale null result.
+    cachedAppDomain = currentAppDomain;
+    allowedHostsComputed = true;
   }
 
   return cachedAllowedHosts;

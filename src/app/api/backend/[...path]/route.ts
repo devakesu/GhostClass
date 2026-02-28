@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "buffer";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
-import { getAllowedHosts, normalizeHost, resolveRequestHostname } from "@/lib/security/origin-validation";
+import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError, NonBreakerError } from "@/lib/circuit-breaker";
 import { getClientIp } from "@/lib/utils.server";
