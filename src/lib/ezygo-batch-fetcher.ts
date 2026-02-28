@@ -15,7 +15,7 @@ import { LRUCache } from 'lru-cache';
 import { logger } from './logger';
 import { ezygoCircuitBreaker, NonBreakerError } from './circuit-breaker';
 import { createHash } from 'crypto';
-import { getEgressConfig } from './utils.server';
+import { egressFetch } from './utils.server';
 
 /**
  * Create an AbortSignal with a timeout.
@@ -239,43 +239,44 @@ export async function fetchEzygoData<T>(
     }
     
     try {
-      // Resolve best available egress tier (CF -> AWS -> direct) and validate URL
-      // before circuit breaker to avoid counting config errors as breaker failures.
-      const { baseUrl, proxyHeaders } = getEgressConfig();
-      if (!baseUrl) {
-        throw new NonBreakerError('NEXT_PUBLIC_BACKEND_URL is not configured');
+      // Validate that at least one egress target is configured before entering the
+      // circuit breaker (avoids counting config errors as breaker failures).
+      const hasAnyEgressTarget =
+        !!process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
+        !!process.env.CF_PROXY_URL?.trim() ||
+        !!process.env.AWS_SECONDARY_URL?.trim();
+      if (!hasAnyEgressTarget) {
+        throw new NonBreakerError(
+          'No egress target configured: set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL'
+        );
       }
 
-      // baseUrl from getEgressConfig() is already normalized without trailing slash.
-      // Remove leading slash from endpoint to avoid double slashes.
-      const cleanEndpoint = endpoint.replace(/^\/+/, '');
-      const url = `${baseUrl}/${cleanEndpoint}`;
-      
       const result = await ezygoCircuitBreaker.execute(async () => {
-        const headers: Record<string, string> = {
+        const fetchHeaders: Record<string, string> = {
           'Authorization': `Bearer ${token}`,
-          ...proxyHeaders,
         };
-        
+
         // Only include Content-Type and body for POST requests with a body
         // to avoid runtime errors in Node/undici and make headers semantically correct
         if (method === 'POST' && serializedBody !== undefined) {
-          headers['Content-Type'] = 'application/json';
+          fetchHeaders['Content-Type'] = 'application/json';
         }
-        
+
         const { signal, cleanup } = createTimeoutSignal(15000); // 15 second timeout
         const fetchOptions: RequestInit = {
           method,
-          headers,
+          headers: fetchHeaders,
           signal,
         };
-        
+
         if (method === 'POST' && serializedBody !== undefined) {
           fetchOptions.body = serializedBody;
         }
-        
+
         try {
-          const response = await fetch(url, fetchOptions);
+          // egressFetch transparently fails over across CF → AWS → direct tiers on
+          // 429 / 5xx retryable statuses, so a single call covers all egress tiers.
+          const response = await egressFetch(endpoint, fetchOptions);
 
           if (!response.ok) {
             const errorMsg = `EzyGo API error: ${response.status} ${response.statusText}`;

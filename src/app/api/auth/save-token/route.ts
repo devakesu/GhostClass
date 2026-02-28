@@ -1,5 +1,4 @@
 import * as Sentry from "@sentry/nextjs";
-import { isAxiosError } from "axios";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -9,7 +8,7 @@ import { createServerClient } from "@supabase/ssr";
 import crypto from "crypto";
 import { z } from "zod";
 import { redis } from "@/lib/redis";
-import { redact, getClientIp, egressAxios } from "@/lib/utils.server";
+import { redact, getClientIp, egressFetch } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
@@ -261,14 +260,17 @@ export async function POST(req: Request) {
     let verifiedUsername = "";
     
     try {
-      const ezygoRes = await egressAxios.get(
-        "user",
-        {
+      const ezygoAbortCtrl = new AbortController();
+      const ezygoTimeout = setTimeout(() => ezygoAbortCtrl.abort(), 15000);
+      let ezygoRes: Response;
+      try {
+        ezygoRes = await egressFetch("user", {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 15000, // Increased from 5s to 15s to handle slow backends and network latency
-          validateStatus: (status) => status < 500,
-        }
-      );
+          signal: ezygoAbortCtrl.signal,
+        });
+      } finally {
+        clearTimeout(ezygoTimeout);
+      }
 
       if (ezygoRes.status === 401) {
         return NextResponse.json({ message: "Invalid or expired token" }, { status: 401 });
@@ -285,12 +287,12 @@ export async function POST(req: Request) {
         );
       }
 
-      const userValidation = EzygoUserSchema.safeParse(ezygoRes.data);
+      const ezygoData: unknown = await ezygoRes.json().catch(() => null);
+      const userValidation = EzygoUserSchema.safeParse(ezygoData);
       if (!userValidation.success) {
         logger.error("Invalid Ezygo response:", userValidation.error);
         Sentry.captureException(userValidation.error, {
             tags: { type: "ezygo_schema_mismatch", location: "save_token" },
-            extra: { userId: redact("id", ezygoRes.data.userId) }
         });
         return NextResponse.json(
           { message: "Invalid user data from authentication service" },
@@ -302,18 +304,15 @@ export async function POST(req: Request) {
       verifieduserId = userValidation.data.id;
       lockUserId = verifieduserId;
 
-    } catch (err: any) {
-      // Handle timeout and connection errors (ECONNABORTED, ENOTFOUND, ETIMEDOUT, EHOSTUNREACH, ECONNRESET, ENETUNREACH, ECONNREFUSED)
-      if (isAxiosError(err) && err.code && ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'ECONNRESET', 'ENETUNREACH', 'ECONNREFUSED'].includes(err.code)) {
-        logger.warn(`EzyGo API timeout/connection error (code: ${err.code})`);
+    } catch (err: unknown) {
+      // Handle AbortError (manual 15s timeout) and TypeError (network failure) from native fetch.
+      if (err instanceof Error && (err.name === 'AbortError' || err instanceof TypeError)) {
+        logger.warn(`EzyGo API timeout/connection error (${err.name}: ${err.message})`);
         Sentry.captureException(err, {
           tags: { type: "ezygo_timeout", location: "save_token" },
           level: "warning",
         });
         return NextResponse.json({ message: "Authentication service unavailable. Please try again." }, { status: 504 });
-      }
-      if (isAxiosError(err) && err.response?.status === 401) {
-        return NextResponse.json({ message: "Invalid or expired token" }, { status: 401 });
       }
       
       const errorMessage = err instanceof Error ? err.message : String(err);

@@ -193,7 +193,7 @@ describe('AttendanceChart', () => {
     );
 
     const touchCalls = addEventListenerSpy.mock.calls.filter(
-      ([event]) => event === 'touchstart'
+      ([event]: [string, ...unknown[]]) => event === 'touchstart'
     );
     expect(touchCalls.length).toBeGreaterThan(0);
 
@@ -219,7 +219,7 @@ describe('AttendanceChart', () => {
     );
 
     const touchCalls = addEventListenerSpy.mock.calls.filter(
-      ([event]) => event === 'touchstart'
+      ([event]: [string, ...unknown[]]) => event === 'touchstart'
     );
     expect(touchCalls.length).toBe(0);
   });
@@ -243,7 +243,7 @@ describe('AttendanceChart', () => {
     unmount();
 
     const touchRemoveCalls = removeEventListenerSpy.mock.calls.filter(
-      ([event]) => event === 'touchstart'
+      ([event]: [string, ...unknown[]]) => event === 'touchstart'
     );
     expect(touchRemoveCalls.length).toBeGreaterThan(0);
 
@@ -284,7 +284,7 @@ describe('AttendanceChart', () => {
 
     // After switching to mobile, touch handler should now be registered
     const touchCalls = addEventListenerSpy.mock.calls.filter(
-      ([event]) => event === 'touchstart'
+      ([event]: [string, ...unknown[]]) => event === 'touchstart'
     );
     expect(touchCalls.length).toBeGreaterThan(0);
 
@@ -310,7 +310,7 @@ describe('AttendanceChart', () => {
 
     // Capture the registered touchstart handler
     const touchCalls = addEventListenerSpy.mock.calls.filter(
-      ([event]) => event === 'touchstart'
+      ([event]: [string, ...unknown[]]) => event === 'touchstart'
     );
     expect(touchCalls.length).toBeGreaterThan(0);
     const handler = touchCalls[0][1] as (e: Partial<TouchEvent>) => void;

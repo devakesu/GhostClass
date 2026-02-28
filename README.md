@@ -96,7 +96,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 src/
 ├── instrumentation.ts        # Sentry server instrumentation
 ├── instrumentation-client.ts # Sentry browser instrumentation
-├── proxy.ts                  # Service worker proxy configuration
+├── proxy.ts                  # Next.js middleware (auth guard, routing, CSP injection)
 ├── sw.ts                     # Service worker with runtime caching
 ├── app/                      # Next.js app router pages and layouts
 │   ├── (auth)/               # Authentication routes (login, signup)
@@ -114,11 +114,15 @@ src/
 │   ├── accept-terms/         # Terms acceptance page (authenticated)
 │   ├── actions/              # Server actions (contact, user operations)
 │   ├── api/                  # API routes
-│   │   ├── auth/             # Authentication endpoints
-│   │   ├── backend/          # Backend proxy endpoints
-│   │   ├── cron/             # Scheduled jobs (sync, cleanup)
-│   │   ├── health/           # Health check endpoint
-│   │   ├── analytics/        # GA4 server-side tracking
+│   │   ├── auth/             # Authentication endpoints (save-token)
+│   │   ├── backend/          # Proxied EzyGo API endpoints
+│   │   ├── cron/             # Scheduled jobs (attendance sync)
+│   │   ├── health/           # Health check + EzyGo integration health
+│   │   ├── analytics/        # GA4 server-side event tracking
+│   │   ├── profile/          # User profile (fetch with PII decryption, update)
+│   │   ├── csrf/             # CSRF token generation
+│   │   ├── logout/           # Session termination
+│   │   ├── csp-report/       # CSP violation reporting
 │   │   ├── docs/             # Dev-only Scalar API viewer (404 in production)
 │   │   └── provenance/       # Build provenance information
 │   ├── api-docs/             # Scalar API documentation viewer (production)
@@ -152,6 +156,7 @@ src/
 │   ├── institution-selector.tsx # Institution picker
 │   ├── loading.tsx           # Loading spinner component
 │   ├── not-found-content.tsx # 404 page content
+│   ├── pwa-install-banner.tsx # PWA install prompt banner
 │   ├── sw-register.tsx       # Service worker registration
 │   └── toaster.tsx           # Toast notification provider
 ├── providers/                # React context providers
@@ -167,7 +172,9 @@ src/
 │   ├── users/                # User data hooks
 │   ├── notifications/        # Notification subscription hooks
 │   ├── __tests__/            # Hook tests
-│   └── use-csrf-token.ts     # CSRF token management hook
+│   ├── use-csrf-token.ts     # CSRF token management hook
+│   ├── use-sync-on-mount.ts  # Triggers background attendance sync on mount
+│   └── usePWAInstall.ts      # PWA install prompt detection and trigger
 ├── lib/                      # Core library code
 │   ├── logic/                # Business logic
 │   │   ├── bunk.ts                      # Attendance calculation algorithm
@@ -186,9 +193,9 @@ src/
 │   ├── email.ts              # Email service (Brevo/SendPulse)
 │   ├── error-handling.ts     # Centralized error handler
 │   ├── ezygo-batch-fetcher.ts # Rate-limited EzyGo API client
-│   ├── global-init.tsx       # Global initialization
+│   ├── ga4-collect.ts        # GA4 Measurement Protocol event collector
+│   ├── global-init.ts        # Global initialization
 │   ├── logger.ts             # Winston logger with Sentry
-│   ├── notifications.ts      # Push notification utilities
 │   ├── ratelimit.ts          # Upstash Redis rate limiting
 │   ├── redis.ts              # Redis client configuration
 │   ├── utils.ts              # Utility functions
@@ -200,6 +207,7 @@ src/
 │   ├── images.d.ts           # Image type definitions
 │   ├── attendance.d.ts       # Attendance data types
 │   ├── course.d.ts           # Course types
+│   ├── exam.d.ts             # Exam and score types
 │   ├── user.d.ts             # User types
 │   ├── institution.d.ts      # Institution types
 │   ├── profile.d.ts          # User profile types
@@ -209,10 +217,18 @@ src/
 supabase/
 ├── config.toml               # Supabase local config
 └── migrations/               # Database schema migrations
-    ├── 20260217174834_remote_schema.sql       # Initial schema
-    ├── 20260221160000_encrypt_pii_fields.sql  # PII field encryption
-    ├── 20260221183457_revoke_anon_grants.sql  # Revoke anon role grants
+    ├── 20260217174834_remote_schema.sql                   # Initial schema
+    ├── 20260221160000_encrypt_pii_fields.sql               # PII field encryption
+    ├── 20260221183457_revoke_anon_grants.sql               # Revoke anon role grants
+    ├── 20260223000001_fix_delete_user_account_storage.sql  # Fix account deletion storage cleanup
+    ├── 20260224000001_enforce_iv_format.sql                # Enforce AES-IV hex format constraint
+    ├── 20260225000001_audit_log.sql                        # Audit log table and triggers
+    ├── 20260227000000_fix_check_225_search_path.sql        # Fix search_path in duty leave trigger
+    ├── 20260227000001_audit_log_rls_policy.sql             # RLS policies for audit log
     └── README.md
+workers/                      # Egress proxy source code (deployed as standalone workers)
+├── ezygo-proxy/              # Cloudflare Worker — Tier 1 outbound proxy for EzyGo API calls
+└── ezygo-proxy-aws/          # AWS Lambda — Tier 2 failover outbound proxy for EzyGo API calls
 ```
 
 ## 🧮 Attendance Calculation Algorithm
@@ -507,27 +523,102 @@ GhostClass uses **Vitest** for unit/component tests and **Playwright** for E2E t
 
 ### Test Structure
 
+The test suite spans 55 files covering every layer of the application.
+
 ```text
 src/
-├── app/(protected)/scores/__tests__/
-│   └── ScoresClient.test.tsx        # Scores page component tests (loading, error, stats, drawer)
-├── components/__tests__/
-│   └── error-boundary.test.tsx      # Error boundary component tests
+├── __tests__/
+│   └── proxy.test.ts                          # Middleware routing and auth redirect
+├── app/
+│   ├── __tests__/
+│   │   ├── robots.test.ts                     # Dynamic robots.txt generation
+│   │   └── sitemap.test.ts                    # Dynamic sitemap.xml generation
+│   ├── (protected)/
+│   │   ├── dashboard/__tests__/
+│   │   │   ├── DashboardClient.test.tsx       # Dashboard (background sync, error states)
+│   │   │   └── page.test.tsx                  # Dashboard page SSR
+│   │   ├── notifications/__tests__/
+│   │   │   └── NotificationsClient.test.tsx   # Notifications page
+│   │   ├── scores/__tests__/
+│   │   │   └── ScoresClient.test.tsx          # Scores: stats strip, drawer, accessibility
+│   │   └── tracking/__tests__/
+│   │       └── TrackingClient.test.tsx        # Manual tracking page
+│   ├── (public)/
+│   │   ├── build-info/__tests__/
+│   │   │   └── page.test.tsx                  # Build provenance page
+│   │   └── help/__tests__/
+│   │       └── HelpClient.test.tsx            # Help center page
+│   └── api/
+│       ├── analytics/track/__tests__/
+│       │   └── route.test.ts                  # GA4 event forwarding
+│       ├── auth/save-token/__tests__/
+│       │   └── route.test.ts                  # Token save endpoint
+│       ├── backend/__tests__/
+│       │   ├── route.test.ts                  # Backend proxy (auth, CSRF, origin)
+│       │   ├── route-failover.test.ts         # Egress tier failover logic
+│       │   └── route-ipv6.test.ts             # IPv6 host normalization
+│       ├── cron/sync/__tests__/
+│       │   └── route.test.ts                  # Attendance sync job
+│       ├── csrf/__tests__/
+│       │   └── route.test.ts                  # CSRF token generation
+│       ├── docs/__tests__/
+│       │   └── route.test.ts                  # API docs dev-only gate
+│       ├── health/__tests__/
+│       │   ├── route.test.ts                  # Basic health check
+│       │   └── ezygo/__tests__/route.test.ts  # EzyGo integration health
+│       ├── profile/__tests__/
+│       │   └── route.test.ts                  # Profile fetch (Origin check, PII crypto)
+│       └── provenance/__tests__/
+│           └── route.test.ts                  # Build provenance endpoint
+├── components/
+│   ├── __tests__/
+│   │   ├── error-boundary.test.tsx            # Error boundary UI
+│   │   ├── pwa-install-banner.test.tsx        # PWA install prompt banner
+│   │   └── sw-register.test.tsx               # Service worker registration
+│   ├── attendance/__tests__/
+│   │   ├── attendance-calendar.test.tsx       # Calendar view
+│   │   ├── attendance-chart.test.tsx          # Performance charts
+│   │   └── course-card.test.tsx               # Course card with bunk calculator
+│   ├── layout/__tests__/
+│   │   ├── footer.test.tsx                    # Footer component
+│   │   └── private-navbar.test.tsx            # Authenticated navbar
+│   ├── legal/__tests__/
+│   │   └── AcceptTermsForm.test.tsx           # Terms acceptance form
+│   ├── ui/__tests__/
+│   │   └── select.test.tsx                    # Shadcn Select component
+│   └── user/__tests__/
+│       ├── login-form.test.tsx                # Login form (auth, CSRF, error cases)
+│       └── password-reset-form.test.tsx       # Password reset flow
 ├── hooks/
-│   ├── __tests__/useUser.test.tsx   # User hook tests
+│   ├── __tests__/
+│   │   ├── use-csrf-token.test.tsx            # CSRF token management hook
+│   │   ├── usePWAInstall.test.ts              # PWA install hook
+│   │   └── useUser.test.tsx                   # User data hook
 │   └── courses/__tests__/
-│       ├── courses.test.tsx         # Course hook tests
-│       └── exams.test.tsx           # Exam data hook tests (useExams, useExamAnswers, useExamQuestions,
-│                                    #   useAllExamAnswers, useAllExamQuestions)
+│       ├── attendance.test.tsx                # Attendance data queries
+│       ├── courses.test.tsx                   # Course list queries
+│       └── exams.test.tsx                     # Exam hooks (useExams, answers, questions)
 └── lib/
     ├── __tests__/
-    │   ├── utils.test.ts            # Utility function tests
-    │   └── crypto.test.ts           # Encryption/decryption tests
-    └── logic/__tests__/
-        └── bunk.test.ts             # Attendance calculation tests
+    │   ├── analytics.test.ts                  # GA4 helpers
+    │   ├── circuit-breaker.test.ts            # Circuit breaker state machine
+    │   ├── crypto.test.ts                     # AES-256-GCM encryption/decryption
+    │   ├── csp.test.ts                        # CSP header generation
+    │   ├── duty-leave-error-handling.test.ts  # Duty leave (code 225) limit errors
+    │   ├── ezygo-batch-fetcher.test.ts        # Rate-limited batch fetcher
+    │   ├── logger.test.ts                     # Logger config and redaction
+    │   ├── utils.server.test.ts               # Server-only utilities
+    │   └── utils.test.ts                      # Shared utility functions
+    ├── logic/__tests__/
+    │   └── bunk.test.ts                       # Attendance calculation algorithm
+    └── security/__tests__/
+        ├── auth.test.ts                       # Auth helpers and logout
+        ├── auth-cookie.test.ts                # Cookie security attributes (SEC-02)
+        ├── csrf.test.ts                       # CSRF token validation
+        └── request-signing.test.ts            # Request HMAC signing
 e2e/
-├── homepage.spec.ts                 # Homepage E2E tests
-└── smoke.spec.ts                    # Smoke tests for critical paths
+├── homepage.spec.ts                           # Homepage E2E
+└── smoke.spec.ts                              # Critical path smoke tests
 ```
 
 ### Running Tests
@@ -556,11 +647,19 @@ Current test suite includes:
 
 - ✅ **Attendance Algorithm** (`bunk.test.ts`) - 100% coverage of calculation logic
 - ✅ **Encryption/Decryption** (`crypto.test.ts`) - AES-256-GCM encryption tests
-- ✅ **Utility Functions** (`utils.test.ts`) - Helper function validation
+- ✅ **Utility Functions** (`utils.test.ts`, `utils.server.test.ts`) - Shared and server-only helpers
+- ✅ **Security** (`auth-cookie.test.ts`, `csrf.test.ts`, `request-signing.test.ts`, `auth.test.ts`) - Cookie flags, CSRF tokens, HMAC signing
 - ✅ **Error Boundaries** (`error-boundary.test.tsx`) - Error handling UI
-- ✅ **Custom Hooks** - User and course data fetching
+- ✅ **Custom Hooks** - User, course, CSRF, and PWA install hooks
 - ✅ **Exam Data Hooks** (`exams.test.tsx`) - All 5 exam hooks: fetching, parallel queries, error isolation, stale-time config
 - ✅ **Scores Page** (`ScoresClient.test.tsx`) - Loading/error/empty states, stats strip, course grouping, score display, visibility rules, per-question drawer, accessibility (ARIA roles, focus management)
+- ✅ **Attendance Components** (`course-card.test.tsx`, `attendance-chart.test.tsx`, `attendance-calendar.test.tsx`) - Rendering, interaction, touch events
+- ✅ **API Routes** - All 14 API route handlers tested: auth, backend proxy, cron sync, profile (PII crypto), CSRF, health, docs gate, provenance, analytics
+- ✅ **Backend Proxy** (`route.test.ts`, `route-failover.test.ts`, `route-ipv6.test.ts`) - Origin validation, egress failover, IPv6 normalization
+- ✅ **Circuit Breaker** (`circuit-breaker.test.ts`) - State machine transitions and half-open requests
+- ✅ **CSP** (`csp.test.ts`) - Content Security Policy header generation with nonces
+- ✅ **PWA** (`pwa-install-banner.test.tsx`, `usePWAInstall.test.ts`, `sw-register.test.tsx`) - Install prompt, SW registration
+- ✅ **Pages** - Dashboard, notifications, scores, tracking, build-info, help
 - ✅ **E2E Smoke Tests** - Critical user flows
 
 **Coverage Goals:**
@@ -624,7 +723,7 @@ GhostClass implements multiple layers of security:
 - **Row Level Security** - Supabase RLS policies ensure users only access their data
 - **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, and Referrer-Policy
 - **Input Validation** - Zod schemas validate all user input
-- **HttpOnly Cookies** - Sensitive data stored in secure, httpOnly cookies
+- **HttpOnly Cookies** - Session token stored in a `httpOnly`, `SameSite=Lax` cookie. `Lax` (not `Strict`) is intentional: `Strict` blocks the cookie on top-level navigations (PWA standalone launch, bookmarks), causing an infinite redirect loop. All mutations are protected by CSRF tokens so `Lax` doesn't weaken mutation safety.
 - **Origin Validation** - Strict origin checking in production (disabled in dev)
 - **Cloudflare Turnstile** - Bot protection on public endpoints
 
@@ -648,6 +747,8 @@ GhostClass uses a two-tier secret management strategy:
 - `UPSTASH_REDIS_REST_*` - Rate limiting credentials
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile validation
 - Email provider credentials
+- `CF_PROXY_URL` / `CF_PROXY_SECRET` - Cloudflare Worker egress proxy (Tier 1 outbound for EzyGo API)
+- `AWS_SECONDARY_URL` / `AWS_SECONDARY_SECRET` - AWS Lambda egress proxy (Tier 2 outbound failover)
 
 See [.example.env](.example.env) for complete list with descriptions.
 
@@ -704,7 +805,7 @@ For more details, see [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md#versioning--r
 5. ✅ Set up Redis instance for rate limiting
 6. ✅ Configure email service (Brevo or SendPulse)
 7. ✅ Enable HTTPS with valid SSL certificate
-8. ✅ Set up cron jobs for attendance sync
+8. ✅ Set up cron jobs for attendance sync — see [Cron Job Setup](docs/DEVELOPER_GUIDE.md#cron-job-setup)
 9. ✅ Configure legal terms version and effective date
 10. ✅ Set up GPG signing and Bot PAT for automated workflows (see [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md))
 
@@ -720,7 +821,7 @@ The original fork exposed the EzyGo bearer token in client-side JavaScript and t
 
 **Can GhostClass get rate-limited by EzyGo?**
 
-Yes — since all users share the server's outbound IP, EzyGo sees a single client. The batch fetcher, LRU cache, and `MAX_CONCURRENT` cap are designed to keep outbound request volume low. If you run a large deployment (hundreds of concurrent users), consider increasing the cache TTL or deploying multiple instances behind different IPs.
+Unlikely in normal deployments. EzyGo API calls are routed through the egress proxy chain (Cloudflare Worker → AWS Lambda → direct), so EzyGo sees the proxy's IP rather than the server's IP. The batch fetcher, LRU cache, and `MAX_CONCURRENT` cap further reduce outbound request volume.
 
 **Is my EzyGo password stored anywhere?**
 

@@ -13,6 +13,46 @@ declare const self: ServiceWorkerGlobalScope & {
   }>;
 };
 
+// ---------------------------------------------------------------------------
+// CRITICAL — Early-exit fetch handler for navigations and Sentry tunnel.
+//
+// Registered BEFORE Serwist's listeners so it fires first.  For matched
+// requests we call `stopImmediatePropagation()` to prevent Serwist from
+// calling `event.respondWith()`, then return without responding — the
+// browser handles the request natively (direct network fetch).
+//
+// Why this matters:
+//   • Navigations: Serwist's NetworkOnly handler does
+//     `event.respondWith(fetch(req))`, which re-fetches inside the SW
+//     context.  On Android Chrome standalone mode this can truncate
+//     Next.js Suspense SSR streaming responses, producing a blank page
+//     (header + footer only, no content).  Letting the browser handle
+//     navigations natively avoids this entirely.
+//   • Sentry tunnel (/monitoring): The Sentry SDK can generate 100+
+//     POST requests per second during error/replay bursts.  Letting
+//     each pass through Serwist's precache-check → runtime-cache-check
+//     pipeline adds unnecessary SW main-thread work.  Bypassing Serwist
+//     entirely eliminates that overhead.
+// ---------------------------------------------------------------------------
+self.addEventListener("fetch", (event) => {
+  // 1. Navigation requests — let browser handle SSR streaming natively
+  if (event.request.mode === "navigate") {
+    event.stopImmediatePropagation();
+    return; // no respondWith() → browser fetches directly
+  }
+
+  // 2. Sentry tunnel — bypass SW entirely to avoid overhead during bursts
+  try {
+    const url = new URL(event.request.url);
+    if (url.pathname.startsWith("/monitoring")) {
+      event.stopImmediatePropagation();
+      return;
+    }
+  } catch {
+    // Malformed URL — let Serwist handle it
+  }
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   // Wait for all clients to close before activating new service worker.
@@ -28,25 +68,21 @@ const serwist = new Serwist({
   // mid-stream of Next.js Suspense SSR streaming (DashboardDataLoader),
   // aborting the in-flight response and producing a blank page.
   //
-  // The NetworkOnly navigation handler below ensures SSR pages always load
-  // from the network, so clientsClaim: false is safe — the SW never serves
-  // stale cached HTML. Manual refresh always works because the SW is
-  // already active by the time the user navigates.
+  // Navigation requests are now fully bypassed in the early-exit fetch
+  // handler above, so the SW never touches SSR streaming at all.
   clientsClaim: false,
   // Disable navigation preload: Next.js uses streaming SSR (Suspense), and
   // navigation preload can produce duplicate or interleaved response streams
   // that interfere with chunk delivery.
   navigationPreload: false,
   runtimeCaching: [
-    // CRITICAL — NetworkOnly for all navigation (document) requests.
+    // DEFENSE-IN-DEPTH — NetworkOnly fallback for navigations.
     //
-    // All protected pages use `export const dynamic = 'force-dynamic'`, which
-    // means every page response is a fresh server-render. Without this rule,
-    // Serwist's precache router intercepts the navigation fetch on standalone
-    // PWA launches, finds no precache entry for the dynamic route, and falls
-    // through with undefined — producing a blank page. Explicitly routing
-    // navigations to the network ensures SSR pages always load correctly,
-    // regardless of SW lifecycle state or precache contents.
+    // The early-exit fetch handler above uses stopImmediatePropagation()
+    // to bypass Serwist for all navigations.  This rule exists purely as
+    // a safety net: if a browser ever fails to honour stopImmediatePropagation()
+    // on SW FetchEvent, this ensures navigations still go to the network
+    // rather than being served from precache (which would produce a blank page).
     {
       matcher: ({ request }) => request.mode === "navigate",
       handler: new NetworkOnly(),

@@ -33,14 +33,7 @@ export function PWAInstallBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isInstalled) {
-      // Hide immediately if the app transitions to standalone mid-session
-      // (e.g. user installs via browser menu while the banner is showing).
-      setVisible(false);
-      return;
-    }
-    if (!canInstall) return;
-    if (!shouldShowBanner(isInstalled)) return;
+    if (isInstalled || !canInstall || !shouldShowBanner(isInstalled)) return;
 
     const timer = setTimeout(() => {
       setVisible(true);
@@ -57,15 +50,9 @@ export function PWAInstallBanner() {
         localStorage.setItem(STORAGE_KEY, "installed");
         // Show the success toast first so the user sees the instruction
         // before the tab potentially closes.
-        toast.success("GhostClass installed!", {
-          description: "Open it from your home screen.",
+        toast.success("GhostClass is installing!", {
+          description: "Next time, open it from your home screen.",
         });
-        // Best-effort: close the browser tab after a brief delay so the
-        // toast renders before the tab disappears.
-        // window.close() only works for tabs opened via window.open(); on
-        // user-opened tabs it silently fails — the toast above serves as
-        // the fallback instruction in that case.
-        setTimeout(() => window.close(), 300);
       } else {
         // User cancelled the native dialog or it was unavailable — snooze
         // so the banner can re-appear after the snooze period.
@@ -88,7 +75,7 @@ export function PWAInstallBanner() {
 
   return (
     <AnimatePresence>
-        {visible && (
+        {visible && !isInstalled && (
           <m.div
             key="pwa-install-banner"
             initial={{ opacity: 0, y: 24 }}

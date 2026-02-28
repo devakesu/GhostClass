@@ -12,6 +12,7 @@ import { encrypt, decrypt } from "@/lib/crypto";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
+import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { redact } from "@/lib/utils";
@@ -50,7 +51,47 @@ function resolve(
 // GET – fetch profile
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // 0. Origin validation (defence-in-depth)
+  // Prevents a cross-site top-level navigation from triggering a profile sync
+  // upsert via the slow path. Response is already protected by CORS/SOP, but
+  // Origin validation closes the gap consistently with /api/backend/[...path].
+  // Skipped in development so localhost / tunnels work without extra config.
+  if (process.env.NODE_ENV !== "development") {
+    const allowedHosts = getAllowedHosts();
+    if (!allowedHosts) {
+      logger.error("GET /api/profile: NEXT_PUBLIC_APP_DOMAIN is missing or blank in production");
+      Sentry.captureMessage("Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing for /api/profile", {
+        level: "error",
+      });
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+    }
+
+    const origin = req.headers.get("origin");
+    if (!origin) {
+      // Some same-origin GET requests omit Origin — allow when Sec-Fetch-Site says
+      // same-origin and the effective request hostname is in the allowlist.
+      const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
+      const requestHostname = resolveRequestHostname(req);
+      const isAllowedSameOriginRead =
+        secFetchSite === "same-origin" &&
+        !!requestHostname &&
+        allowedHosts.has(requestHostname);
+      if (!isAllowedSameOriginRead) {
+        return NextResponse.json({ error: "Origin header required" }, { status: 400 });
+      }
+    } else {
+      try {
+        const originHostname = new URL(origin).hostname.toLowerCase();
+        if (!allowedHosts.has(originHostname)) {
+          return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ error: "Invalid origin header" }, { status: 400 });
+      }
+    }
+  }
+
   const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
 

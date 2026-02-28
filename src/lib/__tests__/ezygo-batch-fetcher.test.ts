@@ -338,8 +338,9 @@ describe('EzyGo Batch Fetcher', () => {
           fetchEzygoData('/endpoint3', token),
         ]);
         
-        // clearTimeout should be called for each request
-        expect(clearTimeoutSpy).toHaveBeenCalledTimes(3);
+        // clearTimeout should be called for each request: once for the batch-fetcher's
+        // own createTimeoutSignal fallback, and once for egressFetch's per-tier timeout.
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(6);
         
         clearTimeoutSpy.mockRestore();
       } finally {
@@ -358,19 +359,15 @@ describe('EzyGo Batch Fetcher', () => {
 
       await fetchEzygoData('/myprofile', 'test-token', 'GET');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.example.com/myprofile',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-          }),
-        })
-      );
-      
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toBe('https://api.example.com/myprofile');
+      expect(calledInit.method).toBe('GET');
+      const h = calledInit.headers as Headers;
+      expect(h.get('Authorization')).toBe('Bearer test-token');
+
       // Verify Content-Type is NOT set for GET requests
-      const fetchCall = (global.fetch as any).mock.calls[0][1];
-      expect(fetchCall.headers['Content-Type']).toBeUndefined();
+      expect(h.get('Content-Type')).toBeNull();
     });
 
     it('should include body for POST requests', async () => {
@@ -382,17 +379,14 @@ describe('EzyGo Batch Fetcher', () => {
       const body = { key: 'value' };
       await fetchEzygoData('/endpoint', 'test-token', 'POST', body);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.example.com/endpoint',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify(body),
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toBe('https://api.example.com/endpoint');
+      expect(calledInit.method).toBe('POST');
+      expect(calledInit.body).toBe(JSON.stringify(body));
+      const h = calledInit.headers as Headers;
+      expect(h.get('Authorization')).toBe('Bearer test-token');
+      expect(h.get('Content-Type')).toBe('application/json');
     });
 
     it('should prefer CF proxy URL and include CF secret header when configured', async () => {
@@ -406,16 +400,13 @@ describe('EzyGo Batch Fetcher', () => {
 
       await fetchEzygoData('/myprofile', 'test-token', 'GET');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://cf-proxy.example.com/myprofile',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-            'x-proxy-secret': 'cf-secret',
-          }),
-        })
-      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toBe('https://cf-proxy.example.com/myprofile');
+      expect(calledInit.method).toBe('GET');
+      const h = calledInit.headers as Headers;
+      expect(h.get('Authorization')).toBe('Bearer test-token');
+      expect(h.get('x-proxy-secret')).toBe('cf-secret');
     });
 
     it('should fall back to AWS secondary URL and include AWS secret header when CF is absent', async () => {
@@ -429,16 +420,13 @@ describe('EzyGo Batch Fetcher', () => {
 
       await fetchEzygoData('/myprofile', 'test-token', 'GET');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://aws-proxy.example.com/myprofile',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-            'x-proxy-secret': 'aws-secret',
-          }),
-        })
-      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toBe('https://aws-proxy.example.com/myprofile');
+      expect(calledInit.method).toBe('GET');
+      const h = calledInit.headers as Headers;
+      expect(h.get('Authorization')).toBe('Bearer test-token');
+      expect(h.get('x-proxy-secret')).toBe('aws-secret');
     });
 
     it('should prefer CF over AWS when both egress tiers are configured', async () => {
@@ -454,16 +442,13 @@ describe('EzyGo Batch Fetcher', () => {
 
       await fetchEzygoData('/myprofile', 'test-token', 'GET');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://cf-proxy.example.com/myprofile',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-            'x-proxy-secret': 'cf-secret',
-          }),
-        })
-      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
+      expect(calledUrl).toBe('https://cf-proxy.example.com/myprofile');
+      expect(calledInit.method).toBe('GET');
+      const h = calledInit.headers as Headers;
+      expect(h.get('Authorization')).toBe('Bearer test-token');
+      expect(h.get('x-proxy-secret')).toBe('cf-secret');
     });
 
     it('should handle endpoints with leading slash', async () => {

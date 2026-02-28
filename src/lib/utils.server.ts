@@ -186,30 +186,140 @@ export function getEgressConfig(): {
 }
 
 // ---------------------------------------------------------------------------
-// egressFetch — thin fetch wrapper that auto-applies egress URL + proxy headers
+// egressFetch — multi-tier fetch wrapper with automatic failover
 // ---------------------------------------------------------------------------
 
+// Retryable upstream statuses — mirrors the backend proxy route.
+// On these statuses the next configured egress tier is tried transparently.
+const RETRYABLE_EGRESS_STATUSES = new Set([429, 502, 503, 504]);
+
+// Per-tier fetch timeout: if a tier does not respond within this window we fail
+// over to the next tier. Chosen to be shorter than typical caller budgets (8–15 s)
+// so failover can occur within the overall request budget.
+const PER_TIER_TIMEOUT_MS = 10_000;
+
+interface EgressTarget {
+  readonly baseUrl: string;
+  readonly proxyHeaders: Record<string, string>;
+  readonly name: string;
+}
+
 /**
- * Fetch wrapper for server-side EzyGo calls. Resolves the highest-priority
- * egress tier, builds the full request URL, and injects the proxy secret header
- * automatically. Callers supply only the endpoint path and their own headers
- * (e.g. Authorization). All other `RequestInit` options are forwarded as-is.
+ * Returns the ordered list of configured egress targets:
+ *   Tier 1 — CF_PROXY_URL      (Cloudflare Worker, optional)
+ *   Tier 2 — AWS_SECONDARY_URL (AWS Lambda, optional)
+ *   Tier 3 — NEXT_PUBLIC_BACKEND_URL (direct EzyGo, always present when set)
+ * Each tier is included only when its URL env var is non-empty.
  */
-export function egressFetch(
+function buildEgressTargets(): EgressTarget[] {
+  const targets: EgressTarget[] = [];
+
+  const cfUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
+  if (cfUrl) {
+    const secret = process.env.CF_PROXY_SECRET?.trim();
+    targets.push({ baseUrl: cfUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "primary (CF Worker)" });
+  }
+
+  const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
+  if (awsUrl) {
+    const secret = process.env.AWS_SECONDARY_SECRET?.trim();
+    targets.push({ baseUrl: awsUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "secondary (AWS)" });
+  }
+
+  const directUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+  if (directUrl) {
+    targets.push({ baseUrl: directUrl, proxyHeaders: {}, name: "direct" });
+  }
+
+  return targets;
+}
+
+/**
+ * Fetch wrapper for server-side EzyGo calls with multi-tier egress failover.
+ *
+ * Loops through the configured tiers (CF Worker → AWS Lambda → direct EzyGo)
+ * and transparently fails over on 429 / 502 / 503 / 504 responses or network
+ * errors. Non-retryable statuses (most 4xx) are returned immediately without
+ * retrying on other tiers. Callers supply only the endpoint path and their own
+ * headers (e.g. Authorization); proxy secrets are injected automatically per tier.
+ *
+ * Each tier is given its own PER_TIER_TIMEOUT_MS budget via a fresh AbortController
+ * combined with the caller's signal (AbortSignal.any). This prevents a slow tier
+ * from consuming the entire caller budget, and prevents an already-aborted caller
+ * signal from being shared across retries (which would make every retry fail
+ * immediately). When the caller's own signal fires, failover is halted immediately.
+ */
+export async function egressFetch(
   endpoint: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const { baseUrl, proxyHeaders } = getEgressConfig();
-  const cleanEndpoint = endpoint.replace(/^\/+/, "");
-  const url = `${baseUrl}/${cleanEndpoint}`;
-  const headers = new Headers(init?.headers);
-  for (const [key, value] of Object.entries(proxyHeaders)) {
-    headers.set(key, value);
+  const targets = buildEgressTargets();
+  if (targets.length === 0) {
+    throw new Error("No egress targets configured — set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL");
   }
-  return fetch(url, {
-    ...init,
-    headers,
-  });
+
+  const cleanEndpoint = endpoint.replace(/^\/+/, "");
+  // Preserve the caller's signal to distinguish deliberate cancellation from
+  // per-tier timeouts when deciding whether to fail over.
+  const callerSignal = init?.signal ?? null;
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const isLast = i === targets.length - 1;
+    const url = `${target.baseUrl}/${cleanEndpoint}`;
+
+    // Merge caller headers then apply per-tier proxy headers (proxy secret takes precedence).
+    const headers = new Headers(init?.headers);
+    for (const [key, value] of Object.entries(target.proxyHeaders)) {
+      headers.set(key, value);
+    }
+
+    // Create a per-tier AbortController + timeout so that:
+    //   a) A slow/hung tier is abandoned after PER_TIER_TIMEOUT_MS and we fail over.
+    //   b) The caller's signal is combined into this tier's signal so deliberate
+    //      cancellation (e.g. overall request budget exhausted) is still honoured.
+    // AbortSignal.any() is available in Node.js ≥ 20.3 (required env: ≥ 20.19).
+    const tierController = new AbortController();
+    const tierTimeout = setTimeout(() => tierController.abort(), PER_TIER_TIMEOUT_MS);
+    const tierSignal: AbortSignal =
+      callerSignal !== null
+        ? AbortSignal.any([callerSignal, tierController.signal])
+        : tierController.signal;
+
+    try {
+      const res = await fetch(url, { ...init, headers, signal: tierSignal });
+      clearTimeout(tierTimeout);
+
+      if (RETRYABLE_EGRESS_STATUSES.has(res.status) && !isLast) {
+        // console.warn used deliberately — see logger import note at top of utils.server.ts.
+        console.warn(
+          `[egress-failover] ${target.name} returned ${res.status} for ${cleanEndpoint} — failing over to next tier`
+        );
+        // Drain the body to release the connection before trying the next tier.
+        await res.body?.cancel?.();
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      clearTimeout(tierTimeout);
+      // If the caller's own signal was aborted (not the per-tier timeout), propagate
+      // immediately — the overall request budget is exhausted and failover won't help.
+      if (callerSignal?.aborted && err instanceof Error && err.name === "AbortError") {
+        throw err;
+      }
+      if (isLast) throw err;
+      // console.warn used deliberately — see logger import note at top of utils.server.ts.
+      console.warn(
+        `[egress-failover] ${target.name} failed for ${cleanEndpoint} — failing over to next tier:`,
+        err instanceof Error ? err.message : String(err)
+      );
+      continue;
+    }
+  }
+
+  // This line is unreachable: the last iteration always returns or throws.
+  throw new Error("[egress-failover] unreachable: exhausted all egress tiers without returning");
 }
 
 // ---------------------------------------------------------------------------

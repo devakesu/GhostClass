@@ -5,7 +5,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 2.1.4
+  version: 2.1.5
   description: |
     **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
     
@@ -788,6 +788,10 @@ paths:
         background job quietly refreshing EzyGo fields for the next call.
         
         **Slow path:** First-time after login — EzyGo is called inline to seed the row.
+        
+        **Origin validation:** In production, requests must include a matching `Origin`
+        header (or `Sec-Fetch-Site: same-origin`). Cross-site requests are rejected
+        with 400/403 as defence-in-depth against CSRF on this read path.
       
       operationId: getProfile
       
@@ -803,14 +807,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserProfile'
-        '401':
-          description: Not authenticated
+        '400':
+          description: Origin header missing (and Sec-Fetch-Site is not same-origin)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '502':
-          description: EzyGo API unavailable during slow-path sync
+        '403':
+          description: Origin not allowed (cross-site request rejected in production)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
           content:
             application/json:
               schema:

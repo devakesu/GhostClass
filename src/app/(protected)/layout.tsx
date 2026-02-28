@@ -2,7 +2,6 @@
 
 import { Navbar } from "@/components/layout/private-navbar";
 import { Footer } from "@/components/layout/footer";
-import { Loading } from "@/components/loading";
 import { useInstitutions } from "@/hooks/users/institutions";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -21,9 +20,15 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  // Track authorization state: 'checking' initially, 'authorized' once confirmed
-  // Unauthorized cases redirect immediately rather than setting a state
-  const [authState, setAuthState] = useState<'checking' | 'authorized'>('checking');
+  // IMPORTANT — No loading state is tracked here.
+  //
+  // The server middleware (proxy.ts) already verified the Supabase session
+  // and would have redirected to "/" if the user isn't authenticated.
+  // By the time this layout renders, auth is guaranteed server-side.
+  //
+  // The useEffect below still validates the session client-side as
+  // defense-in-depth; if the session is invalid it calls handleLogout().
+  // On success it is a no-op. On failure it redirects — no loading UI needed.
   const [isHidden, setIsHidden] = useState(false);
   const { scrollY } = useScroll();
   const lastScrollY = useRef(0);
@@ -96,8 +101,6 @@ export default function ProtectedLayout({
         // from client-side JavaScript; it's automatically sent with API requests and validated
         // server-side. Any additional validation should occur on the server (e.g., via a server
         // action or API endpoint).
-
-        if (active) setAuthState('authorized');
       } catch (err) {
         if (active) {
           // Log the error for debugging, then attempt logout
@@ -120,24 +123,13 @@ export default function ProtectedLayout({
     };
   }, [router]); 
 
-  // Determine if we should show content or loading
-  const isAuthorized = authState === 'authorized';
-  const showLoading = authState === 'checking' || !isAuthorized;
-
   return (
     <ErrorBoundary>
       <div className="flex min-h-screen flex-col" suppressHydrationWarning>
         <Toaster />
-        {/* Show loading state while checking auth or if institutions are loading/error */}
-        {showLoading && (
-          <div className="h-screen flex items-center justify-center" suppressHydrationWarning>
-            <Loading />
-          </div>
-        )}
-
-        {/* Only render protected content when definitively authorized and institutions loaded */}
-        {!showLoading && (
-          <>
+        {/* Middleware already verified auth server-side; content renders immediately. */}
+        {/* Client-side session validation runs in useEffect above as defense-in-depth. */}
+        <>
             <LazyMotion features={domAnimation}>
             <motion.div
               variants={{
@@ -174,7 +166,6 @@ export default function ProtectedLayout({
             
             <Footer />
           </>
-        )}
       </div>
     </ErrorBoundary>
   );

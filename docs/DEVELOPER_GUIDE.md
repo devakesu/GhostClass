@@ -13,6 +13,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 - [Versioning & Releases](#versioning--releases)
 - [Release Verification](#release-verification)
 - [Known Issues](#known-issues)
+- [Cron Job Setup](#cron-job-setup)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -818,6 +819,90 @@ npm audit
 npm audit
 # → found 0 vulnerabilities
 ```
+
+---
+
+## Cron Job Setup
+
+GhostClass has a server-side attendance sync job at `GET /api/cron/sync` that polls EzyGo for all active users and writes updated attendance data to Supabase. It must be triggered by an external scheduler.
+
+### Authentication
+
+The endpoint uses Bearer token auth. Set a strong random secret in your runtime environment:
+
+```bash
+# Generate CRON_SECRET (add to your server env vars)
+openssl rand -base64 32
+```
+
+```env
+# .env (runtime secret — never bake into the image)
+CRON_SECRET=<your-generated-secret>
+```
+
+### Calling the Endpoint
+
+```bash
+curl -s \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  https://your-app.com/api/cron/sync
+```
+
+A successful response returns HTTP 200 with a JSON summary:
+
+```json
+{
+  "success": true,
+  "processed": 42,
+  "failed": 0,
+  "skipped": 0,
+  "duration_ms": 3120
+}
+```
+
+Partial failures (some users synced, some not) return HTTP 207 with per-user error details.
+
+### Recommended Frequency
+
+| Use case | Interval |
+| --- | --- |
+| Typical deployment | Every 30 minutes |
+| Low-traffic / cost-sensitive | Hourly |
+| High-traffic / near-real-time | Every 15 minutes |
+
+Avoid sub-5-minute intervals — EzyGo rate-limits outbound requests and the batch fetcher serialises up to `CONCURRENCY_LIMIT=2` users at a time.
+
+### GitHub Actions Schedule
+
+Add a workflow to `.github/workflows/cron-sync.yml`:
+
+```yaml
+name: Attendance Sync
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 minutes
+  workflow_dispatch:           # allow manual runs
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        run: |
+          curl -sf \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.NEXT_PUBLIC_APP_URL }}/api/cron/sync"
+```
+
+Add `CRON_SECRET` as a **GitHub Secret** and `NEXT_PUBLIC_APP_URL` as a **GitHub Variable**.
+
+### Alternative Schedulers
+
+Any HTTP scheduler works — Vercel Cron Jobs, EasyCron, cron-job.org, AWS EventBridge, a simple systemd timer, etc. The only requirement is the `Authorization: Bearer <CRON_SECRET>` header on a `GET` request to `/api/cron/sync`.
+
+### Rate-Limit Quota
+
+The endpoint is protected by Upstash Redis rate limiting. If you receive HTTP 429, wait for the next window (the `Retry-After` header gives the exact wait time in seconds) before retrying.
 
 ---
 

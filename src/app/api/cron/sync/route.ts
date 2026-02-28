@@ -176,19 +176,31 @@ export async function GET(req: Request) {
       }
     }
 
-    const { success, reset } = await syncRateLimiter.limit(ip);
-
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many requests", retryAfter: reset },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
-            "X-RateLimit-Reset": reset.toString(),
-          },
-        }
-      );
+    try {
+      const { success, reset } = await syncRateLimiter.limit(ip);
+      if (!success) {
+        return NextResponse.json(
+          { error: "Too many requests", retryAfter: reset },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+              "X-RateLimit-Reset": reset.toString(),
+            },
+          }
+        );
+      }
+    } catch (redisError) {
+      // Redis quota exhausted or connection failure — fail-open to preserve functionality.
+      // Rate limiting is best-effort; losing it temporarily is preferable to blocking
+      // all legitimate sync requests. Log and alert via Sentry.
+      logger.warn("[cron-sync] Rate limiter Redis error — failing open", {
+        error: redisError instanceof Error ? redisError.message : String(redisError),
+      });
+      Sentry.captureException(redisError, {
+        level: "warning",
+        tags: { type: "redis_ratelimit_error", location: "cron/sync" },
+      });
     }
   }
 

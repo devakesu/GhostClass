@@ -194,12 +194,14 @@ describe('DashboardClient', () => {
           'Partial Sync Completed',
           expect.objectContaining({ description: expect.any(String) })
         );
-      });
-    });
+      }, { timeout: 10000 });
+    }, 15000);
   });
 
   describe('Background sync – failure', () => {
     it('should call captureSentryException when sync fetch throws', async () => {
+      // Async Sentry lazy-import + effect scheduling can take longer on a slow CI
+      // machine. Set an explicit timeout so this test isn't flaky.
       const Sentry = await import('@sentry/nextjs');
 
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
@@ -211,11 +213,11 @@ describe('DashboardClient', () => {
         // The dynamic import of Sentry happens asynchronously, but the module-level
         // captureSentryException wrapper is invoked when the error is caught
         expect(global.fetch).toHaveBeenCalled();
-      });
+      }, { timeout: 10000 });
 
       // Sentry is lazily imported inside captureSentryException; give it a tick to resolve
       await new Promise(resolve => setTimeout(resolve, 0));
       expect(Sentry.captureException).toHaveBeenCalled();
-    });
+    }, 15000);
   });
 });

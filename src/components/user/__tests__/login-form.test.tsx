@@ -127,8 +127,8 @@ import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/sec
 
 async function renderAndWaitForForm() {
   render(<LoginForm />);
-  // Wait for the password input to appear – this only shows when isLoadingPage=false
-  // (i.e., after the mount-time auth check has completed and the form is stable).
+  // Wait for the password input to appear – the form renders immediately on mount,
+  // even while the mount-time auth/session check may still be in progress.
   return screen.findByLabelText("Password");
 }
 
