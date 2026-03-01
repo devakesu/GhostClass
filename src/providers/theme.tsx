@@ -19,7 +19,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = "ghostclass-theme";
+export const STORAGE_KEY = "ghostclass-theme";
 
 /**
  * Reads the persisted theme from localStorage.

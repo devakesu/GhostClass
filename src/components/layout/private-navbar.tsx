@@ -385,7 +385,7 @@ export const Navbar = () => {
                     ) : (
                       <Sun className="h-4 w-4" aria-hidden="true" />
                     )}
-                    <label htmlFor="theme-toggle" className="text-sm cursor-pointer">
+                    <label className="text-sm cursor-pointer" onClick={toggleTheme}>
                       Dark Mode
                     </label>
                   </div>

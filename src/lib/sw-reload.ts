@@ -55,10 +55,12 @@ export function reloadWithUpdate(): void {
 
       // A new SW is queued. Activate it, then reload.
       let reloaded = false;
+      let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
 
       const doReload = () => {
         if (!reloaded) {
           reloaded = true;
+          clearTimeout(reloadTimeout);
           window.location.reload();
         }
       };
@@ -68,9 +70,18 @@ export function reloadWithUpdate(): void {
         once: true,
       });
 
-      // Safety net: if controllerchange never arrives within 3 s (e.g. the
-      // new SW calls skipWaiting but doesn't claim clients), reload anyway.
-      setTimeout(doReload, 3000);
+      // Secondary signal: waiting worker reached 'activated' state.
+      // Fires even when clientsClaim: false (where controllerchange may never
+      // fire), ensuring we reload after the new SW is actually in control.
+      waitingWorker.addEventListener("statechange", function onActivated() {
+        if (waitingWorker.state === "activated") {
+          waitingWorker.removeEventListener("statechange", onActivated);
+          doReload();
+        }
+      });
+
+      // Safety net: if neither signal arrives within 3 s, reload anyway.
+      reloadTimeout = setTimeout(doReload, 3000);
 
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
     } catch {
@@ -138,9 +149,12 @@ export function tryAutoUpdate(): void {
       sessionStorage.setItem(AUTO_UPDATE_GUARD_KEY, "1");
 
       let reloaded = false;
+      let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
+
       const doReload = () => {
         if (!reloaded) {
           reloaded = true;
+          clearTimeout(reloadTimeout);
           window.location.reload();
         }
       };
@@ -148,8 +162,16 @@ export function tryAutoUpdate(): void {
       navigator.serviceWorker.addEventListener("controllerchange", doReload, {
         once: true,
       });
-      // Safety net: if controllerchange never fires within 3 s, reload anyway.
-      setTimeout(doReload, 3000);
+      // Secondary signal: waiting worker reached 'activated' state.
+      // Fires even when clientsClaim: false (where controllerchange may never fire).
+      waitingWorker.addEventListener("statechange", function onActivated() {
+        if (waitingWorker.state === "activated") {
+          waitingWorker.removeEventListener("statechange", onActivated);
+          doReload();
+        }
+      });
+      // Safety net: if neither signal arrives within 3 s, reload anyway.
+      reloadTimeout = setTimeout(doReload, 3000);
 
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
     } catch {
