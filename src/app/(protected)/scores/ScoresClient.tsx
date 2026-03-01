@@ -719,12 +719,17 @@ export default function ScoresClient() {
     [router, pathname, searchParams]
   );
 
-  // Programmatic close: go back to pop the ?panel=1 entry we pushed.
-  // If somehow the param is already gone (e.g. user navigated manually),
-  // just clear state directly.
+  // Programmatic close: replace the URL with panel param removed.
+  // This is safe regardless of whether openDrawer used push or replace,
+  // since we never risk navigating to a different page.
+  // The Android back button still works via the history entry pushed by openDrawer
+  // (when panel was absent), caught by the useEffect below.
   const closeDrawer = useCallback(() => {
     if (searchParams.get("panel")) {
-      router.back();
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete("panel");
+      const params = nextParams.toString();
+      router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
     } else {
       setSelectedExam(null);
     }

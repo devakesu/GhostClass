@@ -23,12 +23,16 @@ const mockRouterPush = vi.fn((url: string) => {
   const q = url.split('?')[1];
   _searchParams = new URLSearchParams(q ?? '');
 });
+const mockRouterReplace = vi.fn((url: string) => {
+  const q = url.split('?')[1];
+  _searchParams = new URLSearchParams(q ?? '');
+});
 const mockRouterBack = vi.fn(() => { _searchParams = new URLSearchParams(); });
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
-    replace: vi.fn(),
+    replace: mockRouterReplace,
     prefetch: vi.fn(),
     back: mockRouterBack,
     forward: vi.fn(),
@@ -548,8 +552,9 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      // Close triggers router.back() which pops the ?panel=1 entry.
-      expect(mockRouterBack).toHaveBeenCalledTimes(1)
+      // Close triggers router.replace() to strip the panel param (safe regardless of
+      // whether openDrawer used push or replace).
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
       // Simulate re-render after navigation clears the URL param.
       rerender(<ScoresClient />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -563,7 +568,7 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })
-      expect(mockRouterBack).toHaveBeenCalledTimes(1)
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
       // Simulate re-render after navigation clears the URL param.
       rerender(<ScoresClient />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
