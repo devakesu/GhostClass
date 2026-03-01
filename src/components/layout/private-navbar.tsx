@@ -385,7 +385,7 @@ export const Navbar = () => {
                     ) : (
                       <Sun className="h-4 w-4" aria-hidden="true" />
                     )}
-                    <span id="theme-toggle-label" className="text-sm cursor-pointer" onClick={toggleTheme}>
+                    <span id="theme-toggle-label" className="text-sm">
                       Dark Mode
                     </span>
                   </div>
