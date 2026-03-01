@@ -214,13 +214,13 @@ export default function ProfileClient() {
                       }
                     }}
                     aria-label="Change profile picture"
-                    className={`relative w-full h-full rounded-full ring-4 ring-background border-2 border-white/10 z-10 cursor-pointer transition-all duration-300 ${isUploading ? 'opacity-80' : 'group-hover:opacity-90'}`}
+                    className={`relative w-full h-full rounded-full ring-4 ring-background border-2 border-border/30 z-10 cursor-pointer transition-all duration-300 ${isUploading ? 'opacity-80' : 'group-hover:opacity-90'}`}
                   >
                     <Image
                       src={displayAvatar}
                       alt="Profile"
                       fill
-                      className="object-cover rounded-full" 
+                      className={`object-cover rounded-full${typeof displayAvatar === 'object' ? ' brightness-150 dark:brightness-100' : ''}`}
                       priority
                       unoptimized={!!avatarPreview?.startsWith('blob:')}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -271,7 +271,7 @@ export default function ProfileClient() {
             className="md:col-span-2"
           >
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-md:mt-4 rounded-[12px] bg-[#2B2B2B]">
+              <TabsList className="grid w-full grid-cols-2 max-md:mt-4 rounded-[12px] bg-muted">
                 <TabsTrigger value="personal">Personal</TabsTrigger>
                 <TabsTrigger value="account">EzyGo</TabsTrigger>
               </TabsList>

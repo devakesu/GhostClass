@@ -22,7 +22,7 @@ vi.mock("@/lib/csp", () => ({
 }));
 
 vi.mock("@/app/config/legal", () => ({
-  TERMS_VERSION: "2.2",
+  TERMS_VERSION: "2.3",
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -73,7 +73,7 @@ describe("proxy – redirect status for non-GET requests", () => {
     const request = new NextRequest("http://localhost/accept-terms", {
       method: "GET",
       headers: {
-        cookie: "terms_version=2.2",
+        cookie: "terms_version=2.3",
       },
     });
 
@@ -87,7 +87,7 @@ describe("proxy – redirect status for non-GET requests", () => {
     const request = new NextRequest("http://localhost/accept-terms", {
       method: "POST",
       headers: {
-        cookie: "terms_version=2.2",
+        cookie: "terms_version=2.3",
       },
     });
 
@@ -108,7 +108,7 @@ describe("proxy – cross-device terms sync", () => {
 
   it("sets terms_version cookie and allows through when DB has current version but cookie is missing", async () => {
     mockSingle.mockResolvedValue({
-      data: { terms_version: "2.2" },
+      data: { terms_version: "2.3" },
       error: null,
     });
 
@@ -126,12 +126,12 @@ describe("proxy – cross-device terms sync", () => {
       h.toLowerCase().startsWith("terms_version="),
     );
     expect(termsCookie).toBeDefined();
-    expect(termsCookie).toContain("2.2");
+    expect(termsCookie).toContain("2.3");
   });
 
   it("sets terms_version cookie and allows through when DB has current version but cookie is stale", async () => {
     mockSingle.mockResolvedValue({
-      data: { terms_version: "2.2" },
+      data: { terms_version: "2.3" },
       error: null,
     });
 
@@ -152,7 +152,7 @@ describe("proxy – cross-device terms sync", () => {
       h.toLowerCase().startsWith("terms_version="),
     );
     expect(termsCookie).toBeDefined();
-    expect(termsCookie).toContain("2.2");
+    expect(termsCookie).toContain("2.3");
   });
 
   it("falls back to redirect when DB query returns an error", async () => {

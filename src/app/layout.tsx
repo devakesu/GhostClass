@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import ReactQueryProvider from "@/providers/react-query";
+import { ThemeProvider } from "@/providers/theme";
 import { Manrope, DM_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
@@ -85,7 +86,7 @@ export default async function RootLayout({
   const hasGoogleAnalytics = !!gaId && gaId !== 'undefined' && gaId.startsWith('G-');
   
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className="dark">
       <head>
         {/* Blocking script: executes synchronously before any CSS or content is
             painted. Measures the real scrollbar track width by creating a hidden
@@ -98,7 +99,7 @@ export default async function RootLayout({
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('ghostclass-theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.add('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
           }}
         />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -120,6 +121,7 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
+        <ThemeProvider>
         <ReactQueryProvider>
           {/* --- GOOGLE ANALYTICS (Server-side via Measurement Protocol) --- */}
           {/* AnalyticsTracker is placed inside ReactQueryProvider so it can safely */}
@@ -149,6 +151,7 @@ export default async function RootLayout({
             {children}
           </div>
         </ReactQueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

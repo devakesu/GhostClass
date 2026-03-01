@@ -88,7 +88,7 @@ const ReadOnlyField = forwardRef<HTMLInputElement, ReadOnlyFieldProps>(
         placeholder={placeholder}
         className={cn(
           "flex h-11 w-full rounded-lg border border-border/40 px-3 py-2 text-sm transition-all",
-          "bg-secondary/20 text-foreground/90 cursor-default",
+          "bg-secondary/30 dark:bg-secondary/50 text-foreground/90 cursor-default",
           !hasValue && "text-muted-foreground italic",
           className
         )}
@@ -367,7 +367,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         <div className="flex items-center gap-2 text-destructive">
            <h3 className="text-lg font-medium">Danger Zone</h3>
         </div>
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+        <div className="rounded-lg border border-destructive/30 dark:border-destructive/40 bg-destructive/5 dark:bg-destructive/10 p-4">
             <DeleteAccount />
         </div>
       </div>

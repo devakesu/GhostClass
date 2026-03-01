@@ -12,7 +12,7 @@ src/
   components/    # Reusable React components (UI, attendance, layout, legal)
   hooks/         # Custom React hooks (data-fetching via TanStack Query)
   lib/           # Core library: logic, security, Supabase, Axios, Redis, crypto, logger
-  providers/     # React context providers (React Query, user settings)
+  providers/     # React context providers (React Query, theme, user settings)
   types/         # TypeScript type definitions
   assets/        # Static images/icons
 supabase/

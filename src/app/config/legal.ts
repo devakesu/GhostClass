@@ -1,5 +1,5 @@
-export const TERMS_VERSION = "2.2";
-export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-01-29";
+export const TERMS_VERSION = "2.3";
+export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-01";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
 // ------------------------------------------------------------------
@@ -28,6 +28,7 @@ To provide the GhostClass service, we collect and process specific categories of
 * **Identity & Contact Information:** When you create an account, we collect your **legal name, email address, phone number, birth date, and gender from EzyGo**. This data is used for account management, security verification, and essential service communications.
 * **Authentication Credentials:** We require your EzyGo authentication token to fetch data on your behalf. **We strictly DO NOT store your raw password.** We only store the encrypted session token.
 * **Academic Data:** We cache your attendance records, course names, and schedule data to improve load times and provide analytics.
+* **Device Preference Data (Browser Storage):** We store non-sensitive UI preferences on your device (for example theme mode, bunk calculator visibility, and target percentage) using localStorage/sessionStorage to improve usability and reduce repeated setup.
 * **Communication Data:** If you contact us via our support forms, we collect your name, email, and message content to address your inquiry, regardless of whether you have a registered account.
 * **Technical Telemetry:** We collect data such as your IP address, browser type, device model, and operating system version to ensure security and optimize performance.
 
@@ -139,6 +140,13 @@ These cookies allow us to count visits and traffic sources so we can measure and
 * **_ga, _gid:** Set by Google Analytics to generate anonymous statistical data on website usage.
 * **sentry-sc:** Set by Sentry to track session errors and debugging information.
 
-**4. Managing & Disabling Cookies**
+**4. Browser Storage (localStorage/sessionStorage)**
+In addition to cookies, GhostClass uses browser storage for functional preferences.
+* **ghostclass-theme:** Stores your selected theme mode (light/dark).
+* **showBunkCalc_[userId], targetPercentage_[userId]:** Stores attendance display preferences for convenience across sessions.
+* **prefetchedSettings (sessionStorage):** Temporarily stores settings during navigation flows in the same browser session.
+These values are used for user experience only and do not grant authentication access.
+
+**5. Managing & Disabling Cookies**
 Most web browsers allow some control of most cookies through the browser settings. However, if you block strictly necessary cookies (like Cloudflare or Supabase tokens), the application will fail to function.
 `;

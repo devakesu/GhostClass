@@ -17,6 +17,9 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-separator: var(--separator);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -47,6 +50,56 @@
 :root {
   --radius: 0.75rem;
   
+  /* ── Light theme ── */
+  --background: oklch(0.97 0.005 285);
+  --foreground: oklch(0.15 0.02 285);
+
+  --card: oklch(0.99 0.003 285);
+  --card-foreground: oklch(0.15 0.02 285);
+  --popover: oklch(0.99 0.003 285);
+  --popover-foreground: oklch(0.15 0.02 285);
+
+  --primary: oklch(0.55 0.25 280);
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.92 0.03 280);
+  --secondary-foreground: oklch(0.30 0.05 280);
+
+  --muted: oklch(0.93 0.01 285);
+  --muted-foreground: oklch(0.45 0.03 280);
+
+  --accent: oklch(0.93 0.04 280);
+  --accent-foreground: oklch(0.20 0.05 280);
+
+  --destructive: oklch(0.55 0.25 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.88 0.02 285);
+  --input: oklch(0.90 0.02 285);
+  --ring: oklch(0.55 0.25 280);
+
+  --chart-1: oklch(0.55 0.25 280);
+  --chart-2: oklch(0.60 0.18 150);
+  --chart-3: oklch(0.50 0.20 200);
+  --chart-4: oklch(0.55 0.20 340);
+  --chart-5: oklch(0.70 0.15 90);
+
+  --sidebar: oklch(0.96 0.005 285);
+  --sidebar-foreground: oklch(0.15 0.02 285);
+  --sidebar-primary: oklch(0.55 0.25 280);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.92 0.04 280);
+  --sidebar-accent-foreground: oklch(0.20 0.05 280);
+  --sidebar-border: oklch(0.88 0.03 285);
+  --sidebar-ring: oklch(0.55 0.25 280);
+
+  /* ── Shared layout tokens ── */
+  --surface-elevated: oklch(0.99 0.003 285);
+  --surface-overlay: oklch(0.15 0.02 285 / 0.12);
+  --separator: oklch(0.88 0.02 285);
+}
+
+.dark {
   --background: oklch(0.12 0.02 285); 
   --foreground: oklch(0.98 0.01 285);
 
@@ -88,6 +141,10 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.30 0.05 285);
   --sidebar-ring: oklch(0.65 0.22 280);
+
+  --surface-elevated: oklch(0.16 0.03 285);
+  --surface-overlay: oklch(0.98 0.01 285 / 0.08);
+  --separator: oklch(0.24 0.04 285);
 }
 
 /* ============================================================================
@@ -205,19 +262,19 @@ select:focus-visible {
 
 @layer utilities {
   .custom-input {
-    @apply bg-[#1F1F1F] border-[#2B2B2B] h-11 border-2 rounded-[12px] text-sm font-medium hover:outline-none focus:outline-none focus:ring-2 focus:ring-[#2B2B2B] focus:border-[#2B2B2B] transition-all duration-200 ease-in-out;
+    @apply bg-input border-border h-11 border-2 rounded-[12px] text-sm font-medium hover:outline-none focus:outline-none focus:ring-2 focus:ring-border focus:border-border transition-all duration-200 ease-in-out;
   }
 
   .custom-dropdown {
-    @apply bg-[#1F1F1F]/40 border-[#2B2B2B]/60 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
+    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
   }
 
   .custom-button {
-    @apply bg-[#1F1F1F]/40 border-[#2B2B2B]/60 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
+    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
   }
 
   .custom-container {
-    @apply bg-card/95 border-white/10 border-2 text-sm font-medium rounded-[12px];
+    @apply bg-card/95 border-border/50 dark:border-border/75 border-2 text-sm font-medium rounded-[12px];
   }
 }
 

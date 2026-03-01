@@ -114,6 +114,11 @@ vi.mock("@/lib/logger", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), dev: vi.fn(), info: vi.fn() },
 }));
 
+vi.mock("@/providers/theme", () => ({
+  useTheme: () => ({ theme: "dark", toggleTheme: vi.fn(), setTheme: vi.fn() }),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+}));
+
 import { Navbar } from "../private-navbar";
 
 // ---------------------------------------------------------------------------

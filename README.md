@@ -34,6 +34,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
 - **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs` (or `/api/docs` in development)
 - **Build Transparency** 🔍 - View complete build provenance and SLSA attestations at `/build-info`
+- **Dark/Light Mode** 🌓 - Switch between dark and light themes with preference saved across sessions
 
 ## 🛠️ Tech Stack
 
@@ -162,6 +163,7 @@ src/
 ├── providers/                # React context providers
 │   ├── attendance-settings.tsx  # Attendance target settings
 │   ├── react-query.tsx       # TanStack Query provider
+│   ├── theme.tsx             # Light/dark theme provider
 │   └── user-settings.ts      # User settings context
 ├── hooks/                    # Custom React hooks
 │   ├── courses/              # Course and exam data fetching hooks
@@ -515,7 +517,6 @@ ENABLE_PUBLIC_BROWSER_SOURCEMAPS=true
 - Webpack bundler (for Serwist PWA compatibility)
 - Origin validation skipped in dev mode
 - Fast Refresh with React 19
-- No NProgress blur on login page
 
 ## 🧪 Testing
 

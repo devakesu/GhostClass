@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useUser } from "@/hooks/users/user";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 /**
  * Extended Course interface with additional attendance statistics.
@@ -201,6 +202,31 @@ export function CourseCard({ course }: CourseCardProps) {
     [stats.displayPercentage, stats.officialPercentage]
   );
 
+  const statusColorClasses = useMemo(() => {
+    if (!hasAttendanceData) return {
+      card: "",
+      headerBg: "bg-muted/60",
+      headerBorder: "border-border/60",
+    };
+    const pct = stats.displayPercentage;
+    const target = targetPercentage ?? 75;
+    if (pct >= target) return {
+      card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
+      headerBg: "bg-green-500/8 dark:bg-muted/40",
+      headerBorder: "border-green-500/30 dark:border-border/60",
+    };
+    if (pct >= target - 10) return {
+      card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
+      headerBg: "bg-amber-500/8 dark:bg-muted/40",
+      headerBorder: "border-amber-500/30 dark:border-border/60",
+    };
+    return {
+      card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
+      headerBg: "bg-red-500/8 dark:bg-muted/40",
+      headerBorder: "border-red-500/30 dark:border-border/60",
+    };
+  }, [hasAttendanceData, stats.displayPercentage, targetPercentage]);
+
   const capitalize = useCallback((str: string) => {
     if (!str) return "";
     return str
@@ -215,8 +241,8 @@ export function CourseCard({ course }: CourseCardProps) {
   );
 
   return (
-    <Card className="pt-0 pb-0 custom-container overflow-clip h-full min-h-70">
-      <CardHeader className="flex justify-between items-start flex-row gap-2 pt-6 bg-[#2B2B2B]/40 pb-5 border-b-2 border-[#2B2B2B]/60">
+    <Card className={cn("pt-0 pb-0 custom-container overflow-clip h-full min-h-70", statusColorClasses.card)}>
+      <CardHeader className={cn("flex justify-between items-start flex-row gap-2 pt-6 pb-5 border-b-2", statusColorClasses.headerBg, statusColorClasses.headerBorder)}>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-semibold wrap-break-word leading-tight">
             {courseName}
@@ -224,7 +250,7 @@ export function CourseCard({ course }: CourseCardProps) {
         </div>
         <Badge
           variant="secondary"
-          className="h-7 uppercase custom-button rounded-md! bg-black/20! scale-105 shrink-0"
+          className="h-7 uppercase custom-button rounded-md! bg-foreground/10! scale-105 shrink-0"
           aria-hidden="true"
         >
           {course.code}
@@ -243,7 +269,7 @@ export function CourseCard({ course }: CourseCardProps) {
             <div className="grid grid-cols-3 gap-2 mt-4">
               
               {/* PRESENT */}
-              <div className="text-center p-1 bg-[#1F1F1F]/60 rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-green-500/10 border border-green-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Present</span>
                 <div className="flex items-center justify-center gap-1.5 flex-wrap px-1">
                   <span className="text-sm font-medium text-green-500">
@@ -263,7 +289,7 @@ export function CourseCard({ course }: CourseCardProps) {
               </div>
 
               {/* ABSENT */}
-              <div className="text-center p-1 bg-[#1F1F1F]/60 rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-red-500/10 border border-red-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Absent</span>
                 <div className="flex items-center justify-center gap-0.5">
                   <span className="text-sm font-medium text-red-500">
@@ -285,7 +311,7 @@ export function CourseCard({ course }: CourseCardProps) {
               </div>
 
               {/* TOTAL */}
-              <div className="text-center p-1 bg-[#1F1F1F]/60 rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-sky-500/10 border border-sky-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Total</span>
                 <div className="flex items-center justify-center gap-0.5">
                   <span className="text-sm font-medium">
@@ -342,7 +368,7 @@ export function CourseCard({ course }: CourseCardProps) {
                       {stats.officialPercentage}% <span className="mx-0.5">→</span>
                     </span>
                   )}
-                  <span className={(stats.correctionPresent > 0 || stats.extras > 0) ? (isGain ? "text-primary font-bold" : "text-red-400 font-bold") : ""}>
+                  <span className={(stats.correctionPresent > 0 || stats.extras > 0) ? (isGain ? "text-primary font-bold" : "text-red-500 dark:text-red-400 font-bold") : ""}>
                     {stats.displayPercentage}%
                   </span>
                 </div>
@@ -365,7 +391,7 @@ export function CourseCard({ course }: CourseCardProps) {
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <>
-                              You need to attend <span className="font-bold text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
                             </>
                           ) : (
                             <>You are on the edge. Skipping now&apos;s risky 💀💀</>
@@ -395,7 +421,7 @@ export function CourseCard({ course }: CourseCardProps) {
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <>
-                              You need to attend <span className="font-bold text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
                             </>
                           ) : (
                             <>You are on the edge. Skipping now&apos;s risky 💀💀</>
@@ -409,12 +435,12 @@ export function CourseCard({ course }: CourseCardProps) {
                   return (
                     <div className="grid grid-cols-2 gap-2">
                       {/* SAFE COUNT */}
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-2">
+                      <div className="bg-blue-500/10 border border-blue-500/35 dark:border-blue-500/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">Safe (Official)</span>
+                          <span className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wide">Safe (Official)</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.safeMetrics.canBunk > 0 ? (
@@ -423,7 +449,7 @@ export function CourseCard({ course }: CourseCardProps) {
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
+                              Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
                             </>
                           ) : (
                             <>Edge 💀</>
@@ -432,12 +458,12 @@ export function CourseCard({ course }: CourseCardProps) {
                       </div>
 
                       {/* OPTIMISTIC COUNT */}
-                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-md p-2">
+                      <div className="bg-purple-500/10 border border-purple-500/35 dark:border-purple-500/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide">+ Tracking Data</span>
+                          <span className="text-[10px] font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wide">+ Tracking Data</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.extraMetrics.canBunk > 0 ? (
@@ -446,7 +472,7 @@ export function CourseCard({ course }: CourseCardProps) {
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
+                              Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
                             </>
                           ) : (
                             <>Edge 💀</>
@@ -461,7 +487,7 @@ export function CourseCard({ course }: CourseCardProps) {
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-4 px-2 h-full gap-1">
-            <div className="flex items-center gap-2 mb-1 text-amber-500">
+            <div className="flex items-center gap-2 mb-1 text-amber-600 dark:text-amber-500">
               <AlertCircle className="h-4 w-4" aria-hidden="true" />
               <span className="font-medium text-sm">No attendance data</span>
             </div>

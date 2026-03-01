@@ -9,7 +9,7 @@ export function PublicNavbar() {
 
   return (
     <nav 
-      className="flex h-20 items-center justify-between gap-4 px-4 md:px-6 border-b border-white/10 bg-background"
+      className="sticky top-0 z-10 flex h-20 items-center justify-between gap-4 px-4 md:px-6 border-b-2 border-border/50 bg-card shadow-sm"
       aria-label="Main navigation"
     >
       <div className="flex items-center gap-2 h-full">

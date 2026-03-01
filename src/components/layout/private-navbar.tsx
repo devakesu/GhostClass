@@ -42,6 +42,8 @@ import {
   Calculator,
   Contact,
   HelpCircle,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useUserSettings } from "@/providers/user-settings";
@@ -51,6 +53,7 @@ import { Bell } from "lucide-react";
 import { useNotifications } from "@/hooks/notifications/useNotifications";
 import { isValidAvatarUrl } from "@/lib/utils";
 import { useTopLoader } from "nextjs-toploader";
+import { useTheme } from "@/providers/theme";
 
 export const Navbar = () => {
   const router = useRouter();
@@ -58,6 +61,7 @@ export const Navbar = () => {
   const { data: user } = useUser();
   const { data: profile } = useProfile();
   const { settings, updateBunkCalc, updateTarget, isLoading: settingsLoading } = useUserSettings();
+  const { theme, toggleTheme } = useTheme();
 
   const { data: institutions, isLoading: institutionsLoading } = useInstitutions();
   const { data: defaultInstitutionUser } = useDefaultInstitutionUser();
@@ -135,7 +139,7 @@ export const Navbar = () => {
     : true;
 
   return (
-    <header className="top-0 z-10 flex h-20 items-center justify-between gap-4 border-b-2 bg-background px-4 md:px-6 text-white border-white/5">
+    <header className="top-0 z-10 flex h-20 items-center justify-between gap-4 border-b-2 bg-background px-4 md:px-6 text-foreground border-border/50">
       <div className="flex items-center gap-2">
         <Link href="/" className="group text-3xl sm:text-4xl lg:text-[2.50rem] font-semibold gradient-logo font-klick tracking-wide">
           <div className="relative w-40 sm:w-48 md:w-52 lg:w-60 h-20 overflow-hidden">
@@ -156,7 +160,7 @@ export const Navbar = () => {
         <div className="gap-3 flex items-center">
 
           {pathname !== "/dashboard" && (
-            <div className="max-lg:hidden text-white/85">
+            <div className="max-lg:hidden text-foreground/85">
               <Button
                 variant={"outline"}
                 className="custom-button cursor-pointer"
@@ -169,7 +173,7 @@ export const Navbar = () => {
           )}
 
           {pathname !== "/tracking" && (
-            <div className="max-lg:hidden text-white/85">
+            <div className="max-lg:hidden text-foreground/85">
               <Button
                 variant={"outline"}
                 className="custom-button cursor-pointer"
@@ -182,7 +186,7 @@ export const Navbar = () => {
           )}
 
           {pathname !== "/scores" && (
-            <div className="max-lg:hidden text-white/85">
+            <div className="max-lg:hidden text-foreground/85">
               <Button
                 variant={"outline"}
                 className="custom-button cursor-pointer"
@@ -220,7 +224,7 @@ export const Navbar = () => {
                 });
               }}
             >
-              <SelectTrigger className="w-27.5 custom-input cursor-pointer" aria-label="Set attendance target percentage">
+              <SelectTrigger className="w-27.5 custom-button h-11 cursor-pointer dark:bg-foreground/8 dark:border-foreground/20" aria-label="Set attendance target percentage">
                 <SelectValue>
                   <div className="flex items-center font-medium">
                     <Percent className="mr-2 h-4 w-4" />
@@ -248,7 +252,7 @@ export const Navbar = () => {
                 value={selectedInstitution}
                 onValueChange={handleInstitutionChange}
               >
-                <SelectTrigger className="w-35 md:w-44 lg:w-72.5 custom-input cursor-pointer" aria-label="Select institution">
+                <SelectTrigger className="w-35 md:w-44 lg:w-72.5 custom-button h-11 cursor-pointer dark:bg-foreground/8 dark:border-foreground/20" aria-label="Select institution">
                   <SelectValue>
                     {selectedInstitution &&
                       institutions?.find(
@@ -332,7 +336,7 @@ export const Navbar = () => {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center rounded-full bg-muted">
-                      <Image src={UserPlaceholder} alt="Default avatar" width={36} height={36} className="object-contain" priority />
+                      <Image src={UserPlaceholder} alt="Default avatar" width={36} height={36} className="object-contain brightness-150 dark:brightness-100" priority />
                     </div>
                   )}
                 </Avatar>
@@ -372,6 +376,28 @@ export const Navbar = () => {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
+              {/* Theme Toggle */}
+              <div className="px-2 py-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {theme === "dark" ? (
+                      <Moon className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Sun className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    <label htmlFor="theme-toggle" className="text-sm cursor-pointer">
+                      Dark Mode
+                    </label>
+                  </div>
+                  <Switch
+                    id="theme-toggle"
+                    checked={theme === "dark"}
+                    onCheckedChange={toggleTheme}
+                    aria-label="Toggle dark mode"
+                  />
+                </div>
+              </div>
+
               {/* Bunk Calculator Toggle */}
               <div className="px-2 py-2">
                 <div className="flex items-center justify-between">
@@ -392,7 +418,7 @@ export const Navbar = () => {
               </div>
 
               {/* Target Percentage Selector (Mobile Only) */}
-              <div className="px-2 py-2 sm:hidden border-t border-white/10 mt-1">
+              <div className="px-2 py-2 sm:hidden border-t border-border/30 mt-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Percent className="h-4 w-4" aria-hidden="true" />
@@ -412,7 +438,7 @@ export const Navbar = () => {
                         });
                       }}
                     >
-                      <SelectTrigger className="w-20 h-8 text-xs bg-background/50 border-white/10">
+                      <SelectTrigger className="w-20 h-8 text-xs bg-background border-border/50">
                         <SelectValue placeholder={`${currentTarget}%`} />
                       </SelectTrigger>
                       <SelectContent className="custom-dropdown z-60">
@@ -426,14 +452,14 @@ export const Navbar = () => {
 
               {/* Institution Selector (Tablet/Mobile Only) */}
               {!institutionsLoading && institutions && institutions.length > 0 && (
-                <div className="px-2 py-2 lg:hidden border-t border-white/10 mt-1">
+                <div className="px-2 py-2 lg:hidden border-t border-border/30 mt-1">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 shrink-0">
                       <Building2 className="h-4 w-4" aria-hidden="true" />
                       <span className="text-sm">Institution</span>
                     </div>
                     <Select value={selectedInstitution} onValueChange={handleInstitutionChange}>
-                      <SelectTrigger className="w-10 h-9 text-xs bg-background/50 border-white/10 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden" aria-label="Select institution">
+                      <SelectTrigger className="w-10 h-9 text-xs bg-background border-border/50 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden" aria-label="Select institution">
                         <SelectValue>
                           <Building2 className="h-5 w-5 shrink-0" aria-hidden="true" />
                         </SelectValue>

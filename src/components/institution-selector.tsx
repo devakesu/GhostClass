@@ -135,11 +135,10 @@ export function InstitutionSelector() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  // whileHover={{ scale: 1.02 }}
-                  className={`flex items-center bg-[#1F1F1F]/40 cursor-pointer border-[#2B2B2B]/60 border-2 rounded-[12px] space-x-2 p-2 md:p-3 ${
+                  className={`flex items-center cursor-pointer border-2 rounded-[12px] space-x-2 p-2 md:p-3 transition-colors ${
                     selectedInstitution === institution.id.toString()
-                      ? "border-primary bg-primary/5"
-                      : "border-input"
+                      ? "border-primary bg-primary/10 dark:bg-primary/20 ring-1 ring-primary/30"
+                      : "bg-input/40 border-input"
                   }`}
                 >
                   <label

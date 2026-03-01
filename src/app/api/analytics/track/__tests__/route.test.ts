@@ -30,12 +30,14 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 describe("Analytics API Route", () => {
-  const createMockRequest = (body: any): NextRequest => {
+  const createMockRequest = (body: any, headers: Record<string, string> = {}): NextRequest => {
     return {
       json: async () => body,
       headers: new Headers({
         "x-forwarded-for": "192.168.1.1",
+        ...headers,
       }),
+      nextUrl: new URL("https://localhost:3001/api/analytics/track"),
     } as NextRequest;
   };
 
@@ -110,6 +112,70 @@ describe("Analytics API Route", () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toContain("Invalid request body");
+    });
+  });
+
+  describe("Origin Validation", () => {
+    it("should allow localhost origin with dynamic port in development", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+      const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+      Object.assign(process.env, {
+        NODE_ENV: "development",
+        NEXT_PUBLIC_APP_DOMAIN: "ghostclass.devakesu.com",
+        NEXT_PUBLIC_APP_URL: "https://ghostclass.devakesu.com",
+      });
+
+      const req = createMockRequest(
+        {
+          clientId: "1234567890.abcdefghi",
+          events: [{ name: "page_view" }],
+        },
+        { origin: "https://localhost:3001" }
+      );
+
+      const response = await POST(req);
+
+      Object.assign(process.env, {
+        NODE_ENV: originalNodeEnv,
+        NEXT_PUBLIC_APP_DOMAIN: originalAppDomain,
+        NEXT_PUBLIC_APP_URL: originalAppUrl,
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    it("should reject non-allowed foreign origin", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+      const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+      Object.assign(process.env, {
+        NODE_ENV: "production",
+        NEXT_PUBLIC_APP_DOMAIN: "ghostclass.devakesu.com",
+        NEXT_PUBLIC_APP_URL: "https://ghostclass.devakesu.com",
+      });
+
+      const req = createMockRequest(
+        {
+          clientId: "1234567890.abcdefghi",
+          events: [{ name: "page_view" }],
+        },
+        { origin: "https://evil.example" }
+      );
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      Object.assign(process.env, {
+        NODE_ENV: originalNodeEnv,
+        NEXT_PUBLIC_APP_DOMAIN: originalAppDomain,
+        NEXT_PUBLIC_APP_URL: originalAppUrl,
+      });
+
+      expect(response.status).toBe(403);
+      expect(data.error).toBe("Forbidden");
     });
   });
 

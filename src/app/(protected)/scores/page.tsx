@@ -1,5 +1,7 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import ScoresClient from "./ScoresClient";
+import { Loading } from "@/components/loading";
 
 // Force dynamic rendering for protected routes
 export const dynamic = "force-dynamic";
@@ -13,5 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default function ScoresPage() {
-  return <ScoresClient />;
+  return (
+    <Suspense fallback={<Loading />}>
+      <ScoresClient />
+    </Suspense>
+  );
 }

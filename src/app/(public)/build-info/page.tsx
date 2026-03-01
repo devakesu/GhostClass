@@ -89,11 +89,11 @@ export default function BuildInfoPage() {
             </Button>
           </Link>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h1 className="text-4xl font-bold font-klick tracking-wide bg-linear-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold font-klick tracking-wide bg-linear-to-r from-primary to-purple-500 dark:to-purple-400 bg-clip-text text-transparent">
               Build Information
             </h1>
             {meta.app_version && (
-              <span className="font-mono text-sm px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-primary self-end mb-1">
+              <span className="font-mono text-sm px-2 py-0.5 rounded-full border border-primary/50 bg-primary/10 text-primary self-end mb-1">
                 v{meta.app_version}
               </span>
             )}
@@ -105,22 +105,22 @@ export default function BuildInfoPage() {
 
         <div className="space-y-6">
           {/* Terminal-style Info Card */}
-          <Card className="bg-card/50 border-border/40 overflow-hidden">
-            <div className="bg-neutral-900/80 px-4 py-2 border-b border-border/40 flex items-center justify-between">
+          <Card className="bg-neutral-950 border-neutral-800 overflow-hidden">
+            <div className="bg-neutral-900 px-4 py-2 border-b border-neutral-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-red-500/80"></div>
                   <div className="h-3 w-3 rounded-full bg-yellow-500/80"></div>
                   <div className="h-3 w-3 rounded-full bg-green-500/80"></div>
                 </div>
-                <span className="text-xs font-mono text-muted-foreground ml-2">
+                <span className="text-xs font-mono text-neutral-400 ml-2">
                   provenance.json
                 </span>
               </div>
               <CopyButton text={metaJson} label="Copy JSON" className="h-6 text-xs" />
             </div>
 
-            <div className="p-6 font-mono text-sm space-y-3 bg-neutral-950/50">
+            <div className="p-6 font-mono text-sm space-y-3 bg-neutral-950 text-neutral-100">
               <div>
                 <span className="text-cyan-400">&gt; VERSION:</span>{" "}
                 <span className="text-green-400 font-semibold">
@@ -144,7 +144,7 @@ export default function BuildInfoPage() {
                     #{meta.github_run_number || meta.build_id}
                   </span>
                 )}{" "}
-                <span className="text-neutral-600">
+                <span className="text-neutral-400">
                   (
                   {validCommitSha && validRepo ? (
                     <a
@@ -167,12 +167,12 @@ export default function BuildInfoPage() {
                 {meta.timestamp ? (
                   <>
                     {meta.timestamp.split("T")[0]}{" "}
-                    <span className="text-neutral-500">
+                    <span className="text-neutral-400">
                       {meta.timestamp.split("T")[1]?.replace("Z", " UTC")}
                     </span>
                   </>
                 ) : (
-                  <span className="text-neutral-500">Local Mode</span>
+                  <span className="text-neutral-400">Local Mode</span>
                 )}
               </div>
 
@@ -188,7 +188,7 @@ export default function BuildInfoPage() {
                   {meta.node_env?.toUpperCase()}
                 </span>
                 {meta.container && (
-                  <span className="text-neutral-500"> (Containerized)</span>
+                  <span className="text-neutral-400"> (Containerized)</span>
                 )}
               </div>
 

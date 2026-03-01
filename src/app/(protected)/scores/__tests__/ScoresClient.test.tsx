@@ -17,6 +17,28 @@ import type { Exam, ExamAnswer, ExamQuestion } from '@/types'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
+// Reactive router mock: tracks searchParams state so the drawer useEffect works
+let _searchParams = new URLSearchParams();
+const mockRouterPush = vi.fn((url: string) => {
+  const q = url.split('?')[1];
+  _searchParams = new URLSearchParams(q ?? '');
+});
+const mockRouterBack = vi.fn(() => { _searchParams = new URLSearchParams(); });
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: mockRouterBack,
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => '/scores',
+  useSearchParams: () => _searchParams,
+  useParams: () => ({}),
+}));
+
 vi.mock('framer-motion', () => ({
   m: {
     div: ({ children, ...p }: any) => <div {...p}>{children}</div>,
@@ -211,6 +233,8 @@ function setupDefault(exams: Exam[], answersMap: Record<number, ExamAnswer[]> = 
 describe('ScoresClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset router search params state
+    _searchParams = new URLSearchParams();
     // Reset body/html overflow after each test in case scroll lock leaked
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
@@ -524,7 +548,9 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      // Close triggers router.back() which pops the ?panel=1 entry;
+      // the useEffect then clears selectedExam on the next navigation.
+      expect(mockRouterBack).toHaveBeenCalledTimes(1)
     })
 
     it('closes the drawer on Escape key', () => {
@@ -535,7 +561,7 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(mockRouterBack).toHaveBeenCalledTimes(1)
     })
 
     it('shows exam name and course in drawer header', () => {
@@ -576,17 +602,13 @@ describe('ScoresClient', () => {
       expect(within(dialog).getByText(/pending marks/i)).toBeInTheDocument()
     })
 
-    it('locks body scroll when open and restores on close', () => {
+    it('locks body scroll when drawer is open', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(document.body.style.overflow).toBe('hidden')
       expect(document.documentElement.style.overflow).toBe('hidden')
-
-      fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      expect(document.body.style.overflow).not.toBe('hidden')
-      expect(document.documentElement.style.overflow).not.toBe('hidden')
     })
   })
 

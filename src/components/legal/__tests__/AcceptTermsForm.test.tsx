@@ -89,7 +89,8 @@ describe('AcceptTermsForm', () => {
 
       const link = screen.getByRole('link', { name: /above Disclaimer and all Policies listed here/i });
       expect(link).toHaveAttribute('href', '/legal');
-      expect(link).toHaveAttribute('target', '_blank');
+      // Link navigates in-app (no _blank) so back button returns to this page in PWA
+      expect(link).not.toHaveAttribute('target', '_blank');
     });
 
     it('should have disabled button initially', () => {
