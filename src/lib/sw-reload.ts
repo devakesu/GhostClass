@@ -72,7 +72,8 @@ export function reloadWithUpdate(): void {
 
       // Secondary signal: waiting worker reached 'activated' state.
       // Fires even when clientsClaim: false (where controllerchange may never
-      // fire), ensuring we reload after the new SW is actually in control.
+      // fire), ensuring we reload after the new SW is activated so it can take
+      // control on the next load.
       waitingWorker.addEventListener("statechange", function onActivated() {
         if (waitingWorker.state === "activated") {
           waitingWorker.removeEventListener("statechange", onActivated);
@@ -163,7 +164,9 @@ export function tryAutoUpdate(): void {
         once: true,
       });
       // Secondary signal: waiting worker reached 'activated' state.
-      // Fires even when clientsClaim: false (where controllerchange may never fire).
+      // Fires even when clientsClaim: false (where controllerchange may never
+      // fire), ensuring we reload after the new SW is activated so it can take
+      // control on the next load.
       waitingWorker.addEventListener("statechange", function onActivated() {
         if (waitingWorker.state === "activated") {
           waitingWorker.removeEventListener("statechange", onActivated);

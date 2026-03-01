@@ -200,12 +200,12 @@ describe("Navbar", () => {
   describe("theme toggle", () => {
     it("renders the dark mode toggle switch", () => {
       render(<Navbar />);
-      expect(screen.getByLabelText("Toggle dark mode")).toBeInTheDocument();
+      expect(screen.getByLabelText("Dark Mode")).toBeInTheDocument();
     });
 
     it("calls toggleTheme when the theme switch is clicked", () => {
       render(<Navbar />);
-      const themeSwitch = screen.getByLabelText("Toggle dark mode");
+      const themeSwitch = screen.getByLabelText("Dark Mode");
       fireEvent.click(themeSwitch);
       expect(mockToggleTheme).toHaveBeenCalled();
     });
@@ -213,7 +213,7 @@ describe("Navbar", () => {
     it("renders the switch as checked in dark mode", () => {
       mockTheme.value = "dark";
       render(<Navbar />);
-      const themeSwitch = screen.getByLabelText("Toggle dark mode");
+      const themeSwitch = screen.getByLabelText("Dark Mode");
       // Switch checked state is represented via aria-checked or data-state
       expect(themeSwitch).toHaveAttribute("aria-checked", "true");
     });
@@ -221,7 +221,7 @@ describe("Navbar", () => {
     it("renders the switch as unchecked in light mode", () => {
       mockTheme.value = "light";
       render(<Navbar />);
-      const themeSwitch = screen.getByLabelText("Toggle dark mode");
+      const themeSwitch = screen.getByLabelText("Dark Mode");
       expect(themeSwitch).toHaveAttribute("aria-checked", "false");
     });
   });
