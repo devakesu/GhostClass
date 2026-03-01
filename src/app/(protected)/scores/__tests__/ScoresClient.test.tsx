@@ -544,6 +544,35 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
+    it('uses router.push on first open (panel absent) and no-op on second open when panel is already set', () => {
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      render(<ScoresClient />)
+
+      // First open: panel absent → push
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterPush).toHaveBeenCalledTimes(1)
+      expect(mockRouterPush).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
+
+      // Second open: panel is already "1" → no-op (neither push nor replace)
+      vi.clearAllMocks()
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterPush).not.toHaveBeenCalled()
+      expect(mockRouterReplace).not.toHaveBeenCalled()
+    })
+
+    it('uses router.replace when panel param already exists with a different value', () => {
+      // Pre-seed searchParams with a different panel value
+      _searchParams = new URLSearchParams('panel=2')
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      render(<ScoresClient />)
+
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterReplace).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
+      expect(mockRouterPush).not.toHaveBeenCalled()
+      // Reset for subsequent tests
+      _searchParams = new URLSearchParams()
+    })
+
     it('closes the drawer when close button is clicked', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       const { rerender } = render(<ScoresClient />)
