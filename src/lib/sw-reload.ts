@@ -48,17 +48,32 @@ function activateAndRun(
 ): void {
   let done = false;
   let activationTimeout: ReturnType<typeof setTimeout> | undefined;
+  let controllerChangeHandler: (() => void) | undefined;
 
   const finish = () => {
     if (!done) {
       done = true;
       clearTimeout(activationTimeout);
+      // Remove the controllerchange listener regardless of which path won
+      // (statechange, timeout, or controllerchange itself) so it is never
+      // left dangling for the rest of the session.
+      if (controllerChangeHandler) {
+        navigator.serviceWorker.removeEventListener(
+          "controllerchange",
+          controllerChangeHandler
+        );
+        controllerChangeHandler = undefined;
+      }
       onReady();
     }
   };
 
   // Primary signal: SW finished claiming the tab.
-  navigator.serviceWorker.addEventListener("controllerchange", finish, {
+  // Use a named wrapper so `controllerChangeHandler` can be removed by the
+  // statechange/timeout paths even if `once:true` hasn't fired yet.
+  const onControllerChange = () => finish();
+  controllerChangeHandler = onControllerChange;
+  navigator.serviceWorker.addEventListener("controllerchange", onControllerChange, {
     once: true,
   });
 
