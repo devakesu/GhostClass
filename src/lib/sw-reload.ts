@@ -32,6 +32,53 @@
  * reloadWithUpdate();
  * ```
  */
+/**
+ * Activates `waitingWorker` by sending SKIP_WAITING, then calls `onReady`
+ * once the worker is activated (via controllerchange, statechange, or a 3 s
+ * safety-net timeout — whichever fires first).
+ *
+ * Extracted so both `reloadWithUpdate` and `tryAutoUpdate` can share the
+ * same activation flow without duplication.
+ */
+const ACTIVATION_TIMEOUT_MS = 3000;
+
+function activateAndRun(
+  waitingWorker: ServiceWorker,
+  onReady: () => void
+): void {
+  let done = false;
+  let activationTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  const finish = () => {
+    if (!done) {
+      done = true;
+      clearTimeout(activationTimeout);
+      onReady();
+    }
+  };
+
+  // Primary signal: SW finished claiming the tab.
+  navigator.serviceWorker.addEventListener("controllerchange", finish, {
+    once: true,
+  });
+
+  // Secondary signal: waiting worker reached 'activated' state.
+  // Fires even when clientsClaim: false (where controllerchange may never
+  // fire), ensuring we act only after the new SW is activated so it can
+  // take control on the next load.
+  waitingWorker.addEventListener("statechange", function onActivated() {
+    if (waitingWorker.state === "activated") {
+      waitingWorker.removeEventListener("statechange", onActivated);
+      finish();
+    }
+  });
+
+  // Safety net: if neither signal arrives within the timeout, proceed anyway.
+  activationTimeout = setTimeout(finish, ACTIVATION_TIMEOUT_MS);
+
+  waitingWorker.postMessage({ type: "SKIP_WAITING" });
+}
+
 export function reloadWithUpdate(): void {
   if (typeof window === "undefined") return;
 
@@ -54,37 +101,7 @@ export function reloadWithUpdate(): void {
       }
 
       // A new SW is queued. Activate it, then reload.
-      let reloaded = false;
-      let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
-
-      const doReload = () => {
-        if (!reloaded) {
-          reloaded = true;
-          clearTimeout(reloadTimeout);
-          window.location.reload();
-        }
-      };
-
-      // Primary signal: SW finished claiming the tab.
-      navigator.serviceWorker.addEventListener("controllerchange", doReload, {
-        once: true,
-      });
-
-      // Secondary signal: waiting worker reached 'activated' state.
-      // Fires even when clientsClaim: false (where controllerchange may never
-      // fire), ensuring we reload after the new SW is activated so it can take
-      // control on the next load.
-      waitingWorker.addEventListener("statechange", function onActivated() {
-        if (waitingWorker.state === "activated") {
-          waitingWorker.removeEventListener("statechange", onActivated);
-          doReload();
-        }
-      });
-
-      // Safety net: if neither signal arrives within 3 s, reload anyway.
-      reloadTimeout = setTimeout(doReload, 3000);
-
-      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+      activateAndRun(waitingWorker, () => window.location.reload());
     } catch {
       // Any error (getRegistration fails, postMessage fails, etc.) →
       // fall back to a normal reload so the user is never stuck.
@@ -149,34 +166,7 @@ export function tryAutoUpdate(): void {
       // Mark so a crash in the fresh code doesn't loop.
       sessionStorage.setItem(AUTO_UPDATE_GUARD_KEY, "1");
 
-      let reloaded = false;
-      let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
-
-      const doReload = () => {
-        if (!reloaded) {
-          reloaded = true;
-          clearTimeout(reloadTimeout);
-          window.location.reload();
-        }
-      };
-
-      navigator.serviceWorker.addEventListener("controllerchange", doReload, {
-        once: true,
-      });
-      // Secondary signal: waiting worker reached 'activated' state.
-      // Fires even when clientsClaim: false (where controllerchange may never
-      // fire), ensuring we reload after the new SW is activated so it can take
-      // control on the next load.
-      waitingWorker.addEventListener("statechange", function onActivated() {
-        if (waitingWorker.state === "activated") {
-          waitingWorker.removeEventListener("statechange", onActivated);
-          doReload();
-        }
-      });
-      // Safety net: if neither signal arrives within 3 s, reload anyway.
-      reloadTimeout = setTimeout(doReload, 3000);
-
-      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+      activateAndRun(waitingWorker, () => window.location.reload());
     } catch {
       // Anything fails → leave the error UI visible; don't loop.
     }

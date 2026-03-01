@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { ThemeProvider, useTheme } from '../theme';
+import { THEME_STORAGE_KEY } from '@/lib/theme-storage-key';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,7 +63,7 @@ describe('ThemeProvider', () => {
     });
 
     it('reads stored "dark" preference from localStorage', () => {
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -72,7 +73,7 @@ describe('ThemeProvider', () => {
     });
 
     it('reads stored "light" preference from localStorage', () => {
-      localStorageMock['ghostclass-theme'] = 'light';
+      localStorageMock[THEME_STORAGE_KEY] = 'light';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -82,7 +83,7 @@ describe('ThemeProvider', () => {
     });
 
     it('falls back to dark when stored value is invalid', () => {
-      localStorageMock['ghostclass-theme'] = 'invalid';
+      localStorageMock[THEME_STORAGE_KEY] = 'invalid';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -108,7 +109,7 @@ describe('ThemeProvider', () => {
 
   describe('applyTheme', () => {
     it('adds "dark" class to documentElement when theme is dark', () => {
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -119,7 +120,7 @@ describe('ThemeProvider', () => {
 
     it('removes "dark" class from documentElement when theme is light', () => {
       document.documentElement.classList.add('dark');
-      localStorageMock['ghostclass-theme'] = 'light';
+      localStorageMock[THEME_STORAGE_KEY] = 'light';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -133,7 +134,7 @@ describe('ThemeProvider', () => {
       meta.setAttribute('name', 'theme-color');
       document.head.appendChild(meta);
 
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -148,7 +149,7 @@ describe('ThemeProvider', () => {
       meta.setAttribute('name', 'theme-color');
       document.head.appendChild(meta);
 
-      localStorageMock['ghostclass-theme'] = 'light';
+      localStorageMock[THEME_STORAGE_KEY] = 'light';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -172,7 +173,7 @@ describe('ThemeProvider', () => {
 
   describe('toggleTheme', () => {
     it('switches from dark to light', () => {
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -186,7 +187,7 @@ describe('ThemeProvider', () => {
     });
 
     it('switches from light to dark', () => {
-      localStorageMock['ghostclass-theme'] = 'light';
+      localStorageMock[THEME_STORAGE_KEY] = 'light';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -200,7 +201,7 @@ describe('ThemeProvider', () => {
     });
 
     it('persists toggled theme to localStorage', () => {
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       const setItemSpy = vi.spyOn(window.localStorage, 'setItem');
 
       render(
@@ -211,13 +212,13 @@ describe('ThemeProvider', () => {
       );
 
       fireEvent.click(screen.getByRole('button', { name: 'toggle' }));
-      expect(setItemSpy).toHaveBeenCalledWith('ghostclass-theme', 'light');
+      expect(setItemSpy).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
     });
   });
 
   describe('setTheme', () => {
     it('sets theme to light explicitly', () => {
-      localStorageMock['ghostclass-theme'] = 'dark';
+      localStorageMock[THEME_STORAGE_KEY] = 'dark';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -230,7 +231,7 @@ describe('ThemeProvider', () => {
     });
 
     it('sets theme to dark explicitly', () => {
-      localStorageMock['ghostclass-theme'] = 'light';
+      localStorageMock[THEME_STORAGE_KEY] = 'light';
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -251,7 +252,7 @@ describe('ThemeProvider', () => {
           <ThemeDisplay />
         </ThemeProvider>
       );
-      expect(setItemSpy).toHaveBeenCalledWith('ghostclass-theme', expect.any(String));
+      expect(setItemSpy).toHaveBeenCalledWith(THEME_STORAGE_KEY, expect.any(String));
     });
 
     it('does not throw when localStorage.setItem throws', () => {
