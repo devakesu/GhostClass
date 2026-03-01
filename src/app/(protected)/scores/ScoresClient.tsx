@@ -701,17 +701,35 @@ export default function ScoresClient() {
   }, [allQuestionsQueries, examIds]);
 
   // Open the drawer and push a history entry so the back button can close it.
-  const openDrawer = useCallback((exam: Exam) => {
-    setSelectedExam(exam);
-    router.push(pathname + "?panel=1", { scroll: false });
-  }, [router, pathname]);
+  // Only push when panel is absent; replace if a different panel value exists;
+  // do nothing if panel=1 is already set. Preserves any existing query params.
+  const openDrawer = useCallback(
+    (exam: Exam) => {
+      setSelectedExam(exam);
+      const currentPanel = searchParams.get("panel");
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("panel", "1");
+      const nextUrl = `${pathname}?${nextParams.toString()}`;
+      if (currentPanel === null) {
+        router.push(nextUrl, { scroll: false });
+      } else if (currentPanel !== "1") {
+        router.replace(nextUrl, { scroll: false });
+      }
+    },
+    [router, pathname, searchParams]
+  );
 
-  // Programmatic close: go back to pop the ?panel=1 entry we pushed.
-  // If somehow the param is already gone (e.g. user navigated manually),
-  // just clear state directly.
+  // Programmatic close: replace the URL with panel param removed.
+  // This is safe regardless of whether openDrawer used push or replace,
+  // since we never risk navigating to a different page.
+  // The Android back button still works via the history entry pushed by openDrawer
+  // (when panel was absent), caught by the useEffect below.
   const closeDrawer = useCallback(() => {
     if (searchParams.get("panel")) {
-      router.back();
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete("panel");
+      const params = nextParams.toString();
+      router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
     } else {
       setSelectedExam(null);
     }
