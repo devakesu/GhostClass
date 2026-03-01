@@ -60,23 +60,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
-  // Listen for system preference changes
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e: MediaQueryListEvent) => {
-      // Only follow system preference if there's no explicit user choice
-      try {
-        if (!localStorage.getItem(STORAGE_KEY)) {
-          setThemeState(e.matches ? "dark" : "light");
-        }
-      } catch {
-        setThemeState(e.matches ? "dark" : "light");
-      }
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
   const setTheme = useCallback((t: Theme) => setThemeState(t), []);
   const toggleTheme = useCallback(
     () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),

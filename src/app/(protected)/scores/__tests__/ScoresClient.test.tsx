@@ -542,26 +542,31 @@ describe('ScoresClient', () => {
 
     it('closes the drawer when close button is clicked', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      // Close triggers router.back() which pops the ?panel=1 entry;
-      // the useEffect then clears selectedExam on the next navigation.
+      // Close triggers router.back() which pops the ?panel=1 entry.
       expect(mockRouterBack).toHaveBeenCalledTimes(1)
+      // Simulate re-render after navigation clears the URL param.
+      rerender(<ScoresClient />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
     it('closes the drawer on Escape key', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })
       expect(mockRouterBack).toHaveBeenCalledTimes(1)
+      // Simulate re-render after navigation clears the URL param.
+      rerender(<ScoresClient />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
     it('shows exam name and course in drawer header', () => {
@@ -602,13 +607,19 @@ describe('ScoresClient', () => {
       expect(within(dialog).getByText(/pending marks/i)).toBeInTheDocument()
     })
 
-    it('locks body scroll when drawer is open', () => {
+    it('locks body scroll when drawer is open and restores on close', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(document.body.style.overflow).toBe('hidden')
       expect(document.documentElement.style.overflow).toBe('hidden')
+
+      // Close the drawer and verify scroll is restored.
+      fireEvent.click(screen.getByRole('button', { name: /close details/i }))
+      rerender(<ScoresClient />)
+      expect(document.body.style.overflow).toBe('')
+      expect(document.documentElement.style.overflow).toBe('')
     })
   })
 

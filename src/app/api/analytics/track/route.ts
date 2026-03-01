@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         try {
           const parsedOrigin = new URL(origin);
           const host = parsedOrigin.hostname;
-          isDevLocalOrigin = host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+          isDevLocalOrigin = host === "localhost" || host === "127.0.0.1" || host === "::1";
         } catch {
           isDevLocalOrigin = false;
         }
