@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   LazyMotion,
   domAnimation,
@@ -73,9 +74,9 @@ function getCourseName(exam: Exam): string {
 
 function getScoreColorClass(score: number, max: number) {
   const pct = (score / max) * 100;
-  if (pct >= 75) return { text: "text-green-400", bar: "bg-green-500" };
-  if (pct >= 50) return { text: "text-yellow-400", bar: "bg-yellow-500" };
-  return { text: "text-red-400", bar: "bg-red-500" };
+  if (pct >= 75) return { text: "text-green-600 dark:text-green-400", bar: "bg-green-500" };
+  if (pct >= 50) return { text: "text-yellow-600 dark:text-yellow-400", bar: "bg-yellow-500" };
+  return { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" };
 }
 
 /**
@@ -143,7 +144,7 @@ function ScoreCard({
       className="h-full"
     >
       <Card
-        className="bg-card border border-white/10 hover:border-purple-500/40 hover:ring-1 hover:ring-purple-500/20 transition-all duration-200 h-full flex flex-col cursor-pointer"
+        className="bg-card border border-border/50 hover:border-purple-500/60 hover:ring-1 hover:ring-purple-500/30 transition-all duration-200 h-full flex flex-col cursor-pointer"
         onClick={onClick}
         role="button"
         tabIndex={0}
@@ -153,11 +154,11 @@ function ScoreCard({
         <CardHeader className="pb-2 sm:pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-sm font-semibold text-white leading-snug line-clamp-2">
+              <CardTitle className="text-sm font-semibold text-foreground leading-snug line-clamp-3">
                 {exam.name}
               </CardTitle>
               {exam.summary && (
-                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5 line-clamp-2">
                   {exam.summary}
                 </p>
               )}
@@ -166,8 +167,8 @@ function ScoreCard({
               className={cn(
                 "shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border",
                 isAssessment
-                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                  : "bg-orange-500/20 text-orange-300 border-orange-500/30"
+                  ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/50 dark:border-blue-500/30"
+                  : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30"
               )}
               variant="outline"
             >
@@ -192,7 +193,7 @@ function ScoreCard({
                 <span
                   className={cn(
                     "text-xl sm:text-2xl font-bold tabular-nums",
-                    colors ? colors.text : "text-white"
+                    colors ? colors.text : "text-foreground"
                   )}
                 >
                   {score}
@@ -220,7 +221,7 @@ function ScoreCard({
           {/* Progress bar */}
           {score != null && maxNum != null && maxNum > 0 && (
             <div
-              className="w-full h-1 bg-white/10 rounded-full overflow-hidden"
+              className="w-full h-1 bg-foreground/10 rounded-full overflow-hidden"
               role="progressbar"
               aria-valuenow={Math.round((score / maxNum) * 100)}
               aria-valuemin={0}
@@ -230,7 +231,7 @@ function ScoreCard({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
-                  colors ? colors.bar : "bg-white/40"
+                  colors ? colors.bar : "bg-foreground/40"
                 )}
                 style={{ width: `${Math.min(100, (score / maxNum) * 100)}%` }}
               />
@@ -239,8 +240,8 @@ function ScoreCard({
 
           {/* View details hint */}
           <div className="flex items-center gap-1 mt-auto pt-1 -mb-1">
-            <span className="text-[10px] text-purple-400">View details</span>
-            <ChevronRight className="h-3 w-3 text-purple-400" aria-hidden="true" />
+            <span className="text-[10px] text-purple-600 dark:text-purple-400">View details</span>
+            <ChevronRight className="h-3 w-3 text-purple-600 dark:text-purple-400" aria-hidden="true" />
           </div>
         </CardContent>
       </Card>
@@ -271,11 +272,11 @@ function QuestionRow({
   const chipClass =
     scoreNum != null
       ? scoreNum === 0
-        ? "bg-red-500/20 text-red-300 border-red-500/30"
+        ? "bg-red-500/15 text-red-600 dark:text-red-300 border-red-500/50 dark:border-red-500/30"
         : scoreNum >= maxNum
-          ? "bg-green-500/20 text-green-300 border-green-500/30"
-          : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-      : "bg-white/10 text-muted-foreground border-white/10";
+          ? "bg-green-500/15 text-green-600 dark:text-green-300 border-green-500/50 dark:border-green-500/30"
+          : "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/50 dark:border-yellow-500/30"
+      : "bg-foreground/10 text-muted-foreground border-foreground/10";
 
   const displayScore =
     scoreNum != null
@@ -289,10 +290,10 @@ function QuestionRow({
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2, delay: Math.min(index * 0.04, 0.5) }}
-      className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0"
+      className="flex items-center gap-3 py-2.5 border-b border-foreground/5 last:border-0"
     >
       {/* Q-number badge */}
-      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 border border-white/10 shrink-0">
+      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground/5 border border-foreground/10 shrink-0">
         <span className="text-[10px] font-bold text-muted-foreground">
           Q{question.question_no}
         </span>
@@ -302,7 +303,7 @@ function QuestionRow({
       <div className="flex-1 min-w-0">
         {scoreNum != null && maxNum > 0 ? (
           <div
-            className="w-full h-1 bg-white/10 rounded-full overflow-hidden"
+            className="w-full h-1 bg-foreground/10 rounded-full overflow-hidden"
             role="progressbar"
             aria-valuenow={Math.round((scoreNum / maxNum) * 100)}
             aria-valuemin={0}
@@ -322,7 +323,7 @@ function QuestionRow({
             />
           </div>
         ) : (
-          <div className="w-full h-1 bg-white/5 rounded-full" />
+          <div className="w-full h-1 bg-foreground/5 rounded-full" />
         )}
       </div>
 
@@ -471,13 +472,13 @@ function ExamDetailDrawer({
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-[#0f0f14] border-l border-white/10 shadow-2xl"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-card border-l-2 border-border shadow-[-8px_0_32px_rgba(0,0,0,0.35)]"
         role="dialog"
         aria-modal="true"
         aria-label={`Exam details: ${exam.name}`}
       >
         {/* Drawer header */}
-        <div className="flex items-start gap-3 border-b border-white/10 px-5 py-4">
+        <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-4">
               <Badge
@@ -485,8 +486,8 @@ function ExamDetailDrawer({
                 className={cn(
                   "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border",
                   isAssessment
-                    ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                    : "bg-orange-500/20 text-orange-300 border-orange-500/30"
+                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/50 dark:border-blue-500/30"
+                    : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30"
                 )}
               >
                 {exam.activity_type}
@@ -494,23 +495,23 @@ function ExamDetailDrawer({
               {!isLoading && !isMarked && (
                 <Badge
                   variant="outline"
-                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/35 dark:border-yellow-500/20"
                 >
                   Pending marks
                 </Badge>
               )}
             </div>
-            <h2 className="text-base font-bold text-white leading-snug line-clamp-2">
+            <h2 className="text-base font-bold text-foreground leading-snug line-clamp-2">
               {exam.name}
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
               {getCourseName(exam)}
             </p>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-red-400 hover:text-red-300 shrink-0 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 hover:border-red-500/50 rounded-lg"
+            className="h-8 w-8 p-0 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 shrink-0 border border-red-500/50 dark:border-red-500/30 bg-red-500/10 hover:bg-red-500/20 hover:border-red-500 dark:hover:border-red-500/50 rounded-lg"
             onClick={onClose}
             aria-label="Close details"
             autoFocus
@@ -520,7 +521,7 @@ function ExamDetailDrawer({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 pb-6 space-y-4">
 
           {/* Loading */}
           {isLoading && (
@@ -542,10 +543,10 @@ function ExamDetailDrawer({
           {/* Question rows — shown for both marked and unmarked exams */}
           {!isLoading && !isError && sortedQuestions.length > 0 && (
             <>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/80">
                 {isMarked ? "Per-question breakdown" : "Question paper"}
               </p>
-              <div className="rounded-xl border border-white/10 bg-white/3 px-4">
+              <div className="rounded-xl border border-border/50 bg-foreground/3 px-4">
                 {sortedQuestions.map((q, i) => (
                   <QuestionRow
                     key={q.id}
@@ -574,7 +575,7 @@ function ExamDetailDrawer({
 
         {/* Footer — computed total (only for marked exams) */}
         {computedTotal !== null && totalPossible !== null && (
-          <div className="border-t border-white/10 px-5 py-4">
+          <div className="border-t border-border px-5 py-5 pb-6">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">
                 Total Score
@@ -583,7 +584,7 @@ function ExamDetailDrawer({
                 <span
                   className={cn(
                     "text-2xl font-bold tabular-nums",
-                    totalColors ? totalColors.text : "text-white"
+                    totalColors ? totalColors.text : "text-foreground"
                   )}
                 >
                   {Number.isInteger(computedTotal)
@@ -597,7 +598,7 @@ function ExamDetailDrawer({
             </div>
             {totalPossible > 0 && (
               <div
-                className="mt-2 w-full h-1.5 bg-white/10 rounded-full overflow-hidden"
+                className="mt-2 w-full h-1.5 bg-foreground/10 rounded-full overflow-hidden"
                 role="progressbar"
                 aria-valuenow={Math.round((computedTotal / totalPossible) * 100)}
                 aria-valuemin={0}
@@ -607,7 +608,7 @@ function ExamDetailDrawer({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-700",
-                    totalColors ? totalColors.bar : "bg-white/40"
+                    totalColors ? totalColors.bar : "bg-foreground/40"
                   )}
                   style={{
                     width: `${Math.min(100, (computedTotal / totalPossible) * 100)}%`,
@@ -631,6 +632,9 @@ const TABS: { key: ActivityFilter; label: string }[] = [
 export default function ScoresClient() {
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } = useExams();
 
   // Pre-fetch all exam answers in parallel on load.
@@ -696,7 +700,51 @@ export default function ScoresClient() {
     return map;
   }, [allQuestionsQueries, examIds]);
 
-  const closeDrawer = useCallback(() => setSelectedExam(null), []);
+  // Derive a stable primitive so useEffect below has a deterministic dependency.
+  const panel = searchParams.get("panel");
+
+  // Open the drawer and push a history entry so the back button can close it.
+  // Only push when panel is absent; replace if a different panel value exists;
+  // do nothing if panel=1 is already set. Preserves any existing query params.
+  const openDrawer = useCallback(
+    (exam: Exam) => {
+      setSelectedExam(exam);
+      const currentPanel = searchParams.get("panel");
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("panel", "1");
+      const nextUrl = `${pathname}?${nextParams.toString()}`;
+      if (currentPanel === null) {
+        router.push(nextUrl, { scroll: false });
+      } else if (currentPanel !== "1") {
+        router.replace(nextUrl, { scroll: false });
+      }
+    },
+    [router, pathname, searchParams]
+  );
+
+  // Programmatic close: replace the URL with panel param removed.
+  // This is safe regardless of whether openDrawer used push or replace,
+  // since we never risk navigating to a different page.
+  // The Android back button still works via the history entry pushed by openDrawer
+  // (when panel was absent), caught by the useEffect below.
+  const closeDrawer = useCallback(() => {
+    if (searchParams.get("panel")) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete("panel");
+      const params = nextParams.toString();
+      router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
+    } else {
+      setSelectedExam(null);
+    }
+  }, [router, pathname, searchParams]);
+
+  // When the back button pops ?panel=1, searchParams loses the param and
+  // this effect clears the selected exam to close the drawer.
+  useEffect(() => {
+    if (!panel && selectedExam) {
+      setSelectedExam(null);
+    }
+  }, [panel, selectedExam]);
 
   /**
    * Mirror EzyGo's visibility rules:
@@ -778,11 +826,11 @@ export default function ScoresClient() {
           transition={{ duration: 0.3 }}
           className="flex items-center gap-3"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20 border border-purple-500/30 shrink-0">
-            <GraduationCap className="h-5 w-5 text-purple-300" aria-hidden="true" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/50 dark:border-purple-500/30 shrink-0">
+            <GraduationCap className="h-5 w-5 text-purple-600 dark:text-purple-300" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
               Scores
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -807,10 +855,10 @@ export default function ScoresClient() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4"
+                className="rounded-xl border border-border/50 bg-card p-3 sm:p-4"
                 aria-label={`${s.label}: ${s.value}`}
               >
-                <div className="text-xl sm:text-2xl font-bold text-white tabular-nums">
+                <div className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">
                   {s.value}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
@@ -836,8 +884,8 @@ export default function ScoresClient() {
               className={cn(
                 "custom-button rounded-lg text-xs font-medium transition-all",
                 filter === tab.key
-                  ? "border-purple-500/60 bg-purple-500/15 text-purple-200"
-                  : "text-muted-foreground hover:text-white"
+                  ? "border-purple-500/60 bg-purple-500/15 text-purple-700 dark:text-purple-200"
+                  : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setFilter(tab.key)}
             >
@@ -845,7 +893,7 @@ export default function ScoresClient() {
               <span
                 className={cn(
                   "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                  filter === tab.key ? "bg-purple-500/30" : "bg-white/10"
+                  filter === tab.key ? "bg-purple-500/30" : "bg-foreground/10"
                 )}
               >
                 {counts[tab.key]}
@@ -857,7 +905,7 @@ export default function ScoresClient() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-white h-8 w-8 p-0"
+              className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
               onClick={() => refetch()}
               disabled={isFetching}
               aria-label="Refresh scores"
@@ -937,11 +985,11 @@ export default function ScoresClient() {
                   <div key={group.id}>
                     {/* Course heading */}
                     <div className="flex items-center gap-3 mb-4">
-                      <BookOpen className="h-4 w-4 text-purple-400 shrink-0" aria-hidden="true" />
-                      <span className="text-sm font-semibold text-white">
+                      <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" aria-hidden="true" />
+                      <span className="text-sm font-semibold text-foreground">
                         {group.label}
                       </span>
-                      <div className="flex-1 h-px bg-white/10" />
+                      <div className="flex-1 h-px bg-foreground/10" />
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                         {countLabel}
                       </span>
@@ -955,7 +1003,7 @@ export default function ScoresClient() {
                             key={exam.id}
                             exam={exam}
                             index={idx}
-                            onClick={() => setSelectedExam(exam)}
+                            onClick={() => openDrawer(exam)}
                             resolvedScore={resolvedScores[exam.id]}
                             resolvedMaxMark={resolvedMaxMarks[exam.id]}
                           />

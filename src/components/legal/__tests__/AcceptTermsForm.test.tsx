@@ -89,7 +89,8 @@ describe('AcceptTermsForm', () => {
 
       const link = screen.getByRole('link', { name: /above Disclaimer and all Policies listed here/i });
       expect(link).toHaveAttribute('href', '/legal');
-      expect(link).toHaveAttribute('target', '_blank');
+      // Link navigates in-app (no _blank) so back button returns to this page in PWA
+      expect(link).not.toHaveAttribute('target', '_blank');
     });
 
     it('should have disabled button initially', () => {
@@ -393,6 +394,17 @@ describe('AcceptTermsForm', () => {
       const checkbox = screen.getByRole('checkbox');
       // Checkbox should remain unchecked since we clicked the link, not the label
       expect(checkbox).not.toBeChecked();
+    });
+
+    it('navigates in-app to /legal when terms link is clicked', async () => {
+      const user = userEvent.setup();
+      render(<AcceptTermsForm />);
+
+      const link = screen.getByRole('link', { name: /above Disclaimer and all Policies listed here/i });
+      await user.click(link);
+
+      // Link click calls router.push('/legal') so PWA back button returns here
+      expect(mockPush).toHaveBeenCalledWith('/legal');
     });
   });
 

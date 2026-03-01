@@ -34,6 +34,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
 - **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs` (or `/api/docs` in development)
 - **Build Transparency** 🔍 - View complete build provenance and SLSA attestations at `/build-info`
+- **Dark/Light Mode** 🌓 - Switch between dark and light themes with preference saved across sessions
 
 ## 🛠️ Tech Stack
 
@@ -162,6 +163,7 @@ src/
 ├── providers/                # React context providers
 │   ├── attendance-settings.tsx  # Attendance target settings
 │   ├── react-query.tsx       # TanStack Query provider
+│   ├── theme.tsx             # Light/dark theme provider
 │   └── user-settings.ts      # User settings context
 ├── hooks/                    # Custom React hooks
 │   ├── courses/              # Course and exam data fetching hooks
@@ -448,10 +450,10 @@ GhostClass is optimized for maximum performance:
 - **Development**: Webpack bundler via `--webpack` flag (Serwist compatibility)
 - Manifest file for installable web app experience
 - Intelligent caching strategies:
-  - Static assets: `StaleWhileRevalidate` for CSS/JS/workers (30-day max age)
+  - Static assets: `StaleWhileRevalidate` for CSS/JS/workers/fonts (30-day max age)
   - Images: `CacheFirst` with 30-day expiration (CDN-trusted sources only)
-  - Selected non-user-specific public API responses that are safe to cache (e.g., metadata): `NetworkFirst`, 10 s timeout
-  - **Attendance data and other user-specific API endpoints** (including `/api/backend/**`, `/api/profile`) always hit the network (no offline caching) to avoid storing sensitive data on-device and to prevent serving stale user-specific data
+  - Navigation responses: `NetworkOnly` (safety net; navigations are bypassed at the fetch handler level to preserve Next.js streaming SSR)
+  - **All API endpoints and user-specific data** always hit the network (no offline caching) to avoid storing sensitive data on-device and to prevent serving stale user-specific data
 
 ### Testing PWA Features Locally
 
@@ -481,11 +483,12 @@ This enables the service worker in development mode without requiring a producti
 
 - React Query with smart cache timing:
   - Profile data: 5min stale time, 30min garbage collection
-  - General queries: 3min stale time, 10min garbage collection
-  - Refetch on window focus disabled
-  - Auto-refetch interval: 15 minutes
+  - General queries: 3min stale time, 10min garbage collection (global default)
+  - Attendance / tracking data: 30s stale time, 60s background refetch interval
+  - Notifications: 30s background refetch interval
+  - Window focus refetch: disabled globally; enabled per-query for time-sensitive data
 - EzyGo API: LRU cache with 60-second TTL and request deduplication
-- Static assets: 1-year cache headers for fonts and `_next/static`
+- Static asset cache headers: `_next/static` 1-year immutable; fonts 7-day max-age + 30-day stale-while-revalidate
 - Next.js Image optimization with AVIF/WebP formats
 
 ### Bundle Optimization
@@ -515,7 +518,6 @@ ENABLE_PUBLIC_BROWSER_SOURCEMAPS=true
 - Webpack bundler (for Serwist PWA compatibility)
 - Origin validation skipped in dev mode
 - Fast Refresh with React 19
-- No NProgress blur on login page
 
 ## 🧪 Testing
 

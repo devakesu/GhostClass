@@ -1,0 +1,84 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
+
+type Theme = "light" | "dark";
+
+interface ThemeContextType {
+  theme: Theme;
+  toggleTheme: () => void;
+  setTheme: (t: Theme) => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+/**
+ * Reads the persisted theme from localStorage.
+ * Falls back to "dark" when no stored preference exists.
+ */
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // localStorage may be blocked (e.g. tracking prevention)
+  }
+  // No stored preference → always default to dark
+  return "dark";
+}
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  // Update meta theme-color for mobile browsers
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute("content", theme === "dark" ? "#141414" : "#f8f8fc");
+  }
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+
+  // Apply theme on mount & when it changes
+  useEffect(() => {
+    applyTheme(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // localStorage may be blocked
+    }
+  }, [theme]);
+
+  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
+  const toggleTheme = useCallback(
+    () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),
+    []
+  );
+
+  const value = useMemo(
+    () => ({ theme, toggleTheme, setTheme }),
+    [theme, toggleTheme, setTheme]
+  );
+
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) {
+    throw new Error("useTheme must be used within a ThemeProvider");
+  }
+  return ctx;
+}

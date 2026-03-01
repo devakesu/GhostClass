@@ -518,11 +518,11 @@ export function AttendanceCalendar({
         const isSelected = isSameDay(date, selectedDate);
         let className = "h-10 w-10 mx-auto rounded-full flex items-center justify-center text-sm cursor-pointer transition-all duration-200 hover:scale-104 ";
         if (isSelected) className += "bg-primary text-primary-foreground font-medium shadow-lg scale-110";
-        else if (status === "absent") className += "bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30";
-        else if (status === "otherLeave") className += "bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30";
-        else if (status === "dutyLeave") className += "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30";
-        else if (status === "present") className += "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30";
-        else if (status === "normal") className += "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30";
+        else if (status === "absent") className += "bg-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/30 border border-red-500/50 dark:border-red-500/30";
+        else if (status === "otherLeave") className += "bg-teal-500/20 text-teal-500 dark:text-teal-400 hover:bg-teal-500/30 border border-teal-500/50 dark:border-teal-500/30";
+        else if (status === "dutyLeave") className += "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/50 dark:border-yellow-500/30";
+        else if (status === "present") className += "bg-blue-500/20 text-blue-500 dark:text-blue-400 hover:bg-blue-500/30 border border-blue-500/50 dark:border-blue-500/30";
+        else if (status === "normal") className += "bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/50 dark:border-indigo-500/30";
         else if (hasEvents) className += "ring-1 ring-gray-500/30 hover:ring-gray-500/50";
         else className += "hover:bg-accent/50";
         if (isToday(date)) className += " ring-2 ring-offset-1 ring-offset-background ring-primary";
@@ -595,7 +595,7 @@ export function AttendanceCalendar({
               </SelectTrigger>
               <SelectContent className="bg-background/90 border-border/60 backdrop-blur-md custom-dropdown max-h-70">
                 {monthNames.map((month, index) => (
-                  <SelectItem key={month} value={index.toString()} className={currentDate.month === index ? "bg-white/5 mt-0.5" : "capitalize"}>
+                  <SelectItem key={month} value={index.toString()} className={currentDate.month === index ? "bg-foreground/5 mt-0.5" : "capitalize"}>
                     {month}
                   </SelectItem>
                 ))}
@@ -607,7 +607,7 @@ export function AttendanceCalendar({
               </SelectTrigger>
               <SelectContent className="bg-background/90 border-border/60 max-h-70 backdrop-blur-md custom-dropdown">
                 {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year.toString()} className={currentDate.year === year ? "bg-white/5 mt-0.5" : "mt-0.5"}>
+                  <SelectItem key={year} value={year.toString()} className={currentDate.year === year ? "bg-foreground/5 mt-0.5" : "mt-0.5"}>
                     {year}
                   </SelectItem>
                 ))}
@@ -654,21 +654,21 @@ export function AttendanceCalendar({
                     let Icon = Clock;
                     let cardStyle = "border-border/40 bg-card hover:bg-accent/30 hover:border-border/60";
                     if (event.status === "Present") {
-                      badgeClass = "text-green-500 border-green-500/20 bg-green-500/10";
+                      badgeClass = "text-green-500 border-green-500/40 bg-green-500/10";
                       Icon = CheckCircle2;
                       cardStyle = "border-green-500/50 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500";
                     } 
                     else if (event.status === "Absent") {
-                      badgeClass = "text-red-500 border-red-500/20 bg-red-500/10";
+                      badgeClass = "text-red-500 border-red-500/40 bg-red-500/10";
                       Icon = AlertCircle;
                       cardStyle = "border-red-500/50 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500";
                     } 
                     else if (event.status === "Duty Leave") {
-                      badgeClass = "text-yellow-500 border-yellow-500/20 bg-yellow-500/10";
+                      badgeClass = "text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
                       cardStyle = "border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500";
                     } 
                     else if (event.status.includes("Leave")) {
-                      badgeClass = "text-teal-500 border-teal-500/20 bg-teal-500/10";
+                      badgeClass = "text-teal-500 border-teal-500/40 bg-teal-500/10";
                       cardStyle = "border-teal-500/50 bg-teal-500/5 hover:bg-teal-500/10 hover:border-teal-500";
                     }
 
@@ -686,7 +686,7 @@ export function AttendanceCalendar({
                         if (event.isExtra) {
                             return (
                                 <div className="shrink-0 w-full sm:w-auto flex items-center justify-end gap-2">
-                                    <Badge variant="outline" className="text-[10px] h-6 px-2 bg-indigo-500/10 text-indigo-400 border-indigo-500/20 gap-1.5"><Sparkles className="w-3 h-3" aria-hidden="true" />Self-Marked</Badge>
+                                    <Badge variant="outline" className="text-[10px] h-6 px-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/40 dark:border-indigo-500/25 gap-1.5"><Sparkles className="w-3 h-3" aria-hidden="true" />Self-Marked</Badge>
                                     <Button 
                                         variant="ghost" 
                                         size="icon" 
@@ -711,7 +711,7 @@ export function AttendanceCalendar({
                             return (
                                 <div className="shrink-0 w-full sm:w-auto flex items-center justify-end gap-2">
                                     {event.isCorrection && (
-                                        <Badge variant="outline" className="text-[10px] h-6 px-2 bg-orange-500/10 text-orange-400 border-orange-500/20 gap-1.5">
+                                        <Badge variant="outline" className="text-[10px] h-6 px-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/40 dark:border-orange-500/25 gap-1.5">
                                             <AlertTriangle className="w-3 h-3" aria-hidden="true" />Official: {event.originalStatus}
                                         </Badge>
                                     )}
@@ -727,8 +727,8 @@ export function AttendanceCalendar({
                             return (
                                 <div className="shrink-0 w-full sm:w-auto">
                                     <div className="flex flex-row gap-2 w-full">
-                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 225, "Duty Leave"); }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500/40 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:text-yellow-500"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
-                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 110, "Incorrectly marked absent"); }} aria-label={`Mark ${event.title} as Present for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-green-500/40 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:text-green-500"}`}>{isLoading ? "..." : <><CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" /><span>Mark Present</span></>}</Button>
+                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 225, "Duty Leave"); }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
+                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 110, "Incorrectly marked absent"); }} aria-label={`Mark ${event.title} as Present for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-green-500 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:border-green-500/70 dark:text-green-400 dark:hover:text-green-300"}`}>{isLoading ? "..." : <><CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" /><span>Mark Present</span></>}</Button>
                                     </div>
                                 </div>
                             );
@@ -741,7 +741,7 @@ export function AttendanceCalendar({
                         <div className="flex flex-col gap-1.5">
                           <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">{event.title.toLowerCase()}</h3>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/30">{event.sessionName ? formatSessionName(event.sessionName) : `Session ${event.sessionKey}`}</span>
+                            <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">{event.sessionName ? formatSessionName(event.sessionName) : `Session ${event.sessionKey}`}</span>
                             <Badge variant="outline" className={`h-5 px-1.5 gap-1 font-medium ${badgeClass}`}><Icon className="w-3 h-3" aria-hidden="true" />{event.status}</Badge>
                           </div>
                         </div>

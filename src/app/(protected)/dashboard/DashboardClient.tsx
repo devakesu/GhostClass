@@ -89,7 +89,6 @@ const AttendanceCalendar = dynamic(
 );
 
 // --- Helper Functions ---
-// ATTENDANCE_STATUS and isPositive are imported from @/lib/logic/attendance-reconciliation.
 
 /** Returns the canonical session identifier from an EzyGo session object. */
 const getOfficialSessionRaw = (session: { session?: string | number | null }, sessionKey: string | number): string | number => {
@@ -559,12 +558,12 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               <p className="flex flex-wrap items-center gap-2.5 max-sm:text-md text-muted-foreground">
                 <span>You&apos;re checking out the</span>
                 <Select value={selectedSemester || ""} onValueChange={(value) => handleSemesterChange(value as "even" | "odd")} disabled={setSemesterMutation.isPending}>
-                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 uppercase custom-dropdown" aria-label="Select semester">{selectedSemester || "semester"}</SelectTrigger>
+                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 uppercase custom-dropdown dark:bg-foreground/10 dark:border-foreground/20" aria-label="Select semester">{selectedSemester || "semester"}</SelectTrigger>
                   <SelectContent className="custom-dropdown"><SelectItem value="odd">ODD</SelectItem><SelectItem value="even">EVEN</SelectItem></SelectContent>
                 </Select>
                 <span>semester reports for academic year</span>
                 <Select value={selectedYear || ""} onValueChange={handleAcademicYearChange} disabled={setAcademicYearMutation.isPending}>
-                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 custom-dropdown" aria-label="Select academic year">{selectedYear || "year"}</SelectTrigger>
+                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 custom-dropdown dark:bg-foreground/10 dark:border-foreground/20" aria-label="Select academic year">{selectedYear || "year"}</SelectTrigger>
                   <SelectContent className="custom-dropdown max-h-70">{academicYears.map((year) => <SelectItem key={year} value={year}>{year}</SelectItem>)}</SelectContent>
                 </Select>
               </p>
@@ -572,14 +571,14 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
           </div>
 
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="w-full lg:w-87.5">
-            <Card className="custom-container shadow-sm border-accent/20">
+            <Card className="custom-container shadow-sm">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium">Total Attendance</CardTitle>
                 <div className="flex items-center gap-2 text-sm font-bold" role="status" aria-live="polite">
                   {(diffPresent !== 0 || diffTotal > 0) && stats.officialPercentage !== stats.percentage && (
                     <span className="text-muted-foreground">{stats.officialPercentage}% <span className="mx-0.5">→</span></span>
                   )}
-                  <span className={stats.rawPercentage >= targetPercentage ? "text-primary" : "text-red-400"}>
+                  <span className={stats.rawPercentage >= targetPercentage ? "text-primary" : "text-red-600 dark:text-red-400"}>
                     {stats.percentage}%
                   </span>
                   <span className="sr-only">Your attendance is {stats.percentage} percent</span>
@@ -666,7 +665,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                       <div className="flex items-center gap-1.5">
                         <span className="text-2xl font-bold text-green-500">{stats.realPresent}</span>
                         {stats.correctionPresent > 0 && <span className="text-lg font-bold text-orange-500">+{stats.correctionPresent}</span>}
-                        {stats.extraPresent > 0 && <span className="text-lg font-bold text-blue-400">+{stats.extraPresent}</span>}
+                        {stats.extraPresent > 0 && <span className="text-lg font-bold text-blue-600 dark:text-blue-400">+{stats.extraPresent}</span>}
                       </div>
                     </CardContent>
                   </Card>
@@ -678,7 +677,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                       <div className="flex items-center gap-1.5">
                         <span className="text-2xl font-bold text-red-500">{stats.realAbsent}</span>
                         {stats.savedAbsent > 0 && <span className="text-lg font-bold text-orange-500">-{stats.savedAbsent}</span>}
-                        {stats.extraAbsent > 0 && <span className="text-lg font-bold text-blue-400">+{stats.extraAbsent}</span>}
+                        {stats.extraAbsent > 0 && <span className="text-lg font-bold text-blue-600 dark:text-blue-400">+{stats.extraAbsent}</span>}
                       </div>
                     </CardContent>
                   </Card>
@@ -693,13 +692,13 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                       <div className="flex items-center gap-1.5">
                           <span className="text-2xl font-bold text-yellow-500">{stats.realDL}</span>
                           {stats.correctionDL > 0 && <span className="text-lg font-bold text-orange-500">+{stats.correctionDL}</span>}
-                          {stats.extraDL > 0 && <span className="text-lg font-bold text-blue-400">+{stats.extraDL}</span>}
+                          {stats.extraDL > 0 && <span className="text-lg font-bold text-blue-600 dark:text-blue-400">+{stats.extraDL}</span>}
                       </div>
                     </CardContent>
                   </Card>
                 </motion.div>
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
-                  <Card className="custom-container flex flex-col justify-center py-4 px-2"><CardHeader className="pb-1 px-4"><CardTitle className="text-sm font-medium whitespace-nowrap">Special Leave(s)</CardTitle></CardHeader><CardContent className="px-4 pb-2"><div className="text-2xl font-bold text-teal-400">{stats.otherLeave}</div></CardContent></Card>
+                  <Card className="custom-container flex flex-col justify-center py-4 px-2"><CardHeader className="pb-1 px-4"><CardTitle className="text-sm font-medium whitespace-nowrap">Special Leave(s)</CardTitle></CardHeader><CardContent className="px-4 pb-2"><div className="text-2xl font-bold text-teal-500 dark:text-teal-400">{stats.otherLeave}</div></CardContent></Card>
                 </motion.div>
               </div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.5 }}>
@@ -724,9 +723,9 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               <div className="w-full overflow-auto">
                 <table className="w-full caption-bottom text-sm">
                   <thead className="relative">
-                    <tr className="border-b-2 border-[#2B2B2B]/60">
-                      <th scope="col" className="h-10 px-4 text-left font-medium text-muted-foreground bg-[rgb(31,31,32)]">Course</th>
-                      <th scope="col" className="h-10 px-4 text-left font-medium text-muted-foreground bg-[rgb(31,31,32)]">Instructor</th>
+                    <tr className="border-b-2 border-border/60">
+                      <th scope="col" className="h-10 px-4 text-left font-medium text-muted-foreground bg-muted/80">Course</th>
+                      <th scope="col" className="h-10 px-4 text-left font-medium text-muted-foreground bg-muted/80">Instructor</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -735,7 +734,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                       return instructors.length > 0 ? (instructors.map((instructor: any, index: number) => (
                         <tr 
                           key={`${courseId}-${instructor.id}`} 
-                          className={`group transition-colors border-[#2B2B2B]/80 ${hoveredCourseId === courseId ? "bg-muted/25" : ""}`} 
+                          className={`group transition-colors border-border/80 ${hoveredCourseId === courseId ? "bg-muted/25" : ""}`} 
                           onMouseEnter={() => setHoveredCourseId(courseId)} 
                           onMouseLeave={() => setHoveredCourseId(null)}
                         >
@@ -743,7 +742,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                             <td className="p-4 align-top" rowSpan={instructors.length}>
                               <div className="font-medium">{course.code}</div>
                               <div className="text-sm text-muted-foreground capitalize">{course.name.toLowerCase()}</div>
-                              {instructors.length > 1 && (<div className="mt-2"><span className="inline-flex items-center rounded-full border px-2 min-h-5 pt-[0.05px] justify-center text-xs font-semibold bg-blue-50/3 text-white/60 border-[#2B2B2B]/80">{instructors.length} instructors</span></div>)}
+                              {instructors.length > 1 && (<div className="mt-2"><span className="inline-flex items-center rounded-full border px-2 min-h-5 pt-[0.05px] justify-center text-xs font-semibold bg-blue-50/3 text-foreground/60 border-border/80">{instructors.length} instructors</span></div>)}
                             </td>
                           ) : null}
                           <td className="p-4"><div className="font-medium">{instructor.first_name} {instructor.last_name}</div></td>

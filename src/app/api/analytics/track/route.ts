@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
     if (origin && (appDomain || appUrl)) {
       const allowedOrigins = new Set<string>();
 
+      // In development, allow the current request origin (same-origin API calls)
+      // to avoid false 403s on dynamic local dev ports (e.g. :3001).
+      if (process.env.NODE_ENV === "development") {
+        allowedOrigins.add(req.nextUrl.origin);
+      }
+
       if (appUrl) {
         try {
           const parsedAppUrl = new URL(appUrl);
@@ -41,13 +47,19 @@ export async function POST(req: NextRequest) {
         allowedOrigins.add(`http://${appDomain}`);
       }
 
-      // Always allow localhost in development
+      // Always allow localhost/loopback in development, regardless of port.
+      let isDevLocalOrigin = false;
       if (process.env.NODE_ENV === "development") {
-        allowedOrigins.add("http://localhost:3000");
-        allowedOrigins.add("https://localhost:3000");
+        try {
+          const parsedOrigin = new URL(origin);
+          const host = parsedOrigin.hostname;
+          isDevLocalOrigin = host === "localhost" || host === "127.0.0.1" || host === "::1";
+        } catch {
+          isDevLocalOrigin = false;
+        }
       }
 
-      if (allowedOrigins.size > 0 && !allowedOrigins.has(origin)) {
+      if (allowedOrigins.size > 0 && !allowedOrigins.has(origin) && !isDevLocalOrigin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }

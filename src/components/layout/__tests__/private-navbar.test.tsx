@@ -114,6 +114,16 @@ vi.mock("@/lib/logger", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), dev: vi.fn(), info: vi.fn() },
 }));
 
+const { mockToggleTheme, mockTheme } = vi.hoisted(() => ({
+  mockToggleTheme: vi.fn(),
+  mockTheme: { value: "dark" as "dark" | "light" },
+}));
+
+vi.mock("@/providers/theme", () => ({
+  useTheme: () => ({ theme: mockTheme.value, toggleTheme: mockToggleTheme, setTheme: vi.fn() }),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+}));
+
 import { Navbar } from "../private-navbar";
 
 // ---------------------------------------------------------------------------
@@ -124,6 +134,7 @@ describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPathname.mockReturnValue("/dashboard");
+    mockTheme.value = "dark";
   });
 
   it("renders without crashing", () => {
@@ -184,5 +195,34 @@ describe("Navbar", () => {
       (btn) => !btn.closest("[role='menu']") && !btn.closest("[role='menuitem']")
     );
     expect(navButtons.length).toBe(0);
+  });
+
+  describe("theme toggle", () => {
+    it("renders the dark mode toggle switch", () => {
+      render(<Navbar />);
+      expect(screen.getByLabelText("Dark Mode")).toBeInTheDocument();
+    });
+
+    it("calls toggleTheme when the theme switch is clicked", () => {
+      render(<Navbar />);
+      const themeSwitch = screen.getByLabelText("Dark Mode");
+      fireEvent.click(themeSwitch);
+      expect(mockToggleTheme).toHaveBeenCalled();
+    });
+
+    it("renders the switch as checked in dark mode", () => {
+      mockTheme.value = "dark";
+      render(<Navbar />);
+      const themeSwitch = screen.getByLabelText("Dark Mode");
+      // Switch checked state is represented via aria-checked or data-state
+      expect(themeSwitch).toHaveAttribute("aria-checked", "true");
+    });
+
+    it("renders the switch as unchecked in light mode", () => {
+      mockTheme.value = "light";
+      render(<Navbar />);
+      const themeSwitch = screen.getByLabelText("Dark Mode");
+      expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+    });
   });
 });

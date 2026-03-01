@@ -37,9 +37,9 @@ import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 const STATUS_ORDER = ["Present", "Duty Leave", "Absent"] as const;
 type StatusKey = (typeof STATUS_ORDER)[number];
 const STATUS_STYLES: Record<StatusKey, { dot: string; text: string; border: string }> = {
-  Present:     { dot: "bg-green-500",  text: "text-green-400",  border: "border-green-500/20" },
-  "Duty Leave": { dot: "bg-orange-500", text: "text-orange-400", border: "border-orange-500/20" },
-  Absent:      { dot: "bg-red-500",    text: "text-red-400",    border: "border-red-500/20" },
+  Present:     { dot: "bg-green-500",  text: "text-green-600 dark:text-green-400",  border: "border-green-500/40 dark:border-green-500/20" },
+  "Duty Leave": { dot: "bg-orange-500", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/40 dark:border-orange-500/20" },
+  Absent:      { dot: "bg-red-500",    text: "text-red-600 dark:text-red-400",    border: "border-red-500/40 dark:border-red-500/20" },
 };
 
 function getStatusKey(attendanceCode: number | undefined): StatusKey {
@@ -284,10 +284,10 @@ export default function TrackingClient() {
               </p>
               {(count ?? 0) > 0 && (
                 <div className="flex flex-col gap-2 items-center justify-center">
-                  <Badge className="text-sm py-1 px-3 bg-yellow-500/12 text-yellow-400/75 border-yellow-500/15">
+                  <Badge className="text-sm py-1 px-3 bg-yellow-500/12 text-yellow-600 dark:text-yellow-400 border border-yellow-500/40 dark:border-yellow-500/20">
                     You have added <strong>{count}</strong> {count === 1 ? "class" : "classes"}.
                   </Badge>
-                  <button onClick={() => setDeleteAllConfirmOpen(true)} aria-label={`Clear all ${count} tracked ${count === 1 ? 'class' : 'classes'}`} className="text-sm cursor-pointer justify-between items-center gap-2 bg-red-500/12 text-red-400/75 hover:bg-red-500/18 duration-300 border border-red-500/15 py-1 px-3 rounded-md flex">
+                  <button onClick={() => setDeleteAllConfirmOpen(true)} aria-label={`Clear all ${count} tracked ${count === 1 ? 'class' : 'classes'}`} className="text-sm cursor-pointer justify-between items-center gap-2 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/15 duration-300 border border-red-500/40 dark:border-red-500/20 py-1 px-3 rounded-md flex">
                     Clear all <Trash2 size={14} aria-hidden="true" />
                   </button>
                 </div>
@@ -315,7 +315,7 @@ export default function TrackingClient() {
                     
                     return (
                       <div key={courseName} className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 pl-1 sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/40 shadow-sm rounded-t-md">
+                        <div className="flex items-center gap-2 px-2 sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/60 shadow-sm rounded-md">
                           <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
                           <Badge variant="outline" className="ml-auto text-xs">{items.length}</Badge>
@@ -362,20 +362,20 @@ export default function TrackingClient() {
 
                                     const typeLabel = isCorrection ? "Correction" : "Extra";
                                     const typeColorClass = isCorrection 
-                                        ? "bg-purple-500/10 text-purple-400 border-purple-500/20" 
-                                        : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
+                                        ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/40 dark:border-purple-500/20" 
+                                        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/40 dark:border-indigo-500/20";
 
-                                    let statusBadgeClass = "bg-green-500/20 text-green-400";
-                                    let cardBgClass = "bg-green-500/5 border-green-500/20";
+                                    let statusBadgeClass = "bg-green-500/20 text-green-600 dark:text-green-400";
+                                    let cardBgClass = "bg-green-500/5 border-green-500/35 dark:border-green-500/20";
 
                                     if (isCorrection) {
-                                        if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; }
-                                        else if (userColor === "red") { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
-                                        else { cardBgClass = "bg-green-500/5 border-green-500/20"; statusBadgeClass = "bg-green-500/20 text-green-400"; }
+                                        if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-600 dark:text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/35 dark:border-orange-500/20"; }
+                                        else if (userColor === "red") { statusBadgeClass = "bg-red-500/20 text-red-600 dark:text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/35 dark:border-red-500/20"; }
+                                        else { cardBgClass = "bg-green-500/5 border-green-500/35 dark:border-green-500/20"; statusBadgeClass = "bg-green-500/20 text-green-600 dark:text-green-400"; }
                                     } else {
-                                        if (userColor === "green") { statusBadgeClass = "bg-green-500/20 text-green-400"; cardBgClass = "bg-green-500/5 border-green-500/20"; } 
-                                        else if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/20"; } 
-                                        else { statusBadgeClass = "bg-red-500/20 text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/20"; }
+                                        if (userColor === "green") { statusBadgeClass = "bg-green-500/20 text-green-600 dark:text-green-400"; cardBgClass = "bg-green-500/5 border-green-500/35 dark:border-green-500/20"; } 
+                                        else if (userColor === "orange") { statusBadgeClass = "bg-orange-500/20 text-orange-600 dark:text-orange-400"; cardBgClass = "bg-orange-500/5 border-orange-500/35 dark:border-orange-500/20"; } 
+                                        else { statusBadgeClass = "bg-red-500/20 text-red-600 dark:text-red-400"; cardBgClass = "bg-red-500/5 border-red-500/35 dark:border-red-500/20"; }
                                     }
 
                                     return (
@@ -402,7 +402,7 @@ export default function TrackingClient() {
                                             disabled={deleteId === trackingId}
                                             onClick={() => setDeleteConfirmOpen(trackingId)} 
                                             aria-label={`Remove tracking entry for ${formatSessionName(trackingItem.session)} session on ${formatDisplayDate(trackingItem.date)}`}
-                                            className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 rounded-lg font-medium text-yellow-600 disabled:opacity-50"
+                                            className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 border border-yellow-500/40 dark:border-yellow-500/20 rounded-lg font-medium text-yellow-600 dark:text-yellow-500 disabled:opacity-50"
                                           >
                                             {deleteId === trackingId ? "Deleting..." : <><span className="max-md:hidden">Remove</span><Trash2 size={15} aria-hidden="true" /></>}
                                           </m.button>

@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 // ─── Section heading ───────────────────────────────────────────────────────────
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-xl font-semibold text-purple-400 border-l-2 border-purple-500 pl-3">
+    <h2 className="text-xl font-semibold text-purple-600 dark:text-purple-400 border-l-2 border-purple-500 pl-3">
       {children}
     </h2>
   );
@@ -38,19 +38,19 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   const panelId = makePanelId(question);
   const btnId = `${panelId}-btn`;
   return (
-    <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg overflow-hidden">
+    <div className="bg-muted/30 border border-border/50 rounded-lg overflow-hidden">
       <button
         id={btnId}
-        className="w-full flex items-center justify-between gap-4 p-4 text-left text-zinc-200 font-medium hover:bg-zinc-800/40 transition-colors"
+        className="w-full flex items-center justify-between gap-4 p-4 text-left text-foreground/90 font-medium hover:bg-muted/60 transition-colors"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={panelId}
       >
         <span>{question}</span>
         {open ? (
-          <ChevronUp className="shrink-0 size-4 text-purple-400" aria-hidden="true" />
+          <ChevronUp className="shrink-0 size-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
         ) : (
-          <ChevronDown className="shrink-0 size-4 text-zinc-500" aria-hidden="true" />
+          <ChevronDown className="shrink-0 size-4 text-muted-foreground" aria-hidden="true" />
         )}
       </button>
       <div
@@ -58,7 +58,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
         role="region"
         aria-labelledby={btnId}
         hidden={!open}
-        className="px-4 pb-4 text-zinc-400 text-sm leading-relaxed border-t border-zinc-800/50 pt-3"
+        className="px-4 pb-4 text-muted-foreground text-sm leading-relaxed border-t border-border/50 pt-3"
       >
         {answer}
       </div>
@@ -73,16 +73,16 @@ function MockCourseCard() {
   const isGain = adjustedPct >= officialPct;
 
   return (
-    <Card className="bg-zinc-900/50 border-zinc-800 w-full max-w-md mx-auto" data-testid="mock-course-card">
+    <Card className="bg-card/80 border-border w-full max-w-md mx-auto" data-testid="mock-course-card">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-white text-base leading-snug">
+            <CardTitle className="text-foreground text-base leading-snug">
               Data Structures & Algorithms
             </CardTitle>
-            <p className="text-zinc-500 text-xs mt-0.5">CSE301</p>
+            <p className="text-muted-foreground text-xs mt-0.5">CSE301</p>
           </div>
-          <Badge variant="outline" className="text-xs border-zinc-700 text-zinc-400 shrink-0">
+          <Badge variant="outline" className="text-xs border-border text-muted-foreground shrink-0">
             {officialPct}%
           </Badge>
         </div>
@@ -101,12 +101,12 @@ function MockCourseCard() {
               +2
             </span>
             <span
-              className="text-blue-400 text-xs cursor-default"
+              className="text-blue-500 dark:text-blue-400 text-xs cursor-default"
               title="Extras"
             >
               +1
             </span>
-            <span className="text-zinc-500 text-xs">present</span>
+            <span className="text-muted-foreground text-xs">present</span>
           </span>
 
           {/* Absent */}
@@ -118,29 +118,29 @@ function MockCourseCard() {
             >
               -2
             </span>
-            <span className="text-zinc-500 text-xs">absent</span>
+            <span className="text-muted-foreground text-xs">absent</span>
           </span>
 
           {/* Total */}
           <span className="flex items-center gap-1">
-            <span className="text-zinc-200 font-semibold">40</span>
+            <span className="text-foreground/90 font-semibold">40</span>
             <span
-              className="text-blue-400 text-xs cursor-default"
+              className="text-blue-500 dark:text-blue-400 text-xs cursor-default"
               title="Extras"
             >
               +1
             </span>
-            <span className="text-zinc-500 text-xs">total</span>
+            <span className="text-muted-foreground text-xs">total</span>
           </span>
         </div>
 
         {/* Progress bar */}
         <div>
-          <div className="flex justify-between text-xs text-zinc-500 mb-1">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
             <span>Official {officialPct}%</span>
-            <span className="text-purple-400">Tracking {adjustedPct}%</span>
+            <span className="text-purple-600 dark:text-purple-400">Tracking {adjustedPct}%</span>
           </div>
-          <div className="relative h-2.5 rounded-full bg-zinc-800 overflow-hidden">
+          <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
             {/* Official bar */}
             <div
               className="absolute left-0 top-0 h-full rounded-full bg-purple-600"
@@ -164,16 +164,16 @@ function MockCourseCard() {
         {/* Bunk calculator panels */}
         <div className="grid grid-cols-2 gap-2 text-xs">
           {/* Official panel */}
-          <div className="bg-blue-950/40 border border-blue-800/40 rounded-lg p-3 space-y-1">
-            <p className="text-blue-300 font-semibold">Safe (Official)</p>
-            <p className="text-zinc-400">Can bunk</p>
-            <p className="text-green-400 font-bold text-lg">3</p>
+          <div className="bg-blue-500/10 dark:bg-blue-950/40 border border-blue-500/30 dark:border-blue-800/40 rounded-lg p-3 space-y-1">
+            <p className="text-blue-600 dark:text-blue-300 font-semibold">Safe (Official)</p>
+            <p className="text-muted-foreground">Can bunk</p>
+            <p className="text-green-600 dark:text-green-400 font-bold text-lg">3</p>
           </div>
           {/* Tracking panel */}
-          <div className="bg-purple-950/40 border border-purple-700/40 rounded-lg p-3 space-y-1">
-            <p className="text-purple-300 font-semibold">+ Tracking Data</p>
-            <p className="text-zinc-400">Can bunk</p>
-            <p className="text-green-400 font-bold text-lg">
+          <div className="bg-purple-500/10 dark:bg-purple-950/40 border border-purple-500/30 dark:border-purple-700/40 rounded-lg p-3 space-y-1">
+            <p className="text-purple-600 dark:text-purple-300 font-semibold">+ Tracking Data</p>
+            <p className="text-muted-foreground">Can bunk</p>
+            <p className="text-green-600 dark:text-green-400 font-bold text-lg">
               4
               <span aria-hidden="true" className="ml-1">
                 🥳
@@ -218,7 +218,7 @@ function MockAttendanceChart() {
   const targetY = (1 - TARGET / 100) * CHART_HEIGHT;
 
   return (
-    <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-4 w-full max-w-md mx-auto">
+    <div className="bg-muted/30 border border-border/50 rounded-lg p-4 w-full max-w-md mx-auto">
       {/* Chart area */}
       <div className="relative" style={{ height: CHART_HEIGHT }}>
         {/* Target dashed line */}
@@ -226,7 +226,7 @@ function MockAttendanceChart() {
           className="absolute left-0 right-0 border-t-2 border-dashed border-amber-400/70 z-10 flex items-center justify-end"
           style={{ top: targetY }}
         >
-          <span className="bg-zinc-900 text-amber-400 text-[10px] px-1 -mt-2">
+          <span className="bg-muted text-amber-600 dark:text-amber-400 text-[10px] px-1 -mt-2">
             Target: {TARGET}%
           </span>
         </div>
@@ -275,15 +275,15 @@ function MockAttendanceChart() {
                     />
                   )}
                 </div>
-                <span className="text-[10px] text-zinc-400 text-center leading-tight">
+                <span className="text-[10px] text-muted-foreground text-center leading-tight">
                   {c.code}
                 </span>
-                <span className="text-[10px] text-zinc-500 text-center leading-tight">
+                <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
                   {c.official}%
                   {hasTracking && (
                     <span
                       className={
-                        isGain ? "text-green-400" : "text-red-400"
+                        isGain ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                       }
                     >
                       {" "}
@@ -298,7 +298,7 @@ function MockAttendanceChart() {
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-400">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="inline-block size-3 rounded-sm bg-green-600" />
           Solid Green = Above target
@@ -330,7 +330,7 @@ function MockAttendanceChart() {
           Striped Red = Tracking loss
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-5 border-t-2 border-dashed border-amber-400" />
+            <span className="inline-block w-5 border-t-2 border-dashed border-amber-500 dark:border-amber-400" />
           Dashed amber = Target %
         </span>
       </div>
@@ -389,16 +389,16 @@ export default function HelpClient() {
   ];
 
   return (
-    <div className="bg-zinc-950 text-zinc-300 px-6 md:px-12 pt-6 md:pt-12">
+    <div className="bg-background text-muted-foreground px-6 md:px-12 pt-6 md:pt-12">
       <div className="max-w-3xl mx-auto space-y-12">
         {/* ── Header ── */}
-        <div className="flex items-center gap-4 border-b border-zinc-800 pb-6">
-          <HelpCircle className="size-8 text-purple-400 shrink-0" aria-hidden="true" />
+        <div className="flex items-center gap-4 border-b border-border pb-6">
+            <HelpCircle className="size-8 text-purple-600 dark:text-purple-400 shrink-0" aria-hidden="true" />
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">
               Help & FAQ
             </h1>
-            <p className="text-zinc-400 text-sm mt-1">
+            <p className="text-muted-foreground text-sm mt-1">
               Everything you need to know about GhostClass.
             </p>
           </div>
@@ -411,20 +411,20 @@ export default function HelpClient() {
             Course Card Explained
           </SectionHeading>
 
-          <p className="text-zinc-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Below is a sample course card with all features shown. Hover over the
             small{" "}
             <span className="text-orange-500 font-semibold">orange</span> and{" "}
-            <span className="text-blue-400 font-semibold">blue</span> modifiers to
+            <span className="text-blue-500 dark:text-blue-400 font-semibold">blue</span> modifiers to
             see tooltips.
           </p>
 
           <MockCourseCard />
 
           {/* Legend */}
-          <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-5 space-y-4 text-sm">
-            <h3 className="text-zinc-200 font-semibold">Counts Legend</h3>
-            <ul className="space-y-2 text-zinc-400">
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-5 space-y-4 text-sm">
+            <h3 className="text-foreground/80 font-semibold">Counts Legend</h3>
+            <ul className="space-y-2 text-muted-foreground">
               <li>
                 🟢{" "}
                 <span className="text-green-500 font-semibold">Green number</span>{" "}
@@ -436,11 +436,11 @@ export default function HelpClient() {
                   Orange <code>+N</code>
                 </span>{" "}
                 next to Present = Correction entries that convert absences to present/DL
-                (does <strong className="text-zinc-200">NOT</strong> add to total)
+                (does <strong className="text-foreground/80">NOT</strong> add to total)
               </li>
               <li>
                 🔵{" "}
-                <span className="text-blue-400 font-semibold">
+                <span className="text-blue-500 dark:text-blue-400 font-semibold">
                   Blue <code>+N</code>
                 </span>{" "}
                 next to Present = Extra present classes you manually added (adds to
@@ -460,24 +460,24 @@ export default function HelpClient() {
               </li>
               <li>
                 🔵{" "}
-                <span className="text-blue-400 font-semibold">
+                <span className="text-blue-500 dark:text-blue-400 font-semibold">
                   Blue <code>+N</code>
                 </span>{" "}
                 next to Absent = Extra absent classes (adds to total)
               </li>
               <li>
-                <span className="text-zinc-200 font-semibold">Total</span> +{" "}
-                <span className="text-blue-400 font-semibold">
+                <span className="text-foreground/80 font-semibold">Total</span> +{" "}
+                <span className="text-blue-500 dark:text-blue-400 font-semibold">
                   Blue <code>+N</code>
                 </span>{" "}
                 = Official total + extra sessions added
               </li>
             </ul>
 
-            <h3 className="text-zinc-200 font-semibold pt-2">
+            <h3 className="text-foreground/80 font-semibold pt-2">
               Progress Bar Legend
             </h3>
-            <ul className="space-y-2 text-zinc-400">
+            <ul className="space-y-2 text-muted-foreground">
               <li>
                 <span className="inline-block size-3 rounded-sm bg-purple-600 mr-1.5 align-middle" />
                 Solid purple bar = Official attendance percentage
@@ -492,7 +492,7 @@ export default function HelpClient() {
                   }}
                 />
                 Striped purple overlay (going further right) = Tracking data{" "}
-                <strong className="text-zinc-200">GAIN</strong> (adjusted % is
+                <strong className="text-foreground/80">GAIN</strong> (adjusted % is
                 higher than official)
               </li>
               <li>
@@ -505,33 +505,33 @@ export default function HelpClient() {
                   }}
                 />
                 Striped red overlay (going further right) = Tracking data{" "}
-                <strong className="text-zinc-200">LOSS</strong> (adjusted % is
+                <strong className="text-foreground/80">LOSS</strong> (adjusted % is
                 lower than official)
               </li>
             </ul>
 
-            <h3 className="text-zinc-200 font-semibold pt-2">
+            <h3 className="text-foreground/80 font-semibold pt-2">
               Bunk Calculator (dual panel)
             </h3>
-            <ul className="space-y-2 text-zinc-400">
+            <ul className="space-y-2 text-muted-foreground">
               <li>
                 🔵{" "}
-                <span className="text-blue-300 font-semibold">
+                <span className="text-blue-600 dark:text-blue-300 font-semibold">
                   Safe (Official)
                 </span>{" "}
                 panel = Based only on data from EzyGo
               </li>
               <li>
                 🟣{" "}
-                <span className="text-purple-300 font-semibold">
+                <span className="text-purple-600 dark:text-purple-300 font-semibold">
                   + Tracking Data
                 </span>{" "}
                 panel = Includes your manually tracked sessions
               </li>
               <li>
                 Shows how many classes you can safely bunk (
-                <span className="text-green-400">green</span>) or must attend (
-                <span className="text-amber-400">amber</span>) to stay at your
+                <span className="text-green-600 dark:text-green-400">green</span>) or must attend (
+                <span className="text-amber-600 dark:text-amber-400">amber</span>) to stay at your
                 target %
               </li>
             </ul>
@@ -544,25 +544,25 @@ export default function HelpClient() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Correction card */}
-            <div className="bg-zinc-900/30 border border-orange-700/50 rounded-lg p-5 space-y-3">
-              <h3 className="text-orange-400 font-semibold text-base">
+            <div className="bg-muted/30 border border-orange-500/50 dark:border-orange-700/50 rounded-lg p-5 space-y-3">
+              <h3 className="text-orange-600 dark:text-orange-400 font-semibold text-base">
                 Correction
               </h3>
-              <ul className="text-zinc-400 text-sm space-y-2 list-disc list-inside">
+              <ul className="text-muted-foreground text-sm space-y-2 list-disc list-inside">
                 <li>
                   Used when EzyGo marked you absent but you were actually present
                 </li>
                 <li>
-                  Does <strong className="text-zinc-200">NOT</strong> add to the
+                  Does <strong className="text-foreground/80">NOT</strong> add to the
                   total class count — it only adjusts present/absent counts
                 </li>
                 <li>
                   Shown in{" "}
-                  <span className="text-orange-500 font-semibold">orange</span> on
+                  <span className="text-orange-600 dark:text-orange-500 font-semibold">orange</span> on
                   the course card
                 </li>
               </ul>
-              <p className="text-zinc-500 text-xs italic">
+              <p className="text-muted-foreground/80 text-xs italic">
                 Example: &quot;You attended class but EzyGo shows Absent. Add a
                 Correction → Present to fix the percentage without affecting the
                 total.&quot;
@@ -570,24 +570,24 @@ export default function HelpClient() {
             </div>
 
             {/* Extra card */}
-            <div className="bg-zinc-900/30 border border-blue-700/50 rounded-lg p-5 space-y-3">
-              <h3 className="text-blue-400 font-semibold text-base">Extra</h3>
-              <ul className="text-zinc-400 text-sm space-y-2 list-disc list-inside">
+            <div className="bg-muted/30 border border-blue-500/50 dark:border-blue-700/50 rounded-lg p-5 space-y-3">
+              <h3 className="text-blue-600 dark:text-blue-400 font-semibold text-base">Extra</h3>
+              <ul className="text-muted-foreground text-sm space-y-2 list-disc list-inside">
                 <li>
                   Used for classes that EzyGo doesn&apos;t know about yet (newly
                   held class not synced)
                 </li>
                 <li>
-                  <strong className="text-zinc-200">ADDS</strong> to the total
+                  <strong className="text-foreground/80">ADDS</strong> to the total
                   class count AND to present/absent
                 </li>
                 <li>
                   Shown in{" "}
-                  <span className="text-blue-400 font-semibold">blue</span> on the
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold">blue</span> on the
                   course card
                 </li>
               </ul>
-              <p className="text-zinc-500 text-xs italic">
+              <p className="text-muted-foreground/80 text-xs italic">
                 Example: &quot;Professor held an extra class that hasn&apos;t appeared in
                 EzyGo yet. Add an Extra → Present so GhostClass factors it in.&quot;
               </p>
@@ -599,39 +599,39 @@ export default function HelpClient() {
         <section className="space-y-4">
           <SectionHeading>Attendance Chart Explained</SectionHeading>
 
-          <p className="text-zinc-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             The attendance chart gives you a quick visual overview of all your
             courses. Below is a sample chart showing all four possible combinations.
           </p>
 
           <MockAttendanceChart />
 
-          <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-5 space-y-2 text-sm text-zinc-400">
-            <h3 className="text-zinc-200 font-semibold">Chart Legend</h3>
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-5 space-y-2 text-sm text-muted-foreground">
+            <h3 className="text-foreground/80 font-semibold">Chart Legend</h3>
             <ul className="space-y-2">
               <li>
                 🟩{" "}
-                <strong className="text-zinc-200">Solid Green</strong> = Above
+                <strong className="text-foreground/80">Solid Green</strong> = Above
                 target (safe)
               </li>
               <li>
                 🟥{" "}
-                <strong className="text-zinc-200">Solid Red</strong> = Below target
+                <strong className="text-foreground/80">Solid Red</strong> = Below target
                 (danger)
               </li>
               <li>
                 🟩{" "}
-                <strong className="text-zinc-200">Striped Green</strong> on top =
+                <strong className="text-foreground/80">Striped Green</strong> on top =
                 Tracking GAIN (adjusted % higher than official)
               </li>
               <li>
                 🟥{" "}
-                <strong className="text-zinc-200">Striped Red</strong> on top =
+                <strong className="text-foreground/80">Striped Red</strong> on top =
                 Tracking LOSS (adjusted % lower than official)
               </li>
               <li>
                 🟨{" "}
-                <strong className="text-zinc-200">Dashed amber line</strong> = Your
+                <strong className="text-foreground/80">Dashed amber line</strong> = Your
                 attendance target (default 75%)
               </li>
             </ul>
@@ -660,12 +660,12 @@ export default function HelpClient() {
         <section className="space-y-4">
           <SectionHeading>Need More Help?</SectionHeading>
 
-          <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-8 flex flex-col items-center gap-4 text-center">
-            <HelpCircle className="size-10 text-purple-400" aria-hidden="true" />
-            <p className="text-zinc-300 text-base font-medium">
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-8 flex flex-col items-center gap-4 text-center">
+            <HelpCircle className="size-10 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+            <p className="text-foreground text-base font-medium">
               Couldn&apos;t find what you were looking for?
             </p>
-            <p className="text-zinc-500 text-sm max-w-sm">
+            <p className="text-muted-foreground/80 text-sm max-w-sm">
               Our team is happy to help. Reach out via the contact page and
               we&apos;ll get back to you as soon as possible.
             </p>

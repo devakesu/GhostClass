@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { AlertTriangle, Mail, RefreshCcw, RotateCcw } from "lucide-react";
 import { getAppDomain } from "@/lib/utils";
+import { reloadWithUpdate } from "@/lib/sw-reload";
 
 /**
  * Props for ErrorBoundary component.
@@ -97,7 +98,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   };
 
   handleReload = (): void => {
-    window.location.reload();
+    // Apply any waiting SW update before reloading so a breaking deploy
+    // doesn't send the user back into the same broken old code.
+    reloadWithUpdate();
   };
 
   handleEmailReport = (): void => {

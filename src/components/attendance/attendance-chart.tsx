@@ -116,7 +116,7 @@ const CustomTargetLabel = (props: LabelProps) => {
   const y = viewBox.y; // align label center on the target line
   return (
     <g style={{ pointerEvents: 'none' }}>
-      <rect x={x - 85} y={y - 12} width="90" height="24" fill="rgba(20, 20, 20, 0.95)" rx="4" stroke="#f59e0b" strokeWidth="1" />
+      <rect x={x - 85} y={y - 12} width="90" height="24" fill="var(--color-popover)" rx="4" stroke="#f59e0b" strokeWidth="1" />
       <text x={x - 40} y={y + 6} fill="#f59e0b" textAnchor="middle" fontSize="12" fontWeight="bold">Target: {value}%</text>
     </g>
   );
@@ -436,7 +436,7 @@ return (
               <line x1="0" y="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="4" strokeOpacity={0.4} />
             </pattern>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-muted-foreground)" strokeOpacity={0.2} />
           
           <XAxis 
             dataKey="name" 
@@ -444,31 +444,31 @@ return (
             textAnchor="end" 
             angle={isMobile ? -90 : -45} 
             height={isMobile ? 72 : 58} 
-            tick={{ fontSize: 11, fill: "#888", dy: 22 }} 
+            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)", dy: 22 }} 
             tickMargin={isMobile ? 16 : 16} 
           />
-          <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "#888" }} axisLine={false} tickLine={false} />
+          <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
           <Tooltip
             active={isMobile && tooltipHidden ? false : undefined}
-            contentStyle={{ backgroundColor: "rgba(20, 20, 20, 0.95)", border: "1px solid #333", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)" }}
-            itemStyle={{ color: "#ffffff", padding: 0 }} labelStyle={{ color: "#a1a1aa", marginBottom: '0.5rem' }} cursor={{ fill: "rgba(255, 255, 255, 0.05)" }} formatter={() => null} 
+            contentStyle={{ backgroundColor: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)" }}
+            itemStyle={{ color: "var(--color-foreground)", padding: 0 }} labelStyle={{ color: "var(--color-muted-foreground)", marginBottom: '0.5rem' }} cursor={{ fill: "rgba(128, 128, 128, 0.08)" }} formatter={() => null} 
             content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const d = payload[0].payload;
                   return (
-                    <div className="bg-[#141414] border border-[#333] p-3 rounded-lg shadow-md text-xs">
-                      <p className="text-gray-400 mb-2 font-medium">{d.fullName}</p>
+                    <div className="bg-popover border border-border p-3 rounded-lg shadow-md text-xs">
+                      <p className="text-muted-foreground mb-2 font-medium">{d.fullName}</p>
                       <div className="flex justify-between gap-4 mb-1">
-                        <span className="text-gray-500">Official:</span>
-                        <span className={`font-mono font-bold ${d.officialPercentage < safeTarget ? 'text-red-400' : 'text-green-400'}`}>
-                          {d.officialPercentage}% <span className="text-gray-600 font-normal">({d.present}/{d.total})</span>
+                        <span className="text-muted-foreground/60">Official:</span>
+                        <span className={`font-mono font-bold ${d.officialPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                          {d.officialPercentage}% <span className="text-muted-foreground/40 font-normal">({d.present}/{d.total})</span>
                         </span>
                       </div>
                       {(d.displayedExtra > 0) && (
                           <div className="flex justify-between gap-4">
                             <span className="text-primary">{d.isLoss ? "Adjusted (Loss):" : "Adjusted (Gain):"}</span>
-                            <span className={`font-mono font-bold ${d.totalPercentage < safeTarget ? 'text-red-400' : 'text-green-400'}`}>
-                              {d.totalPercentage}% <span className="text-gray-600 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
+                            <span className={`font-mono font-bold ${d.totalPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                              {d.totalPercentage}% <span className="text-muted-foreground/40 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
                             </span>
                           </div>
                       )}

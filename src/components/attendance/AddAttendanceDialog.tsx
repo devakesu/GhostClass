@@ -408,7 +408,7 @@ export function AddAttendanceDialog({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal bg-accent/20 border-accent/30 hover:bg-accent/30"
+                      "w-full justify-start text-left font-normal bg-accent/20 border-border/50 hover:bg-accent/30"
                     )}
                     aria-label={`Selected date: ${format(date, 'MMMM d, yyyy')}. Click to change date`}
                   >
@@ -495,7 +495,7 @@ export function AddAttendanceDialog({
             <Label htmlFor="session-select" className="text-right text-muted-foreground">Session</Label>
             <div className="col-span-3">
               <Select value={session} onValueChange={setSession}>
-                <SelectTrigger id="session-select" className="bg-accent/20 border-accent/30" aria-label="Select class session">
+                <SelectTrigger id="session-select" className="bg-accent/20 border-border/50" aria-label="Select class session">
                   <SelectValue placeholder="Select Session" />
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown max-h-60">
@@ -507,7 +507,7 @@ export function AddAttendanceDialog({
                 </SelectContent>
               </Select>
               {isSessionBlocked && (
-                 <p id="session-blocked-warning" className="text-[10px] text-red-400 mt-1.5 ml-1 flex items-center gap-1" role="alert" aria-live="polite">
+                 <p id="session-blocked-warning" className="text-[10px] text-red-600 dark:text-red-400 mt-1.5 ml-1 flex items-center gap-1" role="alert" aria-live="polite">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
                     Session occupied
                  </p>
@@ -520,7 +520,7 @@ export function AddAttendanceDialog({
             <Label htmlFor="course-select" className="text-right text-muted-foreground">Subject</Label>
             <div className="col-span-3">
               <Select value={courseId} onValueChange={setCourseId}>
-                <SelectTrigger id="course-select" className="bg-accent/20 border-accent/30 h-auto min-h-10 py-2.5 whitespace-normal text-left [&>span]:line-clamp-none" aria-label="Select course or subject">
+                <SelectTrigger id="course-select" className="bg-accent/20 border-border/50 h-auto min-h-10 py-2.5 whitespace-normal text-left [&>span]:line-clamp-none" aria-label="Select course or subject">
                   <SelectValue placeholder="Select Subject" />
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown max-h-60 w-75 max-w-[calc(100vw-40px)]">

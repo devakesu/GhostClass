@@ -17,6 +17,32 @@ import type { Exam, ExamAnswer, ExamQuestion } from '@/types'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
+// Reactive router mock: tracks searchParams state so the drawer useEffect works
+let _searchParams = new URLSearchParams();
+const mockRouterPush = vi.fn((url: string) => {
+  const q = url.split('?')[1];
+  _searchParams = new URLSearchParams(q ?? '');
+});
+const mockRouterReplace = vi.fn((url: string) => {
+  const q = url.split('?')[1];
+  _searchParams = new URLSearchParams(q ?? '');
+});
+const mockRouterBack = vi.fn(() => { _searchParams = new URLSearchParams(); });
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+    replace: mockRouterReplace,
+    prefetch: vi.fn(),
+    back: mockRouterBack,
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => '/scores',
+  useSearchParams: () => _searchParams,
+  useParams: () => ({}),
+}));
+
 vi.mock('framer-motion', () => ({
   m: {
     div: ({ children, ...p }: any) => <div {...p}>{children}</div>,
@@ -211,6 +237,8 @@ function setupDefault(exams: Exam[], answersMap: Record<number, ExamAnswer[]> = 
 describe('ScoresClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset router search params state
+    _searchParams = new URLSearchParams();
     // Reset body/html overflow after each test in case scroll lock leaked
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
@@ -516,25 +544,62 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('closes the drawer when close button is clicked', () => {
+    it('uses router.push on first open (panel absent) and no-op on second open when panel is already set', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
+
+      // First open: panel absent → push
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterPush).toHaveBeenCalledTimes(1)
+      expect(mockRouterPush).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
+
+      // Second open: panel is already "1" → no-op (neither push nor replace)
+      vi.clearAllMocks()
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterPush).not.toHaveBeenCalled()
+      expect(mockRouterReplace).not.toHaveBeenCalled()
+    })
+
+    it('uses router.replace when panel param already exists with a different value', () => {
+      // Pre-seed searchParams with a different panel value
+      _searchParams = new URLSearchParams('panel=2')
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      render(<ScoresClient />)
+
+      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(mockRouterReplace).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
+      expect(mockRouterPush).not.toHaveBeenCalled()
+      // Reset for subsequent tests
+      _searchParams = new URLSearchParams()
+    })
+
+    it('closes the drawer when close button is clicked', () => {
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
+      // Close triggers router.replace() to strip the panel param (safe regardless of
+      // whether openDrawer used push or replace).
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
+      // Simulate re-render after navigation clears the URL param.
+      rerender(<ScoresClient />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
     it('closes the drawer on Escape key', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
+      // Simulate re-render after navigation clears the URL param.
+      rerender(<ScoresClient />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
@@ -576,17 +641,19 @@ describe('ScoresClient', () => {
       expect(within(dialog).getByText(/pending marks/i)).toBeInTheDocument()
     })
 
-    it('locks body scroll when open and restores on close', () => {
+    it('locks body scroll when drawer is open and restores on close', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
+      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(document.body.style.overflow).toBe('hidden')
       expect(document.documentElement.style.overflow).toBe('hidden')
 
+      // Close the drawer and verify scroll is restored.
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      expect(document.body.style.overflow).not.toBe('hidden')
-      expect(document.documentElement.style.overflow).not.toBe('hidden')
+      rerender(<ScoresClient />)
+      expect(document.body.style.overflow).toBe('')
+      expect(document.documentElement.style.overflow).toBe('')
     })
   })
 

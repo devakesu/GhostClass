@@ -431,7 +431,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   id="login"
                   type={loginMethodProps[loginMethod].type}
                   value={formData.username}
-                  className="custom-input bg-secondary/10 border-white/10 focus:border-purple-500/50 transition-colors"
+                  className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors"
                   onChange={(e) =>
                     setFormData({ ...formData, username: e.target.value })
                   }
@@ -462,7 +462,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   required
                   value={formData.password}
                   className={cn(
-                    "custom-input bg-secondary/10 border-white/10 focus:border-purple-500/50 transition-colors",
+                    "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors",
                     passwordError && "border-red-500/50 focus:border-red-500"
                   )}
                   onChange={handlePasswordChange}
@@ -488,7 +488,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
             </motion.div>
 
             {passwordError && (
-                  <p id="password-error" className="text-xs text-red-400 mt-1">
+                  <p id="password-error" className="text-xs text-red-600 dark:text-red-400 mt-1">
                     {passwordError}
                   </p>
             )}
@@ -507,7 +507,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center text-sm text-red-400 border rounded-lg bg-red-500/10 border-red-500/20 p-2"
+                className="text-center text-sm text-red-600 dark:text-red-400 border rounded-lg bg-red-500/10 border-red-500/30 dark:border-red-500/20 p-2"
               >
                 {error}
               </motion.div>
@@ -518,8 +518,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         {/* Disclaimer Section */}
         <div className="mt-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 mb-3">
-            <LockIcon className="h-3 w-3 text-purple-400" />
-            <span className="text-[11px] font-bold tracking-widest uppercase text-purple-300/80">
+            <LockIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+            <span className="text-[11px] font-bold tracking-widest uppercase text-purple-600 dark:text-purple-300/80">
               Ghosts don&apos;t snoop 😁
             </span>
           </div>
