@@ -733,7 +733,7 @@ export default function ScoresClient() {
     } else {
       setSelectedExam(null);
     }
-  }, [router, searchParams]);
+  }, [router, pathname, searchParams]);
 
   // When the back button pops ?panel=1, searchParams loses the param and
   // this effect clears the selected exam to close the drawer.

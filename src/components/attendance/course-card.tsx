@@ -212,17 +212,17 @@ export function CourseCard({ course }: CourseCardProps) {
     const target = targetPercentage ?? 75;
     if (pct >= target) return {
       card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
-      headerBg: "bg-green-500/8 dark:bg-muted/40",
+      headerBg: "bg-green-500/10 dark:bg-muted/40",
       headerBorder: "border-green-500/30 dark:border-border/60",
     };
     if (pct >= target - 10) return {
       card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
-      headerBg: "bg-amber-500/8 dark:bg-muted/40",
+      headerBg: "bg-amber-500/10 dark:bg-muted/40",
       headerBorder: "border-amber-500/30 dark:border-border/60",
     };
     return {
       card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
-      headerBg: "bg-red-500/8 dark:bg-muted/40",
+      headerBg: "bg-red-500/10 dark:bg-muted/40",
       headerBorder: "border-red-500/30 dark:border-border/60",
     };
   }, [hasAttendanceData, stats.displayPercentage, targetPercentage]);

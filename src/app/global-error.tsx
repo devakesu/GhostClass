@@ -72,11 +72,11 @@ export default function GlobalError({
         ` }} />
         <script dangerouslySetInnerHTML={{ __html: `
           try {
-            var t = localStorage.getItem('ghostclass-theme');
-            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            var t = localStorage.getItem('ghostclass-theme') || 'dark';
+            if (t === 'dark') {
               document.documentElement.classList.add('dark');
             }
-          } catch(e) {}
+          } catch(e) { document.documentElement.classList.add('dark'); }
         ` }} />
       </head>
       <body style={{
