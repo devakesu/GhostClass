@@ -114,13 +114,13 @@ vi.mock("@/lib/logger", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), dev: vi.fn(), info: vi.fn() },
 }));
 
-const { mockToggleTheme } = vi.hoisted(() => ({
+const { mockToggleTheme, mockTheme } = vi.hoisted(() => ({
   mockToggleTheme: vi.fn(),
+  mockTheme: { value: "dark" as "dark" | "light" },
 }));
-let _mockTheme: "dark" | "light" = "dark";
 
 vi.mock("@/providers/theme", () => ({
-  useTheme: () => ({ theme: _mockTheme, toggleTheme: mockToggleTheme, setTheme: vi.fn() }),
+  useTheme: () => ({ theme: mockTheme.value, toggleTheme: mockToggleTheme, setTheme: vi.fn() }),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
 }));
 
@@ -134,7 +134,7 @@ describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPathname.mockReturnValue("/dashboard");
-    _mockTheme = "dark";
+    mockTheme.value = "dark";
   });
 
   it("renders without crashing", () => {
@@ -211,7 +211,7 @@ describe("Navbar", () => {
     });
 
     it("renders the switch as checked in dark mode", () => {
-      _mockTheme = "dark";
+      mockTheme.value = "dark";
       render(<Navbar />);
       const themeSwitch = screen.getByLabelText("Toggle dark mode");
       // Switch checked state is represented via aria-checked or data-state
@@ -219,7 +219,7 @@ describe("Navbar", () => {
     });
 
     it("renders the switch as unchecked in light mode", () => {
-      _mockTheme = "light";
+      mockTheme.value = "light";
       render(<Navbar />);
       const themeSwitch = screen.getByLabelText("Toggle dark mode");
       expect(themeSwitch).toHaveAttribute("aria-checked", "false");

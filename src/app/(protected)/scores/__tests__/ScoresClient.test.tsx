@@ -544,7 +544,7 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('uses router.push on first open (panel absent) and router.replace on second open (panel already set)', () => {
+    it('uses router.push on first open (panel absent) and no-op on second open when panel is already set', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
 
