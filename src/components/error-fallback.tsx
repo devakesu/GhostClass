@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getAppDomain } from "@/lib/utils";
 import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
+import { reloadWithUpdate } from "@/lib/sw-reload";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logger } from "@/lib/logger";
@@ -70,8 +71,9 @@ export function ErrorFallback({ error, reset, showDetails, homeUrl = "/dashboard
     if (reset) {
       reset();
     } else {
-      // Fallback to page refresh if reset function is not provided
-      window.location.reload();
+      // No reset callback — fall back to a full reload. Apply any waiting SW
+      // update first so a breaking deploy doesn't reload into stale code.
+      reloadWithUpdate();
     }
   };
 

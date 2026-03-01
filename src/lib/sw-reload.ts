@@ -1,0 +1,159 @@
+/**
+ * sw-reload.ts
+ *
+ * Smart page reload that applies any waiting service-worker update BEFORE
+ * reloading the tab.
+ *
+ * Problem context
+ * ---------------
+ * The app uses `skipWaiting: false` in the SW config so that a new service
+ * worker never activates mid-session. A user who is still running old code
+ * (e.g. after a breaking deploy) will see the "App updated — tap to refresh"
+ * toast. If they crash before clicking it, every error-screen "Reload" button
+ * previously called `window.location.reload()` directly — which keeps the old
+ * SW in control because `SKIP_WAITING` was never sent. The user would reload
+ * right back into the same broken JS bundles.
+ *
+ * Solution
+ * --------
+ * `reloadWithUpdate()` checks `registration.waiting` first. When a new SW is
+ * waiting it sends `SKIP_WAITING`, listens for the resulting `controllerchange`
+ * event, and only then reloads — so the fresh code is served. If no update is
+ * waiting, or if anything fails, it falls back to a plain `window.location.reload()`.
+ *
+ * Usage
+ * -----
+ * Replace every `window.location.reload()` on error screens with this function:
+ *
+ * ```ts
+ * import { reloadWithUpdate } from "@/lib/sw-reload";
+ *
+ * // in an error boundary / error page button handler:
+ * reloadWithUpdate();
+ * ```
+ */
+export function reloadWithUpdate(): void {
+  if (typeof window === "undefined") return;
+
+  if (!("serviceWorker" in navigator)) {
+    window.location.reload();
+    return;
+  }
+
+  // Fire-and-forget: the async work happens in the microtask queue; the
+  // synchronous part of the calling event handler finishes immediately.
+  void (async () => {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      const waitingWorker = registration?.waiting;
+
+      if (!waitingWorker) {
+        // No update pending — plain reload.
+        window.location.reload();
+        return;
+      }
+
+      // A new SW is queued. Activate it, then reload.
+      let reloaded = false;
+
+      const doReload = () => {
+        if (!reloaded) {
+          reloaded = true;
+          window.location.reload();
+        }
+      };
+
+      // Primary signal: SW finished claiming the tab.
+      navigator.serviceWorker.addEventListener("controllerchange", doReload, {
+        once: true,
+      });
+
+      // Safety net: if controllerchange never arrives within 3 s (e.g. the
+      // new SW calls skipWaiting but doesn't claim clients), reload anyway.
+      setTimeout(doReload, 3000);
+
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    } catch {
+      // Any error (getRegistration fails, postMessage fails, etc.) →
+      // fall back to a normal reload so the user is never stuck.
+      window.location.reload();
+    }
+  })();
+}
+
+/**
+ * Automatically applies a waiting SW update and reloads — but only once per
+ * browser session, to prevent an infinite reload loop when the new code also
+ * crashes.
+ *
+ * Intended for last-resort error surfaces (e.g. `global-error.tsx`) where the
+ * root layout itself has failed and the user is already seeing a broken/blank
+ * page. Silent auto-reload is preferable to leaving them stranded there.
+ *
+ * Flow
+ * ----
+ * 1. If `sessionStorage` already has the guard key → bail out (don't loop).
+ * 2. If no SW is registered or no update is waiting → bail out (nothing to apply).
+ * 3. Otherwise: set the guard, send SKIP_WAITING, reload once the new SW activates.
+ *
+ * The guard is only cleared when the user navigates away or closes the tab
+ * (sessionStorage is session-scoped), so repeated crashes in the same session
+ * fall through to the normal error UI.
+ *
+ * Usage
+ * -----
+ * ```ts
+ * import { tryAutoUpdate } from "@/lib/sw-reload";
+ *
+ * // Inside a useEffect on a last-resort error page:
+ * useEffect(() => { tryAutoUpdate(); }, []);
+ * ```
+ */
+const AUTO_UPDATE_GUARD_KEY = "sw-auto-reload-attempted";
+
+export function tryAutoUpdate(): void {
+  if (typeof window === "undefined") return;
+  if (!("serviceWorker" in navigator)) return;
+
+  // Guard: only attempt once per session to prevent reload loops.
+  try {
+    if (sessionStorage.getItem(AUTO_UPDATE_GUARD_KEY)) return;
+  } catch {
+    // sessionStorage unavailable (private-browsing restriction, etc.) — bail
+    // out rather than risk a loop.
+    return;
+  }
+
+  void (async () => {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      const waitingWorker = registration?.waiting;
+
+      if (!waitingWorker) {
+        // No update pending — leave the error UI visible so the user can act.
+        return;
+      }
+
+      // Mark so a crash in the fresh code doesn't loop.
+      sessionStorage.setItem(AUTO_UPDATE_GUARD_KEY, "1");
+
+      let reloaded = false;
+      const doReload = () => {
+        if (!reloaded) {
+          reloaded = true;
+          window.location.reload();
+        }
+      };
+
+      navigator.serviceWorker.addEventListener("controllerchange", doReload, {
+        once: true,
+      });
+      // Safety net: if controllerchange never fires within 3 s, reload anyway.
+      setTimeout(doReload, 3000);
+
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    } catch {
+      // Anything fails → leave the error UI visible; don't loop.
+    }
+  })();
+}

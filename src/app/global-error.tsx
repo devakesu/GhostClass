@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCcw, Home } from "lucide-react";
+import { reloadWithUpdate, tryAutoUpdate } from "@/lib/sw-reload";
 
 /**
  * Global Error Handler
@@ -11,7 +12,7 @@ import { AlertTriangle, RefreshCcw, Home } from "lucide-react";
  */
 export default function GlobalError({
   error,
-  reset,
+  reset: _reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -23,14 +24,18 @@ export default function GlobalError({
         digest: error.digest,
       },
     });
+    // Root layout crashed — the normal error UI never got a chance to show.
+    // Silently apply any waiting SW update and reload once (session-guarded
+    // against loops). If there is no update waiting, or if this session has
+    // already tried once, this is a no-op and the error UI stays visible.
+    tryAutoUpdate();
   }, [error]);
 
   const handleRefresh = () => {
-    try {
-      reset();
-    } catch {
-      window.location.reload();
-    }
+    // Global errors indicate a root-layout crash; re-rendering with reset()
+    // won't help if the crash is caused by running stale code after a breaking
+    // deploy. Apply any waiting SW update first so the fresh bundle is served.
+    reloadWithUpdate();
   };
 
   const handleGoHome = () => {
