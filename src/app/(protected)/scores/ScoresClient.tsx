@@ -700,6 +700,9 @@ export default function ScoresClient() {
     return map;
   }, [allQuestionsQueries, examIds]);
 
+  // Derive a stable primitive so useEffect below has a deterministic dependency.
+  const panel = searchParams.get("panel");
+
   // Open the drawer and push a history entry so the back button can close it.
   // Only push when panel is absent; replace if a different panel value exists;
   // do nothing if panel=1 is already set. Preserves any existing query params.
@@ -738,10 +741,10 @@ export default function ScoresClient() {
   // When the back button pops ?panel=1, searchParams loses the param and
   // this effect clears the selected exam to close the drawer.
   useEffect(() => {
-    if (!searchParams.get("panel") && selectedExam) {
+    if (!panel && selectedExam) {
       setSelectedExam(null);
     }
-  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panel, selectedExam]);
 
   /**
    * Mirror EzyGo's visibility rules:

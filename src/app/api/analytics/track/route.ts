@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
     if (origin && (appDomain || appUrl)) {
       const allowedOrigins = new Set<string>();
 
-      // Always allow the current request origin (same-origin API calls).
-      // This avoids false 403s on dynamic local dev ports (e.g. :3001).
-      allowedOrigins.add(req.nextUrl.origin);
+      // In development, allow the current request origin (same-origin API calls)
+      // to avoid false 403s on dynamic local dev ports (e.g. :3001).
+      if (process.env.NODE_ENV === "development") {
+        allowedOrigins.add(req.nextUrl.origin);
+      }
 
       if (appUrl) {
         try {
