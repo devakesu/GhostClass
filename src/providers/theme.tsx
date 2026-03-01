@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
 
 type Theme = "light" | "dark";
 
@@ -19,8 +20,6 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = "ghostclass-theme";
-
 /**
  * Reads the persisted theme from localStorage.
  * Falls back to "dark" when no stored preference exists.
@@ -28,7 +27,7 @@ const STORAGE_KEY = "ghostclass-theme";
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "dark";
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // localStorage may be blocked (e.g. tracking prevention)
@@ -54,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTheme(theme);
     try {
-      localStorage.setItem(STORAGE_KEY, theme);
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       // localStorage may be blocked
     }

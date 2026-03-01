@@ -385,15 +385,14 @@ export const Navbar = () => {
                     ) : (
                       <Sun className="h-4 w-4" aria-hidden="true" />
                     )}
-                    <label htmlFor="theme-toggle" className="text-sm cursor-pointer">
+                    <span id="theme-toggle-label" className="text-sm cursor-pointer" onClick={toggleTheme}>
                       Dark Mode
-                    </label>
+                    </span>
                   </div>
                   <Switch
-                    id="theme-toggle"
                     checked={theme === "dark"}
                     onCheckedChange={toggleTheme}
-                    aria-label="Toggle dark mode"
+                    aria-labelledby="theme-toggle-label"
                   />
                 </div>
               </div>
