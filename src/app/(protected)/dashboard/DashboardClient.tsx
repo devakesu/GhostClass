@@ -558,12 +558,12 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               <p className="flex flex-wrap items-center gap-2.5 max-sm:text-md text-muted-foreground">
                 <span>You&apos;re checking out the</span>
                 <Select value={selectedSemester || ""} onValueChange={(value) => handleSemesterChange(value as "even" | "odd")} disabled={setSemesterMutation.isPending}>
-                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 uppercase custom-dropdown dark:bg-foreground/8 dark:border-foreground/20" aria-label="Select semester">{selectedSemester || "semester"}</SelectTrigger>
+                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 uppercase custom-dropdown dark:bg-foreground/10 dark:border-foreground/20" aria-label="Select semester">{selectedSemester || "semester"}</SelectTrigger>
                   <SelectContent className="custom-dropdown"><SelectItem value="odd">ODD</SelectItem><SelectItem value="even">EVEN</SelectItem></SelectContent>
                 </Select>
                 <span>semester reports for academic year</span>
                 <Select value={selectedYear || ""} onValueChange={handleAcademicYearChange} disabled={setAcademicYearMutation.isPending}>
-                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 custom-dropdown dark:bg-foreground/8 dark:border-foreground/20" aria-label="Select academic year">{selectedYear || "year"}</SelectTrigger>
+                  <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 custom-dropdown dark:bg-foreground/10 dark:border-foreground/20" aria-label="Select academic year">{selectedYear || "year"}</SelectTrigger>
                   <SelectContent className="custom-dropdown max-h-70">{academicYears.map((year) => <SelectItem key={year} value={year}>{year}</SelectItem>)}</SelectContent>
                 </Select>
               </p>
