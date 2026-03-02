@@ -14,7 +14,7 @@
  * The Next.js *server* still talks directly to Supabase (no extra hop) because
  * server-to-Supabase is unaffected by the ISP block.  Only the browser
  * Supabase JS client (`src/lib/supabase/client.ts`) is redirected here via
- * `NEXT_PUBLIC_SUPABASE_PROXY_URL`.
+ * `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` (and optionally `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL`).
  *
  * SECURITY MODEL
  * --------------
@@ -103,10 +103,17 @@ export default {
 
     const allowedOrigin = (env.ALLOWED_ORIGIN ?? "").trim().replace(/\/+$/, "");
 
+    const requestOrigin = request.headers.get("origin");
+
     // ── 2. Origin check ───────────────────────────────────────────────────────
     // Reject requests arriving from a different website to prevent quota abuse.
     // Requests with no Origin header (server-to-server or same-origin) are allowed.
-    const requestOrigin = request.headers.get("origin");
+    if (requestOrigin && !allowedOrigin) {
+      return new Response("Misconfigured: ALLOWED_ORIGIN is not set", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
     if (requestOrigin && allowedOrigin) {
       // Normalise both sides before comparing.
       const normReq = requestOrigin.trim().replace(/\/+$/, "");
