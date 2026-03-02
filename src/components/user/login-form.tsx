@@ -195,10 +195,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       if (!token) throw new Error("Invalid response from server");
 
       // 2. Securely Save Token (Bridge to GhostClass) - requires CSRF token.
-      // getCsrfToken() reads the in-memory token set by useCSRFToken(). On very fast
-      // submissions (e.g. password manager autofill) the async CSRF fetch may not have
-      // completed yet, which would send no header and cause a 403. If the token is
-      // missing here, attempt a one-time re-fetch before giving up.
+      // getCsrfToken() reads the stored CSRF token (backed by sessionStorage and
+      // initialized by useCSRFToken()). On very fast submissions (e.g. password manager
+      // autofill) the async CSRF fetch may not have completed yet, which would send no
+      // header and cause a 403. If the token is missing here, attempt a one-time re-fetch
+      // before giving up.
       let csrfToken = getCsrfToken();
       if (!csrfToken) {
         try {
@@ -208,7 +209,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           const csrfRes = await fetch("/api/csrf");
           if (csrfRes.ok) {
             const data = await csrfRes.json();
-            csrfToken = data?.token ?? null;
+            const tokenFromResponse =
+              typeof data?.token === "string" ? data.token : null;
+            csrfToken = tokenFromResponse;
             if (csrfToken) setCsrfToken(csrfToken);
           }
         } catch {

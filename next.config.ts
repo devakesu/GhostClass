@@ -237,8 +237,9 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // Tie the Sentry release to the commit SHA so source maps are correctly linked
   // to events in Sentry. Without an explicit name, Sentry auto-detects a value
   // that may differ between build and runtime, breaking stack trace symbolication.
+  // Fall back to "dev" for local builds where APP_COMMIT_SHA is not set.
   release: {
-    name: process.env.APP_COMMIT_SHA,
+    name: process.env.APP_COMMIT_SHA ?? "dev",
   },
 
   sourcemaps: {
@@ -255,11 +256,12 @@ export default withSentryConfig(withSerwist(nextConfig), {
     excludeDebugStatements: true,
   },
 
-  // Prevent a transient Sentry upload failure (network issue, expired token, etc.)
-  // from failing the entire Docker build. The release still deploys successfully;
-  // only source map symbolication in Sentry is affected until the next build.
+  // Make Sentry upload failures fatal so we never ship builds that still contain
+  // browser source maps due to a failed upload + deletion step. This preserves the
+  // "never publicly served" guarantee when productionBrowserSourceMaps is enabled.
   errorHandler: (error) => {
-    console.warn("[Sentry] Build-time upload error (non-fatal):", error);
+    console.error("[Sentry] Build-time upload error (fatal):", error);
+    throw error;
   },
 
   widenClientFileUpload: true,
