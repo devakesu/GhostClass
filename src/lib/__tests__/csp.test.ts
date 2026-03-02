@@ -355,4 +355,35 @@ describe("Content Security Policy", () => {
       expect(directiveValue).not.toContain("'nonce-dev-nonce'");
     });
   });
+
+  describe("Supabase browser proxy origins in connect-src", () => {
+    it("includes CF proxy origin in connect-src when NEXT_PUBLIC_SUPABASE_CF_PROXY_URL is set", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "https://cf-proxy.workers.dev");
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
+      const header = getCspHeader();
+      expect(header).toContain("https://cf-proxy.workers.dev");
+    });
+
+    it("includes AWS proxy origin in connect-src when NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL is set", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "https://abc.execute-api.amazonaws.com");
+      const header = getCspHeader();
+      expect(header).toContain("https://abc.execute-api.amazonaws.com");
+    });
+
+    it("returns empty string for parseProxyOrigin when URL is invalid (catch branch)", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "not-a-valid-url!!!");
+      const header = getCspHeader();
+      // Invalid URL falls through the catch and returns ""; the header must not contain the garbage value.
+      expect(header).not.toContain("not-a-valid-url!!!");
+    });
+
+    it("omits proxy origins when neither proxy var is set", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
+      const header = getCspHeader();
+      expect(header).not.toContain("workers.dev");
+      expect(header).not.toContain("execute-api");
+    });
+  });
 });
