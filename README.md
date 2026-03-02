@@ -498,20 +498,7 @@ This enables the service worker in development mode without requiring a producti
 - Font optimization with `display: swap` (prevents FOIT)
 - Priority loading for critical images (logo, avatar)
 - Blur placeholders for instant image feedback
-- Production source maps are **off by default**; opt in with `ENABLE_PUBLIC_BROWSER_SOURCEMAPS=true` (see below)
-
-### Production Source Maps
-
-By default, JavaScript source maps are **not** served publicly in production builds. Source maps are always uploaded to Sentry separately for private error symbolication.
-
-To enable public source maps (useful for Lighthouse audits or open DevTools debugging):
-
-```bash
-# .env
-ENABLE_PUBLIC_BROWSER_SOURCEMAPS=true
-```
-
-> ⚠️ **Security note:** Public source maps make it easier to analyse the exact deployed code. Enable only when the DevTools/Lighthouse benefit outweighs the trade-off.
+- Production source maps are generated, uploaded to Sentry (with `sourcesContent` for full stack traces), then deleted from the build output — never publicly served
 
 ### Development Experience
 

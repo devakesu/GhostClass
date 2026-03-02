@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 import axios, { AxiosError } from "axios"; 
-import { getCsrfToken } from "@/lib/axios";
+import { getCsrfToken, setCsrfToken } from "@/lib/axios";
 import { useCSRFToken } from "@/hooks/use-csrf-token"; 
 
 import { PasswordResetForm } from "./password-reset-form";
@@ -194,9 +194,29 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
       if (!token) throw new Error("Invalid response from server");
 
-      // 2. Securely Save Token (Bridge to GhostClass) - requires CSRF token
-      const csrfToken = getCsrfToken();
-      
+      // 2. Securely Save Token (Bridge to GhostClass) - requires CSRF token.
+      // getCsrfToken() reads the in-memory token set by useCSRFToken(). On very fast
+      // submissions (e.g. password manager autofill) the async CSRF fetch may not have
+      // completed yet, which would send no header and cause a 403. If the token is
+      // missing here, attempt a one-time re-fetch before giving up.
+      let csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        try {
+          // Token not yet available — the async CSRF init may not have finished
+          // (e.g. password manager autofill + instant submit). Re-fetch directly
+          // and store the token so the Axios interceptor also picks it up.
+          const csrfRes = await fetch("/api/csrf");
+          if (csrfRes.ok) {
+            const data = await csrfRes.json();
+            csrfToken = data?.token ?? null;
+            if (csrfToken) setCsrfToken(csrfToken);
+          }
+        } catch {
+          // If the re-fetch itself fails, proceed without the token — the server
+          // will reject with 403 and the catch block will surface the right error.
+        }
+      }
+
       const saveTokenResponse = await axios.post("/api/auth/save-token", 
         { token }, 
         { 
@@ -300,11 +320,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       NProgress.done();
       setIsLoading(false);
       
-      let errorMsg = "An unexpected error occurred";
+      let errorMsg = "An unexpected error occurred. Please try again later.";
 
       if (err.config?.url?.includes("save-token")) {
          // This is a critical failure in OUR backend bridge
-         errorMsg = "Secure session setup failed. Please try again.";
+         errorMsg = "Secure session setup failed. Please try again later. If not resolved, contact us from link in footer.";
          Sentry.captureException(error, { tags: { type: "auth_bridge_client_error", location: "LoginForm/handleSubmit" } });
       } else if (err.response?.status === 401) {
          // User error (wrong password) - No Sentry needed
@@ -320,14 +340,21 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       setError(errorMsg);
 
       // Announce error to screen readers
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && document.body) {
         const announcement = document.createElement('div');
         announcement.setAttribute('role', 'alert');
         announcement.setAttribute('aria-live', 'assertive');
         announcement.className = 'sr-only';
         announcement.textContent = errorMsg;
         document.body.appendChild(announcement);
-        setTimeout(() => document.body.removeChild(announcement), 5000);
+        setTimeout(() => {
+          // Guard against the body being null or the node already removed
+          // (e.g. during Next.js App Router page transitions or PWA page lifecycle events)
+          // that could cause an unhandled TypeError outside the try/catch scope.
+          if (document.body?.contains(announcement)) {
+            document.body.removeChild(announcement);
+          }
+        }, 5000);
       }
       logger.error("Login failed:", err);
     }

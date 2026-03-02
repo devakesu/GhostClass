@@ -83,11 +83,10 @@ These variables are **not required** for local development but enable additional
 | Variable | Default | Description |
 | --- | --- | --- |
 | `NEXT_PUBLIC_ENABLE_SW_IN_DEV` | `""` (disabled) | Set `"true"` to enable the service worker in development mode (useful for testing PWA/offline behaviour). |
-| `ENABLE_PUBLIC_BROWSER_SOURCEMAPS` | `""` (disabled) | Set `"true"` to serve JS source maps publicly in production builds (opt-in — see note below). |
 | `FORCE_STRICT_CSP` / `NEXT_PUBLIC_FORCE_STRICT_CSP` | `""` (disabled) | Set `"true"` to enforce a stricter CSP in development (removes most uses of `'unsafe-inline'` but still allows it in `script-src-elem` and certain dev style directives so Next.js hydration and dev tooling continue to work; useful for reproducing CSP violations locally). **Note:** `'unsafe-eval'` is NOT removed in dev mode even when set — Next.js HMR requires it. It is only absent in a real production build. Use `npm run build && npm start` to test the production CSP. |
 | `NEXT_PUBLIC_ATTENDANCE_TARGET_MIN` | `75` | Minimum attendance target percentage (1–100). Applies in both development and production. Adjust to match your institution's minimum attendance requirements. |
 
-> **`ENABLE_PUBLIC_BROWSER_SOURCEMAPS` note:** By default, JavaScript source maps are *not* served publicly. They are always uploaded to Sentry separately for private error symbolication. Set this variable to `"true"` only when you need browser DevTools or Lighthouse to resolve production stack traces locally. Exposing source maps makes it easier for attackers to analyse deployed code, so treat this as a debugging aid rather than a permanent setting.
+> **Source maps:** Production source maps are always generated and uploaded to Sentry (with `sourcesContent` embedded so stack traces resolve correctly), then deleted from the build output automatically. They are never publicly served.
 
 ### Development Workflow
 
@@ -598,7 +597,6 @@ Optional Variables (omit to use defaults):
 | `NEXT_PUBLIC_DONATE_URL` | *(blank)* | Donation link shown in footer |
 | `NEXT_PUBLIC_DEFAULT_DOMAIN` | *(blank)* | Fallback domain used by `getAppDomain()` when `NEXT_PUBLIC_APP_DOMAIN` is not set |
 | `NEXT_PUBLIC_FORCE_STRICT_CSP` | *(blank)* | Set `"true"` to force strict CSP in production builds |
-| `ENABLE_PUBLIC_BROWSER_SOURCEMAPS` | *(blank)* | Set `"true"` to serve JS source maps publicly in the build |
 
 > **Why Variables and not Secrets?** All values above are non-sensitive and already embedded in the browser JavaScript bundle or HTML. Storing them as Secrets causes GitHub Actions log masking to redact their values from build output, making logs unreadable (e.g. the package name becomes `***@1.9.5`).
 

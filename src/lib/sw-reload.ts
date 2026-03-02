@@ -47,6 +47,7 @@ function activateAndRun(
   onReady: () => void
 ): void {
   let done = false;
+  // eslint-disable-next-line prefer-const -- declared before `finish()` which closes over it; cannot use const
   let activationTimeout: ReturnType<typeof setTimeout> | undefined;
   let controllerChangeHandler: (() => void) | undefined;
 

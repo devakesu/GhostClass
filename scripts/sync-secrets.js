@@ -215,7 +215,6 @@ function main() {
     'NEXT_PUBLIC_ATTENDANCE_TARGET_MIN',
     'NEXT_PUBLIC_SENTRY_REPLAY_RATE',
     'NEXT_PUBLIC_FORCE_STRICT_CSP',
-    'ENABLE_PUBLIC_BROWSER_SOURCEMAPS',
     'NEXT_PUBLIC_ENABLE_SW_IN_DEV',
     // Egress proxy deployment config (non-sensitive; used as vars.* in workflow)
     'CF_WORKER_NAME',

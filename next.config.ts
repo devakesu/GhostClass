@@ -56,11 +56,14 @@ const supabaseImageHostname = (() => {
 const nextConfig: NextConfig = {
   output: "standalone",
   compress: true, // Enable gzip compression for better performance
-  // Serve source maps publicly in production only when explicitly opted in.
-  // Even though the project is GPL open-source, public browser source maps increase bandwidth
-  // and make it easier for attackers to analyse the exact deployed code.
-  // Source maps are always uploaded to Sentry separately for private error symbolication.
-  productionBrowserSourceMaps: process.env.ENABLE_PUBLIC_BROWSER_SOURCEMAPS === "true",
+  // Always generate full source maps in production so that Sentry receives maps that embed
+  // the original source file content (sourcesContent). Without this, Next.js uses
+  // `nosources-source-map` which strips sourcesContent, forcing Sentry to fetch
+  // source files by URL — which fails with "app is not an allowed download scheme".
+  // The Sentry plugin deletes the map files from the build output after uploading
+  // (deleteSourcemapsAfterUpload: true below), so they are never publicly served
+  // regardless of this setting.
+  productionBrowserSourceMaps: true,
 
   async headers() {
     // 1. Define headers common to all environments
@@ -230,9 +233,35 @@ export default withSentryConfig(withSerwist(nextConfig), {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
+
+  // Tie the Sentry release to the commit SHA so source maps are correctly linked
+  // to events in Sentry. Without an explicit name, Sentry auto-detects a value
+  // that may differ between build and runtime, breaking stack trace symbolication.
+  release: {
+    name: process.env.APP_COMMIT_SHA,
+  },
+
   sourcemaps: {
     disable: process.env.NODE_ENV !== "production",
+    // Delete source maps from the build output after uploading to Sentry so they
+    // are never shipped in the Docker image or served publicly, even though
+    // productionBrowserSourceMaps is true (required to embed sourcesContent).
+    deleteSourcemapsAfterUpload: true,
   },
+
+  // Strip Sentry's own internal debug statements from the client bundle.
+  // Complements the removeConsole compiler option already configured above.
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
+
+  // Prevent a transient Sentry upload failure (network issue, expired token, etc.)
+  // from failing the entire Docker build. The release still deploys successfully;
+  // only source map symbolication in Sentry is affected until the next build.
+  errorHandler: (error) => {
+    console.warn("[Sentry] Build-time upload error (non-fatal):", error);
+  },
+
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
 });
