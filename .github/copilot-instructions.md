@@ -70,6 +70,8 @@ Copy `.example.env` to `.env` and populate. Key variables:
 - `NEXT_PUBLIC_BACKEND_URL` – EzyGo API base URL (do not change)
 - `CF_PROXY_URL` / `CF_PROXY_SECRET` – Optional Cloudflare Worker egress proxy (Tier 1)
 - `AWS_SECONDARY_URL` / `AWS_SECONDARY_SECRET` – Optional AWS Lambda egress proxy (Tier 2)
+- `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` – Optional CF Worker for browser→Supabase (ISP bypass Tier 1; `src/lib/supabase/client.ts` auto-fails-over CF→AWS→direct)
+- `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL` – Optional Lambda for browser→Supabase (ISP bypass Tier 2 fallback)
 
 `NEXT_PUBLIC_*` variables are client-safe. All others are server-only runtime secrets.
 

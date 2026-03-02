@@ -44,6 +44,17 @@ export const getCspHeader = (nonce?: string) => {
       return "";
     }
   })();
+
+  // When Supabase browser proxies are configured (ISP block workaround), browsers
+  // connect through CF Worker (Tier 1) or AWS Lambda (Tier 2) instead of supabase.co.
+  // Both proxy origins are kept in connect-src alongside the real Supabase origin so
+  // that the tiered fetch wrapper can reach whichever tier is active.
+  const parseProxyOrigin = (envVar: string | undefined): string => {
+    if (!envVar) return "";
+    try { return new URL(envVar).origin; } catch { return ""; }
+  };
+  const supabaseCfProxyOrigin  = parseProxyOrigin(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
+  const supabaseAwsProxyOrigin = parseProxyOrigin(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
   
   // Supabase WebSocket URL for Realtime features
   const supabaseWsUrl = (() => {
@@ -105,6 +116,8 @@ export const getCspHeader = (nonce?: string) => {
       worker-src 'self' blob:;
       connect-src 'self' 
         ${supabaseOrigin}
+        ${supabaseCfProxyOrigin}
+        ${supabaseAwsProxyOrigin}
         https://production.api.ezygo.app
         https://*.ingest.sentry.io 
         https://challenges.cloudflare.com
@@ -279,6 +292,8 @@ export const getCspHeader = (nonce?: string) => {
     "'self'",
     supabaseOrigin,
     supabaseWsUrl,
+    supabaseCfProxyOrigin,
+    supabaseAwsProxyOrigin,
     "https://production.api.ezygo.app",
     "https://*.ingest.sentry.io",
     "https://challenges.cloudflare.com",

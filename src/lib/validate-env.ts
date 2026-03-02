@@ -217,6 +217,38 @@ export function validateEnvironment() {
     );
   }
 
+  // Supabase browser proxy — optional CF Worker (Tier 1).
+  // No shared secret: browser proxies use ALLOWED_ORIGIN header checks (secrets
+  // would be visible in DevTools). Either or both proxy vars may be set.
+  const supabaseCfProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL?.trim();
+  if (supabaseCfProxyUrl) {
+    try {
+      const parsed = new URL(supabaseCfProxyUrl);
+      if (!['https:', 'http:'].includes(parsed.protocol)) {
+        errors.push('❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use http or https protocol');
+      } else if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+        errors.push('❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use https:// in production (proxies auth tokens)');
+      }
+    } catch {
+      errors.push('❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must be a valid absolute URL (e.g. https://supabase.example.workers.dev)');
+    }
+  }
+
+  // Supabase browser proxy — optional AWS Lambda (Tier 2 fallback).
+  const supabaseAwsProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL?.trim();
+  if (supabaseAwsProxyUrl) {
+    try {
+      const parsed = new URL(supabaseAwsProxyUrl);
+      if (!['https:', 'http:'].includes(parsed.protocol)) {
+        errors.push('❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use http or https protocol');
+      } else if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+        errors.push('❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use https:// in production (proxies auth tokens)');
+      }
+    } catch {
+      errors.push('❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)');
+    }
+  }
+
   // ============================================================================
   // OPTIONAL - App works but features may be limited
   // ============================================================================

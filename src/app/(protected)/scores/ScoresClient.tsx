@@ -738,13 +738,18 @@ export default function ScoresClient() {
     }
   }, [router, pathname, searchParams]);
 
-  // When the back button pops ?panel=1, searchParams loses the param and
-  // this effect clears the selected exam to close the drawer.
+  // When the back button (or any navigation) removes ?panel= from the URL,
+  // searchParams loses the param and this effect clears the selected exam
+  // to close the drawer.
+  //
+  // The effect depends only on `panel`, so it runs when the URL panel state
+  // changes, and always resets `selectedExam` when there is no active panel.
+  // setSelectedExam(null) is a no-op when selectedExam is already null.
   useEffect(() => {
-    if (!panel && selectedExam) {
+    if (!panel) {
       setSelectedExam(null);
     }
-  }, [panel, selectedExam]);
+  }, [panel]);
 
   /**
    * Mirror EzyGo's visibility rules:

@@ -228,9 +228,11 @@ supabase/
     ├── 20260227000000_fix_check_225_search_path.sql        # Fix search_path in duty leave trigger
     ├── 20260227000001_audit_log_rls_policy.sql             # RLS policies for audit log
     └── README.md
-workers/                      # Egress proxy source code (deployed as standalone workers)
-├── ezygo-proxy/              # Cloudflare Worker — Tier 1 outbound proxy for EzyGo API calls
-└── ezygo-proxy-aws/          # AWS Lambda — Tier 2 failover outbound proxy for EzyGo API calls
+workers/                      # Proxy workers (deployed as standalone CF Workers / Lambda fns)
+├── ezygo-proxy/              # CF Worker — Tier 1 outbound proxy for EzyGo API (server-side)
+├── ezygo-proxy-aws/          # AWS Lambda — Tier 2 failover outbound proxy for EzyGo API (server-side)
+├── supabase-proxy/                      # CF Worker — Tier 1 inbound proxy for Supabase (browser-side, ISP bypass)
+└── supabase-proxy-aws/                  # AWS Lambda — Tier 2 fallback inbound proxy for Supabase (browser-side)
 ```
 
 ## 🧮 Attendance Calculation Algorithm
@@ -738,6 +740,8 @@ GhostClass uses a two-tier secret management strategy:
 - Email provider credentials
 - `CF_PROXY_URL` / `CF_PROXY_SECRET` - Cloudflare Worker egress proxy (Tier 1 outbound for EzyGo API)
 - `AWS_SECONDARY_URL` / `AWS_SECONDARY_SECRET` - AWS Lambda egress proxy (Tier 2 outbound failover)
+- `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` - CF Worker URL for browser→Supabase (ISP bypass Tier 1; leave unset for direct)
+- `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL` - Lambda URL for browser→Supabase (ISP bypass Tier 2 fallback; leave unset for direct)
 
 See [.example.env](.example.env) for complete list with descriptions.
 
