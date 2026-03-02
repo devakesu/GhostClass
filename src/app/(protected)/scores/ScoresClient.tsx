@@ -740,11 +740,21 @@ export default function ScoresClient() {
 
   // When the back button pops ?panel=1, searchParams loses the param and
   // this effect clears the selected exam to close the drawer.
+  //
+  // IMPORTANT: `selectedExam` is intentionally NOT in the dependency array.
+  // Adding it would cause a race condition: openDrawer() calls setSelectedExam()
+  // and router.push() in the same event handler. React processes setSelectedExam
+  // before the router has flushed the URL update, so the first re-render has
+  // selectedExam set but panel still null — the effect would immediately fire
+  // and clear selectedExam, closing the drawer before it was ever visible.
+  // Depending only on `panel` means the effect only fires when the URL changes,
+  // which happens after the router flush — never on the initial openDrawer call.
+  // setSelectedExam(null) is a no-op when selectedExam is already null.
   useEffect(() => {
-    if (!panel && selectedExam) {
+    if (!panel) {
       setSelectedExam(null);
     }
-  }, [panel, selectedExam]);
+  }, [panel]);
 
   /**
    * Mirror EzyGo's visibility rules:

@@ -1,5 +1,5 @@
 import { Footer } from "@/components/layout/footer";
-import { LoginForm } from "@/components/user/login-form";
+import { LoginFormClient } from "@/components/user/login-form-client";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default async function LoginPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 pt-12 sm:p-8 sm:pt-16">
         <div className="w-full max-w-sm">
-          <LoginForm />
+          <LoginFormClient />
         </div>
       </div>
 

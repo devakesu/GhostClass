@@ -220,6 +220,13 @@ function main() {
     'CF_WORKER_NAME',
     'AWS_REGION',
     'AWS_LAMBDA_FUNCTION_NAME',
+    // Supabase browser proxy deployment config (non-sensitive; used as vars.* in workflow)
+    'CF_SUPABASE_PROXY_WORKER_NAME',
+    'AWS_SUPABASE_LAMBDA_FUNCTION_NAME',
+    // Supabase browser proxy URLs (NEXT_PUBLIC_* — baked into browser bundle at build time)
+    // Leave empty in .env when supabase.co is reachable directly.
+    'NEXT_PUBLIC_SUPABASE_CF_PROXY_URL',
+    'NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL',
   ];
 
   // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────

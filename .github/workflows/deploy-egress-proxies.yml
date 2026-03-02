@@ -155,3 +155,139 @@ jobs:
             --function-name "${AWS_LAMBDA_FUNCTION_NAME}" \
             --zip-file "fileb://${GITHUB_WORKSPACE}/ezygo-proxy-aws.zip" \
             --publish
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Supabase ISP-block bypass proxy — Cloudflare Worker (Tier 1)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-supabase-cf-proxy:
+    name: Deploy Supabase CF Worker Proxy
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '20'
+
+      - name: Validate Cloudflare deploy secrets
+        id: validate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_SUPABASE_PROXY_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${NEXT_PUBLIC_APP_DOMAIN}" ]; then
+            echo "::warning::Skipping Supabase CF Worker deploy because required credentials/vars are missing."
+            echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, vars.CF_SUPABASE_PROXY_WORKER_NAME, vars.NEXT_PUBLIC_SUPABASE_URL, vars.NEXT_PUBLIC_APP_DOMAIN"
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Wrangler
+        if: steps.validate.outputs.skip != 'true'
+        run: npm ci --prefix workers
+
+      - name: Deploy Supabase CF Worker
+        if: steps.validate.outputs.skip != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+          COMPAT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d' "${{ github.sha }}")
+          ./workers/node_modules/.bin/wrangler deploy workers/supabase-proxy/index.js \
+            --name "${CF_SUPABASE_PROXY_WORKER_NAME}" \
+            --var "SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL}" \
+            --var "ALLOWED_ORIGIN:https://${NEXT_PUBLIC_APP_DOMAIN}" \
+            --compatibility-date "${COMPAT_DATE}"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Supabase ISP-block bypass proxy — AWS Lambda (Tier 2 / fallback)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-supabase-aws-proxy:
+    name: Deploy Supabase AWS Lambda Proxy
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Validate AWS deploy secrets
+        id: validate
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "${AWS_REGION}" ] || [ -z "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${NEXT_PUBLIC_APP_DOMAIN}" ] || [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "::warning::Skipping Supabase AWS Lambda deploy because required credentials/vars are missing."
+            echo "Required: vars.AWS_REGION, vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME, vars.NEXT_PUBLIC_SUPABASE_URL, vars.NEXT_PUBLIC_APP_DOMAIN, secrets.AWS_ACCESS_KEY_ID, secrets.AWS_SECRET_ACCESS_KEY"
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.validate.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update Lambda environment variables
+        if: steps.validate.outputs.skip != 'true'
+        env:
+          AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+
+          CURRENT_VARS_JSON=$(aws lambda get-function-configuration \
+            --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}" \
+            --query 'Environment.Variables' \
+            --output json)
+
+          MERGED_VARS_JSON=$(jq -c \
+            --arg supabase_url "${NEXT_PUBLIC_SUPABASE_URL}" \
+            --arg allowed_origin "https://${NEXT_PUBLIC_APP_DOMAIN}" \
+            '. // {} | .SUPABASE_URL = $supabase_url | .ALLOWED_ORIGIN = $allowed_origin | { Variables: . }' \
+            <<< "${CURRENT_VARS_JSON}")
+
+          aws lambda update-function-configuration \
+            --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}" \
+            --environment "${MERGED_VARS_JSON}"
+
+          aws lambda wait function-updated --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}"
+
+      - name: Package Lambda source
+        if: steps.validate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          cd workers/supabase-proxy-aws
+          zip -q -r "${GITHUB_WORKSPACE}/supabase-proxy-aws.zip" index.mjs
+
+      - name: Deploy Lambda function code
+        if: steps.validate.outputs.skip != 'true'
+        env:
+          AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
+        run: |
+          set -euo pipefail
+
+          aws lambda update-function-code \
+            --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}" \
+            --zip-file "fileb://${GITHUB_WORKSPACE}/supabase-proxy-aws.zip" \
+            --publish

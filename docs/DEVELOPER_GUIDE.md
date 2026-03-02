@@ -12,6 +12,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 - [Contributing](#contributing)
 - [Versioning & Releases](#versioning--releases)
 - [Release Verification](#release-verification)
+- [Supabase Browser Proxy (ISP Bypass)](#supabase-browser-proxy-isp-bypass)
 - [Known Issues](#known-issues)
 - [Cron Job Setup](#cron-job-setup)
 - [Troubleshooting](#troubleshooting)
@@ -750,6 +751,83 @@ grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 - [ ] Test pulling and running the released image
 - [ ] Check deployment succeeded (if auto-deployed)
 - [ ] Verify OpenSSF Scorecard "Signed-Releases" passes
+
+---
+
+## Supabase Browser Proxy (ISP Bypass)
+
+When `supabase.co` is blocked by ISPs (or any regional DNS/routing failure), browser clients cannot connect directly to Supabase. GhostClass ships two deployable proxy workers that transparently forward browser → Supabase traffic through your own infrastructure:
+
+| | Tier 1 | Tier 2 |
+| --- | --- | --- |
+| **Type** | Cloudflare Worker | AWS Lambda + API Gateway |
+| **Source** | `workers/supabase-proxy/index.js` | `workers/supabase-proxy-aws/index.mjs` |
+| **Free quota** | 100k req / day | 1M req / month |
+| **Latency** | Lowest (CF global PoPs) | Higher (single region) |
+| **Auto-deploy** | `deploy-egress-proxies.yml` | `deploy-egress-proxies.yml` |
+
+The Next.js **server** always connects to Supabase directly (`server.ts`, `admin.ts`) — only the browser Supabase JS client is affected.
+
+### Architecture
+
+```text
+Browser  ──►  CF Worker / Lambda  ──►  <project>.supabase.co
+                  (proxy)
+Next.js server  ──►  <project>.supabase.co  (direct, always)
+```
+
+### Security Model
+
+Unlike the EzyGo egress proxies (server-side, use `x-proxy-secret`), the Supabase proxies are called **directly by the browser**. A shared secret would be visible in DevTools, so the security model uses **Origin header checking** instead:
+
+- Requests from your app's domain are forwarded.
+- Requests from other origins are rejected with 403.
+- Supabase's own auth (anon key + Row Level Security) governs all data access.
+
+### One-time Setup
+
+#### Tier 1 — Cloudflare Worker
+
+1. Cloudflare Dashboard → **Workers & Pages → Create Worker** → name it e.g. `ghostclass-supabase-proxy`.
+2. Paste `workers/supabase-proxy/index.js` as the worker code and **Deploy**.
+3. Worker auto-deploys on every push to `main` via CI (see below). The `--var` flags inject `SUPABASE_URL` and `ALLOWED_ORIGIN` automatically from GitHub Actions Variables.
+
+#### Tier 2 — AWS Lambda
+
+1. AWS Console → Lambda → **Create function** → Author from scratch.
+   - Runtime: **Node.js 22.x**, Architecture: **arm64**.
+   - Function name: e.g. `ghostclass-supabase-proxy`.
+2. API Gateway → **HTTP API** → route `ANY /{proxy+}` → Lambda integration. Do **not** place Lambda in a VPC.
+3. Lambda auto-deploys on every push to `main` via CI (see below). Env vars (`SUPABASE_URL`, `ALLOWED_ORIGIN`) are updated by the workflow automatically.
+
+### GitHub Actions Variables required
+
+Add these in **Repository → Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Example value | Description |
+| --- | --- | --- |
+| `CF_SUPABASE_PROXY_WORKER_NAME` | `ghostclass-supabase-proxy` | Name of the CF Worker |
+| `AWS_SUPABASE_LAMBDA_FUNCTION_NAME` | `ghostclass-supabase-proxy` | Lambda function name |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` | Already required for the app build |
+| `NEXT_PUBLIC_APP_DOMAIN` | `yourapp.com` | Already required for CSP |
+
+No new **secrets** are needed — the existing `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` are reused.
+
+### Activating the proxies for users
+
+Set one or both GitHub Actions Variables (build-time), then trigger a new build:
+
+```env
+# Tier 1 — CF Worker (preferred: lowest latency)
+NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=https://ghostclass-supabase-proxy.<cf-username>.workers.dev
+
+# Tier 2 — AWS Lambda (fallback, independent infra)
+NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=https://<api-gw-id>.execute-api.ap-south-1.amazonaws.com
+```
+
+The browser client automatically tries CF → AWS → direct on network errors or 5xx. Setting only one tier is valid — the other will be skipped.
+
+When the ISP block is lifted, **clear both** vars (set to empty) and redeploy. No code change needed.
 
 ---
 
