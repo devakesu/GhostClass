@@ -171,6 +171,7 @@ export const handler = async (event) => {
     responseContentType === "" ||
     responseContentType.startsWith("text/") ||
     responseContentType.startsWith("application/json") ||
+    responseContentType.startsWith("application/vnd.pgrst.") ||
     responseContentType.startsWith("application/x-www-form-urlencoded") ||
     responseContentType.startsWith("application/xml");
 

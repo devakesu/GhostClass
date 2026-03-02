@@ -145,6 +145,33 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     const calledUrl = (mockFetch.mock.calls[0][0] as string);
     expect(calledUrl).toContain("?select=*");
   });
+
+  it("preserves method and headers when input is a Request object", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
+
+    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const requestInput = new Request(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+      method: "POST",
+      headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
+      body: '{"key":"value"}',
+    });
+
+    const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
+    await tieredFetch(requestInput);
+
+    // The proxied call should use the CF proxy origin, not the Supabase origin.
+    const [calledInput, calledInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(calledInput).toMatch(new RegExp(`^${CF_PROXY}`));
+    expect(calledInput).toContain("/auth/v1/user");
+
+    // Method and Authorization header from the original Request must be preserved.
+    expect(calledInit.method).toBe("POST");
+    const headers = new Headers(calledInit.headers as HeadersInit);
+    expect(headers.get("authorization")).toBe("Bearer test-token");
+  });
 });
 
 // ---------------------------------------------------------------------------
