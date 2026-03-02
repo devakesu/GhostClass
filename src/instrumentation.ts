@@ -20,4 +20,10 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export const onRequestError = (...args: unknown[]) => {
+  const sentryWithHook = Sentry as unknown as {
+    captureRequestError?: (...hookArgs: unknown[]) => unknown;
+  };
+
+  return sentryWithHook.captureRequestError?.(...args);
+};

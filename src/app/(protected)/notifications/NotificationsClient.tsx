@@ -6,10 +6,15 @@ import { useNotifications, Notification } from "@/hooks/notifications/useNotific
 import { useUser } from "@/hooks/users/user";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { CaptureContext } from "@sentry/core";
+
+type SentryCaptureContext = {
+  tags?: Record<string, string>;
+  level?: "fatal" | "error" | "warning" | "log" | "info" | "debug";
+  extra?: Record<string, unknown>;
+};
 
 // Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
-const captureSentryException = (error: unknown, context?: CaptureContext) => {
+const captureSentryException = (error: unknown, context?: SentryCaptureContext) => {
   void import("@sentry/nextjs")
     .then(({ captureException }) => captureException(error, context))
     .catch((importError) => {

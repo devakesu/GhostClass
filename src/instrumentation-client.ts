@@ -15,10 +15,6 @@ Sentry.init({
   integrations: replayRate > 0 ? [Sentry.replayIntegration()] : [],
 
   tracesSampleRate: isProd ? 0.1 : 1,
-  // enableLogs forwards console.* output to Sentry; only enabled in development
-  // to aid local debugging. In production this is intentionally off to avoid
-  // sending verbose console output to Sentry.
-  enableLogs: !isProd,
 
   replaysSessionSampleRate: replayRate,
   replaysOnErrorSampleRate: Math.min(1, Math.max(0, replayRate * 5)),
@@ -26,4 +22,10 @@ Sentry.init({
   sendDefaultPii: false,
 });
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export const onRouterTransitionStart = () => {
+  const sentryWithHook = Sentry as unknown as {
+    captureRouterTransitionStart?: () => void;
+  };
+
+  sentryWithHook.captureRouterTransitionStart?.();
+};

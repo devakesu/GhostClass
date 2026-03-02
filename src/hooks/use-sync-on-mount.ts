@@ -19,12 +19,17 @@
 import { useState, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
-import type { CaptureContext } from "@sentry/core";
+
+type SentryCaptureContext = {
+  tags?: Record<string, string>;
+  level?: "fatal" | "error" | "warning" | "log" | "info" | "debug";
+  extra?: Record<string, unknown>;
+};
 
 // ---------------------------------------------------------------------------
 // Lazy Sentry helpers – keeps the SDK (~250 KB) out of the initial bundle.
 // ---------------------------------------------------------------------------
-const captureSentryException = (error: unknown, context?: CaptureContext) => {
+const captureSentryException = (error: unknown, context?: SentryCaptureContext) => {
   void import("@sentry/nextjs")
     .then(({ captureException }) => captureException(error, context))
     .catch((importError) => {
@@ -32,7 +37,7 @@ const captureSentryException = (error: unknown, context?: CaptureContext) => {
       console.error("[Sentry] Original error:", error);
     });
 };
-const captureSentryMessage = (message: string, context?: CaptureContext) => {
+const captureSentryMessage = (message: string, context?: SentryCaptureContext) => {
   void import("@sentry/nextjs")
     .then(({ captureMessage }) => captureMessage(message, context))
     .catch((importError) => {

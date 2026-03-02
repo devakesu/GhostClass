@@ -53,7 +53,7 @@ const supabaseImageHostname = (() => {
   return new URL(url).hostname;
 })();
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   output: "standalone",
   compress: true, // Enable gzip compression for better performance
   // Always generate full source maps in production so that Sentry receives maps that embed
@@ -227,9 +227,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-};
+} satisfies NextConfig;
 
-export default withSentryConfig(withSerwist(nextConfig), {
+const sentryCompatibleConfig = withSerwist(nextConfig) as Parameters<typeof withSentryConfig>[0];
+
+const sentryPluginOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
@@ -238,9 +240,7 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // to events in Sentry. Without an explicit name, Sentry auto-detects a value
   // that may differ between build and runtime, breaking stack trace symbolication.
   // Fall back to "dev" for local builds where APP_COMMIT_SHA is not set.
-  release: {
-    name: process.env.APP_COMMIT_SHA ?? "dev",
-  },
+  release: process.env.APP_COMMIT_SHA ?? "dev",
 
   sourcemaps: {
     disable: process.env.NODE_ENV !== "production",
@@ -259,11 +259,13 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // Make Sentry upload failures fatal so we never ship builds that still contain
   // browser source maps due to a failed upload + deletion step. This preserves the
   // "never publicly served" guarantee when productionBrowserSourceMaps is enabled.
-  errorHandler: (error) => {
+  errorHandler: (error: unknown) => {
     console.error("[Sentry] Build-time upload error (fatal):", error);
     throw error;
   },
 
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-});
+} as unknown as Parameters<typeof withSentryConfig>[1];
+
+export default withSentryConfig(sentryCompatibleConfig, sentryPluginOptions);
