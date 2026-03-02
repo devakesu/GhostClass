@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import React from "react";
 
@@ -90,6 +90,7 @@ vi.mock("@/hooks/use-csrf-token", () => ({
 }));
 vi.mock("@/lib/axios", () => ({
   getCsrfToken: vi.fn().mockReturnValue("test-csrf-token"),
+  setCsrfToken: vi.fn(),
 }));
 
 // --- Logger ---
@@ -120,6 +121,7 @@ vi.mock("@/lib/security/csrf-constants", () => ({
 
 import { LoginForm } from "../login-form";
 import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
+import { getCsrfToken, setCsrfToken } from "@/lib/axios";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -294,5 +296,120 @@ describe("LoginForm – EzyGo credential error message override", () => {
     await waitFor(() =>
       expect(screen.getAllByText("Some other error from EzyGo.").length).toBeGreaterThan(0)
     );
+  });
+});
+
+describe("LoginForm – CSRF re-fetch on null token", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
+    // Restore the default CSRF token after any test that may have overridden it.
+    vi.mocked(getCsrfToken).mockReturnValue("test-csrf-token");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("re-fetches and stores the CSRF token when getCsrfToken returns null, then completes login", async () => {
+    // Simulate the race condition: CSRF init hasn't completed before form submit.
+    vi.mocked(getCsrfToken).mockReturnValueOnce(null);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ token: "refetched-csrf-token" }),
+      }),
+    );
+
+    mockAxiosPost
+      .mockResolvedValueOnce({ data: { access_token: "ezygo-tok" } })
+      .mockResolvedValueOnce({ data: { userId: "uid-1", settings: null } });
+
+    const passwordInput = await renderAndWaitForForm();
+    fillValidForm(passwordInput);
+
+    await act(async () => {
+      fireEvent.submit(passwordInput.closest("form")!);
+    });
+
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+    expect(vi.mocked(setCsrfToken)).toHaveBeenCalledWith("refetched-csrf-token");
+  });
+
+  it("surfaces the save-token error when the CSRF re-fetch throws", async () => {
+    vi.mocked(getCsrfToken).mockReturnValueOnce(null);
+
+    // Simulates the CSRF endpoint being unreachable; login proceeds without a header.
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+
+    const err = new (vi.mocked(await import("axios")).AxiosError)("403");
+    err.config = { url: "/api/auth/save-token", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    mockAxiosPost
+      .mockResolvedValueOnce({ data: { access_token: "ezygo-tok" } })
+      .mockRejectedValueOnce(err);
+
+    const passwordInput = await renderAndWaitForForm();
+    fillValidForm(passwordInput);
+
+    await act(async () => {
+      fireEvent.submit(passwordInput.closest("form")!);
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText((t) => t.includes("Secure session setup failed")).length,
+      ).toBeGreaterThan(0),
+    );
+  });
+});
+
+describe("LoginForm – screen reader announcement cleanup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
+    vi.mocked(getCsrfToken).mockReturnValue("test-csrf-token");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("removes the sr-only announcement node from the DOM after 5 seconds", async () => {
+    mockAxiosPost.mockRejectedValue(new Error("network error"));
+
+    // Render with real timers so findByLabelText (which polls via setTimeout) works.
+    const passwordInput = await renderAndWaitForForm();
+    fillValidForm(passwordInput);
+
+    // Switch to fake timers before submit so the 5 s cleanup timeout is controllable.
+    // Use fireEvent (not userEvent) — no built-in delays, safe with fake timers active.
+    vi.useFakeTimers();
+
+    // Snapshot body announcement count before the submit so we compare relatively.
+    // Prior tests also append [role="alert"] nodes to document.body (outside the React
+    // render container), so the count is not guaranteed to be zero entering this test.
+    const selector = '[role="alert"][aria-live="assertive"]';
+    const countBefore = document.body.querySelectorAll(selector).length;
+
+    fireEvent.submit(passwordInput.closest("form")!);
+
+    // Flush pending microtasks (promise rejection + catch block) without advancing timers.
+    await act(async () => {});
+
+    // One new announcement should have been appended.
+    expect(document.body.querySelectorAll(selector).length).toBe(countBefore + 1);
+
+    // Advance past the 5-second removal timeout; advanceTimersByTimeAsync also
+    // drains any resulting async callbacks.
+    await vi.advanceTimersByTimeAsync(5001);
+
+    // The announcement added by this test should have been removed.
+    expect(document.body.querySelectorAll(selector).length).toBe(countBefore);
   });
 });

@@ -334,7 +334,6 @@ jobs:
             NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
             NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
             NEXT_PUBLIC_FORCE_STRICT_CSP=${{ vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
-            ENABLE_PUBLIC_BROWSER_SOURCEMAPS=${{ vars.ENABLE_PUBLIC_BROWSER_SOURCEMAPS }}
             GITHUB_REPOSITORY=${{ github.repository }}
             GITHUB_RUN_ID=${{ github.run_id }}
             GITHUB_RUN_NUMBER=${{ github.run_number }}
