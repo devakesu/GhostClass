@@ -22,8 +22,7 @@
  *   a server-side shared secret is not applicable.
  * • Instead, ALLOWED_ORIGIN restricts which websites may use this proxy:
  *   preflight and cross-origin requests from other domains are rejected with
- *   403.  Same-origin / direct requests (no Origin header) are allowed to
- *   support server-side use in case it ever needs to call this worker.
+ *   403, and requests with no Origin header are also rejected with 403.
  * • Supabase's own authentication (anon key + Row Level Security) controls
  *   all data access — the proxy is truly transparent and adds no permissions.
  * • CF infra headers (cf-connecting-ip, cf-ray, etc.) are stripped so
