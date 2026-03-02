@@ -15,6 +15,41 @@ const SUPABASE_RETRYABLE_STATUSES = new Set([502, 503, 504]);
 // well within typical auth operation budgets (~30 s).
 const SUPABASE_TIER_TIMEOUT_MS = 10_000;
 
+function combineSignals(
+  callerSignal: AbortSignal | null,
+  tierSignal: AbortSignal,
+): AbortSignal {
+  if (callerSignal === null) {
+    return tierSignal;
+  }
+
+  const abortSignalAny = (AbortSignal as typeof AbortSignal & {
+    any?: (signals: AbortSignal[]) => AbortSignal;
+  }).any;
+
+  if (typeof abortSignalAny === "function") {
+    return abortSignalAny([callerSignal, tierSignal]);
+  }
+
+  const combinedController = new AbortController();
+
+  if (callerSignal.aborted || tierSignal.aborted) {
+    combinedController.abort();
+    return combinedController.signal;
+  }
+
+  const onAbort = () => {
+    callerSignal.removeEventListener("abort", onAbort);
+    tierSignal.removeEventListener("abort", onAbort);
+    combinedController.abort();
+  };
+
+  callerSignal.addEventListener("abort", onAbort, { once: true });
+  tierSignal.addEventListener("abort", onAbort, { once: true });
+
+  return combinedController.signal;
+}
+
 /**
  * Builds a tiered custom fetch function for browser → Supabase requests.
  *
@@ -60,20 +95,27 @@ export function buildSupabaseTieredFetch(
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> {
-    // Resolve the URL string regardless of input type.
+    // Resolve and parse the input URL regardless of input type.
     const inputUrl =
       typeof input === "string"
         ? input
         : input instanceof URL
           ? input.href
           : (input as Request).url;
-
-    // Pass through any request not aimed at the Supabase origin unchanged.
-    if (!inputUrl.startsWith(supabaseOrigin)) {
+    let parsedInputUrl: URL;
+    try {
+      parsedInputUrl = new URL(inputUrl);
+    } catch {
+      // If the request URL is malformed or relative, do not attempt proxying.
       return fetch(input, init);
     }
 
-    const path         = inputUrl.slice(supabaseOrigin.length); // path + query
+    // Pass through any request not aimed at the Supabase origin unchanged.
+    if (parsedInputUrl.origin !== supabaseOrigin) {
+      return fetch(input, init);
+    }
+
+    const path         = `${parsedInputUrl.pathname}${parsedInputUrl.search}`;
     const callerSignal = (init?.signal as AbortSignal | undefined) ?? null;
 
     // Determine the HTTP method so we can decide whether status-based failover
@@ -130,10 +172,7 @@ export function buildSupabaseTieredFetch(
         () => tierController.abort(),
         SUPABASE_TIER_TIMEOUT_MS,
       );
-      const tierSignal: AbortSignal =
-        callerSignal !== null
-          ? AbortSignal.any([callerSignal, tierController.signal])
-          : tierController.signal;
+      const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
 
       // Rebuild the input with this tier's origin.
       // When a body has been pre-buffered (see above), inject it so each tier
