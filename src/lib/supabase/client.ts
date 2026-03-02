@@ -119,8 +119,10 @@ export function buildSupabaseTieredFetch(
       return fetch(input, init);
     }
 
-    const path         = `${parsedInputUrl.pathname}${parsedInputUrl.search}`;
-    const callerSignal = (init?.signal as AbortSignal | undefined) ?? null;
+    const path = `${parsedInputUrl.pathname}${parsedInputUrl.search}`;
+    const callerSignal: AbortSignal | null =
+      (init?.signal as AbortSignal | undefined) ??
+      (input instanceof Request ? input.signal : null);
 
     // Determine the HTTP method so we can decide whether status-based failover
     // is safe. GET / HEAD / OPTIONS are idempotent and safe to retry on 5xx.

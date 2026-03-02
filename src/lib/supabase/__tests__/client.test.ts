@@ -405,6 +405,27 @@ describe("buildSupabaseTieredFetch — caller AbortSignal", () => {
     // Must not retry on subsequent tiers when caller aborted.
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("uses Request.signal when init.signal is not provided", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", AWS_PROXY);
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const abortError = new DOMException("Aborted", "AbortError");
+    const mockFetch = vi.fn().mockRejectedValue(abortError);
+    vi.stubGlobal("fetch", mockFetch);
+
+    const request = new Request(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+      signal: controller.signal,
+    });
+
+    const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
+    await expect(tieredFetch(request)).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
