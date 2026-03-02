@@ -67,6 +67,10 @@ const STRIP_REQUEST_HEADERS = new Set([
   "x-amz-security-token", // Defensive strip
   "via",                   // Hop-by-hop proxy trail
   "connection",            // HTTP/1.1 connection management
+  // Request framing/encoding can become stale when API Gateway delivers
+  // base64-decoded payloads to Lambda. Let undici compute these correctly.
+  "content-length",
+  "content-encoding",
 ]);
 
 // Hop-by-hop response headers that must not be forwarded to the browser.
