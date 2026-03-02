@@ -65,27 +65,35 @@ function combineSignals(
 export function buildSupabaseTieredFetch(
   supabaseOrigin: string,
 ): typeof fetch | undefined {
-  const parseOrigin = (envVal: string | undefined): string | null => {
+  // Parses the proxy URL into a base string (origin + optional path prefix).
+  // Preserves any path component so API Gateway stage prefixes (e.g. /prod)
+  // survive when Supabase request paths are appended.
+  // Trailing slashes are stripped to avoid "https://host//path" double-slashes.
+  const parseProxyBase = (envVal: string | undefined): string | null => {
     const u = envVal?.trim().replace(/\/+$/, "");
     if (!u) return null;
     try {
-      return new URL(u).origin;
+      const url = new URL(u);
+      // If the path is exactly "/", omit it so bare origins (CF Workers)
+      // don't produce "https://host/" + "/auth/v1/…" → "https://host//auth/v1/…".
+      const basePath = url.pathname === "/" ? "" : url.pathname.replace(/\/+$/, "");
+      return `${url.origin}${basePath}`;
     } catch {
       return null;
     }
   };
 
-  const cfOrigin  = parseOrigin(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
-  const awsOrigin = parseOrigin(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
+  const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
+  const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
 
   // No proxies configured — return undefined so createBrowserClient uses native fetch.
-  if (!cfOrigin && !awsOrigin) return undefined;
+  if (!cfBase && !awsBase) return undefined;
 
   // Build ordered tier list; direct supabase.co is always the final fallback.
-  const tiers: Array<{ origin: string; name: string }> = [];
-  if (cfOrigin)  tiers.push({ origin: cfOrigin,      name: "CF" });
-  if (awsOrigin) tiers.push({ origin: awsOrigin,     name: "AWS" });
-  tiers.push(       { origin: supabaseOrigin, name: "direct" });
+  const tiers: Array<{ base: string; name: string }> = [];
+  if (cfBase)  tiers.push({ base: cfBase,         name: "CF" });
+  if (awsBase) tiers.push({ base: awsBase,         name: "AWS" });
+  tiers.push(    { base: supabaseOrigin,  name: "direct" });
 
   return async function tieredFetch(
     input: RequestInfo | URL,
@@ -161,7 +169,7 @@ export function buildSupabaseTieredFetch(
     for (let i = 0; i < tiers.length; i++) {
       const tier   = tiers[i];
       const isLast = i === tiers.length - 1;
-      const url    = `${tier.origin}${path}`;
+      const url    = `${tier.base}${path}`;
 
       const tierController = new AbortController();
       const tierTimeout    = setTimeout(

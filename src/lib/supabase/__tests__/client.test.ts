@@ -449,3 +449,45 @@ describe("buildSupabaseTieredFetch — 4xx are not retried", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// API Gateway stage path preservation
+// ---------------------------------------------------------------------------
+
+describe("buildSupabaseTieredFetch — API Gateway stage path preservation", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("preserves a stage path prefix (e.g. /prod) when rewriting Supabase URLs", async () => {
+    const awsWithStage = `${AWS_PROXY}/prod`;
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", awsWithStage);
+
+    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
+    await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/token`, { method: "POST" });
+
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    // The stage prefix must be present and must NOT be doubled.
+    expect(calledUrl).toBe(`${AWS_PROXY}/prod/auth/v1/token`);
+  });
+
+  it("does not double-slash when proxy URL has a trailing slash", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", `${CF_PROXY}/`);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
+
+    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
+    await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {});
+
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain("//auth"); // must not double-slash
+    expect(calledUrl).toBe(`${CF_PROXY}/auth/v1/user`);
+  });
+});

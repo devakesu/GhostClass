@@ -104,16 +104,18 @@ export const handler = async (event) => {
   }
 
   // ── 2. Origin check ───────────────────────────────────────────────────────
-  // Reject requests from other websites to prevent quota abuse.
-  // Requests with no Origin header (server-to-server / same-origin) are allowed.
+  // All requests must supply an Origin header that exactly matches ALLOWED_ORIGIN.
+  // Allowing origin-less requests would make this an open proxy to your Supabase
+  // project — anyone with curl/Postman could relay arbitrary traffic at your cost.
   const requestOrigin = (event.headers?.["origin"] ?? "").trim().replace(/\/+$/, "");
-  if (requestOrigin && !ALLOWED_ORIGIN) {
+  if (!requestOrigin) {
+    return { statusCode: 403, body: "Forbidden: Origin header is required" };
+  }
+  if (!ALLOWED_ORIGIN) {
     return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
   }
-  if (requestOrigin && ALLOWED_ORIGIN) {
-    if (requestOrigin !== ALLOWED_ORIGIN) {
-      return { statusCode: 403, body: "Forbidden: origin not allowed" };
-    }
+  if (requestOrigin !== ALLOWED_ORIGIN) {
+    return { statusCode: 403, body: "Forbidden: origin not allowed" };
   }
 
   // ── 3. Build target URL ───────────────────────────────────────────────────
