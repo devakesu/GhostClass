@@ -52,7 +52,7 @@
  * Security model
  * --------------
  * • Browser requests arriving from a different domain are rejected with 403.
- * • Requests with no Origin header (direct / server-side) are allowed.
+ * • Requests with no Origin header are rejected with 403 (browser-facing proxy only).
  * • All AWS / API-GW infrastructure headers are stripped before forwarding.
  * • Supabase's own authentication (anon key + RLS) governs data access.
  */
