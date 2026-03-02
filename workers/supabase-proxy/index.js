@@ -107,25 +107,31 @@ export default {
 
     // ── 2. Origin check ───────────────────────────────────────────────────────
     // Reject requests arriving from a different website to prevent quota abuse.
-    // Requests with no Origin header (server-to-server or same-origin) are allowed.
-    if (requestOrigin && !allowedOrigin) {
+    // When ALLOWED_ORIGIN is configured, all requests must include an Origin
+    // header that exactly matches the allowed origin.
+    if (!allowedOrigin) {
       return new Response("Misconfigured: ALLOWED_ORIGIN is not set", {
         status: 500,
         headers: { "Content-Type": "text/plain" },
       });
     }
-    if (requestOrigin && allowedOrigin) {
-      // Normalise both sides before comparing.
-      const normReq = requestOrigin.trim().replace(/\/+$/, "");
-      const normAllowed = allowedOrigin.trim().replace(/\/+$/, "");
-      if (normReq !== normAllowed) {
-        return new Response("Forbidden: origin not allowed", {
-          status: 403,
-          headers: { "Content-Type": "text/plain" },
-        });
-      }
+
+    if (!requestOrigin) {
+      return new Response("Forbidden: missing Origin header", {
+        status: 403,
+        headers: { "Content-Type": "text/plain" },
+      });
     }
 
+    // Normalise both sides before comparing.
+    const normReq = requestOrigin.trim().replace(/\/+$/, "");
+    const normAllowed = allowedOrigin.trim().replace(/\/+$/, "");
+    if (normReq !== normAllowed) {
+      return new Response("Forbidden: origin not allowed", {
+        status: 403,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
     // ── 3. Build upstream URL ─────────────────────────────────────────────────
     // Keep the incoming path + query; only replace the origin.
     const incomingUrl = new URL(request.url);
