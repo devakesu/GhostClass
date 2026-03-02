@@ -31,23 +31,19 @@ function combineSignals(
     return abortSignalAny([callerSignal, tierSignal]);
   }
 
-  const combinedController = new AbortController();
-
-  if (callerSignal.aborted || tierSignal.aborted) {
-    combinedController.abort();
-    return combinedController.signal;
+  // Fallback for environments without AbortSignal.any.
+  // Avoid attaching per-request listeners to prevent an event-listener leak.
+  // If the caller has already aborted, immediately return an aborted signal.
+  if (callerSignal.aborted) {
+    const controller = new AbortController();
+    controller.abort();
+    return controller.signal;
   }
 
-  const onAbort = () => {
-    callerSignal.removeEventListener("abort", onAbort);
-    tierSignal.removeEventListener("abort", onAbort);
-    combinedController.abort();
-  };
-
-  callerSignal.addEventListener("abort", onAbort, { once: true });
-  tierSignal.addEventListener("abort", onAbort, { once: true });
-
-  return combinedController.signal;
+  // Otherwise, rely solely on the tier-specific signal (e.g., timeout).
+  // This means mid-flight caller aborts are not propagated in this fallback,
+  // but we avoid leaking listeners on older browsers.
+  return tierSignal;
 }
 
 /**
