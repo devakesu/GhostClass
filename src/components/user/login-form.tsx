@@ -327,7 +327,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
       if (err.config?.url?.includes("save-token")) {
          // This is a critical failure in OUR backend bridge
-         errorMsg = "Secure session setup failed. Please try again later. If not resolved, contact us from link in footer.";
+         errorMsg = "Secure session setup failed. Please try again later. If the issue persists, contact us via the link in the footer.";
          Sentry.captureException(error, { tags: { type: "auth_bridge_client_error", location: "LoginForm/handleSubmit" } });
       } else if (err.response?.status === 401) {
          // User error (wrong password) - No Sentry needed
