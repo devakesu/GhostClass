@@ -71,7 +71,9 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
         run: |
           set -euo pipefail
-          COMPAT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d' "${{ github.sha }}")
+          # Evaluate the commit date in UTC so Cloudflare (UTC) never sees a future date
+          # (commits made in east-of-UTC timezones would otherwise record tomorrow's date)
+          COMPAT_DATE=$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d' "${{ github.sha }}")
           ./workers/node_modules/.bin/wrangler deploy workers/ezygo-proxy/index.js \
             --name "${CF_WORKER_NAME}" \
             --var "EZYGO_API_URL:${NEXT_PUBLIC_BACKEND_URL}" \
@@ -203,7 +205,9 @@ jobs:
           NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
         run: |
           set -euo pipefail
-          COMPAT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d' "${{ github.sha }}")
+          # Evaluate the commit date in UTC so Cloudflare (UTC) never sees a future date
+          # (commits made in east-of-UTC timezones would otherwise record tomorrow's date)
+          COMPAT_DATE=$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d' "${{ github.sha }}")
           ./workers/node_modules/.bin/wrangler deploy workers/supabase-proxy/index.js \
             --name "${CF_SUPABASE_PROXY_WORKER_NAME}" \
             --var "SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL}" \
