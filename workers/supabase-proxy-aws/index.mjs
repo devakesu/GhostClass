@@ -31,11 +31,15 @@
  * Origin header checking instead of a shared secret — Supabase's own auth
  * (anon key + Row Level Security) controls all data access.
  *
- * Tier priority (operator-controlled via NEXT_PUBLIC_SUPABASE_PROXY_URL):
+ * Tier priority (operator-controlled via NEXT_PUBLIC_SUPABASE_CF_PROXY_URL
+ * and NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL):
  *   Tier 1  — CF Worker (lower latency, global PoPs, 100k req/day free)
+ *             NEXT_PUBLIC_SUPABASE_CF_PROXY_URL (browser-facing)
  *   Tier 2  — This Lambda (higher req limits, independent infra)
- * The browser uses whichever URL is baked at build-time; switching tiers
- * requires changing NEXT_PUBLIC_SUPABASE_PROXY_URL and redeploying.
+ *             NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL (browser-facing)
+ * The browser uses whichever proxy URL(s) are baked at build-time; switching
+ * tiers or changing endpoints requires updating those NEXT_PUBLIC_* vars and
+ * redeploying the Next.js app.
  *
  * Lambda environment variables (Configuration → Environment variables)
  * --------------------------------------------------------------------
@@ -103,6 +107,9 @@ export const handler = async (event) => {
   // Reject requests from other websites to prevent quota abuse.
   // Requests with no Origin header (server-to-server / same-origin) are allowed.
   const requestOrigin = (event.headers?.["origin"] ?? "").trim().replace(/\/+$/, "");
+  if (requestOrigin && !ALLOWED_ORIGIN) {
+    return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
+  }
   if (requestOrigin && ALLOWED_ORIGIN) {
     if (requestOrigin !== ALLOWED_ORIGIN) {
       return { statusCode: 403, body: "Forbidden: origin not allowed" };
@@ -153,7 +160,30 @@ export const handler = async (event) => {
   }
 
   // ── 7. Read response body ─────────────────────────────────────────────────
-  const responseBody = await response.text();
+  // Use text() for text/JSON responses (all Supabase Auth and PostgREST calls).
+  // Use arrayBuffer() + base64 for binary content (e.g. Supabase Storage downloads)
+  // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
+  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  // Default to text when content-type is absent — Supabase Auth and PostgREST
+  // always send a content-type header; a missing header means an unexpected
+  // response where text() is the safest fallback for logging/debugging.
+  const isTextResponse =
+    responseContentType === "" ||
+    responseContentType.startsWith("text/") ||
+    responseContentType.startsWith("application/json") ||
+    responseContentType.startsWith("application/x-www-form-urlencoded") ||
+    responseContentType.startsWith("application/xml");
+
+  let responseBody;
+  let isBase64Encoded;
+  if (isTextResponse) {
+    responseBody = await response.text();
+    isBase64Encoded = false;
+  } else {
+    const buffer = await response.arrayBuffer();
+    responseBody = Buffer.from(buffer).toString("base64");
+    isBase64Encoded = true;
+  }
 
   // ── 8. Filter and forward response headers ────────────────────────────────
   const responseHeaders = {};
@@ -167,6 +197,6 @@ export const handler = async (event) => {
     statusCode: response.status,
     headers:    responseHeaders,
     body:       responseBody,
-    isBase64Encoded: false,
+    isBase64Encoded,
   };
 };

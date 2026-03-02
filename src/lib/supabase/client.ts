@@ -113,9 +113,9 @@ export function buildSupabaseTieredFetch(
         try {
           bodyOverride = await new Response(rawBody).arrayBuffer();
         } catch {
-          // Stream already consumed or empty — proceed without override.
+          // Stream already consumed or empty — proceed without body override.
           // Supabase will return a 400 and the caller handles it normally.
-          bodyOverride = new ArrayBuffer(0);
+          bodyOverride = null;
         }
       }
     }
@@ -144,17 +144,32 @@ export function buildSupabaseTieredFetch(
         signal: tierSignal,
         ...(bodyOverride !== null ? { body: bodyOverride } : {}),
       };
-      const tierInput: RequestInfo | URL =
-        typeof input === "string"
-          ? url
-          : input instanceof URL
-            ? new URL(url)
-            : new Request(url, { ...effectiveInit, signal: undefined });
-            // signal is passed separately via effectiveInit to avoid
-            // "signal already aborted" errors when cloning an aborted Request.
+
+      let tierInput: RequestInfo | URL;
+      let tierInit: RequestInit = effectiveInit;
+
+      if (typeof input === "string") {
+        tierInput = url;
+      } else if (input instanceof URL) {
+        tierInput = new URL(url);
+      } else {
+        // When input is a Request, its method and headers live on the object
+        // itself — they are not automatically copied into `init`. Spread them
+        // first so effectiveInit (signal, buffered body override) wins on clash.
+        const originalRequest = input as Request;
+        const requestInitFromRequest: RequestInit = {
+          method: originalRequest.method,
+          headers: originalRequest.headers,
+        };
+        tierInput = url;
+        tierInit = {
+          ...requestInitFromRequest,
+          ...effectiveInit,
+        };
+      }
 
       try {
-        const res = await fetch(tierInput, effectiveInit);
+        const res = await fetch(tierInput, tierInit);
         clearTimeout(tierTimeout);
 
         if (SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod) {
