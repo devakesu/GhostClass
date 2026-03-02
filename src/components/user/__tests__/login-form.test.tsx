@@ -309,6 +309,10 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
     vi.mocked(getCsrfToken).mockReturnValue("test-csrf-token");
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("re-fetches and stores the CSRF token when getCsrfToken returns null, then completes login", async () => {
     // Simulate the race condition: CSRF init hasn't completed before form submit.
     vi.mocked(getCsrfToken).mockReturnValueOnce(null);
@@ -334,7 +338,6 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
 
     await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
     expect(vi.mocked(setCsrfToken)).toHaveBeenCalledWith("refetched-csrf-token");
-    vi.unstubAllGlobals();
   });
 
   it("surfaces the save-token error when the CSRF re-fetch throws", async () => {
@@ -361,7 +364,6 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
         screen.getAllByText((t) => t.includes("Secure session setup failed")).length,
       ).toBeGreaterThan(0),
     );
-    vi.unstubAllGlobals();
   });
 });
 
