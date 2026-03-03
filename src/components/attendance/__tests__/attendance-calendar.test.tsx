@@ -226,7 +226,7 @@ describe('AttendanceCalendar', () => {
     expect(nextBtn).toBeInTheDocument();
   });
 
-  it('should call handleDlConfirm and close dialog when Confirm is clicked', async () => {
+  it('should close the dialog when Confirm is clicked', async () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
