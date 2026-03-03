@@ -52,6 +52,17 @@
  * IMPORTANT: Cookie writes must only happen in Route Handlers or Server Actions,
  * not in Server Components. Use getCsrfToken() from Server Components (read-only),
  * Route Handlers, and Server Actions.
+ *
+ * SameSite=Lax (not Strict) is used deliberately:
+ * - The csrf_token cookie is httpOnly and is never read by JS.
+ * - Its sole purpose is server-side double-submit validation (header vs cookie).
+ * - SameSite=Strict causes browsers to silently drop Set-Cookie on post-deploy
+ *   navigations when CDN/edge infrastructure introduces a cross-site hop in the
+ *   redirect chain, resulting in the cookie appearing in the response but never
+ *   landing in the browser's cookie store.
+ * - SameSite=Lax provides equivalent CSRF protection for this pattern: it blocks
+ *   cross-site form POSTs (the actual threat) while allowing the cookie to be
+ *   set and sent on same-origin requests and top-level navigations.
  */
 
 import { cookies } from "next/headers";
@@ -97,7 +108,7 @@ export async function setCsrfCookie(token: string): Promise<void> {
     value: token,
     httpOnly: true, // Server-side validation token (not accessible to JavaScript)
     secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
-    sameSite: "strict",
+    sameSite: "lax",   // Lax (not Strict): see module-level SameSite note above
     maxAge: CSRF_COOKIE_MAX_AGE,
     path: "/",
   });

@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useCSRFToken } from '@/hooks/use-csrf-token'
+import { useCSRFToken, CSRF_LAST_INIT_KEY, CSRF_LAST_INIT_KEY_PREFIX } from '@/hooks/use-csrf-token'
 
-// Mirror the module-private constants from use-csrf-token.ts.
-// Keep these in sync if the values change in the source file.
-const CSRF_LAST_INIT_KEY = "csrf_last_init"
+// Mirror the module-private constant from use-csrf-token.ts.
 const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
 import * as axiosModule from '@/lib/axios'
 
@@ -34,6 +32,10 @@ describe('useCSRFToken', () => {
     const sessionStorageMock = (() => {
       let store: Record<string, string> = {}
       return {
+        get length() {
+          return Object.keys(store).length
+        },
+        key: (index: number) => Object.keys(store)[index] ?? null,
         getItem: (key: string) => store[key] || null,
         setItem: (key: string, value: string) => {
           store[key] = value
@@ -132,6 +134,25 @@ describe('useCSRFToken', () => {
     await waitFor(() => {
       expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
     })
+  })
+
+  it('should clean up stale csrf_last_init keys from previous versions on successful init', async () => {
+    // Stale keys from previous deployments should be removed to prevent unbounded growth.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
+    // Plant stale keys from two hypothetical old versions
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`, Date.now().toString())
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`, Date.now().toString())
+
+    renderHook(() => useCSRFToken())
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
+
+    // Stale keys must be removed; only the current version key should remain
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).not.toBeNull()
   })
 
   it('should handle concurrent component mounts via shared promise', async () => {
