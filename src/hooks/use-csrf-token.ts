@@ -115,12 +115,13 @@ export function useCSRFToken() {
       // Start new initialization
       csrfInitPromise = (async () => {
         try {
-          // Call /api/csrf to initialize the CSRF token.
+          // Call /api/csrf to initialize the CSRF token when the throttle above determines
+          // that a fresh initialization is required (e.g. missing token, expired interval,
+          // or no recent successful init timestamp).
           // The token is set in an httpOnly cookie server-side (for server validation)
           // and returned in the response body for client-side storage in sessionStorage.
-          // When initialization is required (per the throttle above), this call is made
-          // even if sessionStorage already has a value, so the server re-issues Set-Cookie
-          // and refreshes the TTL.
+          // In these cases, the server will (re-)issue Set-Cookie and refresh the TTL,
+          // even if a previous token value might already be present in sessionStorage.
           //
           // SECURITY: Token storage in sessionStorage is protected by CSP (see src/lib/csp.ts)
           // which prevents unauthorized script execution and XSS attacks.
