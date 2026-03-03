@@ -64,7 +64,7 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
   });
 });
 
-describe("proxy – redirect status for non-GET requests", () => {
+describe("proxy – Scenario D: authenticated user on auth route", () => {
   beforeEach(() => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-123" } },
@@ -93,6 +93,15 @@ describe("proxy – redirect status for non-GET requests", () => {
             h.toLowerCase().includes("expires=thu, 01 jan 1970")),
       );
     expect(isDeleted("terms_redirect_count")).toBe(true);
+  });
+});
+
+describe("proxy – redirect status for non-GET requests", () => {
+  beforeEach(() => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
   });
 
   it("redirects GET /accept-terms to /dashboard when terms are already accepted", async () => {
