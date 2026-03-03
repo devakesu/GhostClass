@@ -266,6 +266,6 @@ const sentryPluginOptions = {
 
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-} as unknown as Parameters<typeof withSentryConfig>[1];
+} satisfies Parameters<typeof withSentryConfig>[1];
 
 export default withSentryConfig(sentryCompatibleConfig, sentryPluginOptions);
