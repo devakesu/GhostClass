@@ -55,23 +55,28 @@ function resolve(
 export async function GET(req: NextRequest) {
   // 0. Rate limiting — keyed per IP to prevent EzyGo quota exhaustion and crypto DoS
   const ip = getClientIp(req.headers);
-  if (ip) {
-    const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_get_${ip}`);
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "no-store",
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
-            "X-RateLimit-Limit": limit.toString(),
-            "X-RateLimit-Remaining": remaining.toString(),
-            "X-RateLimit-Reset": reset.toString(),
-          },
-        }
-      );
-    }
+  if (!ip) {
+    logger.warn("GET /api/profile: missing client IP; rejecting request to avoid bypassing rate limiting");
+    return NextResponse.json(
+      { error: "Unable to determine client IP address." },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+  const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_get_${ip}`);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
   }
 
   // 1. Origin validation (defence-in-depth)
@@ -471,23 +476,28 @@ const patchSchema = z.object({
 export async function PATCH(req: NextRequest) {
   // 0. Rate limiting — keyed per IP to prevent crypto DoS on AES encrypt/decrypt
   const ip = getClientIp(req.headers);
-  if (ip) {
-    const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_patch_${ip}`);
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "no-store",
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
-            "X-RateLimit-Limit": limit.toString(),
-            "X-RateLimit-Remaining": remaining.toString(),
-            "X-RateLimit-Reset": reset.toString(),
-          },
-        }
-      );
-    }
+  if (!ip) {
+    logger.warn("PATCH /api/profile: missing client IP; rejecting request to avoid bypassing rate limiting");
+    return NextResponse.json(
+      { error: "Unable to determine client IP. Please try again later." },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+  const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_patch_${ip}`);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
   }
 
   // 1. CSRF validation

@@ -156,6 +156,7 @@ vi.mock('@/components/ui/label', () => ({
 
 describe('AttendanceCalendar', () => {
   beforeEach(() => {
+    vi.useRealTimers(); // Guard against fake-timer leakage from other test files
     vi.clearAllMocks();
     // Reset useTrackingData to the default (no records) before each test so that a
     // mockReturnValue set in one test does not leak into subsequent tests.

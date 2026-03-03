@@ -25,8 +25,10 @@ export function makeRetryFn(maxRetries = 1) {
       if (status !== undefined && status >= 400 && status < 500) return false;
     }
     // Fetch-based errors with a .status property manually attached
-    const status = (error as { status?: number }).status;
-    if (status !== undefined && status >= 400 && status < 500) return false;
+    if (typeof error === "object" && error !== null) {
+      const status = (error as { status?: number }).status;
+      if (status !== undefined && status >= 400 && status < 500) return false;
+    }
     return failureCount < maxRetries;
   };
 }

@@ -326,6 +326,16 @@ describe("GET /api/profile", () => {
       expect(mockGetUser).not.toHaveBeenCalled();
       expect(mockEgressFetch).not.toHaveBeenCalled();
     });
+
+    it("returns 400 with Cache-Control: no-store when client IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      vi.mocked(getClientIp).mockReturnValueOnce(null);
+      const { GET } = await import("../route");
+      const res = await GET(makeGetReq());
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(mockRateLimiterLimit).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -508,6 +518,17 @@ describe("PATCH /api/profile", () => {
       await PATCH(req);
       expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockGetUser).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 with Cache-Control: no-store when client IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      vi.mocked(getClientIp).mockReturnValueOnce(null);
+      const { PATCH } = await import("../route");
+      const req = makePatchRequest({ first_name: "Alice", gender: "female" });
+      const res = await PATCH(req);
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(mockRateLimiterLimit).not.toHaveBeenCalled();
     });
   });
 });

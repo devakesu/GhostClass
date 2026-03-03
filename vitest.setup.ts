@@ -17,6 +17,9 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
+  // Restore real timers in case a test used vi.useFakeTimers() without cleanup.
+  // This prevents fake-timer state from leaking across test files in the same worker.
+  vi.useRealTimers()
 })
 
 // Mock window.matchMedia (not available in jsdom)

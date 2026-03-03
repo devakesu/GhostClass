@@ -127,6 +127,17 @@ describe("POST /api/logout", () => {
       expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
     });
+
+    it("returns 400 with Cache-Control: no-store when client IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      vi.mocked(getClientIp).mockReturnValueOnce(null);
+      const { POST } = await import("../route");
+      const res = await POST(makePostReq());
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(mockRateLimiterLimit).not.toHaveBeenCalled();
+      expect(mockValidateCsrf).not.toHaveBeenCalled();
+    });
   });
 
   describe("CSRF protection", () => {

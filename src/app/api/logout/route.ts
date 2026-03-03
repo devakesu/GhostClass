@@ -5,27 +5,33 @@ import { removeCsrfToken, validateCsrfToken } from "@/lib/security/csrf";
 import { clearTermsVersionCookie, clearTermsRedirectCountCookie } from "@/app/actions/user";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   // Rate limiting — prevents flooding the logout endpoint even with a valid CSRF token
   const ip = getClientIp(req.headers);
-  if (ip) {
-    const { success, reset, limit, remaining } = await authRateLimiter.limit(`logout_${ip}`);
-    if (!success) {
-      return NextResponse.json(
-        { message: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "no-store",
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
-            "X-RateLimit-Limit": limit.toString(),
-            "X-RateLimit-Remaining": remaining.toString(),
-            "X-RateLimit-Reset": reset.toString(),
-          },
-        }
-      );
-    }
+  if (!ip) {
+    logger.warn("POST /api/logout: missing client IP; rejecting request to avoid bypassing rate limiting");
+    return NextResponse.json(
+      { message: "Unable to determine client IP for rate limiting." },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+  const { success, reset, limit, remaining } = await authRateLimiter.limit(`logout_${ip}`);
+  if (!success) {
+    return NextResponse.json(
+      { message: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
   }
 
   // CSRF protection: Prevent unauthorized logout attacks

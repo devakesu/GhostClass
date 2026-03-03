@@ -42,7 +42,7 @@ describe("makeRetryFn", () => {
       }
     );
 
-    it("returns true for 499 (unknown 4xx not yet hard-coded) — no, actually 4xx is the whole range", () => {
+    it("returns false for 499 (4xx is fully blocked)", () => {
       // The guard covers the entire 400–499 range
       expect(fn(0, axiosError(499))).toBe(false);
     });
@@ -110,6 +110,18 @@ describe("makeRetryFn", () => {
       const fn = makeRetryFn(1);
       expect(fn(0, "something blew up")).toBe(true);
       expect(fn(1, "something blew up")).toBe(false);
+    });
+
+    it("does not throw when error is null", () => {
+      const fn = makeRetryFn(1);
+      expect(() => fn(0, null)).not.toThrow();
+      expect(fn(0, null)).toBe(true);
+    });
+
+    it("does not throw when error is undefined", () => {
+      const fn = makeRetryFn(1);
+      expect(() => fn(0, undefined)).not.toThrow();
+      expect(fn(0, undefined)).toBe(true);
     });
   });
 
