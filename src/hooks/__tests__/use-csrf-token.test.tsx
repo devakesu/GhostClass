@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useCSRFToken, CSRF_LAST_INIT_KEY, CSRF_LAST_INIT_KEY_PREFIX } from '@/hooks/use-csrf-token'
+import * as axiosModule from '@/lib/axios'
 
 // CSRF reinitialization interval used in tests (30 minutes in milliseconds).
 const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
-import * as axiosModule from '@/lib/axios'
 
 // Mock the axios module
 vi.mock('@/lib/axios', () => ({
