@@ -157,6 +157,19 @@ const sampleTrackingItem = {
   year: '2024',
 };
 
+// Duty Leave item with a custom (non-placeholder) remarks to exercise the DL remarks <p>
+const dlTrackingItem = {
+  auth_user_id: 'auth-user-123',
+  course: 'CS101',
+  session: 'II',
+  date: '20240902',
+  attendance: 225,
+  status: 'correction',
+  semester: '1',
+  year: '2024',
+  remarks: 'NSS Camp 2024',
+};
+
 describe('TrackingClient', () => {
   const originalFetch = global.fetch;
 
@@ -243,6 +256,28 @@ describe('TrackingClient', () => {
       await waitFor(() => {
         expect(screen.queryByText(/2 tracking records\./i)).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('DL remarks display', () => {
+    it('renders custom DL remarks when attCode is 225 and remarks is not a placeholder', async () => {
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [dlTrackingItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [dlTrackingItem], isLoading: false, error: null }),
+      } as any);
+
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // The custom remarks should be rendered as an italicised paragraph
+      expect(await screen.findByText('NSS Camp 2024')).toBeInTheDocument();
     });
   });
 

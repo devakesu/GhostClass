@@ -358,4 +358,30 @@ describe("Analytics API Route", () => {
       expect(data.error).toContain("Unable to determine client IP");
     });
   });
+
+  describe("Body Parsing", () => {
+    it("should return 400 with Invalid JSON body when req.json() throws", async () => {
+      const req = {
+        json: async () => { throw new SyntaxError("Unexpected token"); },
+        headers: new Headers({ "x-forwarded-for": "192.168.1.1" }),
+        nextUrl: new URL("https://localhost:3001/api/analytics/track"),
+      } as unknown as import("next/server").NextRequest;
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid JSON body");
+    });
+
+    it("should return 400 with Invalid request body when body is an array", async () => {
+      const req = createMockRequest([{ clientId: "1234567890.abcdefghi", events: [] }] as any);
+
+      const response = await POST(req);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+    });
+  });
 });

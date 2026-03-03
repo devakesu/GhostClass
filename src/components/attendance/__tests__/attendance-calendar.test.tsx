@@ -186,6 +186,40 @@ describe('AttendanceCalendar', () => {
     expect(nextBtn).toBeInTheDocument();
   });
 
+  it('should call handleDlConfirm and close dialog when Confirm is clicked', async () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+
+    const mockAttendanceData = {
+      courses: { '42': { name: 'Test Course', code: 'TC101' } },
+      sessions: {},
+      attendanceTypes: {},
+      studentAttendanceData: {
+        [todayStr]: {
+          '1': { course: '42', attendance: 111, session: '1' },
+        },
+      },
+      attendanceDatesArray: {},
+    };
+
+    render(<AttendanceCalendar attendanceData={mockAttendanceData as any} />);
+
+    // Wait for Mark DL button then open dialog
+    const markDlBtn = await screen.findByRole('button', { name: /mark.*duty leave/i });
+    await waitFor(() => { fireEvent.click(markDlBtn); });
+
+    const reasonInput = await screen.findByPlaceholderText('Programme/Activity Name');
+    expect(reasonInput).toBeInTheDocument();
+
+    // Click Confirm – should call handleDlConfirm and close the dialog
+    const confirmBtn = screen.getByRole('button', { name: /confirm/i });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Programme/Activity Name')).not.toBeInTheDocument();
+    });
+  });
+
   it('should open DL reason dialog when Mark DL is clicked, and close on cancel', async () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
