@@ -41,12 +41,15 @@ self.addEventListener("fetch", (event) => {
     return; // no respondWith() → browser fetches directly
   }
 
-  // 2. Sentry tunnel — bypass SW entirely to avoid overhead during bursts
-  // 3. API routes — bypass SW so the browser processes Set-Cookie headers natively.
-  //    Responses proxied through a service worker may not have cookies stored by
-  //    the browser's cookie jar (observed with the httpOnly CSRF token cookie).
-  //    Regardless of each route's caching mode, /api/ responses must always go
-  //    directly to the network so the browser handles cookies and caching itself.
+  // 2. Monitoring + API routes — bypass SW entirely.
+  //    • Sentry tunnel (/monitoring): Avoid SW overhead during error/replay bursts
+  //      by skipping precache/runtime-cache checks for high-volume telemetry.
+  //    • API routes (/api/*): Bypass SW so the browser processes Set-Cookie headers
+  //      natively. Responses proxied through a service worker may not have cookies
+  //      stored by the browser's cookie jar (observed with the httpOnly CSRF
+  //      token cookie). Regardless of each route's caching mode, /api/ responses
+  //      must always go directly to the network so the browser handles cookies
+  //      and caching itself.
   try {
     const url = new URL(event.request.url);
     if (url.pathname.startsWith("/monitoring") || url.pathname.startsWith("/api/")) {
