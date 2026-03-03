@@ -784,7 +784,7 @@ export function AttendanceCalendar({
                             <Badge variant="outline" className={`h-5 px-1.5 gap-1 font-medium ${badgeClass}`}><Icon className="w-3 h-3" aria-hidden="true" />{event.status}</Badge>
                           </div>
                           {event.status === "Duty Leave" && event.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(event.remarks.trim()) && (
-                            <p className="text-[11px] text-yellow-600/80 dark:text-yellow-400/80 italic truncate max-w-[200px] sm:max-w-xs">{event.remarks.trim()}</p>
+                            <p className="text-[11px] text-yellow-600/80 dark:text-yellow-400/80 italic truncate max-w-50 sm:max-w-xs">{event.remarks.trim()}</p>
                           )}
                         </div>
                         {renderActions()}
@@ -842,7 +842,7 @@ export function AttendanceCalendar({
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <Label htmlFor="dl-reason-calendar" className="text-sm mb-1.5 block">Reason</Label>
+            <Label htmlFor="dl-reason-calendar" className="text-sm mb-1.5 block">Reason (Optional)</Label>
             <Input
               id="dl-reason-calendar"
               placeholder="Programme/Activity Name"

@@ -87,8 +87,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { clientId, events, userProperties } = body;
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const { clientId, events, userProperties } = body as Record<string, unknown>;
 
     // Validate clientId format and type
     if (!clientId || typeof clientId !== 'string') {

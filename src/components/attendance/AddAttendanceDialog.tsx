@@ -565,11 +565,11 @@ export function AddAttendanceDialog({
           {/* DL REASON */}
           {statusType === "Duty Leave" && (
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="dl-reason-dialog" className="text-right text-muted-foreground">Reason</Label>
+              <Label htmlFor="dl-reason-dialog" className="text-right text-muted-foreground">Reason (optional)</Label>
               <div className="col-span-3">
                 <Input
                   id="dl-reason-dialog"
-                  placeholder="Programme/Activity Name"
+                  placeholder="Programme/Activity"
                   value={dlReason}
                   onChange={(e) => setDlReason(e.target.value)}
                   className="bg-accent/20 border-border/50"
