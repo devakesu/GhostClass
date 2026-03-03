@@ -12,9 +12,13 @@
  * 
  * IMPLEMENTATION NOTES:
  * - Uses useRef to track initialization state to avoid issues with React 18+ concurrent rendering
- * - Always calls /api/csrf on first mount (does NOT short-circuit on sessionStorage)
- *   so the server can re-issue the Set-Cookie header and refresh the cookie TTL.
- *   This prevents the cookie-expired / sessionStorage-stale desync seen after deployments.
+ * - On initial use, calls /api/csrf to allow the server to (re-)issue the Set-Cookie header
+ *   and refresh the CSRF cookie TTL. However, a per-tab throttle is applied: if a token is
+ *   already present and a recent csrf_last_init timestamp exists in sessionStorage (within
+ *   CSRF_REINIT_INTERVAL_MS), the fetch is intentionally skipped to avoid hammering the
+ *   endpoint under shared-NAT/IP-rate-limited scenarios. Once the interval elapses or in a
+ *   fresh tab without csrf_last_init, the hook will call /api/csrf again to refresh the cookie
+ *   and prevent cookie-expired / sessionStorage-stale desync after deployments.
  * - Module-level promise prevents duplicate concurrent requests across different component instances
  * - Safe for StrictMode double-effect execution and hot module replacement
  * 
