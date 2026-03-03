@@ -47,24 +47,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { ATTENDANCE_STATUS, isPositive } from "@/lib/logic/attendance-reconciliation";
+import { captureSentryException } from "@/lib/sentry-lazy";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
-
-import type {
-  captureException as SentryCaptureException,
-} from "@sentry/nextjs";
-
-type CaptureExceptionContext = Parameters<typeof SentryCaptureException>[1];
-
-// Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
-const captureSentryException = (error: unknown, context?: CaptureExceptionContext) => {
-  void import("@sentry/nextjs")
-    .then(({ captureException }) => captureException(error, context))
-    .catch((importError) => {
-      console.error("[Sentry] Failed to load SDK for captureException:", importError);
-      console.error("[Sentry] Original error:", error);
-    });
-};
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
