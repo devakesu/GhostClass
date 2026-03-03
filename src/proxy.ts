@@ -106,15 +106,20 @@ export async function proxy(request: NextRequest) {
   // 5. Refresh Session
   let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-  } catch (error) {
-    if (isRefreshTokenNotFoundError(error)) {
-      clearSessionCookies(response, request);
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      if (isRefreshTokenNotFoundError(error)) {
+        clearSessionCookies(response, request);
+      } else {
+        logger.warn("Supabase auth refresh failed in proxy; proceeding unauthenticated.", { error });
+        clearSessionCookies(response, request);
+      }
     } else {
-      logger.warn("Supabase auth refresh failed in proxy; proceeding unauthenticated.", { error });
-      clearSessionCookies(response, request);
+      user = data.user;
     }
+  } catch (error) {
+    logger.warn("Supabase auth getUser threw unexpectedly in proxy; proceeding unauthenticated.", { error });
+    clearSessionCookies(response, request);
   }
 
   // 6. Routing Logic
