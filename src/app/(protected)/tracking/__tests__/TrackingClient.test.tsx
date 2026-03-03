@@ -1,6 +1,12 @@
 import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import TrackingClient from '../TrackingClient';
+import { createClient } from '@/lib/supabase/client';
+
+// Hoisted flag that controls whether the @sentry/nextjs dynamic import throws.
+// Used by the "import failure" test suite to exercise the .catch() branch
+// in captureSentryException without resetting every module-level mock.
+const sentryConfig = vi.hoisted(() => ({ shouldFail: false }));
 
 // Mock all required hooks
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
@@ -67,9 +73,10 @@ vi.mock('@/lib/supabase/client', () => ({
   })),
 }));
 
-vi.mock('@sentry/nextjs', () => ({
-  captureException: vi.fn(),
-}));
+vi.mock('@sentry/nextjs', () => {
+  if (sentryConfig.shouldFail) throw new Error('Sentry SDK unavailable');
+  return { captureException: vi.fn() };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: {
@@ -234,6 +241,74 @@ describe('TrackingClient', () => {
       // After confirming, dialog should close (setDeleteAllConfirmOpen(false) called)
       await waitFor(() => {
         expect(screen.queryByText(/2 tracking records\./i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('captureSentryException – Sentry import failure', () => {
+    let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+      sentryConfig.shouldFail = false;
+      vi.resetModules();
+    });
+
+    it('logs console errors when Sentry SDK import fails during a delete operation', async () => {
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [sampleTrackingItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [sampleTrackingItem], isLoading: false, error: null }),
+      } as any);
+
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      // Make Supabase delete resolve with an error so captureSentryException is called
+      vi.mocked(createClient).mockReturnValueOnce({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'auth-user-123' } } }),
+        },
+        from: vi.fn(() => {
+          const builder: any = {};
+          builder.delete = vi.fn(() => builder);
+          builder.eq = vi.fn(() => builder);
+          // Minimal thenable so that `await` on the builder yields the Supabase-style response
+          builder.then = vi.fn((onFulfilled: (value: { data: null; error: Error }) => unknown) =>
+            Promise.resolve({ data: null, error: new Error('Supabase delete failed') }).then(onFulfilled),
+          );
+          return builder;
+        }),
+      } as any);
+
+      // Force the @sentry/nextjs dynamic import to fail on next resolution
+      sentryConfig.shouldFail = true;
+      vi.resetModules();
+
+      render(<TrackingClient />);
+
+      // Wait for the component to render past the loading state (sync completes)
+      const removeBtn = await screen.findByRole('button', { name: /remove tracking entry/i });
+      fireEvent.click(removeBtn);
+
+      // Confirm deletion in the single-item dialog
+      const deleteBtn = await screen.findByRole('button', { name: /^delete$/i });
+      fireEvent.click(deleteBtn);
+
+      // The .catch() handler inside captureSentryException should log the error
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[Sentry] Failed to load SDK for captureException:',
+          expect.any(Error),
+        );
       });
     });
   });

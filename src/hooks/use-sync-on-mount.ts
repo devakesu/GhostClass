@@ -19,27 +19,7 @@
 import { useState, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
-import type { CaptureContext } from "@sentry/core";
-
-// ---------------------------------------------------------------------------
-// Lazy Sentry helpers – keeps the SDK (~250 KB) out of the initial bundle.
-// ---------------------------------------------------------------------------
-const captureSentryException = (error: unknown, context?: CaptureContext) => {
-  void import("@sentry/nextjs")
-    .then(({ captureException }) => captureException(error, context))
-    .catch((importError) => {
-      console.error("[Sentry] Failed to load SDK for captureException:", importError);
-      console.error("[Sentry] Original error:", error);
-    });
-};
-const captureSentryMessage = (message: string, context?: CaptureContext) => {
-  void import("@sentry/nextjs")
-    .then(({ captureMessage }) => captureMessage(message, context))
-    .catch((importError) => {
-      console.error("[Sentry] Failed to load SDK for captureMessage:", importError);
-      console.error("[Sentry] Original message:", message);
-    });
-};
+import { captureSentryException, captureSentryMessage } from "@/lib/sentry-lazy";
 
 // ---------------------------------------------------------------------------
 // Public types

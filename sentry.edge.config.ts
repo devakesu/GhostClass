@@ -37,9 +37,6 @@ function scrubGaApiSecret(url: string): string {
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
   // Set sample rate (usually lower in production, e.g., 0.1)
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 

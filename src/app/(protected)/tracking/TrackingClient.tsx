@@ -1,14 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { CaptureContext } from "@sentry/core";
-// Lazy Sentry helpers – deferred import keeps the Sentry SDK (~250 KB) out of the initial bundle.
-const captureSentryException = (error: unknown, context?: CaptureContext) => {
-  void import("@sentry/nextjs").then(({ captureException }) => captureException(error, context));
-};
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useUser } from "@/hooks/users/user";
+import { captureSentryException } from "@/lib/sentry-lazy";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,

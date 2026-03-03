@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/nextjs";
 import { validateEnvironment } from "@/lib/validate-env";
 
 export async function register() {
@@ -20,4 +19,6 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+// captureRequestError is a first-class export in Sentry v10+ and matches the
+// exact signature Next.js expects for the onRequestError instrumentation hook.
+export { captureRequestError as onRequestError } from "@sentry/nextjs";
