@@ -277,10 +277,16 @@ describe('TrackingClient', () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'auth-user-123' } } }),
         },
-        from: vi.fn(() => ({
-          delete: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({ data: null, error: new Error('Supabase delete failed') }),
-        })),
+        from: vi.fn(() => {
+          const builder: any = {};
+          builder.delete = vi.fn(() => builder);
+          builder.eq = vi.fn(() => builder);
+          // Minimal thenable so that `await` on the builder yields the Supabase-style response
+          builder.then = vi.fn((onFulfilled: (value: { data: null; error: Error }) => unknown) =>
+            Promise.resolve({ data: null, error: new Error('Supabase delete failed') }).then(onFulfilled),
+          );
+          return builder;
+        }),
       } as any);
 
       // Force the @sentry/nextjs dynamic import to fail on next resolution
