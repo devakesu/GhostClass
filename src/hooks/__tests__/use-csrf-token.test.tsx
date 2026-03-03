@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useCSRFToken } from '@/hooks/use-csrf-token'
+
+// Mirror the module-private constants from use-csrf-token.ts.
+// Keep these in sync if the values change in the source file.
+const CSRF_LAST_INIT_KEY = "csrf_last_init"
+const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
 import * as axiosModule from '@/lib/axios'
 
 // Mock the axios module
@@ -68,7 +73,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait for setCsrfToken to be called with the token
@@ -77,18 +82,56 @@ describe('useCSRFToken', () => {
     })
   })
 
-  it('should skip initialization when token already exists', async () => {
-    // Mock getCsrfToken to return an existing token
+  it('should call /api/csrf on mount when token exists but no recent init timestamp is recorded', async () => {
+    // The httpOnly CSRF cookie can expire while sessionStorage still holds the
+    // old token (e.g. after a production deploy or tab reopen). useCSRFToken must
+    // call /api/csrf when csrf_last_init is absent so initializeCsrfToken() re-issues
+    // the Set-Cookie header. sessionStorage is empty (cleared in beforeEach).
     vi.mocked(axiosModule.getCsrfToken).mockReturnValue('existing-token')
 
     renderHook(() => useCSRFToken())
 
-    // Wait a bit to ensure no fetch is made
+    // fetch must still be called to refresh the cookie server-side
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
+    })
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
+  })
+
+  it('should skip /api/csrf when token exists and last init was within the throttle window', async () => {
+    // When a token and a recent csrf_last_init timestamp both exist, the cookie is
+    // guaranteed fresh (at most CSRF_REINIT_INTERVAL_MS old). Skip the rate-limited
+    // /api/csrf call to avoid exhausting the IP-based quota under NAT scenarios.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue('existing-token')
+    window.sessionStorage.setItem(CSRF_LAST_INIT_KEY, Date.now().toString())
+
+    renderHook(() => useCSRFToken())
+
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Verify fetch was not called
     expect(global.fetch).not.toHaveBeenCalled()
     expect(axiosModule.setCsrfToken).not.toHaveBeenCalled()
+  })
+
+  it('should call /api/csrf when token exists but last init timestamp is stale', async () => {
+    // When the throttle interval has elapsed the cookie may be approaching its 24-hour
+    // TTL. Re-init to refresh Set-Cookie even though a token exists in sessionStorage.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue('existing-token')
+    const staleTimestamp = Date.now() - (CSRF_REINIT_INTERVAL_MS + 1000)
+    window.sessionStorage.setItem(CSRF_LAST_INIT_KEY, staleTimestamp.toString())
+
+    renderHook(() => useCSRFToken())
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
+    })
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
   })
 
   it('should handle concurrent component mounts via shared promise', async () => {
@@ -162,7 +205,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait a bit to ensure error handling completes
@@ -186,7 +229,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait a bit to ensure error handling completes

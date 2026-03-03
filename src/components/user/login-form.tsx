@@ -206,7 +206,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           // Token not yet available — the async CSRF init may not have finished
           // (e.g. password manager autofill + instant submit). Re-fetch directly
           // and store the token so the Axios interceptor also picks it up.
-          const csrfRes = await fetch("/api/csrf");
+          const csrfRes = await fetch("/api/csrf", { credentials: "include" });
           if (csrfRes.ok) {
             const data = await csrfRes.json();
             const tokenFromResponse =

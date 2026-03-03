@@ -197,14 +197,21 @@ describe("CSRF Protection", () => {
   });
 
   describe("initializeCsrfToken", () => {
-    it("should return existing token if present", async () => {
+    it("should return existing token if present and refresh its cookie TTL", async () => {
       const existingToken = "existing-token-123";
       mockCookieStore.get.mockReturnValue({ value: existingToken });
 
       const token = await initializeCsrfToken();
       
       expect(token).toBe(existingToken);
-      expect(mockCookieStore.set).not.toHaveBeenCalled();
+      // Cookie is always re-issued to refresh TTL and prevent the
+      // "cookie expired / sessionStorage stale" desync seen after deployments.
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "csrf_token",
+          value: existingToken,
+        })
+      );
     });
 
     it("should create new token if none exists", async () => {
