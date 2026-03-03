@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useCSRFToken, CSRF_LAST_INIT_KEY, CSRF_REINIT_INTERVAL_MS } from '@/hooks/use-csrf-token'
+import { useCSRFToken } from '@/hooks/use-csrf-token'
+
+// Mirror the module-private constants from use-csrf-token.ts.
+// Keep these in sync if the values change in the source file.
+const CSRF_LAST_INIT_KEY = "csrf_last_init"
+const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
 import * as axiosModule from '@/lib/axios'
 
 // Mock the axios module
