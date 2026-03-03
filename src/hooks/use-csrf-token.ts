@@ -118,8 +118,9 @@ export function useCSRFToken() {
           // Call /api/csrf to initialize the CSRF token.
           // The token is set in an httpOnly cookie server-side (for server validation)
           // and returned in the response body for client-side storage in sessionStorage.
-          // This call is made on every first mount — even if sessionStorage already has a
-          // value — so the server always re-issues Set-Cookie and refreshes the TTL.
+          // When initialization is required (per the throttle above), this call is made
+          // even if sessionStorage already has a value, so the server re-issues Set-Cookie
+          // and refreshes the TTL.
           //
           // SECURITY: Token storage in sessionStorage is protected by CSP (see src/lib/csp.ts)
           // which prevents unauthorized script execution and XSS attacks.
