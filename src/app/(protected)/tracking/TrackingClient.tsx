@@ -403,6 +403,9 @@ export default function TrackingClient() {
                                             {deleteId === trackingId ? "Deleting..." : <><span className="max-md:hidden">Remove</span><Trash2 size={15} aria-hidden="true" /></>}
                                           </m.button>
                                         </div>
+                                        {attCode === 225 && trackingItem.remarks && (
+                                          <p className="text-[11px] text-orange-600/80 dark:text-orange-400/80 mt-1.5 italic truncate">{trackingItem.remarks}</p>
+                                        )}
                                       </m.div>
                                     );
                                   })}

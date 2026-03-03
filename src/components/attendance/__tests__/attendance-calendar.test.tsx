@@ -133,6 +133,24 @@ vi.mock('lucide-react', () => ({
   Loader2: () => <span data-testid="loader2-icon" />,
   AlertTriangle: () => <span data-testid="alert-triangle-icon" />,
   ArrowUpRight: () => <span data-testid="arrow-up-right-icon" />,
+  XIcon: () => <span data-testid="x-icon" />,
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogHeader: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  DialogDescription: ({ children }: any) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/ui/input', () => ({
+  Input: ({ ...props }: any) => <input {...props} />,
+}));
+
+vi.mock('@/components/ui/label', () => ({
+  Label: ({ children, ...props }: any) => <label {...props}>{children}</label>,
 }));
 
 describe('AttendanceCalendar', () => {

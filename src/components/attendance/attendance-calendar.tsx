@@ -16,6 +16,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
@@ -95,6 +105,9 @@ export function AttendanceCalendar({
   const [filter, setFilter] = useState<string>("all");
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<string | null>(null);
+  const [dlReasonOpen, setDlReasonOpen] = useState(false);
+  const [dlReason, setDlReason] = useState("");
+  const [pendingDl, setPendingDl] = useState<{ courseId: string; dbDate: string; sessionForDB: string; buttonKey: string } | null>(null);
   const clickedButtons = useRef<Set<string>>(new Set());
 
   // Initialize dates on mount to avoid hydration mismatch
@@ -231,6 +244,31 @@ export function AttendanceCalendar({
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
         clickedButtons.current?.delete(buttonKey); 
       }
+  };
+
+  const handleDlConfirm = () => {
+    if (pendingDl && authUserId) {
+      handleWriteTracking(
+        pendingDl.courseId,
+        pendingDl.dbDate,
+        "correction",
+        pendingDl.sessionForDB,
+        225,
+        dlReason.trim() || "Duty Leave"
+      );
+    }
+    setDlReasonOpen(false);
+    setDlReason("");
+    setPendingDl(null);
+  };
+
+  const handleDlCancel = () => {
+    if (pendingDl) {
+      clickedButtons.current?.delete(pendingDl.buttonKey);
+    }
+    setDlReasonOpen(false);
+    setDlReason("");
+    setPendingDl(null);
   };
 
   // --- 1. PARSE OFFICIAL API DATA ---
@@ -727,7 +765,7 @@ export function AttendanceCalendar({
                             return (
                                 <div className="shrink-0 w-full sm:w-auto">
                                     <div className="flex flex-row gap-2 w-full">
-                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 225, "Duty Leave"); }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
+                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) { setPendingDl({ courseId: event.courseId, dbDate, sessionForDB, buttonKey }); setDlReasonOpen(true); } }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
                                         <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); if (authUserId) handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 110, "Incorrectly marked absent"); }} aria-label={`Mark ${event.title} as Present for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-green-500 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:border-green-500/70 dark:text-green-400 dark:hover:text-green-300"}`}>{isLoading ? "..." : <><CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" /><span>Mark Present</span></>}</Button>
                                     </div>
                                 </div>
@@ -744,6 +782,9 @@ export function AttendanceCalendar({
                             <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">{event.sessionName ? formatSessionName(event.sessionName) : `Session ${event.sessionKey}`}</span>
                             <Badge variant="outline" className={`h-5 px-1.5 gap-1 font-medium ${badgeClass}`}><Icon className="w-3 h-3" aria-hidden="true" />{event.status}</Badge>
                           </div>
+                          {event.status === "Duty Leave" && event.remarks && (
+                            <p className="text-[11px] text-yellow-600/80 dark:text-yellow-400/80 italic truncate max-w-[200px] sm:max-w-xs">{event.remarks}</p>
+                          )}
                         </div>
                         {renderActions()}
                       </motion.div>
@@ -789,6 +830,33 @@ export function AttendanceCalendar({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* DL Reason Dialog */}
+      <Dialog open={dlReasonOpen} onOpenChange={(open) => { if (!open) handleDlCancel(); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duty Leave Reason</DialogTitle>
+            <DialogDescription>
+              Enter the reason for marking this session as duty leave.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="dl-reason-calendar" className="text-sm mb-1.5 block">Reason</Label>
+            <Input
+              id="dl-reason-calendar"
+              placeholder="Programme/Activity Name"
+              value={dlReason}
+              onChange={(e) => setDlReason(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleDlConfirm(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDlCancel}>Cancel</Button>
+            <Button onClick={handleDlConfirm} className="bg-yellow-500 text-white hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700">Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
