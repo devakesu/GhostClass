@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "@/lib/axios";
 import { Institution } from "@/types";
+import { retryOnce } from "@/lib/query-utils";
 
 /**
  * React Query hook for fetching user's enrolled institutions.
@@ -66,6 +67,7 @@ export function useDefaultInstitute() {
 
       return res.data;
     },
+    retry: retryOnce,
   });
 }
 
@@ -106,6 +108,7 @@ export function useDefaultInstitutionUser() {
       return defaultInstitutionUser;
     },
     enabled: !!institutions,
+    retry: retryOnce,
   });
 }
 

@@ -78,6 +78,12 @@ vi.mock("@/lib/utils.server", () => ({
   egressFetch: mockEgressFetch,
 }));
 
+// --- Mock rate limiter ---
+const mockRateLimiterLimit = vi.fn();
+vi.mock("@/lib/ratelimit", () => ({
+  authRateLimiter: { limit: mockRateLimiterLimit },
+}));
+
 // ---------------------------------------------------------------------------
 // Helper builders
 // ---------------------------------------------------------------------------
@@ -146,6 +152,8 @@ describe("GET /api/profile", () => {
     });
     // Default: upsert succeeds
     mockAdminUpsert.mockResolvedValue({ error: null });
+    // Default: rate limiter allows the request
+    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
   });
 
   afterEach(() => {
@@ -287,6 +295,48 @@ describe("GET /api/profile", () => {
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
     expect(body.birth_date).toBe(MOCK_EZYGO_PROFILE.birth_date);
   });
+
+  describe("rate limiting", () => {
+    it("returns 429 with Cache-Control: no-store when rate limit is exceeded", async () => {
+      mockRateLimiterLimit.mockResolvedValueOnce({
+        success: false,
+        reset: Date.now() + 60000,
+        limit: 5,
+        remaining: 0,
+      });
+      const { GET } = await import("../route");
+      const res = await GET(makeGetReq());
+      expect(res.status).toBe(429);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(res.headers.get("Retry-After")).toBeDefined();
+      expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+      const body = await res.json() as { error: string };
+      expect(body.error).toMatch(/too many requests/i);
+    });
+
+    it("does not call auth or EzyGo when rate limited", async () => {
+      mockRateLimiterLimit.mockResolvedValueOnce({
+        success: false,
+        reset: Date.now() + 60000,
+        limit: 5,
+        remaining: 0,
+      });
+      const { GET } = await import("../route");
+      await GET(makeGetReq());
+      expect(mockGetUser).not.toHaveBeenCalled();
+      expect(mockEgressFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 with Cache-Control: no-store when client IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      vi.mocked(getClientIp).mockReturnValueOnce(null);
+      const { GET } = await import("../route");
+      const res = await GET(makeGetReq());
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(mockRateLimiterLimit).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("PATCH /api/profile", () => {
@@ -304,6 +354,8 @@ describe("PATCH /api/profile", () => {
     mockAdminUpdate.mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
+    // Default: rate limiter allows the request
+    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
   });
 
   afterEach(() => {
@@ -433,5 +485,50 @@ describe("PATCH /api/profile", () => {
     expect(capturedUpdate.gender_iv).toBeNull();
     expect(capturedUpdate.birth_date).toBeNull();
     expect(capturedUpdate.birth_date_iv).toBeNull();
+  });
+
+  describe("rate limiting", () => {
+    it("returns 429 with Cache-Control: no-store when rate limit is exceeded", async () => {
+      mockRateLimiterLimit.mockResolvedValueOnce({
+        success: false,
+        reset: Date.now() + 60000,
+        limit: 5,
+        remaining: 0,
+      });
+      const { PATCH } = await import("../route");
+      const req = makePatchRequest({ first_name: "Alice", gender: "female" });
+      const res = await PATCH(req);
+      expect(res.status).toBe(429);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(res.headers.get("Retry-After")).toBeDefined();
+      expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+      const body = await res.json() as { error: string };
+      expect(body.error).toMatch(/too many requests/i);
+    });
+
+    it("does not call CSRF or auth when rate limited", async () => {
+      mockRateLimiterLimit.mockResolvedValueOnce({
+        success: false,
+        reset: Date.now() + 60000,
+        limit: 5,
+        remaining: 0,
+      });
+      const { PATCH } = await import("../route");
+      const req = makePatchRequest({ first_name: "Alice", gender: "female" });
+      await PATCH(req);
+      expect(mockValidateCsrf).not.toHaveBeenCalled();
+      expect(mockGetUser).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 with Cache-Control: no-store when client IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      vi.mocked(getClientIp).mockReturnValueOnce(null);
+      const { PATCH } = await import("../route");
+      const req = makePatchRequest({ first_name: "Alice", gender: "female" });
+      const res = await PATCH(req);
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(mockRateLimiterLimit).not.toHaveBeenCalled();
+    });
   });
 });

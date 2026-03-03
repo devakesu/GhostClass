@@ -4,6 +4,7 @@
 import axios from "@/lib/axios";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Exam, ExamAnswer, ExamQuestion } from "@/types";
+import { retryOnce } from "@/lib/query-utils";
 
 /**
  * React Query hook for fetching the current user's exams and scores.
@@ -37,7 +38,7 @@ export const useExams = (options?: { enabled?: boolean }) => {
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    retry: 1,
+    retry: retryOnce,
   });
 };
 
@@ -68,7 +69,7 @@ export const useExamQuestions = (examId: number | null) => {
     enabled: examId !== null,
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
-    retry: 1,
+    retry: retryOnce,
   });
 };
 
@@ -99,7 +100,7 @@ export const useExamAnswers = (examId: number | null) => {
     enabled: examId !== null,
     staleTime: 0,
     gcTime: 15 * 60 * 1000,
-    retry: 1,
+    retry: retryOnce,
   });
 };
 
@@ -128,7 +129,7 @@ export const useAllExamAnswers = (examIds: number[]) => {
       },
       staleTime: 0,
       gcTime: 15 * 60 * 1000,
-      retry: 1,
+      retry: retryOnce,
     })),
   });
 };
@@ -152,7 +153,7 @@ export const useAllExamQuestions = (examIds: number[]) => {
       },
       staleTime: 10 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
-      retry: 1,
+      retry: retryOnce,
     })),
   });
 };

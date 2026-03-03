@@ -6,6 +6,7 @@ import { isAxiosError } from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
+import { makeRetryFn } from "@/lib/query-utils";
 
 type SemesterData = {
   default_semester: "even" | "odd";
@@ -15,19 +16,8 @@ type AcademicYearData = {
   default_academic_year: string;
 };
 
-// Shared retry logic for settings queries
-// Don't retry on auth errors (401/403) - these need user intervention
-const MAX_RETRIES = 2;
-
-const settingsRetryFn = (failureCount: number, error: unknown) => {
-  if (isAxiosError(error)) {
-    const status = error.response?.status;
-    if (status === 401 || status === 403) {
-      return false;
-    }
-  }
-  return failureCount < MAX_RETRIES;
-};
+// Shared retry logic for settings queries — skip all 4xx, retry twice for 5xx/network
+const settingsRetryFn = makeRetryFn(2);
 
 export const useFetchSemester = () => {
   return useQuery<"even" | "odd" | null>({

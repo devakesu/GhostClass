@@ -1,4 +1,4 @@
-export const TERMS_VERSION = "2.3";
+export const TERMS_VERSION = "2.4";
 export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-01";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
@@ -47,14 +47,14 @@ We use trusted third-party infrastructure to operate GhostClass. By using the Se
     * *Data:* User IP addresses, web traffic metadata, and security cookies.
     * *Location:* Global (Edge Network). [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
 
-* **Cloudflare Workers (Egress Proxy):**
-    * *Purpose:* Tier-1 outbound proxy for EzyGo API requests to improve resiliency.
-    * *Data:* Request metadata (including source IP/User-Agent forwarding headers) and proxied EzyGo request/response payloads processed in transit.
+* **Cloudflare Workers (Egress & ISP-Bypass Proxy):**
+    * *Purpose:* Two separate worker deployments: (1) **EzyGo egress proxy** — Tier-1 server-side outbound proxy for EzyGo API requests, improving resiliency and masking the origin server IP; (2) **Supabase browser proxy** — optional, transparently routes browser → Supabase requests when \`supabase.co\` is regionally blocked by ISPs, without exposing a shared secret to the client (access is controlled by Origin header checking).
+    * *Data:* (1) EzyGo proxy: request metadata (source IP / User-Agent forwarding headers) and proxied EzyGo request/response payloads, processed entirely in transit — no persistent storage. (2) Supabase proxy: Supabase authentication and database request/response payloads processed in transit — no persistent storage.
     * *Location:* Global (Cloudflare network). [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
 
-* **Amazon Web Services - Lambda + API Gateway (Egress Proxy):**
-    * *Purpose:* Tier-2 outbound proxy fallback for EzyGo API requests when primary egress is unavailable.
-    * *Data:* Request metadata (including source IP/User-Agent forwarding headers) and proxied EzyGo request/response payloads processed in transit.
+* **Amazon Web Services - Lambda + API Gateway (Egress & ISP-Bypass Proxy):**
+    * *Purpose:* Two separate Lambda deployments: (1) **EzyGo egress proxy** — Tier-2 server-side outbound proxy fallback for EzyGo API requests when the Cloudflare tier is unavailable; (2) **Supabase browser proxy** — optional Tier-2 fallback for browser → Supabase requests when the Cloudflare Supabase proxy is unavailable.
+    * *Data:* (1) EzyGo proxy: request metadata (source IP / User-Agent forwarding headers) and proxied EzyGo request/response payloads, processed entirely in transit — no persistent storage. (2) Supabase proxy: Supabase authentication and database request/response payloads processed in transit — no persistent storage.
     * *Location:* Configured AWS region (set by deployment). [Privacy Policy](https://aws.amazon.com/privacy/)
 
 * **Hetzner Online GmbH (Compute Infrastructure):**

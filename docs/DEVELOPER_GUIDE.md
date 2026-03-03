@@ -598,6 +598,8 @@ Optional Variables (omit to use defaults):
 | `NEXT_PUBLIC_DONATE_URL` | *(blank)* | Donation link shown in footer |
 | `NEXT_PUBLIC_DEFAULT_DOMAIN` | *(blank)* | Fallback domain used by `getAppDomain()` when `NEXT_PUBLIC_APP_DOMAIN` is not set |
 | `NEXT_PUBLIC_FORCE_STRICT_CSP` | *(blank)* | Set `"true"` to force strict CSP in production builds |
+| `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` | *(blank)* | CF Worker URL for browser→Supabase requests (ISP bypass Tier 1); omit for direct connection |
+| `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL` | *(blank)* | Lambda URL for browser→Supabase requests (ISP bypass Tier 2 fallback); omit for direct connection |
 
 > **Why Variables and not Secrets?** All values above are non-sensitive and already embedded in the browser JavaScript bundle or HTML. Storing them as Secrets causes GitHub Actions log masking to redact their values from build output, making logs unreadable (e.g. the package name becomes `***@1.9.5`).
 
@@ -614,6 +616,12 @@ Navigate to the **Secrets** tab and create the following:
 | `COOLIFY_BASE_URL` | Deployment server base URL for deployment trigger |
 | `COOLIFY_APP_ID` | App UUID on deployment server |
 | `COOLIFY_API_TOKEN` | Deployment server API bearer token |
+| `CF_PROXY_SECRET` | PROXY_SECRET for the Cloudflare Worker egress proxy — injected into the Worker at deploy time and used at runtime to sign requests from the app |
+| `AWS_SECONDARY_SECRET` | PROXY_SECRET for the AWS Lambda egress proxy — injected into the Lambda at deploy time and used at runtime to sign requests from the app |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token for deploying the CF Worker egress proxy (`deploy-egress-proxies.yml`) |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID for CF Worker deployment |
+| `AWS_ACCESS_KEY_ID` | AWS access key ID for deploying the Lambda egress proxy |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key corresponding to `AWS_ACCESS_KEY_ID` |
 
 > **`NEXT_PUBLIC_APP_VERSION` is not a Variable** — the pipeline derives it automatically from the git tag via the `calculate-version` job. Setting it manually would cause it to go stale after every auto-bump.
 > **`SOURCE_DATE_EPOCH` is not a Variable** — the pipeline derives it from the git commit timestamp (`git log -1 --format=%ct`) in the `prep` step. This guarantees the same tag always produces the same image digest (reproducible builds) without any manual sync needed.

@@ -4,6 +4,7 @@
 import axios from "@/lib/axios";
 import { useQuery } from "@tanstack/react-query";
 import { AttendanceReport, CourseDetail } from "@/types";
+import { retryOnce, retryTwice } from "@/lib/query-utils";
 
 export const useAttendanceReport = (options?: { enabled?: boolean; initialData?: AttendanceReport }) => {
   return useQuery<AttendanceReport>({
@@ -20,7 +21,7 @@ export const useAttendanceReport = (options?: { enabled?: boolean; initialData?:
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     refetchInterval: 60 * 1000,
-    retry: 1,
+    retry: retryOnce,
   });
 };
 
@@ -41,6 +42,6 @@ export const useCourseDetails = (courseId: string) => {
     gcTime: 10 * 60 * 1000,
     refetchOnReconnect: true, // Keep real-time on reconnect
     refetchInterval: 5 * 60 * 1000, // Poll every 5 minutes instead of 1 minute
-    retry: 2,
+    retry: retryTwice,
   });
 };

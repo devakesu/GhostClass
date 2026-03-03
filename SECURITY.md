@@ -27,7 +27,7 @@ GhostClass implements multiple layers of security:
 
 ### Data Protection
 
-- **HttpOnly Cookies** - Session token stored in a `httpOnly`, `SameSite=Lax` cookie. `Lax` is used instead of `Strict` to allow the cookie on PWA standalone launches (top-level navigations); all mutations remain protected by CSRF tokens.
+- **HttpOnly Cookies** - Multiple `httpOnly` cookies with distinct `SameSite` policies. The session token (`ezygo_access_token`) uses `SameSite=Lax` — intentional to allow the cookie on PWA standalone launches (top-level navigations); `Strict` would block it on bookmarks and installed-app launch, causing an infinite redirect loop. The CSRF token cookie uses `SameSite=Strict` since it only needs to be present on same-site requests where the header can be validated. All mutations require a valid CSRF token regardless.
 - **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 - **Input Validation** - Zod schemas validate all user input
 - **Origin Validation** - Strict origin checking in production
@@ -63,6 +63,12 @@ GhostClass implements multiple layers of security:
 - **Environment Variable Validation** - Runtime validation of required secrets
 - **Two-Tier Secret Management** - Separate build-time and runtime secrets
 - **Production Safety Checks** - Strict validation in production mode
+
+### Egress Proxy Chain
+
+- **EzyGo Server-Side Egress** - All server-to-EzyGo API requests route through a two-tier egress proxy chain: a Cloudflare Worker (`CF_PROXY_URL`, Tier 1) falling back to an AWS Lambda (`AWS_SECONDARY_URL`, Tier 2), then direct. This masks the origin server IP and bypasses ISP-level blocks. Implemented via `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`.
+- **Supabase Browser Proxy (ISP Bypass)** - Browser-to-Supabase requests auto-fail-over through the same pattern: CF Worker (`NEXT_PUBLIC_SUPABASE_CF_PROXY_URL`) → Lambda (`NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL`) → direct. Implemented in `src/lib/supabase/client.ts`.
+- **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret` header on every incoming request; requests without a valid secret are rejected with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET` and `AWS_SECONDARY_SECRET` are server-only runtime variables).
 
 ## Dependency Security Overrides
 

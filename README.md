@@ -714,7 +714,7 @@ GhostClass implements multiple layers of security:
 - **Row Level Security** - Supabase RLS policies ensure users only access their data
 - **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, and Referrer-Policy
 - **Input Validation** - Zod schemas validate all user input
-- **HttpOnly Cookies** - Session token stored in a `httpOnly`, `SameSite=Lax` cookie. `Lax` (not `Strict`) is intentional: `Strict` blocks the cookie on top-level navigations (PWA standalone launch, bookmarks), causing an infinite redirect loop. All mutations are protected by CSRF tokens so `Lax` doesn't weaken mutation safety.
+- **HttpOnly Cookies** - Multiple `httpOnly` cookies with distinct `SameSite` policies. The session token (`ezygo_access_token`) uses `SameSite=Lax` — intentional to allow the cookie on PWA standalone launches (top-level navigations); `Strict` would block it on bookmarks and installed-app launch, causing an infinite redirect loop. The CSRF token cookie uses `SameSite=Strict` since it only needs to be present on same-site requests where the header can be validated. All mutations require a valid CSRF token regardless.
 - **Origin Validation** - Strict origin checking in production (disabled in dev)
 - **Cloudflare Turnstile** - Bot protection on public endpoints
 
