@@ -206,7 +206,7 @@ describe('AttendanceCalendar', () => {
 
     // Wait for Mark DL button then open dialog
     const markDlBtn = await screen.findByRole('button', { name: /mark.*duty leave/i });
-    await waitFor(() => { fireEvent.click(markDlBtn); });
+    fireEvent.click(markDlBtn);
 
     const reasonInput = await screen.findByPlaceholderText('Programme/Activity Name');
     expect(reasonInput).toBeInTheDocument();
