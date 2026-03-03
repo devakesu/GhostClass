@@ -10,11 +10,18 @@ import { logger } from "./lib/logger";
  * any chunked variants) derived from NEXT_PUBLIC_SUPABASE_URL.
  * Call this on every logout/unauthenticated-redirect path so that adding a
  * new session cookie only requires a change here, not in every branch.
+ *
+ * NOTE: csrf_token is intentionally NOT cleared here. The CSRF token is a
+ * browser-tab nonce — it is not tied to any specific user identity and does
+ * not carry session state. Clearing it on every unauthenticated redirect
+ * would leave the subsequent login attempt without a valid cookie if the
+ * 30-minute per-tab throttle in useCSRFToken is still active, causing a
+ * 403 on the next CSRF-protected request (e.g. /api/auth/save-token).
+ * csrf_token is only cleared by the explicit logout handler via removeCsrfToken().
  */
 function clearSessionCookies(res: NextResponse, request: NextRequest) {
   res.cookies.delete('ezygo_access_token');
   res.cookies.delete('terms_version');
-  res.cookies.delete('csrf_token');
   res.cookies.delete('terms_redirect_count');
   try {
     const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
@@ -109,17 +116,24 @@ export async function proxy(request: NextRequest) {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
       if (isRefreshTokenNotFoundError(error)) {
-        clearSessionCookies(response, request);
+        // Invalid refresh token — treat as unauthenticated. Do NOT clear
+        // session cookies here: clearSessionCookies() must only run on
+        // redirect responses (Scenarios A / logout-loop below). Calling it
+        // on the pass-through response for public-route requests (RSC fetches
+        // for /help, /legal, etc.) would delete csrf_token and other cookies
+        // that are still valid and unrelated to the Supabase session.
+        // The redirect-path in Scenario A already calls clearSessionCookies()
+        // when the user later tries to reach a protected route.
       } else {
         logger.warn("Supabase auth refresh failed in proxy; proceeding unauthenticated.", { error });
-        clearSessionCookies(response, request);
+        // Transient error — proceed as unauthenticated without touching cookies.
       }
     } else {
       user = data.user;
     }
   } catch (error) {
     logger.warn("Supabase auth getUser threw unexpectedly in proxy; proceeding unauthenticated.", { error });
-    clearSessionCookies(response, request);
+    // Unexpected error — proceed as unauthenticated without touching cookies.
   }
 
   // 6. Routing Logic
@@ -246,6 +260,9 @@ export async function proxy(request: NextRequest) {
     const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
     redirectRes.headers.set('Content-Security-Policy', cspHeader);
     redirectRes.headers.set("x-nonce", nonce);
+    // Clear redirect count so a fresh login doesn't inherit a stale counter
+    // from a previous terms-redirect loop on the same device.
+    redirectRes.cookies.delete('terms_redirect_count');
     return redirectRes;
   }
 
@@ -256,17 +273,23 @@ export const config = {
   // Match all routes except:
   // - Static assets (_next/static, _next/image, favicon.ico, robots.txt)
   // - API routes (handled separately with their own auth)
-  // 
+  // - Public PWA/static files that must never trigger auth session logic
+  //
   // This simplified matcher pattern uses a negative lookahead regex to exclude specific paths.
   // Any new routes will automatically have CSP headers and Supabase session refresh applied.
-  // 
-  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|robots.txt|monitoring).*)
-  // - Matches all paths that DON'T START with: api, _next/static, _next/image, favicon.ico, robots.txt, or monitoring
+  //
+  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon-|logo.png).*)
+  // - Matches all paths that DON'T START with the listed prefixes/names
   // - The negative lookahead (?!...) is evaluated at match time to exclude specific paths
-  // 
+  //
   // This ensures middleware runs on all page routes for proper security headers and auth handling.
   // Public routes like /health are under /api and are excluded by the 'api' pattern.
-  // Static files in /public are served directly and don't go through middleware.
+  //
+  // ⚠️ IMPORTANT: Public static files in /public (manifest.webmanifest, sw.js, icons) MUST be
+  // excluded here. The middleware calls supabase.auth.getUser() on every matched request, which
+  // is a live network call. Having it run on every PWA manifest or icon fetch is wasteful and
+  // can create race conditions with cookie mutations on response objects. These files are static
+  // and never need auth session logic or CSP headers.
   // If you need to add more exclusions (e.g., /sitemap.xml), add them to the pattern below.
   matcher: [
     // Exclude monitoring (Sentry tunnel) from middleware processing.
@@ -275,6 +298,6 @@ export const config = {
     // routing logic) for each one overwhelms the server and blocks SSR
     // streaming for actual page navigations — especially on Android PWA
     // standalone launch where the burst compounds with SW lifecycle events.
-    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|monitoring).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon-|logo.png).*)",
   ],
 };

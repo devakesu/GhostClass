@@ -36,14 +36,14 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
   });
 
-  it("redirects to / and deletes all four custom session cookies", async () => {
+  it("redirects to / and clears session cookies (but preserves csrf_token)", async () => {
     const request = new NextRequest("http://localhost/dashboard");
     const response = await proxy(request);
 
     // Should redirect to the login page
     expect(response.status).toBe(307);
 
-    // All four custom session cookies must be cleared (Max-Age=0 means deletion)
+    // Session cookies must be cleared (Max-Age=0 means deletion)
     const setCookies = response.headers.getSetCookie();
     // NextResponse.cookies.delete() sets Expires to epoch (Jan 1 1970) to invalidate the cookie
     const isDeleted = (name: string) =>
@@ -56,7 +56,42 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
 
     expect(isDeleted("ezygo_access_token")).toBe(true);
     expect(isDeleted("terms_version")).toBe(true);
-    expect(isDeleted("csrf_token")).toBe(true);
+    expect(isDeleted("terms_redirect_count")).toBe(true);
+    // csrf_token is intentionally NOT cleared on unauthenticated redirects — only on
+    // explicit logout. Clearing it here would break the login flow when the 30-minute
+    // per-tab throttle in useCSRFToken is still active (cookie gone, sessionStorage stale).
+    expect(isDeleted("csrf_token")).toBe(false);
+  });
+});
+
+describe("proxy – Scenario D: authenticated user on auth route", () => {
+  beforeEach(() => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+  });
+
+  it("redirects authenticated user on / to /dashboard and clears terms_redirect_count", async () => {
+    const request = new NextRequest("http://localhost/", {
+      headers: {
+        cookie: "terms_version=2.3; terms_redirect_count=2",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/dashboard");
+
+    // Stale redirect counter must be cleared so a fresh login doesn't inherit it
+    const isDeleted = (name: string) =>
+      response.headers.getSetCookie().some(
+        (h) =>
+          h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
+          (h.toLowerCase().includes("max-age=0") ||
+            h.toLowerCase().includes("expires=thu, 01 jan 1970")),
+      );
     expect(isDeleted("terms_redirect_count")).toBe(true);
   });
 });
