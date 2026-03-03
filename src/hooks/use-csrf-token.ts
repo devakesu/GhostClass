@@ -12,7 +12,9 @@
  * 
  * IMPLEMENTATION NOTES:
  * - Uses useRef to track initialization state to avoid issues with React 18+ concurrent rendering
- * - Checks sessionStorage as source of truth for token existence
+ * - Always calls /api/csrf on first mount (does NOT short-circuit on sessionStorage)
+ *   so the server can re-issue the Set-Cookie header and refresh the cookie TTL.
+ *   This prevents the cookie-expired / sessionStorage-stale desync seen after deployments.
  * - Module-level promise prevents duplicate concurrent requests across different component instances
  * - Safe for StrictMode double-effect execution and hot module replacement
  * 
@@ -29,14 +31,14 @@ import { useEffect, useRef } from "react";
 import { setCsrfToken, getCsrfToken } from "@/lib/axios";
 import { logger } from "@/lib/logger";
 
-// Module-level promise to prevent concurrent CSRF initialization across component instances
-// This is only used for request deduplication, not for tracking initialization state
-// The source of truth for initialization is sessionStorage, which is checked in each component
+// Module-level promise to prevent concurrent CSRF initialization across component instances.
+// This is only used for request deduplication, not for tracking initialization state.
+// Each component always calls /api/csrf on first mount to refresh the server-side cookie TTL;
+// the promise ensures only one in-flight request runs at a time across simultaneous mounts.
 //
 // ERROR RECOVERY: If initialization fails, the promise is rejected and cleared in the finally
-// block (line 112). Components mounting during a failure will see the rejected promise and
-// verify token state afterward (lines 78-82). If no token exists after the failed promise,
-// they will start a new initialization attempt. This ensures eventual consistency even if
+// block. Components mounting during a failure will see the rejected promise and
+// attempt initialization themselves. This ensures eventual consistency even if
 // some initialization attempts fail due to network issues or component unmounts.
 let csrfInitPromise: Promise<void> | null = null;
 
@@ -90,10 +92,12 @@ export function useCSRFToken() {
       // Start new initialization
       csrfInitPromise = (async () => {
         try {
-          // Call the /api/csrf/init endpoint to initialize the CSRF token
-          // The token is stored in an httpOnly cookie (server-side validation)
-          // and returned in the response for client-side storage in sessionStorage.
-          // 
+          // Call /api/csrf to initialize the CSRF token.
+          // The token is set in an httpOnly cookie server-side (for server validation)
+          // and returned in the response body for client-side storage in sessionStorage.
+          // This call is made on every first mount — even if sessionStorage already has a
+          // value — so the server always re-issues Set-Cookie and refreshes the TTL.
+          //
           // SECURITY: Token storage in sessionStorage is protected by CSP (see src/lib/csp.ts)
           // which prevents unauthorized script execution and XSS attacks.
           const response = await fetch("/api/csrf", { credentials: "include" });
