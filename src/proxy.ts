@@ -44,6 +44,16 @@ function createNonce() {
   return btoa(String.fromCharCode(...bytes));
 }
 
+function isRefreshTokenNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const authError = error as { code?: unknown; status?: unknown; message?: unknown };
+  return authError.code === "refresh_token_not_found"
+    || (authError.status === 400 && typeof authError.message === "string" && authError.message.includes("Invalid Refresh Token"));
+}
+
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const requestHeaders = new Headers(request.headers);
@@ -94,7 +104,23 @@ export async function proxy(request: NextRequest) {
   );
 
   // 5. Refresh Session
-  const { data: { user } } = await supabase.auth.getUser();
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      if (isRefreshTokenNotFoundError(error)) {
+        clearSessionCookies(response, request);
+      } else {
+        logger.warn("Supabase auth refresh failed in proxy; proceeding unauthenticated.", { error });
+        clearSessionCookies(response, request);
+      }
+    } else {
+      user = data.user;
+    }
+  } catch (error) {
+    logger.warn("Supabase auth getUser threw unexpectedly in proxy; proceeding unauthenticated.", { error });
+    clearSessionCookies(response, request);
+  }
 
   // 6. Routing Logic
   const termsVersion = request.cookies.get("terms_version")?.value;

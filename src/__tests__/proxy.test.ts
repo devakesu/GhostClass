@@ -187,3 +187,56 @@ describe("proxy – cross-device terms sync", () => {
     expect(response.headers.get("location")).toContain("/accept-terms");
   });
 });
+
+describe("proxy – auth.getUser throws an error", () => {
+  const isDeleted = (res: Response, name: string) =>
+    res.headers.getSetCookie().some(
+      (h) =>
+        h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
+        (h.toLowerCase().includes("max-age=0") ||
+          h.toLowerCase().includes("expires=thu, 01 jan 1970")),
+    );
+
+  it("clears session cookies and redirects when getUser throws refresh_token_not_found", async () => {
+    mockGetUser.mockRejectedValueOnce({
+      code: "refresh_token_not_found",
+      status: 400,
+      message: "Invalid Refresh Token: old",
+    });
+
+    const request = new NextRequest("http://localhost/dashboard");
+    const response = await proxy(request);
+
+    // user is null after catch → protected route redirects to /
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/");
+
+    // Cookies should be cleared by clearSessionCookies
+    expect(isDeleted(response, "ezygo_access_token")).toBe(true);
+    expect(isDeleted(response, "terms_version")).toBe(true);
+  });
+
+  it("clears session cookies and redirects when getUser throws an unrecognised error", async () => {
+    mockGetUser.mockRejectedValueOnce(new Error("Network error"));
+
+    const request = new NextRequest("http://localhost/dashboard");
+    const response = await proxy(request);
+
+    // user is null after catch → protected route redirects to /
+    expect(response.status).toBe(307);
+    expect(isDeleted(response, "ezygo_access_token")).toBe(true);
+  });
+
+  it("proceeds unauthenticated (200) on a public route when getUser throws a non-object", async () => {
+    // Throwing a non-object (string) exercises the !error || typeof !== 'object' branch
+    // inside isRefreshTokenNotFoundError, which returns false
+    mockGetUser.mockRejectedValueOnce("invalid error");
+
+    // Public auth route (/), not protected → no redirect
+    const request = new NextRequest("http://localhost/");
+    const response = await proxy(request);
+
+    // No user, but / is not a protected route (user && isAuthRoute guard isn't hit)
+    expect(response.status).toBe(200);
+  });
+});

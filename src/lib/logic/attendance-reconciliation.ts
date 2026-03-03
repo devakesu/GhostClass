@@ -15,6 +15,15 @@ export const ATTENDANCE_STATUS = {
   OTHER_LEAVE: 112,
 };
 
+/**
+ * Default/placeholder remarks stored when a DL reason is not provided.
+ * These should not be surfaced in the UI as user-entered reasons.
+ */
+export const DUTY_LEAVE_PLACEHOLDER_REMARKS = new Set<string>([
+  "Duty Leave",
+  "Self-Marked: Duty Leave",
+]);
+
 export const isPositive = (code: number) => code === ATTENDANCE_STATUS.PRESENT || code === ATTENDANCE_STATUS.DUTY_LEAVE;
 // code === 0 is NOT treated as Absent: 0 is either an uninitialised value or an unknown
 // API response, not a documented EzyGo attendance state. Treating it as Absent would
