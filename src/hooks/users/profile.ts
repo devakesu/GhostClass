@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UserProfile } from "@/types";
 import * as Sentry from "@sentry/nextjs";
+import { retryOnce } from "@/lib/query-utils";
 import { getCsrfToken } from "@/lib/axios";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 
@@ -20,9 +21,11 @@ export const useProfile = (options?: { initialData?: UserProfile }) => {
       const res = await fetch("/api/profile");
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
-        throw new Error(
+        const err = new Error(
           json.error ?? "Failed to load profile data from remote source."
         );
+        (err as Error & { status: number }).status = res.status;
+        throw err;
       }
       return res.json() as Promise<UserProfile>;
     },
@@ -30,7 +33,9 @@ export const useProfile = (options?: { initialData?: UserProfile }) => {
     // Cache for 5 mins to avoid spamming the sync logic
     staleTime: 1000 * 60 * 5,
     gcTime: 30 * 60 * 1000,
-    retry: 1, // Only retry once if Ezygo fails
+    // Never retry 4xx errors (rate limit, auth, bad request) — retrying a 429
+    // would waste a rate-limit slot. Retries once for 5xx / network errors.
+    retry: retryOnce,
   });
 };
 

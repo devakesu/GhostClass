@@ -16,7 +16,8 @@ import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-v
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { redact } from "@/lib/utils";
-import { egressFetch } from "@/lib/utils.server";
+import { egressFetch, getClientIp } from "@/lib/utils.server";
+import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 
 interface EzygoProfileResponse {
@@ -52,7 +53,28 @@ function resolve(
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
-  // 0. Origin validation (defence-in-depth)
+  // 0. Rate limiting — keyed per IP to prevent EzyGo quota exhaustion and crypto DoS
+  const ip = getClientIp(req.headers);
+  if (ip) {
+    const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_get_${ip}`);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+            "X-RateLimit-Limit": limit.toString(),
+            "X-RateLimit-Remaining": remaining.toString(),
+            "X-RateLimit-Reset": reset.toString(),
+          },
+        }
+      );
+    }
+  }
+
+  // 1. Origin validation (defence-in-depth)
   // Prevents a cross-site top-level navigation from triggering a profile sync
   // upsert via the slow path. Response is already protected by CORS/SOP, but
   // Origin validation closes the gap consistently with /api/backend/[...path].
@@ -447,6 +469,27 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
+  // 0. Rate limiting — keyed per IP to prevent crypto DoS on AES encrypt/decrypt
+  const ip = getClientIp(req.headers);
+  if (ip) {
+    const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_patch_${ip}`);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+            "X-RateLimit-Limit": limit.toString(),
+            "X-RateLimit-Remaining": remaining.toString(),
+            "X-RateLimit-Reset": reset.toString(),
+          },
+        }
+      );
+    }
+  }
+
   // 1. CSRF validation
   const csrfToken = req.headers.get(CSRF_HEADER);
   const csrfValid = await validateCsrfToken(csrfToken);

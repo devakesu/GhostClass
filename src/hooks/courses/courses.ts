@@ -4,6 +4,7 @@
 import axios from "@/lib/axios";
 import { useQuery } from "@tanstack/react-query";
 import { Course } from "@/types";
+import { retryOnce } from "@/lib/query-utils";
 
 /**
  * React Query hook for fetching user's enrolled courses with student data.
@@ -57,7 +58,7 @@ export const useFetchCourses = (options?: {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     refetchInterval: 60 * 1000,
-    retry: 1,
+    retry: retryOnce,
     retryDelay: 1000,
   });
 };
