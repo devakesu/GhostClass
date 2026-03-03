@@ -25,7 +25,7 @@ import { Loading } from "@/components/loading";
 import { formatSessionName, generateSlotKey, getSessionNumber, redact } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useFetchCourses } from "@/hooks/courses/courses";
-import { getOfficialSessionRaw } from "@/lib/logic/attendance-reconciliation";
+import { getOfficialSessionRaw, DUTY_LEAVE_PLACEHOLDER_REMARKS } from "@/lib/logic/attendance-reconciliation";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 // --- Helper Functions ---
@@ -403,8 +403,8 @@ export default function TrackingClient() {
                                             {deleteId === trackingId ? "Deleting..." : <><span className="max-md:hidden">Remove</span><Trash2 size={15} aria-hidden="true" /></>}
                                           </m.button>
                                         </div>
-                                        {attCode === 225 && trackingItem.remarks && (
-                                          <p className="text-[11px] text-orange-600/80 dark:text-orange-400/80 mt-1.5 italic truncate">{trackingItem.remarks}</p>
+                                        {attCode === 225 && trackingItem.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trackingItem.remarks.trim()) && (
+                                          <p className="text-[11px] text-orange-600/80 dark:text-orange-400/80 mt-1.5 italic truncate">{trackingItem.remarks.trim()}</p>
                                         )}
                                       </m.div>
                                     );

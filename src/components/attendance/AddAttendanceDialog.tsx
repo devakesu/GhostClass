@@ -341,8 +341,8 @@ export function AddAttendanceDialog({
           year: selectedYear,         
           status: "extra", 
           attendance: attCode,
-          remarks: statusType === "Duty Leave" && dlReason.trim()
-            ? dlReason.trim()
+          remarks: statusType === "Duty Leave"
+            ? (dlReason.trim() || "Duty Leave")
             : `Self-Marked: ${statusType}`,
         });
 

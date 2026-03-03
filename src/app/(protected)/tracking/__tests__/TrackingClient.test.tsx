@@ -139,6 +139,7 @@ vi.mock('@/lib/logic/attendance-reconciliation', () => ({
     if (session && session.session != null && session.session !== '') return session.session;
     return sessionKey;
   }),
+  DUTY_LEAVE_PLACEHOLDER_REMARKS: new Set<string>(["Duty Leave", "Self-Marked: Duty Leave"]),
 }));
 
 import { useTrackingData } from '@/hooks/tracker/useTrackingData';
