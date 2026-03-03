@@ -254,7 +254,7 @@ export function AttendanceCalendar({
         "correction",
         pendingDl.sessionForDB,
         225,
-        dlReason.trim() || "Duty Leave"
+        dlReason.trim()
       );
     }
     setDlReasonOpen(false);
