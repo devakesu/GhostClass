@@ -97,7 +97,7 @@ describe("CSRF Protection", () => {
         value: token,
         httpOnly: true, // XSS-safe: token not accessible to JavaScript
         secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 86400, // 24 hours
         path: "/",
       });
@@ -312,11 +312,11 @@ describe("CSRF Protection", () => {
       );
     });
 
-    it("should set sameSite to strict", async () => {
+    it("should set sameSite to lax", async () => {
       await setCsrfCookie("token");
       
       expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ sameSite: "strict" })
+        expect.objectContaining({ sameSite: "lax" })
       );
     });
 

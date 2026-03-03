@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useCSRFToken } from '@/hooks/use-csrf-token'
-
-// Mirror the module-private constants from use-csrf-token.ts.
-// Keep these in sync if the values change in the source file.
-const CSRF_LAST_INIT_KEY = "csrf_last_init"
-const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
+import { useCSRFToken, CSRF_LAST_INIT_KEY, CSRF_LAST_INIT_KEY_PREFIX } from '@/hooks/use-csrf-token'
 import * as axiosModule from '@/lib/axios'
+
+// CSRF reinitialization interval used in tests (30 minutes in milliseconds).
+const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000
 
 // Mock the axios module
 vi.mock('@/lib/axios', () => ({
@@ -34,6 +32,10 @@ describe('useCSRFToken', () => {
     const sessionStorageMock = (() => {
       let store: Record<string, string> = {}
       return {
+        get length() {
+          return Object.keys(store).length
+        },
+        key: (index: number) => Object.keys(store)[index] ?? null,
         getItem: (key: string) => store[key] || null,
         setItem: (key: string, value: string) => {
           store[key] = value
@@ -132,6 +134,55 @@ describe('useCSRFToken', () => {
     await waitFor(() => {
       expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
     })
+  })
+
+  it('should clean up stale csrf_last_init keys from previous versions on successful init', async () => {
+    // Stale keys from previous deployments should be removed to prevent unbounded growth.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
+    // Plant stale keys from two hypothetical old versions
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`, Date.now().toString())
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`, Date.now().toString())
+
+    renderHook(() => useCSRFToken())
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
+
+    // Stale keys must be removed; only the current version key should remain
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).not.toBeNull()
+  })
+
+  it('should still clean up stale keys even when setItem throws QuotaExceededError', async () => {
+    // Verify that stale-key cleanup is independent of the setItem write — if setItem throws,
+    // cleanup must still remove old keys to prevent unbounded sessionStorage growth.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
+    // Plant stale keys from previous versions
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`, Date.now().toString())
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`, Date.now().toString())
+
+    // Override setItem to throw only for the current version key
+    const originalSetItem = window.sessionStorage.setItem.bind(window.sessionStorage)
+    vi.spyOn(window.sessionStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === CSRF_LAST_INIT_KEY) {
+        throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+      }
+      originalSetItem(key, value)
+    })
+
+    renderHook(() => useCSRFToken())
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
+
+    // Stale keys must still be removed despite setItem failing
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`)).toBeNull()
+    // Current version key was not written because setItem threw
+    expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).toBeNull()
   })
 
   it('should handle concurrent component mounts via shared promise', async () => {

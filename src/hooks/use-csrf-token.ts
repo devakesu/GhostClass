@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Hook for initializing CSRF token
  * 
@@ -40,7 +42,16 @@ import { logger } from "@/lib/logger";
 // skipped when a token already exists. This prevents exhausting the IP-based rate
 // limit under shared-NAT scenarios (e.g. multiple users behind one IP) while still
 // ensuring the httpOnly cookie is refreshed after the interval or on a fresh tab.
-const CSRF_LAST_INIT_KEY = "csrf_last_init";
+//
+// The key is scoped to the current app version so that a new deployment (which changes
+// NEXT_PUBLIC_APP_VERSION) automatically bypasses the throttle and re-issues Set-Cookie
+// on the first page load after a deploy, preventing the stale sessionStorage token /
+// missing httpOnly cookie desync when the 30-minute throttle is still active at deploy
+// time. NEXT_PUBLIC_APP_VERSION is baked into the JS bundle at build time — no new env
+// var is needed.
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
+export const CSRF_LAST_INIT_KEY_PREFIX = "csrf_last_init_";
+export const CSRF_LAST_INIT_KEY = `${CSRF_LAST_INIT_KEY_PREFIX}${APP_VERSION}`;
 const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000; // 30 min — well within the 24-hour cookie TTL
 
 // Module-level promise to prevent concurrent CSRF initialization across component instances.
@@ -130,6 +141,21 @@ export function useCSRFToken() {
             const data = await response.json();
             // Store token in sessionStorage for use in subsequent requests
             setCsrfToken(data.token);
+            // Clean up stale keys from previous versions to avoid unbounded sessionStorage growth.
+            // This runs first, independently of the setItem below, so that cleanup still happens
+            // even if writing the current key fails (e.g. QuotaExceededError).
+            try {
+              const staleKeys: string[] = [];
+              for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith(CSRF_LAST_INIT_KEY_PREFIX) && key !== CSRF_LAST_INIT_KEY) {
+                  staleKeys.push(key);
+                }
+              }
+              staleKeys.forEach((key) => sessionStorage.removeItem(key));
+            } catch {
+              // sessionStorage unavailable — cleanup skipped, not critical
+            }
             // Record the successful init time for per-tab throttling on subsequent mounts
             try {
               sessionStorage.setItem(CSRF_LAST_INIT_KEY, Date.now().toString());
