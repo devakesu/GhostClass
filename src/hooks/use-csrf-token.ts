@@ -40,8 +40,8 @@ import { logger } from "@/lib/logger";
 // skipped when a token already exists. This prevents exhausting the IP-based rate
 // limit under shared-NAT scenarios (e.g. multiple users behind one IP) while still
 // ensuring the httpOnly cookie is refreshed after the interval or on a fresh tab.
-export const CSRF_LAST_INIT_KEY = "csrf_last_init";
-export const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000; // 30 min — well within the 24-hour cookie TTL
+const CSRF_LAST_INIT_KEY = "csrf_last_init";
+const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000; // 30 min — well within the 24-hour cookie TTL
 
 // Module-level promise to prevent concurrent CSRF initialization across component instances.
 // This is only used for request deduplication, not for tracking initialization state.
