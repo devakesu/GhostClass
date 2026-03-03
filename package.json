@@ -7,7 +7,8 @@
     "npm": ">=11"
   },
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
+    "dev:turbopack": "next dev --turbopack",
     "dev:webpack": "next dev --webpack",
     "dev:https": "node -e \"const fs=require('fs');const files=['./certificates/localhost-key.pem','./certificates/localhost.pem'];if(files.some(f=>!fs.existsSync(f))){console.error('Error: Missing HTTPS certificates. Expected ./certificates/localhost-key.pem and ./certificates/localhost.pem. Please create these files in the ./certificates directory.');process.exit(1);}\" && next dev --turbopack --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
     "dev:https:webpack": "node -e \"const fs=require('fs');const files=['./certificates/localhost-key.pem','./certificates/localhost.pem'];if(files.some(f=>!fs.existsSync(f))){console.error('Error: Missing HTTPS certificates. Expected ./certificates/localhost-key.pem and ./certificates/localhost.pem. Please create these files in the ./certificates directory.');process.exit(1);}\" && next dev --webpack --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
