@@ -31,10 +31,18 @@ import { useEffect, useRef } from "react";
 import { setCsrfToken, getCsrfToken } from "@/lib/axios";
 import { logger } from "@/lib/logger";
 
+// Per-tab throttle: after a successful /api/csrf call the timestamp is stored in
+// sessionStorage. On subsequent mounts within CSRF_REINIT_INTERVAL_MS, the fetch is
+// skipped when a token already exists. This prevents exhausting the IP-based rate
+// limit under shared-NAT scenarios (e.g. multiple users behind one IP) while still
+// ensuring the httpOnly cookie is refreshed after the interval or on a fresh tab.
+export const CSRF_LAST_INIT_KEY = "csrf_last_init";
+export const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000; // 30 min — well within the 24-hour cookie TTL
+
 // Module-level promise to prevent concurrent CSRF initialization across component instances.
 // This is only used for request deduplication, not for tracking initialization state.
-// Each component always calls /api/csrf on first mount to refresh the server-side cookie TTL;
-// the promise ensures only one in-flight request runs at a time across simultaneous mounts.
+// The promise ensures only one in-flight /api/csrf request runs at a time when multiple
+// components mount simultaneously (e.g. initial page render).
 //
 // ERROR RECOVERY: If initialization fails, the promise is rejected and cleared in the finally
 // block. Components mounting during a failure will see the rejected promise and
@@ -65,11 +73,22 @@ export function useCSRFToken() {
       // Mark as initialized for this component instance
       hasInitialized.current = true;
 
-      // Do NOT skip if sessionStorage already has a token. The httpOnly CSRF cookie
-      // can expire (or be absent after a new production deployment) while sessionStorage
-      // still holds the old value. Always call /api/csrf on first mount so the server
-      // re-issues the Set-Cookie header. initializeCsrfToken() on the server reuses the
-      // existing token value (no rotation) but always refreshes the cookie TTL.
+      // Throttle: if a token is already in sessionStorage and a successful init happened
+      // within CSRF_REINIT_INTERVAL_MS, the httpOnly cookie is still fresh — skip the
+      // fetch to avoid consuming the IP-rate-limited /api/csrf quota unnecessarily.
+      // A fresh tab (no lastInit), an expired interval, or a missing token all bypass
+      // the throttle and proceed with the fetch.
+      const existingToken = getCsrfToken();
+      if (existingToken) {
+        try {
+          const lastInit = sessionStorage.getItem(CSRF_LAST_INIT_KEY);
+          if (lastInit && Date.now() - parseInt(lastInit, 10) < CSRF_REINIT_INTERVAL_MS) {
+            return; // Cookie is fresh; skip the rate-limited call
+          }
+        } catch {
+          // sessionStorage unavailable (e.g. private browsing restrictions) — fall through
+        }
+      }
 
       // If an initialization is already in progress from another component, wait for it
       if (csrfInitPromise) {
@@ -105,6 +124,12 @@ export function useCSRFToken() {
             const data = await response.json();
             // Store token in sessionStorage for use in subsequent requests
             setCsrfToken(data.token);
+            // Record the successful init time for per-tab throttling on subsequent mounts
+            try {
+              sessionStorage.setItem(CSRF_LAST_INIT_KEY, Date.now().toString());
+            } catch {
+              // sessionStorage unavailable — throttle disabled for this tab, not critical
+            }
           } else if (!isMounted) {
             logger.dev("Component unmounted before CSRF init completed");
           } else {
