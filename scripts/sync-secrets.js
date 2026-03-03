@@ -215,7 +215,11 @@ function main() {
     'NEXT_PUBLIC_ATTENDANCE_TARGET_MIN',
     'NEXT_PUBLIC_SENTRY_REPLAY_RATE',
     'NEXT_PUBLIC_FORCE_STRICT_CSP',
-    'NEXT_PUBLIC_ENABLE_SW_IN_DEV',
+    // Note: NEXT_PUBLIC_ENABLE_SW_IN_DEV is intentionally excluded — it is a
+    // local-dev-only flag (enables the SW outside production mode) that is NOT
+    // a Dockerfile ARG and is NOT passed as a build-arg in release.yml.
+    // It only belongs in a developer's local .env file; syncing it to GitHub
+    // Variables would have no effect on any CI/CD workflow.
     // Egress proxy deployment config (non-sensitive; used as vars.* in workflow)
     'CF_WORKER_NAME',
     'AWS_REGION',
