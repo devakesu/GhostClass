@@ -68,7 +68,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait for setCsrfToken to be called with the token
@@ -77,18 +77,22 @@ describe('useCSRFToken', () => {
     })
   })
 
-  it('should skip initialization when token already exists', async () => {
-    // Mock getCsrfToken to return an existing token
+  it('should always call /api/csrf on mount even when sessionStorage has an existing token', async () => {
+    // The httpOnly CSRF cookie can expire while sessionStorage still holds the
+    // old token (e.g. after a production deploy). useCSRFToken must always call
+    // /api/csrf on first mount so initializeCsrfToken() re-issues the Set-Cookie.
     vi.mocked(axiosModule.getCsrfToken).mockReturnValue('existing-token')
 
     renderHook(() => useCSRFToken())
 
-    // Wait a bit to ensure no fetch is made
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // fetch must still be called to refresh the cookie server-side
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
+    })
 
-    // Verify fetch was not called
-    expect(global.fetch).not.toHaveBeenCalled()
-    expect(axiosModule.setCsrfToken).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
   })
 
   it('should handle concurrent component mounts via shared promise', async () => {
@@ -162,7 +166,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait a bit to ensure error handling completes
@@ -186,7 +190,7 @@ describe('useCSRFToken', () => {
 
     // Wait for the fetch to be called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/csrf')
+      expect(global.fetch).toHaveBeenCalledWith('/api/csrf', { credentials: 'include' })
     })
 
     // Wait a bit to ensure error handling completes

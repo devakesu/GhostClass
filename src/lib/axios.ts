@@ -109,7 +109,7 @@ async function refreshCsrfToken(): Promise<string | null> {
     try {
       const response = await fetch("/api/csrf", {
         method: "POST",
-        credentials: "same-origin",
+        credentials: "include",
         cache: "no-store",
       });
 

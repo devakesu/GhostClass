@@ -154,15 +154,16 @@ export async function validateCsrfToken(requestToken: string | null | undefined)
  */
 export async function initializeCsrfToken(): Promise<string> {
   const existingToken = await getCsrfToken();
-  
-  if (existingToken) {
-    return existingToken;
-  }
 
-  const newToken = generateCsrfToken();
-  await setCsrfCookie(newToken);
-  
-  return newToken;
+  // Always call setCsrfCookie to refresh the cookie TTL, even if a token already
+  // exists. Without this, the httpOnly cookie can expire while sessionStorage still
+  // holds the old token value, causing CSRF validation failures on the next request
+  // (most commonly observed right after a new production deployment).
+  // When an existing token is reused its value is unchanged; only its expiry extends.
+  const token = existingToken ?? generateCsrfToken();
+  await setCsrfCookie(token);
+
+  return token;
 }
 
 /**

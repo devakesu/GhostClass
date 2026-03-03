@@ -63,12 +63,11 @@ export function useCSRFToken() {
       // Mark as initialized for this component instance
       hasInitialized.current = true;
 
-      // Check if token already exists in sessionStorage - this is the source of truth
-      // This allows re-initialization if token is cleared (e.g., after logout or session expiry)
-      const existingToken = getCsrfToken();
-      if (existingToken) {
-        return;
-      }
+      // Do NOT skip if sessionStorage already has a token. The httpOnly CSRF cookie
+      // can expire (or be absent after a new production deployment) while sessionStorage
+      // still holds the old value. Always call /api/csrf on first mount so the server
+      // re-issues the Set-Cookie header. initializeCsrfToken() on the server reuses the
+      // existing token value (no rotation) but always refreshes the cookie TTL.
 
       // If an initialization is already in progress from another component, wait for it
       if (csrfInitPromise) {
@@ -97,7 +96,7 @@ export function useCSRFToken() {
           // 
           // SECURITY: Token storage in sessionStorage is protected by CSP (see src/lib/csp.ts)
           // which prevents unauthorized script execution and XSS attacks.
-          const response = await fetch("/api/csrf");
+          const response = await fetch("/api/csrf", { credentials: "include" });
           if (response.ok && isMounted) {
             const data = await response.json();
             // Store token in sessionStorage for use in subsequent requests

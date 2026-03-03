@@ -64,6 +64,7 @@ export async function GET() {
         status: 200,
         headers: {
           'Cache-Control': 'no-store, max-age=0',
+          'Access-Control-Allow-Credentials': 'true',
         }
       }
     );
@@ -128,6 +129,7 @@ export async function POST() {
         status: 200,
         headers: {
           'Cache-Control': 'no-store, max-age=0',
+          'Access-Control-Allow-Credentials': 'true',
         }
       }
     );
