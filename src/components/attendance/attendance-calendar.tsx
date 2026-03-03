@@ -484,8 +484,8 @@ export function AttendanceCalendar({
 
                 if (!alreadyMerged && t.status === 'extra') {
                     let label = "Present";
-                    if (t.attendance === 111) label = "Absent";
-                    else if (t.attendance === 225) label = "Duty Leave";
+                    if (Number(t.attendance) === 111) label = "Absent";
+                    else if (Number(t.attendance) === 225) label = "Duty Leave";
                     
                     const cId = t.course.toString();
                     const resolvedName = attendanceData?.courses?.[cId]?.name || coursesData?.courses?.[cId]?.name || t.course;

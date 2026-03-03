@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AttendanceCalendar } from '../attendance-calendar';
+import { useTrackingData } from '@/hooks/tracker/useTrackingData';
 
 vi.mock('@/hooks/users/user', () => ({
   useUser: () => ({
@@ -156,6 +157,13 @@ vi.mock('@/components/ui/label', () => ({
 describe('AttendanceCalendar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset useTrackingData to the default (no records) before each test so that a
+    // mockReturnValue set in one test does not leak into subsequent tests.
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: null,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: null }),
+    } as any);
     // Stub sessionStorage to avoid browser API issues in jsdom
     vi.stubGlobal('sessionStorage', {
       getItem: vi.fn().mockReturnValue(null),
@@ -166,6 +174,38 @@ describe('AttendanceCalendar', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('renders custom DL remarks for an extra event whose attendance is stored as a string ("225")', async () => {
+    // Supabase commonly returns numeric columns as strings. Before the fix,
+    // `t.attendance === 225` would be false for "225", leaving status as
+    // "Present" and skipping the remarks <p>. After the fix (Number()) it works.
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [
+        {
+          auth_user_id: 'auth-user-123',
+          course: '42',
+          session: 'I',
+          date: todayStr,
+          attendance: '225' as any,   // string – simulates raw Supabase payload
+          status: 'extra',
+          semester: '1',
+          year: '2024',
+          remarks: 'NSS Camp 2026',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn().mockResolvedValue({ data: null }),
+    } as any);
+
+    render(<AttendanceCalendar attendanceData={undefined} />);
+
+    // The custom DL remarks paragraph must be visible in the day-events panel
+    expect(await screen.findByText('NSS Camp 2026')).toBeInTheDocument();
   });
 
   it('should render the calendar heading', async () => {
