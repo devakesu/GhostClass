@@ -240,7 +240,9 @@ const sentryPluginOptions = {
   // to events in Sentry. Without an explicit name, Sentry auto-detects a value
   // that may differ between build and runtime, breaking stack trace symbolication.
   // Fall back to "dev" for local builds where APP_COMMIT_SHA is not set.
-  release: process.env.APP_COMMIT_SHA ?? "dev",
+  release: {
+    name: process.env.APP_COMMIT_SHA ?? "dev",
+  },
 
   sourcemaps: {
     disable: process.env.NODE_ENV !== "production",
