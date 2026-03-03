@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -117,6 +118,7 @@ export function AddAttendanceDialog({
   const [session, setSession] = useState<string>("");
   const [courseId, setCourseId] = useState<string>("");
   const [statusType, setStatusType] = useState<"Present" | "Absent" | "Duty Leave">("Present");
+  const [dlReason, setDlReason] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
@@ -339,7 +341,9 @@ export function AddAttendanceDialog({
           year: selectedYear,         
           status: "extra", 
           attendance: attCode,
-          remarks: `Self-Marked: ${statusType}`,
+          remarks: statusType === "Duty Leave"
+            ? (dlReason.trim() || "Duty Leave")
+            : `Self-Marked: ${statusType}`,
         });
 
       if (error) {
@@ -539,7 +543,7 @@ export function AddAttendanceDialog({
             <Label className="text-right text-muted-foreground">Status</Label>
             <RadioGroup 
                value={statusType} 
-               onValueChange={(v: any) => setStatusType(v)} 
+               onValueChange={(v: any) => { setStatusType(v); if (v !== "Duty Leave") setDlReason(""); }} 
                className="col-span-3 flex gap-4"
                aria-label="Select attendance status"
             >
@@ -557,6 +561,22 @@ export function AddAttendanceDialog({
               </div>
             </RadioGroup>
           </div>
+
+          {/* DL REASON */}
+          {statusType === "Duty Leave" && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="dl-reason-dialog" className="text-right text-muted-foreground">Reason</Label>
+              <div className="col-span-3">
+                <Input
+                  id="dl-reason-dialog"
+                  placeholder="Programme/Activity Name"
+                  value={dlReason}
+                  onChange={(e) => setDlReason(e.target.value)}
+                  className="bg-accent/20 border-border/50"
+                />
+              </div>
+            </div>
+          )}
 
         </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AttendanceCalendar } from '../attendance-calendar';
 
 vi.mock('@/hooks/users/user', () => ({
@@ -133,6 +133,24 @@ vi.mock('lucide-react', () => ({
   Loader2: () => <span data-testid="loader2-icon" />,
   AlertTriangle: () => <span data-testid="alert-triangle-icon" />,
   ArrowUpRight: () => <span data-testid="arrow-up-right-icon" />,
+  XIcon: () => <span data-testid="x-icon" />,
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogHeader: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  DialogDescription: ({ children }: any) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/ui/input', () => ({
+  Input: ({ ...props }: any) => <input {...props} />,
+}));
+
+vi.mock('@/components/ui/label', () => ({
+  Label: ({ children, ...props }: any) => <label {...props}>{children}</label>,
 }));
 
 describe('AttendanceCalendar', () => {
@@ -166,5 +184,43 @@ describe('AttendanceCalendar', () => {
 
     expect(prevBtn).toBeInTheDocument();
     expect(nextBtn).toBeInTheDocument();
+  });
+
+  it('should open DL reason dialog when Mark DL is clicked, and close on cancel', async () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+
+    const mockAttendanceData = {
+      courses: { '42': { name: 'Test Course', code: 'TC101' } },
+      sessions: {},
+      attendanceTypes: {},
+      studentAttendanceData: {
+        [todayStr]: {
+          '1': { course: '42', attendance: 111, session: '1' },
+        },
+      },
+      attendanceDatesArray: {},
+    };
+
+    render(<AttendanceCalendar attendanceData={mockAttendanceData as any} />);
+
+    // Dialog input should not be visible before clicking
+    expect(screen.queryByPlaceholderText('Programme/Activity Name')).not.toBeInTheDocument();
+
+    // Wait for Mark DL button (requires calendar + auth to initialize)
+    const markDlBtn = await screen.findByRole('button', { name: /mark.*duty leave/i });
+
+    // Click Mark DL – dialog should open
+    await waitFor(() => {
+      fireEvent.click(markDlBtn);
+      expect(screen.queryByPlaceholderText('Programme/Activity Name')).toBeInTheDocument();
+    });
+
+    // Click Cancel – dialog should close
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Programme/Activity Name')).not.toBeInTheDocument();
+    });
   });
 });
