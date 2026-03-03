@@ -38,6 +38,7 @@
     "samsung >= 19"
   ],
   "overrides": {
+    "serialize-javascript": "^7.0.4",
     "tar": "^7.5.6",
     "fast-xml-parser": "^5.3.4",
     "js-yaml": "^4.1.1",
