@@ -72,6 +72,29 @@ describe("proxy – redirect status for non-GET requests", () => {
     });
   });
 
+  it("redirects authenticated user on / to /dashboard and clears terms_redirect_count", async () => {
+    const request = new NextRequest("http://localhost/", {
+      headers: {
+        cookie: "terms_version=2.3; terms_redirect_count=2",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/dashboard");
+
+    // Stale redirect counter must be cleared so a fresh login doesn't inherit it
+    const isDeleted = (name: string) =>
+      response.headers.getSetCookie().some(
+        (h) =>
+          h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
+          (h.toLowerCase().includes("max-age=0") ||
+            h.toLowerCase().includes("expires=thu, 01 jan 1970")),
+      );
+    expect(isDeleted("terms_redirect_count")).toBe(true);
+  });
+
   it("redirects GET /accept-terms to /dashboard when terms are already accepted", async () => {
     const request = new NextRequest("http://localhost/accept-terms", {
       method: "GET",
