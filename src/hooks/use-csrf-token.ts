@@ -139,10 +139,10 @@ export function useCSRFToken() {
             const data = await response.json();
             // Store token in sessionStorage for use in subsequent requests
             setCsrfToken(data.token);
-            // Record the successful init time for per-tab throttling on subsequent mounts
+            // Clean up stale keys from previous versions to avoid unbounded sessionStorage growth.
+            // This runs first, independently of the setItem below, so that cleanup still happens
+            // even if writing the current key fails (e.g. QuotaExceededError).
             try {
-              sessionStorage.setItem(CSRF_LAST_INIT_KEY, Date.now().toString());
-              // Clean up stale keys from previous versions to avoid unbounded sessionStorage growth
               const staleKeys: string[] = [];
               for (let i = 0; i < sessionStorage.length; i++) {
                 const key = sessionStorage.key(i);
@@ -151,6 +151,12 @@ export function useCSRFToken() {
                 }
               }
               staleKeys.forEach((key) => sessionStorage.removeItem(key));
+            } catch {
+              // sessionStorage unavailable — cleanup skipped, not critical
+            }
+            // Record the successful init time for per-tab throttling on subsequent mounts
+            try {
+              sessionStorage.setItem(CSRF_LAST_INIT_KEY, Date.now().toString());
             } catch {
               // sessionStorage unavailable — throttle disabled for this tab, not critical
             }

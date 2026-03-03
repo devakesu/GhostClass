@@ -155,6 +155,36 @@ describe('useCSRFToken', () => {
     expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).not.toBeNull()
   })
 
+  it('should still clean up stale keys even when setItem throws QuotaExceededError', async () => {
+    // Verify that stale-key cleanup is independent of the setItem write — if setItem throws,
+    // cleanup must still remove old keys to prevent unbounded sessionStorage growth.
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
+    // Plant stale keys from previous versions
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`, Date.now().toString())
+    window.sessionStorage.setItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`, Date.now().toString())
+
+    // Override setItem to throw only for the current version key
+    const originalSetItem = window.sessionStorage.setItem.bind(window.sessionStorage)
+    vi.spyOn(window.sessionStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === CSRF_LAST_INIT_KEY) {
+        throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+      }
+      originalSetItem(key, value)
+    })
+
+    renderHook(() => useCSRFToken())
+
+    await waitFor(() => {
+      expect(axiosModule.setCsrfToken).toHaveBeenCalledWith('test-csrf-token')
+    })
+
+    // Stale keys must still be removed despite setItem failing
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`)).toBeNull()
+    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`)).toBeNull()
+    // Current version key was not written because setItem threw
+    expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).toBeNull()
+  })
+
   it('should handle concurrent component mounts via shared promise', async () => {
     // Mock getCsrfToken to return null for all calls
     vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
