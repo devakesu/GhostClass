@@ -26,6 +26,7 @@ import { formatSessionName, generateSlotKey, getSessionNumber, redact } from "@/
 import { createClient } from "@/lib/supabase/client";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import { getOfficialSessionRaw, DUTY_LEAVE_PLACEHOLDER_REMARKS } from "@/lib/logic/attendance-reconciliation";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 
 // --- Helper Functions ---
@@ -110,6 +111,10 @@ export default function TrackingClient() {
   const { data: attendanceData } = useAttendanceReport();
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
+  const { isDisabled: isCourseDisabled } = useDisabledCourses({
+    academicYear: academicYearData,
+    semester: semesterData,
+  });
 
   useEffect(() => { if (user) setEnabled(true); }, [user]);
 
@@ -126,9 +131,12 @@ export default function TrackingClient() {
       await Promise.all([refetchTrackingData(), refetchCount()]);
     },
     onSuccess: async (data) => {
-      toast.info("Data Synced", {
-        description: `${data.deletions ?? 0} outdated records removed.`,
-      });
+      const removed = data.deletions ?? 0;
+      if (removed > 0) {
+        toast.info("Data Synced", {
+          description: `${removed} outdated record${removed === 1 ? '' : 's'} removed.`,
+        });
+      }
       await Promise.all([refetchTrackingData(), refetchCount()]);
     },
   });
@@ -158,7 +166,14 @@ export default function TrackingClient() {
     return grouped;
   }, [trackingData, semesterData, academicYearData]);
 
-  const allCourseKeys = useMemo(() => Object.keys(groupedAllData).sort(), [groupedAllData]);
+  const allCourseKeys = useMemo(() => Object.keys(groupedAllData).sort((a, b) => {
+    const codeA = (attendanceData?.courses?.[a]?.code ?? coursesData?.courses?.[a]?.code ?? "").toUpperCase();
+    const codeB = (attendanceData?.courses?.[b]?.code ?? coursesData?.courses?.[b]?.code ?? "").toUpperCase();
+    const aDisabled = isCourseDisabled(codeA);
+    const bDisabled = isCourseDisabled(codeB);
+    if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+    return a.localeCompare(b);
+  }), [groupedAllData, isCourseDisabled, attendanceData, coursesData]);
   const totalPages = Math.ceil(allCourseKeys.length / coursesPerPage);
   
   const currentCourseKeys = useMemo(() => {
@@ -295,7 +310,9 @@ export default function TrackingClient() {
                 <m.div key={currentPage} custom={currentPage} initial="enter" animate="center" exit="exit" variants={pageVariants} transition={{ type: "tween", duration: 0.3 }} className="flex flex-col gap-6">
                   {currentCourseKeys.map((courseName) => {
                     const items = groupedAllData[courseName];
-                    const displayCourseName = attendanceData?.courses?.[items[0].course]?.name || coursesData?.courses?.[items[0].course]?.name || courseName; 
+                    const displayCourseName = attendanceData?.courses?.[items[0].course]?.name || coursesData?.courses?.[items[0].course]?.name || courseName;
+                    const courseCode = (attendanceData?.courses?.[items[0].course]?.code ?? coursesData?.courses?.[items[0].course]?.code ?? "").toUpperCase();
+                    const isCourseCurrentlyDisabled = isCourseDisabled(courseCode);
                     
                     // Performance optimization: limit records per course
                     const isExpanded = expandedCourses.has(courseName);
@@ -314,6 +331,9 @@ export default function TrackingClient() {
                         <div className="flex items-center gap-2 px-2 sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/60 shadow-sm rounded-md">
                           <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
+                          {isCourseCurrentlyDisabled && (
+                            <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">Disabled</Badge>
+                          )}
                           <Badge variant="outline" className="ml-auto text-xs">{items.length}</Badge>
                         </div>
 

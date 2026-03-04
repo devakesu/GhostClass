@@ -34,6 +34,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
 - **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs` (or `/api/docs` in development)
 - **Build Transparency** 🔍 - View complete build provenance and SLSA attestations at `/build-info`
+- **Course Toggle** 🔕 - Disable courses you've cleared (e.g., challenge passed) so they stop affecting your aggregate stats while still appearing in course cards and the calendar
 - **Dark/Light Mode** 🌓 - Switch between dark and light themes with preference saved across sessions
 
 ## 🛠️ Tech Stack
@@ -164,12 +165,13 @@ src/
 │   ├── attendance-settings.tsx  # Attendance target settings
 │   ├── react-query.tsx       # TanStack Query provider
 │   ├── theme.tsx             # Light/dark theme provider
-│   └── user-settings.ts      # User settings context
+│   └── user-settings.tsx     # User settings context provider
 ├── hooks/                    # Custom React hooks
 │   ├── courses/              # Course and exam data fetching hooks
 │   │   │                     # courses.ts — attendance/course queries
 │   │   │                     # exams.ts  — useExams, useExamAnswers, useExamQuestions,
 │   │   │                     #             useAllExamAnswers, useAllExamQuestions
+│   │   │                     # useDisabledCourses.ts — disable/enable courses hook
 │   ├── tracker/              # Tracking data hooks
 │   ├── users/                # User data hooks
 │   ├── notifications/        # Notification subscription hooks
@@ -227,6 +229,7 @@ supabase/
     ├── 20260225000001_audit_log.sql                        # Audit log table and triggers
     ├── 20260227000000_fix_check_225_search_path.sql        # Fix search_path in duty leave trigger
     ├── 20260227000001_audit_log_rls_policy.sql             # RLS policies for audit log
+    ├── 20260304000000_disabled_courses.sql                 # Add disabled_courses JSONB column
     └── README.md
 workers/                      # Proxy workers (deployed as standalone CF Workers / Lambda fns)
 ├── ezygo-proxy/              # CF Worker — Tier 1 outbound proxy for EzyGo API (server-side)
@@ -348,6 +351,55 @@ Result: requiredToAttend = 6 classes
 x(100 - target) = target*total - 100*present
 x = (target*total - 100*present) / (100 - target)
 ```
+
+## Disable Courses
+
+Courses can be disabled on a per-semester basis so they no longer affect aggregate attendance statistics. This is useful when a student has passed a challenge exam or otherwise no longer needs to attend a course.
+
+### How It Works
+
+1. **Toggle** — Each course card shows a status indicator (green dot **Enabled** / red dot **Disabled**) next to the course code. Clicking it opens a confirmation dialog.
+2. **Disable Dialog** — When disabling, the user selects a reason from a dropdown (`Challenge passed`, or a custom free-text reason).
+3. **Enable Dialog** — When re-enabling, the stored reason is displayed and the user confirms.
+4. **Persistence** — The disabled state is stored in the `disabled_courses` JSONB column on the `user_settings` table, keyed by `year-semester`:
+
+   ```jsonc
+   // disabled_courses column schema
+   {
+     "2025-2026-even": {
+       "GXEST204": "Challenge passed",
+       "BTECH301": "Dropped course"
+     }
+   }
+   ```
+
+### What Changes When a Course Is Disabled
+
+| Area | Effect |
+| --- | --- |
+| **Total Attendance Card** | Excluded from aggregate percentage |
+| **Dashboard Stat Cards** | Excluded from Present, Absent, DL, Special Leave, Active Courses counts |
+| **Attendance Chart** | Bar removed from the chart |
+| **Course Card** | Still shown (with reduced opacity + "Disabled" indicator) |
+| **Tracking Page** | Still shown with a "Disabled" badge; disabled courses sorted to end |
+| **Scores Page** | Still shown with a "Disabled" badge; disabled course groups sorted to end |
+| **Calendar** | Sessions still shown with a "Disabled" badge next to the status |
+| **Bunk Calculator** | Still functional on the individual course card |
+
+### Implementation Files
+
+| File | Role |
+| --- | --- |
+| `supabase/migrations/20260304000000_disabled_courses.sql` | Adds `disabled_courses` JSONB column |
+| `src/types/user-settings.ts` | `DisabledCoursesMap` type definition |
+| `src/hooks/courses/useDisabledCourses.ts` | `useDisabledCourses` hook (isDisabled, disableCourse, enableCourse) |
+| `src/providers/user-settings.tsx` | Context provider with CRUD for `disabled_courses` via `updateDisabledCourses` |
+| `src/components/attendance/course-card.tsx` | Toggle UI + disable/enable dialogs |
+| `src/app/(protected)/dashboard/DashboardClient.tsx` | Excludes disabled courses from stats |
+| `src/components/attendance/attendance-chart.tsx` | Filters disabled courses from chart |
+| `src/components/attendance/attendance-calendar.tsx` | Shows "Disabled" badge on calendar events |
+| `src/app/(protected)/tracking/TrackingClient.tsx` | "Disabled" badge + sorts disabled courses to end |
+| `src/app/(protected)/scores/ScoresClient.tsx` | "Disabled" badge + sorts disabled course groups to end |
 
 ## 🚀 Getting Started
 

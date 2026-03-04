@@ -49,6 +49,13 @@ describe('Backend Proxy Route', () => {
   }
 
   beforeEach(async () => {
+    // Defensive: restore real timers first. The timeout test in this file uses
+    // vi.useFakeTimers() with a real AbortSignal.timeout(15s) internally, which
+    // can leave a dangling real timer that fires after the test times out. If
+    // that timer fires while another test's beforeEach is running an async
+    // import, it can corrupt the Vitest worker state. Restoring timers here
+    // proactively prevents that from affecting later tests.
+    vi.useRealTimers();
     vi.clearAllMocks();
     
     // Ensure env vars are set for each test (in case global afterEach clears them)
@@ -67,6 +74,13 @@ describe('Backend Proxy Route', () => {
       DELETE = routeModule.DELETE;
       HEAD = routeModule.HEAD;
     }
+
+    // Always reset the circuit breaker before each test. The circuit breaker is
+    // a module-level singleton; tests that mock 5xx responses can trip it and
+    // leave it OPEN, making subsequent tests fail with 503 / 0 fetch calls when
+    // Vitest runs multiple files in the same worker thread.
+    const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
+    ezygoCircuitBreaker.reset();
   });
 
   afterEach(() => {

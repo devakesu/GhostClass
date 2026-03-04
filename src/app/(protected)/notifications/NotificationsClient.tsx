@@ -115,8 +115,10 @@ export default function NotificationsPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
-    onSuccess: async () => {
-      toast.info("Notifications Updated", { description: "New attendance data found." });
+    onSuccess: async (data) => {
+      if ((data.deletions ?? 0) + (data.updates ?? 0) > 0) {
+        toast.info("Notifications Updated", { description: "New attendance data found." });
+      }
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });

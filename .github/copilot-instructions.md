@@ -178,6 +178,38 @@ Core algorithm used by `src/components/attendance/course-card.tsx`:
 
 ---
 
+## Disable Courses
+
+Courses can be disabled per-semester via `useDisabledCourses` hook (`src/hooks/courses/useDisabledCourses.ts`). Disabled courses are excluded from dashboard aggregate stats, stat cards, active course count, and the attendance chart, but still appear in course cards (with reduced opacity and a red "Disabled" toggle) and on the calendar (with a "Disabled" badge). On the tracking and scores pages, disabled courses are sorted to the end with a "Disabled" badge.
+
+- **Storage**: `user_settings.disabled_courses` JSONB column, keyed `{ "year-semester": { "CODE": "reason" } }`
+- **Hook API**: `isDisabled(code)`, `getDisableReason(code)`, `disableCourse(code, reason)`, `enableCourse(code)`, `disabledCodes` (Set)
+- **UI**: Course card header shows a green/red dot toggle; disable dialog has reason selection ("Challenge passed" / "Other"), enable dialog shows stored reason
+- **Context**: `useUserSettings` is a **Context-based provider** (`src/providers/user-settings.tsx`), not a bare hook. Wraps children as `<UserSettingsProvider>` inside `react-query.tsx`.
+- **Sign-out cleanup**: `SIGNED_OUT` handler clears `disabledCourses_`, `showBunkCalc_`, and `targetPercentage_` from localStorage
+- **Migration**: `supabase/migrations/20260304000000_disabled_courses.sql`
+
+---
+
+## Pre-hydration Loader
+
+A non-React DOM overlay (`#prehyd-loader`) is injected via an inline `<script>` in `layout.tsx` to bridge the gap between initial HTML paint and React hydration. The script creates the element imperatively (not JSX) to avoid corrupting React's fiber tree. `GlobalInit` (`src/lib/global-init.ts`) removes the element on mount via `document.getElementById("prehyd-loader")?.remove()`. CSS auto-hides it after 12s as a fallback if JS fails to mount (`globals.css`).
+
+---
+
+## EzyGo API Field Normalization
+
+The EzyGo `/summery` endpoint returns fields with typos (`totel` instead of `total`, `persantage` instead of `percentage`). The `useCourseDetails` hook normalizes these on fetch. The TypeScript types in `src/types/attendance.d.ts` document both the misspelled and correct field names.
+
+---
+
+## Cron Sync (`src/app/api/cron/sync/route.ts`)
+
+- Date keys from EzyGo may arrive as `YYYYMMDD` or `YYYY-MM-DD`; the cron normalizes both to `YYYYMMDD` before comparison with tracker records.
+- Session IDs fall back: `session.session` → numeric session key (if < 20) → 1-based index (for opaque EzyGo slot IDs).
+
+---
+
 ## Key Known Errors & Workarounds
 
 - **Service worker in standalone mode**: `@serwist/next` doesn't generate the SW with Next.js `output: "standalone"`. The Dockerfile uses `npx esbuild src/sw.ts` to compile it manually during Docker build.

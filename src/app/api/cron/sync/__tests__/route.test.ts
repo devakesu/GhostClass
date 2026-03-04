@@ -698,3 +698,33 @@ describe("Cron sync — invalid CRON_SECRET → 401", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — malformed authorization header (no Bearer prefix)", () => {
+  it("returns 403 when authorization header does not start with 'Bearer '", async () => {
+    buildAdminMock({ trackerData: [] });
+
+    const req = new NextRequest("http://localhost:3000/api/cron/sync", {
+      headers: { authorization: "Basic dXNlcjpwYXNz" },
+    });
+
+    const res = await GET(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 when authorization header is a bare token without Bearer prefix", async () => {
+    buildAdminMock({ trackerData: [] });
+
+    const req = new NextRequest("http://localhost:3000/api/cron/sync", {
+      headers: { authorization: "test-cron-secret-value" },
+    });
+
+    const res = await GET(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+  });
+});

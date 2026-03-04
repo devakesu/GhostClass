@@ -35,7 +35,17 @@ export const useCourseDetails = (courseId: string) => {
         `/attendancereports/institutionuser/courses/${courseId}/summery`
       );
       if (!res) throw new Error("Failed to fetch course details data");
-      return res.data;
+      // Normalize EzyGo API typos so the rest of the codebase uses correct field names.
+      // Destructure out the misspelled fields so they can't leak through to consumers.
+      const { totel, persantage, ...rest } = res.data as {
+        totel?: number;
+        persantage?: number;
+      } & CourseDetail;
+      return {
+        ...rest,
+        total: rest.total ?? totel,
+        percentage: rest.percentage ?? persantage,
+      } satisfies CourseDetail;
     },
     enabled: !!courseId,
     staleTime: 2 * 60 * 1000, // 2 minutes - balance between real-time and performance

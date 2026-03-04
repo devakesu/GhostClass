@@ -59,6 +59,7 @@ import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/erro
 import Link from "next/link";
 import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate } from "@/lib/utils";
 import { DUTY_LEAVE_PLACEHOLDER_REMARKS } from "@/lib/logic/attendance-reconciliation";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 
 interface AttendanceCalendarProps {
   attendanceData: AttendanceReport | undefined;
@@ -151,6 +152,17 @@ export function AttendanceCalendar({
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
+
+  const { isDisabled: isCourseDisabled } = useDisabledCourses({
+    academicYear: academicYearData,
+    semester: semesterData,
+  });
+
+  /** Resolve course code from courseId using available course registries */
+  const getCourseCodeById = useCallback((courseId: string): string => {
+    const course = attendanceData?.courses?.[courseId] ?? coursesData?.courses?.[courseId];
+    return (course?.code ?? "").toUpperCase();
+  }, [attendanceData, coursesData]);
 
   useEffect(() => {
     const getAuthId = async () => {
@@ -415,7 +427,7 @@ export function AttendanceCalendar({
              else finalStatus = "Present";
           }
 
-          if (finalStatus === "Absent") hasAbsent = true;
+          if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) hasAbsent = true;
           else if (finalStatus.includes("Leave")) hasLeave = true;
       });
 
@@ -423,7 +435,7 @@ export function AttendanceCalendar({
       if (hasAbsent) return "absent";
       if (hasLeave) return "dutyLeave";
       return "present";
-  }, [rawEvents, isSameDay, normalizedTrackingData, semesterData, academicYearData]);
+  }, [rawEvents, isSameDay, normalizedTrackingData, semesterData, academicYearData, isCourseDisabled, getCourseCodeById]);
 
   // --- 2. MERGE LOGIC ---
   const selectedDateEvents = useMemo(() => {
@@ -779,9 +791,12 @@ export function AttendanceCalendar({
                       <motion.div key={`event-${event.sessionKey}-${index}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all gap-4 ${cardStyle}`}>
                         <div className="flex flex-col gap-1.5">
                           <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">{event.title.toLowerCase()}</h3>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">{event.sessionName ? formatSessionName(event.sessionName) : `Session ${event.sessionKey}`}</span>
                             <Badge variant="outline" className={`h-5 px-1.5 gap-1 font-medium ${badgeClass}`}><Icon className="w-3 h-3" aria-hidden="true" />{event.status}</Badge>
+                            {isCourseDisabled(getCourseCodeById(event.courseId)) && (
+                              <Badge variant="outline" className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10">Disabled</Badge>
+                            )}
                           </div>
                           {event.status === "Duty Leave" && event.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(event.remarks.trim()) && (
                             <p className="text-[11px] text-yellow-600/80 dark:text-yellow-400/80 italic truncate max-w-50 sm:max-w-xs">{event.remarks.trim()}</p>

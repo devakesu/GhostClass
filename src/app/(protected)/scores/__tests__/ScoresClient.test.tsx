@@ -56,6 +56,23 @@ vi.mock('@/components/loading', () => ({
   Loading: () => <div data-testid="loading-spinner" />,
 }))
 
+vi.mock('@/hooks/users/settings', () => ({
+  useFetchSemester: vi.fn(() => ({ data: 'even', isLoading: false })),
+  useFetchAcademicYear: vi.fn(() => ({ data: '2025-2026', isLoading: false })),
+}))
+
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: vi.fn(() => ({
+    disabledCoursesMap: {},
+    disabledCodes: new Set<string>(),
+    isDisabled: vi.fn(() => false),
+    getDisableReason: vi.fn(() => null),
+    disableCourse: vi.fn(),
+    enableCourse: vi.fn(),
+    isLoading: false,
+  })),
+}))
+
 vi.mock('@/hooks/courses/exams', () => ({
   useExams: vi.fn(),
   useAllExamAnswers: vi.fn(),
@@ -665,6 +682,30 @@ describe('ScoresClient', () => {
       render(<ScoresClient />)
 
       expect(screen.getByRole('button', { name: /view details for midterm exam/i })).toBeInTheDocument()
+    })
+
+    it('opens drawer when Enter key is pressed on an exam card', () => {
+      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
+      mockUseExamQuestions.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      render(<ScoresClient />)
+
+      const card = screen.getByRole('button', { name: /view details for midterm exam/i })
+      fireEvent.keyDown(card, { key: 'Enter' })
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('opens drawer when Space key is pressed on an exam card', () => {
+      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
+      mockUseExamQuestions.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
+      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
+      render(<ScoresClient />)
+
+      const card = screen.getByRole('button', { name: /view details for midterm exam/i })
+      fireEvent.keyDown(card, { key: ' ' })
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('drawer has role=dialog and aria-modal=true', () => {

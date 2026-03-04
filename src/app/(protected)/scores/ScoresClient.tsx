@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/card";
 import { Loading } from "@/components/loading";
 import { useExams, useExamAnswers, useExamQuestions, useAllExamAnswers, useAllExamQuestions } from "@/hooks/courses/exams";
+import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import type { Exam, ExamAnswer, ExamQuestion } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -636,6 +638,12 @@ export default function ScoresClient() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } = useExams();
+  const { data: semesterData } = useFetchSemester();
+  const { data: academicYearData } = useFetchAcademicYear();
+  const { isDisabled: isCourseDisabled } = useDisabledCourses({
+    academicYear: academicYearData,
+    semester: semesterData,
+  });
 
   // Pre-fetch all exam answers in parallel on load.
   // Only for participated exams (participants.length > 0) — no point fetching
@@ -965,7 +973,14 @@ export default function ScoresClient() {
 
         {/* Cards grouped by course */}
         {!isError && filtered.length > 0 && (() => {
-          const groups = groupByCourse(filtered);
+          const groups = [...groupByCourse(filtered)].sort((a, b) => {
+            const codeA = (a.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
+            const codeB = (b.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
+            const aDisabled = isCourseDisabled(codeA);
+            const bDisabled = isCourseDisabled(codeB);
+            if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+            return 0;
+          });
           let globalIndex = 0;
           return (
             <AnimatePresence mode="wait">
@@ -994,6 +1009,9 @@ export default function ScoresClient() {
                       <span className="text-sm font-semibold text-foreground">
                         {group.label}
                       </span>
+                      {isCourseDisabled((group.exams[0]?.course?.[0]?.code ?? "").toUpperCase()) && (
+                        <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">Disabled</Badge>
+                      )}
                       <div className="flex-1 h-px bg-foreground/10" />
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                         {countLabel}

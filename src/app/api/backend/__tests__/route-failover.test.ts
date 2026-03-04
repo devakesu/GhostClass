@@ -38,6 +38,37 @@ vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
 }));
 
+// Provide a lightweight pass-through circuit breaker so that:
+// (a) the real @sentry/nextjs initialization is never triggered in this file
+//     (Sentry registers setInterval timers; if a sibling test left fake timers
+//     active in the same Vitest worker, those timers would hang the import)
+// (b) tests are not affected by circuit-breaker state left open by other files
+// Error classes are re-declared so that route.ts instanceof guards still work.
+vi.mock('@/lib/circuit-breaker', () => {
+  class CircuitBreakerOpenError extends Error {
+    constructor(message: string) { super(message); this.name = 'CircuitBreakerOpenError'; }
+  }
+  class NonBreakerError extends Error {
+    constructor(message: string) { super(message); this.name = 'NonBreakerError'; }
+  }
+  class UpstreamServerError extends Error {
+    status: number; statusText: string; body: string; headers?: Headers;
+    constructor(message: string, status: number, statusText: string, body: string, headers?: Headers) {
+      super(message); this.name = 'UpstreamServerError';
+      this.status = status; this.statusText = statusText; this.body = body; this.headers = headers;
+    }
+  }
+  return {
+    CircuitBreakerOpenError,
+    NonBreakerError,
+    UpstreamServerError,
+    ezygoCircuitBreaker: {
+      execute: vi.fn(<T>(fn: () => Promise<T>) => fn()),
+      reset: vi.fn(),
+    },
+  };
+});
+
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
@@ -46,16 +77,16 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
   let GET: RouteModule['GET'];
 
   beforeEach(async () => {
+    // Defensive: restore real timers first in case a sibling file in the same
+    // Vitest worker left fake timers active. This prevents module imports from
+    // hanging due to Sentry's timer-based initialization code.
+    vi.useRealTimers();
     vi.clearAllMocks();
 
     if (!GET) {
       const routeModule = await import('../[...path]/route');
       GET = routeModule.GET;
     }
-
-    // Reset circuit breaker state before each test
-    const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
-    ezygoCircuitBreaker.reset();
   });
 
   afterEach(() => {

@@ -15,11 +15,13 @@ beforeEach(() => {
 // Cleanup after each test
 afterEach(() => {
   cleanup()
+  // Restore real timers FIRST — before restoreAllMocks() — so that any mock
+  // wrapping timer globals is torn down while the fake-timer system is still
+  // coherent. Reversing this order can leave Vitest's fake-timer bookkeeping
+  // in a corrupt state and cause the next test's imports / async ops to hang.
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
-  // Restore real timers in case a test used vi.useFakeTimers() without cleanup.
-  // This prevents fake-timer state from leaking across test files in the same worker.
-  vi.useRealTimers()
 })
 
 // Mock window.matchMedia (not available in jsdom)

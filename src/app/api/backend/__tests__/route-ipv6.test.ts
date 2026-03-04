@@ -34,6 +34,33 @@ vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
 }));
 
+// Same lightweight pass-through circuit breaker as in route-failover.test.ts.
+// Avoids Sentry initialization side effects and cross-file CB state pollution.
+vi.mock('@/lib/circuit-breaker', () => {
+  class CircuitBreakerOpenError extends Error {
+    constructor(message: string) { super(message); this.name = 'CircuitBreakerOpenError'; }
+  }
+  class NonBreakerError extends Error {
+    constructor(message: string) { super(message); this.name = 'NonBreakerError'; }
+  }
+  class UpstreamServerError extends Error {
+    status: number; statusText: string; body: string; headers?: Headers;
+    constructor(message: string, status: number, statusText: string, body: string, headers?: Headers) {
+      super(message); this.name = 'UpstreamServerError';
+      this.status = status; this.statusText = statusText; this.body = body; this.headers = headers;
+    }
+  }
+  return {
+    CircuitBreakerOpenError,
+    NonBreakerError,
+    UpstreamServerError,
+    ezygoCircuitBreaker: {
+      execute: vi.fn(<T>(fn: () => Promise<T>) => fn()),
+      reset: vi.fn(),
+    },
+  };
+});
+
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
@@ -42,6 +69,8 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
   let GET: RouteModule['GET'];
 
   beforeEach(async () => {
+    // Defensive: restore real timers first (see route-failover.test.ts comment).
+    vi.useRealTimers();
     vi.clearAllMocks();
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');

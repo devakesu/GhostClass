@@ -352,12 +352,26 @@ export async function GET(req: Request) {
                     const revisionKeys = new Set<string>();
 
                     Object.entries(officialData).forEach(([dateStr, dateObj]) => {
-                        Object.entries(dateObj).forEach(([sessionKey, session]) => {
+                        // Normalize to YYYYMMDD so keys match the tracker's stored date
+                        // regardless of whether EzyGo returned YYYYMMDD or YYYY-MM-DD.
+                        const normalizedDate = dateStr.replace(/-/g, '');
+                        const sessionEntries = Object.entries(dateObj);
+                        sessionEntries.forEach(([sessionKey, session], index) => {
                             // Skip empty/holiday slots where course or attendance is null
                             if (session.course == null || session.attendance == null) return;
-                            const rawSession = session.session || sessionKey;
+                            // Mirror the calendar's session resolution logic:
+                            // session.session is the human-readable value (e.g. "VI").
+                            // When it's absent, sessionKey may be an opaque EzyGo slot ID
+                            // (e.g. "219") — not a usable session number. In that case,
+                            // fall back to the 1-based index within the day, matching how
+                            // AttendanceCalendar derives session names for display.
+                            let rawSession: string | number = session.session ?? "";
+                            if (!rawSession || rawSession === "null") {
+                                const skNum = parseInt(String(sessionKey), 10);
+                                rawSession = (!isNaN(skNum) && skNum < 20) ? sessionKey : String(index + 1);
+                            }
                             const normalizedSession = toRoman(parseInt(normalizeSession(rawSession)) || rawSession);
-                            const key = `${dateStr}|${normalizedSession}`;
+                            const key = `${normalizedDate}|${normalizedSession}`;
 
                             if (session.class_type === "Revision") {
                                 // Track but don't add to officialMap — Revision classes
@@ -404,8 +418,12 @@ export async function GET(req: Request) {
                     // ─────────────────────────────────────────────────────────────
 
                     for (const item of trackingData) {
+                        // Tracker dates are stored as ISO "YYYY-MM-DD" in Supabase,
+                        // but officialMap keys use EzyGo's raw "YYYYMMDD" format.
+                        // Strip dashes so both sides compare in the same format.
+                        const trackerDateKey = item.date.replace(/-/g, '');
                         const normalizedTrackerSession = toRoman(parseInt(normalizeSession(item.session)) || item.session);
-                        const key = `${item.date}|${normalizedTrackerSession}`;
+                        const key = `${trackerDateKey}|${normalizedTrackerSession}`;
 
                         // Revision class — EzyGo doesn't count this toward attendance.
                         // Always delete the manual entry. Only notify for 'extra' — corrections
@@ -441,17 +459,17 @@ export async function GET(req: Request) {
                         }
 
                         if (officialMap.has(key)) {
-                            const official = officialMap.get(key)!;
+                            const officialEntry = officialMap.get(key)!;
                             
                             // Course Mismatch — only for 'extra' entries.
                             // 'correction' entries are promoted from 'extra' by this same sync, so
                             // their course ID is guaranteed to match the official record already.
-                            if (item.status === 'extra' && String(item.course) !== official.course) {
+                            if (item.status === 'extra' && String(item.course) !== officialEntry.course) {
                                 toDelete.add(item.id);
                                 notifications.push({
                                     auth_user_id: user.auth_id,
                                     title: "Course Mismatch 💀",
-                                    description: `${item.date} (${item.session}): Removed ${coursesMap[String(item.course)]?.name}. Official: ${official.course_name}`,
+                                    description: `${item.date} (${item.session}): Removed ${coursesMap[String(item.course)]?.name}. Official: ${officialEntry.course_name}`,
                                     topic: `conflict-course-${key}`
                                 });
 
@@ -462,11 +480,11 @@ export async function GET(req: Request) {
                                             date: item.date,
                                             session: item.session,
                                             manualCourseName: coursesMap[String(item.course)]?.name || String(item.course),
-                                            courseLabel: official.course_name,
+                                            courseLabel: officialEntry.course_name,
                                             dashboardUrl: `${appUrl}/dashboard`
                                         }).then(html => ({
                                             to: user.email!,
-                                            subject: `💀 Course Conflict: ${official.course_name}`,
+                                            subject: `💀 Course Conflict: ${officialEntry.course_name}`,
                                             html,
                                         }))
                                     );
@@ -474,7 +492,7 @@ export async function GET(req: Request) {
                                 continue;
                             }
 
-                            const officialCode = official.code;
+                            const officialCode = officialEntry.code;
                             const trackerCode = Number(item.attendance);
                             const isOfficialPositive = [110, 225, 112].includes(officialCode);
                             const isTrackerPositive = [110, 225, 112].includes(trackerCode);
@@ -490,7 +508,7 @@ export async function GET(req: Request) {
                                 notifications.push({
                                     auth_user_id: user.auth_id,
                                     title: "Attendance Updated 🥳",
-                                    description: `${official.course_name} - ${item.date} (${item.session}): Official record is Present. Manual entry removed.`,
+                                    description: `${officialEntry.course_name} - ${item.date} (${item.session}): Official record is Present. Manual entry removed.`,
                                     topic: `sync-surprise-${key}`
                                 });
                             } else if (officialCode === trackerCode) {
@@ -500,7 +518,7 @@ export async function GET(req: Request) {
                                 notifications.push({
                                     auth_user_id: user.auth_id,
                                     title: "Attendance Updated 🥳",
-                                    description: `${official.course_name} - ${item.date} (${item.session}): Official record matches. Manual entry removed.`,
+                                    description: `${officialEntry.course_name} - ${item.date} (${item.session}): Official record matches. Manual entry removed.`,
                                     topic: `sync-surprise-${key}`
                                 });
                             } else if (officialCode === 111 && isTrackerPositive && item.status === 'extra') {
@@ -511,7 +529,7 @@ export async function GET(req: Request) {
                                 notifications.push({
                                     auth_user_id: user.auth_id,
                                     title: "Attendance Conflict 💀",
-                                    description: `${official.course_name} - ${item.date} (${item.session}): You marked Present, Official says Absent.`,
+                                    description: `${officialEntry.course_name} - ${item.date} (${item.session}): You marked Present, Official says Absent.`,
                                     topic: `conflict-${key}`
                                 });
                                 
@@ -519,13 +537,13 @@ export async function GET(req: Request) {
                                     emailRenderPromises.push(
                                         renderAttendanceConflictEmail({
                                             username: user.username,
-                                            courseLabel: official.course_name,
+                                            courseLabel: officialEntry.course_name,
                                             date: item.date,
                                             session: item.session,
                                             dashboardUrl: `${appUrl}/dashboard`
                                         }).then(html => ({
                                             to: user.email!,
-                                            subject: `💀 Attendance Conflict: ${official.course_name}`,
+                                            subject: `💀 Attendance Conflict: ${officialEntry.course_name}`,
                                             html,
                                         }))
                                     );

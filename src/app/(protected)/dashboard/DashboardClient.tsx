@@ -50,6 +50,7 @@ import { ATTENDANCE_STATUS, isPositive } from "@/lib/logic/attendance-reconcilia
 import { captureSentryException } from "@/lib/sentry-lazy";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
@@ -165,6 +166,18 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     isLoading: isLoadingTracking, 
     refetch: refetchTracking 
   } = useTrackingData(user);
+
+  // Disabled courses — exclude from stats, chart, and active count
+  const { disabledCodes } = useDisabledCourses({
+    academicYear: selectedYear ?? academicYearData,
+    semester: selectedSemester ?? semesterData,
+  });
+
+  /** Look up course code from course ID using coursesData */
+  const getCourseCode = useCallback((courseId: string): string => {
+    const course = coursesData?.courses?.[courseId];
+    return (course?.code ?? "").toUpperCase();
+  }, [coursesData?.courses]);
 
   const handleSemesterChange = (value: "even" | "odd") => {
     if (value === selectedSemester) return;
@@ -310,9 +323,12 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
       ]);
     },
     onSuccess: async (data) => {
-      toast.info("Attendance Synced", {
-        description: `Dashboard updated. ${(data.deletions ?? 0) + (data.updates ?? 0)} records synced.`,
-      });
+      const changed = (data.deletions ?? 0) + (data.updates ?? 0);
+      if (changed > 0) {
+        toast.info("Attendance Synced", {
+          description: `Dashboard updated. ${changed} record${changed === 1 ? '' : 's'} synced.`,
+        });
+      }
       await Promise.all([
         refetchTracking(),
         refetchAttendance(),
@@ -347,7 +363,10 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
           const isValidAttendance = [110, 111, 225, 112].includes(attCode);
 
           if (session.course && session.course !== "null" && isValidAttendance) {
-            activeIds.add(String(session.course));
+            const cid = String(session.course);
+            // Skip disabled courses
+            if (disabledCodes.has(getCourseCode(cid))) return;
+            activeIds.add(cid);
           }
         });
       });
@@ -360,7 +379,10 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
         const isSameYear = !selectedYear || t.year === selectedYear;
 
         if (t.course && isSameSemester && isSameYear) {
-          activeIds.add(String(t.course));
+          const cid = String(t.course);
+          // Skip disabled courses
+          if (disabledCodes.has(getCourseCode(cid))) return;
+          activeIds.add(cid);
         }
       });
     }
@@ -369,7 +391,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
       active: activeIds.size,
       total: totalCourses
     };
-  }, [attendanceData, trackingData, coursesData, selectedSemester, selectedYear]);
+  }, [attendanceData, trackingData, coursesData, selectedSemester, selectedYear, disabledCodes, getCourseCode]);
 
   const filteredChartData = useMemo(() => {
     if (!attendanceData) return undefined;
@@ -397,12 +419,18 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     const officialStats = { present: 0, absent: 0, dl: 0, total: 0, other: 0 };
     const modifierStats = { correctionPresent: 0, savedAbsent: 0, correctionDL: 0, extraPresent: 0, extraAbsent: 0, extraDL: 0 };
     
-    const courseStats: Record<string, { present: number; total: number; bunkable: number; required: number }> = {};
+    const courseStats: Record<string, { present: number; total: number; officialPresent: number; officialTotal: number; bunkable: number; required: number }> = {};
     if (coursesData?.courses) { 
         Object.values(coursesData.courses).forEach((c: any) => { 
-            courseStats[String(c.id)] = { present: 0, total: 0, bunkable: 0, required: 0 }; 
+            courseStats[String(c.id)] = { present: 0, total: 0, officialPresent: 0, officialTotal: 0, bunkable: 0, required: 0 }; 
         }); 
     }
+
+    /** Check if a course ID maps to a disabled course code */
+    const isCourseDisabled = (cid: string): boolean => {
+      const code = coursesData?.courses?.[cid]?.code;
+      return !!code && disabledCodes.has(code.toUpperCase());
+    };
 
     const officialMap = new Map<string, number>();
     if (attendanceData?.studentAttendanceData) {
@@ -416,14 +444,21 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
             
             officialMap.set(key, status);
 
-            officialStats.total++;
-            if (isPositive(status)) officialStats.present++; else officialStats.absent++; 
-            if (status === ATTENDANCE_STATUS.DUTY_LEAVE) officialStats.dl++;
-            if (status === ATTENDANCE_STATUS.OTHER_LEAVE) officialStats.other++;
+            const courseDisabled = isCourseDisabled(cid);
 
+            // Always update per-course stats (course cards still show)
             if (courseStats[cid]) { 
                 courseStats[cid].total++; 
-                if (isPositive(status)) courseStats[cid].present++; 
+                courseStats[cid].officialTotal++;
+                if (isPositive(status)) { courseStats[cid].present++; courseStats[cid].officialPresent++; }
+            }
+
+            // Only aggregate into dashboard totals when course is NOT disabled
+            if (!courseDisabled) {
+              officialStats.total++;
+              if (isPositive(status)) officialStats.present++; else officialStats.absent++; 
+              if (status === ATTENDANCE_STATUS.DUTY_LEAVE) officialStats.dl++;
+              if (status === ATTENDANCE_STATUS.OTHER_LEAVE) officialStats.other++;
             }
           }
         });
@@ -453,6 +488,8 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
         const officialPositive = officialStatus !== undefined ? isPositive(officialStatus) : false; 
         const officialDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
 
+        const courseDisabled = isCourseDisabled(cid);
+
         const updateCourse = (isExtraClass: boolean, offPos: boolean, trackPos: boolean) => {
             if (courseStats[cid]) {
                 if (isExtraClass) { 
@@ -466,15 +503,22 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
         };
 
         if (isTrulyExtra) {
-            if (trackerPositive) modifierStats.extraPresent++; else modifierStats.extraAbsent++;
-            if (trackerDL) modifierStats.extraDL++;
-            updateCourse(true, false, trackerPositive); 
+            // Always update per-course stats
+            updateCourse(true, false, trackerPositive);
+            // Only aggregate into dashboard totals when course is NOT disabled
+            if (!courseDisabled) {
+              if (trackerPositive) modifierStats.extraPresent++; else modifierStats.extraAbsent++;
+              if (trackerDL) modifierStats.extraDL++;
+            }
         } else {
-            if (!officialPositive && trackerPositive) modifierStats.correctionPresent++;
-            if (!officialPositive && (trackerPositive || trackerDL)) modifierStats.savedAbsent++;
-            if (!officialDL && trackerDL) modifierStats.correctionDL++;
-            
+            // Always update per-course stats
             updateCourse(false, officialPositive, trackerPositive);
+            // Only aggregate into dashboard totals when course is NOT disabled
+            if (!courseDisabled) {
+              if (!officialPositive && trackerPositive) modifierStats.correctionPresent++;
+              if (!officialPositive && (trackerPositive || trackerDL)) modifierStats.savedAbsent++;
+              if (!officialDL && trackerDL) modifierStats.correctionDL++;
+            }
         }
       });
     }
@@ -488,19 +532,19 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
     return {
         percentage: formatPct(percentage), rawPercentage: percentage, officialPercentage: formatPct(officialPercentage), rawOfficialPercentage: officialPercentage,
-        realPresent: officialStats.present, correctionPresent: modifierStats.correctionPresent, extraPresent: modifierStats.extraPresent, 
+        realPresent: officialStats.present, correctionPresent: modifierStats.correctionPresent, extraPresent: modifierStats.extraPresent,
         realAbsent: officialStats.absent, savedAbsent: modifierStats.savedAbsent, extraAbsent: modifierStats.extraAbsent, 
         realDL: officialStats.dl, correctionDL: modifierStats.correctionDL, extraDL: modifierStats.extraDL, otherLeave: officialStats.other,
         realTotal: officialStats.total, finalTotal: finalTotal, finalPresent: finalPresent, courseStats
     };
-  }, [attendanceData, trackingData, coursesData, selectedSemester, selectedYear]);
+  }, [attendanceData, trackingData, coursesData, selectedSemester, selectedYear, disabledCodes]);
 
   const sortedCourses = useMemo(() => {
     if (!coursesData?.courses) return [];
     return Object.values(coursesData.courses).map((course: any) => {
         const id = String(course.id);
-        const statsObj = stats.courseStats[id] || { present: 0, total: 0 };
-        const { present, total } = statsObj;
+        const statsObj = stats.courseStats[id] || { present: 0, total: 0, officialPresent: 0, officialTotal: 0 };
+        const { present, total, officialPresent, officialTotal } = statsObj;
         const isNew = total === 0;
         const pct = total > 0 ? Math.round((present / total) * 100) : 0;
         let canBunk = 0, requiredToAttend = 0;
@@ -509,13 +553,17 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
             canBunk = result.canBunk;
             requiredToAttend = result.requiredToAttend;
         }
-        return { ...course, currentPercentage: pct, bunkable: canBunk, required: requiredToAttend, isNew, present, total }; 
+        const isDisabled = !!course.code && disabledCodes.has(course.code.toUpperCase());
+        return { ...course, currentPercentage: pct, bunkable: canBunk, required: requiredToAttend, isNew, isDisabled, present, total, officialPresent, officialTotal }; 
       }).sort((a: any, b: any) => {
-        if (a.isNew && !b.isNew) return 1; if (!a.isNew && b.isNew) return -1;
+        // Tier 0: normal  Tier 1: disabled  Tier 2: no data
+        const tierA = a.isNew ? 2 : a.isDisabled ? 1 : 0;
+        const tierB = b.isNew ? 2 : b.isDisabled ? 1 : 0;
+        if (tierA !== tierB) return tierA - tierB;
         if (b.bunkable !== a.bunkable) return b.bunkable - a.bunkable;
         return a.required - b.required;
       });
-  }, [coursesData?.courses, stats?.courseStats, targetPercentage]);
+  }, [coursesData?.courses, stats?.courseStats, targetPercentage, disabledCodes]);
 
   if (isLoadingSemester || isLoadingAcademicYear || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isUpdating) {
     return <CompLoading />;
@@ -625,7 +673,8 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                         <AttendanceChart 
                           attendanceData={filteredChartData} 
                           trackingData={trackingData} 
-                          coursesData={coursesData ?? undefined} 
+                          coursesData={coursesData ?? undefined}
+                          disabledCodes={disabledCodes}
                         />
                       </ErrorBoundary>
                     ) : (

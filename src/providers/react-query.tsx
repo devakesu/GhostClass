@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { PropsWithChildren } from "react";
 import { AttendanceSettingsProvider } from "./attendance-settings";
+import { UserSettingsProvider } from "./user-settings";
 
 /**
  * React Query provider with pre-configured defaults for the application.
@@ -58,9 +59,11 @@ export default function ReactQueryProvider({ children }: PropsWithChildren) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AttendanceSettingsProvider>
-        {children}
-      </AttendanceSettingsProvider>
+      <UserSettingsProvider>
+        <AttendanceSettingsProvider>
+          {children}
+        </AttendanceSettingsProvider>
+      </UserSettingsProvider>
     </QueryClientProvider>
   );
 }

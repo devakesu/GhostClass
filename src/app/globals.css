@@ -392,3 +392,23 @@ body:has(#nprogress) #nprogress {
 [data-sonner-toast][data-type="info"] [data-title] {
   color: hsl(217 91% 60%) !important;
 }
+
+/* Pre-hydration spinner animation (see layout.tsx #prehyd-loader) */
+@keyframes gc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fallback: auto-hide pre-hydration loader after 12s if JS fails to mount */
+#prehyd-loader {
+  animation: gc-loader-fade 0.3s ease 12s forwards;
+}
+
+@keyframes gc-loader-fade {
+  to {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
