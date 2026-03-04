@@ -259,4 +259,26 @@ describe('usePWAInstall', () => {
     await act(async () => { window.dispatchEvent(makeFakePrompt('dismissed')); });
     expect(result.current.canInstall).toBe(true);
   });
+
+  it('triggerInstall returns "unavailable" and clears the prompt when prompt() throws', async () => {
+    const { result } = renderHook(() => usePWAInstall());
+
+    // Dispatch a prompt whose .prompt() rejects (browser rate-limit / already consumed)
+    const throwingPrompt = Object.assign(new Event('beforeinstallprompt'), {
+      prompt: vi.fn().mockRejectedValue(new Error('AbortError: prompt already used')),
+      userChoice: Promise.resolve({ outcome: 'accepted', platform: '' }),
+      platforms: [] as string[],
+    });
+
+    await act(async () => { window.dispatchEvent(throwingPrompt); });
+    expect(result.current.canInstall).toBe(true);
+
+    let outcome!: 'accepted' | 'dismissed' | 'unavailable';
+    await act(async () => { outcome = await result.current.triggerInstall(); });
+
+    // Must return "unavailable" instead of propagating the error
+    expect(outcome).toBe('unavailable');
+    // Stale prompt must be cleared so the banner won't re-offer it
+    expect(result.current.canInstall).toBe(false);
+  });
 });

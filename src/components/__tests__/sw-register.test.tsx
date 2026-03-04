@@ -116,9 +116,7 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     expect(swContainer.register).not.toHaveBeenCalled();
     expect(mockLoggerDev).toHaveBeenCalledWith(
@@ -131,7 +129,7 @@ describe('ServiceWorkerRegister', () => {
   // Registration timing
   // -------------------------------------------------------------------------
 
-  it('registers after the 3-second delay when document is already loaded', async () => {
+  it('registers immediately when document is already loaded', async () => {
     const { swContainer } = makeSWEnv();
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
@@ -140,17 +138,12 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    // No registration yet before the timer fires
-    expect(swContainer.register).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     expect(swContainer.register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 
-  it('waits for the window load event before starting the 3-second timer', async () => {
+  it('registers after the window load event fires when document is not yet loaded', async () => {
     Object.defineProperty(document, 'readyState', { configurable: true, value: 'loading' });
 
     const { swContainer } = makeSWEnv();
@@ -161,36 +154,39 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    // Time passes but no load event — no registration
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
+    // No registration yet — waiting for load event
+    await act(async () => {});
     expect(swContainer.register).not.toHaveBeenCalled();
 
-    // Fire load, then wait for the 3-second timer
+    // Fire load → registers immediately (no artificial delay)
     await act(async () => {
       window.dispatchEvent(new Event('load'));
-      await vi.advanceTimersByTimeAsync(3000);
     });
 
     expect(swContainer.register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 
-  it('does not register if unmounted before the 3-second timer fires', async () => {
-    const { swContainer } = makeSWEnv();
+  it('does not set up the hourly interval if unmounted before registration resolves', async () => {
+    const { registration, swContainer } = makeSWEnv();
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
       value: swContainer,
     });
 
     const { unmount } = render(<ServiceWorkerRegister />);
-    unmount(); // cleanup clears the timeout
+    // Sets isMounted=false before the async register() Promise resolves.
+    // The isMounted check after `await register()` prevents post-registration
+    // setup (event listeners and the hourly interval) from running.
+    unmount();
 
+    // Flush microtasks — register() resolves but isMounted is false so setup is skipped.
+    await act(async () => {});
+
+    // No interval was created — one full hour must not trigger an update check.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     });
-
-    expect(swContainer.register).not.toHaveBeenCalled();
+    expect(registration.update).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -206,9 +202,7 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     expect(mockLoggerDev).toHaveBeenCalledWith(
       'Service worker registered successfully',
@@ -227,9 +221,7 @@ describe('ServiceWorkerRegister', () => {
 
     render(<ServiceWorkerRegister />);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     expect(mockLoggerError).toHaveBeenCalledWith(
       'Service worker registration failed',
@@ -250,9 +242,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     await act(async () => {
       registration.installing = installingWorker;
@@ -278,9 +268,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     await act(async () => {
       registration.installing = installingWorker;
@@ -310,9 +298,7 @@ describe('ServiceWorkerRegister', () => {
       value: swContainer,
     });
     render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
     await act(async () => {
       registration.installing = installingWorker;
       registration._emit('updatefound');
@@ -414,9 +400,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     expect(registration.update).not.toHaveBeenCalled();
 
@@ -436,9 +420,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     });
@@ -461,9 +443,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     const { unmount } = render(<ServiceWorkerRegister />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
+    await act(async () => {});
 
     unmount();
     vi.clearAllMocks();

@@ -284,4 +284,23 @@ describe('PWAInstallBanner', () => {
     // Banner hides despite the storage error
     expect(screen.queryByRole('complementary')).toBeNull();
   });
+
+  it('hides banner without writing to storage when triggerInstall returns "unavailable" (prompt threw)', async () => {
+    // Simulate the native install prompt throwing — e.g. browser rate-limiting on mobile
+    mockTriggerInstall.mockResolvedValue('unavailable');
+    const store = setupLocalStorage(null);
+    await importAndRender();
+
+    await act(async () => { vi.advanceTimersByTime(2500); });
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /install ghostclass app/i }));
+    });
+
+    // Banner must close
+    expect(screen.queryByRole('complementary')).toBeNull();
+    // No storage entry written — banner can re-appear when browser re-emits the event
+    expect(store[STORAGE_KEY]).toBeUndefined();
+  });
 });

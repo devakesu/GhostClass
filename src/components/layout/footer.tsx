@@ -66,7 +66,6 @@ export const Footer = ({ className }: { className?: string }) => {
             
             <div className="flex gap-2">
               <Link 
-                target="_blank"
                 href="/legal"
                 className="hover:text-foreground hover:underline underline-offset-4 transition-all"
               >
@@ -122,8 +121,6 @@ export const Footer = ({ className }: { className?: string }) => {
               </a>
               <span className="opacity-30">/</span>
               <Link
-                target="_blank"
-                rel="noopener noreferrer"
                 href="/build-info"
                 className="flex items-center gap-1 hover:text-emerald-500 transition-colors"
                 aria-label="View build provenance and security information"

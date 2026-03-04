@@ -30,11 +30,20 @@ vi.mock('@/lib/logic/attendance-reconciliation', () => ({
   },
 }));
 
+// Capture the Tooltip content prop so tests can invoke it directly.
+type TooltipPayload = { payload: Record<string, unknown> };
+type TooltipContentFn = (props: { active?: boolean; payload?: TooltipPayload[] }) => React.ReactNode;
+let capturedTooltipContent: TooltipContentFn | null = null;
+
 // Mock recharts so it renders minimal DOM without canvas/SVG complexities
 vi.mock('recharts', () => {
   const MockBarChart = ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'bar-chart' }, children);
   const noop = () => null;
+  const MockTooltip = ({ content }: { content?: TooltipContentFn }) => {
+    capturedTooltipContent = content ?? null;
+    return null;
+  };
   return {
     BarChart: MockBarChart,
     Bar: noop,
@@ -42,7 +51,7 @@ vi.mock('recharts', () => {
     ReferenceLine: noop,
     XAxis: noop,
     YAxis: noop,
-    Tooltip: noop,
+    Tooltip: MockTooltip,
   };
 });
 
@@ -85,6 +94,7 @@ describe('AttendanceChart', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    capturedTooltipContent = null;
     originalResizeObserver = global.ResizeObserver;
     // Provide a minimal ResizeObserver stub
     global.ResizeObserver = class {
@@ -372,5 +382,92 @@ describe('AttendanceChart', () => {
     });
 
     expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+  });
+
+  describe('Tooltip color logic', () => {
+    // Helper: render the chart with valid dimensions so the BarChart (and
+    // thus MockTooltip) mounts and capturedTooltipContent gets populated.
+    async function renderChartWithDimensions() {
+      let resizeCallback: ResizeObserverCallback | null = null;
+      global.ResizeObserver = class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        constructor(cb: ResizeObserverCallback) { resizeCallback = cb; }
+      };
+
+      render(
+        React.createElement(AttendanceChart, {
+          attendanceData: sampleAttendanceData as any,
+          trackingData: [],
+          coursesData: sampleCourses as any,
+        })
+      );
+
+      const containerEl = screen.getByRole('img');
+      vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+        width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+      } as DOMRect);
+
+      await act(async () => {
+        if (resizeCallback) resizeCallback([], {} as ResizeObserver);
+      });
+    }
+
+    it('colors Adjusted (Loss) row red when isLoss is true', async () => {
+      await renderChartWithDimensions();
+      expect(capturedTooltipContent).not.toBeNull();
+
+      // officialPercentage=90, totalPercentage=85 — both above the 75% target.
+      // The old code coloured this green (85 >= 75); the fix must colour it red (isLoss=true).
+      const lossPayload = {
+        fullName: 'Computer Science',
+        officialPercentage: 90,
+        present: 9,
+        total: 10,
+        displayedExtra: 1,
+        isLoss: true,
+        totalPercentage: 85,
+        mergedPresent: 8,
+        mergedTotal: 10,
+      };
+
+      const { getByText } = render(
+        capturedTooltipContent!({ active: true, payload: [{ payload: lossPayload }] }) as React.ReactElement
+      );
+
+      const adjustedLabel = getByText('Adjusted (Loss):');
+      const adjustedRow = adjustedLabel.closest('div')!;
+      const valueSpan = adjustedRow.querySelector('span.font-mono');
+      expect(valueSpan).toHaveClass('text-red-600');
+      expect(valueSpan).not.toHaveClass('text-green-600');
+    });
+
+    it('colors Adjusted (Gain) row green when isLoss is false', async () => {
+      await renderChartWithDimensions();
+      expect(capturedTooltipContent).not.toBeNull();
+
+      const gainPayload = {
+        fullName: 'Computer Science',
+        officialPercentage: 80,
+        present: 8,
+        total: 10,
+        displayedExtra: 1,
+        isLoss: false,
+        totalPercentage: 90,
+        mergedPresent: 9,
+        mergedTotal: 10,
+      };
+
+      const { getByText } = render(
+        capturedTooltipContent!({ active: true, payload: [{ payload: gainPayload }] }) as React.ReactElement
+      );
+
+      const adjustedLabel = getByText('Adjusted (Gain):');
+      const adjustedRow = adjustedLabel.closest('div')!;
+      const valueSpan = adjustedRow.querySelector('span.font-mono');
+      expect(valueSpan).toHaveClass('text-green-600');
+      expect(valueSpan).not.toHaveClass('text-red-600');
+    });
   });
 });
