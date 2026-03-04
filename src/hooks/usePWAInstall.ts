@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { isStandalonePWA } from "@/lib/pwa";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -44,13 +45,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
   );
   // Initialise synchronously so we never call setState inside an effect body.
   // Chrome/Edge use the display-mode media query; iOS Safari uses navigator.standalone.
-  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return (
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-    );
-  });
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => isStandalonePWA());
 
   useEffect(() => {
     // If the event fires after this component mounts, update state directly.

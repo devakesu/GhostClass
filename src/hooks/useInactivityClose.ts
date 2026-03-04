@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { isStandalonePWA } from "@/lib/pwa";
 
 /**
  * Closes the standalone PWA after it has been backgrounded continuously for
@@ -18,14 +19,6 @@ import { useEffect, useRef } from "react";
  */
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-
-function isStandalonePWA(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
 
 export function useInactivityClose(timeoutMs = DEFAULT_TIMEOUT_MS): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,7 +39,12 @@ export function useInactivityClose(timeoutMs = DEFAULT_TIMEOUT_MS): void {
         // already running (guards against duplicate hidden events).
         if (timerRef.current === null) {
           timerRef.current = setTimeout(() => {
-            window.close();
+            // Clear the ref first; then only close if we're genuinely still
+            // hidden (guards against a missed or late visibilitychange event).
+            timerRef.current = null;
+            if (document.hidden) {
+              window.close();
+            }
           }, timeoutMs);
         }
       } else {

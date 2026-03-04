@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { isStandalonePWA } from "@/lib/pwa";
 
 /**
  * Double-back-to-exit for standalone PWA.
@@ -45,14 +46,6 @@ const SENTINEL_KEY = "__gce";
  */
 let sentinelInitialized = false;
 
-function isStandalonePWA(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
 function getHistoryState(): Record<string, unknown> {
   return typeof history.state === "object" && history.state !== null
     ? (history.state as Record<string, unknown>)
@@ -79,11 +72,13 @@ export function useBackToExit(): void {
     }
 
     const handlePopState = (event: PopStateEvent) => {
-      // Ignore mid-app back presses — their state doesn't carry the sentinel.
+      // Ignore mid-app back presses — their state doesn't carry a true sentinel.
+      // Strict === true check avoids accidental matches if __gce ever appears
+      // with a falsy value in some other history entry.
       if (
         !event.state ||
         typeof event.state !== "object" ||
-        !(SENTINEL_KEY in (event.state as Record<string, unknown>))
+        (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
       ) {
         return;
       }
