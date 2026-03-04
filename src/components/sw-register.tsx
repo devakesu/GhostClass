@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { useBackToExit } from "@/hooks/useBackToExit";
+import { useInactivityClose } from "@/hooks/useInactivityClose";
 // Side-effect import: ensures the usePWAInstall module-level listener is
 // registered before `beforeinstallprompt` can fire, even on pages where
 // PWAInstallBanner (the component that uses the hook) hasn't mounted yet.
@@ -21,6 +23,11 @@ import "@/hooks/usePWAInstall";
  * service worker is registered on all pages.
  */
 export function ServiceWorkerRegister() {
+  // Press back twice to exit in standalone PWA mode.
+  useBackToExit();
+  // Close the PWA after 30 min in the background.
+  useInactivityClose();
+
   // Track if registration is in progress to prevent duplicate intervals
   // across component remounts (e.g., during SPA navigation)
   const registrationInProgressRef = useRef(false);
