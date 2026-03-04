@@ -7,24 +7,16 @@ import { renderHook } from '@testing-library/react';
 
 function setStandaloneMode(isStandalone: boolean) {
   const original = window.matchMedia;
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    configurable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: isStandalone && query === '(display-mode: standalone)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  });
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: isStandalone && query === '(display-mode: standalone)',
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
   return () => {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      configurable: true,
-      value: original,
-    });
+    window.matchMedia = original;
   };
 }
 
