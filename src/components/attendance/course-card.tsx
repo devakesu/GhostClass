@@ -625,9 +625,9 @@ export function CourseCard({ course }: CourseCardProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3 py-2">
-            <label className="text-sm font-medium">Reason</label>
+            <label htmlFor="disable-reason-select" className="text-sm font-medium">Reason</label>
             <Select value={disableReason} onValueChange={(v) => { setDisableReason(v); if (v !== "Other") setCustomReason(""); }}>
-              <SelectTrigger className="w-full custom-dropdown">
+              <SelectTrigger id="disable-reason-select" className="w-full custom-dropdown">
                 <SelectValue placeholder="Select reason" />
               </SelectTrigger>
               <SelectContent className="custom-dropdown">
