@@ -12,6 +12,7 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useUser } from "@/hooks/users/user";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import {
@@ -656,6 +657,9 @@ export function CourseCard({ course }: CourseCardProps) {
                 const reason = isOtherReason ? customReason.trim() : disableReason;
                 disableCourse(courseCode, reason);
                 setShowDisableDialog(false);
+                toast.success(`${courseCode} disabled`, {
+                  description: reason,
+                });
               }}
             >
               Disable
@@ -682,6 +686,7 @@ export function CourseCard({ course }: CourseCardProps) {
                 if (!courseCode) return;
                 enableCourse(courseCode);
                 setShowEnableDialog(false);
+                toast.success(`${courseCode} enabled`);
               }}
             >
               Enable
