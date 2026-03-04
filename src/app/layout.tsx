@@ -115,6 +115,37 @@ export default async function RootLayout({
       <body
         className={`overflow-x-hidden w-full max-w-[100vw] antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
       >
+        {/* Pre-hydration loader — injected via script so React never owns this
+            DOM node. Safe to imperatively .remove() from GlobalInit without
+            corrupting React's fiber tree. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `
+(function(){
+  var wrap = document.createElement('div');
+  wrap.id = 'prehyd-loader';
+  wrap.setAttribute('aria-hidden', 'true');
+  Object.assign(wrap.style, {
+    position:'fixed', inset:'0', display:'flex', flexDirection:'column',
+    alignItems:'center', justifyContent:'center', gap:'24px',
+    background:'var(--background)', zIndex:'99999'
+  });
+  var ring = document.createElement('div');
+  Object.assign(ring.style, {
+    width:'38px', height:'38px', borderRadius:'50%',
+    border:'3px solid rgba(168,85,247,0.15)', borderTopColor:'#a855f7',
+    animation:'gc-spin 0.75s linear infinite'
+  });
+  var txt = document.createElement('p');
+  Object.assign(txt.style, {
+    margin:'0', fontFamily:'var(--font-manrope),sans-serif', fontSize:'15px',
+    fontStyle:'italic', color:'var(--muted-foreground)',
+    textAlign:'center', maxWidth:'280px', lineHeight:'1.5'
+  });
+  txt.textContent = '\u201cWaiting on Ezygo to stop ghosting us \uD83D\uDC7B\u201d';
+  wrap.appendChild(ring);
+  wrap.appendChild(txt);
+  document.currentScript.parentNode.insertBefore(wrap, document.currentScript.nextSibling);
+})();
+        `}} />
         {/* Skip Navigation Link for Accessibility */}
         <a 
           href="#main-content" 

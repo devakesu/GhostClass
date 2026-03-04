@@ -58,6 +58,18 @@ vi.mock('@/hooks/courses/courses', () => ({
   }),
 }));
 
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: vi.fn(() => ({
+    disabledCoursesMap: {},
+    disabledCodes: new Set<string>(),
+    isDisabled: vi.fn(() => false),
+    getDisableReason: vi.fn(() => null),
+    disableCourse: vi.fn(),
+    enableCourse: vi.fn(),
+    isLoading: false,
+  })),
+}));
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
     auth: {

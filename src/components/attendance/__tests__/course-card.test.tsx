@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { CourseCard, ExtendedCourse } from '../course-card';
 import { useCourseDetails } from '@/hooks/courses/attendance';
 
@@ -42,8 +42,37 @@ vi.mock('@/lib/supabase/client', () => ({
   })),
 }));
 
-vi.mock('lucide-react', () => ({
-  AlertCircle: () => <span data-testid="alert-circle-icon" />,
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return {
+    ...actual,
+    AlertCircle: () => <span data-testid="alert-circle-icon" />,
+  };
+});
+
+// Mock disabled courses hook
+const mockDisableCourse = vi.fn();
+const mockEnableCourse = vi.fn();
+
+const defaultDisabledCoursesReturn = {
+  isDisabled: (_code: string) => false,
+  getDisableReason: (_code: string): string | null => null,
+  disableCourse: mockDisableCourse,
+  enableCourse: mockEnableCourse,
+  disabledCodes: new Set<string>(),
+  disabledCoursesMap: {},
+  isLoading: false,
+};
+
+const mockUseDisabledCourses = vi.fn((_opts?: any) => defaultDisabledCoursesReturn);
+
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: (opts: any) => mockUseDisabledCourses(opts),
+}));
+
+vi.mock('@/hooks/users/settings', () => ({
+  useFetchSemester: () => ({ data: 'even' }),
+  useFetchAcademicYear: () => ({ data: '2025-2026' }),
 }));
 
 const sampleCourse: ExtendedCourse = {
@@ -57,6 +86,7 @@ const sampleCourse: ExtendedCourse = {
 describe('CourseCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseDisabledCourses.mockReturnValue(defaultDisabledCoursesReturn);
     vi.stubGlobal('localStorage', {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
@@ -127,6 +157,66 @@ describe('CourseCard', () => {
       const card = container.querySelector('.custom-container');
       expect(await within(card as HTMLElement).findByText('Red Course')).toBeInTheDocument();
       expect(card?.className).toMatch(/border-t-red/);
+    });
+  });
+
+  describe('Enabled/Disabled toggle', () => {
+    it('shows "Enabled" toggle button by default', async () => {
+      render(<CourseCard course={sampleCourse} />);
+      expect(await screen.findByText('Enabled')).toBeInTheDocument();
+    });
+
+    it('shows "Disabled" when course is disabled', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (code: string) => code === 'CS101',
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      render(<CourseCard course={sampleCourse} />);
+      expect(await screen.findByText('Disabled')).toBeInTheDocument();
+    });
+
+    it('opens disable dialog when clicking Enabled toggle', async () => {
+      render(<CourseCard course={sampleCourse} />);
+      const toggle = await screen.findByText('Enabled');
+      fireEvent.click(toggle);
+      expect(await screen.findByText(/Disable CS101/)).toBeInTheDocument();
+    });
+
+    it('opens enable dialog when clicking Disabled toggle', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (code: string) => code === 'CS101',
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      render(<CourseCard course={sampleCourse} />);
+      const toggle = await screen.findByText('Disabled');
+      fireEvent.click(toggle);
+      expect(await screen.findByText(/Enable CS101/)).toBeInTheDocument();
+      expect(await screen.findByText(/Challenge passed/)).toBeInTheDocument();
+    });
+
+    it('applies opacity to card when disabled', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (_code: string) => true,
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      const { container } = render(<CourseCard course={sampleCourse} />);
+      const card = container.querySelector('.custom-container');
+      expect(card?.className).toContain('opacity-60');
     });
   });
 });

@@ -12,16 +12,43 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useUser } from "@/hooks/users/user";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 /**
  * Extended Course interface with additional attendance statistics.
  */
 export interface ExtendedCourse extends Course {
-  /** Number of present marks */
+  /** Number of present marks (official + tracking combined, used for display) */
   present?: number;
-  /** Total attendance records */
+  /** Total attendance records (official + tracking combined, used for display) */
   total?: number;
+  /** Official-only present count (not affected by tracking extras/corrections) */
+  officialPresent?: number;
+  /** Official-only total count (not affected by tracking extras/corrections) */
+  officialTotal?: number;
 }
+
+/** Pre-defined reasons for disabling a course */
+const DISABLE_REASONS = ["Challenge passed", "Other"] as const;
 
 /**
  * Props for CourseCard component.
@@ -60,6 +87,23 @@ export function CourseCard({ course }: CourseCardProps) {
 
   const { targetPercentage } = useAttendanceSettings();
   const [showBunkCalc, setShowBunkCalc] = useState(true);
+
+  // Disabled courses management
+  const { data: semesterData } = useFetchSemester();
+  const { data: academicYearData } = useFetchAcademicYear();
+  const { isDisabled: isCourseDisabled, getDisableReason, disableCourse, enableCourse } = useDisabledCourses({
+    academicYear: academicYearData,
+    semester: semesterData,
+  });
+  const courseCode = course.code?.toUpperCase() ?? "";
+  const disabled = isCourseDisabled(courseCode);
+
+  // Dialog state for disable/enable workflow
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [showEnableDialog, setShowEnableDialog] = useState(false);
+  const [disableReason, setDisableReason] = useState<string>("Challenge passed");
+  const [customReason, setCustomReason] = useState("");
+  const isOtherReason = disableReason === "Other";
 
   const normalize = useCallback((s: string | undefined) => 
     s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "", 
@@ -130,10 +174,17 @@ export function CourseCard({ course }: CourseCardProps) {
   }, []);
 
   const stats = useMemo(() => {
-    // 1. Official Data (From API) - Use course prop as fallback for initial render
-    const realPresent = courseDetails?.present ?? course.present ?? 0;
-    const realTotal = courseDetails?.total ?? course.total ?? 0;
-    const realAbsent = courseDetails?.absent ?? Math.max(realTotal - realPresent, 0);
+    // 1. Official Data (From API)
+    // Fall back to officialPresent/officialTotal (official-only, no tracking extras)
+    // to avoid contaminating safeMetrics with tracking data when courseDetails is not yet loaded.
+    // Derive total from present+absent instead of courseDetails.total, because the EzyGo
+    // /summery endpoint may include revision or untracked slots in its total field, causing
+    // it to exceed present+absent and diverge from our per-day count.
+    const realPresent = courseDetails?.present ?? course.officialPresent ?? 0;
+    const realAbsent = courseDetails?.absent ?? Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0);
+    const realTotal = courseDetails
+      ? courseDetails.present + courseDetails.absent
+      : (course.officialTotal ?? 0);
     const officialPercentage = realTotal > 0 ? (realPresent / realTotal) * 100 : 0;
     
     // 2. Filter Tracking Data (Local Calculation Backup)
@@ -190,7 +241,7 @@ export function CourseCard({ course }: CourseCardProps) {
       safeMetrics,
       extraMetrics
     };
-  }, [courseDetails?.present, courseDetails?.total, courseDetails?.absent, trackingData, courseIdentifiers, course.present, course.total, targetPercentage, normalize]);
+  }, [courseDetails, course.officialPresent, course.officialTotal, course.present, course.total, courseIdentifiers, trackingData, targetPercentage, normalize]);
 
   const hasAttendanceData = useMemo(() => 
     !isLoading && stats.displayTotal > 0,
@@ -241,20 +292,55 @@ export function CourseCard({ course }: CourseCardProps) {
   );
 
   return (
-    <Card className={cn("pt-0 pb-0 custom-container overflow-clip h-full min-h-70", statusColorClasses.card)}>
+    <Card className={cn("pt-0 pb-0 custom-container overflow-clip h-full min-h-70", statusColorClasses.card, (disabled || (!isLoading && !hasAttendanceData)) && "opacity-60")}>
       <CardHeader className={cn("flex justify-between items-start flex-row gap-2 pt-6 pb-5 border-b-2", statusColorClasses.headerBg, statusColorClasses.headerBorder)}>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-semibold wrap-break-word leading-tight">
             {courseName}
           </CardTitle>
         </div>
-        <Badge
-          variant="secondary"
-          className="h-7 uppercase custom-button rounded-md! bg-foreground/10! scale-105 shrink-0"
-          aria-hidden="true"
-        >
-          {course.code}
-        </Badge>
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          <Badge
+            variant="secondary"
+            className="h-7 uppercase custom-button rounded-md! bg-foreground/10! scale-105 shrink-0"
+            aria-hidden="true"
+          >
+            {course.code}
+          </Badge>
+          {/* Enabled/Disabled dot toggle */}
+          {!isLoading && !hasAttendanceData ? (
+            <span
+              className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border select-none bg-muted/40 text-muted-foreground border-border/40 cursor-default"
+              aria-label={`No attendance data for ${course.code}`}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+              No data
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (disabled) {
+                  setShowEnableDialog(true);
+                } else {
+                  setDisableReason("Challenge passed");
+                  setCustomReason("");
+                  setShowDisableDialog(true);
+                }
+              }}
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none",
+                disabled
+                  ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
+                  : "bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20"
+              )}
+              aria-label={disabled ? `Enable course ${course.code}` : `Disable course ${course.code}`}
+            >
+              <span className={cn("inline-block w-2 h-2 rounded-full", disabled ? "bg-red-500" : "bg-green-500")} aria-hidden="true" />
+              {disabled ? "Disabled" : "Enabled"}
+            </button>
+          )}
+        </div>
       </CardHeader>
       
       <CardContent className="h-full pb-6">
@@ -401,6 +487,10 @@ export function CourseCard({ course }: CourseCardProps) {
                     );
                   }
 
+                  // No official data yet — skip the Safe (Official) panel entirely and
+                  // show only the tracking-based result so we don't mislead the user.
+                  const noOfficialData = stats.realTotal === 0;
+
                   // CHECK: Official bunkable > Tracking bunkable
                   const officialIsBetter = 
                     // Official has MORE bunkable classes
@@ -409,6 +499,29 @@ export function CourseCard({ course }: CourseCardProps) {
                     (stats.safeMetrics.canBunk === 0 && 
                     stats.extraMetrics.canBunk === 0 && 
                     stats.safeMetrics.requiredToAttend < stats.extraMetrics.requiredToAttend);
+
+                  if (noOfficialData) {
+                    // TRACKING ONLY — no official data yet, show the purple tracking panel full-width
+                    return (
+                      <div className="bg-purple-500/10 border border-purple-500/35 dark:border-purple-500/20 rounded-md p-2">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <svg className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className="text-[10px] font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wide">Tracking Data</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-medium leading-tight">
+                          {stats.extraMetrics.canBunk > 0 ? (
+                            <>Bunkable: <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> 🥳</>
+                          ) : stats.extraMetrics.requiredToAttend > 0 ? (
+                            <>Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span></>
+                          ) : (
+                            <>Edge 💀</>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  }
 
                   if (officialIsBetter) {
                     // SHOW ONLY TRACKING (single display)
@@ -497,6 +610,79 @@ export function CourseCard({ course }: CourseCardProps) {
           </div>
         )}
       </CardContent>
+
+      {/* Disable Course Dialog */}
+      <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+        <AlertDialogContent className="custom-container">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable {course.code}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Disabling this course will exclude it from your total attendance, stat cards, and the attendance chart. It will still appear on the course grid and calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <label className="text-sm font-medium">Reason</label>
+            <Select value={disableReason} onValueChange={(v) => { setDisableReason(v); if (v !== "Other") setCustomReason(""); }}>
+              <SelectTrigger className="w-full custom-dropdown">
+                <SelectValue placeholder="Select reason" />
+              </SelectTrigger>
+              <SelectContent className="custom-dropdown">
+                {DISABLE_REASONS.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isOtherReason && (
+              <Input
+                placeholder="Enter your reason"
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                className="mt-1"
+                autoFocus
+              />
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="custom-button bg-red-600! hover:bg-red-700! border-none!"
+              disabled={isOtherReason && !customReason.trim()}
+              onClick={() => {
+                const reason = isOtherReason ? customReason.trim() : disableReason;
+                disableCourse(courseCode, reason);
+                setShowDisableDialog(false);
+              }}
+            >
+              Disable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Enable Course Dialog */}
+      <AlertDialog open={showEnableDialog} onOpenChange={setShowEnableDialog}>
+        <AlertDialogContent className="custom-container">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enable {course.code}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This course was disabled with reason: <span className="font-semibold text-foreground">&ldquo;{getDisableReason(courseCode) ?? "N/A"}&rdquo;</span>.
+              Enabling it will include it back in your total attendance calculations.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="custom-button bg-green-600! hover:bg-green-700! border-none!"
+              onClick={() => {
+                enableCourse(courseCode);
+                setShowEnableDialog(false);
+              }}
+            >
+              Enable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

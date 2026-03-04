@@ -70,6 +70,16 @@ vi.mock('@/hooks/tracker/useTrackingData', () => ({
   useTrackingData: () => ({ data: null, isLoading: false }),
 }));
 
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: () => ({
+    isDisabled: () => false,
+    getDisableReason: () => undefined,
+    disableCourse: vi.fn(),
+    enableCourse: vi.fn(),
+    disabledCodes: new Set<string>(),
+  }),
+}));
+
 vi.mock('@/providers/attendance-settings', () => ({
   useAttendanceSettings: () => ({
     absenceIncludesOtherLeave: false,

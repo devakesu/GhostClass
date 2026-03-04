@@ -56,6 +56,23 @@ vi.mock('@/components/loading', () => ({
   Loading: () => <div data-testid="loading-spinner" />,
 }))
 
+vi.mock('@/hooks/users/settings', () => ({
+  useFetchSemester: vi.fn(() => ({ data: 'even', isLoading: false })),
+  useFetchAcademicYear: vi.fn(() => ({ data: '2025-2026', isLoading: false })),
+}))
+
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: vi.fn(() => ({
+    disabledCoursesMap: {},
+    disabledCodes: new Set<string>(),
+    isDisabled: vi.fn(() => false),
+    getDisableReason: vi.fn(() => null),
+    disableCourse: vi.fn(),
+    enableCourse: vi.fn(),
+    isLoading: false,
+  })),
+}))
+
 vi.mock('@/hooks/courses/exams', () => ({
   useExams: vi.fn(),
   useAllExamAnswers: vi.fn(),

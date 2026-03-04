@@ -67,15 +67,17 @@ export interface AttendanceEvent {
 /**
  * Detailed attendance statistics for a specific course.
  * Used for displaying attendance summaries and percentages.
+ * Note: The EzyGo API returns `totel` and `persantage` (typos); these are
+ * normalized to `total` and `percentage` in the useCourseDetails query function.
  */
 export interface CourseDetail {
   /** Number of present marks */
   present: number;
   /** Number of absent marks */
   absent: number;
-  /** Total attendance records (present + absent) */
+  /** Total attendance records (present + absent). API field is `totel` — normalized in hook. */
   total: number;
-  /** Attendance percentage (0-100) */
+  /** Attendance percentage (0-100). API field is `persantage` — normalized in hook. */
   percentage: number;
   /** Course information */
   course: {

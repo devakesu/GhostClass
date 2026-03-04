@@ -45,6 +45,8 @@ interface AttendanceChartProps {
   trackingData?: TrackAttendance[];
   /** Available courses data */
   coursesData?: { courses: Record<string, Course> };
+  /** Set of upper-cased course codes to exclude from the chart */
+  disabledCodes?: Set<string>;
 }
 
 /**
@@ -122,7 +124,7 @@ const CustomTargetLabel = (props: LabelProps) => {
   );
 };
 
-export function AttendanceChart({ attendanceData, trackingData, coursesData }: AttendanceChartProps) {
+export function AttendanceChart({ attendanceData, trackingData, coursesData, disabledCodes }: AttendanceChartProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltipHidden, setTooltipHidden] = useState(false);
@@ -331,7 +333,13 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
     }
 
     return Object.values(courseAttendance)
-      .filter((course) => (course.total + course.selfTotal) > 0)
+      .filter((course) => {
+        // Exclude courses with no data
+        if ((course.total + course.selfTotal) <= 0) return false;
+        // Exclude disabled courses
+        if (disabledCodes?.has((course.code ?? "").toUpperCase())) return false;
+        return true;
+      })
       .map((course): CourseData => {
         const officialPct = course.total > 0 ? parseFloat(((course.present / course.total) * 100).toFixed(2)) : 0;
         
@@ -373,7 +381,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
         };
       })
       .sort((a, b) => a.totalPercentage - b.totalPercentage);
-  }, [attendanceData, trackingData, coursesData, safeTarget]);
+  }, [attendanceData, trackingData, coursesData, safeTarget, disabledCodes]);
 
   const getBarSize = () => {
     const courseCount = data.length;
