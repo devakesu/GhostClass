@@ -295,7 +295,7 @@ export function CourseCard({ course }: CourseCardProps) {
 
   return (
     <Card className={cn("pt-0 pb-0 custom-container overflow-clip h-full min-h-70", statusColorClasses.card, (disabled || (!isLoading && !hasAttendanceData)) && "opacity-60")}>
-      <CardHeader className={cn("flex justify-between items-start flex-row gap-2 pt-6 pb-5 border-b-2", statusColorClasses.headerBg, statusColorClasses.headerBorder)}>
+      <CardHeader className={cn("flex justify-between items-start flex-row gap-2 pt-6 pb-5 border-b-2", statusColorClasses.headerBg, statusColorClasses.headerBorder, disabled && "bg-red-500/10 dark:bg-muted/40 border-red-500/30 dark:border-border/60")}>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-semibold wrap-break-word leading-tight">
             {courseName}
