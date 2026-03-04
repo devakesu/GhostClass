@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,7 @@ describe('useBackToExit', () => {
   let useBackToExit: typeof import('@/hooks/useBackToExit').useBackToExit;
   let restoreMatchMedia: () => void;
   let pushStateSpy: ReturnType<typeof vi.spyOn>;
+  let replaceStateSpy: ReturnType<typeof vi.spyOn>;
   let closeSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
@@ -62,6 +63,7 @@ describe('useBackToExit', () => {
 
     restoreMatchMedia = setStandaloneMode(true);
     pushStateSpy = vi.spyOn(history, 'pushState');
+    replaceStateSpy = vi.spyOn(history, 'replaceState');
     closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
 
     const mod = await import('@/hooks/useBackToExit');
@@ -73,6 +75,7 @@ describe('useBackToExit', () => {
     vi.clearAllMocks();
     restoreMatchMedia();
     pushStateSpy.mockRestore();
+    replaceStateSpy.mockRestore();
     closeSpy.mockRestore();
   });
 
@@ -95,10 +98,17 @@ describe('useBackToExit', () => {
   // Sentinel push on mount
   // -------------------------------------------------------------------------
 
-  it('pushes sentinel entry on mount in standalone mode', () => {
+  it('marks root entry with sentinel (replaceState) and pushes clean top on mount', () => {
     renderHook(() => useBackToExit());
-    expect(pushStateSpy).toHaveBeenCalledWith(
+    // Root entry is marked with __gce via replaceState (preserves existing state)
+    expect(replaceStateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ __gce: true }),
+      '',
+      expect.any(String),
+    );
+    // Clean top entry is pushed WITHOUT __gce so mid-app backs are not caught
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.not.objectContaining({ __gce: true }),
       '',
       expect.any(String),
     );
@@ -145,14 +155,15 @@ describe('useBackToExit', () => {
     );
   });
 
-  it('re-pushes sentinel after first hit so the next press is catchable', () => {
+  it('re-pushes a clean top entry (no sentinel) after first hit so the next press is catchable', () => {
     renderHook(() => useBackToExit());
     pushStateSpy.mockClear();
 
     act(() => { fireSentinelPopState(); });
 
+    // A new clean top is pushed WITHOUT __gce (derived from event.state minus sentinel)
     expect(pushStateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ __gce: true }),
+      expect.not.objectContaining({ __gce: true }),
       '',
       expect.any(String),
     );
@@ -284,12 +295,19 @@ describe('useBackToExit', () => {
     expect(mockDismiss).toHaveBeenCalledWith('toast-unmount');
   });
 
-  it('does not push sentinel when history state already has the key (StrictMode guard)', () => {
-    history.replaceState({ __gce: true }, '');
+  it('does not re-initialize sentinel on StrictMode re-mount (module-level flag guard)', () => {
+    // First mount — initializes the sentinel (replaceState + pushState)
+    const { unmount } = renderHook(() => useBackToExit());
+    replaceStateSpy.mockClear();
     pushStateSpy.mockClear();
 
+    unmount();
+
+    // Second mount in the same module context (StrictMode / HMR re-mount).
+    // sentinelInitialized is already true → no extra replaceState or pushState.
     renderHook(() => useBackToExit());
 
+    expect(replaceStateSpy).not.toHaveBeenCalled();
     expect(pushStateSpy).not.toHaveBeenCalled();
   });
 });
