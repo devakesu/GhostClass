@@ -122,19 +122,22 @@ export default async function RootLayout({
 (function(){
   var wrap = document.createElement('div');
   wrap.id = 'prehyd-loader';
-  wrap.setAttribute('aria-hidden', 'true');
+  wrap.setAttribute('role', 'status');
+  wrap.setAttribute('aria-label', 'Loading, please wait');
   Object.assign(wrap.style, {
     position:'fixed', inset:'0', display:'flex', flexDirection:'column',
     alignItems:'center', justifyContent:'center', gap:'24px',
     background:'var(--background)', zIndex:'99999'
   });
   var ring = document.createElement('div');
+  ring.setAttribute('aria-hidden', 'true');
   Object.assign(ring.style, {
     width:'38px', height:'38px', borderRadius:'50%',
     border:'3px solid rgba(168,85,247,0.15)', borderTopColor:'#a855f7',
     animation:'gc-spin 0.75s linear infinite'
   });
   var txt = document.createElement('p');
+  txt.setAttribute('aria-hidden', 'true');
   Object.assign(txt.style, {
     margin:'0', fontFamily:'var(--font-manrope),sans-serif', fontSize:'15px',
     fontStyle:'italic', color:'var(--muted-foreground)',
