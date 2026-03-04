@@ -105,7 +105,7 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Mid-app back press â€” ignored entirely
+  // Mid-app back press — ignored entirely
   // -------------------------------------------------------------------------
 
   it('does not show toast on a mid-app back press (non-sentinel state)', () => {
@@ -130,7 +130,7 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // First sentinel hit â€” shows toast, re-pushes sentinel
+  // First sentinel hit — shows toast, re-pushes sentinel
   // -------------------------------------------------------------------------
 
   it('shows toast when user hits the sentinel (back at root)', () => {
@@ -159,7 +159,7 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Second sentinel hit within threshold â†’ window.close()
+  // Second sentinel hit within threshold → window.close()
   // -------------------------------------------------------------------------
 
   it('calls window.close() on second sentinel hit within 2 s', () => {
@@ -189,7 +189,7 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Second sentinel hit AFTER threshold â†’ fresh first press
+  // Second sentinel hit AFTER threshold → fresh first press
   // -------------------------------------------------------------------------
 
   it('treats a sentinel hit after the threshold as a new first press', () => {
@@ -217,7 +217,7 @@ describe('useBackToExit', () => {
     act(() => { fireSentinelPopState(); }); // root hit, toast shown
     act(() => {
       vi.advanceTimersByTime(500);
-      fireMidAppPopState(); // mid-app back â€” should be ignored
+      fireMidAppPopState(); // mid-app back — should be ignored
     });
 
     expect(closeSpy).not.toHaveBeenCalled();
@@ -271,5 +271,25 @@ describe('useBackToExit', () => {
 
     act(() => { fireSentinelPopState(); });
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('dismisses active toast on unmount', () => {
+    mockToast.mockReturnValueOnce('toast-unmount');
+    const { unmount } = renderHook(() => useBackToExit());
+
+    act(() => { fireSentinelPopState(); }); // show toast
+    expect(mockToast).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(mockDismiss).toHaveBeenCalledWith('toast-unmount');
+  });
+
+  it('does not push sentinel when history state already has the key (StrictMode guard)', () => {
+    history.replaceState({ __gce: true }, '');
+    pushStateSpy.mockClear();
+
+    renderHook(() => useBackToExit());
+
+    expect(pushStateSpy).not.toHaveBeenCalled();
   });
 });

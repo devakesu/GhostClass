@@ -42,10 +42,13 @@ export function useInactivityClose(timeoutMs = DEFAULT_TIMEOUT_MS): void {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // App went to background — start the countdown.
-        timerRef.current = setTimeout(() => {
-          window.close();
-        }, timeoutMs);
+        // App went to background — start the countdown only if one isn't
+        // already running (guards against duplicate hidden events).
+        if (timerRef.current === null) {
+          timerRef.current = setTimeout(() => {
+            window.close();
+          }, timeoutMs);
+        }
       } else {
         // App came back to foreground — cancel countdown.
         clearTimer();
@@ -53,6 +56,9 @@ export function useInactivityClose(timeoutMs = DEFAULT_TIMEOUT_MS): void {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Handle the case where the hook mounts while the document is already
+    // hidden (e.g. app resumed in background).
+    handleVisibilityChange();
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);

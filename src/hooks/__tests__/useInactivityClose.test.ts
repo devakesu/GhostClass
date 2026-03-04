@@ -144,18 +144,14 @@ describe('useInactivityClose', () => {
     removeSpy.mockRestore();
   });
 
-  it('clears the timer on unmount', () => {
-    renderHook(() => useInactivityClose(5000));
-
-    fireVisibilityChange(true); // start timer
+  it('clears the timer on unmount before it fires', () => {
     const { unmount } = renderHook(() => useInactivityClose(5000));
-    unmount();
 
-    vi.advanceTimersByTime(10000);
-    // Only the first hook's timer may fire (second was cleaned up), but
-    // the important thing is close isn't called for the unmounted instance.
-    // Just verify no double-close from the unmounted hook.
-    expect(closeSpy.mock.calls.length).toBeLessThanOrEqual(1);
+    fireVisibilityChange(true); // schedules timer on this instance
+    unmount();                   // cleanup should cancel it
+
+    vi.advanceTimersByTime(10000); // well past the 5 s timeout
+    expect(closeSpy).not.toHaveBeenCalled();
   });
 
   it('does not close after unmount even if backgrounded', () => {
@@ -166,5 +162,27 @@ describe('useInactivityClose', () => {
     vi.advanceTimersByTime(10000);
 
     expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('starts timer immediately if document is already hidden on mount', () => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+
+    renderHook(() => useInactivityClose(5000));
+
+    vi.advanceTimersByTime(4999);
+    expect(closeSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not schedule duplicate timers on repeated hidden events', () => {
+    renderHook(() => useInactivityClose(5000));
+
+    fireVisibilityChange(true); // first hidden — starts timer
+    fireVisibilityChange(true); // second hidden — must not start a second timer
+
+    vi.advanceTimersByTime(5000);
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 });

@@ -49,8 +49,12 @@ export function useBackToExit(): void {
     if (typeof window === "undefined" || !isStandalonePWA()) return;
 
     // Push the sentinel so the first back press from the root hits it instead
-    // of immediately closing the PWA.
-    history.pushState({ [SENTINEL_KEY]: true }, "", window.location.href);
+    // of immediately closing the PWA. Guard against double-invocation in React
+    // StrictMode / HMR by only pushing if the current state isn't already ours.
+    const currentState = history.state as Record<string, unknown> | null;
+    if (!currentState || !(SENTINEL_KEY in currentState)) {
+      history.pushState({ [SENTINEL_KEY]: true }, "", window.location.href);
+    }
 
     const handlePopState = (event: PopStateEvent) => {
       // Ignore mid-app back presses — they don't have the sentinel state.
@@ -95,6 +99,13 @@ export function useBackToExit(): void {
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
+      // Dismiss any active toast and reset refs so stale UI is never left
+      // behind after unmount (e.g. during HMR or StrictMode double-effect).
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
+        toastIdRef.current = null;
+      }
+      firstBackTimeRef.current = null;
     };
   }, []);
 }
