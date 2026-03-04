@@ -401,7 +401,7 @@ Courses can be disabled on a per-semester basis so they no longer affect aggrega
 | `src/app/(protected)/tracking/TrackingClient.tsx` | "Disabled" badge + sorts disabled courses to end |
 | `src/app/(protected)/scores/ScoresClient.tsx` | "Disabled" badge + sorts disabled course groups to end |
 
-## �🚀 Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
