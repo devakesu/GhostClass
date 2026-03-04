@@ -214,16 +214,35 @@ describe('useBackToExit', () => {
   // Mid-app press does NOT trigger close even after sentinel toast shown
   // -------------------------------------------------------------------------
 
-  it('does not close when a mid-app back follows the sentinel toast within 2 s', () => {
+  it('cancels the exit toast and resets state when a mid-app back fires while toast is showing', () => {
+    mockToast.mockReturnValueOnce('toast-mid');
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); }); // root hit, toast shown
+    act(() => { fireSentinelPopState(); }); // root hit — toast shown
     act(() => {
       vi.advanceTimersByTime(500);
-      fireMidAppPopState(); // mid-app back — should be ignored
+      fireMidAppPopState(); // mid-app back — must cancel the countdown
+    });
+
+    expect(mockDismiss).toHaveBeenCalledWith('toast-mid');
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not close when sentinel → mid-app back → sentinel within threshold (mid-app resets countdown)', () => {
+    renderHook(() => useBackToExit());
+
+    act(() => { fireSentinelPopState(); }); // first root hit
+    act(() => {
+      vi.advanceTimersByTime(500);
+      fireMidAppPopState();  // navigated away — resets countdown
+    });
+    act(() => {
+      vi.advanceTimersByTime(100);
+      fireSentinelPopState(); // root again, but countdown was reset — NOT a close
     });
 
     expect(closeSpy).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledTimes(2); // each root hit shows a fresh toast
   });
 
   // -------------------------------------------------------------------------

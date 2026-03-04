@@ -80,6 +80,14 @@ export function useBackToExit(): void {
         typeof event.state !== "object" ||
         (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
       ) {
+        // If a mid-app back fires while the exit toast is showing, cancel the
+        // pending exit. Only two *consecutive* root-level presses should close
+        // the PWA — navigating away resets the countdown.
+        if (toastIdRef.current !== null) {
+          toast.dismiss(toastIdRef.current);
+          toastIdRef.current = null;
+        }
+        firstBackTimeRef.current = null;
         return;
       }
 
