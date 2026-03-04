@@ -199,7 +199,7 @@ A non-React DOM overlay (`#prehyd-loader`) is injected via an inline `<script>` 
 
 ## EzyGo API Field Normalization
 
-The EzyGo `/summery` endpoint returns fields with typos (`totel` instead of `total`, `persantage` instead of `percentage`). The `useAttendanceReport` hook (`src/hooks/courses/attendance.ts`) normalizes these on fetch. The TypeScript types in `src/types/attendance.d.ts` document both the misspelled and correct field names.
+The EzyGo `/summery` endpoint returns fields with typos (`totel` instead of `total`, `persantage` instead of `percentage`). The `useCourseDetails` hook normalizes these on fetch. The TypeScript types in `src/types/attendance.d.ts` document both the misspelled and correct field names.
 
 ---
 
