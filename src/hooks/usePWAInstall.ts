@@ -94,11 +94,21 @@ export function usePWAInstall(): UsePWAInstallReturn {
 
   const triggerInstall = async (): Promise<"accepted" | "dismissed" | "unavailable"> => {
     if (!deferredPrompt) return "unavailable";
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    _earlyPrompt = null;
-    return outcome;
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      _earlyPrompt = null;
+      return outcome;
+    } catch {
+      // prompt() can throw when the deferred event was already consumed, or when
+      // the browser rate-limits the install dialog on mobile (Android/iOS).
+      // Clear the stale prompt so the banner won't offer it again until the
+      // browser re-emits the beforeinstallprompt event.
+      setDeferredPrompt(null);
+      _earlyPrompt = null;
+      return "unavailable";
+    }
   };
 
   return {
