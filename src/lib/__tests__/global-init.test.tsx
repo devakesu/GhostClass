@@ -14,7 +14,7 @@ import { render, act } from '@testing-library/react';
 // Mocks (must be hoisted before imports)
 // ---------------------------------------------------------------------------
 
-const mockSetContext = vi.fn();
+const mockSetContext = vi.hoisted(() => vi.fn());
 
 vi.mock('@sentry/nextjs', () => ({
   setContext: mockSetContext,
