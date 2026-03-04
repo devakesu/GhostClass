@@ -312,7 +312,7 @@ export function CourseCard({ course }: CourseCardProps) {
           {!isLoading && !hasAttendanceData ? (
             <span
               className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border select-none bg-muted/40 text-muted-foreground border-border/40 cursor-default"
-              aria-label={`No attendance data for ${course.code}`}
+              aria-label={`No attendance data for ${courseCode ?? course.name}`}
             >
               <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/50" aria-hidden="true" />
               No data
@@ -338,7 +338,7 @@ export function CourseCard({ course }: CourseCardProps) {
                   ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
                   : "bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20"
               )}
-              aria-label={disabled ? `Enable course ${course.code}` : `Disable course ${course.code}`}
+              aria-label={disabled ? `Enable course ${courseCode ?? course.name}` : `Disable course ${courseCode ?? course.name}`}
             >
               <span className={cn("inline-block w-2 h-2 rounded-full", disabled ? "bg-red-500" : "bg-green-500")} aria-hidden="true" />
               {disabled ? "Disabled" : "Enabled"}

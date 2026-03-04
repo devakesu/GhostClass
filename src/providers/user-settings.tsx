@@ -336,7 +336,9 @@ export function useUserSettingsState() {
         queryClient.setQueryData(["userSettings", context.currentUserId], context.previousSettings);
       }
       
-      if (err.message !== NO_USER_ERROR_MESSAGE) {
+      // err is unknown by default in useMutation — narrow before comparing to NO_USER_ERROR_MESSAGE.
+      const isNoUserError = err instanceof Error && err.message === NO_USER_ERROR_MESSAGE;
+      if (!isNoUserError) {
         toast.error("Failed to save settings");
         Sentry.captureException(err, { tags: { type: "settings_update_error", location: "useUserSettings" } });
       }
