@@ -352,7 +352,7 @@ x(100 - target) = target*total - 100*present
 x = (target*total - 100*present) / (100 - target)
 ```
 
-## � Disable Courses
+## Disable Courses
 
 Courses can be disabled on a per-semester basis so they no longer affect aggregate attendance statistics. This is useful when a student has passed a challenge exam or otherwise no longer needs to attend a course.
 
