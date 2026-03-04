@@ -390,7 +390,7 @@ export function useUserSettingsState() {
           }
 
           const localDisabledKey = `disabledCourses_${userId}`;
-          const dbDisabled = JSON.stringify(settings.disabled_courses ?? {});
+          const dbDisabled = JSON.stringify(settings.disabled_courses);
           if (localStorage.getItem(localDisabledKey) !== dbDisabled) {
             if (!isMounted) return;
             localStorage.setItem(localDisabledKey, dbDisabled);

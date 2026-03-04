@@ -12,8 +12,10 @@ export interface UserSettings {
    * When a course is disabled it is excluded from dashboard aggregate stats
    * and the attendance chart, but continues to appear on the course card
    * grid and the attendance calendar (with a "Disabled" badge).
+   *
+   * Mirrors the DB column: `disabled_courses jsonb NOT NULL DEFAULT '{}'`.
    */
-  disabled_courses?: DisabledCoursesMap;
+  disabled_courses: DisabledCoursesMap;
 }
 
 /**
