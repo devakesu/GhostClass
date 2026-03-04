@@ -53,14 +53,15 @@ export function ServiceWorkerRegister() {
     registrationInProgressRef.current = true;
     let isMounted = true;
 
-    // Delay SW registration 3 seconds after window.load to ensure all SSR
-    // streaming chunks (Next.js Suspense) have fully flushed to the browser
-    // before the SW installs and potentially claims the tab mid-stream.
-    let registrationTimeoutId: NodeJS.Timeout | null = null;
+    // Register the SW immediately after load. The SW never touches navigation
+    // responses (early-exit handler in sw.ts uses stopImmediatePropagation() for
+    // all navigate-mode requests) and clientsClaim: false means it never claims
+    // existing clients, so there is no risk of interfering with SSR streaming.
     const handleLoad = () => {
       if (!isMounted) return;
-      registrationTimeoutId = setTimeout(async () => {
-        // Check if component is still mounted
+      void (async () => {
+        // Check again — component may have unmounted between handleLoad call and
+        // the first microtask.
         if (!isMounted) return;
 
         try {
@@ -165,7 +166,7 @@ export function ServiceWorkerRegister() {
             error,
           });
         }
-      }, 3000);
+      })();
     };
 
     if (document.readyState === "complete") {
@@ -180,9 +181,6 @@ export function ServiceWorkerRegister() {
       isMounted = false;
       registrationInProgressRef.current = false;
       window.removeEventListener("load", handleLoad);
-      if (registrationTimeoutId) {
-        clearTimeout(registrationTimeoutId);
-      }
       if (updateIntervalIdRef.current) {
         clearInterval(updateIntervalIdRef.current);
         updateIntervalIdRef.current = null;

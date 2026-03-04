@@ -53,11 +53,14 @@ export function PWAInstallBanner() {
         toast.success("GhostClass is installing!", {
           description: "Next time, open it from your home screen.",
         });
-      } else {
-        // User cancelled the native dialog or it was unavailable — snooze
-        // so the banner can re-appear after the snooze period.
+      } else if (outcome === "dismissed") {
+        // User cancelled the native dialog — snooze so the banner can
+        // re-appear after the snooze period.
         localStorage.setItem(STORAGE_KEY, Date.now().toString());
       }
+      // "unavailable": prompt() threw (e.g. browser rate-limited on mobile) or
+      // the event was already consumed. Close the banner without writing to
+      // storage so it re-appears when the browser re-emits the event.
     } catch {
       // Ignore storage errors (e.g., private browsing, storage disabled)
     }
