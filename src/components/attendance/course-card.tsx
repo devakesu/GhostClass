@@ -91,12 +91,13 @@ export function CourseCard({ course }: CourseCardProps) {
   // Disabled courses management
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
-  const { isDisabled: isCourseDisabled, getDisableReason, disableCourse, enableCourse } = useDisabledCourses({
+  const { isDisabled: isCourseDisabled, getDisableReason, disableCourse, enableCourse, isLoading: isDisabledCoursesLoading } = useDisabledCourses({
     academicYear: academicYearData,
     semester: semesterData,
   });
-  const courseCode = course.code?.toUpperCase() ?? "";
-  const disabled = isCourseDisabled(courseCode);
+  // undefined when course.code is missing — guards against creating a "" key in disabled_courses.
+  const courseCode = course.code ? course.code.toUpperCase() : undefined;
+  const disabled = courseCode ? isCourseDisabled(courseCode) : false;
 
   // Dialog state for disable/enable workflow
   const [showDisableDialog, setShowDisableDialog] = useState(false);
@@ -319,6 +320,7 @@ export function CourseCard({ course }: CourseCardProps) {
           ) : (
             <button
               type="button"
+              disabled={isDisabledCoursesLoading || !courseCode}
               onClick={() => {
                 if (disabled) {
                   setShowEnableDialog(true);
@@ -330,7 +332,9 @@ export function CourseCard({ course }: CourseCardProps) {
               }}
               className={cn(
                 "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none",
-                disabled
+                (isDisabledCoursesLoading || !courseCode)
+                  ? "opacity-50 cursor-not-allowed"
+                  : disabled
                   ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
                   : "bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20"
               )}
@@ -648,6 +652,7 @@ export function CourseCard({ course }: CourseCardProps) {
               className="custom-button bg-red-600! hover:bg-red-700! border-none!"
               disabled={isOtherReason && !customReason.trim()}
               onClick={() => {
+                if (!courseCode) return;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
                 disableCourse(courseCode, reason);
                 setShowDisableDialog(false);
@@ -665,7 +670,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Enable {course.code}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This course was disabled with reason: <span className="font-semibold text-foreground">&ldquo;{getDisableReason(courseCode) ?? "N/A"}&rdquo;</span>.
+              This course was disabled with reason: <span className="font-semibold text-foreground">&ldquo;{(courseCode ? getDisableReason(courseCode) : null) ?? "N/A"}&rdquo;</span>.
               Enabling it will include it back in your total attendance calculations.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -674,6 +679,7 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogAction
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
               onClick={() => {
+                if (!courseCode) return;
                 enableCourse(courseCode);
                 setShowEnableDialog(false);
               }}

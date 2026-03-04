@@ -243,7 +243,10 @@ export function useUserSettingsState() {
       if (error) {
         logger.error("Error fetching settings:", error);
         Sentry.captureException(error, { tags: { type: "settings_fetch_error", location: "useUserSettings" } });
-        return null;
+        // Throw so React Query sets isError (not isSuccess with null), preventing the
+        // sync effect from mistaking a transient fetch failure for a "new user / no row"
+        // and overwriting existing settings.
+        throw error;
       }
 
       return data as UserSettings | null;

@@ -161,7 +161,7 @@ export function AttendanceCalendar({
   /** Resolve course code from courseId using available course registries */
   const getCourseCodeById = useCallback((courseId: string): string => {
     const course = attendanceData?.courses?.[courseId] ?? coursesData?.courses?.[courseId];
-    return ((course as any)?.code ?? "").toUpperCase();
+    return (course?.code ?? "").toUpperCase();
   }, [attendanceData, coursesData]);
 
   useEffect(() => {
