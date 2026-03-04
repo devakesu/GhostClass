@@ -2,14 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode } from 'react'
-import { useAttendanceReport } from '@/hooks/courses/attendance'
+import { useAttendanceReport, useCourseDetails } from '@/hooks/courses/attendance'
 import { type AttendanceReport } from '@/types'
 import axiosInstance from '@/lib/axios'
 
 vi.mock('@/lib/axios', () => ({
   default: {
     post: vi.fn(),
+    get: vi.fn(),
   },
+}))
+
+vi.mock('@/lib/query-utils', () => ({
+  retryOnce: () => false,
+  retryTwice: () => false,
 }))
 
 describe('useAttendanceReport', () => {
@@ -137,5 +143,98 @@ describe('useAttendanceReport', () => {
     
     // Should not have called the API yet (using initialData)
     expect(axiosInstance.post).not.toHaveBeenCalled()
+  })
+})
+
+describe('useCourseDetails', () => {
+  const createWrapper = () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
+          refetchInterval: false,
+        },
+      },
+    })
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    Wrapper.displayName = 'QueryClientWrapper'
+    return Wrapper
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns normalised data (totel → total, persantage → percentage)', async () => {
+    const rawData = { present: 15, absent: 5, totel: 20, persantage: 75 }
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+
+    const { result } = renderHook(() => useCourseDetails('999'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.total).toBe(20)
+    expect(result.current.data?.percentage).toBe(75)
+    expect((result.current.data as any)?.totel).toBeUndefined()
+    expect((result.current.data as any)?.persantage).toBeUndefined()
+  })
+
+  it('prefers existing total/percentage fields over typo fields', async () => {
+    const rawData = {
+      present: 10,
+      absent: 5,
+      total: 15,
+      percentage: 66,
+      totel: 99,
+      persantage: 99,
+    }
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+
+    const { result } = renderHook(() => useCourseDetails('888'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.total).toBe(15)
+    expect(result.current.data?.percentage).toBe(66)
+  })
+
+  it('does not fetch when courseId is empty string', () => {
+    const { result } = renderHook(() => useCourseDetails(''), {
+      wrapper: createWrapper(),
+    })
+
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(axiosInstance.get).not.toHaveBeenCalled()
+  })
+
+  it('throws when axios.get returns falsy', async () => {
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce(null)
+
+    const { result } = renderHook(() => useCourseDetails('777'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toBeInstanceOf(Error)
+  })
+
+  it('calls correct EzyGo course URL', async () => {
+    const rawData = { present: 5, absent: 2, total: 7, percentage: 71 }
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+
+    const { result } = renderHook(() => useCourseDetails('123'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(axiosInstance.get).toHaveBeenCalledWith(
+      '/attendancereports/institutionuser/courses/123/summery'
+    )
   })
 })

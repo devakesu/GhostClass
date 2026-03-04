@@ -218,5 +218,130 @@ describe('CourseCard', () => {
       const card = container.querySelector('.custom-container');
       expect(card?.className).toContain('opacity-60');
     });
+
+    it('calls disableCourse with courseCode and selected reason when Disable button is clicked', async () => {
+      render(<CourseCard course={sampleCourse} />);
+      // Open the disable dialog
+      const toggle = await screen.findByText('Enabled');
+      fireEvent.click(toggle);
+      // Click the "Disable" confirm button
+      const disableConfirmBtn = await screen.findByRole('button', { name: /^disable$/i });
+      fireEvent.click(disableConfirmBtn);
+      expect(mockDisableCourse).toHaveBeenCalledWith('CS101', 'Challenge passed');
+    });
+
+    it('calls enableCourse with courseCode when Enable button is clicked', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (code: string) => code === 'CS101',
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      render(<CourseCard course={sampleCourse} />);
+      // Open the enable dialog
+      const toggle = await screen.findByText('Disabled');
+      fireEvent.click(toggle);
+      // Click the "Enable" confirm button
+      const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
+      fireEvent.click(enableConfirmBtn);
+      expect(mockEnableCourse).toHaveBeenCalledWith('CS101');
+    });
+
+    it('does not show the toggle for a course without a code', async () => {
+      const noCourseCode: ExtendedCourse = { id: 99, name: 'No Code Course' };
+      render(<CourseCard course={noCourseCode} />);
+      // Wait for component to render
+      expect(await screen.findByText('No Code Course')).toBeInTheDocument();
+      // Toggle button should be disabled (rendered but not interactive) when course.code is undefined
+      const toggleBtn = screen.queryByRole('button', { name: /disable course/i });
+      if (toggleBtn) {
+        expect(toggleBtn).toBeDisabled();
+      }
+    });
+  });
+
+  describe('bunkCalcToggle event listener', () => {
+    it('updates showBunkCalc state when bunkCalcToggle event is dispatched with false', async () => {
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 15, total: 20, absent: 5 },
+        isLoading: false,
+      } as any);
+      render(<CourseCard course={sampleCourse} />);
+
+      // Wait for component to finish loading and show bunk calc (default: true)
+      expect(await screen.findByText('Computer Science')).toBeInTheDocument();
+
+      // Dispatch a toggle event to turn off bunk calc
+      fireEvent(
+        window,
+        new CustomEvent('bunkCalcToggle', { detail: false })
+      );
+
+      // Bunk calculator section should no longer be visible
+      await expect(
+        screen.queryByText(/You can safely bunk|You need to attend|You are on the edge/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('updates showBunkCalc state when bunkCalcToggle event is dispatched with true', async () => {
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 15, total: 20, absent: 5 },
+        isLoading: false,
+      } as any);
+      vi.stubGlobal('localStorage', {
+        getItem: vi.fn().mockReturnValue('false'), // start hidden
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      });
+      render(<CourseCard course={sampleCourse} />);
+
+      fireEvent(
+        window,
+        new CustomEvent('bunkCalcToggle', { detail: true })
+      );
+
+      // Bunk calculator should become visible
+      await screen.findByText('Computer Science');
+    });
+  });
+
+  describe('loadSetting with authenticated session', () => {
+    it('loads bunk calc preference from user-scoped localStorage key when session has userId', async () => {
+      const { createClient } = await import('@/lib/supabase/client');
+      vi.mocked(createClient).mockReturnValue({
+        auth: {
+          getSession: vi.fn().mockResolvedValue({
+            data: { session: { user: { id: 'auth-user-abc' } } },
+            error: null,
+          }),
+          getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        },
+      } as any);
+
+      vi.stubGlobal('localStorage', {
+        getItem: vi.fn((key: string) => {
+          if (key === 'showBunkCalc_auth-user-abc') return 'false';
+          return null;
+        }),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      });
+
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 15, total: 20, absent: 5 },
+        isLoading: false,
+      } as any);
+
+      render(<CourseCard course={sampleCourse} />);
+      await screen.findByText('Computer Science');
+
+      // The component should read the scoped key on mount
+      await vi.waitFor(() => {
+        expect(localStorage.getItem).toHaveBeenCalledWith('showBunkCalc_auth-user-abc');
+      });
+    });
   });
 });

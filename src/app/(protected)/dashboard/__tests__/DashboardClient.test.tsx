@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import DashboardClient from '../DashboardClient';
+import { useFetchSemester, useFetchAcademicYear } from '@/hooks/users/settings';
+
+// Hoisted spies so they can be captured in vi.mock factory and used in assertions
+const mockSetSemesterMutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+const mockSetAcademicYearMutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 // Mock next/dynamic
 vi.mock('next/dynamic', () => ({
@@ -60,10 +65,10 @@ vi.mock('@/hooks/courses/courses', () => ({
 }));
 
 vi.mock('@/hooks/users/settings', () => ({
-  useFetchSemester: () => ({ data: null, isLoading: false, isError: false }),
-  useFetchAcademicYear: () => ({ data: null, isLoading: false, isError: false }),
-  useSetSemester: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  useSetAcademicYear: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useFetchSemester: vi.fn(() => ({ data: null, isLoading: false, isError: false })),
+  useFetchAcademicYear: vi.fn(() => ({ data: null, isLoading: false, isError: false })),
+  useSetSemester: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: mockSetSemesterMutateAsync, isPending: false })),
+  useSetAcademicYear: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: mockSetAcademicYearMutateAsync, isPending: false })),
 }));
 
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
@@ -122,6 +127,33 @@ vi.mock('@/lib/logger', () => ({
     error: vi.fn(),
     dev: vi.fn(),
   },
+}));
+
+// Mock alert-dialog
+vi.mock('@/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children, open }: any) => (open ? <div data-testid="alert-dialog">{children}</div> : null),
+  AlertDialogAction: ({ children, onClick, ...props }: any) => <button onClick={onClick} {...props}>{children}</button>,
+  AlertDialogCancel: ({ children, onClick, ...props }: any) => <button onClick={onClick} {...props}>{children}</button>,
+  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
+}));
+
+// Mock select (expose onValueChange via data-testid buttons for testing)
+vi.mock('@/components/ui/select', () => ({
+  Select: ({ children, onValueChange, value }: any) => (
+    <div data-testid="select-root" data-value={value}>
+      <button data-testid="select-trigger-even" onClick={() => onValueChange?.('even')}>even</button>
+      <button data-testid="select-trigger-odd" onClick={() => onValueChange?.('odd')}>odd</button>
+      {children}
+    </div>
+  ),
+  SelectTrigger: ({ children }: any) => <div>{children}</div>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
 }));
 
 // Mock toast
@@ -229,5 +261,70 @@ describe('DashboardClient', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
       expect(Sentry.captureException).toHaveBeenCalled();
     }, 15000);
+  });
+
+  describe('Semester auto-initialization (Case B – null data)', () => {
+    it('calls setSemesterMutation.mutateAsync when semesterData is null and no error', async () => {
+      // Default mock already returns { data: null, isLoading: false, isError: false }
+      // which triggers the Case B auto-init effect
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      render(<DashboardClient initialData={null} />);
+
+      await waitFor(() => {
+        expect(mockSetSemesterMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ default_semester: expect.any(String) })
+        );
+      }, { timeout: 5000 });
+    });
+  });
+
+  describe('Academic year auto-initialization (Case B – null data)', () => {
+    it('calls setAcademicYearMutation.mutateAsync when academicYearData is null and no error', async () => {
+      // Default mock returns { data: null, isLoading: false, isError: false }
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      render(<DashboardClient initialData={null} />);
+
+      await waitFor(() => {
+        expect(mockSetAcademicYearMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ default_academic_year: expect.any(String) })
+        );
+      }, { timeout: 5000 });
+    });
+  });
+
+  describe('handleConfirmChange – confirm semester change dialog', () => {
+    it('calls setSemesterMutation.mutateAsync and closes dialog on confirm', async () => {
+      // Return existing semester 'even' so auto-init does NOT fire for semester
+      vi.mocked(useFetchSemester).mockReturnValue({ data: 'even', isLoading: false, isError: false } as any);
+      // Still null for year so we don't need to worry about it here (separate effect)
+      vi.mocked(useFetchAcademicYear).mockReturnValue({ data: '2024-25', isLoading: false, isError: false } as any);
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      render(<DashboardClient initialData={null} />);
+
+      // Click the "odd" option on the first Select (semester Select, which appears at top)
+      const oddTriggers = await screen.findAllByTestId('select-trigger-odd');
+      fireEvent.click(oddTriggers[0]);
+
+      // The AlertDialog should now be visible with a Confirm button
+      const confirmBtn = await screen.findByRole('button', { name: /confirm/i });
+      fireEvent.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(mockSetSemesterMutateAsync).toHaveBeenCalledWith({ default_semester: 'odd' });
+      }, { timeout: 5000 });
+    });
   });
 });

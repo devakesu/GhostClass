@@ -360,4 +360,154 @@ describe('TrackingClient', () => {
       });
     });
   });
+
+  describe('getStatusKey – Present attendance code (110)', () => {
+    it('renders "Present" status badge for attendance code 110', async () => {
+      const presentItem = {
+        auth_user_id: 'auth-user-123',
+        course: 'CS101',
+        session: 'III',
+        date: '20240903',
+        attendance: 110,
+        status: 'extra',
+        semester: '1',
+        year: '2024',
+      };
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [presentItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [presentItem], isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // "Present" status label should appear in the status sub-header
+      const presentElements = await screen.findAllByText('Present');
+      expect(presentElements.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('normalizeDate – ISO, slash and dash formats', () => {
+    it('renders correctly formatted date from ISO format input (T-branch)', async () => {
+      const isoDateItem = {
+        auth_user_id: 'auth-user-123',
+        course: 'CS101',
+        session: 'IV',
+        date: '2024-09-04T10:00:00.000Z',
+        attendance: 111,
+        status: 'extra',
+        semester: '1',
+        year: '2024',
+      };
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [isoDateItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [isoDateItem], isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // normalizeDate('2024-09-04T10:00:00.000Z') → '20240904' → formatDisplayDate → '04/09/2024'
+      expect(await screen.findByText('04/09/2024')).toBeInTheDocument();
+    });
+
+    it('renders correctly formatted date from DD/MM/YYYY slash format', async () => {
+      const slashDateItem = {
+        auth_user_id: 'auth-user-123',
+        course: 'CS101',
+        session: 'V',
+        date: '04/09/2024',
+        attendance: 111,
+        status: 'extra',
+        semester: '1',
+        year: '2024',
+      };
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [slashDateItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [slashDateItem], isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // normalizeDate('04/09/2024') → '20240904' → formatDisplayDate → '04/09/2024'
+      expect(await screen.findByText('04/09/2024')).toBeInTheDocument();
+    });
+
+    it('renders correctly formatted date from YYYY-MM-DD dash format (no T)', async () => {
+      const dashDateItem = {
+        auth_user_id: 'auth-user-123',
+        course: 'CS101',
+        session: 'VI',
+        date: '2024-09-05',
+        attendance: 111,
+        status: 'extra',
+        semester: '1',
+        year: '2024',
+      };
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [dashDateItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [dashDateItem], isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // normalizeDate('2024-09-05') → '20240905' → formatDisplayDate → '05/09/2024'
+      expect(await screen.findByText('05/09/2024')).toBeInTheDocument();
+    });
+
+    it('falls back to raw dateStr when date cannot be normalized to 8 digits (formatDisplayDate/parseDateValue fallback)', async () => {
+      const badDateItem = {
+        auth_user_id: 'auth-user-123',
+        course: 'CS101',
+        session: 'VII',
+        date: 'invalid',
+        attendance: 111,
+        status: 'extra',
+        semester: '1',
+        year: '2024',
+      };
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: [badDateItem] as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: [badDateItem], isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 1,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 1, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // formatDisplayDate('invalid') → normalizeDate → '' → length !== 8 → returns 'invalid'
+      expect(await screen.findByText('invalid')).toBeInTheDocument();
+    });
+  });
 });
