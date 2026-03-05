@@ -154,11 +154,11 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
       },
       {
         onSuccess: () => {
-          toast.success("Profile updated", { invert: true });
+          toast.success("Profile updated");
           setIsEditing(false);
         },
         onError: (error) => {
-          toast.error("Failed to update profile", { invert: true });
+          toast.error("Failed to update profile");
           logger.error(error);
           
           // Capture failure in Sentry

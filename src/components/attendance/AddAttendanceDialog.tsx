@@ -308,11 +308,11 @@ export function AddAttendanceDialog({
 
   const handleSubmit = async () => {
     if (!user?.id || !courseId || !session) {
-      toast.error("Please fill all fields", { invert: true });
+      toast.error("Please fill all fields");
       return;
     }
     if (isSessionBlocked) {
-      toast.error("This session is already marked!", { invert: true });
+      toast.error("This session is already marked!");
       return;
     }
     setIsSubmitting(true);
@@ -326,7 +326,7 @@ export function AddAttendanceDialog({
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (!authUser) {
-        toast.error("You must be logged in", { invert: true });
+        toast.error("You must be logged in");
         return;
       }
 
@@ -349,27 +349,27 @@ export function AddAttendanceDialog({
       if (error) {
         // Check for duty leave constraint violation
         if (isDutyLeaveConstraintError(error)) {
-          toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
+          toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
           return;
         }
         throw error;
       }
 
-      toast.success("Extra class added successfully", { invert: true });
+      toast.success("Extra class added successfully");
       onSuccess();
       onOpenChange(false);
 
     } catch (error: any) {
       // Check for duty leave constraint violation in catch block as well
       if (isDutyLeaveConstraintError(error)) {
-        toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
+        toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
         // Expected business constraint violation; do not report to Sentry or log as error
         return;
       }
       
       // Only log and report unexpected errors
       logger.error("Add Record Failed:", error);
-      toast.error("Failed to add record", { invert: true });
+      toast.error("Failed to add record");
       
       Sentry.captureException(error, {
           tags: { type: "add_attendance_failure", location: "AddAttendanceDialog/handleSubmit" },

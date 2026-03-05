@@ -296,7 +296,6 @@ describe('CourseCard', () => {
       fireEvent.click(disableConfirmBtn);
       expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
         description: 'Challenge passed',
-        invert: true,
       });
     });
 
@@ -315,7 +314,7 @@ describe('CourseCard', () => {
       fireEvent.click(toggle);
       const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
       fireEvent.click(enableConfirmBtn);
-      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled', { invert: true });
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
     });
   });
 

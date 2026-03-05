@@ -60,14 +60,12 @@ export function InstitutionSelector() {
         queryClient.invalidateQueries({ queryKey: ["institutions"] });
         toast("Institution updated", {
           description: "Your default institution has been updated.",
-          invert: true,
         });
       },
       onError: () => {
         setPendingSelection(null); // Clear pending state on error to revert to server value
         toast.error("Error", {
           description: "Failed to update institution. Please try again.",
-          invert: true,
         });
       },
     });

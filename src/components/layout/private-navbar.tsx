@@ -82,9 +82,9 @@ export const Navbar = () => {
     // No need to dispatch here (or in onSuccess) to avoid double-firing
 
     if (checked) {
-      toast.success("Bunk Calculator Enabled", { invert: true });
+      toast.success("Bunk Calculator Enabled");
     } else {
-      toast.warning("Bunk Calculator Disabled", { invert: true });
+      toast.warning("Bunk Calculator Disabled");
     }
   };
 
@@ -102,11 +102,10 @@ export const Navbar = () => {
         queryClient.invalidateQueries({ queryKey: ["institutions"] });
         toast("Institution updated", {
           description: "Your default institution has been updated.",
-          invert: true,
         });
       },
       onError: () => {
-        toast.error("Failed to update institution", { invert: true });
+        toast.error("Failed to update institution");
       },
     });
   };

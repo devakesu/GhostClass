@@ -38,7 +38,7 @@ export function AcceptTermsForm() {
         tags: { type: "terms_acceptance_failure", location: "AcceptTermsForm/handleAgree" },
         extra: { version: TERMS_VERSION }
       });
-      toast.error("Failed to accept terms. Please try again.", { invert: true });
+      toast.error("Failed to accept terms. Please try again.");
       setLoading(false);
     }
   };

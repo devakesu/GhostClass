@@ -199,10 +199,10 @@ export function AttendanceCalendar({
             .eq('auth_user_id', authUserId);
 
         if (error) throw error;
-        toast.success("Record deleted", { invert: true });
+        toast.success("Record deleted");
         await Promise.all([refetchTrackData(), refetchCount()]); 
       } catch (error: any) {
-        toast.error("Error deleting: " + error.message, { invert: true });
+        toast.error("Error deleting: " + error.message);
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
       }
@@ -236,22 +236,22 @@ export function AttendanceCalendar({
         if (error) {
           // Check for duty leave constraint violation
           if (isDutyLeaveConstraintError(error)) {
-            toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
+            toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
             return;
           }
           throw error;
         }
-        toast.success("Added to tracking", { invert: true });
+        toast.success("Added to tracking");
         await refetchTrackData(); 
         await refetchCount();
       } catch (error: any) { 
         // Check for duty leave constraint violation in catch block as well
         if (isDutyLeaveConstraintError(error)) {
-          toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
+          toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
           // Expected business constraint violation; do not report to Sentry
           return;
         } 
-        toast.error("Failed to add record", { invert: true });
+        toast.error("Failed to add record");
         Sentry.captureException(error, { tags: { type: "tracking_add_error", location: "AttendanceCalendar/handleWriteTracking" }, extra: { courseId, dateStr, status, sessionName, attendanceCode, remarks } });
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
@@ -340,7 +340,7 @@ export function AttendanceCalendar({
   const handlePreviousMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
     if (currentDate.month === null || currentDate.year === null) {
-      toast.info("Calendar is still loading. Please wait...", { invert: true });
+      toast.info("Calendar is still loading. Please wait...");
       return;
     }
 
@@ -358,7 +358,7 @@ export function AttendanceCalendar({
   const handleNextMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
     if (currentDate.month === null || currentDate.year === null) {
-      toast.info("Calendar is still loading. Please wait...", { invert: true });
+      toast.info("Calendar is still loading. Please wait...");
       return;
     }
 

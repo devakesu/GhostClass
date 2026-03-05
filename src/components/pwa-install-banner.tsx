@@ -52,7 +52,6 @@ export function PWAInstallBanner() {
         // before the tab potentially closes.
         toast.success("GhostClass is installing!", {
           description: "Next time, open it from your home screen.",
-          invert: true,
         });
       } else if (outcome === "dismissed") {
         // User cancelled the native dialog — snooze so the banner can

@@ -294,7 +294,7 @@ describe('AcceptTermsForm', () => {
       await user.click(button);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Failed to accept terms. Please try again.', { invert: true });
+        expect(toast.error).toHaveBeenCalledWith('Failed to accept terms. Please try again.');
       });
 
       expect(mockNProgressDone).toHaveBeenCalled();

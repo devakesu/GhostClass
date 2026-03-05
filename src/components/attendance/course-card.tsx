@@ -659,7 +659,6 @@ export function CourseCard({ course }: CourseCardProps) {
                 setShowDisableDialog(false);
                 toast.success(`${courseCode} disabled`, {
                   description: reason,
-                  invert: true,
                 });
               }}
             >
@@ -687,7 +686,7 @@ export function CourseCard({ course }: CourseCardProps) {
                 if (!courseCode) return;
                 enableCourse(courseCode);
                 setShowEnableDialog(false);
-                toast.success(`${courseCode} enabled`, { invert: true });
+                toast.success(`${courseCode} enabled`);
               }}
             >
               Enable
