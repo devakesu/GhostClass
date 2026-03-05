@@ -339,7 +339,7 @@ export function useUserSettingsState() {
       // err is unknown by default in useMutation — narrow before comparing to NO_USER_ERROR_MESSAGE.
       const isNoUserError = err instanceof Error && err.message === NO_USER_ERROR_MESSAGE;
       if (!isNoUserError) {
-        toast.error("Failed to save settings");
+        toast.error("Failed to save settings", { invert: true });
         Sentry.captureException(err, { tags: { type: "settings_update_error", location: "useUserSettings" } });
       }
     }

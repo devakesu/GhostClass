@@ -199,10 +199,10 @@ export function AttendanceCalendar({
             .eq('auth_user_id', authUserId);
 
         if (error) throw error;
-        toast.success("Record deleted");
+        toast.success("Record deleted", { invert: true });
         await Promise.all([refetchTrackData(), refetchCount()]); 
       } catch (error: any) {
-        toast.error("Error deleting: " + error.message);
+        toast.error("Error deleting: " + error.message, { invert: true });
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
       }
@@ -236,22 +236,22 @@ export function AttendanceCalendar({
         if (error) {
           // Check for duty leave constraint violation
           if (isDutyLeaveConstraintError(error)) {
-            toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
+            toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
             return;
           }
           throw error;
         }
-        toast.success("Added to tracking", { style: { backgroundColor: "rgba(34, 197, 94, 0.1)", color: "rgb(74, 222, 128)", border: "1px solid rgba(34, 197, 94, 0.2)", backdropFilter: "blur(5px)" } });
+        toast.success("Added to tracking", { invert: true });
         await refetchTrackData(); 
         await refetchCount();
       } catch (error: any) { 
         // Check for duty leave constraint violation in catch block as well
         if (isDutyLeaveConstraintError(error)) {
-          toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
+          toast.error(getDutyLeaveErrorMessage(courseId, coursesData), { invert: true });
           // Expected business constraint violation; do not report to Sentry
           return;
         } 
-        toast.error("Failed to add record");
+        toast.error("Failed to add record", { invert: true });
         Sentry.captureException(error, { tags: { type: "tracking_add_error", location: "AttendanceCalendar/handleWriteTracking" }, extra: { courseId, dateStr, status, sessionName, attendanceCode, remarks } });
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
@@ -340,7 +340,7 @@ export function AttendanceCalendar({
   const handlePreviousMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
     if (currentDate.month === null || currentDate.year === null) {
-      toast.info("Calendar is still loading. Please wait...");
+      toast.info("Calendar is still loading. Please wait...", { invert: true });
       return;
     }
 
@@ -358,7 +358,7 @@ export function AttendanceCalendar({
   const handleNextMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
     if (currentDate.month === null || currentDate.year === null) {
-      toast.info("Calendar is still loading. Please wait...");
+      toast.info("Calendar is still loading. Please wait...", { invert: true });
       return;
     }
 

@@ -127,6 +127,7 @@ export default function TrackingClient() {
     onPartialSync: async () => {
       toast.warning("Partial Sync Completed", {
         description: "Some tracking records couldn't be synced. Your data may be incomplete.",
+        invert: true,
       });
       await Promise.all([refetchTrackingData(), refetchCount()]);
     },
@@ -135,6 +136,7 @@ export default function TrackingClient() {
       if (removed > 0) {
         toast.info("Data Synced", {
           description: `${removed} outdated record${removed === 1 ? '' : 's'} removed.`,
+          invert: true,
         });
       }
       await Promise.all([refetchTrackingData(), refetchCount()]);
@@ -215,7 +217,7 @@ export default function TrackingClient() {
 
         if (error) throw error;
 
-        toast.success("Delete successful");
+        toast.success("Delete successful", { invert: true });
         await Promise.all([refetchTrackingData(), refetchCount()]);
 
         const remainingInCourse = groupedAllData[course]?.length || 0;
@@ -224,7 +226,7 @@ export default function TrackingClient() {
         }
 
       } catch (error) {
-        toast.error("Error deleting the record.");
+        toast.error("Error deleting the record.", { invert: true });
         captureSentryException(error, { tags: { type: "tracking_delete_single", location: "TrackingClient/handleDeleteTrackData" }, extra: { userId: redact("id", String(user?.id)), session, course, date } });
       } finally {
         setDeleteId("");
@@ -247,12 +249,12 @@ export default function TrackingClient() {
 
       if (error) throw error;
 
-      toast.success("All records cleared.");
+      toast.success("All records cleared.", { invert: true });
       await Promise.all([refetchTrackingData(), refetchCount()]);
       setCurrentPage(0);
 
     } catch (error) {
-      toast.error("Failed to delete all tracking data.");
+      toast.error("Failed to delete all tracking data.", { invert: true });
       captureSentryException(error, { tags: { type: "tracking_delete_all", location: "TrackingClient/deleteAllTrackingData" }, extra: { userId: redact("id", String(user?.id)) }   });
     } finally {
       setIsProcessing(false);

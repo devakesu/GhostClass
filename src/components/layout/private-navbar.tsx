@@ -82,9 +82,9 @@ export const Navbar = () => {
     // No need to dispatch here (or in onSuccess) to avoid double-firing
 
     if (checked) {
-      toast.success("Bunk Calculator Enabled");
+      toast.success("Bunk Calculator Enabled", { invert: true });
     } else {
-      toast.warning("Bunk Calculator Disabled");
+      toast.warning("Bunk Calculator Disabled", { invert: true });
     }
   };
 
@@ -106,7 +106,7 @@ export const Navbar = () => {
         });
       },
       onError: () => {
-        toast.error("Failed to update institution");
+        toast.error("Failed to update institution", { invert: true });
       },
     });
   };

@@ -67,6 +67,7 @@ export function InstitutionSelector() {
         setPendingSelection(null); // Clear pending state on error to revert to server value
         toast.error("Error", {
           description: "Failed to update institution. Please try again.",
+          invert: true,
         });
       },
     });

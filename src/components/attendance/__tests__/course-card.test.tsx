@@ -281,9 +281,9 @@ describe('CourseCard', () => {
       });
       const { container } = render(<CourseCard course={sampleCourse} />);
       await screen.findByText('Computer Science');
-      // CardHeader is the first element child of the Card (.custom-container)
+      // Select the CardHeader using its stable data-slot attribute inside the Card (.custom-container)
       const card = container.querySelector('.custom-container');
-      const header = card?.firstElementChild;
+      const header = card?.querySelector('[data-slot="card-header"]');
       expect(header?.className).toContain('bg-red-500/10');
       expect(header?.className).toContain('border-red-500/30');
     });
@@ -296,6 +296,7 @@ describe('CourseCard', () => {
       fireEvent.click(disableConfirmBtn);
       expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
         description: 'Challenge passed',
+        invert: true,
       });
     });
 
@@ -314,7 +315,7 @@ describe('CourseCard', () => {
       fireEvent.click(toggle);
       const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
       fireEvent.click(enableConfirmBtn);
-      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled', { invert: true });
     });
   });
 

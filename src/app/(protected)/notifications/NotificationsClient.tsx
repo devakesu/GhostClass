@@ -112,12 +112,13 @@ export default function NotificationsPage() {
     onPartialSync: async () => {
       toast.warning("Partial Sync Completed", {
         description: "Some notifications couldn't be synced. Your notification list may be incomplete.",
+        invert: true,
       });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
     onSuccess: async (data) => {
       if ((data.deletions ?? 0) + (data.updates ?? 0) > 0) {
-        toast.info("Notifications Updated", { description: "New attendance data found." });
+        toast.info("Notifications Updated", { description: "New attendance data found.", invert: true });
       }
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -225,7 +226,7 @@ export default function NotificationsPage() {
           if (process.env.NODE_ENV === 'development') {
             logger.error("Failed to mark notification read", error);
           }
-          toast.error("Could not update notification");
+          toast.error("Could not update notification", { invert: true });
           captureSentryException(error, {
               tags: { type: "mark_notification_read", location: "NotificationsClient/handleMarkRead" },
               extra: { notification_id: id, action: "mark_read", userId: redact("id", String(user?.id)) }

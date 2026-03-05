@@ -99,7 +99,7 @@ export function DeleteAccount() {
 
       if (error) throw error;
       
-      toast.success("Account deleted successfully");
+      toast.success("Account deleted successfully", { invert: true });
 
       // Clear React Query cache
       queryClient.clear();
@@ -109,7 +109,7 @@ export function DeleteAccount() {
       await handleLogout();
       
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete account");
+      toast.error(error.message || "Failed to delete account", { invert: true });
       setIsDeleting(false);
     }
   };

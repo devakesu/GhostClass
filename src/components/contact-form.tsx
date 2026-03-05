@@ -49,7 +49,7 @@ export function ContactForm({ userDetails }: ContactFormProps) {
     e.preventDefault(); 
     
     if (!token) {
-        toast.error("Please complete the security check.");
+        toast.error("Please complete the security check.", { invert: true });
         setCaptchaError(true);
         return;
     }
@@ -76,7 +76,7 @@ export function ContactForm({ userDetails }: ContactFormProps) {
                     },
                 });
                 
-                toast.error("Something went wrong with the security check. Please try again.");
+                toast.error("Something went wrong with the security check. Please try again.", { invert: true });
                 setLoading(false);
                 return;
             }
@@ -91,7 +91,7 @@ export function ContactForm({ userDetails }: ContactFormProps) {
                 },
             });
             
-            toast.error("Something went wrong with the security check. Please try again.");
+            toast.error("Something went wrong with the security check. Please try again.", { invert: true });
             setLoading(false);
             return;
         }
@@ -105,18 +105,18 @@ export function ContactForm({ userDetails }: ContactFormProps) {
         const result = await submitContactForm(formData);
 
         if (result.error) {
-            toast.error(result.error);
+            toast.error(result.error, { invert: true });
             turnstile.reset();
             setToken(""); 
         } else {
-            toast.success("Message sent successfully!");
+            toast.success("Message sent successfully!", { invert: true });
             formRef.current?.reset();
             turnstile.reset();
             setToken(""); 
         }
     } catch (error) {
         logger.error("Form Error:", error);
-        toast.error("Something went wrong. Please try again.");
+        toast.error("Something went wrong. Please try again.", { invert: true });
         
         // Capture Client-Side Submission Errors
         Sentry.captureException(error, { 
@@ -213,7 +213,7 @@ export function ContactForm({ userDetails }: ContactFormProps) {
             onError={(err) => {
               logger.error("Turnstile Error:", err);
               setCaptchaError(true);
-              toast.error("Security check failed. Please refresh.");
+              toast.error("Security check failed. Please refresh.", { invert: true });
               Sentry.captureException(err, { tags: { type: "turnstile_client_error", location: "ContactForm/Turnstile" } });
             }}
             onExpire={() => setToken("")}

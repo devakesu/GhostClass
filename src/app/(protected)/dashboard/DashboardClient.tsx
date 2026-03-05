@@ -216,7 +216,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
             }
         });
 
-        toast.error("Failed to update settings");
+        toast.error("Failed to update settings", { invert: true });
 
     } finally {
         setIsUpdating(false);
@@ -315,6 +315,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     onPartialSync: async () => {
       toast.warning("Partial Sync Completed", {
         description: "Some attendance data couldn't be synced. Your dashboard may be incomplete.",
+        invert: true,
       });
       await Promise.all([
         refetchTracking(),
@@ -327,6 +328,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
       if (changed > 0) {
         toast.info("Attendance Synced", {
           description: `Dashboard updated. ${changed} record${changed === 1 ? '' : 's'} synced.`,
+          invert: true,
         });
       }
       await Promise.all([

@@ -55,7 +55,7 @@ export default function ProfileClient() {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!user?.id) {
-      toast.error("User not found. Please reload.");
+      toast.error("User not found. Please reload.", { invert: true });
       return;
     }
 
@@ -63,7 +63,7 @@ export default function ProfileClient() {
     if (!originalFile) return;
 
     if (!originalFile.type.startsWith("image/")) {
-      toast.error("Please upload an image file.");
+      toast.error("Please upload an image file.", { invert: true });
       return;
     }
 
@@ -81,7 +81,7 @@ export default function ProfileClient() {
 
       // 2. Compression Logic
       if (originalFile.size > 5 * 1024 * 1024) {
-        toast.info("Compressing large image...", { duration: 2000 });
+        toast.info("Compressing large image...", { duration: 2000, invert: true });
         try {
           const compressed = await compressImage(originalFile, 0.7);
           // Compress harder if first pass is still > 5MB
@@ -106,7 +106,7 @@ export default function ProfileClient() {
               // file_name omitted — original filenames are user PII (e.g. "john_doe_photo.jpg").
               extra: { original_size: originalFile.size, user_id: redact("id", String(user?.id ?? "unknown")) }
           });
-          toast.warning("Could not compress image. Uploading original.");
+          toast.warning("Could not compress image. Uploading original.", { invert: true });
         }
       }
       
@@ -115,7 +115,7 @@ export default function ProfileClient() {
       
       // 4. Success: Switch to remote URL
       setAvatarPreview(newAvatarUrl);
-      toast.success("Profile picture updated!");
+      toast.success("Profile picture updated!", { invert: true });
       
       // Sync DB changes
       refetchProfile(); 
@@ -126,7 +126,7 @@ export default function ProfileClient() {
       // 5. Revert to previous valid avatar on failure (Better UX than showing nothing)
       setAvatarPreview(profile?.avatar_url || null); 
       
-      toast.error(error.message || "Failed to update profile picture");
+      toast.error(error.message || "Failed to update profile picture", { invert: true });
       
       // Report fatal error to Sentry
       Sentry.captureException(error, {
