@@ -1,6 +1,6 @@
 "use client";
 
-import { Toaster as SonnerToaster, type ToasterProps } from "sonner";
+import { Toaster as SonnerToaster } from "sonner";
 import { useTheme } from "@/providers/theme";
 
 /**
@@ -15,7 +15,7 @@ export function Toaster() {
     <SonnerToaster 
       richColors 
       invert
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       position="bottom-right"
     />
   );
