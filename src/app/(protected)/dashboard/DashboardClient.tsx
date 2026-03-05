@@ -20,7 +20,7 @@ import {
 import { CourseCard } from "@/components/attendance/course-card";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useProfile } from "@/hooks/users/profile";
-import { useAttendanceReport } from "@/hooks/courses/attendance";
+import { useAttendanceReport, useAllCourseDetails } from "@/hooks/courses/attendance";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import {
   useFetchSemester,
@@ -166,6 +166,14 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     isLoading: isLoadingTracking, 
     refetch: refetchTracking 
   } = useTrackingData(user);
+
+  // Batch-prefetch all course summeries so each CourseCard finds its data already
+  // in the TanStack Query cache — eliminates the N+1 /summery call pattern.
+  const courseIds = useMemo(
+    () => (coursesData?.courses ? Object.keys(coursesData.courses) : []),
+    [coursesData?.courses]
+  );
+  useAllCourseDetails(courseIds);
 
   // Disabled courses — exclude from stats, chart, and active count
   const { disabledCodes } = useDisabledCourses({

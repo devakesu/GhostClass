@@ -51,7 +51,7 @@ try {
   const exampleEnvVersion = extractVersion(exampleEnvPath);
 
   // 5. OpenAPI spec
-  const openApiPath = path.join(process.cwd(), 'public', 'api-docs', 'openapi.yaml');
+  const openApiPath = path.join(process.cwd(), 'public', 'openapi', 'openapi.yaml');
   let openApiVersion = null;
   if (fs.existsSync(openApiPath)) {
     const openApiContent = fs.readFileSync(openApiPath, 'utf8');

@@ -71,9 +71,9 @@ describe("sitemap.xml", () => {
     expect(helpPage?.priority).toBe(0.7);
   });
 
-  it("should have 5 URLs total", () => {
+  it("should have 6 URLs total", () => {
     const urls = sitemap();
-    expect(urls).toHaveLength(5);
+    expect(urls).toHaveLength(6);
   });
 
   it("should set lastModified to Date when BUILD_TIMESTAMP is set", () => {

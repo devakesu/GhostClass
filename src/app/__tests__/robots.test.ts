@@ -39,10 +39,10 @@ describe("robots.txt", () => {
     const config = robots();
     const rules = Array.isArray(config.rules) ? config.rules[0] : config.rules;
     const disallowed = rules.disallow;
-    
-    expect(disallowed).toContain("/profile/");
-    expect(disallowed).toContain("/notifications/");
-    expect(disallowed).toContain("/api/");
+
+    expect(disallowed).toContain("/profile");
+    expect(disallowed).toContain("/notifications");
+    expect(disallowed).toContain("/dashboard");
     expect(disallowed).toContain("/tracking");
   });
 
@@ -68,10 +68,10 @@ describe("robots.txt", () => {
     expect(Array.isArray(rules.disallow)).toBe(true);
   });
 
-  it("should disallow exactly 7 paths", () => {
+  it("should disallow exactly 6 paths", () => {
     const config = robots();
     const rules = Array.isArray(config.rules) ? config.rules[0] : config.rules;
-    expect(rules.disallow).toHaveLength(7);
+    expect(rules.disallow).toHaveLength(6);
   });
 
   it("should disallow /scores", () => {

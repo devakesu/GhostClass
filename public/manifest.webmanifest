@@ -12,6 +12,22 @@
   "orientation": "portrait",
   "lang": "en",
   "dir": "ltr",
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "GhostClass — Dashboard"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "GhostClass — Dashboard"
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

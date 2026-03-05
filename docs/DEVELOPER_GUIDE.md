@@ -478,7 +478,7 @@ We follow [Semantic Versioning 2.0.0](https://semver.org/):
 4. Updates version files if needed:
    - `package.json`, `package-lock.json`
    - `.env`, `.example.env` (NEXT_PUBLIC_APP_VERSION)
-   - `public/api-docs/openapi.yaml`
+   - `public/openapi/openapi.yaml`
 
 5. Creates and pushes a git tag (e.g., `v1.5.6`)
 

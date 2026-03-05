@@ -32,7 +32,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Real-time Updates** ⚡ - Get instant updates on your attendance status and skip calculations
 - **Track Status Changes** 📝 – Get notified when your attendance is updated
 - **Mobile Friendly** 📱 - Access your attendance data on any device, anywhere
-- **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs` (or `/api/docs` in development)
+- **API Documentation** 📚 - Interactive OpenAPI documentation at `/api-docs`
 - **Build Transparency** 🔍 - View complete build provenance and SLSA attestations at `/build-info`
 - **Course Toggle** 🔕 - Disable courses you've cleared (e.g., challenge passed) so they stop affecting your aggregate stats while still appearing in course cards and the calendar
 - **Dark/Light Mode** 🌓 - Switch between dark and light themes with preference saved across sessions
@@ -164,7 +164,8 @@ src/
 │   ├── attendance-settings.tsx  # Attendance target settings
 │   ├── react-query.tsx       # TanStack Query provider
 │   ├── theme.tsx             # Light/dark theme provider
-│   └── user-settings.tsx     # User settings context provider
+│   ├── user-settings.tsx     # User settings context provider
+│   └── __tests__/            # Provider tests (theme, user-settings)
 ├── hooks/                    # Custom React hooks
 │   ├── courses/              # Course and exam data fetching hooks
 │   │   │                     # courses.ts — attendance/course queries
@@ -175,9 +176,11 @@ src/
 │   ├── users/                # User data hooks
 │   ├── notifications/        # Notification subscription hooks
 │   ├── __tests__/            # Hook tests
-│   ├── use-csrf-token.ts     # CSRF token management hook
-│   ├── use-sync-on-mount.ts  # Triggers background attendance sync on mount
-│   └── usePWAInstall.ts      # PWA install prompt detection and trigger
+│   ├── use-csrf-token.ts         # CSRF token management hook
+│   ├── use-sync-on-mount.ts      # Triggers background attendance sync on mount
+│   ├── useBackToExit.ts          # Android back-button to exit PWA
+│   ├── useInactivityClose.ts     # Auto-close inactive PWA window
+│   └── usePWAInstall.ts          # PWA install prompt detection and trigger
 ├── lib/                      # Core library code
 │   ├── logic/                # Business logic
 │   │   ├── bunk.ts                      # Attendance calculation algorithm
@@ -233,8 +236,8 @@ supabase/
 workers/                      # Proxy workers (deployed as standalone CF Workers / Lambda fns)
 ├── ezygo-proxy/              # CF Worker — Tier 1 outbound proxy for EzyGo API (server-side)
 ├── ezygo-proxy-aws/          # AWS Lambda — Tier 2 failover outbound proxy for EzyGo API (server-side)
-├── supabase-proxy/                      # CF Worker — Tier 1 inbound proxy for Supabase (browser-side, ISP bypass)
-└── supabase-proxy-aws/                  # AWS Lambda — Tier 2 fallback inbound proxy for Supabase (browser-side)
+├── supabase-proxy/           # CF Worker — Tier 1 inbound proxy for Supabase (browser-side, ISP bypass)
+└── supabase-proxy-aws/       # AWS Lambda — Tier 2 fallback inbound proxy for Supabase (browser-side)
 ```
 
 ## 🧮 Attendance Calculation Algorithm
@@ -374,31 +377,7 @@ Courses can be disabled on a per-semester basis so they no longer affect aggrega
 
 ### What Changes When a Course Is Disabled
 
-| Area | Effect |
-| --- | --- |
-| **Total Attendance Card** | Excluded from aggregate percentage |
-| **Dashboard Stat Cards** | Excluded from Present, Absent, DL, Special Leave, Active Courses counts |
-| **Attendance Chart** | Bar removed from the chart |
-| **Course Card** | Still shown (with reduced opacity + "Disabled" indicator) |
-| **Tracking Page** | Still shown with a "Disabled" badge; disabled courses sorted to end |
-| **Scores Page** | Still shown with a "Disabled" badge; disabled course groups sorted to end |
-| **Calendar** | Sessions still shown with a "Disabled" badge next to the status |
-| **Bunk Calculator** | Still functional on the individual course card |
-
-### Implementation Files
-
-| File | Role |
-| --- | --- |
-| `supabase/migrations/20260304000000_disabled_courses.sql` | Adds `disabled_courses` JSONB column |
-| `src/types/user-settings.ts` | `DisabledCoursesMap` type definition |
-| `src/hooks/courses/useDisabledCourses.ts` | `useDisabledCourses` hook (isDisabled, disableCourse, enableCourse) |
-| `src/providers/user-settings.tsx` | Context provider with CRUD for `disabled_courses` via `updateDisabledCourses` |
-| `src/components/attendance/course-card.tsx` | Toggle UI + disable/enable dialogs |
-| `src/app/(protected)/dashboard/DashboardClient.tsx` | Excludes disabled courses from stats |
-| `src/components/attendance/attendance-chart.tsx` | Filters disabled courses from chart |
-| `src/components/attendance/attendance-calendar.tsx` | Shows "Disabled" badge on calendar events |
-| `src/app/(protected)/tracking/TrackingClient.tsx` | "Disabled" badge + sorts disabled courses to end |
-| `src/app/(protected)/scores/ScoresClient.tsx` | "Disabled" badge + sorts disabled course groups to end |
+Excluded from aggregate percentage and counts, but still visible in course cards, calendar and other pages with a "Disabled" badge.
 
 ## 🚀 Getting Started
 
@@ -565,17 +544,23 @@ GhostClass uses **Vitest** for unit/component tests and **Playwright** for E2E t
 
 ### Test Structure
 
-The test suite spans 55 files covering every layer of the application.
+The test suite spans 70 files covering every layer of the application.
 
 ```text
 src/
 ├── __tests__/
+│   ├── instrumentation-client.test.ts         # Sentry browser instrumentation
 │   └── proxy.test.ts                          # Middleware routing and auth redirect
 ├── app/
 │   ├── __tests__/
 │   │   ├── robots.test.ts                     # Dynamic robots.txt generation
 │   │   └── sitemap.test.ts                    # Dynamic sitemap.xml generation
+│   ├── (auth)/
+│   │   └── __tests__/
+│   │       └── loading.test.tsx               # Auth route loading skeleton
 │   ├── (protected)/
+│   │   ├── __tests__/
+│   │   │   └── loading.test.tsx               # Protected route loading skeleton
 │   │   ├── dashboard/__tests__/
 │   │   │   ├── DashboardClient.test.tsx       # Dashboard (background sync, error states)
 │   │   │   └── page.test.tsx                  # Dashboard page SSR
@@ -608,6 +593,8 @@ src/
 │       ├── health/__tests__/
 │       │   ├── route.test.ts                  # Basic health check
 │       │   └── ezygo/__tests__/route.test.ts  # EzyGo integration health
+│       ├── logout/__tests__/
+│       │   └── route.test.ts                  # Session termination
 │       ├── profile/__tests__/
 │       │   └── route.test.ts                  # Profile fetch (Origin check, PII crypto)
 │       └── provenance/__tests__/
@@ -616,8 +603,10 @@ src/
 │   ├── __tests__/
 │   │   ├── error-boundary.test.tsx            # Error boundary UI
 │   │   ├── pwa-install-banner.test.tsx        # PWA install prompt banner
-│   │   └── sw-register.test.tsx               # Service worker registration
+│   │   ├── sw-register.test.tsx               # Service worker registration
+│   │   └── toaster.test.tsx                   # Toast notification provider
 │   ├── attendance/__tests__/
+│   │   ├── AddAttendanceDialog.test.tsx        # Add manual attendance dialog
 │   │   ├── attendance-calendar.test.tsx       # Calendar view
 │   │   ├── attendance-chart.test.tsx          # Performance charts
 │   │   └── course-card.test.tsx               # Course card with bunk calculator
@@ -629,35 +618,47 @@ src/
 │   ├── ui/__tests__/
 │   │   └── select.test.tsx                    # Shadcn Select component
 │   └── user/__tests__/
+│       ├── login-form-client.test.tsx         # Login form client component
 │       ├── login-form.test.tsx                # Login form (auth, CSRF, error cases)
 │       └── password-reset-form.test.tsx       # Password reset flow
 ├── hooks/
 │   ├── __tests__/
 │   │   ├── use-csrf-token.test.tsx            # CSRF token management hook
+│   │   ├── useBackToExit.test.ts              # Android back-button to exit PWA
+│   │   ├── useInactivityClose.test.ts         # Auto-close inactive PWA window
 │   │   ├── usePWAInstall.test.ts              # PWA install hook
 │   │   └── useUser.test.tsx                   # User data hook
 │   └── courses/__tests__/
-│       ├── attendance.test.tsx                # Attendance data queries
+│       ├── attendance.test.tsx                # Attendance data queries + batch prefetch
 │       ├── courses.test.tsx                   # Course list queries
-│       └── exams.test.tsx                     # Exam hooks (useExams, answers, questions)
-└── lib/
-    ├── __tests__/
-    │   ├── analytics.test.ts                  # GA4 helpers
-    │   ├── circuit-breaker.test.ts            # Circuit breaker state machine
-    │   ├── crypto.test.ts                     # AES-256-GCM encryption/decryption
-    │   ├── csp.test.ts                        # CSP header generation
-    │   ├── duty-leave-error-handling.test.ts  # Duty leave (code 225) limit errors
-    │   ├── ezygo-batch-fetcher.test.ts        # Rate-limited batch fetcher
-    │   ├── logger.test.ts                     # Logger config and redaction
-    │   ├── utils.server.test.ts               # Server-only utilities
-    │   └── utils.test.ts                      # Shared utility functions
-    ├── logic/__tests__/
-    │   └── bunk.test.ts                       # Attendance calculation algorithm
-    └── security/__tests__/
-        ├── auth.test.ts                       # Auth helpers and logout
-        ├── auth-cookie.test.ts                # Cookie security attributes (SEC-02)
-        ├── csrf.test.ts                       # CSRF token validation
-        └── request-signing.test.ts            # Request HMAC signing
+│       ├── exams.test.tsx                     # Exam hooks (useExams, answers, questions)
+│       └── useDisabledCourses.test.ts         # Disable/enable courses hook
+├── lib/
+│   ├── __tests__/
+│   │   ├── analytics.test.ts                  # GA4 helpers
+│   │   ├── circuit-breaker.test.ts            # Circuit breaker state machine
+│   │   ├── crypto.test.ts                     # AES-256-GCM encryption/decryption
+│   │   ├── csp.test.ts                        # CSP header generation
+│   │   ├── duty-leave-error-handling.test.ts  # Duty leave (code 225) limit errors
+│   │   ├── ezygo-batch-fetcher.test.ts        # Rate-limited batch fetcher
+│   │   ├── global-init.test.tsx               # Pre-hydration loader removal
+│   │   ├── logger.test.ts                     # Logger config and redaction
+│   │   ├── query-utils.test.ts                # TanStack Query retry helpers
+│   │   ├── utils.server.test.ts               # Server-only utilities
+│   │   ├── utils.test.ts                      # Shared utility functions
+│   │   └── validate-env.test.ts               # Environment variable validation
+│   ├── logic/__tests__/
+│   │   └── bunk.test.ts                       # Attendance calculation algorithm
+│   ├── security/__tests__/
+│   │   ├── auth.test.ts                       # Auth helpers and logout
+│   │   ├── auth-cookie.test.ts                # Cookie security attributes (SEC-02)
+│   │   ├── csrf.test.ts                       # CSRF token validation
+│   │   └── request-signing.test.ts            # Request HMAC signing
+│   └── supabase/__tests__/
+│       └── client.test.ts                     # Supabase client proxy failover
+└── providers/__tests__/
+    ├── theme.test.tsx                         # Theme provider (light/dark switching)
+    └── user-settings.test.tsx                 # User settings context provider
 e2e/
 ├── homepage.spec.ts                           # Homepage E2E
 └── smoke.spec.ts                              # Critical path smoke tests
@@ -689,12 +690,16 @@ Current test suite includes:
 - ✅ **Utility Functions** (`utils.test.ts`, `utils.server.test.ts`) - Shared and server-only helpers
 - ✅ **Security** (`auth-cookie.test.ts`, `csrf.test.ts`, `request-signing.test.ts`, `auth.test.ts`) - Cookie flags, CSRF tokens, HMAC signing
 - ✅ **Error Boundaries** (`error-boundary.test.tsx`) - Error handling UI
-- ✅ **Custom Hooks** - User, course, CSRF, and PWA install hooks
+- ✅ **Custom Hooks** - User, course, CSRF, PWA install, back-to-exit (`useBackToExit`), and inactivity close (`useInactivityClose`) hooks
+- ✅ **Disabled Courses Hook** (`useDisabledCourses.test.ts`) - Per-semester disable/enable course management
 - ✅ **Exam Data Hooks** (`exams.test.tsx`) - All 5 exam hooks: fetching, parallel queries, error isolation, stale-time config
 - ✅ **Scores Page** (`ScoresClient.test.tsx`) - Loading/error/empty states, stats strip, course grouping, score display, visibility rules, per-question drawer, accessibility (ARIA roles, focus management)
-- ✅ **Attendance Components** (`course-card.test.tsx`, `attendance-chart.test.tsx`, `attendance-calendar.test.tsx`) - Rendering, interaction, touch events
-- ✅ **API Routes** - All 14 API route handlers tested: auth, backend proxy, cron sync, profile (PII crypto), CSRF, health, docs gate, provenance, analytics
+- ✅ **Attendance Components** (`course-card.test.tsx`, `attendance-chart.test.tsx`, `attendance-calendar.test.tsx`, `AddAttendanceDialog.test.tsx`) - Rendering, interaction, touch events, add-record dialog
+- ✅ **API Routes** - All 11 API route handlers tested (15 test files): auth, backend proxy (origin, failover, IPv6), cron sync, profile (PII crypto), CSRF, health, EzyGo health, logout, docs gate, provenance, analytics
 - ✅ **Backend Proxy** (`route.test.ts`, `route-failover.test.ts`, `route-ipv6.test.ts`) - Origin validation, egress failover, IPv6 normalization
+- ✅ **Providers** (`theme.test.tsx`, `user-settings.test.tsx`) - Theme switching and user settings context
+- ✅ **Supabase Client** (`client.test.ts`) - CF → AWS → direct proxy failover chain
+- ✅ **Lib Utilities** (`global-init.test.tsx`, `query-utils.test.ts`, `validate-env.test.ts`) - Pre-hydration loader, TanStack Query retry helpers, env validation
 - ✅ **Circuit Breaker** (`circuit-breaker.test.ts`) - State machine transitions and half-open requests
 - ✅ **CSP** (`csp.test.ts`) - Content Security Policy header generation with nonces
 - ✅ **PWA** (`pwa-install-banner.test.tsx`, `usePWAInstall.test.ts`, `sw-register.test.tsx`) - Install prompt, SW registration

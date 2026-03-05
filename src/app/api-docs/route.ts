@@ -1,7 +1,8 @@
 import { ApiReference } from "@scalar/nextjs-api-reference";
+import { resolveOpenApiSpec } from "@/lib/openapi";
 
 export const GET = ApiReference({
-  url: "/api-docs/openapi.yaml",
+  content: resolveOpenApiSpec(),
   theme: "purple",
   layout: "modern",
   darkMode: true,
