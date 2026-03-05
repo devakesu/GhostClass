@@ -102,6 +102,7 @@ export const Navbar = () => {
         queryClient.invalidateQueries({ queryKey: ["institutions"] });
         toast("Institution updated", {
           description: "Your default institution has been updated.",
+          invert: true,
         });
       },
       onError: () => {

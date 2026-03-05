@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { CourseCard, ExtendedCourse } from '../course-card';
 import { useCourseDetails } from '@/hooks/courses/attendance';
+import { toast } from 'sonner';
 
 vi.mock('@/hooks/courses/attendance', () => ({
   useCourseDetails: vi.fn(() => ({
@@ -73,6 +74,12 @@ vi.mock('@/hooks/courses/useDisabledCourses', () => ({
 vi.mock('@/hooks/users/settings', () => ({
   useFetchSemester: () => ({ data: 'even' }),
   useFetchAcademicYear: () => ({ data: '2025-2026' }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+  },
 }));
 
 const sampleCourse: ExtendedCourse = {
@@ -260,6 +267,54 @@ describe('CourseCard', () => {
       if (toggleBtn) {
         expect(toggleBtn).toBeDisabled();
       }
+    });
+
+    it('applies red bg/border override to CardHeader when course is disabled', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (_code: string) => true,
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      const { container } = render(<CourseCard course={sampleCourse} />);
+      await screen.findByText('Computer Science');
+      // CardHeader is the first element child of the Card (.custom-container)
+      const card = container.querySelector('.custom-container');
+      const header = card?.firstElementChild;
+      expect(header?.className).toContain('bg-red-500/10');
+      expect(header?.className).toContain('border-red-500/30');
+    });
+
+    it('calls toast.success with courseCode and reason after confirming disable', async () => {
+      render(<CourseCard course={sampleCourse} />);
+      const toggle = await screen.findByText('Enabled');
+      fireEvent.click(toggle);
+      const disableConfirmBtn = await screen.findByRole('button', { name: /^disable$/i });
+      fireEvent.click(disableConfirmBtn);
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
+        description: 'Challenge passed',
+      });
+    });
+
+    it('calls toast.success with courseCode after confirming enable', async () => {
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (code: string) => code === 'CS101',
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+      render(<CourseCard course={sampleCourse} />);
+      const toggle = await screen.findByText('Disabled');
+      fireEvent.click(toggle);
+      const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
+      fireEvent.click(enableConfirmBtn);
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
     });
   });
 
