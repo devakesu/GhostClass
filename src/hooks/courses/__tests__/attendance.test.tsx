@@ -272,7 +272,7 @@ describe('useAllCourseDetails', () => {
     expect(axiosInstance.get).not.toHaveBeenCalled()
   })
 
-  it('fetches all course summeries in parallel and returns a map', async () => {
+  it('fetches all course summaries in parallel and returns a map', async () => {
     const raw101 = { present: 10, absent: 2, total: 12, percentage: 83 }
     const raw202 = { present: 5, absent: 5, totel: 10, persantage: 50 }
     vi.mocked(axiosInstance.get)

@@ -2,6 +2,7 @@
 // src/hooks/courses/attendance.ts
 
 import axios from "@/lib/axios";
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
@@ -70,9 +71,9 @@ export const useCourseDetails = (courseId: string) => {
  */
 export const useAllCourseDetails = (courseIds: string[]) => {
   const queryClient = useQueryClient();
-  const key = courseIds.slice().sort().join(",");
-  return useQuery<Record<string, CourseDetail>>({
-    queryKey: ["attendance-report-all", key],
+  const sortedCourseIds = courseIds.slice().sort();
+  const query = useQuery<Record<string, CourseDetail>>({
+    queryKey: ["attendance-report-all", sortedCourseIds],
     queryFn: async () => {
       const results = await Promise.all(
         courseIds.map(async (id) => {
@@ -86,8 +87,6 @@ export const useAllCourseDetails = (courseIds: string[]) => {
       const map: Record<string, CourseDetail> = {};
       for (const { id, detail } of results) {
         map[id] = detail;
-        // Seed the per-course cache so useCourseDetails won't fire network requests.
-        queryClient.setQueryData(["attendance-report", id], detail);
       }
       return map;
     },
@@ -98,4 +97,16 @@ export const useAllCourseDetails = (courseIds: string[]) => {
     refetchInterval: 5 * 60 * 1000,
     retry: retryTwice,
   });
+
+  // Seed the per-course cache so useCourseDetails won't fire network requests.
+  // Kept outside queryFn to preserve purity — TanStack Query may invoke queryFn
+  // multiple times on retries/refetches; side effects belong here instead.
+  useEffect(() => {
+    if (!query.data) return;
+    for (const [id, detail] of Object.entries(query.data)) {
+      queryClient.setQueryData(["attendance-report", id], detail);
+    }
+  }, [query.data, queryClient]);
+
+  return query;
 };
