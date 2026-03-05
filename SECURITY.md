@@ -76,26 +76,32 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 ### Current Overrides (package.json)
 
-#### tar: ^7.5.6
+#### serialize-javascript: ^7.0.4
 
-- **Reason**: Path traversal vulnerabilities in versions <6.1.9
-- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713
-- **Scope**: Dev-only (used by supabase CLI for unpacking)
+- **Reason**: Cross-site scripting vulnerability in versions <3.1.0
+- **CVEs**: CVE-2020-7660
+- **Scope**: Dev-only (used by Webpack/build toolchain)
 - **Status**: ✅ Patched
 
-#### fast-xml-parser: ^5.3.4
+#### tar: ^7.5.10
 
-- **Reason**: Prototype pollution and XXE (XML External Entity) vulnerabilities in versions <4.2.4
-- **CVEs**: CVE-2023-26920 (prototype pollution), CVE-2022-39353 (XXE)
-- **Scope**: Dev-only (used by @redocly/cli for OpenAPI parsing)
+- **Reason**: Path traversal vulnerabilities in versions ≤7.5.9
+- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713 / GHSA-qffp-2rhf-9h96
+- **Scope**: Dev-only (used by supabase CLI for unpacking)
 - **Status**: ✅ Patched
 
 #### js-yaml: ^4.1.1
 
 - **Reason**: Code execution via `load()` function in versions <4.0.0
 - **CVEs**: CVE-2021-23343
-- **Scope**: Dev-only (used by ESLint and Redocly CLI)
+- **Scope**: Dev-only (used by ESLint → @eslint/eslintrc)
 - **Status**: ✅ Patched
+
+#### rollup: ^4.52.3
+
+- **Reason**: Security and stability improvements in v4.x
+- **Scope**: Dev-only (used by Vite/Vitest for bundling)
+- **Status**: ✅ Up-to-date
 
 #### glob: ^13.0.6
 
@@ -109,13 +115,12 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
 - **Status**: ✅ Up-to-date
 
-#### @redocly/cli, @redocly/openapi-core, @redocly/respect-core → ajv: ^8.18.0 (selective override)
+#### minimatch: ^10.2.2
 
-- **Reason**: ReDoS vulnerability when using `$data` option in @redocly packages' ajv dependency
-- **CVEs**: CVE-2025-69873 / [GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6)
-- **Scope**: Dev-only (Redocly CLI for OpenAPI validation)
-- **Status**: ✅ Patched via selective overrides
-- **Note**: ESLint's internal ajv (v6) is no longer flagged by `npm audit` — the advisory was resolved without requiring a global override or ESLint upgrade
+- **Reason**: ReDoS vulnerability in versions <3.0.5
+- **CVEs**: GHSA-3ppc-4f35-3m26
+- **Scope**: Dev-only (used by @sentry/nextjs and other build tools)
+- **Status**: ✅ Patched
 
 ### Maintenance Policy
 
@@ -132,7 +137,7 @@ All previously tracked issues have been resolved:
 
 | Issue | Resolution |
 | --- | --- |
-| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. `@redocly/*` selective overrides remain as defence-in-depth. |
+| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. |
 | `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.2` override in `package.json`. |
 
 See [Dependency Security Overrides](#dependency-security-overrides) for the current override list.

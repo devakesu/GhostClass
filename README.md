@@ -14,7 +14,7 @@
 [![React](https://img.shields.io/badge/React-19.2.4-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Node.js](https://img.shields.io/badge/Node.js-20.19.0%2B%20%7C%2022.12.0%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-22.12.0%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Tests](https://img.shields.io/badge/Tests-Vitest%20%2B%20Playwright-green)](https://vitest.dev/)
 
 ## Overview
@@ -43,7 +43,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 - **Next.js 16.1.6** - React 19 with App Router
 - **TypeScript 5.9.3** - Strict mode for type safety
-- **Node.js** - v20.19.2+ or v22.12.0+
+- **Node.js** - v22.12.0+
 
 ### Styling & UI
 
@@ -63,7 +63,6 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 - **OpenAPI 3.1** - API specification standard
 - **Scalar** - Interactive API documentation viewer
-- **Redocly CLI** - OpenAPI validation and linting
 
 ### Backend & Database
 
@@ -405,7 +404,7 @@ Courses can be disabled on a per-semester basis so they no longer affect aggrega
 
 ### Prerequisites
 
-- **Node.js** - v20.19.2+ or v22.12.0+
+- **Node.js** - v22.12.0+
 - **npm** - v11+ (specified in `package.json` engines)
 - **Docker** - For containerized deployment (optional)
 - **Git** - Version control
@@ -679,9 +678,6 @@ npm run test:e2e:ui        # Interactive E2E with Playwright UI
 
 # Run All Tests
 npm run test:all           # Unit + E2E tests
-
-# Validate API Documentation
-npm run docs:validate      # Lint OpenAPI spec
 ```
 
 ### Test Coverage

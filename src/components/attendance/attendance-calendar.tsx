@@ -241,7 +241,7 @@ export function AttendanceCalendar({
           }
           throw error;
         }
-        toast.success("Added to tracking", { style: { backgroundColor: "rgba(34, 197, 94, 0.1)", color: "rgb(74, 222, 128)", border: "1px solid rgba(34, 197, 94, 0.2)", backdropFilter: "blur(5px)" } });
+        toast.success("Added to tracking");
         await refetchTrackData(); 
         await refetchCount();
       } catch (error: any) { 
