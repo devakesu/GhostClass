@@ -121,7 +121,6 @@ export function ServiceWorkerRegister() {
                 toast("App updated — tap to refresh", {
                   description: "A new version of GhostClass is ready.",
                   duration: Infinity,
-                  invert: true,
                   action: {
                     label: "Refresh",
                     onClick: () => {

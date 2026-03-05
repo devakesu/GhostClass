@@ -118,7 +118,6 @@ export function useBackToExit(): void {
 
       toastIdRef.current = toast("Press back again to exit", {
         duration: THRESHOLD_MS,
-        invert: true,
         onDismiss: () => {
           toastIdRef.current = null;
           firstBackTimeRef.current = null;

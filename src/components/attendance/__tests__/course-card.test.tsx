@@ -281,9 +281,9 @@ describe('CourseCard', () => {
       });
       const { container } = render(<CourseCard course={sampleCourse} />);
       await screen.findByText('Computer Science');
-      // CardHeader is the first element child of the Card (.custom-container)
+      // Select the CardHeader using its stable data-slot attribute inside the Card (.custom-container)
       const card = container.querySelector('.custom-container');
-      const header = card?.firstElementChild;
+      const header = card?.querySelector('[data-slot="card-header"]');
       expect(header?.className).toContain('bg-red-500/10');
       expect(header?.className).toContain('border-red-500/30');
     });
