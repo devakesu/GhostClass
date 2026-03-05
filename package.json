@@ -17,7 +17,6 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint src",
-    "docs:validate": "npx @redocly/cli lint public/api-docs/openapi.yaml",
     "verify-version": "node scripts/verify-version.js",
     "bump-version": "node scripts/bump-version.js",
     "sync-secrets": "node scripts/sync-secrets.js",
@@ -39,22 +38,13 @@
   ],
   "overrides": {
     "serialize-javascript": "^7.0.4",
-    "tar": "^7.5.6",
+    "tar": "^7.5.10",
     "fast-xml-parser": "^5.3.4",
     "js-yaml": "^4.1.1",
     "rollup": "^4.52.3",
     "glob": "^13.0.6",
     "source-map": "^0.7.6",
-    "minimatch": "^10.2.2",
-    "@redocly/cli": {
-      "ajv": "^8.18.0"
-    },
-    "@redocly/openapi-core": {
-      "ajv": "^8.18.0"
-    },
-    "@redocly/respect-core": {
-      "ajv": "^8.18.0"
-    }
+    "minimatch": "^10.2.2"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -74,7 +64,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@react-email/components": "^1.0.8",
-    "@scalar/nextjs-api-reference": "^0.9.24",
+    "@scalar/nextjs-api-reference": "^0.10.0",
     "@sentry/nextjs": "^10.41.0",
     "@serwist/next": "^9.5.6",
     "@supabase/ssr": "^0.9.0",
@@ -114,7 +104,6 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.58.2",
-    "@redocly/cli": "^2.19.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.1",
