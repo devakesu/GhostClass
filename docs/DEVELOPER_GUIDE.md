@@ -894,7 +894,6 @@ npm audit
 
 - `ajv@6.14.0` is still installed as an internal dependency of ESLint (`eslint@9.39.2`), however the advisory GHSA-2g4f-4pwh-qvx6 is no longer flagged by npm audit
 - `minimatch` is fully patched via the `^10.2.2` override in `package.json`
-- `@redocly/*` packages are patched via selective `ajv@^8.18.0` overrides
 - No ESLint 10 upgrade or `typescript-eslint` v9 was required to reach zero vulnerabilities
 
 **Verification**:

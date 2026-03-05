@@ -39,7 +39,6 @@
   "overrides": {
     "serialize-javascript": "^7.0.4",
     "tar": "^7.5.10",
-    "fast-xml-parser": "^5.3.4",
     "js-yaml": "^4.1.1",
     "rollup": "^4.52.3",
     "glob": "^13.0.6",

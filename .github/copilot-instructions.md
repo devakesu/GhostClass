@@ -55,7 +55,6 @@ npm run lint         # ESLint
 npm run test         # Vitest unit/component tests (watch mode by default)
 npm run test:coverage # Coverage report (lcov, html, json)
 npm run test:e2e     # Playwright E2E tests (all configured projects; CI uses --project=chromium)
-npm run docs:validate # Validate OpenAPI spec with Redocly
 ```
 
 ### Environment Setup

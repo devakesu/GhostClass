@@ -679,9 +679,6 @@ npm run test:e2e:ui        # Interactive E2E with Playwright UI
 
 # Run All Tests
 npm run test:all           # Unit + E2E tests
-
-# Validate API Documentation
-npm run docs:validate      # Lint OpenAPI spec
 ```
 
 ### Test Coverage

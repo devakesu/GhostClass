@@ -87,17 +87,17 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 - **Reason**: Prototype pollution and XXE (XML External Entity) vulnerabilities in versions <4.2.4
 - **CVEs**: CVE-2023-26920 (prototype pollution), CVE-2022-39353 (XXE)
-- **Scope**: Dev-only (used by @redocly/cli for OpenAPI parsing)
+- **Scope**: Dev-only (was used by @redocly/cli; override kept until all transitive consumers are updated)
 - **Status**: ✅ Patched
 
 #### js-yaml: ^4.1.1
 
 - **Reason**: Code execution via `load()` function in versions <4.0.0
 - **CVEs**: CVE-2021-23343
-- **Scope**: Dev-only (used by ESLint and Redocly CLI)
+- **Scope**: Dev-only (used by ESLint → @eslint/eslintrc)
 - **Status**: ✅ Patched
 
-#### glob: ^13.0.6
+### Maintenance Policy
 
 - **Reason**: Performance improvements and security hardening in v13+
 - **Scope**: Dev-only (used by build tools: Sentry, Serwist)
@@ -109,13 +109,11 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
 - **Status**: ✅ Up-to-date
 
-#### @redocly/cli, @redocly/openapi-core, @redocly/respect-core → ajv: ^8.18.0 (selective override)
+#### glob: ^13.0.6
 
-- **Reason**: ReDoS vulnerability when using `$data` option in @redocly packages' ajv dependency
-- **CVEs**: CVE-2025-69873 / [GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6)
-- **Scope**: Dev-only (Redocly CLI for OpenAPI validation)
-- **Status**: ✅ Patched via selective overrides
-- **Note**: ESLint's internal ajv (v6) is no longer flagged by `npm audit` — the advisory was resolved without requiring a global override or ESLint upgrade
+- **Reason**: Performance improvements and security hardening in v13+
+- **Scope**: Dev-only (used by build tools: Sentry, Serwist)
+- **Status**: ✅ Up-to-date
 
 ### Maintenance Policy
 
@@ -132,7 +130,7 @@ All previously tracked issues have been resolved:
 
 | Issue | Resolution |
 | --- | --- |
-| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. `@redocly/*` selective overrides remain as defence-in-depth. |
+| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. |
 | `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.2` override in `package.json`. |
 
 See [Dependency Security Overrides](#dependency-security-overrides) for the current override list.
