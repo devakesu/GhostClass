@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useUser } from "@/hooks/users/user";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, CircleAlert, ChevronLeft, ChevronRight, BookOpen, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
-import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useAttendanceReport } from "@/hooks/courses/attendance";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { Loading } from "@/components/loading";
@@ -96,6 +96,9 @@ export default function TrackingClient() {
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null);
+  const [showPinnedCourse, setShowPinnedCourse] = useState(false);
+  const courseHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   // Per-course record limits (for performance with 100+ records)
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
@@ -180,6 +183,28 @@ export default function TrackingClient() {
     const startIndex = currentPage * coursesPerPage;
     return allCourseKeys.slice(startIndex, startIndex + coursesPerPage);
   }, [currentPage, allCourseKeys, coursesPerPage]);
+
+  const activeCourseMeta = useMemo(() => {
+    if (!activeCourseKey) return null;
+    const items = groupedAllData[activeCourseKey];
+    if (!items?.length) return null;
+
+    const displayCourseName =
+      attendanceData?.courses?.[items[0].course]?.name ||
+      coursesData?.courses?.[items[0].course]?.name ||
+      activeCourseKey;
+    const courseCode = (
+      attendanceData?.courses?.[items[0].course]?.code ??
+      coursesData?.courses?.[items[0].course]?.code ??
+      ""
+    ).toUpperCase();
+
+    return {
+      displayCourseName,
+      isDisabled: isCourseDisabled(courseCode),
+      count: items.length,
+    };
+  }, [activeCourseKey, groupedAllData, attendanceData, coursesData, isCourseDisabled]);
 
   const goToPrevPage = () => { if (currentPage > 0) setCurrentPage(currentPage - 1); };
   const goToNextPage = () => { if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1); };
@@ -266,6 +291,51 @@ export default function TrackingClient() {
       behavior: "smooth",
     });
   };
+
+  useEffect(() => {
+    if (currentCourseKeys.length === 0) {
+      setActiveCourseKey(null);
+      setShowPinnedCourse(false);
+      return;
+    }
+
+    const navOffsetPx = 80; // matches protected layout navbar height (h-20)
+
+    const updateActiveCourse = () => {
+      // Pick the most recent course header that has crossed the navbar line.
+      // Header-based tracking avoids late/incorrect switching caused by using
+      // full section bounds (which include many records).
+      let lastCrossedHeader: string | null = null;
+
+      for (const courseKey of currentCourseKeys) {
+        const el = courseHeaderRefs.current[courseKey];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= navOffsetPx) {
+          lastCrossedHeader = courseKey;
+        } else {
+          break;
+        }
+      }
+
+      if (lastCrossedHeader) {
+        setActiveCourseKey(lastCrossedHeader);
+        setShowPinnedCourse(true);
+      } else {
+        setActiveCourseKey(null);
+        setShowPinnedCourse(false);
+      }
+    };
+
+    updateActiveCourse();
+    window.addEventListener("scroll", updateActiveCourse, { passive: true });
+    window.addEventListener("resize", updateActiveCourse);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveCourse);
+      window.removeEventListener("resize", updateActiveCourse);
+    };
+  }, [currentCourseKeys]);
   
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
   const officialSessionsMap = useMemo(() => {
@@ -285,15 +355,12 @@ export default function TrackingClient() {
   }, [attendanceData]);
 
   const cardVariants = { hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.95 } };
-  const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.3, staggerChildren: 0.05 } } };
-  const pageVariants = { enter: (d: number) => ({ x: d > 0 ? 50 : -50, opacity: 0 }), center: { x: 0, opacity: 1 }, exit: (d: number) => ({ x: d < 0 ? 50 : -50, opacity: 0 }) };
-
   // Block rendering until tracking is enabled, base data has loaded, and initial sync has completed.
   if (!enabled || isDataLoading || isSyncing || !syncCompleted) return <Loading />;
 
   return isProcessing ? ( <div className="h-screen flex items-center justify-center"><Loading /></div> ) : (
     <LazyMotion features={domAnimation}>
-      <div className="flex flex-1 flex-col flex-wrap gap-4 h-full p-4 md:p-6 text-center relative">
+      <div className="relative flex h-full flex-1 flex-col gap-4 p-4 text-center md:p-6">
         {trackingData && allCourseKeys.length > 0 ? (
           <>
             <div className="mb-2 pb-4 mt-10">
@@ -318,15 +385,25 @@ export default function TrackingClient() {
                 type="button"
                 onClick={scrollToBottom}
                 aria-label="Scroll to end of tracking page"
-                className="fixed right-4 md:right-6 bottom-20 md:bottom-24 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/15 text-blue-600 shadow-md backdrop-blur-xs transition-colors hover:bg-blue-500/25 dark:border-blue-500/30 dark:text-blue-400"
+                className="fixed right-5 bottom-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/15 text-blue-600 shadow-md backdrop-blur-xs transition-colors hover:bg-blue-500/25 md:right-7 md:bottom-7 dark:border-blue-500/30 dark:text-blue-400"
               >
                 <ArrowDown size={18} aria-hidden="true" />
               </button>
             )}
 
-            <m.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-4 relative w-full max-w-175 mx-auto">
-              <AnimatePresence mode="wait" initial={false} custom={currentPage > 0 ? -1 : 1}>
-                <m.div key={currentPage} custom={currentPage} initial="enter" animate="center" exit="exit" variants={pageVariants} transition={{ type: "tween", duration: 0.3 }} className="flex flex-col gap-6">
+            {showPinnedCourse && activeCourseMeta && (
+              <div className="fixed top-22 left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
+                <div className="rounded-md bg-primary/10 p-1.5 text-primary"><BookOpen size={16} /></div>
+                <h3 className="text-left text-sm font-semibold text-foreground/90 capitalize">{activeCourseMeta.displayCourseName.toLowerCase()}</h3>
+                {activeCourseMeta.isDisabled && (
+                  <Badge className="h-4 border-border bg-muted px-1.5 text-[10px] text-muted-foreground">Disabled</Badge>
+                )}
+                <Badge variant="outline" className="ml-auto text-xs">{activeCourseMeta.count}</Badge>
+              </div>
+            )}
+
+            <div className="relative mx-auto flex w-full max-w-175 flex-col gap-4 overflow-visible">
+              <div key={currentPage} className="flex flex-col gap-6 overflow-visible">
                   {currentCourseKeys.map((courseName) => {
                     const items = groupedAllData[courseName];
                     const displayCourseName = attendanceData?.courses?.[items[0].course]?.name || coursesData?.courses?.[items[0].course]?.name || courseName;
@@ -346,8 +423,16 @@ export default function TrackingClient() {
                     const activeStatusLabels = STATUS_ORDER.filter(s => statusGroups[s].length > 0);
                     
                     return (
-                      <div key={courseName} className="flex flex-col gap-3">
-                        <div className="sticky top-14 md:top-16 z-20 flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm">
+                      <div
+                        key={courseName}
+                        className="scroll-mt-24 flex flex-col gap-3"
+                      >
+                        <div
+                          ref={(el) => {
+                            courseHeaderRefs.current[courseName] = el;
+                          }}
+                          className="flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm"
+                        >
                           <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
                           {isCourseCurrentlyDisabled && (
@@ -471,8 +556,7 @@ export default function TrackingClient() {
                       </div>
                     );
                   })}
-                </m.div>
-              </AnimatePresence>
+                </div>
 
               {totalPages > 1 && (
                 <div className="flex justify-center items-center mt-6 gap-8 pb-8">
@@ -481,7 +565,7 @@ export default function TrackingClient() {
                   <m.button onClick={goToNextPage} disabled={currentPage === totalPages - 1} className={`h-8 w-8 flex justify-center items-center rounded-lg ${currentPage === totalPages - 1 ? "text-muted-foreground bg-accent/30" : "text-primary bg-accent hover:bg-accent/40"}`} aria-label="Next page"><ChevronRight size={20} aria-hidden="true" /></m.button>
                 </div>
               )}
-            </m.div>
+            </div>
           </>
         ) : (
           <m.div 

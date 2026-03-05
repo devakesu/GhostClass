@@ -182,6 +182,38 @@ describe('useBackToExit', () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('requires two qualifying non-dashboard backs again after deep-mode threshold expires', () => {
+    renderHook(() => useBackToExit());
+
+    history.pushState({ page: 'tracking-a' }, '', '/tracking?step=a');
+    history.pushState({ page: 'tracking-b' }, '', '/tracking?step=b');
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+
+    // Let deep-mode window expire, then press back once: should NOT re-show toast.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+
+    // Second qualifying back after expiry should show a fresh toast.
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(2);
+  });
+
   // -------------------------------------------------------------------------
   // First sentinel hit — shows toast, re-pushes sentinel
   // -------------------------------------------------------------------------

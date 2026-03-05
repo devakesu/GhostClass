@@ -80,6 +80,7 @@ export function useBackToExit(): void {
         toastIdRef.current = null;
       }
       firstBackTimeRef.current = null;
+      nonDashboardBackCountRef.current = 0;
       exitArmedRef.current = false;
       exitModeRef.current = null;
     };
@@ -94,12 +95,14 @@ export function useBackToExit(): void {
         onDismiss: () => {
           toastIdRef.current = null;
           firstBackTimeRef.current = null;
+          nonDashboardBackCountRef.current = 0;
           exitArmedRef.current = false;
           exitModeRef.current = null;
         },
         onAutoClose: () => {
           toastIdRef.current = null;
           firstBackTimeRef.current = null;
+          nonDashboardBackCountRef.current = 0;
           exitArmedRef.current = false;
           exitModeRef.current = null;
         },
