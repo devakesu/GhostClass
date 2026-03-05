@@ -42,7 +42,19 @@ function PolicySection({ title, content }: { title: string, content: string }) {
              p: ({node: _node, ...props}) => <p className="leading-relaxed mb-3" {...props} />,
              ul: ({node: _node, ...props}) => <ul className="list-disc pl-5 space-y-1 mb-3" {...props} />,
              li: ({node: _node, ...props}) => <li className="pl-1" {...props} />,
-             strong: ({node: _node, ...props}) => <strong className="text-foreground/80" {...props} />
+             strong: ({node: _node, ...props}) => <strong className="text-foreground/80" {...props} />,
+             a: ({node: _node, href, ...props}) => {
+               const isExternal = typeof href === "string" && /^https?:\/\//i.test(href);
+               return (
+                 <a
+                   href={href}
+                   className="font-semibold text-sky-700 underline decoration-2 underline-offset-2 hover:text-sky-600 dark:text-sky-300 dark:hover:text-sky-200"
+                   target={isExternal ? "_blank" : undefined}
+                   rel={isExternal ? "noopener noreferrer" : undefined}
+                   {...props}
+                 />
+               );
+             }
            }}
         >
           {content}

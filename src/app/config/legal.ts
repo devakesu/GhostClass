@@ -1,5 +1,5 @@
-export const TERMS_VERSION = "2.4";
-export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-01";
+export const TERMS_VERSION = "2.5";
+export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-06";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
 // ------------------------------------------------------------------
@@ -43,7 +43,7 @@ We employ industry-standard security measures to protect your data:
 We use trusted third-party infrastructure to operate GhostClass. By using the Service, you acknowledge and consent to your data being processed by the following providers:
 
 * **Cloudflare (Edge Network & Security):**
-    * *Purpose:* DNS resolution, DDoS protection, Content Delivery Network (CDN), Web Application Firewall (WAF), and **Turnstile (CAPTCHA)**.
+    * *Purpose:* DNS resolution, DDoS protection, Content Delivery Network (CDN), Web Application Firewall (WAF), and **Turnstile CAPTCHA verification** for abuse prevention on user-submitted forms.
     * *Data:* User IP addresses, web traffic metadata, and security cookies.
     * *Location:* Global (Edge Network). [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
 
@@ -55,7 +55,7 @@ We use trusted third-party infrastructure to operate GhostClass. By using the Se
 * **Amazon Web Services - Lambda + API Gateway (Egress & ISP-Bypass Proxy):**
     * *Purpose:* Two separate Lambda deployments: (1) **EzyGo egress proxy** — Tier-2 server-side outbound proxy fallback for EzyGo API requests when the Cloudflare tier is unavailable; (2) **Supabase browser proxy** — optional Tier-2 fallback for browser → Supabase requests when the Cloudflare Supabase proxy is unavailable.
     * *Data:* (1) EzyGo proxy: request metadata (source IP / User-Agent forwarding headers) and proxied EzyGo request/response payloads, processed entirely in transit — no persistent storage. (2) Supabase proxy: Supabase authentication and database request/response payloads processed in transit — no persistent storage.
-    * *Location:* Configured AWS region (set by deployment). [Privacy Policy](https://aws.amazon.com/privacy/)
+    * *Location:* **Mumbai, India (AWS ap-south-1)**. [Privacy Policy](https://aws.amazon.com/privacy/)
 
 * **Hetzner Online GmbH (Compute Infrastructure):**
     * *Purpose:* Hosts the application servers (VPS) that run the GhostClass logic and proxy requests to EzyGo.
@@ -75,7 +75,7 @@ We use trusted third-party infrastructure to operate GhostClass. By using the Se
     * *Purpose:* Anonymized usage statistics.
 
 **4. International Data Transfers**
-By using GhostClass, you acknowledge that your data may be transferred to and processed in servers located in **Germany (Hetzner)**, **The United States / configured AWS regions (Supabase/AWS Lambda/API Gateway)**, and globally via **Cloudflare's Edge/Workers**, regardless of your own physical location or the location of your university.
+By using GhostClass, you acknowledge that your data may be transferred to and processed in servers located in **Germany (Hetzner)**, **India (AWS ap-south-1 for Lambda/API Gateway proxies)**, **your project's configured Supabase AWS region**, and globally via **Cloudflare's Edge/Workers**, regardless of your own physical location or the location of your university.
 
 **5. Data Retention & Your Rights**
 You retain full ownership and control over your data.
@@ -114,7 +114,7 @@ You agree to defend, indemnify, and hold harmless the creators, maintainers, and
 We reserve the right to terminate or suspend access to our hosted service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
 
 **7. Governing Law**
-These Terms shall be governed and construed in accordance with the laws of the **Republic of India**, without regard to its conflict of law provisions. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in the **Republic of India**.
+These Terms shall be governed and construed in accordance with the laws of **India**, without regard to its conflict of law provisions. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts at **Kochi, Kerala, India**.
 
 **8. Contact Information**
 For any legal inquiries, data deletion requests, or notices of violation, please contact us at **[${LEGAL_EMAIL}](mailto:${LEGAL_EMAIL})**.

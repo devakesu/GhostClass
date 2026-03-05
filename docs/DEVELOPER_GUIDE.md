@@ -584,7 +584,7 @@ Navigate to the **Variables** tab and create the following:
 | `NEXT_PUBLIC_GA_ID` | `G-XXXXXXXXXX` | Google Analytics measurement ID |
 | `NEXT_PUBLIC_AUTHOR_NAME` | `@handle` | Author display name |
 | `NEXT_PUBLIC_AUTHOR_URL` | `https://example.com` | Author URL |
-| `NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE` | `January 1, 2026` | Legal docs effective date |
+| `NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE` | `March 6, 2026` | Legal docs effective date |
 | `SENTRY_ORG` | `devakesu` | Sentry organisation slug |
 | `SENTRY_PROJECT` | `ghostclass` | Sentry project slug |
 

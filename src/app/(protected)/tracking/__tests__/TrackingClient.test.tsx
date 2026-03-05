@@ -70,6 +70,13 @@ vi.mock('@/hooks/courses/useDisabledCourses', () => ({
   })),
 }));
 
+vi.mock('@/hooks/use-sync-on-mount', () => ({
+  useSyncOnMount: vi.fn(() => ({
+    isSyncing: false,
+    syncCompleted: true,
+  })),
+}));
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
     auth: {
@@ -143,6 +150,7 @@ vi.mock('lucide-react', () => ({
   ChevronLeft: () => <span data-testid="chevron-left-icon" />,
   ChevronRight: () => <span data-testid="chevron-right-icon" />,
   BookOpen: () => <span data-testid="book-open-icon" />,
+  ArrowDown: () => <span data-testid="arrow-down-icon" />,
 }));
 
 // Mock attendance-reconciliation

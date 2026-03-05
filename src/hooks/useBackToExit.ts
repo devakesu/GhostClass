@@ -55,6 +55,9 @@ function getHistoryState(): Record<string, unknown> {
 export function useBackToExit(): void {
   const firstBackTimeRef = useRef<number | null>(null);
   const toastIdRef = useRef<ReturnType<typeof toast> | null>(null);
+  const nonDashboardBackCountRef = useRef(0);
+  const exitArmedRef = useRef(false);
+  const exitModeRef = useRef<"root" | "deep" | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isStandalonePWA()) return;
@@ -71,47 +74,17 @@ export function useBackToExit(): void {
       history.pushState(rootState, "", window.location.href);
     }
 
-    const handlePopState = (event: PopStateEvent) => {
-      // Ignore mid-app back presses — their state doesn't carry a true sentinel.
-      // Strict === true check avoids accidental matches if __gce ever appears
-      // with a falsy value in some other history entry.
-      if (
-        !event.state ||
-        typeof event.state !== "object" ||
-        (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
-      ) {
-        // If a mid-app back fires while the exit toast is showing, cancel the
-        // pending exit. Only two *consecutive* root-level presses should close
-        // the PWA — navigating away resets the countdown.
-        if (toastIdRef.current !== null) {
-          toast.dismiss(toastIdRef.current);
-          toastIdRef.current = null;
-        }
-        firstBackTimeRef.current = null;
-        return;
-      }
-
-      const now = Date.now();
-
-      if (firstBackTimeRef.current !== null && now - firstBackTimeRef.current < THRESHOLD_MS) {
-        // Second back at root within threshold — close the PWA.
-        if (toastIdRef.current !== null) {
-          toast.dismiss(toastIdRef.current);
-        }
+    const resetExitState = () => {
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
         toastIdRef.current = null;
-        firstBackTimeRef.current = null;
-        window.close();
-        return;
       }
+      firstBackTimeRef.current = null;
+      exitArmedRef.current = false;
+      exitModeRef.current = null;
+    };
 
-      // First back at root (or threshold expired).
-      // Derive a clean top state by stripping __gce from the sentinel entry
-      // so Next.js router metadata is kept on the re-pushed entry.
-      firstBackTimeRef.current = now;
-      const { [SENTINEL_KEY]: _sentinel, ...cleanState } =
-        event.state as Record<string, unknown>;
-      history.pushState(cleanState, "", window.location.href);
-
+    const showExitToast = () => {
       if (toastIdRef.current !== null) {
         toast.dismiss(toastIdRef.current);
       }
@@ -121,12 +94,94 @@ export function useBackToExit(): void {
         onDismiss: () => {
           toastIdRef.current = null;
           firstBackTimeRef.current = null;
+          exitArmedRef.current = false;
+          exitModeRef.current = null;
         },
         onAutoClose: () => {
           toastIdRef.current = null;
           firstBackTimeRef.current = null;
+          exitArmedRef.current = false;
+          exitModeRef.current = null;
         },
       });
+    };
+
+    const handlePopState = (event: PopStateEvent) => {
+      // Ignore mid-app back presses — their state doesn't carry a true sentinel.
+      // Strict === true check avoids accidental matches if __gce ever appears
+      // with a falsy value in some other history entry.
+      if (
+        !event.state ||
+        typeof event.state !== "object" ||
+        (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
+      ) {
+        const isDashboardRoute = window.location.pathname.startsWith("/dashboard");
+        const hasDeepHistory = history.length > 2;
+
+        if (!isDashboardRoute && hasDeepHistory) {
+          const now = Date.now();
+
+          if (exitModeRef.current === "root") {
+            resetExitState();
+          }
+
+          if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
+            if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+              resetExitState();
+              nonDashboardBackCountRef.current = 0;
+              window.close();
+              return;
+            }
+
+            resetExitState();
+          }
+
+          nonDashboardBackCountRef.current += 1;
+
+          // Outside dashboard: after two qualifying back presses, show toast.
+          // Next qualifying back within threshold closes the standalone app.
+          if (nonDashboardBackCountRef.current >= 2) {
+            firstBackTimeRef.current = now;
+            exitArmedRef.current = true;
+            exitModeRef.current = "deep";
+            showExitToast();
+          }
+          return;
+        }
+
+        // Dashboard (or shallow history) behaves like the classic root flow.
+        // Any non-qualifying pop resets pending non-dashboard exit state.
+        nonDashboardBackCountRef.current = 0;
+        resetExitState();
+        return;
+      }
+
+      nonDashboardBackCountRef.current = 0;
+
+      const now = Date.now();
+
+      if (
+        exitArmedRef.current &&
+        exitModeRef.current === "root" &&
+        firstBackTimeRef.current !== null &&
+        now - firstBackTimeRef.current < THRESHOLD_MS
+      ) {
+        // Second back at root within threshold — close the PWA.
+        resetExitState();
+        window.close();
+        return;
+      }
+
+      // First back at root (or threshold expired).
+      // Derive a clean top state by stripping __gce from the sentinel entry
+      // so Next.js router metadata is kept on the re-pushed entry.
+      firstBackTimeRef.current = now;
+      exitArmedRef.current = true;
+      exitModeRef.current = "root";
+      const { [SENTINEL_KEY]: _sentinel, ...cleanState } =
+        event.state as Record<string, unknown>;
+      history.pushState(cleanState, "", window.location.href);
+      showExitToast();
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -140,6 +195,9 @@ export function useBackToExit(): void {
         toastIdRef.current = null;
       }
       firstBackTimeRef.current = null;
+      nonDashboardBackCountRef.current = 0;
+      exitArmedRef.current = false;
+      exitModeRef.current = null;
     };
   }, []);
 }

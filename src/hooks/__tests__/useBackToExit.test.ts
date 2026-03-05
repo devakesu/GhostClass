@@ -42,6 +42,10 @@ function fireMidAppPopState() {
   window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'dashboard' } }));
 }
 
+function setPath(path: string) {
+  history.replaceState(history.state, '', path);
+}
+
 describe('useBackToExit', () => {
   let useBackToExit: typeof import('@/hooks/useBackToExit').useBackToExit;
   let restoreMatchMedia: () => void;
@@ -129,6 +133,53 @@ describe('useBackToExit', () => {
     });
 
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('shows toast after the second qualifying non-dashboard back when deep history exists', () => {
+    renderHook(() => useBackToExit());
+
+    // Make history depth > 2 and keep pathname on a non-dashboard route.
+    history.pushState({ page: 'tracking-1' }, '', '/tracking?step=1');
+    history.pushState({ page: 'tracking-2' }, '', '/tracking?step=2');
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).not.toHaveBeenCalled();
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledWith(
+      'Press back again to exit',
+      expect.objectContaining({ duration: 2000 }),
+    );
+  });
+
+  it('closes on further qualifying non-dashboard back after toast is shown', () => {
+    renderHook(() => useBackToExit());
+
+    history.pushState({ page: 'scores-1' }, '', '/scores?step=1');
+    history.pushState({ page: 'scores-2' }, '', '/scores?step=2');
+
+    act(() => {
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+    act(() => {
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------

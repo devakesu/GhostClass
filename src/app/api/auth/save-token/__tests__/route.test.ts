@@ -247,7 +247,7 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
               auth_id: "auth-uuid-existing",
               auth_password: "enc-pw",
               auth_password_iv: MOCK_IV,
-              terms_version: "2.4",
+              terms_version: "2.5",
               terms_accepted_at: "2026-01-29T00:00:00Z",
             },
             error: null,
@@ -259,7 +259,7 @@ describe("POST /api/auth/save-token – terms cookie branching", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
-    expect(mockSetTermsVersionCookie).toHaveBeenCalledWith("2.4");
+    expect(mockSetTermsVersionCookie).toHaveBeenCalledWith("2.5");
     expect(mockClearTermsVersionCookie).not.toHaveBeenCalled();
   });
 });

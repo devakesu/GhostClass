@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, CircleAlert, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+import { Trash2, CircleAlert, ChevronLeft, ChevronRight, BookOpen, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useAttendanceReport } from "@/hooks/courses/attendance";
@@ -258,6 +258,14 @@ export default function TrackingClient() {
       setIsProcessing(false);
     }
   };
+
+  const scrollToBottom = () => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
+  };
   
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
   const officialSessionsMap = useMemo(() => {
@@ -305,6 +313,17 @@ export default function TrackingClient() {
               )}
             </div>
 
+            {(count ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                aria-label="Scroll to end of tracking page"
+                className="fixed right-4 md:right-6 bottom-20 md:bottom-24 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/15 text-blue-600 shadow-md backdrop-blur-xs transition-colors hover:bg-blue-500/25 dark:border-blue-500/30 dark:text-blue-400"
+              >
+                <ArrowDown size={18} aria-hidden="true" />
+              </button>
+            )}
+
             <m.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-4 relative w-full max-w-175 mx-auto">
               <AnimatePresence mode="wait" initial={false} custom={currentPage > 0 ? -1 : 1}>
                 <m.div key={currentPage} custom={currentPage} initial="enter" animate="center" exit="exit" variants={pageVariants} transition={{ type: "tween", duration: 0.3 }} className="flex flex-col gap-6">
@@ -328,7 +347,7 @@ export default function TrackingClient() {
                     
                     return (
                       <div key={courseName} className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 px-2 sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/60 shadow-sm rounded-md">
+                        <div className="sticky top-14 md:top-16 z-20 flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm">
                           <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
                           {isCourseCurrentlyDisabled && (
