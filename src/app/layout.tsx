@@ -113,7 +113,7 @@ export default async function RootLayout({
         <meta name="theme-color" content="#141414" />
       </head>
       <body
-        className={`overflow-x-hidden w-full max-w-[100vw] antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
+        className={`overflow-x-hidden w-full max-w-screen antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
       >
         {/* Pre-hydration loader — injected via script so React never owns this
             DOM node. Safe to imperatively .remove() from GlobalInit without

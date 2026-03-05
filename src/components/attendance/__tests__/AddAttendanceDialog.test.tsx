@@ -308,7 +308,7 @@ describe("AddAttendanceDialog", () => {
      *    triggering the "Session occupied" warning.
      */
     it("treats an opaque slot key at index 0 as occupying session 1 (index+1 fallback)", async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ['Date'] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
       const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
@@ -358,7 +358,7 @@ describe("AddAttendanceDialog", () => {
     });
 
     it("treats the second opaque slot (index 1) as session 2 when key is non-numeric", async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ['Date'] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
       const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
