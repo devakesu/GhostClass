@@ -308,87 +308,99 @@ describe("AddAttendanceDialog", () => {
      *    triggering the "Session occupied" warning.
      */
     it("treats an opaque slot key at index 0 as occupying session 1 (index+1 fallback)", async () => {
-      const today = new Date();
-      const todayKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+      vi.useFakeTimers();
+      const fixedDate = new Date("2025-01-15T10:00:00Z");
+      vi.setSystemTime(fixedDate);
+      const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
 
-      const propsWithAttendance = {
-        ...defaultProps,
-        attendanceData: {
-          courses: { "42": { name: "Test Course", code: "TC101" } },
-          sessions: {}, // no named sessions → fallback must kick in
-          attendanceTypes: {},
-          studentAttendanceData: {
-            [todayKey]: {
-              // key that parseInt() cannot resolve as a number < 20
-              "opaque-key-99": {
-                course: "42",
-                session: null,
+      try {
+        const propsWithAttendance = {
+          ...defaultProps,
+          attendanceData: {
+            courses: { "42": { name: "Test Course", code: "TC101" } },
+            sessions: {}, // no named sessions → fallback must kick in
+            attendanceTypes: {},
+            studentAttendanceData: {
+              [todayKey]: {
+                // key that parseInt() cannot resolve as a number < 20
+                "opaque-key-99": {
+                  course: "42",
+                  session: null,
+                },
               },
             },
+            attendanceDatesArray: {},
           },
-          attendanceDatesArray: {},
-        },
-      };
+        };
 
-      render(<AddAttendanceDialog {...(propsWithAttendance as any)} />);
+        render(<AddAttendanceDialog {...(propsWithAttendance as any)} />);
 
-      // Wait for the dialog to fully render
-      await waitFor(() => {
-        expect(screen.getByText("Add Extra Class")).toBeInTheDocument();
-      });
+        // Wait for the dialog to fully render
+        await waitFor(() => {
+          expect(screen.getByText("Add Extra Class")).toBeInTheDocument();
+        });
 
-      // After mount the useEffect auto-selects session "2" (first free, since "1" is
-      // occupied by the opaque slot at index 0). Now manually select "1" to trigger
-      // isSessionBlocked and confirm the "Session occupied" warning appears.
-      const sessionOneOption = screen
-        .getAllByRole("option")
-        .find((el) => el.getAttribute("data-value") === "1");
-      expect(sessionOneOption).toBeDefined();
-      fireEvent.click(sessionOneOption!);
+        // After mount the useEffect auto-selects session "2" (first free, since "1" is
+        // occupied by the opaque slot at index 0). Now manually select "1" to trigger
+        // isSessionBlocked and confirm the "Session occupied" warning appears.
+        const sessionOneOption = screen
+          .getAllByRole("option")
+          .find((el) => el.getAttribute("data-value") === "1");
+        expect(sessionOneOption).toBeDefined();
+        fireEvent.click(sessionOneOption!);
 
-      await waitFor(() => {
-        expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
-      });
+        await waitFor(() => {
+          expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("treats the second opaque slot (index 1) as session 2 when key is non-numeric", async () => {
-      const today = new Date();
-      const todayKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+      vi.useFakeTimers();
+      const fixedDate = new Date("2025-01-15T10:00:00Z");
+      vi.setSystemTime(fixedDate);
+      const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
 
-      const propsWithAttendance = {
-        ...defaultProps,
-        attendanceData: {
-          courses: { "42": { name: "Test Course", code: "TC101" } },
-          sessions: {},
-          attendanceTypes: {},
-          studentAttendanceData: {
-            [todayKey]: {
-              // index 0 → session "1" occupied
-              "slot-a": { course: "42", session: null },
-              // index 1 → session "2" occupied
-              "slot-b": { course: "42", session: null },
+      try {
+        const propsWithAttendance = {
+          ...defaultProps,
+          attendanceData: {
+            courses: { "42": { name: "Test Course", code: "TC101" } },
+            sessions: {},
+            attendanceTypes: {},
+            studentAttendanceData: {
+              [todayKey]: {
+                // index 0 → session "1" occupied
+                "slot-a": { course: "42", session: null },
+                // index 1 → session "2" occupied
+                "slot-b": { course: "42", session: null },
+              },
             },
+            attendanceDatesArray: {},
           },
-          attendanceDatesArray: {},
-        },
-      };
+        };
 
-      render(<AddAttendanceDialog {...(propsWithAttendance as any)} />);
+        render(<AddAttendanceDialog {...(propsWithAttendance as any)} />);
 
-      await waitFor(() => {
-        expect(screen.getByText("Add Extra Class")).toBeInTheDocument();
-      });
+        await waitFor(() => {
+          expect(screen.getByText("Add Extra Class")).toBeInTheDocument();
+        });
 
-      // Select session "2" – should be blocked (slot-b at index 1 maps to "2")
-      const sessionTwoOption = screen
-        .getAllByRole("option")
-        .find((el) => el.getAttribute("data-value") === "2");
-      expect(sessionTwoOption).toBeDefined();
-      fireEvent.click(sessionTwoOption!);
+        // Select session "2" – should be blocked (slot-b at index 1 maps to "2")
+        const sessionTwoOption = screen
+          .getAllByRole("option")
+          .find((el) => el.getAttribute("data-value") === "2");
+        expect(sessionTwoOption).toBeDefined();
+        fireEvent.click(sessionTwoOption!);
 
-      await waitFor(() => {
-        expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
-      });
+        await waitFor(() => {
+          expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
