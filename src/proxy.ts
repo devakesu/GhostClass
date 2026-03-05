@@ -82,7 +82,29 @@ export async function proxy(request: NextRequest) {
   // x-nonce is attached to the *request* (see requestHeaders + NextResponse.next above)
   // so that Next.js Server Components can read it via headers() and inject it into inline
   // <script>/<style> tags (e.g., in layout.tsx). We also mirror it on the response header.
-  response.headers.set('Content-Security-Policy', cspHeader);
+  //
+  // /api-docs uses @scalar/nextjs-api-reference which renders a standalone HTML page that
+  // loads its runtime from cdn.jsdelivr.net. This external CDN is not in the standard app
+  // CSP. We apply a dedicated, relaxed CSP only for this documentation route so the Scalar
+  // viewer can load while the rest of the app remains under strict CSP.
+  const isApiDocs = request.nextUrl.pathname === '/api-docs';
+  const effectiveCspHeader = isApiDocs
+    ? [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' https:",
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; ")
+    : cspHeader;
+  response.headers.set('Content-Security-Policy', effectiveCspHeader);
   response.headers.set("x-nonce", nonce);
 
   // 4. Initialize Supabase
@@ -103,7 +125,7 @@ export async function proxy(request: NextRequest) {
           );
 
           // ⚠️ CRITICAL: Re-apply CSP and nonce to the new response
-          response.headers.set('Content-Security-Policy', cspHeader);
+          response.headers.set('Content-Security-Policy', effectiveCspHeader);
           response.headers.set("x-nonce", nonce);
         },
       },

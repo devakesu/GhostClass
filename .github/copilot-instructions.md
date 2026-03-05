@@ -144,11 +144,11 @@ import { createClient } from '@/lib/supabase/client';
 GhostClass uses an automated version bump workflow (`.github/workflows/auto-version-bump.yml`):
 
 - **Same-repo PRs**: Version is auto-bumped by the workflow when a PR is opened/updated. No manual action needed.
-- **Fork PRs**: Run `CI=true GITHUB_HEAD_REF="$(git rev-parse --abbrev-ref HEAD)" node scripts/bump-version.js`, then commit `package.json`, `package-lock.json`, `.example.env`, `public/api-docs/openapi.yaml`.
+- **Fork PRs**: Run `CI=true GITHUB_HEAD_REF="$(git rev-parse --abbrev-ref HEAD)" node scripts/bump-version.js`, then commit `package.json`, `package-lock.json`, `.example.env`, `public/openapi/openapi.yaml`.
 - Version format is `X.Y.Z` with rollover (e.g., `1.9.9 → 2.0.0`).
 
 **Files that must be updated together when bumping version:**
-`package.json`, `package-lock.json`, `.example.env` (NEXT_PUBLIC_APP_VERSION), `public/api-docs/openapi.yaml`.
+`package.json`, `package-lock.json`, `.example.env` (NEXT_PUBLIC_APP_VERSION), `public/openapi/openapi.yaml`.
 
 ### CI Workflows
 

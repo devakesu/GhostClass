@@ -95,7 +95,7 @@ When you create a PR from a branch in the main repository:
 
 - `package.json` and `package-lock.json`
 - `.example.env` (NEXT_PUBLIC_APP_VERSION)
-- `public/api-docs/openapi.yaml`
+- `public/openapi/openapi.yaml`
 
 > **Note for Maintainers**: The auto-bump workflow uses `BOT_PAT` secret to trigger workflows after version bump commits. If you're a repository maintainer, see [Bot PAT Configuration](DEVELOPER_GUIDE.md#bot-pat-configuration) for setup. External contributors don't need this - the workflow will guide you through a simple manual script instead.
 
@@ -114,7 +114,7 @@ If contributing from a forked repository:
 4. Commit and push the changes:
 
    ```bash
-   git add package.json package-lock.json .example.env public/api-docs/openapi.yaml
+   git add package.json package-lock.json .example.env public/openapi/openapi.yaml
    git commit -m "chore: bump version"
    git push
    ```

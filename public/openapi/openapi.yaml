@@ -1,11 +1,12 @@
 # NOTE: This file contains template variables (e.g., ${NEXT_PUBLIC_APP_EMAIL}, ${NEXT_PUBLIC_APP_URL})
-# that require build-time substitution. Add a build step to replace these variables with actual values
-# from environment variables before deploying or serving this file.
+# that are substituted at request time by src/app/api/openapi/route.ts.
+# Do NOT serve this file directly (e.g., via the static /api-docs/openapi.yaml path) as the
+# placeholders will be returned literally. Always use the /api/openapi endpoint instead.
 openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 3.0.2
+  version: 3.0.3
   description: |
     **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
     
@@ -44,18 +45,20 @@ info:
 
   contact:
     name: GhostClass Support
-    email: ${NEXT_PUBLIC_APP_EMAIL}
+    email: "support${NEXT_PUBLIC_APP_EMAIL}"
     url: ${NEXT_PUBLIC_GITHUB_URL}
   
   license:
-    name: MIT
+    name: GPL-3.0
     url: ${NEXT_PUBLIC_GITHUB_URL}/blob/main/LICENSE
 
 servers:
   - url: ${NEXT_PUBLIC_APP_URL}
     description: Production
+  - url: https://localhost:3000
+    description: Development (HTTPS)
   - url: http://localhost:3000
-    description: Development
+    description: Development (HTTP)
 
 tags:
   - name: Authentication

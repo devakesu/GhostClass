@@ -194,7 +194,7 @@ jobs:
           # Stage and commit changes
           # Note: Files are explicitly listed (not git add -u) to ensure only version files are committed
           # This matches the files updated by bump-version.js
-          git add package.json package-lock.json .example.env public/api-docs/openapi.yaml
+          git add package.json package-lock.json .example.env public/openapi/openapi.yaml
 
           # Check if there are changes to commit
           if git diff --staged --quiet; then
@@ -242,7 +242,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Stage and commit changes
-          git add package.json package-lock.json .example.env public/api-docs/openapi.yaml
+          git add package.json package-lock.json .example.env public/openapi/openapi.yaml
 
           # Check if there are changes to commit
           if git diff --staged --quiet; then
@@ -363,7 +363,7 @@ jobs:
             The script will update:
             - \`package.json\` and \`package-lock.json\`
             - \`.example.env\` (NEXT_PUBLIC_APP_VERSION)
-            - \`public/api-docs/openapi.yaml\`
+            - \`public/openapi/openapi.yaml\`
 
             **Rollover versioning:** X.Y.Z where X ≥ 0 and Y, Z ∈ {0-9}
             - Example: 1.6.9 → 1.7.0, 1.9.9 → 2.0.0, 9.9.9 → 10.0.0

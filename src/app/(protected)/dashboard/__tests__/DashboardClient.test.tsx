@@ -58,6 +58,11 @@ vi.mock('@/hooks/courses/attendance', () => ({
       },
     }),
   }),
+  useAllCourseDetails: () => ({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 vi.mock('@/hooks/courses/courses', () => ({

@@ -303,7 +303,7 @@ try {
   });
 
   // 5. Update OpenAPI documentation version
-  const openApiPath = path.join(process.cwd(), 'public', 'api-docs', 'openapi.yaml');
+  const openApiPath = path.join(process.cwd(), 'public', 'openapi', 'openapi.yaml');
   
   if (fs.existsSync(openApiPath)) {
     let openApiContent = fs.readFileSync(openApiPath, 'utf8');
@@ -313,7 +313,7 @@ try {
     openApiContent = openApiContent.replace(versionRegex, `$1${newVersion}`);
     
     fs.writeFileSync(openApiPath, openApiContent);
-    console.log(`${GREEN}   ✔ Updated public/api-docs/openapi.yaml${RESET}`);
+    console.log(`${GREEN}   ✔ Updated public/openapi/openapi.yaml${RESET}`);
   } else {
     console.log(`${YELLOW}   ⚠  OpenAPI file not found, skipping.${RESET}`);
   }
