@@ -76,18 +76,18 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 ### Current Overrides (package.json)
 
-#### tar: ^7.5.6
+#### serialize-javascript: ^7.0.4
 
-- **Reason**: Path traversal vulnerabilities in versions <6.1.9
-- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713
-- **Scope**: Dev-only (used by supabase CLI for unpacking)
+- **Reason**: Cross-site scripting vulnerability in versions <3.1.0
+- **CVEs**: CVE-2020-7660
+- **Scope**: Dev-only (used by Webpack/build toolchain)
 - **Status**: ✅ Patched
 
-#### fast-xml-parser: ^5.3.4
+#### tar: ^7.5.10
 
-- **Reason**: Prototype pollution and XXE (XML External Entity) vulnerabilities in versions <4.2.4
-- **CVEs**: CVE-2023-26920 (prototype pollution), CVE-2022-39353 (XXE)
-- **Scope**: Dev-only (was used by @redocly/cli; override kept until all transitive consumers are updated)
+- **Reason**: Path traversal vulnerabilities in versions ≤7.5.9
+- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713 / GHSA-qffp-2rhf-9h96
+- **Scope**: Dev-only (used by supabase CLI for unpacking)
 - **Status**: ✅ Patched
 
 #### js-yaml: ^4.1.1
@@ -97,7 +97,13 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by ESLint → @eslint/eslintrc)
 - **Status**: ✅ Patched
 
-### Maintenance Policy
+#### rollup: ^4.52.3
+
+- **Reason**: Security and stability improvements in v4.x
+- **Scope**: Dev-only (used by Vite/Vitest for bundling)
+- **Status**: ✅ Up-to-date
+
+#### glob: ^13.0.6
 
 - **Reason**: Performance improvements and security hardening in v13+
 - **Scope**: Dev-only (used by build tools: Sentry, Serwist)
@@ -109,11 +115,12 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
 - **Status**: ✅ Up-to-date
 
-#### glob: ^13.0.6
+#### minimatch: ^10.2.2
 
-- **Reason**: Performance improvements and security hardening in v13+
-- **Scope**: Dev-only (used by build tools: Sentry, Serwist)
-- **Status**: ✅ Up-to-date
+- **Reason**: ReDoS vulnerability in versions <3.0.5
+- **CVEs**: GHSA-3ppc-4f35-3m26
+- **Scope**: Dev-only (used by @sentry/nextjs and other build tools)
+- **Status**: ✅ Patched
 
 ### Maintenance Policy
 

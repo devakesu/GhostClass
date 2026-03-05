@@ -63,7 +63,6 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 - **OpenAPI 3.1** - API specification standard
 - **Scalar** - Interactive API documentation viewer
-- **Redocly CLI** - OpenAPI validation and linting
 
 ### Backend & Database
 
