@@ -39,7 +39,7 @@ describe('Toaster', () => {
     });
   });
 
-  it('renders with invert=true and richColors in both themes', () => {
+  it('renders with invert=true and richColors', () => {
     render(<Toaster />);
     expect(capturedProps.current).toMatchObject({
       invert: true,
