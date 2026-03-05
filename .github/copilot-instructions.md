@@ -48,7 +48,7 @@ Key config files at root: `next.config.ts`, `vitest.config.ts`, `vitest.setup.ts
 ## Development Commands
 
 ```bash
-npm install          # Install dependencies (requires Node 20.19+ or 22.12+)
+npm install          # Install dependencies (requires Node 22.12+)
 npm run dev          # Development server on http://localhost:3000 (uses --webpack for Serwist)
 npm run build        # Production build
 npm run lint         # ESLint

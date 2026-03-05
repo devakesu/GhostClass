@@ -19,7 +19,7 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 ### Prerequisites
 
-- **Node.js**: 20.19.0+ or 22.12.0+
+- **Node.js**: 22.12.0+
 - **npm**: 11+
 - **Git**: Latest version
 

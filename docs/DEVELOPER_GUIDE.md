@@ -23,7 +23,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 
 ### Prerequisites
 
-- **Node.js**: v20.19.2+ or v22.12.0+
+- **Node.js**: v22.12.0+
 - **npm**: v11+
 - **Git**: Latest version
 - **GPG**: For commit signing (optional for local development, required for automated workflows)

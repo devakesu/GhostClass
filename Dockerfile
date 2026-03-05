@@ -1,7 +1,7 @@
 # ===============================
 # 0. Global deterministic settings
 # ===============================
-ARG NODE_IMAGE=node:20.19.2-alpine3.20@sha256:6e0e1a13235997255e6f36fd3da4169d99b5e87c0de01dc08300359d23224c33
+ARG NODE_IMAGE=node:22.14.0-alpine3.20@sha256:40be979442621049f40b1d51a26b55e281246b5de4e5f51a18da7beb6e17e3f9
 ARG SOURCE_DATE_EPOCH=1767225600
 
 # ===============================
