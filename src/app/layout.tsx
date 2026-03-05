@@ -118,7 +118,7 @@ export default async function RootLayout({
         {/* Pre-hydration loader — injected via script so React never owns this
             DOM node. Safe to imperatively .remove() from GlobalInit without
             corrupting React's fiber tree. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
 (function(){
   var wrap = document.createElement('div');
   wrap.id = 'prehyd-loader';

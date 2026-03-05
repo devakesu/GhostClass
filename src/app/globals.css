@@ -305,27 +305,16 @@ body:has(#nprogress) #nprogress {
   z-index: 2147483647 !important;
 }
 
-/* Toast customizations to work with tracking prevention issues */
-[data-sonner-toast] {
-  /* Ensure toasts have proper styling even when localStorage is blocked */
-  background-color: var(--background) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--foreground) !important;
-}
-
+/* Toast customizations — structural overrides only.
+   Background/color are intentionally left to Sonner so that `invert` can work.
+   The previous `background-color/color !important` rules were blocking inversion. */
 [data-sonner-toast][data-styled="true"] {
-  /* Use !important to override Sonner's inline styles */
   padding: 16px !important;
   border-radius: var(--radius-lg) !important;
 }
 
 [data-sonner-toast] [data-title] {
-  color: var(--foreground) !important;
   font-weight: 500 !important;
-}
-
-[data-sonner-toast] [data-description] {
-  color: var(--muted-foreground) !important;
 }
 
 [data-sonner-toast] [data-icon] {
@@ -333,64 +322,25 @@ body:has(#nprogress) #nprogress {
   align-items: center !important;
 }
 
-/* Success toast - Green themed */
+/* Type-specific border accents (no background override — let Sonner/richColors handle fill) */
 [data-sonner-toast][data-type="success"] {
-  background-color: var(--background) !important;
   border-color: hsl(142 76% 36%) !important;
   border-width: 2px !important;
 }
 
-[data-sonner-toast][data-type="success"] [data-icon] {
-  color: hsl(142 76% 36%) !important;
-}
-
-[data-sonner-toast][data-type="success"] [data-title] {
-  color: hsl(142 76% 45%) !important;
-}
-
-/* Error toast - Red themed */
 [data-sonner-toast][data-type="error"] {
-  background-color: var(--background) !important;
   border-color: hsl(0 84% 60%) !important;
   border-width: 2px !important;
 }
 
-[data-sonner-toast][data-type="error"] [data-icon] {
-  color: hsl(0 84% 60%) !important;
-}
-
-[data-sonner-toast][data-type="error"] [data-title] {
-  color: hsl(0 84% 60%) !important;
-}
-
-/* Warning toast - Yellow/Orange themed */
 [data-sonner-toast][data-type="warning"] {
-  background-color: var(--background) !important;
   border-color: hsl(38 92% 50%) !important;
   border-width: 2px !important;
 }
 
-[data-sonner-toast][data-type="warning"] [data-icon] {
-  color: hsl(38 92% 50%) !important;
-}
-
-[data-sonner-toast][data-type="warning"] [data-title] {
-  color: hsl(38 92% 50%) !important;
-}
-
-/* Info toast - Blue themed */
 [data-sonner-toast][data-type="info"] {
-  background-color: var(--background) !important;
   border-color: hsl(217 91% 60%) !important;
   border-width: 2px !important;
-}
-
-[data-sonner-toast][data-type="info"] [data-icon] {
-  color: hsl(217 91% 60%) !important;
-}
-
-[data-sonner-toast][data-type="info"] [data-title] {
-  color: hsl(217 91% 60%) !important;
 }
 
 /* Pre-hydration spinner animation (see layout.tsx #prehyd-loader) */

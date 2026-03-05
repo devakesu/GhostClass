@@ -178,17 +178,17 @@ export function AddAttendanceDialog({
       // A. Official Data
       const officialDay = attendanceData.studentAttendanceData?.[dateKey];
       if (officialDay) {
-          Object.keys(officialDay).forEach((key) => {
-            const s = officialDay[key] as { course: string | number | null; session?: string | null };
+          Object.entries(officialDay).forEach(([key, s], index) => {
+            const slot = s as { course: string | number | null; session?: string | number | null };
            
-            if (s.course == null || s.course === "null" || s.course === 0 || s.course === "0") return;
+            if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
 
-            let effectiveName = attendanceData.sessions?.[key]?.name;
-            if (!effectiveName && s.session && s.session !== "null") effectiveName = s.session;
+            let effectiveName: string | undefined = attendanceData.sessions?.[key]?.name;
+            if (!effectiveName && slot.session && slot.session !== "null") effectiveName = String(slot.session);
 
            if (!effectiveName) {
                const keyInt = parseInt(key);
-               if (!isNaN(keyInt) && keyInt < 20) effectiveName = key;
+               effectiveName = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
            }
 
            if (effectiveName) occupiedSessions.add(normalizeSession(effectiveName));
@@ -225,20 +225,20 @@ export function AddAttendanceDialog({
          const currentDay = new Date(y, m, d).getDay();
 
          if (currentDay === dayOfWeek) {
-            Object.keys(sessions).forEach((key) => {
-              const s = sessions[key] as { course: string | number | null; session?: string | null };
-              if (s.course == null || s.course === "null" || s.course === 0 || s.course === "0") return;
+            Object.entries(sessions).forEach(([key, s], index) => {
+              const slot = s as { course: string | number | null; session?: string | number | null };
+              if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
 
-               let effectiveName = attendanceData.sessions?.[key]?.name;
-               if (!effectiveName && s.session && s.session !== "null") effectiveName = s.session;
+               let effectiveName: string | undefined = attendanceData.sessions?.[key]?.name;
+               if (!effectiveName && slot.session && slot.session !== "null") effectiveName = String(slot.session);
                
                if (!effectiveName) {
                    const keyInt = parseInt(key);
-                   if (!isNaN(keyInt) && keyInt < 20) effectiveName = key;
+                   effectiveName = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
                }
 
                if (effectiveName && normalizeSession(effectiveName) === target) {
-                  const cid = String(s.course);
+                  const cid = String(slot.course);
                   frequencyMap[cid] = (frequencyMap[cid] || 0) + 1;
                }
             });
@@ -268,24 +268,22 @@ export function AddAttendanceDialog({
       let isBlocked = false;
       
       if (officialDay) {
-         isBlocked = Object.keys(officialDay).some((key) => {
-            const s = officialDay[key] as { course: string | number | null; session?: string | null };
+         isBlocked = Object.entries(officialDay).some(([key, s], index) => {
+            const slot = s as { course: string | number | null; session?: string | number | null };
 
-            if (s.course == null || s.course === "null" || s.course === 0 || s.course === "0") {
+            if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") {
                 return false;
             }
 
-            let effectiveName = attendanceData.sessions?.[key]?.name;
+            let effectiveName: string | undefined = attendanceData.sessions?.[key]?.name;
 
-            if (!effectiveName && s.session && s.session !== "null") {
-                effectiveName = s.session;
+            if (!effectiveName && slot.session && slot.session !== "null") {
+                effectiveName = String(slot.session);
             }
             
             if (!effectiveName) {
                 const keyInt = parseInt(key);
-                if (!isNaN(keyInt) && keyInt < 20) {
-                    effectiveName = key;
-                }
+                effectiveName = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
             }
 
             if (effectiveName && normalizeSession(effectiveName) === targetSession) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { Toaster as SonnerToaster } from "sonner";
+import { Toaster as SonnerToaster, type ToasterProps } from "sonner";
+import { useTheme } from "@/providers/theme";
 
 /**
  * Centralized Toaster component with consistent configuration across the app.
@@ -9,11 +10,13 @@ import { Toaster as SonnerToaster } from "sonner";
  * contrast against the page (dark bg in light mode, light bg in dark mode).
  */
 export function Toaster() {
+  const { theme } = useTheme();
   return (
     <SonnerToaster 
       richColors 
+      invert
+      theme={theme as ToasterProps["theme"]}
       position="bottom-right"
-      toastOptions={{ invert: true }}
     />
   );
 }
