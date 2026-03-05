@@ -135,12 +135,8 @@ describe('useBackToExit', () => {
     expect(mockToast).not.toHaveBeenCalled();
   });
 
-  it('shows toast after the second qualifying non-dashboard back when deep history exists', () => {
+  it('shows toast after the second qualifying non-dashboard back press', () => {
     renderHook(() => useBackToExit());
-
-    // Make history depth > 2 and keep pathname on a non-dashboard route.
-    history.pushState({ page: 'tracking-1' }, '', '/tracking?step=1');
-    history.pushState({ page: 'tracking-2' }, '', '/tracking?step=2');
 
     act(() => {
       setPath('/tracking');
@@ -160,9 +156,6 @@ describe('useBackToExit', () => {
 
   it('closes on further qualifying non-dashboard back after toast is shown', () => {
     renderHook(() => useBackToExit());
-
-    history.pushState({ page: 'scores-1' }, '', '/scores?step=1');
-    history.pushState({ page: 'scores-2' }, '', '/scores?step=2');
 
     act(() => {
       setPath('/scores');
@@ -184,9 +177,6 @@ describe('useBackToExit', () => {
 
   it('requires two qualifying non-dashboard backs again after deep-mode threshold expires', () => {
     renderHook(() => useBackToExit());
-
-    history.pushState({ page: 'tracking-a' }, '', '/tracking?step=a');
-    history.pushState({ page: 'tracking-b' }, '', '/tracking?step=b');
 
     act(() => {
       setPath('/tracking');

@@ -58,6 +58,10 @@ export function useBackToExit(): void {
   const nonDashboardBackCountRef = useRef(0);
   const exitArmedRef = useRef(false);
   const exitModeRef = useRef<"root" | "deep" | null>(null);
+  // Tracks non-sentinel navigation depth since the last sentinel hit or reset.
+  // Incremented on every non-sentinel back press on a non-dashboard route;
+  // reset when the sentinel is reached or a dashboard route is active.
+  const navDepthRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isStandalonePWA()) return;
@@ -74,15 +78,22 @@ export function useBackToExit(): void {
       history.pushState(rootState, "", window.location.href);
     }
 
-    const resetExitState = () => {
-      if (toastIdRef.current !== null) {
-        toast.dismiss(toastIdRef.current);
-        toastIdRef.current = null;
-      }
+    // Resets all exit-state refs WITHOUT dismissing the active toast.
+    // Used by onDismiss/onAutoClose where the toast is already leaving,
+    // so calling toast.dismiss() again would be re-entrant.
+    const clearState = () => {
+      toastIdRef.current = null;
       firstBackTimeRef.current = null;
       nonDashboardBackCountRef.current = 0;
       exitArmedRef.current = false;
       exitModeRef.current = null;
+    };
+
+    const resetExitState = () => {
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
+      }
+      clearState();
     };
 
     const showExitToast = () => {
@@ -92,20 +103,8 @@ export function useBackToExit(): void {
 
       toastIdRef.current = toast("Press back again to exit", {
         duration: THRESHOLD_MS,
-        onDismiss: () => {
-          toastIdRef.current = null;
-          firstBackTimeRef.current = null;
-          nonDashboardBackCountRef.current = 0;
-          exitArmedRef.current = false;
-          exitModeRef.current = null;
-        },
-        onAutoClose: () => {
-          toastIdRef.current = null;
-          firstBackTimeRef.current = null;
-          nonDashboardBackCountRef.current = 0;
-          exitArmedRef.current = false;
-          exitModeRef.current = null;
-        },
+        onDismiss: clearState,
+        onAutoClose: clearState,
       });
     };
 
@@ -119,9 +118,11 @@ export function useBackToExit(): void {
         (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
       ) {
         const isDashboardRoute = window.location.pathname.startsWith("/dashboard");
-        const hasDeepHistory = history.length > 2;
 
-        if (!isDashboardRoute && hasDeepHistory) {
+        if (!isDashboardRoute) {
+          // Track depth within the hook — more reliable than history.length,
+          // which is a session-wide counter that never decreases on back navigation.
+          navDepthRef.current += 1;
           const now = Date.now();
 
           if (exitModeRef.current === "root") {
@@ -130,8 +131,8 @@ export function useBackToExit(): void {
 
           if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
             if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+              navDepthRef.current = 0;
               resetExitState();
-              nonDashboardBackCountRef.current = 0;
               window.close();
               return;
             }
@@ -152,13 +153,14 @@ export function useBackToExit(): void {
           return;
         }
 
-        // Dashboard (or shallow history) behaves like the classic root flow.
-        // Any non-qualifying pop resets pending non-dashboard exit state.
-        nonDashboardBackCountRef.current = 0;
+        // Dashboard route: reset depth and any pending non-dashboard exit state.
+        navDepthRef.current = 0;
         resetExitState();
         return;
       }
 
+      // Sentinel hit: user backed all the way to the root entry. Reset depth.
+      navDepthRef.current = 0;
       nonDashboardBackCountRef.current = 0;
 
       const now = Date.now();
@@ -193,14 +195,8 @@ export function useBackToExit(): void {
       window.removeEventListener("popstate", handlePopState);
       // Dismiss any active toast and reset refs so stale UI is never left
       // behind after unmount (e.g. during HMR or StrictMode double-effect).
-      if (toastIdRef.current !== null) {
-        toast.dismiss(toastIdRef.current);
-        toastIdRef.current = null;
-      }
-      firstBackTimeRef.current = null;
-      nonDashboardBackCountRef.current = 0;
-      exitArmedRef.current = false;
-      exitModeRef.current = null;
+      resetExitState();
+      navDepthRef.current = 0;
     };
   }, []);
 }
