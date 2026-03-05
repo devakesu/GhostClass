@@ -58,7 +58,7 @@ export const useCourseDetails = (courseId: string) => {
 };
 
 /**
- * Batch-prefetch all course summeries in a **single** query using `Promise.all`.
+ * Batch-prefetch all course summaries in a **single** query using `Promise.all`.
  *
  * After fetching, each result is written into the per-course TanStack Query cache
  * (`["attendance-report", courseId]`) so that `useCourseDetails` in every
