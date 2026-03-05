@@ -58,9 +58,10 @@ export function useBackToExit(): void {
   const nonDashboardBackCountRef = useRef(0);
   const exitArmedRef = useRef(false);
   const exitModeRef = useRef<"root" | "deep" | null>(null);
-  // Tracks non-sentinel navigation depth since the last sentinel hit or reset.
-  // Incremented on every non-sentinel back press on a non-dashboard route;
-  // reset when the sentinel is reached or a dashboard route is active.
+  // Counts qualifying non-sentinel back presses on non-dashboard routes since
+  // the last sentinel hit or dashboard visit. Only incremented (never decremented
+  // during forward navigation), and reset to zero when the user returns to a
+  // shallow/root position (sentinel, dashboard, or deep-mode close).
   const navDepthRef = useRef(0);
 
   useEffect(() => {
@@ -81,6 +82,10 @@ export function useBackToExit(): void {
     // Resets all exit-state refs WITHOUT dismissing the active toast.
     // Used by onDismiss/onAutoClose where the toast is already leaving,
     // so calling toast.dismiss() again would be re-entrant.
+    // NOTE: navDepthRef is intentionally not reset here — depth represents
+    // "how deep in the app has the user navigated?" and should only be reset
+    // when they return to root/sentinel or a dashboard route, not merely
+    // because an exit toast was dismissed.
     const clearState = () => {
       toastIdRef.current = null;
       firstBackTimeRef.current = null;
@@ -131,6 +136,9 @@ export function useBackToExit(): void {
 
           if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
             if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+              // Reset depth before close: if window.close() is blocked (rare),
+              // the hook remains in a clean state. resetExitState() handles
+              // exit-armed refs; navDepthRef is separate (not in clearState).
               navDepthRef.current = 0;
               resetExitState();
               window.close();
