@@ -2,7 +2,6 @@
 // src/hooks/courses/attendance.ts
 
 import axios from "@/lib/axios";
-import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
@@ -16,6 +15,30 @@ function normalizeCourseDetail(raw: unknown): CourseDetail {
     total: rest.total ?? totel,
     percentage: rest.percentage ?? persantage,
   } satisfies CourseDetail;
+}
+
+/**
+ * Standalone async function that fetches and normalizes a single course's
+ * attendance summary. Shared by both `useCourseDetails` and the batch hook
+ * so the fetch logic is never duplicated.
+ */
+async function fetchCourseDetail(courseId: string): Promise<CourseDetail> {
+  if (!courseId) throw new Error("Course ID is required");
+  const res = await axios.get(
+    `/attendancereports/institutionuser/courses/${courseId}/summery`
+  );
+  if (!res) throw new Error("Failed to fetch course details data");
+  return normalizeCourseDetail(res.data);
+}
+
+/** Shared query options for a single course — keeps staleTime/gcTime/etc. in sync. */
+function courseDetailQueryOptions(courseId: string) {
+  return {
+    queryKey: ["attendance-report", courseId] as const,
+    queryFn: () => fetchCourseDetail(courseId),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  };
 }
 
 export const useAttendanceReport = (options?: { enabled?: boolean; initialData?: AttendanceReport }) => {
@@ -39,32 +62,23 @@ export const useAttendanceReport = (options?: { enabled?: boolean; initialData?:
 
 export const useCourseDetails = (courseId: string) => {
   return useQuery<CourseDetail>({
-    queryKey: ["attendance-report", courseId],
-    queryFn: async () => {
-      if (!courseId) throw new Error("Course ID is required");
-
-      const res = await axios.get(
-        `/attendancereports/institutionuser/courses/${courseId}/summery`
-      );
-      if (!res) throw new Error("Failed to fetch course details data");
-      return normalizeCourseDetail(res.data);
-    },
+    ...courseDetailQueryOptions(courseId),
     enabled: !!courseId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - balance between real-time and performance
-    gcTime: 10 * 60 * 1000,
-    refetchOnReconnect: true, // Keep real-time on reconnect
-    refetchInterval: 5 * 60 * 1000, // Poll every 5 minutes instead of 1 minute
+    refetchOnReconnect: true,
+    refetchInterval: 5 * 60 * 1000,
     retry: retryTwice,
   });
 };
 
 /**
- * Batch-prefetch all course summaries in a **single** query using `Promise.all`.
+ * Batch-prefetch all course summaries using `queryClient.fetchQuery` so each
+ * per-course fetch is registered under its own `["attendance-report", id]` key.
  *
- * After fetching, each result is written into the per-course TanStack Query cache
- * (`["attendance-report", courseId]`) so that `useCourseDetails` in every
- * `CourseCard` finds the data already populated and makes **zero** additional
- * network requests — eliminating the N+1 API call pattern.
+ * Because we use the **same** query key that `useCourseDetails` uses, TanStack
+ * Query deduplicates automatically: if a `CourseCard` mounts and calls
+ * `useCourseDetails(id)` while the batch is in-flight, it subscribes to the
+ * already-running promise instead of firing a second network request — fully
+ * eliminating the N+1 API call pattern without any `setQueryData` side effects.
  *
  * Call this hook in the dashboard (or any parent) that has the full list of
  * course IDs before the course cards are rendered.
@@ -72,23 +86,22 @@ export const useCourseDetails = (courseId: string) => {
 export const useAllCourseDetails = (courseIds: string[]) => {
   const queryClient = useQueryClient();
   const sortedCourseIds = courseIds.slice().sort();
-  const query = useQuery<Record<string, CourseDetail>>({
+  return useQuery<Record<string, CourseDetail>>({
     queryKey: ["attendance-report-all", sortedCourseIds],
     queryFn: async () => {
+      // fetchQuery uses the same per-course query key as useCourseDetails.
+      // TanStack Query tracks these fetches: concurrent useCourseDetails calls
+      // will deduplicate against in-flight promises rather than issuing new requests.
       const results = await Promise.all(
-        courseIds.map(async (id) => {
-          const res = await axios.get(
-            `/attendancereports/institutionuser/courses/${id}/summery`
-          );
-          if (!res) throw new Error(`Failed to fetch course details for ${id}`);
-          return { id, detail: normalizeCourseDetail(res.data) };
-        })
+        courseIds.map((id) =>
+          queryClient.fetchQuery<CourseDetail>({
+            ...courseDetailQueryOptions(id),
+            // Reuse any already-fresh per-course data (e.g. from a previous render).
+            staleTime: 2 * 60 * 1000,
+          })
+        )
       );
-      const map: Record<string, CourseDetail> = {};
-      for (const { id, detail } of results) {
-        map[id] = detail;
-      }
-      return map;
+      return Object.fromEntries(courseIds.map((id, i) => [id, results[i]]));
     },
     enabled: courseIds.length > 0,
     staleTime: 2 * 60 * 1000,
@@ -97,16 +110,4 @@ export const useAllCourseDetails = (courseIds: string[]) => {
     refetchInterval: 5 * 60 * 1000,
     retry: retryTwice,
   });
-
-  // Seed the per-course cache so useCourseDetails won't fire network requests.
-  // Kept outside queryFn to preserve purity — TanStack Query may invoke queryFn
-  // multiple times on retries/refetches; side effects belong here instead.
-  useEffect(() => {
-    if (!query.data) return;
-    for (const [id, detail] of Object.entries(query.data)) {
-      queryClient.setQueryData(["attendance-report", id], detail);
-    }
-  }, [query.data, queryClient]);
-
-  return query;
 };
