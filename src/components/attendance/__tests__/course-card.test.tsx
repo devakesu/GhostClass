@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { CourseCard, ExtendedCourse } from '../course-card';
 import { useCourseDetails } from '@/hooks/courses/attendance';
 import { toast } from 'sonner';
@@ -294,8 +294,10 @@ describe('CourseCard', () => {
       fireEvent.click(toggle);
       const disableConfirmBtn = await screen.findByRole('button', { name: /^disable$/i });
       fireEvent.click(disableConfirmBtn);
-      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
-        description: 'Challenge passed',
+      await waitFor(() => {
+        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
+          description: 'Challenge passed',
+        });
       });
     });
 
@@ -314,7 +316,9 @@ describe('CourseCard', () => {
       fireEvent.click(toggle);
       const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
       fireEvent.click(enableConfirmBtn);
-      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
+      await waitFor(() => {
+        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
+      });
     });
   });
 

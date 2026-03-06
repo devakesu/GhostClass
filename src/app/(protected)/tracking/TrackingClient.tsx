@@ -412,7 +412,7 @@ export default function TrackingClient() {
             )}
 
             {showPinnedCourse && activeCourseMeta && (
-              <div className="fixed top-[88px] left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
+              <div className="fixed top-22 left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
                 <div className="rounded-md bg-primary/10 p-1.5 text-primary"><BookOpen size={16} aria-hidden="true" /></div>
                 <h3 className="text-left text-sm font-semibold text-foreground/90 capitalize">{activeCourseMeta.displayCourseName.toLowerCase()}</h3>
                 {activeCourseMeta.isDisabled && (

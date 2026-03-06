@@ -189,6 +189,21 @@ describe('UserSettingsProvider', () => {
     expect(screen.getByTestId('settings').textContent).toBe('no-settings');
   });
 
+  it('configures refetch policy for cross-device settings sync', () => {
+    render(<WrappedConsumer />);
+
+    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as unknown as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(firstCallArgs).toBeDefined();
+    expect(firstCallArgs?.refetchOnMount).toBe('always');
+    expect(firstCallArgs?.refetchOnWindowFocus).toBe('always');
+    expect(firstCallArgs?.refetchOnReconnect).toBe('always');
+    expect(firstCallArgs?.refetchInterval).toBe(60 * 1000);
+    expect(firstCallArgs?.refetchIntervalInBackground).toBe(false);
+  });
+
   describe('useUserSettings guard', () => {
     it('throws when used outside provider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -211,7 +226,7 @@ describe('UserSettingsProvider', () => {
         </UserSettingsProvider>
       );
       screen.getByRole('button').click();
-      expect(mockMutate).toHaveBeenCalledWith({ bunk_calculator_enabled: false });
+      expect(mockMutateAsync).toHaveBeenCalledWith({ bunk_calculator_enabled: false });
     });
 
     it('updateTarget normalizes and calls mutate with target_percentage', () => {
@@ -227,7 +242,7 @@ describe('UserSettingsProvider', () => {
       );
       screen.getByRole('button').click();
       // 200 clamped to 100
-      expect(mockMutate).toHaveBeenCalledWith({ target_percentage: 100 });
+      expect(mockMutateAsync).toHaveBeenCalledWith({ target_percentage: 100 });
     });
 
     it('updateDisabledCourses calls mutate with disabled_courses map', () => {
@@ -242,7 +257,7 @@ describe('UserSettingsProvider', () => {
         </UserSettingsProvider>
       );
       screen.getByRole('button').click();
-      expect(mockMutate).toHaveBeenCalledWith({ disabled_courses: map });
+      expect(mockMutateAsync).toHaveBeenCalledWith({ disabled_courses: map });
     });
   });
 
