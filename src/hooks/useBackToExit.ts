@@ -24,7 +24,8 @@ import { isStandalonePWA } from "@/lib/pwa";
  *
  * When the user navigates within the app, normal entries pile up above "top
  * clean". Back-pressing through those entries fires `popstate` with states
- * that have NO sentinel key → the handler ignores them entirely.
+ * that have NO sentinel key → on a dashboard route the press is ignored;
+ * on any other route it counts toward deep-mode (see Behaviour above).
  *
  * When the user backs all the way to the __gce-marked root entry, `popstate`
  * fires with event.state containing __gce:true → toast is shown and a new
