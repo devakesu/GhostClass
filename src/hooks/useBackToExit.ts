@@ -101,11 +101,24 @@ export function useBackToExit(): void {
         toast.dismiss(toastIdRef.current);
       }
 
-      toastIdRef.current = toast("Press back again to exit", {
+      // Capture the id in a closure so that if this toast is dismissed before
+      // its callbacks fire (e.g. during an exit animation after a rapid
+      // dismiss+create cycle), the stale callback won't clear state that
+      // already belongs to the newer, active toast.
+      let newToastId: ReturnType<typeof toast> | null = null;
+      const handleClear = () => {
+        if (toastIdRef.current === newToastId) {
+          clearState();
+        }
+      };
+
+      newToastId = toast("Press back again to exit", {
         duration: THRESHOLD_MS,
-        onDismiss: clearState,
-        onAutoClose: clearState,
+        onDismiss: handleClear,
+        onAutoClose: handleClear,
       });
+
+      toastIdRef.current = newToastId;
     };
 
     const handlePopState = (event: PopStateEvent) => {
