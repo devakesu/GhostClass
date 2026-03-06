@@ -36,15 +36,21 @@ export const metadata: Metadata = {
     description: "GhostClass — Survive Attendance!",
     url: process.env.NEXT_PUBLIC_APP_URL,
     siteName: "GhostClass",
-    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "GhostClass",
     description: "Bunk college smartly with GhostClass.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
   },
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/apple-icon',
+  },
+  manifest: '/manifest.webmanifest',
 };
 
 const klick = localFont({
@@ -103,9 +109,6 @@ export default async function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:'dark';if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.add('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
           }}
         />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" href="/logo.png" />
         <meta name="application-name" content="GhostClass" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-TileColor" content="#141414" />
