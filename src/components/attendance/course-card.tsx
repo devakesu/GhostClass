@@ -7,7 +7,7 @@ import { useCourseDetails } from "@/hooks/courses/attendance";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useUser } from "@/hooks/users/user";
 import { createClient } from "@/lib/supabase/client";
@@ -107,6 +107,8 @@ export function CourseCard({ course }: CourseCardProps) {
   const [customReason, setCustomReason] = useState("");
   const [isDisabling, setIsDisabling] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
+  const disableInFlightRef = useRef(false);
+  const enableInFlightRef = useRef(false);
   const isOtherReason = disableReason === "Other";
 
   const normalize = useCallback((s: string | undefined) => 
@@ -660,7 +662,8 @@ export function CourseCard({ course }: CourseCardProps) {
               aria-busy={isDisabling}
               onClick={async (event) => {
                 event.preventDefault();
-                if (!courseCode || isDisabling) return;
+                if (!courseCode || disableInFlightRef.current) return;
+                disableInFlightRef.current = true;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
                 setIsDisabling(true);
                 try {
@@ -672,6 +675,7 @@ export function CourseCard({ course }: CourseCardProps) {
                 } catch {
                   // Provider-level mutation handler already displays an error toast.
                 } finally {
+                  disableInFlightRef.current = false;
                   setIsDisabling(false);
                 }
               }}
@@ -710,7 +714,8 @@ export function CourseCard({ course }: CourseCardProps) {
               aria-busy={isEnabling}
               onClick={async (event) => {
                 event.preventDefault();
-                if (!courseCode || isEnabling) return;
+                if (!courseCode || enableInFlightRef.current) return;
+                enableInFlightRef.current = true;
                 setIsEnabling(true);
                 try {
                   await enableCourse(courseCode);
@@ -719,6 +724,7 @@ export function CourseCard({ course }: CourseCardProps) {
                 } catch {
                   // Provider-level mutation handler already displays an error toast.
                 } finally {
+                  enableInFlightRef.current = false;
                   setIsEnabling(false);
                 }
               }}
