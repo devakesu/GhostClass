@@ -306,7 +306,7 @@ export const config = {
   // This simplified matcher pattern uses a negative lookahead regex to exclude specific paths.
   // Any new routes will automatically have CSP headers and Supabase session refresh applied.
   //
-  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon-|logo.png).*)
+  // Pattern explanation: /((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon|logo.png|opengraph-image|apple-icon).*)
   // - Matches all paths that DON'T START with the listed prefixes/names
   // - The negative lookahead (?!...) is evaluated at match time to exclude specific paths
   //
@@ -326,6 +326,6 @@ export const config = {
     // routing logic) for each one overwhelms the server and blocks SSR
     // streaming for actual page navigations — especially on Android PWA
     // standalone launch where the burst compounds with SW lifecycle events.
-    "/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon-|logo.png).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|robots.txt|monitoring|manifest.webmanifest|sw.js|icon|logo.png|opengraph-image|apple-icon).*)",
   ],
 };

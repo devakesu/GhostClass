@@ -1,11 +1,15 @@
 import { ImageResponse } from 'next/og';
+import { readPublicPngAsDataUri } from '@/lib/read-public-icon';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const size = { width: 32, height: 32 };
 export const contentType = 'image/png';
 
+// Read and encode the icon once at module load time so subsequent requests
+// do not pay the filesystem + base64 cost on every invocation.
+const iconSrc = readPublicPngAsDataUri('icon-192.png');
+
 export default function Icon() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   return new ImageResponse(
     (
       <div
@@ -18,7 +22,7 @@ export default function Icon() {
           justifyContent: 'center',
         }}
       >
-        <img src={`${baseUrl}/favicon.svg`} width={28} height={28} />
+        {iconSrc && <img src={iconSrc} width={28} height={28} />}
       </div>
     ),
     { ...size }
