@@ -703,7 +703,7 @@ export function CourseCard({ course }: CourseCardProps) {
 
       {/* Enable Course Dialog */}
       <AlertDialog open={showEnableDialog} onOpenChange={(open) => {
-        if (isEnabling) return;
+        if (isEnabling || enableInFlightRef.current) return;
         setShowEnableDialog(open);
       }}>
         <AlertDialogContent className="custom-container">
