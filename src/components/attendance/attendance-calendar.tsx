@@ -621,7 +621,7 @@ export function AttendanceCalendar({
   }
 
   // After the null check above, we know currentDate.year and currentDate.month are not null
-  // Non-null assertions in this block are safe due to the guard condition at line 516
+  // Non-null assertions in this block are safe due to the guard condition above
   const shouldShowJumpToToday = !isToday(selectedDate);
 
   return (

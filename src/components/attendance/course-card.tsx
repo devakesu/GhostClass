@@ -96,6 +96,7 @@ export function CourseCard({ course }: CourseCardProps) {
     academicYear: academicYearData,
     semester: semesterData,
   });
+  const hasSemesterContext = Boolean(academicYearData && semesterData);
   // undefined when course.code is missing — guards against creating a "" key in disabled_courses.
   const courseCode = course.code ? course.code.toUpperCase() : undefined;
   const disabled = courseCode ? isCourseDisabled(courseCode) : false;
@@ -325,7 +326,7 @@ export function CourseCard({ course }: CourseCardProps) {
           ) : (
             <button
               type="button"
-              disabled={isDisabledCoursesLoading || !courseCode}
+              disabled={isDisabledCoursesLoading || !courseCode || !hasSemesterContext}
               onClick={() => {
                 if (disabled) {
                   setShowEnableDialog(true);
@@ -337,7 +338,7 @@ export function CourseCard({ course }: CourseCardProps) {
               }}
               className={cn(
                 "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none",
-                (isDisabledCoursesLoading || !courseCode)
+                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext)
                   ? "opacity-50 cursor-not-allowed"
                   : disabled
                   ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
@@ -658,11 +659,15 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogCancel className="custom-button" disabled={isDisabling}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-red-600! hover:bg-red-700! border-none!"
-              disabled={isDisabling || (isOtherReason && !customReason.trim())}
+              disabled={isDisabling || !hasSemesterContext || (isOtherReason && !customReason.trim())}
               aria-busy={isDisabling}
               onClick={async (event) => {
                 event.preventDefault();
                 if (!courseCode || disableInFlightRef.current) return;
+                if (!hasSemesterContext) {
+                  toast.error("Semester context not loaded yet. Please try again.");
+                  return;
+                }
                 disableInFlightRef.current = true;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
                 setIsDisabling(true);
@@ -710,11 +715,15 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogCancel className="custom-button" disabled={isEnabling}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
-              disabled={isEnabling}
+              disabled={isEnabling || !hasSemesterContext}
               aria-busy={isEnabling}
               onClick={async (event) => {
                 event.preventDefault();
                 if (!courseCode || enableInFlightRef.current) return;
+                if (!hasSemesterContext) {
+                  toast.error("Semester context not loaded yet. Please try again.");
+                  return;
+                }
                 enableInFlightRef.current = true;
                 setIsEnabling(true);
                 try {
