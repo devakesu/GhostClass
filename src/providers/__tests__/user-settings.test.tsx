@@ -159,7 +159,7 @@ describe('UserSettingsProvider', () => {
     expect(screen.getByTestId('loading').textContent).toBe('true');
   });
 
-  it('provides isLoading=true when query is fetching', () => {
+  it('keeps isLoading=false during background fetching', () => {
     vi.mocked(useQuery).mockReturnValue({
       data: undefined,
       isLoading: false,

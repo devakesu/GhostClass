@@ -652,7 +652,8 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogAction
               className="custom-button bg-red-600! hover:bg-red-700! border-none!"
               disabled={isOtherReason && !customReason.trim()}
-              onClick={async () => {
+              onClick={async (event) => {
+                event.preventDefault();
                 if (!courseCode) return;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
                 try {
@@ -662,7 +663,7 @@ export function CourseCard({ course }: CourseCardProps) {
                     description: reason,
                   });
                 } catch {
-                  toast.error(`Failed to disable ${courseCode}`);
+                  // Provider-level mutation handler already displays an error toast.
                 }
               }}
             >
@@ -686,14 +687,15 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
-              onClick={async () => {
+              onClick={async (event) => {
+                event.preventDefault();
                 if (!courseCode) return;
                 try {
                   await enableCourse(courseCode);
                   setShowEnableDialog(false);
                   toast.success(`${courseCode} enabled`);
                 } catch {
-                  toast.error(`Failed to enable ${courseCode}`);
+                  // Provider-level mutation handler already displays an error toast.
                 }
               }}
             >
