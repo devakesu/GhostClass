@@ -4,33 +4,35 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock next/og before importing the module under test
-// ImageResponse is used with `new`, so it must be a constructable class
-vi.mock("next/og", () => ({
-  ImageResponse: vi.fn(function (
-    this: { type: string; element: unknown; options: unknown },
-    element: unknown,
-    options: unknown
-  ) {
-    this.type = "ImageResponse";
-    this.element = element;
-    this.options = options;
-  }),
-}));
-
-// Mock fs so readFileSync can be controlled per test
-// Node.js built-ins need both default and named exports for CJS/ESM interop
-vi.mock("fs", () => {
-  const readFileSyncMock = vi.fn().mockReturnValue(Buffer.from("fake-png-data"));
-  return {
-    default: { readFileSync: readFileSyncMock },
-    readFileSync: readFileSyncMock,
-  };
+// Stable constructor mock — must be a `function`, not an arrow, to be constructable.
+// Using a module-scope constant keeps the same reference across vi.resetModules() calls.
+const MockImageResponse = vi.fn(function (
+  this: { type: string; element: unknown; options: unknown },
+  element: unknown,
+  options: unknown
+) {
+  this.type = "ImageResponse";
+  this.element = element;
+  this.options = options;
 });
+
+vi.mock("next/og", () => ({ ImageResponse: MockImageResponse }));
+
+// Stable mock for the shared icon helper.
+const mockReadPublicPngAsDataUri = vi
+  .fn()
+  .mockReturnValue("data:image/png;base64,ZmFrZQ==");
+
+vi.mock("@/lib/read-public-icon", () => ({
+  readPublicPngAsDataUri: mockReadPublicPngAsDataUri,
+}));
 
 describe("icon", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
+    // Restore default icon return value after clearAllMocks resets call history.
+    mockReadPublicPngAsDataUri.mockReturnValue("data:image/png;base64,ZmFrZQ==");
   });
 
   it("should export correct size dimensions", async () => {
@@ -49,34 +51,28 @@ describe("icon", () => {
   });
 
   it("should return an ImageResponse", async () => {
-    const { ImageResponse } = await import("next/og");
     const mod = await import("../icon");
     const result = mod.default();
-    expect(ImageResponse).toHaveBeenCalled();
+    expect(MockImageResponse).toHaveBeenCalled();
     expect(result).toHaveProperty("type", "ImageResponse");
   });
 
   it("should call ImageResponse with size options", async () => {
-    const { ImageResponse } = await import("next/og");
     const mod = await import("../icon");
     mod.default();
-    expect(ImageResponse).toHaveBeenCalledWith(
+    expect(MockImageResponse).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ width: 32, height: 32 })
     );
   });
 
   it("should render without logo when icon file is missing", async () => {
-    const fs = await import("fs");
-    vi.mocked(fs.readFileSync).mockImplementationOnce(() => {
-      throw new Error("ENOENT: no such file or directory");
-    });
-    vi.resetModules();
+    mockReadPublicPngAsDataUri.mockReturnValueOnce(null);
 
-    const { ImageResponse } = await import("next/og");
     const mod = await import("../icon");
     const result = mod.default();
     expect(result).toHaveProperty("type", "ImageResponse");
-    expect(ImageResponse).toHaveBeenCalled();
+    expect(MockImageResponse).toHaveBeenCalled();
   });
 });
+
