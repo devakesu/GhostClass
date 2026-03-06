@@ -4,6 +4,8 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 // Node.js built-ins need both default and named exports for CJS/ESM interop
 const readFileSyncMock = vi.fn().mockReturnValue(Buffer.from("fake-png-data"));
 
@@ -52,5 +54,27 @@ describe("readPublicPngAsDataUri", () => {
     expect(readFileSyncMock).toHaveBeenCalledWith(
       expect.stringContaining("icon-192.png")
     );
+  });
+
+  it("should return null for filenames with path traversal sequences", async () => {
+    const { readPublicPngAsDataUri } = await import("@/lib/read-public-icon");
+    expect(readPublicPngAsDataUri("../somefile.png")).toBeNull();
+    expect(readPublicPngAsDataUri("../../etc/passwd")).toBeNull();
+    expect(readFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("should return null for filenames that are not PNG files", async () => {
+    const { readPublicPngAsDataUri } = await import("@/lib/read-public-icon");
+    expect(readPublicPngAsDataUri("icon-192.jpg")).toBeNull();
+    expect(readPublicPngAsDataUri("icon-192")).toBeNull();
+    expect(readPublicPngAsDataUri("icon-192.png.js")).toBeNull();
+    expect(readFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("should return null for filenames with directory separators", async () => {
+    const { readPublicPngAsDataUri } = await import("@/lib/read-public-icon");
+    expect(readPublicPngAsDataUri("subdir/icon.png")).toBeNull();
+    expect(readPublicPngAsDataUri("subdir\\icon.png")).toBeNull();
+    expect(readFileSyncMock).not.toHaveBeenCalled();
   });
 });
