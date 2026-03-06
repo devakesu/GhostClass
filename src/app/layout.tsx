@@ -42,8 +42,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    site: "@ghostclassapp",
-    creator: "@deva.kesu",
+    site: "@devakesu",
+    creator: "@devakesu",
     title: "GhostClass",
     description: "Bunk college smartly with GhostClass.",
     images: ["/opengraph-image"],
