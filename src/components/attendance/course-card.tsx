@@ -622,10 +622,13 @@ export function CourseCard({ course }: CourseCardProps) {
       </CardContent>
 
       {/* Disable Course Dialog */}
-      <AlertDialog open={showDisableDialog} onOpenChange={(open) => {
-        if (isDisabling) return;
-        setShowDisableDialog(open);
-      }}>
+      <AlertDialog
+        open={showDisableDialog}
+        onOpenChange={(open) => {
+          if (isDisabling || disableInFlightRef.current) return;
+          setShowDisableDialog(open);
+        }}
+      >
         <AlertDialogContent className="custom-container">
           <AlertDialogHeader>
             <AlertDialogTitle>Disable {course.code}?</AlertDialogTitle>
