@@ -91,9 +91,9 @@ const sampleCourse: ExtendedCourse = {
 };
 
 function createDeferredPromise<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
+  let resolve!: (value?: T | PromiseLike<T>) => void;
   const promise = new Promise<T>((res) => {
-    resolve = res;
+    resolve = (value) => res(value as T | PromiseLike<T>);
   });
   return { promise, resolve };
 }
