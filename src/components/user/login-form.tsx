@@ -147,8 +147,14 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     setFormData((prev) => ({ ...prev, username: loginValue }));
 
-    // Auto-switch method selector as users type email/phone-like identifiers.
-    setLoginMethod(inferredMethod);
+    // Auto-switch method selector only when it helps, without overriding
+    // an explicit user choice back to "username" during typing.
+    setLoginMethod((previousMethod) => {
+      if (previousMethod !== "username" && inferredMethod === "username") {
+        return previousMethod;
+      }
+      return inferredMethod;
+    });
   };
 
   useEffect(() => {

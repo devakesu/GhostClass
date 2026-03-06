@@ -213,6 +213,18 @@ describe("LoginForm – login method auto-detection", () => {
     expect(screen.getByLabelText("Phone")).toBeInTheDocument();
     expect(screen.getByDisplayValue("919234567890")).toHaveAttribute("type", "tel");
   });
+
+  it("keeps manual email selection while typing a local-part without @", async () => {
+    await renderAndWaitForForm();
+
+    fireEvent.click(screen.getByLabelText("Login with email"));
+
+    const loginInput = screen.getByLabelText("Email");
+    fireEvent.change(loginInput, { target: { value: "student" } });
+
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "email");
+  });
 });
 
 describe("LoginForm – mount-time storage cleanup", () => {
