@@ -413,7 +413,7 @@ export default function TrackingClient() {
 
             {showPinnedCourse && activeCourseMeta && (
               <div className="fixed top-[88px] left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
-                <div className="rounded-md bg-primary/10 p-1.5 text-primary"><BookOpen size={16} /></div>
+                <div className="rounded-md bg-primary/10 p-1.5 text-primary"><BookOpen size={16} aria-hidden="true" /></div>
                 <h3 className="text-left text-sm font-semibold text-foreground/90 capitalize">{activeCourseMeta.displayCourseName.toLowerCase()}</h3>
                 {activeCourseMeta.isDisabled && (
                   <Badge className="h-4 border-border bg-muted px-1.5 text-[10px] text-muted-foreground">Disabled</Badge>
@@ -453,7 +453,7 @@ export default function TrackingClient() {
                           }}
                           className="flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm"
                         >
-                          <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
+                          <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} aria-hidden="true" /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
                           {isCourseCurrentlyDisabled && (
                             <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">Disabled</Badge>

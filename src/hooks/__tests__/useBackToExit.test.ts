@@ -111,7 +111,8 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Mid-app back press — ignored entirely
+  // Mid-app back press — dashboard route ignored; non-dashboard accumulates
+  // toward deep-mode exit toast
   // -------------------------------------------------------------------------
 
   it('does not show toast on a mid-app back press (non-sentinel state)', () => {
