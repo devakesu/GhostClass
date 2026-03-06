@@ -225,6 +225,18 @@ describe("LoginForm – login method auto-detection", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "email");
   });
+
+  it("keeps manual phone selection while typing short digits", async () => {
+    await renderAndWaitForForm();
+
+    fireEvent.click(screen.getByLabelText("Login with phone"));
+
+    const loginInput = screen.getByLabelText("Phone");
+    fireEvent.change(loginInput, { target: { value: "123" } });
+
+    expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("123")).toHaveAttribute("type", "tel");
+  });
 });
 
 describe("LoginForm – mount-time storage cleanup", () => {
