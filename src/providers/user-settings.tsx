@@ -452,12 +452,14 @@ export function useUserSettingsState() {
 
   return {
     settings,
-    isLoading: isLoading || isFetching,
-    updateBunkCalc: async (enabled: boolean) => {
-      await updateSettingsMutation.mutateAsync({ bunk_calculator_enabled: enabled });
+    // Keep initial-load signal stable; background refetches should not disable UI controls.
+    isLoading,
+    isFetching,
+    updateBunkCalc: (enabled: boolean) => {
+      updateSettingsMutation.mutate({ bunk_calculator_enabled: enabled });
     },
-    updateTarget: async (target: number) => {
-      await updateSettingsMutation.mutateAsync({ target_percentage: normalizeTarget(target) });
+    updateTarget: (target: number) => {
+      updateSettingsMutation.mutate({ target_percentage: normalizeTarget(target) });
     },
     updateDisabledCourses: async (disabledCourses: DisabledCoursesMap) => {
       await updateSettingsMutation.mutateAsync({ disabled_courses: disabledCourses });

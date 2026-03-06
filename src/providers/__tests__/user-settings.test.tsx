@@ -166,7 +166,7 @@ describe('UserSettingsProvider', () => {
       isFetching: true,
     } as any);
     render(<WrappedConsumer />);
-    expect(screen.getByTestId('loading').textContent).toBe('true');
+    expect(screen.getByTestId('loading').textContent).toBe('false');
   });
 
   it('provides settings when query returns data', () => {
@@ -226,7 +226,7 @@ describe('UserSettingsProvider', () => {
         </UserSettingsProvider>
       );
       screen.getByRole('button').click();
-      expect(mockMutateAsync).toHaveBeenCalledWith({ bunk_calculator_enabled: false });
+      expect(mockMutate).toHaveBeenCalledWith({ bunk_calculator_enabled: false });
     });
 
     it('updateTarget normalizes and calls mutate with target_percentage', () => {
@@ -242,7 +242,7 @@ describe('UserSettingsProvider', () => {
       );
       screen.getByRole('button').click();
       // 200 clamped to 100
-      expect(mockMutateAsync).toHaveBeenCalledWith({ target_percentage: 100 });
+      expect(mockMutate).toHaveBeenCalledWith({ target_percentage: 100 });
     });
 
     it('updateDisabledCourses calls mutate with disabled_courses map', () => {

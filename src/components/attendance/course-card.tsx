@@ -655,11 +655,15 @@ export function CourseCard({ course }: CourseCardProps) {
               onClick={async () => {
                 if (!courseCode) return;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
-                await disableCourse(courseCode, reason);
-                setShowDisableDialog(false);
-                toast.success(`${courseCode} disabled`, {
-                  description: reason,
-                });
+                try {
+                  await disableCourse(courseCode, reason);
+                  setShowDisableDialog(false);
+                  toast.success(`${courseCode} disabled`, {
+                    description: reason,
+                  });
+                } catch {
+                  toast.error(`Failed to disable ${courseCode}`);
+                }
               }}
             >
               Disable
@@ -684,9 +688,13 @@ export function CourseCard({ course }: CourseCardProps) {
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
               onClick={async () => {
                 if (!courseCode) return;
-                await enableCourse(courseCode);
-                setShowEnableDialog(false);
-                toast.success(`${courseCode} enabled`);
+                try {
+                  await enableCourse(courseCode);
+                  setShowEnableDialog(false);
+                  toast.success(`${courseCode} enabled`);
+                } catch {
+                  toast.error(`Failed to enable ${courseCode}`);
+                }
               }}
             >
               Enable
