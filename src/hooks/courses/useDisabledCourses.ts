@@ -48,14 +48,16 @@ export interface UseDisabledCoursesReturn {
  *
  * @example
  * ```tsx
+ * async function handleCourseToggle() {
  * const { isDisabled, disableCourse, enableCourse } = useDisabledCourses({
  *   academicYear: "2025-2026",
  *   semester: "even",
  * });
  *
  * if (isDisabled("GXEST204")) { … }
- * disableCourse("GXEST204", "Challenge passed");
- * enableCourse("GXEST204");
+ * await disableCourse("GXEST204", "Challenge passed");
+ * await enableCourse("GXEST204");
+ * }
  * ```
  */
 export function useDisabledCourses({
