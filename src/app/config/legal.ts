@@ -1,5 +1,40 @@
 export const TERMS_VERSION = "2.5";
-export const LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-06";
+const RAW_LEGAL_EFFECTIVE_DATE =
+    process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-03-06";
+
+function normalizeLegalEffectiveDate(value: string): string {
+    const trimmed = value.trim();
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!isoMatch) return trimmed;
+
+    const [, year, month, day] = isoMatch;
+    const monthIndex = Number(month) - 1;
+    const months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ];
+
+    if (monthIndex < 0 || monthIndex > 11) return trimmed;
+
+    const dayNum = Number(day);
+    if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) return trimmed;
+
+    return `${months[monthIndex]} ${dayNum}, ${year}`;
+}
+
+export const LEGAL_EFFECTIVE_DATE = normalizeLegalEffectiveDate(
+    RAW_LEGAL_EFFECTIVE_DATE,
+);
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@example.com";
 
 // ------------------------------------------------------------------
