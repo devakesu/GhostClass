@@ -99,6 +99,8 @@ export default function TrackingClient() {
   const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null);
   const [showPinnedCourse, setShowPinnedCourse] = useState(false);
   const courseHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastActiveCourseKeyRef = useRef<string | null>(null);
+  const lastShowPinnedCourseRef = useRef(false);
   
   // Per-course record limits (for performance with 100+ records)
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
@@ -189,13 +191,14 @@ export default function TrackingClient() {
     const items = groupedAllData[activeCourseKey];
     if (!items?.length) return null;
 
+    const courseKey = activeCourseKey;
     const displayCourseName =
-      attendanceData?.courses?.[items[0].course]?.name ||
-      coursesData?.courses?.[items[0].course]?.name ||
-      activeCourseKey;
+      attendanceData?.courses?.[courseKey]?.name ||
+      coursesData?.courses?.[courseKey]?.name ||
+      courseKey;
     const courseCode = (
-      attendanceData?.courses?.[items[0].course]?.code ??
-      coursesData?.courses?.[items[0].course]?.code ??
+      attendanceData?.courses?.[courseKey]?.code ??
+      coursesData?.courses?.[courseKey]?.code ??
       ""
     ).toUpperCase();
 
@@ -318,22 +321,40 @@ export default function TrackingClient() {
         }
       }
 
-      if (lastCrossedHeader) {
-        setActiveCourseKey(lastCrossedHeader);
-        setShowPinnedCourse(true);
-      } else {
-        setActiveCourseKey(null);
-        setShowPinnedCourse(false);
+      const newKey = lastCrossedHeader;
+      const newShow = lastCrossedHeader !== null;
+
+      // Only call setState when the value actually changed to avoid unnecessary
+      // React re-renders on every scroll/resize event.
+      if (newKey !== lastActiveCourseKeyRef.current) {
+        lastActiveCourseKeyRef.current = newKey;
+        setActiveCourseKey(newKey);
+      }
+      if (newShow !== lastShowPinnedCourseRef.current) {
+        lastShowPinnedCourseRef.current = newShow;
+        setShowPinnedCourse(newShow);
       }
     };
 
+    // Throttle via requestAnimationFrame so at most one DOM read + setState
+    // pair runs per frame during rapid scroll/resize bursts.
+    let rafId: ReturnType<typeof requestAnimationFrame> | null = null;
+    const scheduleUpdate = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateActiveCourse();
+      });
+    };
+
     updateActiveCourse();
-    window.addEventListener("scroll", updateActiveCourse, { passive: true });
-    window.addEventListener("resize", updateActiveCourse);
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
 
     return () => {
-      window.removeEventListener("scroll", updateActiveCourse);
-      window.removeEventListener("resize", updateActiveCourse);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [currentCourseKeys]);
   
