@@ -1,12 +1,19 @@
 import { ImageResponse } from 'next/og';
+import { readFileSync } from 'fs';
+import path from 'path';
 
-export const runtime = 'edge';
 export const alt = 'GhostClass — Smart Attendance Tracker';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default function Image() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  let iconSrc: string | null = null;
+  try {
+    const iconBuffer = readFileSync(path.join(process.cwd(), 'public/icon-192.png'));
+    iconSrc = `data:image/png;base64,${iconBuffer.toString('base64')}`;
+  } catch {
+    // Icon unavailable — render without logo
+  }
   return new ImageResponse(
     (
       <div
@@ -21,12 +28,14 @@ export default function Image() {
           gap: 32,
         }}
       >
-        <img
-          src={`${baseUrl}/favicon.svg`}
-          width={160}
-          height={160}
-          style={{ borderRadius: 24 }}
-        />
+        {iconSrc && (
+          <img
+            src={iconSrc}
+            width={160}
+            height={160}
+            style={{ borderRadius: 24 }}
+          />
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 72, fontWeight: 800, color: '#ffffff', letterSpacing: '-2px' }}>
             GhostClass
