@@ -55,13 +55,12 @@ function getHistoryState(): Record<string, unknown> {
 export function useBackToExit(): void {
   const firstBackTimeRef = useRef<number | null>(null);
   const toastIdRef = useRef<ReturnType<typeof toast> | null>(null);
-  const nonDashboardBackCountRef = useRef(0);
   const exitArmedRef = useRef(false);
   const exitModeRef = useRef<"root" | "deep" | null>(null);
   // Counts qualifying non-sentinel back presses on non-dashboard routes since
-  // the last sentinel hit or dashboard visit. Only incremented (never decremented
-  // during forward navigation), and reset to zero when the user returns to a
-  // shallow/root position (sentinel, dashboard, or deep-mode close).
+  // the last sentinel hit, dashboard visit, or clearState call (toast expiry).
+  // Incremented after any exit-state resets so each new sequence starts at 1.
+  // After two qualifying presses the deep-mode exit toast is shown.
   const navDepthRef = useRef(0);
 
   useEffect(() => {
@@ -82,14 +81,10 @@ export function useBackToExit(): void {
     // Resets all exit-state refs WITHOUT dismissing the active toast.
     // Used by onDismiss/onAutoClose where the toast is already leaving,
     // so calling toast.dismiss() again would be re-entrant.
-    // NOTE: navDepthRef is intentionally not reset here — depth represents
-    // "how deep in the app has the user navigated?" and should only be reset
-    // when they return to root/sentinel or a dashboard route, not merely
-    // because an exit toast was dismissed.
     const clearState = () => {
       toastIdRef.current = null;
       firstBackTimeRef.current = null;
-      nonDashboardBackCountRef.current = 0;
+      navDepthRef.current = 0;
       exitArmedRef.current = false;
       exitModeRef.current = null;
     };
@@ -125,9 +120,6 @@ export function useBackToExit(): void {
         const isDashboardRoute = window.location.pathname.startsWith("/dashboard");
 
         if (!isDashboardRoute) {
-          // Track depth within the hook — more reliable than history.length,
-          // which is a session-wide counter that never decreases on back navigation.
-          navDepthRef.current += 1;
           const now = Date.now();
 
           if (exitModeRef.current === "root") {
@@ -136,10 +128,6 @@ export function useBackToExit(): void {
 
           if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
             if (now - firstBackTimeRef.current < THRESHOLD_MS) {
-              // Reset depth before close: if window.close() is blocked (rare),
-              // the hook remains in a clean state. resetExitState() handles
-              // exit-armed refs; navDepthRef is separate (not in clearState).
-              navDepthRef.current = 0;
               resetExitState();
               window.close();
               return;
@@ -148,11 +136,13 @@ export function useBackToExit(): void {
             resetExitState();
           }
 
-          nonDashboardBackCountRef.current += 1;
+          // Increment after any resets so the count begins at 1 in each new
+          // sequence; navDepthRef.current is 0 after clearState / resetExitState.
+          navDepthRef.current += 1;
 
           // Outside dashboard: after two qualifying back presses, show toast.
           // Next qualifying back within threshold closes the standalone app.
-          if (nonDashboardBackCountRef.current >= 2) {
+          if (navDepthRef.current >= 2) {
             firstBackTimeRef.current = now;
             exitArmedRef.current = true;
             exitModeRef.current = "deep";
@@ -162,14 +152,14 @@ export function useBackToExit(): void {
         }
 
         // Dashboard route: reset depth and any pending non-dashboard exit state.
-        navDepthRef.current = 0;
         resetExitState();
         return;
       }
 
-      // Sentinel hit: user backed all the way to the root entry. Reset depth.
+      // Sentinel hit: user backed all the way to the root entry. Always reset
+      // navDepthRef here, regardless of whether the arm/close branch fires,
+      // so deep-mode counting restarts cleanly from the root position.
       navDepthRef.current = 0;
-      nonDashboardBackCountRef.current = 0;
 
       const now = Date.now();
 
@@ -204,7 +194,6 @@ export function useBackToExit(): void {
       // Dismiss any active toast and reset refs so stale UI is never left
       // behind after unmount (e.g. during HMR or StrictMode double-effect).
       resetExitState();
-      navDepthRef.current = 0;
     };
   }, []);
 }
