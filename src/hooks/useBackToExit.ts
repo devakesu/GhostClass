@@ -9,10 +9,11 @@ import { isStandalonePWA } from "@/lib/pwa";
  *
  * Behaviour
  * ---------
- * - Back press mid-app  → navigates back normally, no toast.
- * - Back press at root  → sentinel detected; toast shown and clean top re-pushed.
- * - Second back press within THRESHOLD_MS of the toast → window.close().
- * - Second back press after THRESHOLD_MS → treated as a fresh root press.
+ * - Non-dashboard, non-sentinel backs count toward deep mode.
+ * - After two qualifying deep-mode backs, an exit toast is shown.
+ * - Another qualifying back within THRESHOLD_MS in deep mode exits the app.
+ * - Back press at root (sentinel hit) arms root mode, shows toast, and re-pushes clean top.
+ * - Second root-mode back within THRESHOLD_MS exits the app; otherwise it is treated as a fresh first root press.
  *
  * Sentinel mechanism
  * ------------------
@@ -98,7 +99,11 @@ export function useBackToExit(): void {
 
     const showExitToast = () => {
       if (toastIdRef.current !== null) {
-        toast.dismiss(toastIdRef.current);
+        const previousToastId = toastIdRef.current;
+        // Detach first so callbacks from the previous toast cannot clear the
+        // new state during a dismiss + recreate cycle.
+        toastIdRef.current = null;
+        toast.dismiss(previousToastId);
       }
 
       // Capture the id in a closure so that if this toast is dismissed before

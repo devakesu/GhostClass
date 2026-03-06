@@ -346,6 +346,34 @@ describe('useBackToExit', () => {
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
+  it('ignores stale callback from replaced toast during dismiss + recreate flow', () => {
+    mockToast
+      .mockReturnValueOnce('toast-old')
+      .mockReturnValueOnce('toast-new');
+
+    renderHook(() => useBackToExit());
+
+    act(() => { fireSentinelPopState(); });
+    const oldToastOptions = mockToast.mock.calls[0][1] as { onDismiss: () => void };
+
+    // Force a new root-mode toast while old one still exists.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+      fireSentinelPopState();
+    });
+
+    // Simulate late callback from the replaced toast.
+    act(() => { oldToastOptions.onDismiss(); });
+
+    // Exit should still be armed for the newer toast.
+    act(() => {
+      vi.advanceTimersByTime(500);
+      fireSentinelPopState();
+    });
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
   // -------------------------------------------------------------------------
   // Cleanup
   // -------------------------------------------------------------------------

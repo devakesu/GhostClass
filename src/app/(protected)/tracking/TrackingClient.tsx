@@ -375,7 +375,6 @@ export default function TrackingClient() {
     return map;
   }, [attendanceData]);
 
-  const cardVariants = { hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.95 } };
   // Block rendering until tracking is enabled, base data has loaded, and initial sync has completed.
   if (!enabled || isDataLoading || isSyncing || !syncCompleted) return <Loading />;
 
@@ -522,7 +521,6 @@ export default function TrackingClient() {
                                     return (
                                       <m.div 
                                         key={trackingId} 
-                                        variants={cardVariants}
                                         className={`p-4 text-left rounded-xl border hover:bg-opacity-20 transition-all w-full ${cardBgClass}`}
                                       >
                                         <div className="flex justify-between items-start mb-2 gap-4">
