@@ -9,10 +9,11 @@ import { isStandalonePWA } from "@/lib/pwa";
  *
  * Behaviour
  * ---------
- * - Back press mid-app  → navigates back normally, no toast.
- * - Back press at root  → sentinel detected; toast shown and clean top re-pushed.
- * - Second back press within THRESHOLD_MS of the toast → window.close().
- * - Second back press after THRESHOLD_MS → treated as a fresh root press.
+ * - Non-dashboard, non-sentinel backs count toward deep mode.
+ * - After two qualifying deep-mode backs, an exit toast is shown.
+ * - Another qualifying back within THRESHOLD_MS in deep mode exits the app.
+ * - Back press at root (sentinel hit) arms root mode, shows toast, and re-pushes clean top.
+ * - Second root-mode back within THRESHOLD_MS exits the app; otherwise it is treated as a fresh first root press.
  *
  * Sentinel mechanism
  * ------------------
@@ -23,7 +24,8 @@ import { isStandalonePWA } from "@/lib/pwa";
  *
  * When the user navigates within the app, normal entries pile up above "top
  * clean". Back-pressing through those entries fires `popstate` with states
- * that have NO sentinel key → the handler ignores them entirely.
+ * that have NO sentinel key → on a dashboard route the press is ignored;
+ * on any other route it counts toward deep-mode (see Behaviour above).
  *
  * When the user backs all the way to the __gce-marked root entry, `popstate`
  * fires with event.state containing __gce:true → toast is shown and a new
@@ -55,6 +57,13 @@ function getHistoryState(): Record<string, unknown> {
 export function useBackToExit(): void {
   const firstBackTimeRef = useRef<number | null>(null);
   const toastIdRef = useRef<ReturnType<typeof toast> | null>(null);
+  const exitArmedRef = useRef(false);
+  const exitModeRef = useRef<"root" | "deep" | null>(null);
+  // Counts qualifying non-sentinel back presses on non-dashboard routes since
+  // the last sentinel hit, dashboard visit, or clearState call (toast expiry).
+  // Incremented after any exit-state resets so each new sequence starts at 1.
+  // After two qualifying presses the deep-mode exit toast is shown.
+  const navDepthRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isStandalonePWA()) return;
@@ -71,6 +80,53 @@ export function useBackToExit(): void {
       history.pushState(rootState, "", window.location.href);
     }
 
+    // Resets all exit-state refs WITHOUT dismissing the active toast.
+    // Used by onDismiss/onAutoClose where the toast is already leaving,
+    // so calling toast.dismiss() again would be re-entrant.
+    const clearState = () => {
+      toastIdRef.current = null;
+      firstBackTimeRef.current = null;
+      navDepthRef.current = 0;
+      exitArmedRef.current = false;
+      exitModeRef.current = null;
+    };
+
+    const resetExitState = () => {
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
+      }
+      clearState();
+    };
+
+    const showExitToast = () => {
+      if (toastIdRef.current !== null) {
+        const previousToastId = toastIdRef.current;
+        // Detach first so callbacks from the previous toast cannot clear the
+        // new state during a dismiss + recreate cycle.
+        toastIdRef.current = null;
+        toast.dismiss(previousToastId);
+      }
+
+      // Capture the id in a closure so that if this toast is dismissed before
+      // its callbacks fire (e.g. during an exit animation after a rapid
+      // dismiss+create cycle), the stale callback won't clear state that
+      // already belongs to the newer, active toast.
+      let newToastId: ReturnType<typeof toast> | null = null;
+      const handleClear = () => {
+        if (toastIdRef.current === newToastId) {
+          clearState();
+        }
+      };
+
+      newToastId = toast("Press back again to exit", {
+        duration: THRESHOLD_MS,
+        onDismiss: handleClear,
+        onAutoClose: handleClear,
+      });
+
+      toastIdRef.current = newToastId;
+    };
+
     const handlePopState = (event: PopStateEvent) => {
       // Ignore mid-app back presses — their state doesn't carry a true sentinel.
       // Strict === true check avoids accidental matches if __gce ever appears
@@ -80,26 +136,60 @@ export function useBackToExit(): void {
         typeof event.state !== "object" ||
         (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
       ) {
-        // If a mid-app back fires while the exit toast is showing, cancel the
-        // pending exit. Only two *consecutive* root-level presses should close
-        // the PWA — navigating away resets the countdown.
-        if (toastIdRef.current !== null) {
-          toast.dismiss(toastIdRef.current);
-          toastIdRef.current = null;
+        const isDashboardRoute = window.location.pathname.startsWith("/dashboard");
+
+        if (!isDashboardRoute) {
+          const now = Date.now();
+
+          if (exitModeRef.current === "root") {
+            resetExitState();
+          }
+
+          if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
+            if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+              resetExitState();
+              window.close();
+              return;
+            }
+
+            resetExitState();
+          }
+
+          // Increment after any resets so the count begins at 1 in each new
+          // sequence; navDepthRef.current is 0 after clearState / resetExitState.
+          navDepthRef.current += 1;
+
+          // Outside dashboard: after two qualifying back presses, show toast.
+          // Next qualifying back within threshold closes the standalone app.
+          if (navDepthRef.current >= 2) {
+            firstBackTimeRef.current = now;
+            exitArmedRef.current = true;
+            exitModeRef.current = "deep";
+            showExitToast();
+          }
+          return;
         }
-        firstBackTimeRef.current = null;
+
+        // Dashboard route: reset depth and any pending non-dashboard exit state.
+        resetExitState();
         return;
       }
 
+      // Sentinel hit: user backed all the way to the root entry. Always reset
+      // navDepthRef here, regardless of whether the arm/close branch fires,
+      // so deep-mode counting restarts cleanly from the root position.
+      navDepthRef.current = 0;
+
       const now = Date.now();
 
-      if (firstBackTimeRef.current !== null && now - firstBackTimeRef.current < THRESHOLD_MS) {
+      if (
+        exitArmedRef.current &&
+        exitModeRef.current === "root" &&
+        firstBackTimeRef.current !== null &&
+        now - firstBackTimeRef.current < THRESHOLD_MS
+      ) {
         // Second back at root within threshold — close the PWA.
-        if (toastIdRef.current !== null) {
-          toast.dismiss(toastIdRef.current);
-        }
-        toastIdRef.current = null;
-        firstBackTimeRef.current = null;
+        resetExitState();
         window.close();
         return;
       }
@@ -108,25 +198,12 @@ export function useBackToExit(): void {
       // Derive a clean top state by stripping __gce from the sentinel entry
       // so Next.js router metadata is kept on the re-pushed entry.
       firstBackTimeRef.current = now;
+      exitArmedRef.current = true;
+      exitModeRef.current = "root";
       const { [SENTINEL_KEY]: _sentinel, ...cleanState } =
         event.state as Record<string, unknown>;
       history.pushState(cleanState, "", window.location.href);
-
-      if (toastIdRef.current !== null) {
-        toast.dismiss(toastIdRef.current);
-      }
-
-      toastIdRef.current = toast("Press back again to exit", {
-        duration: THRESHOLD_MS,
-        onDismiss: () => {
-          toastIdRef.current = null;
-          firstBackTimeRef.current = null;
-        },
-        onAutoClose: () => {
-          toastIdRef.current = null;
-          firstBackTimeRef.current = null;
-        },
-      });
+      showExitToast();
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -135,11 +212,7 @@ export function useBackToExit(): void {
       window.removeEventListener("popstate", handlePopState);
       // Dismiss any active toast and reset refs so stale UI is never left
       // behind after unmount (e.g. during HMR or StrictMode double-effect).
-      if (toastIdRef.current !== null) {
-        toast.dismiss(toastIdRef.current);
-        toastIdRef.current = null;
-      }
-      firstBackTimeRef.current = null;
+      resetExitState();
     };
   }, []);
 }

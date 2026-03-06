@@ -29,8 +29,8 @@ export function AcceptTermsForm() {
       // Small delay to ensure cookie propagation and cache revalidation complete
       // This helps prevent race conditions with middleware cookie checks
       await new Promise(resolve => setTimeout(resolve, 100));
-      // Redirect to dashboard after successful acceptance
-      router.push("/dashboard");
+      // Replace history entry so back does not return to accept-terms.
+      router.replace("/dashboard");
     } catch (error) {
       NProgress.done();
       logger.error("Failed to accept terms", error);

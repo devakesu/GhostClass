@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useUser } from "@/hooks/users/user";
@@ -16,9 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, CircleAlert, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+import { Trash2, CircleAlert, ChevronLeft, ChevronRight, BookOpen, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
-import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useAttendanceReport } from "@/hooks/courses/attendance";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { Loading } from "@/components/loading";
@@ -96,6 +96,11 @@ export default function TrackingClient() {
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null);
+  const [showPinnedCourse, setShowPinnedCourse] = useState(false);
+  const courseHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastActiveCourseKeyRef = useRef<string | null>(null);
+  const lastShowPinnedCourseRef = useRef(false);
   
   // Per-course record limits (for performance with 100+ records)
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
@@ -181,6 +186,29 @@ export default function TrackingClient() {
     return allCourseKeys.slice(startIndex, startIndex + coursesPerPage);
   }, [currentPage, allCourseKeys, coursesPerPage]);
 
+  const activeCourseMeta = useMemo(() => {
+    if (!activeCourseKey) return null;
+    const items = groupedAllData[activeCourseKey];
+    if (!items?.length) return null;
+
+    const courseKey = activeCourseKey;
+    const displayCourseName =
+      attendanceData?.courses?.[courseKey]?.name ||
+      coursesData?.courses?.[courseKey]?.name ||
+      courseKey;
+    const courseCode = (
+      attendanceData?.courses?.[courseKey]?.code ??
+      coursesData?.courses?.[courseKey]?.code ??
+      ""
+    ).toUpperCase();
+
+    return {
+      displayCourseName,
+      isDisabled: isCourseDisabled(courseCode),
+      count: items.length,
+    };
+  }, [activeCourseKey, groupedAllData, attendanceData, coursesData, isCourseDisabled]);
+
   const goToPrevPage = () => { if (currentPage > 0) setCurrentPage(currentPage - 1); };
   const goToNextPage = () => { if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1); };
 
@@ -258,6 +286,77 @@ export default function TrackingClient() {
       setIsProcessing(false);
     }
   };
+
+  const scrollToBottom = () => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    if (currentCourseKeys.length === 0) {
+      setActiveCourseKey(null);
+      setShowPinnedCourse(false);
+      return;
+    }
+
+    const navOffsetPx = 80; // matches protected layout navbar height (h-20)
+
+    const updateActiveCourse = () => {
+      // Pick the most recent course header that has crossed the navbar line.
+      // Header-based tracking avoids late/incorrect switching caused by using
+      // full section bounds (which include many records).
+      let lastCrossedHeader: string | null = null;
+
+      for (const courseKey of currentCourseKeys) {
+        const el = courseHeaderRefs.current[courseKey];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= navOffsetPx) {
+          lastCrossedHeader = courseKey;
+        } else {
+          break;
+        }
+      }
+
+      const newKey = lastCrossedHeader;
+      const newShow = lastCrossedHeader !== null;
+
+      // Only call setState when the value actually changed to avoid unnecessary
+      // React re-renders on every scroll/resize event.
+      if (newKey !== lastActiveCourseKeyRef.current) {
+        lastActiveCourseKeyRef.current = newKey;
+        setActiveCourseKey(newKey);
+      }
+      if (newShow !== lastShowPinnedCourseRef.current) {
+        lastShowPinnedCourseRef.current = newShow;
+        setShowPinnedCourse(newShow);
+      }
+    };
+
+    // Throttle via requestAnimationFrame so at most one DOM read + setState
+    // pair runs per frame during rapid scroll/resize bursts.
+    let rafId: ReturnType<typeof requestAnimationFrame> | null = null;
+    const scheduleUpdate = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateActiveCourse();
+      });
+    };
+
+    updateActiveCourse();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [currentCourseKeys]);
   
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
   const officialSessionsMap = useMemo(() => {
@@ -276,16 +375,12 @@ export default function TrackingClient() {
     return map;
   }, [attendanceData]);
 
-  const cardVariants = { hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.95 } };
-  const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.3, staggerChildren: 0.05 } } };
-  const pageVariants = { enter: (d: number) => ({ x: d > 0 ? 50 : -50, opacity: 0 }), center: { x: 0, opacity: 1 }, exit: (d: number) => ({ x: d < 0 ? 50 : -50, opacity: 0 }) };
-
   // Block rendering until tracking is enabled, base data has loaded, and initial sync has completed.
   if (!enabled || isDataLoading || isSyncing || !syncCompleted) return <Loading />;
 
   return isProcessing ? ( <div className="h-screen flex items-center justify-center"><Loading /></div> ) : (
     <LazyMotion features={domAnimation}>
-      <div className="flex flex-1 flex-col flex-wrap gap-4 h-full p-4 md:p-6 text-center relative">
+      <div className="relative flex h-full flex-1 flex-col gap-4 p-4 text-center md:p-6">
         {trackingData && allCourseKeys.length > 0 ? (
           <>
             <div className="mb-2 pb-4 mt-10">
@@ -305,9 +400,30 @@ export default function TrackingClient() {
               )}
             </div>
 
-            <m.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-4 relative w-full max-w-175 mx-auto">
-              <AnimatePresence mode="wait" initial={false} custom={currentPage > 0 ? -1 : 1}>
-                <m.div key={currentPage} custom={currentPage} initial="enter" animate="center" exit="exit" variants={pageVariants} transition={{ type: "tween", duration: 0.3 }} className="flex flex-col gap-6">
+            {(count ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                aria-label="Scroll to end of tracking page"
+                className="fixed right-5 bottom-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/15 text-blue-600 shadow-md backdrop-blur-sm transition-colors hover:bg-blue-500/25 md:right-7 md:bottom-7 dark:border-blue-500/30 dark:text-blue-400"
+              >
+                <ArrowDown size={18} aria-hidden="true" />
+              </button>
+            )}
+
+            {showPinnedCourse && activeCourseMeta && (
+              <div className="fixed top-[88px] left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
+                <div className="rounded-md bg-primary/10 p-1.5 text-primary"><BookOpen size={16} aria-hidden="true" /></div>
+                <h3 className="text-left text-sm font-semibold text-foreground/90 capitalize">{activeCourseMeta.displayCourseName.toLowerCase()}</h3>
+                {activeCourseMeta.isDisabled && (
+                  <Badge className="h-4 border-border bg-muted px-1.5 text-[10px] text-muted-foreground">Disabled</Badge>
+                )}
+                <Badge variant="outline" className="ml-auto text-xs">{activeCourseMeta.count}</Badge>
+              </div>
+            )}
+
+            <div className="relative mx-auto flex w-full max-w-175 flex-col gap-4 overflow-visible">
+              <div key={currentPage} className="flex flex-col gap-6 overflow-visible">
                   {currentCourseKeys.map((courseName) => {
                     const items = groupedAllData[courseName];
                     const displayCourseName = attendanceData?.courses?.[items[0].course]?.name || coursesData?.courses?.[items[0].course]?.name || courseName;
@@ -327,9 +443,17 @@ export default function TrackingClient() {
                     const activeStatusLabels = STATUS_ORDER.filter(s => statusGroups[s].length > 0);
                     
                     return (
-                      <div key={courseName} className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 px-2 sticky top-16 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/60 shadow-sm rounded-md">
-                          <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} /></div>
+                      <div
+                        key={courseName}
+                        className="scroll-mt-24 flex flex-col gap-3"
+                      >
+                        <div
+                          ref={(el) => {
+                            courseHeaderRefs.current[courseName] = el;
+                          }}
+                          className="flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm"
+                        >
+                          <div className="p-1.5 rounded-md bg-primary/10 text-primary"><BookOpen size={16} aria-hidden="true" /></div>
                           <h3 className="text-md font-semibold text-left text-foreground/90 capitalize">{displayCourseName.toLowerCase()}</h3>
                           {isCourseCurrentlyDisabled && (
                             <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">Disabled</Badge>
@@ -397,7 +521,6 @@ export default function TrackingClient() {
                                     return (
                                       <m.div 
                                         key={trackingId} 
-                                        variants={cardVariants}
                                         className={`p-4 text-left rounded-xl border hover:bg-opacity-20 transition-all w-full ${cardBgClass}`}
                                       >
                                         <div className="flex justify-between items-start mb-2 gap-4">
@@ -452,8 +575,7 @@ export default function TrackingClient() {
                       </div>
                     );
                   })}
-                </m.div>
-              </AnimatePresence>
+                </div>
 
               {totalPages > 1 && (
                 <div className="flex justify-center items-center mt-6 gap-8 pb-8">
@@ -462,7 +584,7 @@ export default function TrackingClient() {
                   <m.button onClick={goToNextPage} disabled={currentPage === totalPages - 1} className={`h-8 w-8 flex justify-center items-center rounded-lg ${currentPage === totalPages - 1 ? "text-muted-foreground bg-accent/30" : "text-primary bg-accent hover:bg-accent/40"}`} aria-label="Next page"><ChevronRight size={20} aria-hidden="true" /></m.button>
                 </div>
               )}
-            </m.div>
+            </div>
           </>
         ) : (
           <m.div 

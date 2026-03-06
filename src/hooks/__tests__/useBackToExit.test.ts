@@ -42,6 +42,10 @@ function fireMidAppPopState() {
   window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'dashboard' } }));
 }
 
+function setPath(path: string) {
+  history.replaceState(history.state, '', path);
+}
+
 describe('useBackToExit', () => {
   let useBackToExit: typeof import('@/hooks/useBackToExit').useBackToExit;
   let restoreMatchMedia: () => void;
@@ -107,7 +111,8 @@ describe('useBackToExit', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Mid-app back press — ignored entirely
+  // Mid-app back press — dashboard route ignored; non-dashboard accumulates
+  // toward deep-mode exit toast
   // -------------------------------------------------------------------------
 
   it('does not show toast on a mid-app back press (non-sentinel state)', () => {
@@ -129,6 +134,75 @@ describe('useBackToExit', () => {
     });
 
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('shows toast after the second qualifying non-dashboard back press', () => {
+    renderHook(() => useBackToExit());
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).not.toHaveBeenCalled();
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledWith(
+      'Press back again to exit',
+      expect.objectContaining({ duration: 2000 }),
+    );
+  });
+
+  it('closes on further qualifying non-dashboard back after toast is shown', () => {
+    renderHook(() => useBackToExit());
+
+    act(() => {
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+    act(() => {
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+      setPath('/scores');
+      fireMidAppPopState();
+    });
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires two qualifying non-dashboard backs again after deep-mode threshold expires', () => {
+    renderHook(() => useBackToExit());
+
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+
+    // Let deep-mode window expire, then press back once: should NOT re-show toast.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(1);
+
+    // Second qualifying back after expiry should show a fresh toast.
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledTimes(2);
   });
 
   // -------------------------------------------------------------------------
@@ -271,6 +345,34 @@ describe('useBackToExit', () => {
     act(() => { fireSentinelPopState(); });
     expect(mockToast).toHaveBeenCalledTimes(2);
     expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignores stale callback from replaced toast during dismiss + recreate flow', () => {
+    mockToast
+      .mockReturnValueOnce('toast-old')
+      .mockReturnValueOnce('toast-new');
+
+    renderHook(() => useBackToExit());
+
+    act(() => { fireSentinelPopState(); });
+    const oldToastOptions = mockToast.mock.calls[0][1] as { onDismiss: () => void };
+
+    // Force a new root-mode toast while old one still exists.
+    act(() => {
+      vi.advanceTimersByTime(2500);
+      fireSentinelPopState();
+    });
+
+    // Simulate late callback from the replaced toast.
+    act(() => { oldToastOptions.onDismiss(); });
+
+    // Exit should still be armed for the newer toast.
+    act(() => {
+      vi.advanceTimersByTime(500);
+      fireSentinelPopState();
+    });
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------

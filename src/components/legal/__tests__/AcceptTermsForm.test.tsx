@@ -10,10 +10,11 @@ const { mockNProgressStart, mockNProgressDone } = vi.hoisted(() => ({
 
 // Mock next/navigation
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    replace: vi.fn(),
+    replace: mockReplace,
     prefetch: vi.fn(),
   }),
 }));
@@ -61,6 +62,7 @@ describe('AcceptTermsForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockClear();
+    mockReplace.mockClear();
     mockAcceptTermsAction.mockClear();
     mockNProgressStart.mockClear();
     mockNProgressDone.mockClear();
@@ -70,6 +72,7 @@ describe('AcceptTermsForm', () => {
   afterEach(() => {
     vi.clearAllMocks();
     mockPush.mockClear();
+    mockReplace.mockClear();
     mockAcceptTermsAction.mockClear();
     mockNProgressStart.mockClear();
     mockNProgressDone.mockClear();
@@ -166,7 +169,7 @@ describe('AcceptTermsForm', () => {
       
       // Wait for the full async flow to complete (including the 100ms delay)
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalled();
       });
     });
 
@@ -183,7 +186,7 @@ describe('AcceptTermsForm', () => {
       await user.click(button);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard');
       });
     });
 
@@ -211,7 +214,7 @@ describe('AcceptTermsForm', () => {
       
       // Wait for the full flow to complete to avoid timer leaks
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalled();
       });
     });
 
@@ -228,7 +231,7 @@ describe('AcceptTermsForm', () => {
       await user.click(button);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard');
       });
 
       // Button should remain in loading state (loading=true) after navigation,
@@ -260,7 +263,7 @@ describe('AcceptTermsForm', () => {
       
       // Wait for the full flow to complete to avoid timer leaks
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalled();
       });
     });
 
@@ -355,6 +358,7 @@ describe('AcceptTermsForm', () => {
     it('should not redirect to dashboard on error', async () => {
       // Clear mocks explicitly at the start of this test
       mockPush.mockClear();
+      mockReplace.mockClear();
       mockAcceptTermsAction.mockClear();
       
       const user = userEvent.setup();
@@ -377,7 +381,7 @@ describe('AcceptTermsForm', () => {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Should not redirect
-      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
     });
   });
 
@@ -461,7 +465,7 @@ describe('AcceptTermsForm', () => {
       
       // Verify action was called but redirect hasn't happened yet (timer not advanced)
       expect(mockAcceptTermsAction).toHaveBeenCalled();
-      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
 
       // Advance timers by 100ms to trigger the setTimeout
       await act(async () => {
@@ -469,7 +473,7 @@ describe('AcceptTermsForm', () => {
       });
 
       // Now the redirect should have been called
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockReplace).toHaveBeenCalledWith('/dashboard');
     });
   });
 });
