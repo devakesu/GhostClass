@@ -36,15 +36,21 @@ export const metadata: Metadata = {
     description: "GhostClass — Survive Attendance!",
     url: process.env.NEXT_PUBLIC_APP_URL,
     siteName: "GhostClass",
-    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "GhostClass",
     description: "Bunk college smartly with GhostClass.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
   },
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/apple-icon',
+  },
+  manifest: '/manifest.webmanifest',
 };
 
 const klick = localFont({
@@ -104,8 +110,6 @@ export default async function RootLayout({
           }}
         />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" href="/logo.png" />
         <meta name="application-name" content="GhostClass" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-TileColor" content="#141414" />
