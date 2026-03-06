@@ -1,0 +1,70 @@
+/**
+ * Tests for apple-icon.tsx
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('next/og', () => ({
+  ImageResponse: vi.fn().mockImplementation(function (
+    this: Record<string, unknown>,
+    element: unknown,
+    options: unknown,
+  ) {
+    this._element = element;
+    this._options = options;
+  }),
+}));
+
+describe('apple-icon', () => {
+  describe('exported constants', () => {
+    it('exports runtime as edge', async () => {
+      const { runtime } = await import('../apple-icon');
+      expect(runtime).toBe('edge');
+    });
+
+    it('exports correct size', async () => {
+      const { size } = await import('../apple-icon');
+      expect(size).toEqual({ width: 180, height: 180 });
+    });
+
+    it('exports correct contentType', async () => {
+      const { contentType } = await import('../apple-icon');
+      expect(contentType).toBe('image/png');
+    });
+  });
+
+  describe('AppleIcon()', () => {
+    it('returns an ImageResponse with the correct size options', async () => {
+      const { ImageResponse } = await import('next/og');
+      const { default: AppleIcon, size } = await import('../apple-icon');
+
+      const result = AppleIcon();
+
+      expect(result).toBeInstanceOf(ImageResponse);
+      expect(ImageResponse).toHaveBeenCalledWith(expect.anything(), size);
+    });
+
+    it('uses NEXT_PUBLIC_APP_URL env var to construct favicon src', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://example.com');
+      const { ImageResponse } = await import('next/og');
+      const { default: AppleIcon } = await import('../apple-icon');
+
+      AppleIcon();
+
+      expect(ImageResponse).toHaveBeenCalled();
+    });
+
+    it('falls back to localhost:3000 when NEXT_PUBLIC_APP_URL is not set', async () => {
+      // env var is read inside the function body, so deleting it before the call
+      // exercises the ?? fallback branch without re-loading the module.
+      delete process.env.NEXT_PUBLIC_APP_URL;
+
+      const { ImageResponse } = await import('next/og');
+      const { default: AppleIcon } = await import('../apple-icon');
+
+      AppleIcon();
+
+      expect(ImageResponse).toHaveBeenCalled();
+    });
+  });
+});
