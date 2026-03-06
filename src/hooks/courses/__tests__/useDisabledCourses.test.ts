@@ -82,13 +82,13 @@ describe("useDisabledCourses", () => {
     expect(result.current.disabledCodes.size).toBe(0);
   });
 
-  it("disableCourse calls updateDisabledCourses with correct map", () => {
+  it("disableCourse calls updateDisabledCourses with correct map", async () => {
     const { result } = renderHook(() =>
       useDisabledCourses({ academicYear: "2025-2026", semester: "even" })
     );
 
-    act(() => {
-      result.current.disableCourse("CS202", "Other reason");
+    await act(async () => {
+      await result.current.disableCourse("CS202", "Other reason");
     });
 
     expect(mockUpdateDisabledCourses).toHaveBeenCalledWith({
@@ -99,38 +99,38 @@ describe("useDisabledCourses", () => {
     });
   });
 
-  it("enableCourse removes course from map", () => {
+  it("enableCourse removes course from map", async () => {
     const { result } = renderHook(() =>
       useDisabledCourses({ academicYear: "2025-2026", semester: "even" })
     );
 
-    act(() => {
-      result.current.enableCourse("CS101");
+    await act(async () => {
+      await result.current.enableCourse("CS101");
     });
 
     // Entire semester bucket should be removed since it becomes empty
     expect(mockUpdateDisabledCourses).toHaveBeenCalledWith({});
   });
 
-  it("enableCourse is a no-op when semester key is null", () => {
+  it("enableCourse is a no-op when semester key is null", async () => {
     const { result } = renderHook(() =>
       useDisabledCourses({ academicYear: null, semester: null })
     );
 
-    act(() => {
-      result.current.enableCourse("CS101");
+    await act(async () => {
+      await result.current.enableCourse("CS101");
     });
 
     expect(mockUpdateDisabledCourses).not.toHaveBeenCalled();
   });
 
-  it("disableCourse is a no-op when semester key is null", () => {
+  it("disableCourse is a no-op when semester key is null", async () => {
     const { result } = renderHook(() =>
       useDisabledCourses({ academicYear: null, semester: null })
     );
 
-    act(() => {
-      result.current.disableCourse("CS101", "reason");
+    await act(async () => {
+      await result.current.disableCourse("CS101", "reason");
     });
 
     expect(mockUpdateDisabledCourses).not.toHaveBeenCalled();

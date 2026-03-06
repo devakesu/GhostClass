@@ -652,14 +652,19 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogAction
               className="custom-button bg-red-600! hover:bg-red-700! border-none!"
               disabled={isOtherReason && !customReason.trim()}
-              onClick={() => {
+              onClick={async (event) => {
+                event.preventDefault();
                 if (!courseCode) return;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
-                disableCourse(courseCode, reason);
-                setShowDisableDialog(false);
-                toast.success(`${courseCode} disabled`, {
-                  description: reason,
-                });
+                try {
+                  await disableCourse(courseCode, reason);
+                  setShowDisableDialog(false);
+                  toast.success(`${courseCode} disabled`, {
+                    description: reason,
+                  });
+                } catch {
+                  // Provider-level mutation handler already displays an error toast.
+                }
               }}
             >
               Disable
@@ -682,11 +687,16 @@ export function CourseCard({ course }: CourseCardProps) {
             <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
-              onClick={() => {
+              onClick={async (event) => {
+                event.preventDefault();
                 if (!courseCode) return;
-                enableCourse(courseCode);
-                setShowEnableDialog(false);
-                toast.success(`${courseCode} enabled`);
+                try {
+                  await enableCourse(courseCode);
+                  setShowEnableDialog(false);
+                  toast.success(`${courseCode} enabled`);
+                } catch {
+                  // Provider-level mutation handler already displays an error toast.
+                }
               }}
             >
               Enable

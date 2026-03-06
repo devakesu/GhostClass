@@ -251,10 +251,14 @@ export function useUserSettingsState() {
 
       return data as UserSettings | null;
     },
-    staleTime: 5 * 60 * 1000,  // 5 min — settings rarely change
+    staleTime: 5 * 60 * 1000,  // 5 min cache window for local responsiveness
     gcTime: 30 * 60 * 1000,     // 30 min — avoid cold-start refetches on re-mount
-    refetchOnWindowFocus: false, // mutations keep cache fresh; focus refetch wastes quota
-    refetchInterval: false,
+    // Keep settings in sync across devices/tabs even when no local mutation runs.
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       // Don't retry "No user" — auth hasn't resolved yet; retrying would hammer Supabase.
       const isNoUserError = error instanceof Error && error.message === NO_USER_ERROR_MESSAGE;
@@ -448,10 +452,18 @@ export function useUserSettingsState() {
 
   return {
     settings,
-    isLoading: isLoading || isFetching,
-    updateBunkCalc: (enabled: boolean) => mutateSettings({ bunk_calculator_enabled: enabled }),
-    updateTarget: (target: number) => mutateSettings({ target_percentage: normalizeTarget(target) }),
-    updateDisabledCourses: (disabledCourses: DisabledCoursesMap) => mutateSettings({ disabled_courses: disabledCourses }),
+    // Keep initial-load signal stable; background refetches should not disable UI controls.
+    isLoading,
+    isFetching,
+    updateBunkCalc: (enabled: boolean) => {
+      updateSettingsMutation.mutate({ bunk_calculator_enabled: enabled });
+    },
+    updateTarget: (target: number) => {
+      updateSettingsMutation.mutate({ target_percentage: normalizeTarget(target) });
+    },
+    updateDisabledCourses: async (disabledCourses: DisabledCoursesMap) => {
+      await updateSettingsMutation.mutateAsync({ disabled_courses: disabledCourses });
+    },
   };
 }
 

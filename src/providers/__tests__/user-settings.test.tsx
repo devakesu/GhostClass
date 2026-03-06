@@ -159,14 +159,14 @@ describe('UserSettingsProvider', () => {
     expect(screen.getByTestId('loading').textContent).toBe('true');
   });
 
-  it('provides isLoading=true when query is fetching', () => {
+  it('keeps isLoading=false during background fetching', () => {
     vi.mocked(useQuery).mockReturnValue({
       data: undefined,
       isLoading: false,
       isFetching: true,
     } as any);
     render(<WrappedConsumer />);
-    expect(screen.getByTestId('loading').textContent).toBe('true');
+    expect(screen.getByTestId('loading').textContent).toBe('false');
   });
 
   it('provides settings when query returns data', () => {
@@ -187,6 +187,21 @@ describe('UserSettingsProvider', () => {
     } as any);
     render(<WrappedConsumer />);
     expect(screen.getByTestId('settings').textContent).toBe('no-settings');
+  });
+
+  it('configures refetch policy for cross-device settings sync', () => {
+    render(<WrappedConsumer />);
+
+    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as unknown as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(firstCallArgs).toBeDefined();
+    expect(firstCallArgs?.refetchOnMount).toBe('always');
+    expect(firstCallArgs?.refetchOnWindowFocus).toBe('always');
+    expect(firstCallArgs?.refetchOnReconnect).toBe('always');
+    expect(firstCallArgs?.refetchInterval).toBe(60 * 1000);
+    expect(firstCallArgs?.refetchIntervalInBackground).toBe(false);
   });
 
   describe('useUserSettings guard', () => {
@@ -242,7 +257,7 @@ describe('UserSettingsProvider', () => {
         </UserSettingsProvider>
       );
       screen.getByRole('button').click();
-      expect(mockMutate).toHaveBeenCalledWith({ disabled_courses: map });
+      expect(mockMutateAsync).toHaveBeenCalledWith({ disabled_courses: map });
     });
   });
 

@@ -33,9 +33,9 @@ export interface UseDisabledCoursesReturn {
   /** Get the disable reason for a course code in the current semester (or null) */
   getDisableReason: (code: string) => string | null;
   /** Disable a course code with a reason in the current semester */
-  disableCourse: (code: string, reason: string) => void;
+  disableCourse: (code: string, reason: string) => Promise<void>;
   /** Enable a previously-disabled course code in the current semester */
-  enableCourse: (code: string) => void;
+  enableCourse: (code: string) => Promise<void>;
   /** Whether the settings are still loading */
   isLoading: boolean;
 }
@@ -48,14 +48,16 @@ export interface UseDisabledCoursesReturn {
  *
  * @example
  * ```tsx
+ * async function handleCourseToggle() {
  * const { isDisabled, disableCourse, enableCourse } = useDisabledCourses({
  *   academicYear: "2025-2026",
  *   semester: "even",
  * });
  *
  * if (isDisabled("GXEST204")) { … }
- * disableCourse("GXEST204", "Challenge passed");
- * enableCourse("GXEST204");
+ * await disableCourse("GXEST204", "Challenge passed");
+ * await enableCourse("GXEST204");
+ * }
  * ```
  */
 export function useDisabledCourses({
@@ -103,18 +105,18 @@ export function useDisabledCourses({
   );
 
   const disableCourse = useCallback(
-    (code: string, reason: string) => {
+    async (code: string, reason: string) => {
       if (!semKey) return;
       const newMap: DisabledCoursesMap = structuredClone(disabledCoursesMap);
       if (!newMap[semKey]) newMap[semKey] = {};
       newMap[semKey][code.toUpperCase()] = reason;
-      updateDisabledCourses(newMap);
+      await updateDisabledCourses(newMap);
     },
     [semKey, disabledCoursesMap, updateDisabledCourses]
   );
 
   const enableCourse = useCallback(
-    (code: string) => {
+    async (code: string) => {
       if (!semKey) return;
       const newMap: DisabledCoursesMap = structuredClone(disabledCoursesMap);
       if (!newMap[semKey]) return;
@@ -130,7 +132,7 @@ export function useDisabledCourses({
       if (Object.keys(newMap[semKey]).length === 0) {
         delete newMap[semKey];
       }
-      updateDisabledCourses(newMap);
+      await updateDisabledCourses(newMap);
     },
     [semKey, disabledCoursesMap, updateDisabledCourses]
   );
