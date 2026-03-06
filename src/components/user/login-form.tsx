@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Lock as LockIcon, Mail, Phone, User } from "lucide-react"; 
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -93,6 +93,7 @@ const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
 
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
+  const manuallySelectedLoginMethodRef = useRef<"email" | "phone" | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -147,14 +148,16 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     setFormData((prev) => ({ ...prev, username: loginValue }));
 
-    // Auto-switch method selector only when it helps, without overriding
-    // an explicit user choice back to "username" during typing.
-    setLoginMethod((previousMethod) => {
-      if (previousMethod !== "username" && inferredMethod === "username") {
-        return previousMethod;
-      }
-      return inferredMethod;
-    });
+    // Preserve explicit email/phone selector choices while typing ambiguous input,
+    // but allow inferred modes to fall back to username when the value no longer matches.
+    const manuallySelectedMethod = manuallySelectedLoginMethodRef.current;
+    if (manuallySelectedMethod && inferredMethod === "username") {
+      setLoginMethod(manuallySelectedMethod);
+      return;
+    }
+
+    manuallySelectedLoginMethodRef.current = null;
+    setLoginMethod(inferredMethod);
   };
 
   useEffect(() => {
@@ -479,7 +482,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                       size="icon"
                       variant={loginMethod === method ? "secondary" : "ghost"}
                       className="h-6 w-6 p-3"
-                      onClick={() => setLoginMethod(method)}
+                      onClick={() => {
+                        setLoginMethod(method);
+                        manuallySelectedLoginMethodRef.current =
+                          method === "email" || method === "phone" ? method : null;
+                      }}
                       aria-label={method === "username" ? "Login with username" : method === "email" ? "Login with email" : "Login with phone"}
                     >
                       {method === "username" && <User className="h-4 w-4" aria-hidden="true" />}

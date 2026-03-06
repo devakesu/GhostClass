@@ -90,6 +90,14 @@ const sampleCourse: ExtendedCourse = {
   total: 20,
 };
 
+function createDeferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe('CourseCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -316,6 +324,62 @@ describe('CourseCard', () => {
       fireEvent.click(toggle);
       const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
       fireEvent.click(enableConfirmBtn);
+      await waitFor(() => {
+        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
+      });
+    });
+
+    it('shows disabling state immediately and prevents duplicate disable submits while pending', async () => {
+      const deferred = createDeferredPromise<void>();
+      mockDisableCourse.mockReturnValueOnce(deferred.promise);
+
+      render(<CourseCard course={sampleCourse} />);
+      fireEvent.click(await screen.findByText('Enabled'));
+
+      const disableConfirmBtn = await screen.findByRole('button', { name: /^disable$/i });
+      fireEvent.click(disableConfirmBtn);
+
+      const disablingBtn = await screen.findByRole('button', { name: /disabling\.\.\./i });
+      expect(disablingBtn).toBeDisabled();
+
+      fireEvent.click(disablingBtn);
+      expect(mockDisableCourse).toHaveBeenCalledTimes(1);
+
+      deferred.resolve();
+      await waitFor(() => {
+        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 disabled', {
+          description: 'Challenge passed',
+        });
+      });
+    });
+
+    it('shows enabling state immediately and prevents duplicate enable submits while pending', async () => {
+      const deferred = createDeferredPromise<void>();
+      mockEnableCourse.mockReturnValueOnce(deferred.promise);
+
+      mockUseDisabledCourses.mockReturnValue({
+        isDisabled: (code: string) => code === 'CS101',
+        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        disableCourse: mockDisableCourse,
+        enableCourse: mockEnableCourse,
+        disabledCodes: new Set(['CS101']),
+        disabledCoursesMap: {},
+        isLoading: false,
+      });
+
+      render(<CourseCard course={sampleCourse} />);
+      fireEvent.click(await screen.findByText('Disabled'));
+
+      const enableConfirmBtn = await screen.findByRole('button', { name: /^enable$/i });
+      fireEvent.click(enableConfirmBtn);
+
+      const enablingBtn = await screen.findByRole('button', { name: /enabling\.\.\./i });
+      expect(enablingBtn).toBeDisabled();
+
+      fireEvent.click(enablingBtn);
+      expect(mockEnableCourse).toHaveBeenCalledTimes(1);
+
+      deferred.resolve();
       await waitFor(() => {
         expect(vi.mocked(toast.success)).toHaveBeenCalledWith('CS101 enabled');
       });

@@ -214,6 +214,19 @@ describe("LoginForm – login method auto-detection", () => {
     expect(screen.getByDisplayValue("919234567890")).toHaveAttribute("type", "tel");
   });
 
+  it("reverts to username mode when an auto-inferred email no longer looks like email", async () => {
+    await renderAndWaitForForm();
+
+    const loginInput = screen.getByLabelText("Username");
+    fireEvent.change(loginInput, { target: { value: "student@" } });
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student" } });
+
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "text");
+  });
+
   it("keeps manual email selection while typing a local-part without @", async () => {
     await renderAndWaitForForm();
 

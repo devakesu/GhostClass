@@ -239,17 +239,19 @@ describe('AttendanceCalendar', () => {
 
   it('should not show Jump to Today when selected date is already today with no sessions', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-06T10:00:00.000Z'));
+    try {
+      vi.setSystemTime(new Date('2026-03-06T10:00:00.000Z'));
 
-    render(<AttendanceCalendar attendanceData={undefined} />);
+      render(<AttendanceCalendar attendanceData={undefined} />);
 
-    await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
 
-    // No sessions on the selected date (frozen to "today") should not show redundant CTA.
-    expect(screen.getByText('No Classes Found')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /jump to today/i })).not.toBeInTheDocument();
-
-    vi.useRealTimers();
+      // No sessions on the selected date (frozen to "today") should not show redundant CTA.
+      expect(screen.getByText('No Classes Found')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /jump to today/i })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should close the dialog when Confirm is clicked', async () => {
