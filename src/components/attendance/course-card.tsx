@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Course } from "@/types";
 import { useCourseDetails } from "@/hooks/courses/attendance";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -105,6 +105,8 @@ export function CourseCard({ course }: CourseCardProps) {
   const [showEnableDialog, setShowEnableDialog] = useState(false);
   const [disableReason, setDisableReason] = useState<string>("Challenge passed");
   const [customReason, setCustomReason] = useState("");
+  const [isDisabling, setIsDisabling] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
   const isOtherReason = disableReason === "Other";
 
   const normalize = useCallback((s: string | undefined) => 
@@ -617,7 +619,10 @@ export function CourseCard({ course }: CourseCardProps) {
       </CardContent>
 
       {/* Disable Course Dialog */}
-      <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+      <AlertDialog open={showDisableDialog} onOpenChange={(open) => {
+        if (isDisabling) return;
+        setShowDisableDialog(open);
+      }}>
         <AlertDialogContent className="custom-container">
           <AlertDialogHeader>
             <AlertDialogTitle>Disable {course.code}?</AlertDialogTitle>
@@ -648,14 +653,16 @@ export function CourseCard({ course }: CourseCardProps) {
             )}
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="custom-button" disabled={isDisabling}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-red-600! hover:bg-red-700! border-none!"
-              disabled={isOtherReason && !customReason.trim()}
+              disabled={isDisabling || (isOtherReason && !customReason.trim())}
+              aria-busy={isDisabling}
               onClick={async (event) => {
                 event.preventDefault();
-                if (!courseCode) return;
+                if (!courseCode || isDisabling) return;
                 const reason = isOtherReason ? customReason.trim() : disableReason;
+                setIsDisabling(true);
                 try {
                   await disableCourse(courseCode, reason);
                   setShowDisableDialog(false);
@@ -664,17 +671,29 @@ export function CourseCard({ course }: CourseCardProps) {
                   });
                 } catch {
                   // Provider-level mutation handler already displays an error toast.
+                } finally {
+                  setIsDisabling(false);
                 }
               }}
             >
-              Disable
+              {isDisabling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Disabling...
+                </>
+              ) : (
+                "Disable"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Enable Course Dialog */}
-      <AlertDialog open={showEnableDialog} onOpenChange={setShowEnableDialog}>
+      <AlertDialog open={showEnableDialog} onOpenChange={(open) => {
+        if (isEnabling) return;
+        setShowEnableDialog(open);
+      }}>
         <AlertDialogContent className="custom-container">
           <AlertDialogHeader>
             <AlertDialogTitle>Enable {course.code}?</AlertDialogTitle>
@@ -684,22 +703,34 @@ export function CourseCard({ course }: CourseCardProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="custom-button">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="custom-button" disabled={isEnabling}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="custom-button bg-green-600! hover:bg-green-700! border-none!"
+              disabled={isEnabling}
+              aria-busy={isEnabling}
               onClick={async (event) => {
                 event.preventDefault();
-                if (!courseCode) return;
+                if (!courseCode || isEnabling) return;
+                setIsEnabling(true);
                 try {
                   await enableCourse(courseCode);
                   setShowEnableDialog(false);
                   toast.success(`${courseCode} enabled`);
                 } catch {
                   // Provider-level mutation handler already displays an error toast.
+                } finally {
+                  setIsEnabling(false);
                 }
               }}
             >
-              Enable
+              {isEnabling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Enabling...
+                </>
+              ) : (
+                "Enable"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

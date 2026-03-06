@@ -74,6 +74,23 @@ const validatePassword = (password: string): string | null => {
   return null; // Valid
 };
 
+const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return "username";
+
+  // Switch early to email mode once users type an @ to keep UX responsive.
+  if (trimmedValue.includes("@")) return "email";
+
+  const digitsOnly = trimmedValue.replace(/\D/g, "");
+  const phoneLikeCharsOnly = /^[+\d\s()-]+$/.test(trimmedValue);
+  if (phoneLikeCharsOnly && digitsOnly.length >= 7) {
+    return "phone";
+  }
+
+  return "username";
+};
+
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
 
@@ -122,6 +139,16 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     } else {
       setPasswordError(null);
     }
+  };
+
+  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const loginValue = e.target.value;
+    const inferredMethod = detectLoginMethod(loginValue);
+
+    setFormData((prev) => ({ ...prev, username: loginValue }));
+
+    // Auto-switch method selector as users type email/phone-like identifiers.
+    setLoginMethod(inferredMethod);
   };
 
   useEffect(() => {
@@ -462,9 +489,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   type={loginMethodProps[loginMethod].type}
                   value={formData.username}
                   className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors"
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
+                  onChange={handleLoginChange}
                   placeholder={loginMethodProps[loginMethod].placeholder}
                   name={loginMethodProps[loginMethod].label.toLowerCase()}
                   required

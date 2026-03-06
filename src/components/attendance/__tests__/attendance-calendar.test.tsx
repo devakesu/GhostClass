@@ -237,6 +237,14 @@ describe('AttendanceCalendar', () => {
     expect(nextBtn).toBeInTheDocument();
   });
 
+  it('should not show Jump to Today when selected date is already today with no sessions', async () => {
+    render(<AttendanceCalendar attendanceData={undefined} />);
+
+    // No sessions on the default selected date (today) should not show redundant CTA.
+    await screen.findByText('No Classes Found');
+    expect(screen.queryByRole('button', { name: /jump to today/i })).not.toBeInTheDocument();
+  });
+
   it('should close the dialog when Confirm is clicked', async () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
