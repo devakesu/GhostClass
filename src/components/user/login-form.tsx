@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Lock as LockIcon, Mail, Phone, User } from "lucide-react"; 
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -74,8 +74,26 @@ const validatePassword = (password: string): string | null => {
   return null; // Valid
 };
 
+const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return "username";
+
+  // Switch early to email mode once users type an @ to keep UX responsive.
+  if (trimmedValue.includes("@")) return "email";
+
+  const digitsOnly = trimmedValue.replace(/\D/g, "");
+  const phoneLikeCharsOnly = /^[+\d\s()-]+$/.test(trimmedValue);
+  if (phoneLikeCharsOnly && digitsOnly.length >= 7) {
+    return "phone";
+  }
+
+  return "username";
+};
+
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
+  const manuallySelectedLoginMethodRef = useRef<"email" | "phone" | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -122,6 +140,24 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     } else {
       setPasswordError(null);
     }
+  };
+
+  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const loginValue = e.target.value;
+    const inferredMethod = detectLoginMethod(loginValue);
+
+    setFormData((prev) => ({ ...prev, username: loginValue }));
+
+    // Preserve explicit email/phone selector choices while typing ambiguous input,
+    // but allow inferred modes to fall back to username when the value no longer matches.
+    const manuallySelectedMethod = manuallySelectedLoginMethodRef.current;
+    if (manuallySelectedMethod && inferredMethod === "username") {
+      setLoginMethod(manuallySelectedMethod);
+      return;
+    }
+
+    manuallySelectedLoginMethodRef.current = null;
+    setLoginMethod(inferredMethod);
   };
 
   useEffect(() => {
@@ -446,7 +482,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                       size="icon"
                       variant={loginMethod === method ? "secondary" : "ghost"}
                       className="h-6 w-6 p-3"
-                      onClick={() => setLoginMethod(method)}
+                      onClick={() => {
+                        setLoginMethod(method);
+                        manuallySelectedLoginMethodRef.current =
+                          method === "email" || method === "phone" ? method : null;
+                      }}
                       aria-label={method === "username" ? "Login with username" : method === "email" ? "Login with email" : "Login with phone"}
                     >
                       {method === "username" && <User className="h-4 w-4" aria-hidden="true" />}
@@ -462,9 +502,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   type={loginMethodProps[loginMethod].type}
                   value={formData.username}
                   className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors"
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
+                  onChange={handleLoginChange}
                   placeholder={loginMethodProps[loginMethod].placeholder}
                   name={loginMethodProps[loginMethod].label.toLowerCase()}
                   required

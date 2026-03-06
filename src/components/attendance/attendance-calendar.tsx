@@ -621,7 +621,9 @@ export function AttendanceCalendar({
   }
 
   // After the null check above, we know currentDate.year and currentDate.month are not null
-  // Non-null assertions in this block are safe due to the guard condition at line 516
+  // Non-null assertions in this block are safe due to the guard condition above
+  const shouldShowJumpToToday = !isToday(selectedDate);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <Card className="overflow-hidden border border-border/40 custom-container h-full flex flex-col">
@@ -812,7 +814,9 @@ export function AttendanceCalendar({
                   <div className="rounded-full bg-accent/30 p-4 mb-3 ring-1 ring-border/50"><CalendarIcon className="h-6 w-6 text-muted-foreground/60" aria-hidden="true" /></div>
                   <h3 className="text-sm font-semibold text-foreground">No Classes Found</h3>
                   <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-50">Enjoy your free time! No classes recorded for this date.</p>
-                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={goToToday}>Jump to Today</Button>
+                  {shouldShowJumpToToday && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={goToToday}>Jump to Today</Button>
+                  )}
                 </div>
               )}
             </motion.div>

@@ -186,6 +186,72 @@ describe("LoginForm – NProgress integration", () => {
   });
 });
 
+describe("LoginForm – login method auto-detection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    vi.mocked(isAuthSessionMissingError).mockReturnValue(false);
+    vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
+  });
+
+  it("switches login method to email while typing an email", async () => {
+    await renderAndWaitForForm();
+
+    const loginInput = screen.getByLabelText("Username");
+    fireEvent.change(loginInput, { target: { value: "student@example.com" } });
+
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("student@example.com")).toHaveAttribute("type", "email");
+  });
+
+  it("switches login method to phone while typing a phone number", async () => {
+    await renderAndWaitForForm();
+
+    const loginInput = screen.getByLabelText("Username");
+    fireEvent.change(loginInput, { target: { value: "919234567890" } });
+
+    expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("919234567890")).toHaveAttribute("type", "tel");
+  });
+
+  it("reverts to username mode when an auto-inferred email no longer looks like email", async () => {
+    await renderAndWaitForForm();
+
+    const loginInput = screen.getByLabelText("Username");
+    fireEvent.change(loginInput, { target: { value: "student@" } });
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student" } });
+
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "text");
+  });
+
+  it("keeps manual email selection while typing a local-part without @", async () => {
+    await renderAndWaitForForm();
+
+    fireEvent.click(screen.getByLabelText("Login with email"));
+
+    const loginInput = screen.getByLabelText("Email");
+    fireEvent.change(loginInput, { target: { value: "student" } });
+
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "email");
+  });
+
+  it("keeps manual phone selection while typing short digits", async () => {
+    await renderAndWaitForForm();
+
+    fireEvent.click(screen.getByLabelText("Login with phone"));
+
+    const loginInput = screen.getByLabelText("Phone");
+    fireEvent.change(loginInput, { target: { value: "123" } });
+
+    expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("123")).toHaveAttribute("type", "tel");
+  });
+});
+
 describe("LoginForm – mount-time storage cleanup", () => {
   // Replace the global Storage objects with mocks so we can reliably track calls.
   // vi.spyOn on the Storage prototype can fail silently in jsdom.
