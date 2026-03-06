@@ -4,6 +4,16 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
+// vi.hoisted ensures mockReadFileSync is defined before vi.mock factories are evaluated.
+const { mockReadFileSync } = vi.hoisted(() => ({
+  mockReadFileSync: vi.fn(),
+}));
+
+vi.mock('fs', () => ({
+  default: { readFileSync: mockReadFileSync },
+  readFileSync: mockReadFileSync,
+}));
+
 // Mock next/og — ImageResponse must be available before the module-level IIFE runs.
 vi.mock('next/og', () => ({
   ImageResponse: vi.fn().mockImplementation(function (
@@ -18,6 +28,7 @@ vi.mock('next/og', () => ({
 
 describe('opengraph-image', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -56,51 +67,42 @@ describe('opengraph-image', () => {
   });
 
   describe('iconSrc IIFE', () => {
-    it('reads the icon file and produces a base64 data URI when the file is readable', async () => {
-      // The real public/icon-192.png exists in the repo, so readFileSync succeeds naturally.
-      // Re-importing after resetModules() re-executes the IIFE and covers the try branch.
-      vi.resetModules();
-      vi.doMock('next/og', () => ({
-        ImageResponse: vi.fn().mockImplementation(function (
-          this: Record<string, unknown>,
-          element: unknown,
-        ) {
-          this._element = element;
-        }),
-      }));
+    it('reads the icon file and includes a base64 img element when the file is readable', async () => {
+      // Configure readFileSync to return a known buffer before the module loads.
+      const fakeBuffer = Buffer.from('fake-png-bytes');
+      mockReadFileSync.mockReturnValue(fakeBuffer);
 
-      const mod = await import('../opengraph-image');
+      const { default: Image } = await import('../opengraph-image');
       const { ImageResponse } = await import('next/og');
-      mod.default();
+      Image();
 
-      expect(ImageResponse).toHaveBeenCalled();
+      // readFileSync was invoked during the IIFE
+      expect(mockReadFileSync).toHaveBeenCalled();
+
+      // The img element is present and its src is a base64 data URI
+      const element = (ImageResponse as ReturnType<typeof vi.fn>).mock.calls[0][0] as any;
+      const imgElement = element.props.children[0];
+      expect(imgElement).toBeTruthy();
+      expect(imgElement.props.src).toMatch(/^data:image\/png;base64,/);
     });
 
-    it('falls back to null when the icon file cannot be read', async () => {
-      // Mock fs so readFileSync throws, exercising the catch branch of the IIFE.
-      // Include a `default` key so Vitest can resolve the CJS named export.
-      vi.resetModules();
-      const mockReadFileSync = vi.fn().mockImplementation(() => {
+    it('omits the img element when the icon file cannot be read', async () => {
+      // Configure readFileSync to throw before the module loads.
+      mockReadFileSync.mockImplementation(() => {
         throw new Error('ENOENT: no such file or directory');
       });
-      vi.doMock('fs', () => ({
-        default: { readFileSync: mockReadFileSync },
-        readFileSync: mockReadFileSync,
-      }));
-      vi.doMock('next/og', () => ({
-        ImageResponse: vi.fn().mockImplementation(function (
-          this: Record<string, unknown>,
-          element: unknown,
-        ) {
-          this._element = element;
-        }),
-      }));
 
-      const mod = await import('../opengraph-image');
+      const { default: Image } = await import('../opengraph-image');
       const { ImageResponse } = await import('next/og');
-      mod.default();
+      Image();
 
-      expect(ImageResponse).toHaveBeenCalled();
+      // readFileSync was called but threw — iconSrc is null
+      expect(mockReadFileSync).toHaveBeenCalled();
+
+      // {iconSrc && <img/>} evaluates to null/false when iconSrc is null
+      const element = (ImageResponse as ReturnType<typeof vi.fn>).mock.calls[0][0] as any;
+      const firstChild = element.props.children[0];
+      expect(firstChild).toBeFalsy();
     });
   });
 });
