@@ -44,6 +44,7 @@ import {
   HelpCircle,
   Sun,
   Moon,
+  FileText,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useUserSettings } from "@/providers/user-settings";
@@ -198,6 +199,19 @@ export const Navbar = () => {
             </div>
           )}
 
+          {pathname !== "/leave-applications" && (
+            <div className="max-lg:hidden text-foreground/85">
+              <Button
+                variant={"outline"}
+                className="custom-button cursor-pointer"
+                onClick={() => navigateTo("/leave-applications")}
+              >
+                <FileText className="h-4 w-4" />
+                Leaves
+              </Button>
+            </div>
+          )}
+
           <div className="gap-3 flex items-center">
             {user && <AddRecordTrigger user={user} onSuccess={handleAddSuccess} />}
           </div>
@@ -317,7 +331,7 @@ export const Navbar = () => {
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="ghost" 
-                className="relative h-9 w-9 rounded-full cursor-pointer"
+                className="relative h-9 w-9 p-0 rounded-full cursor-pointer"
                 aria-label="Open user menu"
               >
                 <Avatar className="h-9 w-9 outline-2 relative">
@@ -361,6 +375,10 @@ export const Navbar = () => {
               <DropdownMenuItem onClick={() => navigateTo("/scores")} className="cursor-pointer py-2" role="menuitem">
                 <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
                 <span>Scores</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigateTo("/leave-applications")} className="cursor-pointer py-2" role="menuitem">
+                <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+                <span>Leave Applications</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigateTo("/profile")} className="cursor-pointer py-2" role="menuitem">
                 <UserRound className="mr-2 h-4 w-4" aria-hidden="true" />

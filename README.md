@@ -101,8 +101,9 @@ src/
 ├── sw.ts                     # Service worker with runtime caching
 ├── app/                      # Next.js app router pages and layouts
 │   ├── (auth)/               # Authentication routes (login, signup)
-│   ├── (protected)/          # Login-restricted routes (dashboard, profile, tracking, scores)
+│   ├── (protected)/          # Login-restricted routes (dashboard, profile, tracking, scores, leave-applications)
 │   │   ├── dashboard/        # Main dashboard with attendance overview
+│   │   ├── leave-applications/ # Viewing EzyGo leave application status
 │   │   ├── profile/          # User profile and settings
 │   │   ├── tracking/         # Manual attendance tracking interface
 │   │   ├── scores/           # Exam & assignment scores viewer with per-question breakdown drawer

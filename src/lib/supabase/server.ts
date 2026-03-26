@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
+import { _customFetch } from "./fetch";
 
 /**
  * Creates a Supabase server client with cookie-based session management.
@@ -55,6 +56,7 @@ export async function createClient() {
           }
         },
       },
+      ...(_customFetch ? { global: { fetch: _customFetch } } : {})
     }
   );
 }

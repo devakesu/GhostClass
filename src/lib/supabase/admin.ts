@@ -3,6 +3,7 @@
 
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { _customFetch } from "./fetch";
 
 /**
  * Creates a Supabase admin client using the service role key.
@@ -17,5 +18,5 @@ export function getAdminClient() {
     throw new Error("Missing Supabase Admin credentials");
   }
 
-  return createClient(url, key);
+  return createClient(url, key, _customFetch ? { global: { fetch: _customFetch } } : undefined);
 }

@@ -68,10 +68,10 @@ describe("robots.txt", () => {
     expect(Array.isArray(rules.disallow)).toBe(true);
   });
 
-  it("should disallow exactly 6 paths", () => {
+  it("should disallow exactly 7 paths", () => {
     const config = robots();
     const rules = Array.isArray(config.rules) ? config.rules[0] : config.rules;
-    expect(rules.disallow).toHaveLength(6);
+    expect(rules.disallow).toHaveLength(7);
   });
 
   it("should disallow /scores", () => {

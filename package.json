@@ -1,6 +1,6 @@
 {
   "name": "ghostclass",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "private": true,
   "engines": {
     "node": ">=22.12.0",
@@ -43,7 +43,8 @@
     "rollup": "^4.52.3",
     "glob": "^13.0.6",
     "source-map": "^0.7.6",
-    "minimatch": "^10.2.2"
+    "minimatch": "^10.2.2",
+    "flatted": "^3.4.2"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -80,7 +81,7 @@
     "ldrs": "^1.1.9",
     "lodash-es": "^4.17.23",
     "lru-cache": "^11.2.6",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.7.0",
     "next": "^16.1.6",
     "nextjs-toploader": "^3.9.17",
     "react": "^19.2.4",
@@ -101,7 +102,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^9.39.4",
     "@opentelemetry/context-async-hooks": "^2.6.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
@@ -115,10 +116,10 @@
     "@types/react-dom": "^19.2.3",
     "@types/sanitize-html": "^2.16.0",
     "@typescript-eslint/parser": "^8.56.1",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
-    "eslint": "^9.39.2",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.1.6",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -126,7 +127,7 @@
     "globals": "^17.3.0",
     "happy-dom": "^20.7.0",
     "husky": "^9.1.7",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.0.0",
     "lint-staged": "^16.2.7",
     "minimatch": "^10.2.2",
     "rimraf": "^6.1.3",

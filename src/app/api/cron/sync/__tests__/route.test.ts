@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for GET /api/cron/sync — EzyGo attendance sync logic
  *
  * These tests mock EzyGo's course/attendance API responses to simulate every
@@ -324,7 +324,7 @@ describe("Cron sync — official present, tracker was absent → delete + 'Atten
     expect(notificationInsertSpy).toHaveBeenCalledOnce();
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications).toHaveLength(1);
-    expect(notifications[0].title).toBe("Attendance Updated 🥳");
+    expect(notifications[0].title).toBe("Surprise Present 🎁");
     expect(notifications[0].topic).toContain("sync-surprise");
   });
 });
@@ -553,7 +553,7 @@ describe("Cron sync — Duty Leave (225) tracker entry; official confirms presen
     expect(deleteInSpy).toHaveBeenCalledWith("id", [102]);
     expect(notificationInsertSpy).toHaveBeenCalledOnce();
     const [notifications] = notificationInsertSpy.mock.calls[0];
-    expect(notifications[0].title).toBe("Attendance Updated 🥳");
+    expect(notifications[0].title).toBe("DL Approved ✅");
   });
 });
 
@@ -617,7 +617,7 @@ describe("Cron sync — mixed batch with multiple outcomes", () => {
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications).toHaveLength(3);
     expect(notifications[0].title).toContain("Attendance Updated"); // A
-    expect(notifications[1].title).toContain("Attendance Updated"); // B
+    expect(notifications[1].title).toContain("DL Approved"); // B
     expect(notifications[2].title).toContain("Attendance Conflict"); // C
   });
 });
