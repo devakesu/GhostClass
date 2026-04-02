@@ -189,8 +189,8 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                 {leave.approvers && leave.approvers.filter((a: any) => a.action_by_user).length > 0 && (
                   <div className="px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/[0.02]">
                     <div className="w-full space-y-2.5">
-                      <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">Recent Activity</span>
-                      <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground">
+                      <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">All Activity</span>
+                      <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                         {leave.approvers
                           .filter((a: any) => a.action_by_user)
                           .reduce((acc: any[], current: any) => {
@@ -203,7 +203,6 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                             return acc;
                           }, [])
                           .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-                          .slice(0, 2)
                           .map((approver: any) => (
                             <div key={approver.id} className="flex items-center justify-between">
                               <span className="flex items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium dark:font-normal">

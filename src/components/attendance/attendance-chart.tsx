@@ -383,15 +383,6 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
       .sort((a, b) => a.totalPercentage - b.totalPercentage);
   }, [attendanceData, trackingData, coursesData, safeTarget, disabledCodes]);
 
-  const getBarSize = () => {
-    const courseCount = data.length;
-    if (courseCount === 1) return 80; 
-    if (courseCount <= 3) return 60;  
-    if (courseCount <= 5) return 40;
-    if (courseCount <= 8) return 30;
-    return 20;
-  };
-
   const allPercentages = data.flatMap(d => [d.totalPercentage, d.officialPercentage]);
   const nonZeroHeights = allPercentages.filter(h => h > 0);
    
@@ -430,7 +421,7 @@ return (
       <BarChart 
         data={data} 
         margin={{ top: 10, right: 20, left: -12, bottom: isMobile ? 30 : 25 }} 
-        barSize={getBarSize()}
+        maxBarSize={50}
         width={dimensions.width}
         height={dimensions.height}
       >

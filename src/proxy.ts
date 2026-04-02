@@ -61,6 +61,15 @@ function isRefreshTokenNotFoundError(error: unknown): boolean {
     || (authError.status === 400 && typeof authError.message === "string" && authError.message.includes("Invalid Refresh Token"));
 }
 
+function isAuthSessionMissingError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const authError = error as { name?: unknown; message?: unknown };
+  return authError.name === "AuthSessionMissingError" || 
+    (typeof authError.message === "string" && authError.message.includes("Auth session missing!"));
+}
+
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const requestHeaders = new Headers(request.headers);
@@ -143,15 +152,12 @@ export async function proxy(request: NextRequest) {
   try {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
-      if (isRefreshTokenNotFoundError(error)) {
-        // Invalid refresh token — treat as unauthenticated. Do NOT clear
-        // session cookies here: clearSessionCookies() must only run on
-        // redirect responses (Scenarios A / logout-loop below). Calling it
-        // on the pass-through response for public-route requests (RSC fetches
-        // for /help, /legal, etc.) would delete csrf_token and other cookies
-        // that are still valid and unrelated to the Supabase session.
-        // The redirect-path in Scenario A already calls clearSessionCookies()
-        // when the user later tries to reach a protected route.
+      if (isRefreshTokenNotFoundError(error) || isAuthSessionMissingError(error)) {
+        // Invalid refresh token or missing session — treat as unauthenticated. 
+        // Do NOT clear session cookies here: clearSessionCookies() must only 
+        // run on redirect responses (Scenarios A / logout-loop below).
+        // Calling it on the pass-through response for public-route requests 
+        // would delete csrf_token and other cookies that are still valid.
       } else {
         logger.warn("Supabase auth refresh failed in proxy; proceeding unauthenticated.", { error });
         // Transient error — proceed as unauthenticated without touching cookies.
