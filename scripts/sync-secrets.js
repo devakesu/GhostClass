@@ -247,6 +247,7 @@ function main() {
     'CLOUDFLARE_ACCOUNT_ID',
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
+    'MOBILE_API_SECRET',
   ];
 
   let successCount = 0;

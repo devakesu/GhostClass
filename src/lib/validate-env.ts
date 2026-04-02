@@ -265,6 +265,10 @@ export function validateEnvironment() {
     warnings.push('⚠️  NEXT_PUBLIC_GITHUB_URL not set');
   }
 
+  if (!process.env.MOBILE_API_SECRET) {
+    warnings.push('⚠️  MOBILE_API_SECRET not set - mobile application login will be disabled');
+  }
+
   if (!process.env.NEXT_PUBLIC_LEGAL_EMAIL) {
     warnings.push('⚠️  NEXT_PUBLIC_LEGAL_EMAIL not set');
   }

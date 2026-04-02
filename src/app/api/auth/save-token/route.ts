@@ -132,10 +132,15 @@ export async function POST(req: Request) {
   // 1. CSRF Protection
   // Extract CSRF token from request header
   const headerList = await headers();
-  const csrfToken = headerList.get("x-csrf-token");
-  const csrfValid = await validateCsrfToken(csrfToken);
-  if (!csrfValid) {
-    return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
+  const mobileApiKey = headerList.get("x-mobile-api-key");
+  const isMobileApp = !!mobileApiKey && !!process.env.MOBILE_API_SECRET && mobileApiKey === process.env.MOBILE_API_SECRET;
+
+  if (!isMobileApp) {
+    const csrfToken = headerList.get("x-csrf-token");
+    const csrfValid = await validateCsrfToken(csrfToken);
+    if (!csrfValid) {
+      return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
+    }
   }
 
   // 2. Origin/Host Validation
@@ -144,7 +149,7 @@ export async function POST(req: Request) {
   // This is safe in dev because: (1) the CSRF token still validates the request,
   // (2) rate limiting is still applied, and (3) there is no production traffic
   // in development. Never set NODE_ENV=development in a publicly accessible deployment.
-  if (process.env.NODE_ENV !== "development") {
+  if (!isMobileApp && process.env.NODE_ENV !== "development") {
     const origin = headerList.get("origin");
     const host = headerList.get("host");
     if (!origin || !host) {
@@ -747,7 +752,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password: passwordToUse,
     });
@@ -830,19 +835,28 @@ export async function POST(req: Request) {
     userSettings = settingsFetchResult;
 
     if (dbError) throw dbError;
-    await setAuthCookie(token);
+    if (!isMobileApp) {
+      await setAuthCookie(token);
 
-    // If user has already accepted the current terms version in DB, set the cookie.
-    // Otherwise, explicitly clear any stale cookie that may have been left by a previous
-    // user on the same device (e.g. User A accepted → logged out without CSRF → User B
-    // logs in and inherits the cookie without ever accepting themselves).
-    if (existingUser?.terms_version === TERMS_VERSION && existingUser?.terms_accepted_at) {
-      await setTermsVersionCookie(TERMS_VERSION);
+      // If user has already accepted the current terms version in DB, set the cookie.
+      // Otherwise, explicitly clear any stale cookie that may have been left by a previous
+      // user on the same device (e.g. User A accepted → logged out without CSRF → User B
+      // logs in and inherits the cookie without ever accepting themselves).
+      if (existingUser?.terms_version === TERMS_VERSION && existingUser?.terms_accepted_at) {
+        await setTermsVersionCookie(TERMS_VERSION);
+      } else {
+        await clearTermsVersionCookie();
+      }
+
+      return NextResponse.json({ success: true, userId: userId ?? null, settings: userSettings });
     } else {
-      await clearTermsVersionCookie();
+      return NextResponse.json({ 
+        success: true, 
+        userId: userId ?? null, 
+        settings: userSettings,
+        session: signInData?.session || null
+      });
     }
-
-    return NextResponse.json({ success: true, userId: userId ?? null, settings: userSettings });
 
   } catch (error: any) {
     logger.error("Auth Bridge Failed:", error);

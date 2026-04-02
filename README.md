@@ -789,6 +789,7 @@ GhostClass uses a two-tier secret management strategy:
 - `CRON_SECRET` - Cron job authentication
 - `REQUEST_SIGNING_SECRET` - API request signature validation (anti-tampering; must be distinct from `ENCRYPTION_KEY`)
 - `SUPABASE_SERVICE_ROLE_KEY` - Admin database access
+- `MOBILE_API_SECRET` - Bypasses CSRF/Origin checks for mobile authentications
 - `UPSTASH_REDIS_REST_*` - Rate limiting credentials
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile validation
 - Email provider credentials
