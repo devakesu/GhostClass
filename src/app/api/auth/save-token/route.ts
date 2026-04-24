@@ -15,6 +15,8 @@ import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { TERMS_VERSION } from "@/app/config/legal";
 import { setTermsVersionCookie, clearTermsVersionCookie } from "@/app/actions/user";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { performProfileSync } from "@/lib/user/sync";
+import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 
 export const dynamic = 'force-dynamic';
 
@@ -126,14 +128,13 @@ async function releaseAuthLock(userId: string, lockValue: string): Promise<void>
   }
 }
 
-export async function POST(req: Request) {
+export const POST = withSecurity(async (req, { decryptedBody }) => {
   const supabaseAdmin = getAdminClient();
 
   // 1. CSRF Protection
   // Extract CSRF token from request header
   const headerList = await headers();
-  const mobileApiKey = headerList.get("x-mobile-api-key");
-  const isMobileApp = !!mobileApiKey && !!process.env.MOBILE_API_SECRET && mobileApiKey === process.env.MOBILE_API_SECRET;
+  const isMobileApp = isMobileRequest(headerList);
 
   if (!isMobileApp) {
     const csrfToken = headerList.get("x-csrf-token");
@@ -246,7 +247,7 @@ export async function POST(req: Request) {
   let lockValue: string | null = null;
 
   try {
-    const body = await req.json();
+    const body = decryptedBody || await req.json();
     
     const validation = SaveTokenRequestSchema.safeParse(body);
     if (!validation.success) {
@@ -404,12 +405,35 @@ export async function POST(req: Request) {
     // Generate a canonical password (only used once on first login)
     const canonicalPassword = crypto.randomBytes(32).toString('hex');
     
-    const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: canonicalPassword,
-      email_confirm: true,
-      user_metadata: { ezygo_id: verifieduserId },
-    });
+    let createData: any;
+    let createError: any;
+
+    try {
+      const result = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: canonicalPassword,
+        email_confirm: true,
+        user_metadata: { ezygo_id: verifieduserId },
+      });
+      createData = result.data;
+      createError = result.error;
+    } catch (err: any) {
+      // Handle non-JSON infrastructure responses (e.g. "Forbidden" strings from WAF/Proxy)
+      if (err instanceof SyntaxError || err.message?.includes("Unexpected token")) {
+        logger.error("Supabase Infrastructure Error: Received non-JSON response (likely Forbidden).", {
+          error: redact("id", err.message),
+          userId: redact("id", verifieduserId),
+        });
+        return NextResponse.json(
+          { 
+            message: "Infrastructure security rejection. Please check your server environment keys and IP restrictions.",
+            error: "InfrastructureForbidden" 
+          }, 
+          { status: 502 }
+        );
+      }
+      throw err; // Re-throw other unexpected errors
+    }
 
     if (createError) {
       // B. If User Exists -> Reuse existing password (do NOT update)
@@ -431,10 +455,17 @@ export async function POST(req: Request) {
           let orphanUserId: string | null = null;
           let page = 1;
           const PER_PAGE = 1000;
+          const MAX_AUTH_SCAN_PAGES = 100;
           let hasMore = true;
+          let pageLimitReached = false;
 
           // Paginated Search Loop
           while (hasMore) {
+            if (page > MAX_AUTH_SCAN_PAGES) {
+              pageLimitReached = true;
+              break;
+            }
+
             const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ 
               page: page, 
               perPage: PER_PAGE 
@@ -481,13 +512,22 @@ export async function POST(req: Request) {
             isFirstLogin = true;
 
           } else {
-             const errorMsg = `Critical: 'User already registered' error, but email ${email} not found in Auth scan.`;
+             const errorMsg = pageLimitReached
+               ? `Critical: Auth scan limit reached for ${email} without locating orphan user.`
+               : `Critical: 'User already registered' error, but email ${email} not found in Auth scan.`;
              logger.error(errorMsg);
              
              // CAPTURE CRITICAL SYNC ERROR
              Sentry.captureException(new Error(errorMsg), {
                  tags: { type: "critical_auth_sync", location: "save_token" },
-                 extra: { verifieduserId: redact("id", verifieduserId), redactedEmail: redact("email", email) }
+                 extra: {
+                   verifieduserId: redact("id", verifieduserId),
+                   redactedEmail: redact("email", email),
+                   page,
+                   perPage: PER_PAGE,
+                   maxPages: MAX_AUTH_SCAN_PAGES,
+                   pageLimitReached,
+                 }
              });
 
              return NextResponse.json({ message: "Account synchronization error" }, { status: 500 });
@@ -528,16 +568,30 @@ export async function POST(req: Request) {
     // Strategy: Store canonical auth password in users table (encrypted),
     // allowing all devices to use the same password without it changing on each login.
     const cookieStore = await cookies();
+    const isProd = process.env.NODE_ENV === "production";
+    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl!,
+      supabaseKey!,
       {
         cookies: {
-          getAll() { return cookieStore.getAll(); },
+          getAll() {
+            return cookieStore.getAll();
+          },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch (_) {
+              // Ignore cookie set errors in this context if they occur
+            }
           },
         },
       }
@@ -658,7 +712,7 @@ export async function POST(req: Request) {
 
         // If updateResult is empty, another request already set a password. Read it.
         if (!updateResult || updateResult.length === 0) {
-          logger.info(
+          logger.dev(
             "Another request already bootstrapped canonical password for this user; reading it",
             { userId: redact("id", verifieduserId) }
           );
@@ -764,15 +818,10 @@ export async function POST(req: Request) {
     
     // Validate Encryption
     if (!iv || !content || !/^[a-f0-9]{24}$/i.test(iv)) {
-      Sentry.captureException(new Error("Encryption failed during token save"), {
-          extra: { userId: redact("id", String(userId)) }
-      });
-      return NextResponse.json({ message: "Encryption failed" }, { status: 500 });
+      throw new Error("Encryption failed during token save");
     }
 
     // Re-use the data already fetched from the users table — no extra DB round-trip needed.
-    // For new users (isFirstLogin=true) cachedUserData is null → existingUser is null →
-    // the cookie is cleared, which is correct (new users must go through the accept-terms flow).
     const existingUser = !isFirstLogin ? cachedUserData : null;
 
     // Encrypt the canonical password on first login
@@ -793,11 +842,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Run the DB upsert and settings prefetch in parallel — they are independent and
-    // the settings query does not depend on the upsert result.
-    // For returning users earlySettingsFetch is already in-flight (started alongside signIn);
-    // for new users / orphan retries the inline fetch runs here instead.
-    let userSettings = null;
+    // Run the DB upsert, settings prefetch and EzyGo sync in parallel
+    let syncResult: any = null;
+    let userSettings: any = null;
     const [upsertResult, settingsFetchResult] = await Promise.all([
       supabaseAdmin
         .from("users")
@@ -807,8 +854,6 @@ export async function POST(req: Request) {
           ezygo_token: content,
           ezygo_iv: iv,
           auth_id: userId,
-          // Store encrypted canonical password on first login; subsequent logins don't update it
-          // This allows all devices to use the same password without invalidating other sessions
           ...(isFirstLogin && encryptedPassword && {
             auth_password: encryptedPassword.content,
             auth_password_iv: encryptedPassword.iv,
@@ -824,37 +869,51 @@ export async function POST(req: Request) {
             .maybeSingle();
           return settings;
         } catch (settingsError) {
-          // Non-critical: settings will load via normal flow if this fails
           logger.warn("Failed to prefetch settings (non-critical):", settingsError);
           return null;
         }
       })(),
+      // Centrally hydrate/refresh profile + academic info
+      performProfileSync(token, verifieduserId, userId!).then(r => syncResult = r).catch(e => {
+        logger.warn("Login-time profile sync failed (non-critical):", e);
+        return null;
+      })
     ]);
 
     const { error: dbError } = upsertResult;
     userSettings = settingsFetchResult;
 
     if (dbError) throw dbError;
+
+    // Use derived academic info for the response
+    const currentSem = syncResult?.academic?.current_semester ?? "odd";
+    const currentYear = syncResult?.academic?.current_year ?? "2024-25";
+
     if (!isMobileApp) {
       await setAuthCookie(token);
-
-      // If user has already accepted the current terms version in DB, set the cookie.
-      // Otherwise, explicitly clear any stale cookie that may have been left by a previous
-      // user on the same device (e.g. User A accepted → logged out without CSRF → User B
-      // logs in and inherits the cookie without ever accepting themselves).
       if (existingUser?.terms_version === TERMS_VERSION && existingUser?.terms_accepted_at) {
         await setTermsVersionCookie(TERMS_VERSION);
       } else {
         await clearTermsVersionCookie();
       }
 
-      return NextResponse.json({ success: true, userId: userId ?? null, settings: userSettings });
+      return NextResponse.json({ 
+        success: true, 
+        userId: userId ?? null, 
+        settings: userSettings,
+        current_semester: currentSem,
+        current_year: currentYear
+      });
     } else {
       return NextResponse.json({ 
         success: true, 
         userId: userId ?? null, 
         settings: userSettings,
-        session: signInData?.session || null
+        session: signInData?.session || null,
+        current_semester: currentSem,
+        current_year: currentYear,
+        id: verifieduserId,
+        ezygo_token: token
       });
     }
 
@@ -890,4 +949,4 @@ export async function POST(req: Request) {
       }
     }
   }
-}
+}, { consume: true });

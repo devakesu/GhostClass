@@ -183,7 +183,8 @@ export async function fetchEzygoData<T>(
   endpoint: string,
   token: string,
   method: 'GET' | 'POST' = 'GET',
-  body?: Record<string, unknown> | unknown[] | null
+  body?: Record<string, unknown> | unknown[] | null,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
   // Normalize endpoint for consistent cache key (remove leading slashes)
   const normalizedEndpoint = endpoint.replace(/^\/+/, '');
@@ -254,6 +255,7 @@ export async function fetchEzygoData<T>(
       const result = await ezygoCircuitBreaker.execute(async () => {
         const fetchHeaders: Record<string, string> = {
           'Authorization': `Bearer ${token}`,
+          ...(extraHeaders ?? {}),
         };
 
         // Only include Content-Type and body for POST requests with a body
@@ -290,7 +292,19 @@ export async function fetchEzygoData<T>(
             throw new Error(errorMsg);
           }
 
-          return response.json();
+          const text = await response.text();
+          try {
+            // EzyGo endpoints usually return JSON, but some settings endpoints 
+            // return plain strings (e.g. "even", "odd") which are not valid JSON.
+            // We try to parse as JSON first, but fallback to raw text if it's a 
+            // SyntaxError and the response was OK.
+            return JSON.parse(text);
+          } catch (err) {
+            if (err instanceof SyntaxError && response.ok) {
+              return text as unknown as T;
+            }
+            throw err;
+          }
         } finally {
           cleanup();
         }
@@ -355,6 +369,22 @@ export function getRateLimiterStats() {
     maxConcurrent: MAX_CONCURRENT,
     cacheSize: requestCache.size,
   };
+}
+
+/**
+ * Invalidates all cached EzyGo requests for a specific user token.
+ */
+export function invalidateEzygoCacheForUser(token: string) {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const iterableCache = requestCache as unknown as Iterable<
+    [string, Promise<any>]
+  >;
+
+  for (const [key] of iterableCache) {
+    if (key.includes(`:${tokenHash}:`)) {
+      requestCache.delete(key);
+    }
+  }
 }
 
 /**

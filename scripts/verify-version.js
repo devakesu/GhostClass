@@ -31,6 +31,22 @@ function extractVersion(filePath) {
   return undefined; // File exists but key is missing
 }
 
+function extractPubspecVersion(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  const versionMatch = content.match(/^\s*version:\s*(\d+\.\d+\.\d+)(?:\+\d+)?\s*$/m);
+  return versionMatch ? versionMatch[1] : undefined;
+}
+
+function extractGetterVersion(filePath, getterName) {
+  if (!fs.existsSync(filePath)) return null;
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  const getterMatch = content.match(new RegExp(`static\\s+String\\s+get\\s+${getterName}\\s+=>\\s+'(\\d+\\.\\d+\\.\\d+)';`));
+  return getterMatch ? getterMatch[1] : undefined;
+}
+
 try {
   console.log(`${YELLOW}🔍 Verifying version consistency...${RESET}`);
 
@@ -59,7 +75,15 @@ try {
     openApiVersion = versionMatch ? versionMatch[1] : undefined;
   }
 
-  // 6. Git Branch
+  // 6. Mobile pubspec
+  const mobilePubspecPath = path.join(process.cwd(), 'mobile', 'pubspec.yaml');
+  const mobilePubspecVersion = extractPubspecVersion(mobilePubspecPath);
+
+  // 7. Mobile runtime version getter
+  const mobileAppConfigPath = path.join(process.cwd(), 'mobile', 'lib', 'config', 'app_config.dart');
+  const mobileAppVersion = extractGetterVersion(mobileAppConfigPath, 'appVersion');
+
+  // 8. Git Branch
   let branchName = 'unknown';
   try {
     branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
@@ -82,6 +106,14 @@ try {
   if (openApiVersion === null) console.log(`   📚 openapi.yaml:     ${RED}MISSING FILE${RESET}`);
   else if (openApiVersion === undefined) console.log(`   📚 openapi.yaml:     ${RED}VERSION MISSING${RESET}`);
   else console.log(`   📚 openapi.yaml:     ${openApiVersion}`);
+
+  if (mobilePubspecVersion === null) console.log(`   📱 mobile/pubspec.yaml: ${RED}MISSING FILE${RESET}`);
+  else if (mobilePubspecVersion === undefined) console.log(`   📱 mobile/pubspec.yaml: ${RED}VERSION MISSING${RESET}`);
+  else console.log(`   📱 mobile/pubspec.yaml: ${mobilePubspecVersion}`);
+
+  if (mobileAppVersion === null) console.log(`   📱 app_config.dart: ${RED}MISSING FILE${RESET}`);
+  else if (mobileAppVersion === undefined) console.log(`   📱 app_config.dart: ${RED}VERSION MISSING${RESET}`);
+  else console.log(`   📱 app_config.dart: ${mobileAppVersion}`);
 
   console.log(`   🌿 Git Branch:       ${branchName}`);
 
@@ -130,7 +162,24 @@ try {
     errors.push(`Mismatch: openapi.yaml version (${openApiVersion}) !== package.json (${pkgVersion})`);
   }
 
-  // Check 5: Branch validation (for non-protected, non-automation branches)
+  // Check 5: Mobile version fields
+  if (mobilePubspecVersion === null) {
+    errors.push(`Critical: mobile/pubspec.yaml file is missing.`);
+  } else if (mobilePubspecVersion === undefined) {
+    errors.push(`Critical: version is missing from mobile/pubspec.yaml`);
+  } else if (mobilePubspecVersion !== pkgVersion) {
+    errors.push(`Mismatch: mobile/pubspec.yaml version (${mobilePubspecVersion}) !== package.json (${pkgVersion})`);
+  }
+
+  if (mobileAppVersion === null) {
+    errors.push(`Critical: mobile/lib/config/app_config.dart file is missing.`);
+  } else if (mobileAppVersion === undefined) {
+    errors.push(`Critical: appVersion getter is missing from mobile/lib/config/app_config.dart`);
+  } else if (mobileAppVersion !== pkgVersion) {
+    errors.push(`Mismatch: mobile/lib/config/app_config.dart appVersion (${mobileAppVersion}) !== package.json (${pkgVersion})`);
+  }
+
+  // Check 6: Branch validation (for non-protected, non-automation branches)
   const protectedBranches = ['main', 'master', 'dev', 'development', 'staging', 'HEAD', 'unknown'];
   
   if (!protectedBranches.includes(branchName) && !isAutomationBranch && normalizedBranch !== pkgVersion) {

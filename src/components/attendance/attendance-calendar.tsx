@@ -48,21 +48,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AttendanceReport, AttendanceEvent } from "@/types/attendance";
-import { useUser } from "@/hooks/users/user";
+import { useProfile } from "@/hooks/users/profile";
 import { createClient } from "@/lib/supabase/client"; 
 import { toast } from "sonner";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
-import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
-import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate } from "@/lib/utils";
+import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
 import { DUTY_LEAVE_PLACEHOLDER_REMARKS } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 
 interface AttendanceCalendarProps {
   attendanceData: AttendanceReport | undefined;
+  semester: "even" | "odd" | null | undefined;
+  year: string | null | undefined;
 }
 
 interface ExtendedAttendanceEvent extends AttendanceEvent {
@@ -75,6 +76,11 @@ interface ExtendedAttendanceEvent extends AttendanceEvent {
 }
 
 const getNormalizedSession = (s: string | number) => parseInt(normalizeSession(s), 10) || 0;
+
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 /**
  * Interactive attendance calendar component for viewing and managing attendance records.
@@ -98,6 +104,8 @@ const getNormalizedSession = (s: string | number) => parseInt(normalizeSession(s
  */
 export function AttendanceCalendar({
   attendanceData,
+  semester,
+  year,
 }: AttendanceCalendarProps) {
   const [currentDate, setCurrentDate] = useState<{ year: number | null; month: number | null }>({ 
     year: null, 
@@ -112,58 +120,60 @@ export function AttendanceCalendar({
   const [pendingDl, setPendingDl] = useState<{ courseId: string; dbDate: string; sessionForDB: string; buttonKey: string } | null>(null);
   const clickedButtons = useRef<Set<string>>(new Set());
 
-  // Initialize dates on mount to avoid hydration mismatch
-  useEffect(() => {
+  const { data: profile } = useProfile();
+  const { refetch: refetchCount } = useTrackingCount(profile);
+  const { data: trackingData, refetch: refetchTrackData } = useTrackingData(profile);
+
+  // Derived academic range for locking the calendar
+  const academicRange = useMemo(() => {
+    if (!semester || !year) return null;
     try {
-      const dateSelected = sessionStorage.getItem("selected_date");
-      if (dateSelected) {
-        const parsedDate = new Date(dateSelected);
-        setSelectedDate(parsedDate);
-        setCurrentDate({ month: parsedDate.getMonth(), year: parsedDate.getFullYear() });
+      const parts = year.split("-");
+      if (parts.length !== 2) return null;
+      const startYear = parseInt(parts[0], 10);
+      const endYearShort = parseInt(parts[1], 10);
+      const endYear = startYear >= 2000 ? (Math.floor(startYear / 100) * 100 + endYearShort) : (2000 + endYearShort);
+      
+      if (semester === "odd") {
+        return {
+          min: new Date(startYear, 6, 1), // July 1
+          max: new Date(startYear, 11, 31, 23, 59, 59), // Dec 31
+        };
       } else {
-        const now = new Date();
-        setCurrentDate({ year: now.getFullYear(), month: now.getMonth() });
-        setSelectedDate(now);
+        return {
+          min: new Date(endYear, 0, 1), // Jan 1
+          max: new Date(endYear, 5, 30, 23, 59, 59), // June 30
+        };
       }
-    } catch (error) {
-      // Fallback if sessionStorage is unavailable or throws
-      Sentry.captureException(error);
-      const now = new Date();
-      setCurrentDate({ year: now.getFullYear(), month: now.getMonth() });
-      setSelectedDate(now);
+    } catch (_e) {
+      return null;
     }
-  }, []);
+  }, [semester, year]);
 
-  const { data: semester } = useFetchSemester();
-  const { data: year } = useFetchAcademicYear();
-  const { data: user } = useUser(); 
-  const { refetch: refetchCount } = useTrackingCount(user);
-  const { data: trackingData, refetch: refetchTrackData } = useTrackingData(user);
-
-  // Pre-normalize all tracker dates once so find()/some() callbacks are O(1) per item
-  // rather than calling normalizeToISODate() on every trackingData item for every calendar
-  // event on every render. Without this the hot path is O(events × trackingData). (L-D)
+  // Pre-normalize all tracker dates once
   const normalizedTrackingData = useMemo(
-    () => (trackingData ?? []).map(t => ({ ...t, _isoDate: normalizeToISODate(t.date) })),
+    () => (trackingData ?? []).map((t: any) => ({ ...t, _isoDate: normalizeToISODate(t.date) })),
     [trackingData]
   );
 
   const { data: coursesData } = useFetchCourses(); 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
-  const { data: semesterData } = useFetchSemester();
-  const { data: academicYearData } = useFetchAcademicYear();
 
   const { isDisabled: isCourseDisabled } = useDisabledCourses({
-    academicYear: academicYearData,
-    semester: semesterData,
+    academicYear: year,
+    semester: semester,
   });
 
   /** Resolve course code from courseId using available course registries */
-  const getCourseCodeById = useCallback((courseId: string): string => {
-    const course = attendanceData?.courses?.[courseId] ?? coursesData?.courses?.[courseId];
-    return (course?.code ?? "").toUpperCase();
+  const getCourseCodeById = useCallback((id: string): string => {
+    if (coursesData?.courses?.[id]) return id.toUpperCase();
+    const course = Object.values(coursesData?.courses || {}).find(c => String(c.id) === id);
+    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, '');
+    const altCourse = attendanceData?.courses?.[id];
+    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, '');
   }, [attendanceData, coursesData]);
 
+  // authUserId initialization
   useEffect(() => {
     const getAuthId = async () => {
       const supabase = createClient();
@@ -176,6 +186,66 @@ export function AttendanceCalendar({
 
     getAuthId();
   }, []);
+
+  const [prevTermKey, setPrevTermKey] = useState<string | null>(null);
+
+
+  // Smart default selection (Adjusting state during render)
+  // This prevents react-hooks/set-state-in-effect by calculating the initial view during the render cycle.
+  const currentTermKey = `${semester}-${year}`;
+  if (academicRange && semester && year && prevTermKey !== currentTermKey) {
+    const applyDate = (d: Date) => {
+      setCurrentDate({ year: d.getFullYear(), month: d.getMonth() });
+      setSelectedDate(d);
+      setPrevTermKey(currentTermKey);
+    };
+
+
+    // 1. Session Storage
+    let initialized = false;
+    try {
+      const stored = sessionStorage.getItem("selected_date");
+      if (stored) {
+        const d = new Date(stored);
+        if (!isNaN(d.getTime()) && d >= academicRange.min && d <= academicRange.max) {
+          applyDate(d);
+          initialized = true;
+        }
+      }
+    } catch (_e) { /* ignore */ }
+
+    if (!initialized) {
+      const now = new Date();
+      if (now >= academicRange.min && now <= academicRange.max) {
+        applyDate(now);
+
+        initialized = true;
+      }
+    }
+
+    if (!initialized && attendanceData !== undefined && trackingData !== undefined) {
+      let last: Date | null = null;
+      if (attendanceData?.studentAttendanceData) {
+        const dates = Object.keys(attendanceData.studentAttendanceData).sort((a, b) => b.localeCompare(a));
+        for (const d of dates) {
+          const dobj = new Date(parseInt(d.substring(0, 4)), parseInt(d.substring(4, 6)) - 1, parseInt(d.substring(6, 8)));
+          if (dobj >= academicRange.min && dobj <= academicRange.max) { last = dobj; break; }
+        }
+      }
+      if (trackingData) {
+        trackingData.forEach((item: any) => {
+          if (!item.date) return;
+          const [y, m, d] = item.date.split("-").map(Number);
+          const dobj = new Date(y, m - 1, d);
+          if (dobj >= academicRange.min && dobj <= academicRange.max) {
+            if (!last || dobj > last) last = dobj;
+          }
+        });
+      }
+      applyDate(last || academicRange.min);
+
+    }
+  }
 
   const formatDateForDB = (date: Date): string => {
     const y = date.getFullYear();
@@ -202,7 +272,9 @@ export function AttendanceCalendar({
         toast.success("Record deleted");
         await Promise.all([refetchTrackData(), refetchCount()]); 
       } catch (error: any) {
-        toast.error("Error deleting: " + error.message);
+        toast.error(
+          "We encountered an error while deleting this record. Please try again later. If the issue persists, please contact us.",
+        );
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
       }
@@ -251,7 +323,9 @@ export function AttendanceCalendar({
           // Expected business constraint violation; do not report to Sentry
           return;
         } 
-        toast.error("Failed to add record");
+        toast.error(
+          "We encountered an error while adding this record. Please try again later. If the issue persists, please contact us.",
+        );
         Sentry.captureException(error, { tags: { type: "tracking_add_error", location: "AttendanceCalendar/handleWriteTracking" }, extra: { courseId, dateStr, status, sessionName, attendanceCode, remarks } });
       } finally { 
         setLoadingStates((prev) => ({ ...prev, [buttonKey]: false })); 
@@ -297,8 +371,11 @@ export function AttendanceCalendar({
 
         Object.entries(sessions).forEach(([sessionKey, sessionData]: [string, any], index) => {
             if (!sessionData.course) return;
-            const courseId = sessionData.course.toString();
-            const courseName = attendanceData.courses?.[courseId]?.name || coursesData?.courses?.[courseId].name || "Unknown Course";
+            const rawId = sessionData.course.toString();
+            
+            // Priority: Unified Registry Name -> EzyGo Registry Name -> Fallback ID
+            const courseId = getCourseCodeById(rawId) || rawId;
+            const courseName = coursesData?.courses?.[courseId]?.name || attendanceData.courses?.[rawId]?.name || "Unknown Course";
 
             let sessionName = sessionData.session;
             if (!sessionName || sessionName === "null") {
@@ -310,9 +387,9 @@ export function AttendanceCalendar({
             }
 
             let attendanceLabel = "Present";
-            let statusColor = "blue";
+            let statusColor = "emerald";
             switch (Number(sessionData.attendance)) {
-                case 110: attendanceLabel = "Present"; statusColor = "blue"; break;
+                case 110: attendanceLabel = "Present"; statusColor = "emerald"; break;
                 case 111: attendanceLabel = "Absent"; statusColor = "red"; break;
                 case 225: attendanceLabel = "Duty Leave"; statusColor = "yellow"; break;
                 case 112: attendanceLabel = "Other Leave"; statusColor = "teal"; break;
@@ -335,13 +412,22 @@ export function AttendanceCalendar({
         });
     });
     return events;
-  }, [attendanceData, coursesData]);
+  }, [attendanceData, coursesData, getCourseCodeById]);
 
   const handlePreviousMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
     if (currentDate.month === null || currentDate.year === null) {
       toast.info("Calendar is still loading. Please wait...");
       return;
+    }
+
+    // Prevent navigation past the academic range min
+    if (academicRange) {
+      const prevDate = new Date(currentDate.year, currentDate.month - 1, getDaysInMonth(currentDate.year, currentDate.month - 1));
+      if (prevDate < academicRange.min) {
+        toast.info(`Start of ${semester} semester reached.`);
+        return;
+      }
     }
 
     setCurrentDate(prev => {
@@ -360,6 +446,15 @@ export function AttendanceCalendar({
     if (currentDate.month === null || currentDate.year === null) {
       toast.info("Calendar is still loading. Please wait...");
       return;
+    }
+
+    // Prevent navigation past the academic range max
+    if (academicRange) {
+      const nextDate = new Date(currentDate.year, currentDate.month + 1, 1);
+      if (nextDate > academicRange.max) {
+        toast.info(`End of ${semester} semester reached.`);
+        return;
+      }
     }
 
     setCurrentDate(prev => {
@@ -408,15 +503,16 @@ export function AttendanceCalendar({
       const dateEvents = rawEvents.filter((event) => isSameDay(event.date, date));
       const dbDateStr = formatDateForDB(date);
       const hasExtra = normalizedTrackingData.some(t =>
-         t._isoDate === dbDateStr && t.status === 'extra' && t.semester === semesterData && t.year === academicYearData
+         t._isoDate === dbDateStr && t.status === 'extra' && t.semester === semester && t.year === year
       );
 
       let hasAbsent = false;
-      let hasLeave = false;
+      let hasDutyLeave = false;
+      let hasOtherLeave = false;
 
       dateEvents.forEach(ev => {
           const key = generateSlotKey(ev.courseId, date, ev.sessionName);
-          const override = normalizedTrackingData.find(t =>
+          const override = normalizedTrackingData.find((t: any) =>
              t._isoDate === dbDateStr && generateSlotKey(t.course, t._isoDate, t.session) === key
           );
 
@@ -428,14 +524,16 @@ export function AttendanceCalendar({
           }
 
           if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) hasAbsent = true;
-          else if (finalStatus.includes("Leave")) hasLeave = true;
+          else if (finalStatus === "Duty Leave") hasDutyLeave = true;
+          else if (finalStatus.includes("Leave")) hasOtherLeave = true;
       });
 
       if (dateEvents.length === 0 && !hasExtra) return null;
       if (hasAbsent) return "absent";
-      if (hasLeave) return "dutyLeave";
+      if (hasDutyLeave) return "dutyLeave";
+      if (hasOtherLeave) return "otherLeave";
       return "present";
-  }, [rawEvents, isSameDay, normalizedTrackingData, semesterData, academicYearData, isCourseDisabled, getCourseCodeById]);
+  }, [rawEvents, isSameDay, normalizedTrackingData, semester, year, isCourseDisabled, getCourseCodeById]);
 
   // --- 2. MERGE LOGIC ---
   const selectedDateEvents = useMemo(() => {
@@ -455,7 +553,7 @@ export function AttendanceCalendar({
     const processedEvents = Array.from(officialsMap.values()).map(ev => {
         const key = generateSlotKey(ev.courseId, selectedDate, ev.sessionName);
 
-        const override = normalizedTrackingData.find(t => {
+        const override = normalizedTrackingData.find((t: any) => {
             const isDateMatch = t._isoDate === dbDateStr;
             const isKeyMatch = generateSlotKey(t.course, t._isoDate, t.session) === key;
             return isDateMatch && isKeyMatch;
@@ -481,9 +579,9 @@ export function AttendanceCalendar({
 
     // 3. Process Extras
     if (normalizedTrackingData.length > 0) {
-        normalizedTrackingData.forEach(t => {
+        normalizedTrackingData.forEach((t: any) => {
 
-            if (t.semester !== semesterData || t.year !== academicYearData) {
+            if (t.semester !== semester || t.year !== year) {
               return;
             }
 
@@ -510,7 +608,7 @@ export function AttendanceCalendar({
                         sessionKey: `extra-${cId}-${t.session}`,
                         type: "normal", 
                         status: label, 
-                        statusColor: "blue", 
+                        statusColor: "emerald", 
                         courseId: cId, 
                         isExtra: true, 
                         hasTrackerRecord: true,
@@ -530,27 +628,29 @@ export function AttendanceCalendar({
     }
 
     return merged.sort((a, b) => getNormalizedSession(a.sessionName) - getNormalizedSession(b.sessionName));
-  }, [selectedDate, rawEvents, filter, normalizedTrackingData, attendanceData, coursesData, semesterData, academicYearData, isSameDay]);
+  }, [selectedDate, rawEvents, filter, normalizedTrackingData, attendanceData, coursesData, semester, year, isSameDay]);
   
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const monthNames = useMemo(
-    () => [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ],
-    []
-  );
-  const yearOptions = useMemo(() => Array.from({ length: new Date().getFullYear() + 1 - 2018 + 1 }, (_, i) => 2018 + i), []);
+  const monthOptions = useMemo(() => {
+    return monthNames.map((name, index) => {
+      const isDisabled = academicRange ? 
+        (new Date(currentDate.year!, index, 1) > academicRange.max || 
+         new Date(currentDate.year!, index, getDaysInMonth(currentDate.year!, index)) < academicRange.min) : 
+        false;
+      return { name, index, isDisabled };
+    });
+  }, [academicRange, currentDate.year, getDaysInMonth]);
+
+  const yearOptions = useMemo(() => {
+    const baseYears = Array.from({ length: new Date().getFullYear() + 1 - 2018 + 1 }, (_, i) => 2018 + i);
+    return baseYears.map(y => {
+      const isDisabled = academicRange ? 
+        (new Date(y, 0, 1) > academicRange.max || 
+         new Date(y, 11, 31) < academicRange.min) : 
+        false;
+      return { year: y, isDisabled };
+    });
+  }, [academicRange]);
   
   const calendarCells = useMemo(() => {
     if (!selectedDate || currentDate.year === null || currentDate.month === null) return [];
@@ -567,16 +667,24 @@ export function AttendanceCalendar({
         const status = getEventStatus(date);
         const hasEvents = status !== null; 
         const isSelected = isSameDay(date, selectedDate);
-        let className = "h-10 w-10 mx-auto rounded-full flex items-center justify-center text-sm cursor-pointer transition-all duration-200 hover:scale-104 ";
-        if (isSelected) className += "bg-primary text-primary-foreground font-medium shadow-lg scale-110";
-        else if (status === "absent") className += "bg-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/30 border border-red-500/50 dark:border-red-500/30";
-        else if (status === "otherLeave") className += "bg-teal-500/20 text-teal-500 dark:text-teal-400 hover:bg-teal-500/30 border border-teal-500/50 dark:border-teal-500/30";
-        else if (status === "dutyLeave") className += "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/50 dark:border-yellow-500/30";
-        else if (status === "present") className += "bg-blue-500/20 text-blue-500 dark:text-blue-400 hover:bg-blue-500/30 border border-blue-500/50 dark:border-blue-500/30";
-        else if (status === "normal") className += "bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/50 dark:border-indigo-500/30";
-        else if (hasEvents) className += "ring-1 ring-gray-500/30 hover:ring-gray-500/50";
-        else className += "hover:bg-accent/50";
-        if (isToday(date)) className += " ring-2 ring-offset-1 ring-offset-background ring-primary";
+        const isOutOfRange = academicRange ? (date < academicRange.min || date > academicRange.max) : false;
+
+        let className = "h-10 w-10 mx-auto rounded-full flex items-center justify-center text-sm transition-all duration-200 ";
+        
+        if (isOutOfRange) {
+          className += "opacity-20 cursor-not-allowed pointer-events-none grayscale";
+        } else {
+          className += "cursor-pointer hover:scale-104 ";
+          if (isSelected) className += "bg-primary text-white font-medium shadow-lg scale-110";
+          else if (status === "absent") className += "bg-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/30 border border-red-500/50 dark:border-red-500/30";
+          else if (status === "otherLeave") className += "bg-blue-500/20 text-blue-500 dark:text-blue-400 hover:bg-blue-500/30 border border-blue-500/50 dark:border-blue-500/30";
+          else if (status === "dutyLeave") className += "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/50 dark:border-yellow-500/30";
+          else if (status === "present") className += "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/50 dark:border-emerald-500/30";
+          else if (status === "normal") className += "bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/50 dark:border-indigo-500/30";
+          else if (hasEvents) className += "ring-1 ring-gray-500/30 hover:ring-gray-500/50";
+          else className += "hover:bg-accent/50";
+          if (isToday(date)) className += " ring-2 ring-offset-1 ring-offset-background ring-primary";
+        }
         
         const handleDateSelect = () => {
           const dateString = date.toISOString();
@@ -591,10 +699,11 @@ export function AttendanceCalendar({
           <div key={`day-${index}`} className="flex items-center justify-center">
             <button 
               type="button"
-              onClick={handleDateSelect}
+              onClick={isOutOfRange ? undefined : handleDateSelect}
               className={className}
               aria-label={dateLabel}
-              aria-pressed={isSelected}
+              aria-current={isSelected ? "date" : undefined}
+              disabled={isOutOfRange}
             >
               {index + 1}
             </button>
@@ -602,27 +711,31 @@ export function AttendanceCalendar({
         );
     });
     return [...leadingEmptyCells, ...dayCells];
-  }, [currentDate.year, currentDate.month, selectedDate, getDaysInMonth, getFirstDayOfMonth, getEventStatus, isSameDay, isToday, monthNames]);
+  }, [currentDate.year, currentDate.month, selectedDate, getDaysInMonth, getFirstDayOfMonth, getEventStatus, isSameDay, isToday, academicRange]);
+
+  const isTodayInRange = useMemo(() => {
+    if (!academicRange) return true;
+    const now = new Date();
+    return now >= academicRange.min && now <= academicRange.max;
+  }, [academicRange]);
 
   // Show loading state while dates are initializing
   if (currentDate.year === null || currentDate.month === null || !selectedDate) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card className="overflow-hidden border border-border/40 custom-container h-full flex flex-col items-center justify-center min-h-100">
-          <div className="text-muted-foreground">Loading calendar...</div>
+          <div className="text-muted-foreground">Loading your calendar...</div>
         </Card>
         <Card className="border border-border/40 custom-container">
           <CardContent className="p-6">
-            <div className="text-muted-foreground">Loading details...</div>
+            <div className="text-muted-foreground text-sm flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Waking up EzyGo...</div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // After the null check above, we know currentDate.year and currentDate.month are not null
-  // Non-null assertions in this block are safe due to the guard condition above
-  const shouldShowJumpToToday = !isToday(selectedDate);
+  const shouldShowJumpToToday = selectedDate && !isToday(selectedDate) && isTodayInRange;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -644,12 +757,12 @@ export function AttendanceCalendar({
             </Select>
             <Select value={currentDate.month!.toString()} onValueChange={handleMonthChange}>
               <SelectTrigger className="w-32.5 h-9 bg-background/60 border-border/60 text-sm capitalize custom-dropdown" aria-label="Select month">
-                <SelectValue>{monthNames[currentDate.month!]}</SelectValue>
+                <SelectValue>{monthOptions[currentDate.month!].name}</SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-background/90 border-border/60 backdrop-blur-md custom-dropdown max-h-70">
-                {monthNames.map((month, index) => (
-                  <SelectItem key={month} value={index.toString()} className={currentDate.month === index ? "bg-foreground/5 mt-0.5" : "capitalize"}>
-                    {month}
+                {monthOptions.map((option: { name: string; index: number; isDisabled: boolean }) => (
+                  <SelectItem key={option.name} value={option.index.toString()} disabled={option.isDisabled} className={currentDate.month === option.index ? "bg-foreground/5 mt-0.5" : "capitalize"}>
+                    {option.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -659,9 +772,9 @@ export function AttendanceCalendar({
                 <SelectValue>{currentDate.year}</SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-background/90 border-border/60 max-h-70 backdrop-blur-md custom-dropdown">
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year.toString()} className={currentDate.year === year ? "bg-foreground/5 mt-0.5" : "mt-0.5"}>
-                    {year}
+                {yearOptions.map((option: { year: number; isDisabled: boolean }) => (
+                  <SelectItem key={option.year} value={option.year.toString()} disabled={option.isDisabled} className={currentDate.year === option.year ? "bg-foreground/5 mt-0.5" : "mt-0.5"}>
+                    {option.year}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -674,10 +787,10 @@ export function AttendanceCalendar({
           <div className="grid grid-cols-7 gap-1 pb-2 flex-1 auto-rows-[1fr]" style={{ gridAutoRows: '1fr' }}>{calendarCells}</div>
           <div className="flex flex-wrap gap-4 mt-6 text-muted-foreground text-xs justify-center border-t border-border/40 pt-4 shrink-0">
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-red-500/20 border border-red-500/30" /><span>absent</span></div>
-            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-teal-500/20 border border-teal-500/30" /><span>other leave</span></div>
+            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-blue-500/20 border border-blue-500/30" /><span>other leave</span></div>
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/30" /><span>duty leave</span></div>
-            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-blue-500/20 border border-blue-500/30" /><span>present</span></div>
-            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full outline-2 outline-primary" /><span>today</span></div>
+            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-emerald-500/20 border border-emerald-500/30" /><span>present</span></div>
+            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full ring-2 ring-primary ring-offset-1" /><span>today</span></div>
           </div>
         </CardContent>
       </Card>
@@ -721,8 +834,8 @@ export function AttendanceCalendar({
                       cardStyle = "border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500";
                     } 
                     else if (event.status.includes("Leave")) {
-                      badgeClass = "text-teal-500 border-teal-500/40 bg-teal-500/10";
-                      cardStyle = "border-teal-500/50 bg-teal-500/5 hover:bg-teal-500/10 hover:border-teal-500";
+                      badgeClass = "text-blue-500 border-blue-500/40 bg-blue-500/10";
+                      cardStyle = "border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500";
                     }
 
                     const dbDate = formatDateForDB(selectedDate);
@@ -800,8 +913,15 @@ export function AttendanceCalendar({
                               <Badge variant="outline" className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10">Disabled</Badge>
                             )}
                           </div>
-                          {event.status === "Duty Leave" && event.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(event.remarks.trim()) && (
-                            <p className="text-[11px] text-yellow-600/80 dark:text-yellow-400/80 italic truncate max-w-50 sm:max-w-xs">{event.remarks.trim()}</p>
+                          {event.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(event.remarks.trim()) && (
+                            <p className={cn(
+                              "text-[11px] italic truncate max-w-50 sm:max-w-xs mt-1",
+                              event.status === "Duty Leave"
+                                ? "text-yellow-600/80 dark:text-yellow-400/80"
+                                : "text-muted-foreground/80"
+                            )}>
+                              {event.remarks.trim()}
+                            </p>
                           )}
                         </div>
                         {renderActions()}
@@ -812,8 +932,8 @@ export function AttendanceCalendar({
               ) : (
                 <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
                   <div className="rounded-full bg-accent/30 p-4 mb-3 ring-1 ring-border/50"><CalendarIcon className="h-6 w-6 text-muted-foreground/60" aria-hidden="true" /></div>
-                  <h3 className="text-sm font-semibold text-foreground">No Classes Found</h3>
-                  <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-50">Enjoy your free time! No classes recorded for this date.</p>
+                  <h3 className="text-sm font-semibold text-foreground">No classes recorded for this day.</h3>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-50">Enjoy your free time!</p>
                   {shouldShowJumpToToday && (
                     <Button variant="outline" size="sm" className="h-8 text-xs" onClick={goToToday}>Jump to Today</Button>
                   )}
@@ -828,9 +948,9 @@ export function AttendanceCalendar({
       <AlertDialog open={!!deleteConfirmOpen} onOpenChange={(open) => !open && setDeleteConfirmOpen(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Tracking Record?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Record</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove this attendance tracking record. This action cannot be undone.
+              Are you sure you want to delete this tracking record? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -843,9 +963,9 @@ export function AttendanceCalendar({
                   setDeleteConfirmOpen(null);
                 }
               }}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Delete
+              DELETE
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

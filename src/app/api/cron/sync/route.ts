@@ -2,8 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { decrypt } from "@/lib/crypto";
-import { headers } from "next/headers";
+import { encrypt, decrypt } from "@/lib/crypto";
 import { syncRateLimiter } from "@/lib/ratelimit";
 import { normalizeSession, toRoman } from "@/lib/utils";
 import { egressFetch, getClientIp, redact } from "@/lib/utils.server";
@@ -18,6 +17,9 @@ import {
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { validateSignedRequest } from "@/lib/security/request-signing";
+import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 
 // Insert shape for the `notification` table (server-generated fields omitted).
 // Matches the DB schema in supabase/migrations/20260217174834_remote_schema.sql.
@@ -93,7 +95,7 @@ interface UserSyncData {
   auth_id: string;
 }
 
-export async function GET(req: Request) {
+export const GET = withSecurity(async (req) => {
   const supabaseAdmin = getAdminClient();
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -103,12 +105,10 @@ export async function GET(req: Request) {
     Sentry.captureException(error, {
       tags: { type: "config_error", location: "cron/sync" },
     });
-    return NextResponse.json({ error: "Server configuration error" }, {
-      status: 500,
-    });
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  const headerList = await headers();
+  const headerList = req.headers;
 
   // Note: This cron endpoint is typically called by non-browser automation (e.g. Vercel Cron, GitHub Actions),
   // so we do not depend on Origin-based validation here. Authentication is handled via CRON_SECRET below.
@@ -117,9 +117,10 @@ export async function GET(req: Request) {
   // invalid requests without consuming rate-limit quota. Uses constant-time comparison
   // to prevent timing attacks.
   const authHeader = req.headers.get("authorization");
+  const isMobile = isMobileRequest(req.headers);
   let isCron = false;
 
-  if (authHeader !== null) {
+  if (authHeader !== null && !isMobile) {
     try {
       if (!authHeader.startsWith("Bearer ")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -137,11 +138,15 @@ export async function GET(req: Request) {
         providedBuf.length === cronBuf.length &&
         crypto.timingSafeEqual(providedBuf, cronBuf);
 
-      if (!isCronValid) {
-        // Auth header was present but invalid — reject immediately before rate limiting
+      // 1b. Signature-based Auth (Ed25519) — The new "Maximum Security" path
+      const isSignatureValid = await validateSignedRequest(req);
+      
+      if (isCronValid || isSignatureValid) {
+        isCron = true;
+      } else {
+        // Auth present but all methods failed — reject immediately before rate limiting
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       }
-      isCron = true;
     } catch (error) {
       // Malformed header or unexpected comparison error — treat as unauthorized
       Sentry.captureException(error, {
@@ -156,6 +161,8 @@ export async function GET(req: Request) {
   const ip = getClientIp(headerList);
 
   if (!isCron) {
+    // App Check Protection is handled by withSecurity HOF
+
     if (!ip) {
       if (process.env.NODE_ENV === "development") {
         // In development, fail fast if we cannot determine the client IP.
@@ -270,7 +277,17 @@ export async function GET(req: Request) {
       if (data) usersToSync = data;
     } else {
       const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      
+      // For mobile apps sending Bearer tokens in the Authorization header:
+      // We manually extract and pass the token to getUser() because the standard 
+      // createClient() primarily targets browser cookie persistence.
+      const authHeader = req.headers.get("authorization");
+      const supabaseToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
+      
+      const { data: { user } } = supabaseToken 
+        ? await supabase.auth.getUser(supabaseToken)
+        : await supabase.auth.getUser();
+
       if (!user) {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
       }
@@ -327,21 +344,17 @@ export async function GET(req: Request) {
       const promises = chunk.map(async (user) => {
         // Per-user stats to avoid race conditions
         const userStats = createEmptyStats();
+        let classIdToUpdate: string | null = null;
 
         try {
           if (!user.ezygo_token || !user.ezygo_iv || !user.auth_id) {
             throw new Error("Missing credentials");
           }
 
-          const decryptedToken = decrypt(user.ezygo_iv, user.ezygo_token);
+          let decryptedToken = decrypt(user.ezygo_iv, user.ezygo_token);
           if (!decryptedToken) throw new Error("Decryption failed");
 
           // A+B. Fetch Courses + Attendance
-
-          // A. Fetch Courses
-          // Native fetch used (axios removed) — Next.js 15 / Node 18+ fetch is
-          // sufficient and keeps a single HTTP client across the codebase. fetch never
-          // throws on HTTP error status, so we check res.ok / res.status explicitly.
           const courseController = new AbortController();
           const courseTimeout = setTimeout(
             () => courseController.abort(),
@@ -360,9 +373,55 @@ export async function GET(req: Request) {
             clearTimeout(courseTimeout);
           }
           if (courseRes.status !== 200) {
-            throw new Error(`Courses API failed: ${courseRes.status}`);
+            // --- SELF-HEALING AUTH (FAILOVER) ---
+            // If the Sync fails with 401 but we are in a Dashboard context (isCron: false),
+            // it means the DB token is stale but the browser session might still be valid.
+            if (courseRes.status === 401 && !isCron) {
+               const cookieToken = await getAuthTokenServer();
+               if (cookieToken && cookieToken !== decryptedToken) {
+                  logger.info(`[sync] Attempting self-healing for user ${redact("id", user.username)} using session cookie...`);
+                  
+                  // Retry the fetch with the cookie token
+                  const retryRes = await egressFetch("institutionuser/courses/withusers", {
+                    headers: { Authorization: `Bearer ${cookieToken}` },
+                  });
+
+                  if (retryRes.status === 200) {
+                    logger.info(`[sync] Self-healed stale token for user ${redact("id", user.username)}. Updating database...`);
+                    
+                    // 1. Swap local reference so the rest of the sync uses the fresh token
+                    decryptedToken = cookieToken;
+                    
+                    // 2. Encrypt and persist the healed token to the DB for future runs
+                    const { iv, content } = encrypt(decryptedToken);
+                    await supabaseAdmin.from("users").update({
+                      ezygo_token: content,
+                      ezygo_iv: iv
+                    }).eq("auth_id", user.auth_id);
+
+                    // 3. Update courseRes and proceed normally
+                    courseRes = retryRes;
+                  } else {
+                    // Cookie token also failed — propagate the original rejection
+                    throw new Error(`Courses API failed: ${courseRes.status}`);
+                  }
+               } else {
+                  throw new Error(`Courses API failed: ${courseRes.status}`);
+               }
+            } else {
+              throw new Error(`Courses API failed: ${courseRes.status}`);
+            }
           }
-          const courseData: unknown = await courseRes.json().catch(() => null);
+          
+          // A2. Fetch Roles (for class detection)
+          const rolesRes = await egressFetch("institutionuser/myroles", {
+            headers: { Authorization: `Bearer ${decryptedToken}` }
+          });
+          const rolesData = rolesRes.ok ? await rolesRes.json().catch(() => null) : null;
+
+          const courseDataRaw: any = await courseRes.json().catch(() => null);
+          const courseData = Array.isArray(courseDataRaw) ? courseDataRaw : (courseDataRaw?.data ?? []);
+          
           if (!courseData) {
             throw new Error(`Courses API failed: empty or invalid JSON`);
           }
@@ -375,6 +434,80 @@ export async function GET(req: Request) {
             (acc, c) => ({ ...acc, [c.id]: c }),
             {} as Record<string, Course>,
           );
+
+          // One-time legacy migration: normalize old numeric tracker course IDs
+          // to canonical alphanumeric course codes (uppercase, no whitespace).
+          const legacyCourseIdToCode = new Map<string, string>();
+          validatedCourses.forEach((course) => {
+            const normalizedCode = course.code?.replace(/\s+/g, "").toUpperCase();
+            if (normalizedCode) {
+              legacyCourseIdToCode.set(String(course.id), normalizedCode);
+            }
+          });
+
+          if (legacyCourseIdToCode.size > 0) {
+            const legacyIds = [...legacyCourseIdToCode.keys()];
+            const { data: legacyRows, error: legacyRowsError } = await supabaseAdmin
+              .from("tracker")
+              .select("id, course")
+              .eq("auth_user_id", user.auth_id)
+              .in("course", legacyIds);
+
+            if (legacyRowsError) {
+              logger.warn(
+                `[sync] Failed to load legacy tracker rows for migration (${redact("id", user.username)})`,
+                legacyRowsError,
+              );
+              Sentry.captureException(legacyRowsError, {
+                tags: { type: "legacy_course_migration_lookup_error", location: "cron/sync" },
+                extra: { user_id: redact("id", user.auth_id) },
+              });
+            } else if (legacyRows && legacyRows.length > 0) {
+              const migrationPromises: Promise<unknown>[] = [];
+              let migrationCandidates = 0;
+
+              for (const row of legacyRows as Array<{ id: number; course: string }>) {
+                const nextCode = legacyCourseIdToCode.get(String(row.course));
+                if (!nextCode || row.course === nextCode) continue;
+                migrationCandidates++;
+                migrationPromises.push(
+                  (async () => {
+                    const { error } = await supabaseAdmin
+                      .from("tracker")
+                      .update({ course: nextCode })
+                      .eq("id", row.id);
+                    if (error) throw error;
+                  })(),
+                );
+              }
+
+              if (migrationPromises.length > 0) {
+                const migrationResults = await Promise.allSettled(migrationPromises);
+                const migratedCount = migrationResults.filter((r) => r.status === "fulfilled").length;
+                const failedCount = migrationResults.length - migratedCount;
+
+                if (migratedCount > 0) {
+                  userStats.updates += migratedCount;
+                  logger.info(
+                    `[sync] Migrated ${migratedCount}/${migrationCandidates} legacy tracker rows to course codes for ${redact("id", user.username)}`,
+                  );
+                }
+
+                if (failedCount > 0) {
+                  Sentry.captureMessage("Partial legacy tracker course migration failure", {
+                    level: "warning",
+                    tags: { type: "legacy_course_migration_partial_failure", location: "cron/sync" },
+                    extra: {
+                      user_id: redact("id", user.auth_id),
+                      attempted: migrationResults.length,
+                      migrated: migratedCount,
+                      failed: failedCount,
+                    },
+                  });
+                }
+              }
+            }
+          }
 
           // B. Fetch Attendance
           const attController = new AbortController();
@@ -397,7 +530,36 @@ export async function GET(req: Request) {
             clearTimeout(attTimeout);
           }
           if (attRes.status !== 200) {
-            throw new Error(`Attendance API failed: ${attRes.status}`);
+            // --- SELF-HEALING AUTH (FAILOVER) for Attendance ---
+            if (attRes.status === 401 && !isCron) {
+               const cookieToken = await getAuthTokenServer();
+               if (cookieToken && cookieToken !== decryptedToken) {
+                  logger.info(`[sync] Attempting self-healing for user ${redact("id", user.username)} (Attendance)...`);
+                  
+                  const retryRes = await egressFetch("attendancereports/student/detailed", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${cookieToken}`,
+                      "content-type": "application/json",
+                    },
+                    body: "{}",
+                  });
+
+                  if (retryRes.status === 200) {
+                    logger.info(`[sync] Self-healed stale token for user ${redact("id", user.username)} (Attendance).`);
+                    decryptedToken = cookieToken;
+                    const { iv, content } = encrypt(decryptedToken);
+                    await supabaseAdmin.from("users").update({ ezygo_token: content, ezygo_iv: iv }).eq("auth_id", user.auth_id);
+                    attRes = retryRes;
+                  } else {
+                    throw new Error(`Attendance API failed: ${attRes.status}`);
+                  }
+               } else {
+                  throw new Error(`Attendance API failed: ${attRes.status}`);
+               }
+            } else {
+              throw new Error(`Attendance API failed: ${attRes.status}`);
+            }
           }
           const attData: unknown = await attRes.json().catch(() => null);
           if (!attData || !(attData as any).studentAttendanceData) {
@@ -407,9 +569,40 @@ export async function GET(req: Request) {
           }
           const rawOfficialData = (attData as any).studentAttendanceData;
 
+          // B2. Class Detection Logic (Self-Healing)
+          const roles = rolesData?.data ?? rolesData;
+          const primarySubgroup = roles?.subgroupRoles?.[0];
+          
+          if (primarySubgroup) {
+            const { data: classData } = await supabaseAdmin
+              .from("classes")
+              .upsert({ external_group_id: primarySubgroup.id, name: primarySubgroup.name }, { onConflict: "external_group_id" })
+              .select("id")
+              .single();
+            if (classData) classIdToUpdate = classData.id;
+          }
+
+          if (!classIdToUpdate && Array.isArray(courseData)) {
+            const courseWithGroup = (courseData as any[]).find((c: any) => c.usersubgroup?.usergroup?.id);
+            if (courseWithGroup) {
+              const group = courseWithGroup.usersubgroup.usergroup;
+              const { data: classData } = await supabaseAdmin
+                .from("classes")
+                .upsert({ external_group_id: group.id, name: group.name }, { onConflict: "external_group_id" })
+                .select("id")
+                .single();
+              if (classData) classIdToUpdate = classData.id;
+            }
+          }
+
           // C. Sync Logic
+          // Handle cases where the API returns [] for empty data instead of {}
+          const normalizedOfficialData = Array.isArray(rawOfficialData) && rawOfficialData.length === 0 
+            ? {} 
+            : rawOfficialData;
+
           const officialDataResult = OfficialAttendanceDataSchema.safeParse(
-            rawOfficialData,
+            normalizedOfficialData,
           );
           if (!officialDataResult.success) {
             throw new Error(
@@ -467,11 +660,15 @@ export async function GET(req: Request) {
                   return;
                 }
 
+                const officialCourse = coursesMap[String(session.course)];
+                const courseIdToUse = officialCourse?.code 
+                  ? String(officialCourse.code).replace(/\s+/g, '').toUpperCase() 
+                  : String(session.course).toUpperCase();
+
                 officialMap.set(key, {
                   code: Number(session.attendance),
-                  course: String(session.course),
-                  course_name: coursesMap[String(session.course)]?.name ||
-                    String(session.course),
+                  course: courseIdToUse,
+                  course_name: officialCourse?.name || String(session.course),
                 });
               });
             });
@@ -760,6 +957,7 @@ export async function GET(req: Request) {
           // will always stay at the top of the queue and cause a "Poison Pill" stall.
           await supabaseAdmin.from("users").update({
             last_synced_at: new Date().toISOString(),
+            ...(classIdToUpdate && { class_id: classIdToUpdate }),
           }).eq("auth_id", user.auth_id).then(({ error }) => {
             if (error) {
               logger.error(`Failed to update last_synced_at for ${redact("id", user.username)}:`, error.message);
@@ -846,4 +1044,4 @@ export async function GET(req: Request) {
       { status: 500 },
     );
   }
-}
+});

@@ -1,9 +1,14 @@
 // Axios instance with base URL and auth token
 // src/lib/axios.ts
 
-import axios from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
+import { encryptRequest, encryptHeader, decryptResponse } from "@/lib/security/jwe-client";
+
+interface JweAxiosConfig extends InternalAxiosRequestConfig {
+  _jweCek?: Uint8Array;
+}
 
 const axiosInstance = axios.create({
   baseURL: "/api/backend/",
@@ -280,7 +285,22 @@ export function setCsrfToken(token: string | null): void {
 // in-flight requests all receive 401 simultaneously.
 let isLoggingOut401 = false;
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    // Transparent JWE Decryption for GhostClass internal APIs
+    const contentType = String(response.headers["content-type"] || "");
+    const config = response.config as JweAxiosConfig;
+
+    if (contentType.includes("application/jose") && config._jweCek) {
+      try {
+        const decryptedData = await decryptResponse(response.data, config._jweCek);
+        response.data = decryptedData;
+      } catch (err) {
+        logger.error("[axios] Failed to decrypt JWE response", err);
+        return Promise.reject(new Error("Failed to decrypt secure response"));
+      }
+    }
+    return response;
+  },
   async (error) => {
     const originalConfig = (error?.config ?? {}) as RetryableRequestConfig & {
       headers?: {
@@ -327,12 +347,53 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Attach CSRF token from memory (Synchronizer Token Pattern)
-axiosInstance.interceptors.request.use((config) => {
-  if (typeof document !== "undefined") {
+// Attach CSRF token and handle JWE encryption
+axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
+  const isBrowser = typeof window !== "undefined";
+  
+  if (isBrowser) {
+    // 1. Attach CSRF token
     const token = getCsrfToken();
     if (token) {
       config.headers.set(CSRF_HEADER, token);
+    }
+
+    // 2. JWE Encryption for internal GhostClass routes
+    const url = config.url || "";
+    const method = config.method?.toLowerCase() || "";
+    
+    // Internal routes: anything directed at our own API.
+    // 1. Absolute URLs starting with /api/ (typical for Next.js)
+    // 2. Relative URLs (axios will prepend baseURL /api/backend/)
+    // 3. URLs starting with current origin
+    const isInternal = (
+      url.startsWith("/api/") || 
+      !url.startsWith("http") || 
+      (typeof window !== "undefined" && url.startsWith(window.location.origin))
+    ) && !url.includes("ezygo.app");
+    
+    const isMutation = ["post", "put", "patch"].includes(method);
+    const isPublic = url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
+
+    if (isInternal && !isPublic) {
+      try {
+        if (isMutation && config.data) {
+          // Mutation: Encrypt body and include CEK
+          const { jwe, cek } = await encryptRequest(config.data);
+          config.data = jwe;
+          config._jweCek = cek;
+          config.headers.set("Content-Type", "application/jose");
+        } else if (method === "get") {
+          // GET: Encrypt CEK in header
+          const { jwe, cek } = await encryptHeader();
+          config.headers.set("X-JWE-Key", jwe);
+          config._jweCek = cek;
+        }
+        config.headers.set("Accept", "application/jose, application/json");
+      } catch (err) {
+        logger.error("[axios] JWE request encryption failed", err);
+        return Promise.reject(err);
+      }
     }
   }
   return config;

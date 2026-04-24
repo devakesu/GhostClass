@@ -7,7 +7,7 @@ import globals from "globals";
 
 export default [
   {
-    ignores: [".next/*", "node_modules/*", "lint-staged.config.js", "public/sw.js"]
+    ignores: [".next/*", "node_modules/*", "lint-staged.config.js", "public/sw.js", "Temp/*"]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

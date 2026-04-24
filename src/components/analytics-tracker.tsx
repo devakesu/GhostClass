@@ -69,6 +69,9 @@ export function AnalyticsTracker() {
         formInteractions.current.clear();
       } catch (error) {
         // Silently fail - don't break app if analytics fails
+        // Ignore AbortError as it's expected during fast navigation/timeouts
+        if (error instanceof Error && error.name === "AbortError") return;
+        
         // Note: Using console.warn instead of logger utility as this is a client component
         // and the logger utility is primarily designed for server-side use
         console.warn("[Analytics] Failed to track page view:", error);
@@ -284,6 +287,9 @@ export async function trackEvent(
       clearTimeout(timeoutId);
     }
   } catch (error) {
+    // Silently fail if analytics fails
+    if (error instanceof Error && error.name === "AbortError") return;
+
     // Note: Using console.warn instead of logger utility as this is a client component
     // and the logger utility is primarily designed for server-side use
     console.warn("[Analytics] Failed to track event:", error);

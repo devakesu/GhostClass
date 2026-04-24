@@ -1,217 +1,66 @@
-// API Route for server-side Google Analytics tracking
-// POST /api/analytics/track
-
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { trackGA4Event } from "@/lib/analytics";
 import { syncRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+import { withSecurity } from "@/lib/security/app-check";
 
 interface GA4Event {
   name: string;
-  params?: Record<string, unknown>;
+  params?: Record<string, string | number | boolean>;
 }
 
-/** Type guard for values already in GA4 user property format { value: string } */
 function isGA4UserProperty(val: unknown): val is { value: string } {
   return typeof val === 'object' && val !== null && 'value' in val && typeof (val as { value: unknown }).value === 'string';
 }
 
-export async function POST(req: NextRequest) {
+const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any }) => {
   try {
-    // Validate request origin to prevent cross-site analytics pollution.
-    // Parse NEXT_PUBLIC_APP_URL to normalize trailing slashes/paths before comparing.
-    const origin = req.headers.get("origin");
-    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (origin && (appDomain || appUrl)) {
-      const allowedOrigins = new Set<string>();
-
-      // In development, allow the current request origin (same-origin API calls)
-      // to avoid false 403s on dynamic local dev ports (e.g. :3001).
-      if (process.env.NODE_ENV === "development") {
-        allowedOrigins.add(req.nextUrl.origin);
-      }
-
-      if (appUrl) {
-        try {
-          const parsedAppUrl = new URL(appUrl);
-          allowedOrigins.add(parsedAppUrl.origin);
-        } catch {
-          // Ignore invalid NEXT_PUBLIC_APP_URL for origin comparison
-        }
-      }
-
-      if (appDomain) {
-        allowedOrigins.add(`https://${appDomain}`);
-        allowedOrigins.add(`http://${appDomain}`);
-      }
-
-      // Always allow localhost/loopback in development, regardless of port.
-      let isDevLocalOrigin = false;
-      if (process.env.NODE_ENV === "development") {
-        try {
-          const parsedOrigin = new URL(origin);
-          const host = parsedOrigin.hostname;
-          isDevLocalOrigin = host === "localhost" || host === "127.0.0.1" || host === "::1";
-        } catch {
-          isDevLocalOrigin = false;
-        }
-      }
-
-      if (allowedOrigins.size > 0 && !allowedOrigins.has(origin) && !isDevLocalOrigin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-    }
-
-    // Rate limiting per IP (default: 10 requests per 10 seconds, configurable)
-    // (via RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW environment variables)
     const ip = getClientIp(req.headers);
+    if (!ip) return NextResponse.json({ error: "No IP" }, { status: 400 });
     
-    if (!ip) {
-      return NextResponse.json(
-        { error: "Unable to determine client IP" },
-        { status: 400 }
-      );
-    }
-    
-    const { success: rateLimitSuccess, reset: rateLimitReset } = await syncRateLimiter.limit(ip);
-    
-    if (!rateLimitSuccess) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded" },
-        {
-          status: 429,
-          headers: { 'Retry-After': Math.max(0, Math.ceil((rateLimitReset - Date.now()) / 1000)).toString() },
-        }
-      );
+    const { success, reset } = await syncRateLimiter.limit(ip);
+    if (!success) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, {
+        status: 429,
+        headers: { 'Retry-After': Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString() },
+      });
     }
 
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
-    }
-
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
-    }
-
-    const { clientId, events, userProperties } = body as Record<string, unknown>;
-
-    // Validate clientId format and type
-    if (!clientId || typeof clientId !== 'string') {
-      return NextResponse.json(
-        { error: "Invalid clientId" },
-        { status: 400 }
-      );
-    }
-    
-    // Validate clientId format (timestamp.random pattern) and length
-    if (clientId.length > 100 || !/^\d+\.[a-z0-9]+$/.test(clientId)) {
-      return NextResponse.json(
-        { error: "Invalid clientId format" },
-        { status: 400 }
-      );
-    }
-
-    if (!events || !Array.isArray(events)) {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
-    }
-
-    // Validate event structure and sanitize
-    const maxEventNameLength = 40; // GA4 limit
-    const maxParamKeyLength = 40;  // GA4 limit
-    const maxParamValueLength = 100; // GA4 limit
-    const maxEventsPerRequest = 25; // GA4 limit
-    
-    if (events.length > maxEventsPerRequest) {
-      return NextResponse.json(
-        { error: `Too many events. Maximum ${maxEventsPerRequest} events per request` },
-        { status: 400 }
-      );
-    }
-    
-    const sanitizedEvents = events.map((event: GA4Event) => {
-      if (!event.name || typeof event.name !== 'string') {
-        throw new Error('Invalid event name');
+    let body = decryptedBody;
+    if (!body) {
+      try {
+        body = await req.json();
+      } catch {
+        return NextResponse.json({ error: "Invalid body" }, { status: 400 });
       }
-      
-      // Validate event name format (lowercase, underscores, numbers)
-      const eventName = event.name.slice(0, maxEventNameLength);
-      if (!/^[a-z0-9_]+$/.test(eventName)) {
-        throw new Error(`Invalid event name format: ${eventName}`);
-      }
-      
-      // Sanitize event parameters
-      const sanitizedParams: Record<string, string | number | boolean> = {};
-      if (event.params && typeof event.params === 'object') {
-        for (const [key, value] of Object.entries(event.params)) {
-          const sanitizedKey = key.slice(0, maxParamKeyLength);
-          
-          // Only allow string, finite number, boolean values
-          if (typeof value === 'string') {
-            sanitizedParams[sanitizedKey] = value.slice(0, maxParamValueLength);
-          } else if (typeof value === 'number' && Number.isFinite(value)) {
-            sanitizedParams[sanitizedKey] = value;
-          } else if (typeof value === 'boolean') {
-            sanitizedParams[sanitizedKey] = value;
-          }
-        }
-      }
-      
-      return {
-        name: eventName,
-        params: sanitizedParams,
-      };
-    });
+    }
 
-    // Validate and sanitize userProperties
-    let sanitizedUserProperties: Record<string, { value: string }> | undefined;
-    if (userProperties !== undefined && userProperties !== null) {
-      if (typeof userProperties !== 'object' || Array.isArray(userProperties)) {
-        return NextResponse.json(
-          { error: "Invalid userProperties format" },
-          { status: 400 }
-        );
-      }
-      
+    if (!body || typeof body !== 'object') return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+
+    const { clientId, events, userProperties } = body as any;
+    if (!clientId || !Array.isArray(events)) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const sanitizedEvents: GA4Event[] = events.map((event: any) => ({
+      name: String(event.name || "event").slice(0, 40),
+      params: event.params || {},
+    }));
+
+    let sanitizedUserProperties: any;
+    if (userProperties) {
       sanitizedUserProperties = {};
-      const maxUserPropertyKeyLength = 24; // GA4 limit
-      const maxUserPropertyValueLength = 36; // GA4 limit
-      
       for (const [key, value] of Object.entries(userProperties)) {
-        const sanitizedKey = key.slice(0, maxUserPropertyKeyLength);
-        
-        // Only allow string values for user properties (GA4 requirement)
-        if (typeof value === 'string') {
-          sanitizedUserProperties[sanitizedKey] = { value: value.slice(0, maxUserPropertyValueLength) };
-        } else if (isGA4UserProperty(value)) {
-          // Already in GA4 format
-          sanitizedUserProperties[sanitizedKey] = { value: value.value.slice(0, maxUserPropertyValueLength) };
-        }
+        if (typeof value === 'string') sanitizedUserProperties[key] = { value };
+        else if (isGA4UserProperty(value)) sanitizedUserProperties[key] = value;
       }
     }
 
-    // Send to GA4
     await trackGA4Event(clientId, sanitizedEvents, sanitizedUserProperties);
-
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("[Analytics API] Error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+};
+
+export const POST = withSecurity(handler as any);

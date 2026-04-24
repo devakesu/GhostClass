@@ -8,7 +8,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
 
 type Theme = "light" | "dark";
 
@@ -20,6 +19,8 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const STORAGE_KEY = "ghostclass-theme";
+
 /**
  * Reads the persisted theme from localStorage.
  * Falls back to "dark" when no stored preference exists.
@@ -27,7 +28,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "dark";
   try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // localStorage may be blocked (e.g. tracking prevention)
@@ -53,11 +54,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTheme(theme);
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(STORAGE_KEY, theme);
     } catch {
       // localStorage may be blocked
     }
   }, [theme]);
+
+  // Listen for system preference changes
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => {
+      // Only follow system preference if there's no explicit user choice
+      try {
+        if (!localStorage.getItem(STORAGE_KEY)) {
+          setThemeState(e.matches ? "dark" : "light");
+        }
+      } catch {
+        setThemeState(e.matches ? "dark" : "light");
+      }
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const setTheme = useCallback((t: Theme) => setThemeState(t), []);
   const toggleTheme = useCallback(

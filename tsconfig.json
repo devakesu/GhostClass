@@ -49,6 +49,7 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase"
+    "supabase",
+    "Temp"
   ]
 }

@@ -7,12 +7,19 @@ import robots from "../robots";
 
 describe("robots.txt", () => {
   const originalSitemapUrl = process.env.NEXT_PUBLIC_SITEMAP_URL;
+  const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   afterEach(() => {
     if (originalSitemapUrl !== undefined) {
       process.env.NEXT_PUBLIC_SITEMAP_URL = originalSitemapUrl;
     } else {
       delete process.env.NEXT_PUBLIC_SITEMAP_URL;
+    }
+
+    if (originalAppUrl !== undefined) {
+      process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
+    } else {
+      delete process.env.NEXT_PUBLIC_APP_URL;
     }
   });
 
@@ -53,9 +60,18 @@ describe("robots.txt", () => {
     expect(config.sitemap).toBe("https://example.com/sitemap.xml");
   });
 
-  it("should handle missing sitemap URL", () => {
+  it("should derive sitemap URL from app URL when NEXT_PUBLIC_SITEMAP_URL is missing", () => {
     delete process.env.NEXT_PUBLIC_SITEMAP_URL;
-    
+    process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
+
+    const config = robots();
+    expect(config.sitemap).toBe("https://example.com/sitemap.xml");
+  });
+
+  it("should handle missing sitemap and app URL", () => {
+    delete process.env.NEXT_PUBLIC_SITEMAP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+
     const config = robots();
     expect(config.sitemap).toBeUndefined();
   });

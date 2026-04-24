@@ -312,7 +312,7 @@ jobs:
             SOURCE_DATE_EPOCH=${{ steps.prep.outputs.source_date_epoch }}
             NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
             NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
             NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
             NEXT_PUBLIC_GITHUB_URL=${{ vars.NEXT_PUBLIC_GITHUB_URL }}
@@ -519,13 +519,148 @@ jobs:
             checksums.txt
             provenance.intoto.jsonl
 
+  build-mobile:
+    name: Build Flutter Android
+    needs: calculate-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.client_payload.version_tag || github.event.inputs.version_tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Prepare mobile release paths
+        id: mobile-prep
+        run: |
+          set -euo pipefail
+
+          mkdir -p mobile/release-assets
+
+          echo "build_name=${{ needs.calculate-version.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+          BUILD_TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          if [ -z "$BUILD_TIMESTAMP" ] || [ "$BUILD_TIMESTAMP" = "null" ]; then
+            BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          fi
+          echo "build_timestamp=${BUILD_TIMESTAMP}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Prepare Android signing key
+        working-directory: mobile/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 secret is required}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD secret is required}"
+          : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
+          : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > ghostclass.p12
+
+          cat > key.properties << EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=ghostclass.p12
+          storeType=pkcs12
+          EOF
+
+          chmod 600 key.properties ghostclass.p12
+
+      - name: Build Android APK
+        working-directory: mobile
+        env:
+          BUILD_TIMESTAMP: ${{ steps.mobile-prep.outputs.build_timestamp }}
+        run: |
+          set -euo pipefail
+
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+
+          flutter build apk --release \
+            --build-name="${{ steps.mobile-prep.outputs.build_name }}" \
+            --build-number="${{ steps.mobile-prep.outputs.build_number }}" \
+            --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
+            --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+            --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
+            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }}
+
+      - name: Generate mobile SBOM
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+
+          npx --yes @cyclonedx/cdxgen -t dart --no-install-deps -o release-assets/mobile-sbom.json .
+
+      - name: Attest mobile APK provenance
+        id: attest-mobile
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: mobile/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Assemble mobile release assets
+        working-directory: mobile
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.attest-mobile.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+
+          cp build/app/outputs/flutter-apk/app-release.apk release-assets/mobile-app-release.apk
+          cp "$ATTESTATION_BUNDLE" release-assets/mobile-provenance.intoto.jsonl
+
+          cd release-assets
+          {
+            echo "# Mobile Release Artifact Checksums"
+            echo ""
+            sha256sum mobile-app-release.apk
+            sha256sum mobile-sbom.json
+            sha256sum mobile-provenance.intoto.jsonl
+            echo ""
+            echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          } > mobile-checksums.txt
+
+      - name: Upload mobile release artifacts
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: mobile-release-artifacts
+          path: |
+            mobile/release-assets/mobile-app-release.apk
+            mobile/release-assets/mobile-sbom.json
+            mobile/release-assets/mobile-provenance.intoto.jsonl
+            mobile/release-assets/mobile-checksums.txt
+
   # Create GitHub Release with artifacts
   create-github-release:
     name: Create GitHub Release
-    needs: [calculate-version, build-and-release]
+    needs: [calculate-version, build-and-release, build-mobile]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -541,15 +676,23 @@ jobs:
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: release-artifacts
-          path: ./artifacts
+          path: ./artifacts/web
+
+      - name: Download mobile artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: mobile-release-artifacts
+          path: ./artifacts/mobile
 
       - name: Verify downloaded artifacts
         run: |
           echo "Downloaded artifacts:"
-          ls -lah ./artifacts/
+          find ./artifacts -maxdepth 2 -type f | sort
           echo ""
           echo "Checksums:"
-          cat ./artifacts/checksums.txt
+          cat ./artifacts/web/checksums.txt
+          echo ""
+          cat ./artifacts/mobile/mobile-checksums.txt
 
       - name: Calculate previous version for changelog
         id: prev_version
@@ -589,7 +732,7 @@ jobs:
           cat > ./artifacts/VERIFY.md << EOF
           # Release Verification Instructions
 
-          This release includes signed artifacts and attestations for supply chain security.
+          This release includes signed web and mobile artifacts with attestations for supply chain security.
 
           ## Verify Docker Image Signature
 
@@ -630,6 +773,13 @@ jobs:
 
           # Or verify individual files
           sha256sum sbom.json sbom.json.bundle
+          \`\`\`
+
+          ## Verify Mobile APK
+
+          \`\`\`bash
+          gh attestation verify mobile-app-release.apk --owner ${REPOSITORY_OWNER}
+          grep -E '^[0-9a-f]{64}  ' mobile-checksums.txt | sha256sum -c
           \`\`\`
 
           ## Image Information
@@ -689,6 +839,7 @@ jobs:
 
           This release includes:
           - 🐳 ${PLATFORM_DESC}
+          - 📱 Flutter Android APK with provenance attestation
           - 🔐 Signed images and artifacts using Sigstore cosign
           - 📋 Software Bill of Materials (SBOM) in CycloneDX format
           - ✅ Build provenance attestations
@@ -722,18 +873,22 @@ jobs:
           ---
 
           **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}" \
-            ./artifacts/sbom.json \
-            ./artifacts/sbom.json.bundle \
-            ./artifacts/checksums.txt \
-            ./artifacts/VERIFY.md \
-            ./artifacts/provenance.intoto.jsonl \
+            ./artifacts/web/sbom.json \
+            ./artifacts/web/sbom.json.bundle \
+            ./artifacts/web/checksums.txt \
+            ./artifacts/web/VERIFY.md \
+            ./artifacts/web/provenance.intoto.jsonl \
+            ./artifacts/mobile/mobile-app-release.apk \
+            ./artifacts/mobile/mobile-sbom.json \
+            ./artifacts/mobile/mobile-checksums.txt \
+            ./artifacts/mobile/mobile-provenance.intoto.jsonl \
             --draft=false
 
   # Deploy to production after successful release creation
   # This ensures deployment only happens after the full release completes successfully
   deploy-to-production:
     name: Deploy to Production
-    needs: [calculate-version, build-and-release, create-github-release]
+    needs: [calculate-version, build-and-release, build-mobile, create-github-release]
     runs-on: ubuntu-latest
     # Deploy on tag pushes, workflow_dispatch with version_tag, OR repository_dispatch
     # Manual workflow_dispatch without version_tag (bump_type only) does not auto-deploy

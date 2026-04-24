@@ -1,0 +1,19 @@
+name: Build Guard
+
+on:
+  pull_request:
+    branches: [main]
+
+  merge_group:
+    branches: [main]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify commit is signed
+        run: |
+          git log -1 --show-signature

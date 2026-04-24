@@ -1,0 +1,58 @@
+name: Build, Push & Sign
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write   # REQUIRED for keyless cosign
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        run: |
+          docker buildx build \
+          --push \
+          --build-arg SOURCE_COMMIT=${{ github.sha }} \
+          --build-arg SOURCE_DATE_EPOCH=1704067200 \
+          -t ghcr.io/devakesu/ghostclass:main \
+          -t ghcr.io/devakesu/ghostclass:${{ github.sha }} \
+          .
+
+
+      - name: Get image digest
+        run: |
+          DIGEST=$(docker buildx imagetools inspect ghcr.io/devakesu/ghostclass:${{ github.sha }} --format '{{.Digest}}')
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
+          echo "Built digest: $DIGEST"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless)
+        run: |
+          cosign sign ghcr.io/devakesu/ghostclass@${IMAGE_DIGEST}
+
+      - name: Trigger Coolify deploy
+        run: |
+          curl -X POST \
+            "$COOLIFY_BASE_URL/api/v1/applications/$COOLIFY_APP_ID/deploy" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN"

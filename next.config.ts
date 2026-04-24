@@ -38,19 +38,25 @@ const withSerwist = withSerwistInit({
   cacheOnNavigation: false,
 });
 
-// Resolve the Supabase storage hostname at build time.
-// Throwing here makes missing NEXT_PUBLIC_SUPABASE_URL a hard build failure rather than
-// silently falling back to 'supabase.co', which would permit Next.js Image Optimization
-// to proxy images from *any* Supabase project.
-const supabaseImageHostname = (() => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
+// Resolve the Supabase storage hostnames at build time.
+// Allowing both production and development hostnames ensures images work across environments.
+const supabaseImageHostnames = (() => {
+  const hosts = [];
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname); } catch { /* ignore */ }
+  }
+  if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_DEV_URL).hostname); } catch { /* ignore */ }
+  }
+  
+  if (hosts.length === 0) {
     throw new Error(
-      '[next.config.ts] NEXT_PUBLIC_SUPABASE_URL is required at build time for ' +
-      'images.remotePatterns. Set it in your environment before running next build.'
+      '[next.config.ts] At least one Supabase URL (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_DEV_URL) ' +
+      'is required at build time for images.remotePatterns.'
     );
   }
-  return new URL(url).hostname;
+  // Deduplicate in case they are the same
+  return Array.from(new Set(hosts));
 })();
 
 const nextConfig = {
@@ -219,12 +225,12 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: supabaseImageHostname,
+      ...supabaseImageHostnames.map(hostname => ({
+        protocol: 'https' as const,
+        hostname,
         port: '',
         pathname: '/storage/v1/object/public/**',
-      },
+      })),
     ],
   },
 } satisfies NextConfig;

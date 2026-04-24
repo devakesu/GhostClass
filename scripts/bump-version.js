@@ -274,7 +274,47 @@ try {
     process.exit(1);
   }
 
-  // 4. Update .env and .example.env
+  // 4. Update Flutter manifest and runtime version metadata.
+  const mobilePubspecPath = path.join(process.cwd(), 'mobile', 'pubspec.yaml');
+  if (fs.existsSync(mobilePubspecPath)) {
+    let mobilePubspec = fs.readFileSync(mobilePubspecPath, 'utf8');
+    const versionLineRegex = /^\s*version:\s*(\d+\.\d+\.\d+)(?:\+(\d+))?\s*$/m;
+    const versionMatch = mobilePubspec.match(versionLineRegex);
+    const buildNumber = versionMatch?.[2] ?? '1';
+    const nextVersionLine = `version: ${newVersion}+${buildNumber}`;
+
+    if (versionMatch) {
+      mobilePubspec = mobilePubspec.replace(versionLineRegex, nextVersionLine);
+    } else if (/^\s*version:\s*/m.test(mobilePubspec)) {
+      mobilePubspec = mobilePubspec.replace(/^\s*version:\s*.*$/m, nextVersionLine);
+    } else {
+      const prefix = mobilePubspec.endsWith('\n') || mobilePubspec.length === 0 ? '' : '\n';
+      mobilePubspec += `${prefix}${nextVersionLine}\n`;
+    }
+
+    fs.writeFileSync(mobilePubspecPath, mobilePubspec);
+    console.log(`${GREEN}   ✔ Updated mobile/pubspec.yaml${RESET}`);
+  } else {
+    console.log(`${YELLOW}   ⚠  mobile/pubspec.yaml not found, skipping.${RESET}`);
+  }
+
+  const mobileAppConfigPath = path.join(process.cwd(), 'mobile', 'lib', 'config', 'app_config.dart');
+  if (fs.existsSync(mobileAppConfigPath)) {
+    let mobileAppConfig = fs.readFileSync(mobileAppConfigPath, 'utf8');
+    const appVersionRegex = /(static\s+String\s+get\s+appVersion\s+=>\s+')\d+\.\d+\.\d+(';)/m;
+
+    if (appVersionRegex.test(mobileAppConfig)) {
+      mobileAppConfig = mobileAppConfig.replace(appVersionRegex, `$1${newVersion}$2`);
+      fs.writeFileSync(mobileAppConfigPath, mobileAppConfig);
+      console.log(`${GREEN}   ✔ Updated mobile/lib/config/app_config.dart${RESET}`);
+    } else {
+      console.log(`${YELLOW}   ⚠  appVersion getter not found in mobile/lib/config/app_config.dart, skipping.${RESET}`);
+    }
+  } else {
+    console.log(`${YELLOW}   ⚠  mobile/lib/config/app_config.dart not found, skipping.${RESET}`);
+  }
+
+  // 5. Update .env and .example.env
   const envFiles = ['.env', '.example.env'];
   const keyToUpdate = 'NEXT_PUBLIC_APP_VERSION';
 
@@ -302,7 +342,7 @@ try {
     }
   });
 
-  // 5. Update OpenAPI documentation version
+  // 6. Update OpenAPI documentation version
   const openApiPath = path.join(process.cwd(), 'public', 'openapi', 'openapi.yaml');
   
   if (fs.existsSync(openApiPath)) {
