@@ -8,7 +8,8 @@ info:
   title: GhostClass API
   version: 3.0.8
   description: |
-    **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
+    **GhostClass API** provides endpoints for authentication, profile synchronization,
+    attendance integrations with EzyGo, telemetry, and build provenance.
     
     ## Authentication
     
@@ -27,6 +28,7 @@ info:
     All endpoints are rate-limited to prevent abuse:
     
     - `/api/auth/save-token` & `/api/cron/sync`: Configurable via environment variables
+    - `/api/backend/*`: Configurable via `PROXY_RATE_LIMIT_REQUESTS` and `PROXY_RATE_LIMIT_WINDOW`
     - Contact Form (Server Action): Configurable via environment variables
     
     Rate limit information is returned in response headers:
@@ -63,10 +65,14 @@ servers:
 tags:
   - name: Authentication
     description: Endpoints for managing EzyGo authentication tokens
+  - name: Mobile
+    description: Mobile-first authenticated endpoints and JWE-secured bridge APIs
   - name: Security
     description: Security endpoints for CSRF protection
   - name: Sync
     description: Endpoints for synchronizing attendance data with EzyGo
+  - name: Proxy
+    description: Secure backend proxy and pass-through endpoints for EzyGo APIs
   - name: Health
     description: System health and status endpoints
   - name: Analytics
@@ -75,6 +81,10 @@ tags:
     description: Browser-generated violation and telemetry reports
   - name: Profile
     description: User profile management
+  - name: Keys
+    description: Public key discovery endpoints for JWE/JWKS
+  - name: Documentation
+    description: OpenAPI and API reference endpoints
   - name: Provenance
     description: Build provenance and version metadata
 
@@ -619,6 +629,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/attendance/summary-batch:
+    post:
+      summary: Batch fetch attendance summaries
+      description: |
+        Retrieves attendance summaries for multiple courses in a single request.
+        Optimized for dashboard card views to avoid N+1 network requests.
+        
+        Requires Firebase App Check and JWE encryption.
+      tags:
+        - Attendance
+      security:
+        - SupabaseAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - courses
+              properties:
+                courses:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - code
+                    properties:
+                      id:
+                        type: integer
+                      code:
+                        type: string
+                      name:
+                        type: string
+      responses:
+        '200':
+          description: Batch summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/CourseDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
   /api/csp-report:
     post:
       tags:
@@ -997,6 +1057,382 @@ paths:
                     timestamp: "2026-02-01T10:00:00.000Z"
                     audit_status: "PASSED"
                     signature_status: "SIGNED"
+
+  /api/openapi:
+    get:
+      tags:
+        - Documentation
+      summary: Get resolved OpenAPI YAML
+      security: []
+      description: |
+        Returns the OpenAPI YAML document with `${NEXT_PUBLIC_*}` template tokens
+        resolved at request time.
+      operationId: getOpenApiSpec
+      responses:
+        '200':
+          description: OpenAPI YAML document
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/.well-known/jwks.json:
+    get:
+      tags:
+        - Keys
+      summary: Get JWKS public keys
+      security: []
+      description: |
+        Returns the JSON Web Key Set (JWKS) used by clients to discover
+        active public keys for cryptographic operations.
+      operationId: getJwks
+      responses:
+        '200':
+          description: JSON Web Key Set
+          content:
+            application/jwk-set+json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: Failed to fetch keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/sync:
+    post:
+      tags:
+        - Authentication
+        - Mobile
+      summary: Self-heal authentication state
+      description: |
+        Attempts to refresh Supabase session cookies and restore EzyGo auth token
+        from server-side storage after client-side auth/session drift.
+      operationId: syncAuth
+      responses:
+        '200':
+          description: Sync attempt completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  terminal:
+                    type: boolean
+        '401':
+          description: Session expired and cannot be recovered
+          headers:
+            x-terminal-auth:
+              schema:
+                type: string
+              description: Present and set to `true` when re-authentication is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contact:
+    post:
+      tags:
+        - Mobile
+      summary: Submit contact/support message
+      description: |
+        Submits a contact message through the shared contact service.
+        Supports both authenticated and guest submissions.
+      operationId: submitContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Message accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: string
+        '400':
+          description: Validation or payload error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Contact processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/attendance/summary-batch:
+    post:
+      tags:
+        - Mobile
+        - Sync
+      summary: Fetch course summary batch
+      description: |
+        Returns attendance summaries for multiple courses in one request.
+        Requires authenticated session and accepts JWE-secured payloads.
+      operationId: fetchAttendanceSummaryBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - courses
+              properties:
+                courses:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Batch summary payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid courses array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/user/profile:
+    get:
+      tags:
+        - Mobile
+        - Profile
+      summary: Get mobile profile bundle
+      description: |
+        Returns mobile-optimized profile payload including settings, academic context,
+        class info, and decrypted EzyGo token when available.
+      operationId: getMobileProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Mobile profile data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: Unauthorized or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/user/accept-terms:
+    post:
+      tags:
+        - Mobile
+      summary: Accept terms for mobile user
+      description: |
+        Updates `terms_version` and `terms_accepted_at` for authenticated mobile users.
+      operationId: acceptTermsMobile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  type: string
+      responses:
+        '200':
+          description: Terms acceptance stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  version:
+                    type: string
+        '400':
+          description: Missing version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to update terms acceptance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/backend/{path}:
+    description: |
+      Proxies requests to EzyGo backend endpoints.
+
+      **Rate Limiting:** Configured via `PROXY_RATE_LIMIT_REQUESTS` and `PROXY_RATE_LIMIT_WINDOW`.
+    parameters:
+      - name: path
+        in: path
+        required: true
+        description: Forwarded EzyGo backend path segment(s)
+        schema:
+          type: string
+    get:
+      tags:
+        - Proxy
+      summary: Proxy GET request to EzyGo backend
+      operationId: proxyGet
+      responses:
+        '200':
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
+    post:
+      tags:
+        - Proxy
+      summary: Proxy POST request to EzyGo backend
+      operationId: proxyPost
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
+    put:
+      tags:
+        - Proxy
+      summary: Proxy PUT request to EzyGo backend
+      operationId: proxyPut
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
+    patch:
+      tags:
+        - Proxy
+      summary: Proxy PATCH request to EzyGo backend
+      operationId: proxyPatch
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
+    delete:
+      tags:
+        - Proxy
+      summary: Proxy DELETE request to EzyGo backend
+      operationId: proxyDelete
+      responses:
+        '200':
+          description: Proxied response
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
+    head:
+      tags:
+        - Proxy
+      summary: Proxy HEAD request to EzyGo backend
+      operationId: proxyHead
+      responses:
+        '200':
+          description: Proxied response
+        '4XX':
+          description: Client error from proxy or upstream
+        '5XX':
+          description: Upstream/proxy failure
 
 components:
   schemas:

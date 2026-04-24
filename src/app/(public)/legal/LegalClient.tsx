@@ -1,7 +1,12 @@
 "use client";
 
 import { BUNK_DISCLAIMER, TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY, TERMS_VERSION, LEGAL_EFFECTIVE_DATE } from "@/app/config/legal";
+import { createElement } from "react";
 import ReactMarkdown from "react-markdown";
+
+function isListParentTag(tagName: unknown): boolean {
+  return tagName === "ul" || tagName === "ol";
+}
 
 export default function LegalClient() {
   return (
@@ -41,7 +46,20 @@ function PolicySection({ title, content }: { title: string, content: string }) {
              h1: ({node: _node, ...props}) => <h3 className="text-sm font-bold text-foreground mt-4 mb-2" {...props} />,
              p: ({node: _node, ...props}) => <p className="leading-relaxed mb-3" {...props} />,
              ul: ({node: _node, ...props}) => <ul className="list-disc pl-5 space-y-1 mb-3" {...props} />,
-             li: ({node: _node, ...props}) => <li className="pl-1" {...props} />,
+             ol: ({node: _node, ...props}) => <ol className="list-decimal pl-5 space-y-1 mb-3" {...props} />,
+             li: ({node, ...props}) => {
+               const parentTagName = (node as { parent?: { tagName?: string } } | undefined)?.parent?.tagName;
+               if (isListParentTag(parentTagName)) {
+                 return createElement("li", { className: "pl-1", ...props });
+               }
+
+               // Defensive fallback for malformed markdown/list parsing edge-cases.
+               return (
+                 <ul className="list-disc pl-5 space-y-1 mb-3">
+                   {createElement("li", { className: "pl-1", ...props })}
+                 </ul>
+               );
+             },
              strong: ({node: _node, ...props}) => <strong className="text-foreground/80" {...props} />,
              a: ({node: _node, href, ...props}) => {
                const isExternal = typeof href === "string" && /^https?:\/\//i.test(href);

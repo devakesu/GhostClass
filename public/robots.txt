@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /          # Allow indexing of landing page
+Disallow: /api/   # Hide your backend routes
+Disallow: /notifications
+Disallow: /profile
+Disallow: /tracking

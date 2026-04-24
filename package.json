@@ -78,6 +78,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.34.3",
+    "googleapis": "^171.4.0",
+    "jose": "^6.2.2",
     "ldrs": "^1.1.9",
     "lodash-es": "^4.17.23",
     "lru-cache": "^11.2.6",
@@ -89,6 +91,7 @@
     "react-dom": "^19.2.4",
     "react-email": "^5.2.8",
     "react-hook-form": "^7.71.2",
+    "react-is": "^19.2.5",
     "react-markdown": "^10.1.0",
     "react-turnstile": "^1.1.5",
     "recharts": "^3.7.0",
@@ -104,7 +107,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@opentelemetry/context-async-hooks": "^2.6.0",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -118,7 +121,7 @@
     "@typescript-eslint/parser": "^8.56.1",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/ui": "^4.1.5",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.1.6",
     "eslint-plugin-react": "^7.37.5",
@@ -136,6 +139,6 @@
     "tailwindcss": "^4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.5"
   }
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearAuthCookie } from "@/lib/security/auth-cookie";
 import { removeCsrfToken, validateCsrfToken } from "@/lib/security/csrf";
@@ -6,8 +6,9 @@ import { clearTermsVersionCookie, clearTermsRedirectCountCookie } from "@/app/ac
 import { authRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+import { withSecurity } from "@/lib/security/app-check";
 
-export async function POST(req: NextRequest) {
+const handler = async (req: Request) => {
   // Rate limiting — prevents flooding the logout endpoint even with a valid CSRF token
   const ip = getClientIp(req.headers);
   if (!ip) {
@@ -89,4 +90,6 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
-}
+};
+
+export const POST = withSecurity(handler as any);

@@ -24,5 +24,27 @@
   "css.lint.unknownAtRules": "ignore",
   "scss.lint.unknownAtRules": "ignore",
   "less.lint.unknownAtRules": "ignore",
-  "markdownlint.ignore": ["LICENSE"]
+  "markdownlint.ignore": [
+    "LICENSE"
+  ],
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "dart.env": {
+    "PUB_CACHE": "${workspaceFolder}\\mobile\\.pub-cache"
+  },
+  
+  "chat.tools.terminal.autoApprove": {
+    "flutter": true
+  },
+
+  "explorer.autoReveal": true,
+  "explorer.incrementalNaming": "smart",
+  "workbench.editor.restoreViewState": true,
+  "workbench.startupEditor": "readme",
+
+  "search.exclude": {
+    "**/Temp": true
+  },
+  "files.watcherExclude": {
+    "**/Temp/**": true
+  }
 }

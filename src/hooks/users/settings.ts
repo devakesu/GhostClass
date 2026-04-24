@@ -16,6 +16,11 @@ type AcademicYearData = {
   default_academic_year: string;
 };
 
+export type UserSettings = {
+  semester: "even" | "odd" | null;
+  academicYear: string | null;
+};
+
 // Shared retry logic for settings queries — skip all 4xx, retry twice for 5xx/network
 const settingsRetryFn = makeRetryFn(2);
 
@@ -118,4 +123,23 @@ export const useSetAcademicYear = () => {
       Sentry.captureException(error, { tags: { type: "setting_update_error", location: "useSetAcademicYear/onError" } });
     },
   });
+};
+
+export const useFetchUserSettings = () => {
+  const semesterQuery = useFetchSemester();
+  const academicYearQuery = useFetchAcademicYear();
+
+  return {
+    data: {
+      semester: semesterQuery.data ?? null,
+      academicYear: academicYearQuery.data ?? null,
+    } as UserSettings,
+    isLoading: semesterQuery.isLoading || academicYearQuery.isLoading,
+    isFetching: semesterQuery.isFetching || academicYearQuery.isFetching,
+    isError: semesterQuery.isError || academicYearQuery.isError,
+    error: semesterQuery.error ?? academicYearQuery.error,
+    refetch: async () => {
+      await Promise.all([semesterQuery.refetch(), academicYearQuery.refetch()]);
+    },
+  };
 };

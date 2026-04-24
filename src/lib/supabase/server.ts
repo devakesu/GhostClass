@@ -25,8 +25,18 @@ import { _customFetch } from "./fetch";
 export async function createClient() {
   const cookieStore = await cookies();
   
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  let key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Use development overrides if present
+  if (process.env.NODE_ENV === "development") {
+    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+      url = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
+    }
+    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY) {
+      key = process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
+    }
+  }
 
   if (!url || !key) {
       const error = new Error("Supabase Environment Variables missing in Server Client");

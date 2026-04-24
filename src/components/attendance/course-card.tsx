@@ -4,17 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Course } from "@/types";
 import { useCourseDetails } from "@/hooks/courses/attendance";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Edit2, Loader2, User2, UserCog } from "lucide-react";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
-import { useUser } from "@/hooks/users/user";
+import { useProfile } from "@/hooks/users/profile";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
-import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
+import { useFetchUserSettings } from "@/hooks/users/settings";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +49,14 @@ export interface ExtendedCourse extends Course {
 }
 
 /** Pre-defined reasons for disabling a course */
-const DISABLE_REASONS = ["Challenge passed", "Other"] as const;
+const DISABLE_REASONS = [
+  "Course not offered this semester",
+  "Already completed/Exempted",
+  "External/Non-Portal course",
+  "Incorrectly imported",
+  "Dropped course",
+  "Other"
+] as const;
 
 /**
  * Props for CourseCard component.
@@ -57,6 +64,18 @@ const DISABLE_REASONS = ["Challenge passed", "Other"] as const;
 interface CourseCardProps {
   /** Course data with optional attendance statistics */
   course: ExtendedCourse;
+  /** Optional pre-fetched attendance details from the dashboard batch-fetcher */
+  initialCourseDetails?: any;
+  /** Whether the parent dashboard is currently batch-fetching details */
+  isBatchLoading?: boolean;
+  /** Instructor display name */
+  instructorName?: string;
+  /** Whether the instructor name was manually customized */
+  hasCustomInstructor?: boolean;
+  /** Callback to trigger instructor editing */
+  onEditInstructor?: () => void;
+  /** Supabase Auth UUID to prevent concurrent auth lock contention */
+  supabaseUserId?: string;
 }
 
 /**
@@ -78,20 +97,43 @@ interface CourseCardProps {
  * <CourseCard course={courseData} />
  * ```
  */
-export function CourseCard({ course }: CourseCardProps) {
+export function CourseCard({ 
+  course, 
+  initialCourseDetails,
+  isBatchLoading,
+  instructorName,
+  hasCustomInstructor,
+  onEditInstructor,
+  supabaseUserId
+}: CourseCardProps) {
+  const courseCodeNormalized = (course.code || String(course.id)).toUpperCase().replace(/\s+/g, "");
   const { data: courseDetails, isLoading } = useCourseDetails(
-    course.id.toString()
+    courseCodeNormalized,
+    Number(course.id),
+    course.name,
+    { 
+      enabled: !initialCourseDetails && !isBatchLoading && !!(course.code || course.id),
+      // If we have initial data, we definitely don't need to fetch
+      staleTime: initialCourseDetails ? Infinity : 10 * 60 * 1000,
+    }
   );
 
-  const { data: user } = useUser();
-  const { data: trackingData } = useTrackingData(user);
+  // Use pre-fetched data if available, otherwise fallback to the individual hook result
+  const activeCourseDetails = initialCourseDetails || courseDetails;
+  // If we have initial data, we aren't "loading" as far as the UI is concerned
+  const isSummaryLoading = isLoading && !initialCourseDetails;
+
+  const { data: profile } = useProfile();
+  const { data: trackingData } = useTrackingData(profile);
 
   const { targetPercentage } = useAttendanceSettings();
   const [showBunkCalc, setShowBunkCalc] = useState(true);
 
   // Disabled courses management
-  const { data: semesterData } = useFetchSemester();
-  const { data: academicYearData } = useFetchAcademicYear();
+  const { data: userSettings } = useFetchUserSettings();
+  const semesterData = userSettings?.semester;
+  const academicYearData = userSettings?.academicYear;
+
   const { isDisabled: isCourseDisabled, getDisableReason, disableCourse, enableCourse, isLoading: isDisabledCoursesLoading } = useDisabledCourses({
     academicYear: academicYearData,
     semester: semesterData,
@@ -130,13 +172,16 @@ export function CourseCard({ course }: CourseCardProps) {
     const loadSetting = async () => {
       try {
         // Get Supabase auth user ID (UUID) to match the localStorage keys written in
-        // login-form.tsx and user-settings.ts. This ensures we read the correct
-        // user-scoped preference, not the numeric backend user ID from useUser().
-        // Use getSession() (local, synchronous) instead of getUser() (network call)
-        // to avoid N network requests on pages with many CourseCards.
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
+        // login-form.tsx and user-settings.ts. Use the provided supabaseUserId prop
+        // if available to avoid concurrent getSession() calls that cause auth lock
+        // contention warnings in the browser.
+        let userId = supabaseUserId;
+        
+        if (!userId) {
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          userId = session?.user?.id;
+        }
         
         if (userId) {
           const scopedKey = `showBunkCalc_${userId}`;
@@ -178,7 +223,7 @@ export function CourseCard({ course }: CourseCardProps) {
         handleBunkCalcToggle as EventListener
       );
     };
-  }, []);
+  }, [supabaseUserId]);
 
   const stats = useMemo(() => {
     // 1. Official Data (From API)
@@ -187,10 +232,10 @@ export function CourseCard({ course }: CourseCardProps) {
     // Derive total from present+absent instead of courseDetails.total, because the EzyGo
     // /summery endpoint may include revision or untracked slots in its total field, causing
     // it to exceed present+absent and diverge from our per-day count.
-    const realPresent = courseDetails?.present ?? course.officialPresent ?? 0;
-    const realAbsent = courseDetails?.absent ?? Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0);
-    const realTotal = courseDetails
-      ? courseDetails.present + courseDetails.absent
+    const realPresent = activeCourseDetails?.present ?? course.officialPresent ?? 0;
+    const realAbsent = activeCourseDetails?.absent ?? Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0);
+    const realTotal = activeCourseDetails
+      ? activeCourseDetails.present + activeCourseDetails.absent
       : (course.officialTotal ?? 0);
     const officialPercentage = realTotal > 0 ? (realPresent / realTotal) * 100 : 0;
     
@@ -248,11 +293,16 @@ export function CourseCard({ course }: CourseCardProps) {
       safeMetrics,
       extraMetrics
     };
-  }, [courseDetails, course.officialPresent, course.officialTotal, course.present, course.total, courseIdentifiers, trackingData, targetPercentage, normalize]);
+  }, [activeCourseDetails, course.officialPresent, course.officialTotal, course.present, course.total, courseIdentifiers, trackingData, targetPercentage, normalize]);
 
   const hasAttendanceData = useMemo(() => 
-    !isLoading && stats.displayTotal > 0,
-    [isLoading, stats.displayTotal]
+    !isSummaryLoading && stats.displayTotal > 0,
+    [isSummaryLoading, stats.displayTotal]
+  );
+
+  const isTrackingOnly = useMemo(() => 
+    !isSummaryLoading && stats.realTotal === 0 && stats.displayTotal > 0,
+    [isSummaryLoading, stats.realTotal, stats.displayTotal]
   );
 
   const isGain = useMemo(() => 
@@ -265,23 +315,21 @@ export function CourseCard({ course }: CourseCardProps) {
       card: "",
       headerBg: "bg-muted/60",
       headerBorder: "border-border/60",
+      badge: "bg-foreground/10 text-muted-foreground",
     };
     const pct = stats.displayPercentage;
     const target = targetPercentage ?? 75;
     if (pct >= target) return {
       card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
-      headerBg: "bg-green-500/10 dark:bg-muted/40",
-      headerBorder: "border-green-500/30 dark:border-border/60",
-    };
-    if (pct >= target - 10) return {
-      card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
-      headerBg: "bg-amber-500/10 dark:bg-muted/40",
-      headerBorder: "border-amber-500/30 dark:border-border/60",
+      headerBg: "bg-green-500/10 dark:bg-green-500/15",
+      headerBorder: "border-green-500/20 dark:border-green-500/30",
+      badge: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
     };
     return {
-      card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
-      headerBg: "bg-red-500/10 dark:bg-muted/40",
-      headerBorder: "border-red-500/30 dark:border-border/60",
+      card: "border-t-[3px] border-t-brand-accent/70 dark:border-t-transparent",
+      headerBg: "bg-brand-accent/10 dark:bg-brand-accent/15",
+      headerBorder: "border-brand-accent/20 dark:border-brand-accent/30",
+      badge: "bg-brand-accent/15 text-brand-accent border-brand-accent/30",
     };
   }, [hasAttendanceData, stats.displayPercentage, targetPercentage]);
 
@@ -298,63 +346,132 @@ export function CourseCard({ course }: CourseCardProps) {
     [course.name, capitalize]
   );
 
+  const isInactive = disabled || (!isSummaryLoading && stats.displayTotal === 0);
+
   return (
-    <Card className={cn("pt-0 pb-0 custom-container overflow-clip h-full min-h-70", statusColorClasses.card, (disabled || (!isLoading && !hasAttendanceData)) && "opacity-60")}>
+    <Card 
+      className={cn(
+        "pt-0 pb-0 custom-container overflow-clip h-full min-h-70 transition-all duration-300", 
+        statusColorClasses.card, 
+        isInactive && "opacity-70",
+        disabled && "opacity-50"
+      )}
+      style={isInactive ? { filter: 'grayscale(100%) brightness(0.9)' } : undefined}
+    >
       <CardHeader className={cn("flex justify-between items-start flex-row gap-2 pt-6 pb-5 border-b-2", statusColorClasses.headerBg, statusColorClasses.headerBorder, disabled && "bg-red-500/10 dark:bg-muted/40 border-red-500/30 dark:border-border/60")}>
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-semibold wrap-break-word leading-tight">
             {courseName}
           </CardTitle>
+          
+          {/* INSTRUCTOR SUBTITLE */}
+          <div className="flex items-center gap-1.5 mt-1.5 opacity-60">
+            <span className={cn(
+              "text-xs font-semibold truncate max-w-37.5",
+              !instructorName && "italic font-medium"
+            )}>
+              {instructorName || "No instructor assigned"}
+            </span>
+            {hasCustomInstructor && (
+              <UserCog className="w-3 h-3 text-primary animate-in fade-in zoom-in duration-300" />
+            )}
+            {onEditInstructor && (
+              <button
+                onClick={onEditInstructor}
+                className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-primary ml-0.5"
+                title="Edit Instructor"
+              >
+                <Edit2 className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-3 shrink-0">
           <Badge
             variant="secondary"
-            className="h-7 uppercase custom-button rounded-md! bg-foreground/10! scale-105 shrink-0"
+            className={cn("h-7 uppercase custom-button rounded-md! scale-105 shrink-0 border", statusColorClasses.badge)}
             aria-hidden="true"
           >
+            {course.id === 0 && (
+              <User2 className="w-3 H-3 mr-1.5 opacity-70" aria-hidden="true" />
+            )}
             {course.code}
           </Badge>
-          {/* Enabled/Disabled dot toggle */}
-          {!isLoading && !hasAttendanceData ? (
-            <span
-              className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border select-none bg-muted/40 text-muted-foreground border-border/40 cursor-default"
-              aria-label={`No attendance data for ${courseCode ?? course.name}`}
+          {/* Status Badge Toggle */}
+          {disabled ? (
+            <button
+              type="button"
+              disabled={isDisabledCoursesLoading || !courseCode || !hasSemesterContext}
+              onClick={() => setShowEnableDialog(true)}
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none bg-primary/10 text-primary border-primary/30 hover:bg-primary/20",
+                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext) && "opacity-50 cursor-not-allowed"
+              )}
+              aria-label={`Enable course ${courseCode ?? course.name}`}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-primary" aria-hidden="true" />
+              Disabled
+            </button>
+          ) : !isSummaryLoading && stats.displayTotal === 0 ? (
+            <button
+              type="button"
+              disabled={isDisabledCoursesLoading || !courseCode || !hasSemesterContext}
+              onClick={() => {
+                setDisableReason("Challenge passed");
+                setCustomReason("");
+                setShowDisableDialog(true);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border select-none transition-colors cursor-pointer bg-muted/40 text-muted-foreground border-border/40 hover:bg-muted/60",
+                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext) && "opacity-50 cursor-not-allowed"
+              )}
+              aria-label={`No attendance data - click to disable ${courseCode ?? course.name}`}
             >
               <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/50" aria-hidden="true" />
               No data
-            </span>
+            </button>
+          ) : isTrackingOnly ? (
+            <button
+              type="button"
+              disabled={isDisabledCoursesLoading || !courseCode || !hasSemesterContext}
+              onClick={() => {
+                setDisableReason("Challenge passed");
+                setCustomReason("");
+                setShowDisableDialog(true);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border select-none transition-colors cursor-pointer bg-primary/10 text-primary border-primary/30 hover:bg-primary/20",
+                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext) && "opacity-50 cursor-not-allowed"
+              )}
+              aria-label={`Tracking data only - click to disable ${courseCode ?? course.name}`}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-primary" aria-hidden="true" />
+              Tracking
+            </button>
           ) : (
             <button
               type="button"
               disabled={isDisabledCoursesLoading || !courseCode || !hasSemesterContext}
               onClick={() => {
-                if (disabled) {
-                  setShowEnableDialog(true);
-                } else {
-                  setDisableReason("Challenge passed");
-                  setCustomReason("");
-                  setShowDisableDialog(true);
-                }
+                setDisableReason("Challenge passed");
+                setCustomReason("");
+                setShowDisableDialog(true);
               }}
               className={cn(
-                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none",
-                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext)
-                  ? "opacity-50 cursor-not-allowed"
-                  : disabled
-                  ? "bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
-                  : "bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20"
+                "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20",
+                (isDisabledCoursesLoading || !courseCode || !hasSemesterContext) && "opacity-50 cursor-not-allowed"
               )}
-              aria-label={disabled ? `Enable course ${courseCode ?? course.name}` : `Disable course ${courseCode ?? course.name}`}
+              aria-label={`Disable course ${courseCode ?? course.name}`}
             >
-              <span className={cn("inline-block w-2 h-2 rounded-full", disabled ? "bg-red-500" : "bg-green-500")} aria-hidden="true" />
-              {disabled ? "Disabled" : "Enabled"}
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
+              Enabled
             </button>
           )}
         </div>
       </CardHeader>
       
       <CardContent className="h-full pb-6">
-        {isLoading ? (
+        {isSummaryLoading ? (
           <div className="flex flex-col items-center justify-center p-4">
             <div className="animate-pulse h-4 w-24 bg-secondary rounded mb-2"></div>
             <div className="animate-pulse h-2 w-16 bg-secondary rounded"></div>
@@ -377,7 +494,7 @@ export function CourseCard({ course }: CourseCardProps) {
                     </span>
                   )}
                   {stats.extraPresent > 0 && (
-                    <span className="text-xs font-medium text-blue-400" title="Extras">
+                    <span className="text-xs font-medium text-blue-500" title="Extras">
                       +{stats.extraPresent}
                     </span>
                   )}
@@ -471,6 +588,7 @@ export function CourseCard({ course }: CourseCardProps) {
               </div>
             </div>
 
+
             {/* BUNK CALCULATOR SECTION */}
             {showBunkCalc && (
               <div className="mt-4">
@@ -490,7 +608,7 @@ export function CourseCard({ course }: CourseCardProps) {
                               You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
                             </>
                           ) : (
-                            <>You are on the edge. Skipping now&apos;s risky 💀💀</>
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
                           )}
                         </p>
                       </div>
@@ -501,40 +619,17 @@ export function CourseCard({ course }: CourseCardProps) {
                   // show only the tracking-based result so we don't mislead the user.
                   const noOfficialData = stats.realTotal === 0;
 
-                  // CHECK: Official bunkable > Tracking bunkable
-                  const officialIsBetter = 
-                    // Official has MORE bunkable classes
-                    stats.safeMetrics.canBunk > stats.extraMetrics.canBunk ||
-                    // OR official needs FEWER classes to attend (when both are below target)
-                    (stats.safeMetrics.canBunk === 0 && 
-                    stats.extraMetrics.canBunk === 0 && 
-                    stats.safeMetrics.requiredToAttend < stats.extraMetrics.requiredToAttend);
+                  // CHECK: Is the tracking data STRICTLY better than the official data?
+                  const trackingIsStrictlyBetter = 
+                    // Tracking has MORE bunkable classes
+                    stats.extraMetrics.canBunk > stats.safeMetrics.canBunk ||
+                    // OR tracking needs FEWER classes to attend (when both are below target)
+                    (stats.extraMetrics.canBunk === 0 && 
+                     stats.safeMetrics.canBunk === 0 && 
+                     stats.extraMetrics.requiredToAttend < stats.safeMetrics.requiredToAttend);
 
                   if (noOfficialData) {
-                    // TRACKING ONLY — no official data yet, show the purple tracking panel full-width
-                    return (
-                      <div className="bg-purple-500/10 border border-purple-500/35 dark:border-purple-500/20 rounded-md p-2">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <span className="text-[10px] font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wide">Tracking Data</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground font-medium leading-tight">
-                          {stats.extraMetrics.canBunk > 0 ? (
-                            <>Bunkable: <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> 🥳</>
-                          ) : stats.extraMetrics.requiredToAttend > 0 ? (
-                            <>Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span></>
-                          ) : (
-                            <>Edge 💀</>
-                          )}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  if (officialIsBetter) {
-                    // SHOW ONLY TRACKING (single display)
+                    // TRACKING ONLY — show as single neutral panel
                     return (
                       <div className="bg-accent/40 rounded-md py-2 px-3 flex justify-center items-center">
                         <p className="text-sm text-muted-foreground text-center font-medium leading-tight">
@@ -547,23 +642,44 @@ export function CourseCard({ course }: CourseCardProps) {
                               You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
                             </>
                           ) : (
-                            <>You are on the edge. Skipping now&apos;s risky 💀💀</>
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
                           )}
                         </p>
                       </div>
                     );
                   }
 
-                  // TRACKING IS BETTER OR EQUAL
+                  if (!trackingIsStrictlyBetter) {
+                    // SHOW ONLY ONE PANEL (Combined/Worse) — matches Flutter's _SimpleBunkPanel
+                    return (
+                      <div className="bg-accent/40 rounded-md py-2 px-3 flex justify-center items-center">
+                        <p className="text-sm text-muted-foreground text-center font-medium leading-tight">
+                          {stats.extraMetrics.canBunk > 0 ? (
+                            <>
+                              You can safely bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
+                            </>
+                          ) : stats.extraMetrics.requiredToAttend > 0 ? (
+                            <>
+                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                            </>
+                          ) : (
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  // TRACKING IS STRICTLY BETTER — Show dual view to highlight the gain
                   return (
                     <div className="grid grid-cols-2 gap-2">
                       {/* SAFE COUNT */}
-                      <div className="bg-blue-500/10 border border-blue-500/35 dark:border-blue-500/20 rounded-md p-2">
+                      <div className="bg-primary/10 border border-primary/35 dark:border-primary/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wide">Safe (Official)</span>
+                          <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Safe (Official)</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.safeMetrics.canBunk > 0 ? (
@@ -575,18 +691,18 @@ export function CourseCard({ course }: CourseCardProps) {
                               Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
                             </>
                           ) : (
-                            <>Edge 💀</>
+                            <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}
                         </p>
                       </div>
 
                       {/* OPTIMISTIC COUNT */}
-                      <div className="bg-purple-500/10 border border-purple-500/35 dark:border-purple-500/20 rounded-md p-2">
+                      <div className="bg-brand-accent/10 border border-brand-accent/35 dark:border-brand-accent/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-brand-accent dark:text-brand-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wide">+ Tracking Data</span>
+                          <span className="text-[10px] font-semibold text-brand-accent dark:text-brand-accent uppercase tracking-wide">+ Tracking Data</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.extraMetrics.canBunk > 0 ? (
@@ -598,7 +714,7 @@ export function CourseCard({ course }: CourseCardProps) {
                               Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
                             </>
                           ) : (
-                            <>Edge 💀</>
+                            <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}
                         </p>
                       </div>
@@ -615,7 +731,7 @@ export function CourseCard({ course }: CourseCardProps) {
               <span className="font-medium text-sm">No attendance data</span>
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Instructor has not updated attendance records yet.
+              No attendance records yet
             </p>
           </div>
         )}
@@ -661,7 +777,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <AlertDialogFooter>
             <AlertDialogCancel className="custom-button" disabled={isDisabling}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="custom-button bg-red-600! hover:bg-red-700! border-none!"
+              className="custom-button bg-red-600! hover:bg-red-700! text-white! border-none!"
               disabled={isDisabling || !hasSemesterContext || (isOtherReason && !customReason.trim())}
               aria-busy={isDisabling}
               onClick={async (event) => {

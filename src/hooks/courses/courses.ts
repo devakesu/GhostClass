@@ -27,12 +27,14 @@ import { retryOnce } from "@/lib/query-utils";
  * const course = data?.courses["101"];
  * ```
  */
-export const useFetchCourses = (options?: { 
-  enabled?: boolean; 
-  initialData?: { courses: Record<string, Course> }
+export const useFetchCourses = (options?: {
+  enabled?: boolean;
+  initialData?: { courses: Record<string, Course> };
+  semester?: string;
+  year?: string;
 }) => {
   return useQuery<{ courses: Record<string, Course> }>({
-    queryKey: ["courses"],
+    queryKey: ["courses", options?.semester ?? null, options?.year ?? null],
     queryFn: async () => {
       const res = await axios.get("/institutionuser/courses/withusers");
       if (!res) throw new Error("Failed to fetch courses data");

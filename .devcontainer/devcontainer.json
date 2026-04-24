@@ -1,0 +1,63 @@
+{
+  "name": "GhostClass-Sandbox",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    // 1. Install Node.js
+    "ghcr.io/devcontainers/features/node:latest": {
+      "version": "24"
+    },
+
+    // 2. Docker-outside-of-Docker (Connects to your host, saves RAM)
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:latest": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "dockerDashComposeVersion": "v2"
+    },
+
+    // 3. GitHub CLI for your workflow
+    "ghcr.io/devcontainers/features/github-cli:latest": {},
+    // 4. Supabase CLI (Lean install)
+    "ghcr.io/devcontainers-extra/features/supabase-cli:latest": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Dart-Code.flutter",
+        "Dart-Code.dart-code",
+        "dsznajder.es7-react-js-snippets",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense",
+        "vitest.explorer",
+        "ms-playwright.playwright",
+        "ms-edgedevtools.vscode-edge-devtools",
+        "davidanson.vscode-markdownlint",
+        "meezilla.json",
+        "ms-vscode.vscode-typescript-next",
+        "oderwat.indent-rainbow",
+        "dbaeumer.vscode-eslint",
+        "usernamehw.errorlens",
+        "supabase.vscode-supabase-extension",
+        "denoland.vscode-deno"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y openjdk-17-jdk-headless && sudo chown -R vscode:vscode /workspace && npm install --legacy-peer-deps && ( [ -d ~/flutter-sdk ] || git clone https://github.com/flutter/flutter.git -b stable ~/flutter-sdk ) && grep -q 'flutter-sdk' ~/.bashrc || echo 'export PATH=\"$PATH:$HOME/flutter-sdk/bin\"' >> ~/.bashrc && npx playwright install --with-deps && killall node",
+
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace"
+}

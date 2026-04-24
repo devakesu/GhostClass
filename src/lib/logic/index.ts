@@ -22,3 +22,6 @@ export type { ReconciledStats } from "./attendance-reconciliation";
 
 export { calculateAttendance } from "./bunk";
 export type { AttendanceResult } from "./bunk";
+
+export { calculateCurrentAcademicInfo } from "./academic";
+export type { AcademicInfo, AcademicInfoOptions } from "./academic";

@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, FileText, CheckCircle2, XCircle, ArrowRight, User } from "lucide-react";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
+import { ServiceErrorView } from "@/components/service-error-view";
+import { cn } from "@/lib/utils";
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "N/A";
@@ -15,17 +17,20 @@ const formatDate = (dateString: string) => {
 const getLeaveStatus = (approvers: any[]) => {
   if (!approvers || approvers.length === 0) return { label: "Pending", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20", icon: Clock };
   
-  const actedApprovers = approvers.filter(a => a.action_by !== null || a.action_at !== null);
+  const actedApprovers = approvers
+    .filter(a => a.action_by !== null || a.action_at !== null)
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
   if (actedApprovers.length === 0) return { label: "Pending", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20", icon: Clock };
   
-  actedApprovers.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   const lastAction = actedApprovers[0].action_type;
   
   if (lastAction === 'reject') return { label: "Rejected", color: "bg-red-500/10 text-red-600 dark:text-red-500 border-red-500/20", icon: XCircle };
   if (lastAction === 'approve') return { label: "Approved", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border-emerald-500/20", icon: CheckCircle2 };
-  if (lastAction === 'recommend' || lastAction === 'forward') return { label: "Recommended", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20", icon: ArrowRight };
+  if (lastAction === 'forward') return { label: "Forwarded", color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20", icon: ArrowRight };
+  if (lastAction === 'recommend') return { label: "Recommended", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20", icon: ArrowRight };
   
-  return { label: "Pending", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20", icon: Clock };
+  return { label: "In Progress", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20", icon: Clock };
 };
 
 const formatBytes = (bytes: string | number) => {
@@ -52,9 +57,12 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
   
   if (!initialData) {
     return (
-      <Card className="bg-red-50 dark:bg-black/40 backdrop-blur-md border border-red-500/20 rounded-xl p-8 text-center text-red-600 dark:text-red-400">
-        <p>Failed to load leave data. Please try refreshing.</p>
-      </Card>
+      <ServiceErrorView 
+        title="Leave Data Sync Unavailable"
+        onRetry={() => {
+          // reloadWithUpdate is handled by ServiceErrorView
+        }}
+      />
     );
   }
 
@@ -66,7 +74,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Total Applied</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+            <div className="text-2xl sm:text-3xl font-bold bg-linear-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
               {leaves.length}
             </div>
           </CardContent>
@@ -77,14 +85,14 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Approved</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-br from-emerald-600 to-teal-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
+            <div className="text-2xl sm:text-3xl font-bold bg-linear-to-br from-emerald-600 to-teal-600 dark:from-teal-400 dark:to-emerald-400 bg-clip-text text-transparent">
               {approvedCount}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <h2 className="text-xl font-semibold mt-8 mb-4">Application History</h2>
+
       
       {leaves.length === 0 ? (
         <Card className="bg-muted/30 dark:bg-black/20 border border-border/50 dark:border-white/5 rounded-xl p-12 text-center border-dashed">
@@ -187,9 +195,9 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
 
                 {/* Workflow Footer */}
                 {leave.approvers && leave.approvers.filter((a: any) => a.action_by_user).length > 0 && (
-                  <div className="px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/[0.02]">
+                  <div className="px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/2">
                     <div className="w-full space-y-2.5">
-                      <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">All Activity</span>
+                      <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">Workflow History</span>
                       <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                         {leave.approvers
                           .filter((a: any) => a.action_by_user)
@@ -202,20 +210,53 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                             if (!isDuplicate) acc.push(current);
                             return acc;
                           }, [])
-                          .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-                          .map((approver: any) => (
-                            <div key={approver.id} className="flex items-center justify-between">
-                              <span className="flex items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium dark:font-normal">
-                                <User className="h-3 w-3 text-muted-foreground" />
-                                {approver.action_by_user.first_name} {approver.action_by_user.last_name}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <span className="capitalize font-medium dark:font-normal">{approver.action_type}</span>
-                                <span className="opacity-50">•</span>
-                                <span>{formatDate(approver.action_at)}</span>
+                          .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) // latest first
+                          .map((approver: any) => {
+                            const isApproved = approver.action_type === 'approve';
+                            const isRejected = approver.action_type === 'reject';
+                            const isForwarded = approver.action_type === 'forward';
+                            const isRecommended = approver.action_type === 'recommend';
+                            
+                            return (
+                              <div key={approver.id} className="flex items-center justify-between border-b border-border/20 last:border-0 pb-1.5 last:pb-0">
+                                <span className="flex items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium">
+                                  <span className={cn(
+                                    "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
+                                    isApproved ? "bg-emerald-500/15" :
+                                    isRejected ? "bg-red-500/15" :
+                                    isForwarded ? "bg-indigo-500/15" :
+                                    isRecommended ? "bg-blue-500/15" : "bg-primary/10"
+                                  )}>
+                                    <User className={cn(
+                                      "h-3 w-3",
+                                      isApproved ? "text-emerald-600" :
+                                      isRejected ? "text-red-600" :
+                                      isForwarded ? "text-indigo-600" :
+                                      isRecommended ? "text-blue-600" : "text-primary"
+                                    )} />
+                                  </span>
+                                  {approver.action_by_user.first_name} {approver.action_by_user.last_name}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={cn(
+                                    "text-[9px] uppercase tracking-tighter px-1.5 py-0 h-4 border-none font-bold",
+                                    isApproved ? "bg-emerald-500/12 text-emerald-600" :
+                                    isForwarded ? "bg-indigo-500/12 text-indigo-600" :
+                                    isRecommended ? "bg-blue-500/12 text-blue-600" :
+                                    isRejected ? "bg-red-500/12 text-red-600" : 
+                                    "bg-muted text-muted-foreground"
+                                  )}>
+                                    {isApproved ? "Approved" :
+                                     isForwarded ? "Forwarded" :
+                                     isRecommended ? "Recommended" :
+                                     isRejected ? "Rejected" : approver.action_type}
+                                  </Badge>
+                                  <span className="opacity-50">•</span>
+                                  <span className="text-[10px] tabular-nums whitespace-nowrap">{formatDate(approver.action_at)}</span>
+                                </div>
                               </div>
-                            </div>
-                        ))}
+                            );
+                          })}
                       </div>
                     </div>
                   </div>

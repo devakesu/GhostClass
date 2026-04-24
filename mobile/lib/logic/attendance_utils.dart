@@ -1,0 +1,321 @@
+import '../models/attendance.dart';
+import '../models/course_details.dart';
+import '../services/logger.dart';
+import 'bunk.dart' as bunk;
+
+String toRoman(dynamic value) {
+  final int n = (value is String)
+      ? int.tryParse(value) ?? 0
+      : (value is num ? value.toInt() : 0);
+  if (n < 1) return value.toString();
+  const romans = [
+    'I',
+    'II',
+    'III',
+    'IV',
+    'V',
+    'VI',
+    'VII',
+    'VIII',
+    'IX',
+    'X',
+    'XI',
+    'XII',
+  ];
+  if (n > 0 && n <= romans.length) {
+    return romans[n - 1];
+  }
+  return n.toString();
+}
+
+Map<String, String> calculateCurrentAcademicInfo({
+  String? semester,
+  String? year,
+}) {
+  if (year != null &&
+      semester != null &&
+      year.isNotEmpty &&
+      semester.isNotEmpty) {
+    final sem = semester.toLowerCase();
+    String? normalizedSem;
+    if (sem.contains('odd') || sem == '1') {
+      normalizedSem = 'odd';
+    } else if (sem.contains('even') || sem == '2') {
+      normalizedSem = 'even';
+    }
+
+    if (normalizedSem != null) {
+      return {'current_semester': normalizedSem, 'current_year': year};
+    }
+  }
+
+  // Clock-based fallback derivation
+  final now = DateTime.now();
+  final month = now.month; // 1-indexed: 1 = Jan, 6 = June
+  final fullYear = now.year;
+
+  // In most systems, Jan-June (months 1-6) is the second half ("Even") semester
+  // July-Dec (months 7-12) is the first half ("Odd") semester.
+  final isFirstHalf = month <= 6;
+  final currentSemester = isFirstHalf ? 'even' : 'odd';
+
+  // An academic year spanning two calendar years (e.g., 2024-25).
+  // Even semesters usually belong to the year that started last summer.
+  final startYearNum = isFirstHalf ? fullYear - 1 : fullYear;
+  final endYearShort = (startYearNum + 1).toString().substring(2);
+  final currentYearStr = '$startYearNum-$endYearShort';
+
+  return {'current_semester': currentSemester, 'current_year': currentYearStr};
+}
+
+String normalizeDate(dynamic date) {
+  if (date == null) return '';
+
+  String s = date.toString().trim();
+  if (s.isEmpty) return '';
+
+  // Handle ISO datetime strings (2024-01-15T10:30:00Z)
+  if (s.contains('T')) s = s.split('T')[0];
+
+  // 1. YYYYMMDD (no separator)
+  if (RegExp(r'^\d{8}$').hasMatch(s)) return s;
+
+  // 2. Dash-separated (YYYY-MM-DD or DD-MM-YYYY)
+  if (s.contains('-')) {
+    final parts = s.split('-');
+    if (parts.length == 3) {
+      if (parts[0].length == 4) {
+        // YYYY-MM-DD
+        return "${parts[0]}${parts[1].padLeft(2, '0')}${parts[2].padLeft(2, '0')}";
+      } else if (parts[2].length == 4) {
+        // DD-MM-YYYY
+        return "${parts[2]}${parts[1].padLeft(2, '0')}${parts[0].padLeft(2, '0')}";
+      }
+    }
+  }
+
+  // 3. Slash-separated (DD/MM/YYYY)
+  if (s.contains('/')) {
+    final parts = s.split('/');
+    if (parts.length == 3) {
+      // Assuming DD/MM/YYYY
+      return "${parts[2]}${parts[1].padLeft(2, '0')}${parts[0].padLeft(2, '0')}";
+    }
+  }
+
+  AppLogger.w(
+    'attendance_utils.normalizeDate: Unrecognized date format. Returning empty string to avoid invalid slot keys.',
+    {'raw': s},
+  );
+  return '';
+}
+
+String normalizeSession(dynamic session) {
+  if (session == null) return '';
+  String s = session.toString().toLowerCase().trim();
+
+  // 1. Remove common noise
+  s = s
+      .replaceAll(RegExp(r'session|lecture|lec|lab|hour|hr|period'), '')
+      .trim();
+  s = s.replaceAll(RegExp(r'(st|nd|rd|th)$'), '').trim(); // Remove ordinals
+
+  // Collapse internal multi-spaces and take only the first word
+  s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (s.contains(' ')) s = s.split(' ')[0];
+
+  // 2. Roman to Number Map
+  const romans = {
+    'viii': '8',
+    'vii': '7',
+    'vi': '6',
+    'v': '5',
+    'iv': '4',
+    'iii': '3',
+    'ii': '2',
+    'i': '1',
+    'ix': '9',
+    'x': '10',
+    'xi': '11',
+    'xii': '12',
+  };
+
+  if (romans.containsKey(s)) return romans[s]!;
+
+  // 3. Parse Integer
+  final num = int.tryParse(s);
+  if (num != null) {
+    return num.toString();
+  }
+
+  // 4. Fallback
+  return s.toUpperCase();
+}
+
+String formatSessionName(String sessionName) {
+  if (sessionName.isEmpty) return '';
+  final clean = sessionName
+      .replaceAll(RegExp(r'Session|Hour', caseSensitive: false), '')
+      .trim();
+
+  final lower = clean.toLowerCase();
+  const romanMap = {
+    'i': '1st Hour',
+    'ii': '2nd Hour',
+    'iii': '3rd Hour',
+    'iv': '4th Hour',
+    'v': '5th Hour',
+    'vi': '6th Hour',
+    'vii': '7th Hour',
+    'viii': '8th Hour',
+    'ix': '9th Hour',
+    'x': '10th Hour',
+    'xi': '11th Hour',
+    'xii': '12th Hour',
+  };
+
+  if (romanMap.containsKey(lower)) return romanMap[lower]!;
+
+  final num = int.tryParse(clean);
+  if (num != null && num > 0) {
+    final j = num % 10;
+    final k = num % 100;
+    if (j == 1 && k != 11) return '${num}st Hour';
+    if (j == 2 && k != 12) return '${num}nd Hour';
+    if (j == 3 && k != 13) return '${num}rd Hour';
+    return '${num}th Hour';
+  }
+
+  return sessionName.toLowerCase().contains('session')
+      ? sessionName
+      : 'Session $sessionName';
+}
+
+int getSessionNumber(String name) {
+  if (name.isEmpty) return 999;
+  final clean = name
+      .toLowerCase()
+      .replaceAll(RegExp(r'session|hour'), '')
+      .trim();
+
+  const romanMap = {
+    'i': 1,
+    'ii': 2,
+    'iii': 3,
+    'iv': 4,
+    'v': 5,
+    'vi': 6,
+    'vii': 7,
+    'viii': 8,
+    'ix': 9,
+    'x': 10,
+    'xi': 11,
+    'xii': 12,
+  };
+
+  if (romanMap.containsKey(clean)) return romanMap[clean]!;
+
+  final match = RegExp(r'\d+').firstMatch(clean);
+  if (match != null) {
+    return int.tryParse(match.group(0)!) ?? 999;
+  }
+  return 999;
+}
+
+/// Resolves the human-readable display name for a course.
+/// Handles the priority: High-fidelity merged name -> Official Report name -> Fallback ID.
+String resolveCourseDisplayName({
+  required String courseKey,
+  CourseDetails? mergedCourse,
+  AttendanceReportDetailed? officialReport,
+}) {
+  // 1. If we have a high-fidelity merged course (standard ID and has a name/code), use it.
+  if (mergedCourse != null && mergedCourse.id != 0) {
+    return mergedCourse.name;
+  }
+
+  // 2. Fallback to Official Report (Case Insensitive)
+  final normalizedKey = courseKey.trim().toUpperCase();
+
+  // Try direct lookup
+  var official = officialReport?.courses[courseKey];
+
+  // Try case-insensitive lookup if direct fails
+  if (official == null && officialReport != null) {
+    for (final entry in officialReport.courses.entries) {
+      if (entry.key.trim().toUpperCase() == normalizedKey) {
+        official = entry.value;
+        break;
+      }
+    }
+  }
+
+  if (official != null) return official.name;
+
+  // 3. Absolute Fallback
+  return mergedCourse?.name ?? courseKey;
+}
+
+String? resolveCourseDisplayCode({
+  required String courseKey,
+  CourseDetails? mergedCourse,
+  AttendanceReportDetailed? officialReport,
+}) {
+  if (mergedCourse?.code != null) return mergedCourse!.code;
+
+  // Fallback to Official Report (Case Insensitive)
+  final normalizedKey = courseKey.trim().toUpperCase();
+  var official = officialReport?.courses[courseKey];
+
+  if (official == null && officialReport != null) {
+    for (final entry in officialReport.courses.entries) {
+      if (entry.key.trim().toUpperCase() == normalizedKey) {
+        official = entry.value;
+        break;
+      }
+    }
+  }
+
+  return official?.code;
+}
+
+typedef AttendanceResult = bunk.AttendanceResult;
+
+AttendanceResult calculateAttendance(
+  int present,
+  int total, {
+  double targetPercentage = 75.0,
+}) {
+  return bunk.calculateAttendance(
+    present,
+    total,
+    targetPercentage: targetPercentage,
+  );
+}
+
+String toTitleCase(String text) {
+  if (text.isEmpty) return text;
+  return text
+      .toLowerCase()
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map((word) {
+        return word[0].toUpperCase() + word.substring(1);
+      })
+      .join(' ');
+}
+
+String standardizeCourseCode(String input) {
+  String s = input.trim().toUpperCase();
+  if (s.contains('-')) {
+    s = s.split('-')[0].trim();
+  }
+  return s.replaceAll(RegExp(r'\s+'), '');
+}
+
+const Set<String> remarkPlaceholders = {
+  'Duty Leave',
+  'Self-Marked: Duty Leave',
+  'Self-Marked: Present',
+  'Self-Marked: Absent',
+};

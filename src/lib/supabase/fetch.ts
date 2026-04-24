@@ -87,10 +87,10 @@ export function buildSupabaseTieredFetch(
   const isServer = typeof window === 'undefined';
   
   if (isServer) {
+    // Server NEVER uses proxy (as per security policy)
     tiers.push({ base: supabaseOrigin, name: "direct" });
-    if (cfBase)  tiers.push({ base: cfBase, name: "CF" });
-    if (awsBase) tiers.push({ base: awsBase, name: "AWS" });
   } else {
+    // Browser client uses tiered failover (CF -> AWS -> Direct)
     if (cfBase)  tiers.push({ base: cfBase, name: "CF" });
     if (awsBase) tiers.push({ base: awsBase, name: "AWS" });
     tiers.push({ base: supabaseOrigin, name: "direct" });
@@ -214,6 +214,17 @@ export function buildSupabaseTieredFetch(
 
 // Module-level singleton
 export const _supabaseOrigin = (() => {
-  try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin; } catch { return process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""; }
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  
+  // Respect development override for origin matching
+  if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+    url = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
+  }
+
+  try { 
+    return new URL(url).origin; 
+  } catch { 
+    return url ?? ""; 
+  }
 })();
 export const _customFetch = buildSupabaseTieredFetch(_supabaseOrigin);

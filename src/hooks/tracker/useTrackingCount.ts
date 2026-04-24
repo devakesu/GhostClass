@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { User } from "@/types";
+import { UserProfile } from "@/types";
 import { useFetchAcademicYear, useFetchSemester } from "../users/settings";
 import * as Sentry from "@sentry/nextjs";
 import { redact } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 
-export function useTrackingCount(user: User | null | undefined) {
+export function useTrackingCount(
+  user: Pick<UserProfile, "id" | "username"> | null | undefined,
+) {
   const supabase = createClient();
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();

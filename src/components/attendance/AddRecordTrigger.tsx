@@ -34,10 +34,15 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
       ? (user as User & { auth_id?: string | null }).auth_id ?? undefined
       : undefined,
   };
+
+  const { data: selectedSemester } = useFetchSemester();
+  const { data: selectedYear } = useFetchAcademicYear();
   
-  const { data: attendanceData, refetch: refetchAttendance } = useAttendanceReport({ 
-    enabled: isOpen 
-  });
+  const { data: attendanceData, refetch: refetchAttendance } = useAttendanceReport(
+    selectedSemester ?? undefined,
+    selectedYear ?? undefined,
+    { enabled: isOpen },
+  );
   
   const { data: trackingData, refetch: refetchTracking } = useTrackingData(user, { 
     enabled: isOpen 
@@ -46,9 +51,6 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   const { data: coursesData } = useFetchCourses({ 
     enabled: isOpen 
   });
-  
-  const { data: selectedSemester } = useFetchSemester();
-  const { data: selectedYear } = useFetchAcademicYear();
 
   // Handle local success, then bubble up
   const handleSuccess = async () => {

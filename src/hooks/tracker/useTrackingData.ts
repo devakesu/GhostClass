@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { TrackAttendance, User } from "@/types";
+import { TrackAttendance, UserProfile } from "@/types";
 import { useFetchAcademicYear, useFetchSemester } from "../users/settings";
 import * as Sentry from "@sentry/nextjs";
 import { redact } from "@/lib/utils";
@@ -13,6 +13,8 @@ import { logger } from "@/lib/logger";
  * @param user - User object or user identifier
  * @param options - Optional configuration object
  * @param options.enabled - Whether the query should run (default: true)
+ * @param options.semester - Optional term override from the dashboard selection
+ * @param options.year - Optional academic year override from the dashboard selection
  * @returns Query result containing tracking attendance records
  * 
  * Query Configuration:
@@ -28,18 +30,23 @@ import { logger } from "@/lib/logger";
  * trackingData?.forEach(record => console.log(record.date));
  * ```
  */
-export function useTrackingData(user: User | null | undefined, options?: { enabled?: boolean }) {
+export function useTrackingData(
+  user: Pick<UserProfile, "id" | "username"> | null | undefined,
+  options?: { enabled?: boolean; semester?: string; year?: string },
+) {
   const supabase = createClient();
   
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
+  const resolvedSemester = options?.semester ?? semesterData;
+  const resolvedAcademicYear = options?.year ?? academicYearData;
 
   return useQuery<TrackAttendance[]>({
     queryKey: [
       "track_data",
       user?.username ?? "",
-      semesterData,
-      academicYearData,
+      resolvedSemester ?? null,
+      resolvedAcademicYear ?? null,
     ],
     
     queryFn: async () => {
@@ -50,15 +57,15 @@ export function useTrackingData(user: User | null | undefined, options?: { enabl
       if (!session?.user) return [];
 
       // Explicit null checks to prevent race conditions
-      if (!semesterData || !academicYearData) {
+      if (!resolvedSemester || !resolvedAcademicYear) {
         return [];
       }
 
       const { data, error } = await supabase
         .from("tracker")
         .select("*")
-        .eq("semester", semesterData) 
-        .eq("year", academicYearData)
+        .eq("semester", resolvedSemester)
+        .eq("year", resolvedAcademicYear)
         .order("date", { ascending: false }) 
         .order("created_at", { ascending: false });
 
@@ -69,8 +76,8 @@ export function useTrackingData(user: User | null | undefined, options?: { enabl
             tags: { type: "tracking_fetch_error" },
             extra: { 
                 userId: redact("id", String(user?.id ?? "unknown")),
-                semester: semesterData,
-                year: academicYearData
+                semester: resolvedSemester,
+                year: resolvedAcademicYear,
             }
         });
         

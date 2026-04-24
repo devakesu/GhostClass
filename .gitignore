@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /workers/node_modules
 /.pnp
 .pnp.*
@@ -20,9 +20,11 @@
 # next.js
 /.next/
 /out/
+/.turbo/
 
 # production
 /build
+/dist
 
 # service worker (generated at build time)
 /public/sw.js
@@ -31,6 +33,10 @@
 # misc
 .DS_Store
 *.pem
+*.local
+.eslintcache
+.stylelintcache
+/Temp
 
 # debug
 npm-debug.log*
@@ -40,6 +46,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.example.env
 DEPLOYMENT_CHECKLIST.md
 
 # vercel
@@ -49,11 +56,49 @@ DEPLOYMENT_CHECKLIST.md
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-
 # Sentry Config File
 .env.sentry-build-plugin
 
-certificates
+# certificates
+certificates/
 
+# IDEs
 /.vscode/
+/.idea/
+*.swp
+*.swo
+
+# Flutter (Mobile)
+/mobile/.dart_tool/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/.packages
+/mobile/.pub-cache/
+/mobile/.pub/
+/mobile/build/
+/mobile/ios/Flutter/.last_build_id
+/mobile/ios/Flutter/Generated.xcconfig
+/mobile/ios/Flutter/flutter_export_environment.sh
+/mobile/android/local.properties
+/mobile/android/key.properties
+/mobile/android/app/src/main/res/raw/app_config.json
+/mobile/android/app/debug/
+/mobile/android/app/profile/
+/mobile/android/app/release/
+/mobile/*.iml
+/mobile/${workspaceFolder}*/
+/mobile/$*
+
+# Android Additional
+/mobile/android/**/*.jks
+/mobile/android/**/*.keystore
+
+# iOS Additional
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/
+/mobile/ios/Flutter/Flutter.framework
+/mobile/ios/Flutter/Flutter.podspec
+/mobile/ios/Flutter/App.framework
+
+# App Secrets
+/mobile/lib/config/app_secrets.dart

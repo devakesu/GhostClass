@@ -5,6 +5,18 @@
 import * as Sentry from "@sentry/nextjs";
 
 /**
+ * Sanitize commit SHA for use as a Sentry release name.
+ * Strips path-invalid characters like <>, spaces, etc.
+ */
+function sanitizeCommitSha(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const sanitized = trimmed.replace(/[^A-Za-z0-9._-]/g, "-");
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
+/**
  * Remove the api_secret query parameter from GA4 Measurement Protocol URLs.
  * ga4-collect.ts is the single place that appends this secret to outgoing URLs;
  * this scrubber provides defense-in-depth for any traces that are still captured
@@ -99,4 +111,6 @@ Sentry.init({
     }
     return event;
   },
+
+  release: sanitizeCommitSha(process.env.NEXT_PUBLIC_GIT_COMMIT_SHA),
 });

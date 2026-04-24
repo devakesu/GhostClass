@@ -26,3 +26,8 @@ export async function clearAuthCookie() {
 export async function getAuthTokenServer() {
   return (await cookies()).get("ezygo_access_token")?.value;
 }
+
+// Compatibility export used by backend proxy route.
+export async function getAuthTokenWithFallback() {
+  return getAuthTokenServer();
+}

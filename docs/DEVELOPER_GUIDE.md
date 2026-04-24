@@ -13,6 +13,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 - [Versioning & Releases](#versioning--releases)
 - [Release Verification](#release-verification)
 - [Supabase Browser Proxy (ISP Bypass)](#supabase-browser-proxy-isp-bypass)
+- [Mobile Development](#mobile-development)
 - [Known Issues](#known-issues)
 - [Cron Job Setup](#cron-job-setup)
 - [Troubleshooting](#troubleshooting)
@@ -21,7 +22,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 
 ## Getting Started
 
-### Prerequisites
+### Mobile Prerequisites
 
 - **Node.js**: v22.12.0+
 - **npm**: v11+
@@ -216,6 +217,19 @@ Go to repository **Settings** → **Secrets and variables** → **Actions**:
 | `GPG_PASSPHRASE` | Your GPG key passphrase | ✅ Yes |
 
 **Note**: For automated workflows, you can generate a key without a passphrase using:
+
+#### Mobile APK signing secrets
+
+The Flutter Android release workflow also expects these repository secrets so it can create a signed APK before publishing release artifacts:
+
+| Secret Name | Purpose |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded `ghostclass.jks` keystore contents |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Release key alias |
+| `ANDROID_KEY_PASSWORD` | Release key password |
+
+These secrets are consumed in the mobile release job before `flutter build apk --release` runs.
 
 ```bash
 gpg --batch --gen-key <<EOF
@@ -577,7 +591,7 @@ Navigate to the **Variables** tab and create the following:
 | `NEXT_PUBLIC_APP_URL` | *(derived by pipeline)* | Auto-constructed from domain |
 | `NEXT_PUBLIC_BACKEND_URL` | `https://…/api/v1/…/` | EzyGo API base URL |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://xyz.supabase.co` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbG…` | Supabase anonymous key (public, in JS bundle) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | Supabase publishable key (public, in JS bundle) |
 | `NEXT_PUBLIC_GITHUB_URL` | `https://github.com/…` | Public repository URL |
 | `NEXT_PUBLIC_SENTRY_DSN` | `https://…@…ingest…` | Sentry DSN (compiled into JS bundle) |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `0x4AAAA…` | Cloudflare Turnstile site key (in HTML) |
@@ -600,6 +614,20 @@ Optional Variables (omit to use defaults):
 | `NEXT_PUBLIC_FORCE_STRICT_CSP` | *(blank)* | Set `"true"` to force strict CSP in production builds |
 | `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` | *(blank)* | CF Worker URL for browser→Supabase requests (ISP bypass Tier 1); omit for direct connection |
 | `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL` | *(blank)* | Lambda URL for browser→Supabase requests (ISP bypass Tier 2 fallback); omit for direct connection |
+| `PROXY_RATE_LIMIT_REQUESTS` | `120` | Optional backend proxy limiter request budget for `/api/backend/*` |
+| `PROXY_RATE_LIMIT_WINDOW` | `60` | Optional backend proxy limiter window in seconds for `/api/backend/*` |
+| `ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK` | `false` | Optional release workflow fallback toggle for non-tag/manual dispatches when `NEXT_PUBLIC_APP_DOMAIN` is unset |
+
+#### Mobile Security (Runtime Secrets)
+
+| Secret | Description |
+| --- | --- |
+| `JWE_PRIVATE_KEY` | RSA Private Key for request/response encryption (required for mobile) |
+| `MOBILE_API_SECRET` | Pre-shared secret to identify mobile requests |
+| `ENFORCE_APP_CHECK` | Set to `"true"` to enforce Firebase App Check |
+| `ENFORCE_PLAY_INTEGRITY` | Set to `"true"` to enforce Play Integrity (Android) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Credentials for Play Integrity API |
+| `PLAY_INTEGRITY_CERT_SHA256` | Developer certificate fingerprint (optional) |
 
 > **Why Variables and not Secrets?** All values above are non-sensitive and already embedded in the browser JavaScript bundle or HTML. Storing them as Secrets causes GitHub Actions log masking to redact their values from build output, making logs unreadable (e.g. the package name becomes `***@1.9.5`).
 
@@ -622,6 +650,10 @@ Navigate to the **Secrets** tab and create the following:
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID for CF Worker deployment |
 | `AWS_ACCESS_KEY_ID` | AWS access key ID for deploying the Lambda egress proxy |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret access key corresponding to `AWS_ACCESS_KEY_ID` |
+| `CODECOV_TOKEN` | Optional Codecov token (recommended for private repos or stricter upload authentication) |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI access token used by `deploy-supabase.yaml` |
+| `SUPABASE_DB_PASSWORD` | Database password used during `supabase db push` |
+| `SUPABASE_PROJECT_ID` | Supabase project reference for `supabase link` |
 
 > **`NEXT_PUBLIC_APP_VERSION` is not a Variable** — the pipeline derives it automatically from the git tag via the `calculate-version` job. Setting it manually would cause it to go stale after every auto-bump.
 > **`SOURCE_DATE_EPOCH` is not a Variable** — the pipeline derives it from the git commit timestamp (`git log -1 --format=%ct`) in the `prep` step. This guarantees the same tag always produces the same image digest (reproducible builds) without any manual sync needed.
@@ -1033,11 +1065,149 @@ All known vulnerabilities are resolved. No `--omit=dev` workaround is needed.
 
 ---
 
+## Mobile Development
+
+The `mobile/` directory contains the Flutter application for Android and iOS. It is a first-class member of this monorepo alongside the Next.js web app.
+
+### Prerequisites
+
+- **Flutter SDK** — 3.27+ ([install guide](https://docs.flutter.dev/get-started/install))
+- **Dart SDK** — ^3.11.4 (bundled with Flutter)
+- **Android Studio** — For Android emulator, Gradle, and the Android build toolchain
+- **Xcode** (macOS only) — For iOS simulator and iOS builds
+- **Firebase CLI** — For `flutterfire configure` and App Check setup
+
+Verify your Flutter installation:
+
+```bash
+flutter doctor
+```
+
+### Setup
+
+#### 1. Install Flutter dependencies
+
+```bash
+cd mobile
+flutter pub get
+```
+
+#### 2. Create `lib/config/app_secrets.dart`
+
+This file is **gitignored** — you must create it manually. It contains API endpoints, Sentry DSN, and other runtime secrets.
+
+See [mobile/README.md](../mobile/README.md#secrets-setup) for the full file schema.
+
+#### 3. Local Vendored Packages
+
+GhostClass uses local vendored packages for security-critical plugins to ensure trust and allow for local patches. Ensure the `mobile/packages/` directory is present:
+
+- `flutter_play_integrity_wrapper`: Vendored for stable Play Integrity attestation.
+
+These are already linked via `path` in `pubspec.yaml`. No separate setup is required other than ensuring the files exist in the `packages/` directory.
+
+#### 4. Place Firebase config files
+
+<!-- markdownlint-disable MD060 -->
+| File                      | Path                                        | Platform |
+| ------------------------- | ------------------------------------------- | -------- |
+| `google-services.json`    | `mobile/android/app/google-services.json`   | Android  |
+| `GoogleService-Info.plist` | `mobile/ios/Runner/GoogleService-Info.plist` | iOS      |
+<!-- markdownlint-enable MD060 -->
+
+Both files are **gitignored**. Download them from your Firebase project console or run:
+
+```bash
+cd mobile
+flutterfire configure
+```
+
+#### 4. Configure Firebase App Check (development)
+
+For local development, use the **Debug** App Check provider. Add your debug token to the Firebase console under **App Check → Apps → [your app] → Debug tokens**.
+
+On Android, the debug token is printed to logcat on first launch:
+
+```bash
+adb logcat | grep "DebugAppCheckProvider"
+```
+
+### Running the App
+
+```bash
+cd mobile
+
+# List available devices
+flutter devices
+
+# Run on a specific device (debug mode)
+flutter run -d <device-id>
+
+# Run with verbose output
+flutter run -v
+```
+
+### Code Generation
+
+Riverpod providers use `build_runner` code generation. After modifying any `@riverpod` annotated provider, regenerate:
+
+```bash
+cd mobile
+dart run build_runner build --delete-conflicting-outputs
+
+# Or watch mode during development
+dart run build_runner watch --delete-conflicting-outputs
+```
+
+### Analysis & Testing
+
+```bash
+cd mobile
+
+# Static analysis
+flutter analyze
+
+# Run unit + widget tests
+flutter test
+
+# With coverage
+flutter test --coverage
+```
+
+**Before submitting a PR with mobile changes**, run `flutter analyze` to ensure there are no analysis issues.
+
+### Building
+
+```bash
+cd mobile
+
+# Android debug APK
+flutter build apk --debug
+
+# Android release App Bundle (for Play Store)
+flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+
+# iOS release (macOS + Xcode required)
+flutter build ios --release
+```
+
+> **Note**: Release builds require properly signed credentials. Place `android/key.properties` and the corresponding keystore file (both **gitignored**) before building a signed release APK or AAB.
+
+### Architecture Notes
+
+- **State**: Riverpod 3 with code-generated providers. Each feature domain has its own provider file under `lib/providers/`.
+- **Networking**: All requests go through `ApiService` (Dio + `JweInterceptor`). The interceptor fetches the JWE public key from the backend on first use, then wraps every request body in JWE before sending and decrypts every response body on receipt.
+- **Secrets storage**: `SecureStorageService` wraps `flutter_secure_storage`. The EzyGo bearer token, Supabase session, and any sensitive keys are stored here — never in `shared_preferences`.
+- **Security guard**: `SecurityGuard.check()` is called at app startup. It requests an App Check token (Play Integrity on Android, DeviceCheck on iOS). In debug mode a Firebase Debug provider token is used automatically.
+
+---
+
 ## Additional Resources
 
 - **Contributing Guidelines**: [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Security Policy**: [../SECURITY.md](../SECURITY.md)
 - **Project README**: [../README.md](../README.md)
+- **Mobile App README**: [../mobile/README.md](../mobile/README.md)
 - **EzyGo Integration**: [EZYGO_INTEGRATION.md](EZYGO_INTEGRATION.md)
 - **Edge Cases Testing**: [EDGE_CASES_TESTS.md](EDGE_CASES_TESTS.md)
 

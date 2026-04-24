@@ -1,0 +1,112 @@
+# Base Image
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+
+USER root
+
+# 1. System Dependencies, Java 17, and SSH Setup
+RUN apt-get update && apt-get install -y \
+    openssh-server curl git unzip openjdk-17-jdk-headless apt-transport-https \
+    && mkdir /var/run/sshd \
+    && echo 'vscode:root' | chpasswd \
+    && echo 'root:root' | chpasswd \
+    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# 2. Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs
+
+# 3. Docker CLI, GitHub CLI, Supabase CLI (Auto-Arch & Latest), Playwright
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y \
+       docker-ce-cli \
+       docker-buildx-plugin \
+       docker-compose-plugin \
+       gh \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "Downloading latest Supabase CLI for ${ARCH}..." \
+    && curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${ARCH}.tar.gz" -o supabase.tar.gz \
+    && tar -xzf supabase.tar.gz \
+    && mv supabase /usr/local/bin/ \
+    && chmod +x /usr/local/bin/supabase \
+    && rm supabase.tar.gz \
+    && npm install -g playwright \
+    && npx playwright install-deps
+
+# Switch to vscode user for user-space SDKs
+USER vscode
+ENV HOME="/home/vscode"
+ENV FLUTTER_HOME="$HOME/flutter-sdk"
+ENV PATH="$PATH:$FLUTTER_HOME/bin"
+
+# 4. Flutter SDK Pre-cache
+RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
+    && $FLUTTER_HOME/bin/flutter precache
+
+# 5. Extension & Workspace Injector Script
+# Switch to root to safely write and change file ownership
+USER root
+RUN cat << 'EOF' > /home/vscode/init_workspace.sh
+#!/bin/bash
+echo "🚀 Starting Full Environment Setup..."
+
+export FLUTTER_HOME="/home/vscode/flutter-sdk"
+export PATH="$PATH:$FLUTTER_HOME/bin"
+
+if ! grep -q "flutter-sdk" ~/.bashrc; then
+    echo "📝 Updating ~/.bashrc..."
+    echo 'export FLUTTER_HOME="/home/vscode/flutter-sdk"' >> ~/.bashrc
+    echo "export PATH=\"\$PATH:\$FLUTTER_HOME/bin\"" >> ~/.bashrc
+fi
+
+if [ -f "/workspace/package.json" ]; then
+    echo "📦 Installing NPM dependencies..."
+    cd /workspace && npm install --legacy-peer-deps
+fi
+
+if [ -d "/workspace/mobile" ]; then
+    echo "🐦 Running flutter pub get..."
+    cd /workspace/mobile && flutter pub get
+fi
+
+EXTENSIONS=(
+  "Dart-Code.flutter" "Dart-Code.dart-code" "dsznajder.es7-react-js-snippets"
+  "esbenp.prettier-vscode" "bradlc.vscode-tailwindcss" "formulahendry.auto-rename-tag"
+  "christian-kohler.path-intellisense" "christian-kohler.npm-intellisense" "vitest.explorer"
+  "ms-playwright.playwright" "ms-edgedevtools.vscode-edge-devtools" "davidanson.vscode-markdownlint"
+  "meezilla.json" "ms-vscode.vscode-typescript-next" "oderwat.indent-rainbow"
+  "dbaeumer.vscode-eslint" "usernamehw.errorlens" "supabase.vscode-supabase-extension"
+  "denoland.vscode-deno"
+)
+
+CLI_PATH=$(find ~/.vscode-server/bin ~/.antigravity-server/bin -type f \( -name "code-server" -o -name "antigravity-server" \) -executable 2>/dev/null | head -n 1)
+
+if [ -n "$CLI_PATH" ]; then
+    echo "🔌 Injecting Extensions..."
+    for ext in "${EXTENSIONS[@]}"; do
+        EXT_NAME=$(echo $ext | tr '[:upper:]' '[:lower:]')
+        if ls ~/.antigravity-server/extensions/ ~/.vscode-server/extensions/ 2>/dev/null | grep -qi "$EXT_NAME"; then
+            continue
+        fi
+        $CLI_PATH --install-extension "$ext" --force --telemetry-level off >/dev/null 2>&1
+    done
+fi
+
+hash -r
+echo "🎯 All systems go!"
+EOF
+
+# Fix permissions so vscode owns the script
+RUN chmod +x /home/vscode/init_workspace.sh && chown vscode:vscode /home/vscode/init_workspace.sh
+
+# Start the SSH Daemon
+WORKDIR /workspace
+EXPOSE 22 7522
+CMD ["/usr/sbin/sshd", "-D"]
