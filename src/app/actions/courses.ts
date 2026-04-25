@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { toTitleCase } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
@@ -38,6 +39,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
     }
   } catch (err) {
     logger.error("Turnstile verification exception in add course", err);
+    Sentry.captureException(err, { tags: { type: "turnstile_verification_error", location: "actions/courses" } });
     return { error: "Security check failed. Please check your connection." };
   }
 
@@ -81,6 +83,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
         return { error: "This course is already in your class lineup." };
       }
       logger.error("Database insert failed for class_courses", insertError);
+      Sentry.captureException(insertError, { tags: { type: "course_insert_error", location: "actions/courses" } });
       return { error: "Failed to add course to database" };
     }
 
@@ -88,6 +91,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
     return {};
   } catch (error) {
     logger.error("addCourseAction failed with exception", error);
+    Sentry.captureException(error, { tags: { type: "course_action_error", location: "actions/courses" } });
     return { error: "An unexpected error occurred while adding course" };
   }
 }

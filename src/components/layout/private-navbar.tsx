@@ -101,7 +101,7 @@ export const Navbar = () => {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["defaultInstitutionUser"] });
         queryClient.invalidateQueries({ queryKey: ["institutions"] });
-        toast("Institution updated", {
+        toast.success("Institution updated", {
           description: "Your default institution has been updated.",
         });
       },
@@ -233,7 +233,7 @@ export const Navbar = () => {
               onValueChange={(value) => {
                 const val = Number(value);
                 updateTarget(val);
-                toast("Attendance Target Updated", {
+                toast.success("Attendance Target Updated", {
                   description: (
                     <span className="text-white">
                       Your attendance target is now {value}%.
@@ -521,7 +521,7 @@ export const Navbar = () => {
                     value={currentTarget.toString()}
                     onValueChange={(value) => {
                       updateTarget(Number(value));
-                      toast("Target Updated", {
+                      toast.success("Target Updated", {
                         description: `Target set to ${value}%`,
                         style: {
                           backgroundColor: "var(--primary)",

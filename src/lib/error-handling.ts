@@ -39,7 +39,7 @@ function normalizeError(error: unknown): { code: string; message: string; status
         : typeof raw.message === "string"
           ? raw.message
           : "",
-    status: typeof raw.status === "number" ? raw.status : undefined,
+    status: typeof raw.status === "number" ? raw.status : typeof (raw.response as any)?.status === "number" ? (raw.response as any).status : undefined,
   };
 }
 
@@ -86,8 +86,13 @@ export function getHumanReadableError(error: unknown, context: string = "operati
   }
 
   // Network / timeout
-  if (message.includes("fetch") || lower.includes("network")) {
+  if (message.includes("fetch") || lower.includes("network") || code === "ERR_NETWORK") {
     return "Connection failed. Please check your internet and try again.";
+  }
+
+  // Circuit Breaker (503)
+  if (status === 503 || lower.includes("technical issues")) {
+    return "EzyGo servers are currently down. Please try again later.";
   }
 
   // Rate limiting

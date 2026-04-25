@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { removeToken } from "@/utils/auth";
+import { handleLogout as performLogout } from "@/lib/security/auth";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/hooks/users/user";
 import { useProfile } from "@/hooks/users/profile";
@@ -21,7 +21,7 @@ import {
   useUpdateDefaultInstitutionUser,
 } from "@/hooks/users/institutions";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Select,
   SelectContent,
@@ -64,8 +64,8 @@ export const Navbar = () => {
   const { data: defaultInstitutionUser } = useDefaultInstitutionUser();
   const updateDefaultInstitutionUser = useUpdateDefaultInstitutionUser();
   const queryClient = useQueryClient();
-  const [selectedInstitution, setSelectedInstitution] = useState<string>("");
-  
+  const selectedInstitution = defaultInstitutionUser?.toString() ?? "";
+
   // --- ADD RECORD STATE ---
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
 
@@ -77,12 +77,6 @@ export const Navbar = () => {
   const pathname = usePathname();
   const { unreadCount } = useNotifications(true);
 
-  useEffect(() => {
-    if (defaultInstitutionUser) {
-      setSelectedInstitution(defaultInstitutionUser.toString());
-    }
-  }, [defaultInstitutionUser]);
-
   // Handle Bunk Calc Toggle 
   const handleBunkCalcToggle = (checked: boolean) => {
     updateBunkCalc(checked);
@@ -92,7 +86,7 @@ export const Navbar = () => {
     );
 
     if (checked) {
-      toast("Bunk Calculator Enabled", {
+      toast.success("Bunk Calculator Enabled", {
         style: {
           backgroundColor: "rgba(34, 197, 94, 0.1)",
           color: "rgb(34, 197, 94)",
@@ -101,7 +95,7 @@ export const Navbar = () => {
         },
       });
     } else {
-      toast("Bunk Calculator Disabled", {
+      toast.info("Bunk Calculator Disabled", {
         style: {
           backgroundColor: "rgba(250, 204, 21, 0.1)",
           color: "rgb(250, 204, 21)",
@@ -112,9 +106,8 @@ export const Navbar = () => {
     }
   };
 
-  const handleLogout = () => {
-    removeToken();
-    router.push("/");
+  const handleLogout = async () => {
+    await performLogout();
   };
 
   const navigateTo = (path: string) => {
@@ -122,18 +115,16 @@ export const Navbar = () => {
   };
 
   const handleInstitutionChange = (value: string) => {
-    setSelectedInstitution(value);
     updateDefaultInstitutionUser.mutate(Number.parseInt(value), {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["defaultInstitutionUser"] });
         queryClient.invalidateQueries({ queryKey: ["institutions"] });
-        toast("Institution updated", {
+        toast.success("Institution updated", {
           description: "Your default institution has been updated.",
         });
       },
       onError: () => {
-        setSelectedInstitution(defaultInstitutionUser?.toString() || "");
-        toast("Error", {
+        toast.error("Error", {
           description: "Failed to update institution. Please try again.",
         });
       },
@@ -224,7 +215,7 @@ export const Navbar = () => {
               onValueChange={(value) => {
                 const val = Number(value);
                 updateTarget(val);
-                toast("Attendance Target Updated", {
+                toast.success("Attendance Target Updated", {
                   description: (
                     <span style={{ color: "#ffffffa6" }}>
                       Your attendance target is now set to {value}%
@@ -251,7 +242,7 @@ export const Navbar = () => {
                 {[75, 80, 85, 90, 95].map((percentage) => (
                   <SelectItem key={percentage} value={percentage.toString()}>
                     <div className="flex items-center cursor-pointer">
-                      <Percent className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <Percent className="mr-2 h-4 w-4 shrink-0" />
                       <span className="font-medium">{percentage}%</span>
                     </div>
                   </SelectItem>
@@ -290,7 +281,7 @@ export const Navbar = () => {
                   {institutions.map((inst) => (
                     <SelectItem key={inst.id} value={inst.id.toString()}>
                       <div className="flex items-center cursor-pointer">
-                        <Building2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                        <Building2 className="mr-2 h-4 w-4 shrink-0" />
                         <span className="font-medium">
                           {inst.institution.name}
                         </span>
@@ -389,13 +380,13 @@ export const Navbar = () => {
                       value={currentTarget.toString()}
                       onValueChange={(value) => {
                         updateTarget(Number(value));
-                        toast("Target Updated", { description: `Target set to ${value}%` });
+                        toast.success("Target Updated", { description: `Target set to ${value}%` });
                       }}
                     >
                       <SelectTrigger className="w-[80px] h-8 text-xs bg-background/50 border-white/10">
                         <SelectValue placeholder={`${currentTarget}%`} />
                       </SelectTrigger>
-                      <SelectContent className="custom-dropdown z-[60]">
+                      <SelectContent className="custom-dropdown z-60">
                           {[75, 80, 85, 90, 95].map((p) => (
                             <SelectItem key={p} value={p.toString()}>{p}%</SelectItem>
                           ))}

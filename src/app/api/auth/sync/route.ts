@@ -9,6 +9,7 @@ import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto";
 import { UserResponse } from "@supabase/supabase-js";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Attempts to get the user with a single retry on network failure.
@@ -134,7 +135,8 @@ const handler = async (req: Request) => {
     }
   } catch (err) {
     logger.error("[sync] Unexpected error during universal auth sync", err);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    Sentry.captureException(err, { tags: { type: "auth_sync_error", location: "api/auth/sync" } });
+    return NextResponse.json({ message: "Failed to synchronize authentication. Please try again." }, { status: 500 });
   }
 };
 

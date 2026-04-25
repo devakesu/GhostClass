@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   AnimatePresence,
@@ -70,6 +70,7 @@ import { captureSentryException } from "@/lib/sentry-lazy";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
@@ -312,27 +313,11 @@ export default function DashboardClient(
     enabled: !!currentSem && !!currentYear && !!profile?.class?.id,
   });
 
-  // Memoized ID to Code mapping for O(1) lookups during count calculations
-  const courseIdMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (coursesData?.courses) {
-      Object.values(coursesData.courses).forEach((c: any) => {
-        const normalizedCode = (c.code ?? "").replace(/\s+/g, "").toUpperCase();
-        if (c.id) map.set(String(c.id), normalizedCode);
-        if (c.code) {
-          map.set(c.code.replace(/\s+/g, "").toUpperCase(), normalizedCode);
-        }
-      });
-    }
-    return map;
-  }, [coursesData]);
-
-
-  /** Look up course code from course ID using coursesData */
-  const getCourseCode = useCallback((courseId: string): string => {
-    const key = courseId.replace(/\s+/g, "").toUpperCase();
-    return courseIdMap.get(key) ?? courseIdMap.get(courseId) ?? "";
-  }, [courseIdMap]);
+  const { getCourseCodeById: getCourseCode } = useCourseLookup({
+    coursesData,
+    classCourses,
+    attendanceData,
+  });
 
   // Batch-prefetch all course summeries so each CourseCard finds its data already
   // in the TanStack Query cache — eliminates the N+1 /summery call pattern.

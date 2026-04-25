@@ -4,6 +4,7 @@ import { syncRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { withSecurity } from "@/lib/security/app-check";
+import * as Sentry from "@sentry/nextjs";
 
 interface GA4Event {
   name: string;
@@ -59,7 +60,8 @@ const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any })
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("[Analytics API] Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    Sentry.captureException(error, { tags: { type: "analytics_api_error", location: "api/analytics/track" } });
+    return NextResponse.json({ error: "Failed to process tracking data." }, { status: 500 });
   }
 };
 

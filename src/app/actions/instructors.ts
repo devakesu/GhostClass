@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { toTitleCase } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 
 export async function upsertInstructorAction(
   formData: FormData,
@@ -40,6 +41,7 @@ export async function upsertInstructorAction(
     }
   } catch (err) {
     logger.error("Turnstile verification exception", err);
+    Sentry.captureException(err, { tags: { type: "turnstile_verification_error", location: "actions/instructors" } });
     return { error: "Security check failed. Please check your connection." };
   }
 
@@ -81,6 +83,7 @@ export async function upsertInstructorAction(
 
     if (upsertError) {
       logger.error("Database upsert failed for course_instructors", upsertError);
+      Sentry.captureException(upsertError, { tags: { type: "instructor_upsert_error", location: "actions/instructors" } });
       return { error: "Failed to save instructor to database" };
     }
 
@@ -88,6 +91,7 @@ export async function upsertInstructorAction(
     return {};
   } catch (error) {
     logger.error("upsertInstructorAction failed with exception", error);
+    Sentry.captureException(error, { tags: { type: "instructor_action_error", location: "actions/instructors" } });
     return { error: "An unexpected error occurred while saving" };
   }
 }

@@ -8,6 +8,7 @@ import {
 } from "@/lib/contact/service";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     logger.error(`API Contact Flow failed: ${errorMessage}`, error);
+    Sentry.captureException(error, { tags: { type: "contact_submission_error", location: "api/contact" } });
     return NextResponse.json({ 
       error: "Failed to process message. Please try again later." 
     }, { status: 500 });

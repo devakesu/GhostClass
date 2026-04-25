@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getOrCreateClientId } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
 
 /**
  * Client component for automatic event tracking via server-side API
@@ -72,9 +73,7 @@ export function AnalyticsTracker() {
         // Ignore AbortError as it's expected during fast navigation/timeouts
         if (error instanceof Error && error.name === "AbortError") return;
         
-        // Note: Using console.warn instead of logger utility as this is a client component
-        // and the logger utility is primarily designed for server-side use
-        console.warn("[Analytics] Failed to track page view:", error);
+        logger.warn("[Analytics] Failed to track page view:", error);
       }
     };
 
@@ -126,9 +125,7 @@ export function AnalyticsTracker() {
           url = new URL(link.href, window.location.href);
         } catch (error) {
           // Malformed URL - skip tracking for this click to avoid breaking analytics
-          // Note: Using console.warn instead of logger utility as this is a client component
-          // and the logger utility is primarily designed for server-side use
-          console.warn("[Analytics] Ignoring click with invalid URL:", link.href, error);
+          logger.warn("[Analytics] Ignoring click with invalid URL:", link.href, error);
           return;
         }
         
@@ -290,8 +287,6 @@ export async function trackEvent(
     // Silently fail if analytics fails
     if (error instanceof Error && error.name === "AbortError") return;
 
-    // Note: Using console.warn instead of logger utility as this is a client component
-    // and the logger utility is primarily designed for server-side use
-    console.warn("[Analytics] Failed to track event:", error);
+    logger.warn("[Analytics] Failed to track event:", error);
   }
 }

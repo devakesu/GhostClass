@@ -19,6 +19,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Turnstile, { useTurnstile } from "react-turnstile";
 import { upsertInstructorAction } from "@/app/actions/instructors";
 import { getCsrfToken } from "@/lib/axios";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 interface EditInstructorDialogProps {
   open: boolean;
@@ -117,7 +119,8 @@ export function EditInstructorDialog({
       turnstile.reset();
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to update instructor:", error);
+      logger.error("Failed to update instructor:", error);
+      Sentry.captureException(error, { tags: { type: "instructor_mutation_error", location: "EditInstructorDialog" } });
       toast.error("Failed to save instructor name.");
     } finally {
       setIsSubmitting(false);
