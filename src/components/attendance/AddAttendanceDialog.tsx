@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import {
@@ -65,6 +65,7 @@ import {
 import { AttendanceReport, Course, TrackAttendance } from "@/types";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
 
 interface User {
   id: string | number;
@@ -156,34 +157,11 @@ export function AddAttendanceDialog({
     enabled: !!selectedSemester && !!selectedYear,
   });
 
-  /** Resolve course code from EzyGo numeric ID or raw code */
-  const getCourseCodeById = useCallback(
-    (id: string): string => {
-      const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
-
-      // 1. Check if ID exists in coursesData and has a code
-      if (coursesData?.courses?.[id]) {
-        return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
-      }
-
-      // 2. Otherwise, find match by numeric code
-      const course = Object.values(coursesData?.courses || {}).find((c) =>
-        String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
-      );
-      if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
-
-      // 3. Check Custom (Class) Courses
-      const custom = classCourses?.find(cc => 
-        cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
-      );
-      if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
-
-      // 4. Fallback to attendanceData courses
-      const altCourse = attendanceData?.courses?.[id];
-      return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
-    },
-    [attendanceData, coursesData, classCourses],
-  );
+  const { getCourseCodeById } = useCourseLookup({
+    coursesData,
+    classCourses,
+    attendanceData,
+  });
 
   const sortedCourses = useMemo(() => {
     const courses: { key: string; name: string }[] = [];

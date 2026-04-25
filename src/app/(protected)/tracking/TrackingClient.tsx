@@ -57,6 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
 
 // --- Helper Functions ---
 
@@ -171,12 +172,7 @@ export default function TrackingClient() {
     "all",
   );
 
-  // Reset to first page when filter changes (Adjusting state during render)
-  const [prevFilter, setPrevFilter] = useState(selectedCourseFilter);
-  if (selectedCourseFilter !== prevFilter) {
-    setPrevFilter(selectedCourseFilter);
-    setCurrentPage(0);
-  }
+  // Reset to first page when filter changes is handled by the Select onValueChange.
 
 
   // Use a unique ID per mount to detect Strict Mode remounts (now managed inside useSyncOnMount)
@@ -225,55 +221,11 @@ export default function TrackingClient() {
     semester: semesterData,
   });
 
-  /** Resolve course code from courseId using available registries */
-  const getCourseCodeById = useCallback((id: string): string => {
-    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
-    
-    // 1. Direct hit in coursesData
-    if (coursesData?.courses?.[id]) {
-      return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
-    }
-    
-    // 2. Find in coursesData by ID or Code
-    const course = Object.values(coursesData?.courses || {}).find(c => 
-      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
-    );
-    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
-
-    // 3. Check Custom (Class) Courses
-    const custom = classCourses?.find(cc => 
-      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
-    );
-    if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
-    
-    // 4. Fallback to attendanceData courses
-    const altCourse = attendanceData?.courses?.[id];
-    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
-  }, [attendanceData, coursesData, classCourses]);
-
-  /** Resolve course name from courseId using available registries */
-  const getCourseNameById = useCallback((id: string): string => {
-    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
-
-    // 1. Direct hit in coursesData
-    if (coursesData?.courses?.[id]) return coursesData.courses[id].name || id;
-
-    // 2. Find in coursesData by ID or Code
-    const course = Object.values(coursesData?.courses || {}).find(c => 
-      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
-    );
-    if (course?.name) return course.name;
-
-    // 3. Check Custom (Class) Courses
-    const custom = classCourses?.find(cc => 
-      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
-    );
-    if (custom) return custom.course_name || custom.course_code;
-
-    // 4. Fallback to attendanceData courses
-    const altCourse = attendanceData?.courses?.[id];
-    return (altCourse?.name ?? id);
-  }, [attendanceData, coursesData, classCourses]);
+  const { getCourseCodeById, getCourseNameById } = useCourseLookup({
+    coursesData,
+    classCourses,
+    attendanceData,
+  });
 
   /** Pre-calculate session indices for all official records to ensure consistent display */
   const sessionIndexMap = useMemo(() => {
@@ -577,8 +529,8 @@ export default function TrackingClient() {
       // Broadly invalidate to update counts, cards, charts and summaries
       queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
       queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
-      
-      await Promise.all([refetchTrackingData(), refetchCount()]);
+      queryClient.invalidateQueries({ queryKey: ["track_data"] });
+      queryClient.invalidateQueries({ queryKey: ["tracking_count"] });
       setCurrentPage(0);
     } catch (error) {
       toast.error(
@@ -773,7 +725,10 @@ export default function TrackingClient() {
                       <div className="w-full max-w-md mx-auto px-1">
                         <Select
                           value={selectedCourseFilter}
-                          onValueChange={setSelectedCourseFilter}
+                          onValueChange={(val) => {
+                            setSelectedCourseFilter(val);
+                            setCurrentPage(0);
+                          }}
                         >
                           <SelectTrigger className="bg-background/40 hover:bg-background/60 border-border/50 h-auto min-h-11 py-2 w-full backdrop-blur-md shadow-sm transition-all duration-300 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-normal text-left [&>span]:line-clamp-none">
                             <div className="flex items-center gap-2.5 w-full">
@@ -1336,6 +1291,7 @@ export default function TrackingClient() {
                   try {
                     await deleteAllTrackingData();
                     setSelectedCourseFilter("all");
+                    setCurrentPage(0);
                   } catch (_err) {
                     // Error is already handled inside deleteAllTrackingData
                   }

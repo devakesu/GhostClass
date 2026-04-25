@@ -2,8 +2,16 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useRef, useState, useMemo, createContext, useContext } from "react";
-import type { ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { UserSettings, DisabledCoursesMap } from "@/types/user-settings";
 import * as Sentry from "@sentry/nextjs";
@@ -17,8 +25,26 @@ export const DEFAULT_TARGET_PERCENTAGE = 75;
 // retry logic, and onError handler to avoid fragile string duplication.
 const NO_USER_ERROR_MESSAGE = "No user";
 
-// Module-level constant — reads NEXT_PUBLIC_ATTENDANCE_TARGET_MIN once at startup.
-// If that env var changes, consider a DB migration to enforce the new floor for existing rows.
+// normalizeTarget is defined at module-level (outside the hook) to avoid recreation on every render.
+// This is preferred over useCallback because:
+// 1. The function has no dependencies (pure function with no closure over component state/props)
+// 2. Module-level avoids the overhead of useCallback's dependency checking
+// 3. Provides a stable reference without requiring React hooks infrastructure
+// If this function needed access to component state/props, useCallback would be more appropriate.
+//
+// Minimum target defaults to 75% but can be configured via NEXT_PUBLIC_ATTENDANCE_TARGET_MIN environment variable
+// to support institutions with different minimum attendance requirements.
+// Values below the configured minimum are unrealistic and could cause issues in attendance calculations.
+//
+// DATABASE MIGRATION CONSIDERATION: If NEXT_PUBLIC_ATTENDANCE_TARGET_MIN is changed to a higher value
+// (e.g., from 75 to 80), users with stored target_percentage values below the new minimum will have
+// their targets silently adjusted upward on the next read. This is intentional behavior to enforce
+// the institutional minimum, but consider:
+// 1. Announcing the change to users before deployment
+// 2. Optionally creating a database migration to update existing values proactively
+// 3. Adding a database constraint: CHECK (target_percentage >= [configured_minimum])
+//
+// Parse the environment variable once at module load time for performance
 const MIN_TARGET = (() => {
   const envValue = process.env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN;
   if (!envValue) return DEFAULT_TARGET_PERCENTAGE;
@@ -32,8 +58,11 @@ const normalizeTarget = (value?: number | null) => {
   return Math.min(100, Math.max(MIN_TARGET, Math.round(value)));
 };
 
-// Loads prefetched settings from sessionStorage/localStorage. Validates ownership when
-// userId is known to prevent cross-user leakage; accepts legacy format when unauthenticated.
+// Helper function to load and validate prefetched settings from sessionStorage
+// When currentUserId is provided (user is authenticated), validates that stored settings
+// belong to that user and rejects legacy records without userId. When currentUserId is null
+// (no user authenticated), accepts any valid settings format.
+// Defined at module level to avoid recreation on every render
 function loadPrefetchedSettings(currentUserId: string | null): UserSettings | null {
   if (typeof window === "undefined") return null;
   
@@ -65,7 +94,9 @@ function loadPrefetchedSettings(currentUserId: string | null): UserSettings | nu
   try {
     const raw = sessionStorage.getItem("prefetchedSettings");
     if (!raw) {
-      // sessionStorage cleared after first DB fetch — rebuild placeholder from localStorage.
+      // Stage 2: sessionStorage is gone (cleared after the first successful DB fetch).
+      // Build placeholder from individual localStorage keys so returning users get their
+      // full settings immediately without waiting for the DB query to complete.
       if (!currentUserId) return null;
       try {
         const bunkStr = localStorage.getItem(`showBunkCalc_${currentUserId}`);
@@ -81,27 +112,42 @@ function loadPrefetchedSettings(currentUserId: string | null): UserSettings | nu
       }
     }
     
+    // Parse as unknown first to avoid unsafe type assertions and enable proper runtime validation
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return clearAndReturn();
     
+    // Convert to Record for safe property access
     const parsedRecord = parsed as Record<string, unknown>;
 
+    // Validate userId if we have a current user - prevent cross-user leakage
     if (currentUserId) {
-      // Reject legacy records (no userId) and mismatched users to prevent cross-user leakage.
-      if (!('userId' in parsedRecord)) return clearAndReturn();
+      // When a user is authenticated, only accept prefetched settings with a matching userId
+      // First check if userId field exists (new format), reject if missing (legacy format)
+      if (!('userId' in parsedRecord)) {
+        // Legacy format without userId - reject when user is known to prevent cross-user leakage
+        return clearAndReturn();
+      }
+      // Then validate the userId is a string and matches the current user
       if (typeof parsedRecord.userId !== "string" || parsedRecord.userId !== currentUserId) {
+        // Invalid type or belongs to a different user - clear and ignore
         return clearAndReturn();
       }
     }
+    // Note: When currentUserId is null (unauthenticated), we accept both new and legacy formats
+    // since there's no cross-user leakage risk. This supports the migration path from legacy format.
 
-    // Support both new format { userId, settings: {...} } and legacy flat format.
+    // Determine if this is the new format { userId, settings } or legacy format { bunk_calculator_enabled, target_percentage }
+    // Runtime type guards for both shapes
     let settingsData: Record<string, unknown>;
     
     if ('settings' in parsedRecord && parsedRecord.settings !== null && typeof parsedRecord.settings === "object") {
+      // New format: { userId?: string; settings: { bunk_calculator_enabled, target_percentage } }
       settingsData = parsedRecord.settings as Record<string, unknown>;
     } else if ('bunk_calculator_enabled' in parsedRecord || 'target_percentage' in parsedRecord) {
+      // Legacy format: { bunk_calculator_enabled, target_percentage }
       settingsData = parsedRecord;
     } else {
+      // Unknown format - clear stale data
       return clearAndReturn();
     }
 
@@ -118,6 +164,7 @@ function loadPrefetchedSettings(currentUserId: string | null): UserSettings | nu
         ? (settingsData.disabled_courses as DisabledCoursesMap)
         : {};
 
+    // Only use prefetched settings if both fields are valid; otherwise, clear and fall back to null.
     if (
       typeof bunk_calculator_enabled !== "boolean" ||
       typeof target_percentage !== "number"
@@ -128,7 +175,8 @@ function loadPrefetchedSettings(currentUserId: string | null): UserSettings | nu
     return {
       bunk_calculator_enabled,
       target_percentage,
-      // Fall back to localStorage for older logins that predate disabled_courses in prefetchedSettings.
+      // Prefer sessionStorage value; fall back to localStorage for logins that predate
+      // the disabled_courses feature (login-form doesn't write it to prefetchedSettings).
       disabled_courses: Object.keys(disabled_courses).length > 0
         ? disabled_courses
         : (currentUserId ? (readLocalDisabledCourses(currentUserId) ?? {}) : {}),
@@ -139,72 +187,117 @@ function loadPrefetchedSettings(currentUserId: string | null): UserSettings | nu
   }
 }
 
-export function useUserSettingsState() {
-  // Stable client ref — stateless, safe to memoize.
+function useUserSettingsState() {
+  // Create stable Supabase client reference to avoid re-subscribing to auth changes on every render
+  // The client is stateless and safe to memoize - auth state is managed separately via Supabase's session management
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
   
-  // Scoped to userId to prevent cross-user flash; ref allows synchronous access in async callbacks.
+  // Track current user ID in state to scope the query key
+  // This prevents cross-user settings flash when switching users
+  // Also maintained in a ref for synchronous access during cleanup
   const [userId, setUserId] = useState<string | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
-  // Derived on the same render userId becomes non-null, so placeholder data is ready immediately
-  // and there's no "defaults" flash before the React Query hook activates.
+  // We derive this from userId via useMemo so that prefetched settings are available
+  // during the same render where userId first becomes non-null, preventing an initial
+  // "defaults" flash when the React Query hook is enabled.
   const prefetchedSettings = useMemo<UserSettings | null>(() => {
-    if (!userId) return null;
+    // If there's no resolved user, do not expose any prefetched settings to avoid cross-user leakage
+    if (!userId) {
+      return null;
+    }
+
+    // When a valid userId is available, load and validate prefetched settings for that user
     return loadPrefetchedSettings(userId);
   }, [userId]);
   
+  // Track if we've attempted initialization to prevent redundant mutation calls
+  // This prevents duplicate initialization during rapid refetches before mutation completes
   const hasAttemptedInitializationRef = useRef(false);
+  
+  // Track if component is still mounted to prevent state updates after unmount
+  // Using a ref ensures the latest value is always accessed in async callbacks
   const isMountedRef = useRef(true);
 
+  // Monitor session changes to trigger settings fetch on login
+  // This ensures settings are loaded immediately when user authenticates,
+  // not just when navigating to protected routes
   useEffect(() => {
+    // Reset mounted flag at the start of the effect to handle effect re-runs
     isMountedRef.current = true;
     
+    // Initialize userId on mount and subscribe to auth changes in a single effect
+    // to avoid race conditions between separate initialization and listener effects
     const initializeAndSubscribe = async () => {
-      // Subscribe BEFORE reading the session so no events are missed during initialization.
+      // Subscribe to auth changes FIRST (before reading session) to ensure we don't miss
+      // any auth events that occur during initialization. The INITIAL_SESSION event will
+      // provide the current session state.
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Guard against state updates on unmounted component
         if (!isMountedRef.current) return;
         
         const newUserId = session?.user?.id ?? null;
         
+        // Handle initial session event (replaces the previous getSession() call)
+        // or when user signs in or session refreshes
         if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          // Update both state and ref when session changes
           currentUserIdRef.current = newUserId;
           setUserId(newUserId);
+          // useMemo will handle recomputing prefetched settings based on the new userId
           
+          // Reset initialization flag on new login/refresh to allow fresh initialization if needed
+          // For INITIAL_SESSION, this is the first time, so flag is already false
           if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
             hasAttemptedInitializationRef.current = false;
           }
-          // Invalidate only on SIGNED_IN — TOKEN_REFRESHED is Supabase's hourly session renewal
-          // and settings are unchanged; INITIAL_SESSION is covered by `enabled: !!userId`.
+          // Only invalidate on SIGNED_IN (fresh login may have different settings).
+          // TOKEN_REFRESHED is Supabase's hourly auto-refresh — the user's settings haven't
+          // changed, so invalidating would fire a needless DB round-trip every hour.
+          // INITIAL_SESSION is handled naturally: `enabled: !!userId` activates the query.
           if (newUserId && event === "SIGNED_IN") {
             queryClient.invalidateQueries({ queryKey: ["userSettings", newUserId] });
           }
+          // Also remove any queries that might have been created with null userId during initial mount
           queryClient.removeQueries({ queryKey: ["userSettings", null] });
-        } else if (event === "SIGNED_OUT") {
+        }
+        // When user signs out, clear settings from cache and browser storage
+        else if (event === "SIGNED_OUT") {
+          // Store the previous userId before clearing the ref
           const previousUserId = currentUserIdRef.current;
           
+          // Update state and ref to null for the signed-out state
           currentUserIdRef.current = newUserId;
           setUserId(newUserId);
+          // useMemo will handle recomputing prefetched settings (clearing) based on userId becoming null
           
+          // Remove user-scoped queries using the previous user's ID
+          // Only remove queries if we have a valid previousUserId to avoid inconsistent cache operations
           if (previousUserId) {
             queryClient.removeQueries({ queryKey: ["userSettings", previousUserId] });
           }
           hasAttemptedInitializationRef.current = false;
           
+          // Clear user-specific storage to prevent data leakage between users
           try {
             if (typeof window !== "undefined") {
+              // Clear user-scoped keys for the user who just signed out
               if (previousUserId) {
                 localStorage.removeItem(`showBunkCalc_${previousUserId}`);
                 localStorage.removeItem(`targetPercentage_${previousUserId}`);
-                localStorage.removeItem(`disabledCourses_${previousUserId}`);
               }
+
+              // Also clear non-scoped prefetched settings to avoid cross-user leakage
+              // This prevents the next user from seeing the previous user's prefetched settings
               sessionStorage.removeItem("prefetchedSettings");
             }
           } catch (error) {
+            // Ignore storage clearing errors (e.g., restricted environment)
             logger.dev("Failed to clear storage on sign out", { error });
           }
         } else {
+          // For all other events (e.g., USER_UPDATED, PASSWORD_RECOVERY), just update the tracking
           currentUserIdRef.current = newUserId;
           setUserId(newUserId);
         }
@@ -216,10 +309,13 @@ export function useUserSettingsState() {
     const subscriptionPromise = initializeAndSubscribe();
     
     return () => {
+      // Mark component as unmounted to prevent state updates
       isMountedRef.current = false;
+      
       subscriptionPromise
         .then(subscription => subscription?.unsubscribe())
         .catch(error => {
+          // Log initialization/cleanup errors but don't throw to avoid breaking cleanup
           logger.dev("Failed to unsubscribe from auth state changes", { error });
         });
     };
@@ -228,10 +324,15 @@ export function useUserSettingsState() {
   // 1. Fetch from DB
   const { data: settings, isLoading, isFetching } = useQuery({
     queryKey: ["userSettings", userId],
-    // Only apply placeholder when userId is resolved to prevent cross-user leakage.
+    // Only apply placeholder data when we have a concrete userId to avoid leaking
+    // prefetched settings into an unauthenticated or unresolved session state.
     placeholderData: userId ? prefetchedSettings ?? undefined : undefined,
+    // Gate the query itself on a non-null userId so we never fetch for ["userSettings", null].
     enabled: !!userId,
     queryFn: async () => {
+      // userId is guaranteed non-null here because `enabled: !!userId` gates this fn.
+      // Using the ref-tracked value avoids a redundant /auth/v1/user network call —
+      // the userId was already server-validated when onAuthStateChange fired.
       if (!userId) return null;
 
       const { data, error } = await supabase
@@ -243,24 +344,28 @@ export function useUserSettingsState() {
       if (error) {
         logger.error("Error fetching settings:", error);
         Sentry.captureException(error, { tags: { type: "settings_fetch_error", location: "useUserSettings" } });
-        // Throw so React Query sets isError (not isSuccess with null), preventing the
-        // sync effect from mistaking a transient fetch failure for a "new user / no row"
-        // and overwriting existing settings.
-        throw error;
+        return null;
       }
 
       return data as UserSettings | null;
     },
-    staleTime: 5 * 60 * 1000,  // 5 min cache window for local responsiveness
-    gcTime: 30 * 60 * 1000,     // 30 min — avoid cold-start refetches on re-mount
-    // Keep settings in sync across devices/tabs even when no local mutation runs.
-    refetchOnMount: "always",
-    refetchOnWindowFocus: "always",
-    refetchOnReconnect: "always",
-    refetchInterval: 60 * 1000,
-    refetchIntervalInBackground: false,
+    staleTime: 5 * 60 * 1000,  // 5 minutes — settings change rarely; no need to re-fetch on every focus
+    gcTime: 30 * 60 * 1000,       // 30 minutes — keep cache long to avoid cold-start fetches on re-mount
+    // Settings don't change on another device mid-session, so window-focus refetch adds no value
+    // and only burns API quota. Mutations (save settings) already update the cache directly.
+    refetchOnWindowFocus: false,
+    // Override the global 15-min refetchInterval — user settings don't need periodic polling
+    refetchInterval: false,
     retry: (failureCount, error) => {
-      // Don't retry "No user" — auth hasn't resolved yet; retrying would hammer Supabase.
+      // Retry on network errors, but not on auth errors
+      // This allows initial fetch attempts while auth is pending to fail gracefully
+      // and automatically retry once session is established
+      //
+      // TECHNICAL DEBT: Using error message string matching is fragile as error messages
+      // can change between Supabase versions or be localized. However, Supabase doesn't
+      // currently provide specific error codes for "no user" scenarios, so string matching
+      // is the most reliable method available. If Supabase adds error codes in the future,
+      // this should be updated to use those instead (e.g., error.code === "NO_USER").
       const isNoUserError = error instanceof Error && error.message === NO_USER_ERROR_MESSAGE;
       return failureCount < 3 && !isNoUserError;
     }
@@ -269,6 +374,9 @@ export function useUserSettingsState() {
   // 2. Mutation to update settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: { bunk_calculator_enabled?: boolean; target_percentage?: number; disabled_courses?: DisabledCoursesMap }) => {
+      // currentUserIdRef is populated by onAuthStateChange (server-validated).
+      // The Supabase DB call will itself reject an expired session, so no extra
+      // getUser() round-trip is needed here.
       const mutationUserId = currentUserIdRef.current;
       if (!mutationUserId) throw new Error(NO_USER_ERROR_MESSAGE);
 
@@ -283,8 +391,12 @@ export function useUserSettingsState() {
     },
     // Optimistic update: update cache before server responds
     onMutate: async (newSettings: { bunk_calculator_enabled?: boolean; target_percentage?: number; disabled_courses?: DisabledCoursesMap }): Promise<{ previousSettings: UserSettings | undefined; currentUserId: string | null }> => {
+      // Read from the ref that onAuthStateChange keeps up-to-date.
+      // Avoids a redundant /auth/v1/user call — the value was already validated server-side
+      // when the INITIAL_SESSION / SIGNED_IN event was received.
       const currentUserId = currentUserIdRef.current;
       
+      // If no userId is available, we shouldn't proceed with cache operations
       if (!currentUserId) {
         logger.dev("Mutation attempted without userId - session not available");
         return { previousSettings: undefined, currentUserId: null };
@@ -330,19 +442,24 @@ export function useUserSettingsState() {
       return { previousSettings, currentUserId };
     },
     onSuccess: (newData, _variables, context) => {
-      // Reconcile cache with the server response. localStorage was already written in onMutate.
+      // Update cache with actual server response (ensures normalized values)
+      // Context should always be present since onMutate returns it (unless onMutate throws before returning)
       if (context?.currentUserId) {
         queryClient.setQueryData(["userSettings", context.currentUserId], newData);
       }
+      
+      // DO NOT write to localStorage here - already done in onMutate
+      // This prevents redundant writes and event dispatches that cause glitches
+      // Server response only validates the optimistic update was correct
     },
     onError: (err, _variables, context) => {
+      // Rollback to previous data on error
+      // Only rollback if we have both the previous settings and a valid userId for the query key
       if (context?.previousSettings && context?.currentUserId) {
         queryClient.setQueryData(["userSettings", context.currentUserId], context.previousSettings);
       }
       
-      // err is unknown by default in useMutation — narrow before comparing to NO_USER_ERROR_MESSAGE.
-      const isNoUserError = err instanceof Error && err.message === NO_USER_ERROR_MESSAGE;
-      if (!isNoUserError) {
+      if (err.message !== NO_USER_ERROR_MESSAGE) {
         toast.error("Failed to save settings");
         Sentry.captureException(err, { tags: { type: "settings_update_error", location: "useUserSettings" } });
       }
@@ -351,17 +468,31 @@ export function useUserSettingsState() {
 
   const { mutate: mutateSettings } = updateSettingsMutation;
 
-  // Sync: Case A — DB → localStorage (DB is source of truth; picks up cross-device changes).
-  //       Case B — DB empty (new user) → create row from localStorage or defaults.
+  // 3. Centralized Sync Logic
+  // IMPORTANT: This effect handles two cases:
+  // - Case A: DB has settings -> Sync down to localStorage (DB is source of truth)
+  // - Case B: DB query completed and is empty (new user) -> Create DB record from localStorage or defaults
   useEffect(() => {
+    // Skip on server-side render
     if (typeof window === 'undefined') return;
+    
+    // Skip while mutation is pending, or while query is loading/fetching
+    // We need complete data from DB before deciding whether to initialize
     if (updateSettingsMutation.isPending || isLoading || isFetching) return;
 
+    // Track if effect is still mounted to prevent state updates after unmount
     let isMounted = true;
-    const validateActiveSession = (expectedUserId: string): boolean =>
-      isMounted && currentUserIdRef.current === expectedUserId;
 
+    // Verify the component is still mounted and the expected user is still the active user.
+    // Synchronous check using currentUserIdRef (kept up-to-date by onAuthStateChange).
+    // Replaces the previous async getUser() call — no extra /auth/v1/user round-trip needed.
+    const validateActiveSession = (expectedUserId: string): boolean => {
+      return isMounted && currentUserIdRef.current === expectedUserId;
+    };
+
+    // Async IIFE to perform storage synchronization operations
     (async () => {
+      // Check if component is still mounted before proceeding
       if (!isMounted) return;
 
       try {
@@ -373,61 +504,122 @@ export function useUserSettingsState() {
           return;
         }
 
-        // Case A: sync DB → localStorage (only write on diff to avoid redundant events).
+        // Case A: DB has data -> Sync to LocalStorage ONLY if different (Source of Truth = DB)
+        // This handles cross-device sync (e.g., changed settings on another device)
         if (settings) {
-          if (sessionStorage.getItem("prefetchedSettings") !== null) sessionStorage.removeItem("prefetchedSettings");
-          if (!validateActiveSession(userId)) return;
+          // Clean up prefetched settings after first successful DB fetch
+          // This prevents stale prefetched data from being reused on subsequent initialData calls
+          const legacyKey = "prefetchedSettings";
+          if (sessionStorage.getItem(legacyKey) !== null) {
+            sessionStorage.removeItem(legacyKey);
+          }
+          
+          // Validate the session is still active and belongs to the same user.
+          if (!validateActiveSession(userId)) {
+            return;
+          }
 
           const localBunkKey = `showBunkCalc_${userId}`;
+          const localBunk = localStorage.getItem(localBunkKey);
           const dbBunk = (settings.bunk_calculator_enabled ?? true).toString();
-          if (localStorage.getItem(localBunkKey) !== dbBunk) {
+          
+          // Only sync if localStorage differs from DB (cross-device change)
+          if (localBunk !== dbBunk) {
+            // Check if component is still mounted before performing side effects
             if (!isMounted) return;
             localStorage.setItem(localBunkKey, dbBunk);
             window.dispatchEvent(new CustomEvent("bunkCalcToggle", { detail: settings.bunk_calculator_enabled ?? true }));
           }
           
           const localTargetKey = `targetPercentage_${userId}`;
+          const localTarget = localStorage.getItem(localTargetKey);
           const dbTarget = normalizeTarget(settings.target_percentage).toString();
-          if (localStorage.getItem(localTargetKey) !== dbTarget) {
+          
+          // Only sync if localStorage differs from DB
+          if (localTarget !== dbTarget) {
+            // Check if component is still mounted before performing side effects
             if (!isMounted) return;
             localStorage.setItem(localTargetKey, dbTarget);
           }
 
           const localDisabledKey = `disabledCourses_${userId}`;
-          const dbDisabled = JSON.stringify(settings.disabled_courses);
-          if (localStorage.getItem(localDisabledKey) !== dbDisabled) {
+          const localDisabled = localStorage.getItem(localDisabledKey);
+          const dbDisabled = JSON.stringify(settings.disabled_courses ?? {});
+
+          // Only sync if localStorage differs from DB (picks up cross-device changes)
+          if (localDisabled !== dbDisabled) {
             if (!isMounted) return;
             localStorage.setItem(localDisabledKey, dbDisabled);
           }
-        } else if (settings === null) {
-          // Case B: new user — create DB row from prefetched settings or localStorage/defaults. Runs once per session.
-          if (hasAttemptedInitializationRef.current) return;
-          if (!validateActiveSession(userId)) return;
+        } 
+        // Case B: DB is empty (New User) -> Migrate LocalStorage to DB or Initialize with defaults
+        // This runs once per session when DB returns null after initial fetch completes
+        else if (settings === null) {
+          // Helper function to determine if initialization should be skipped
+          const shouldSkipInitialization = () => {
+            // Skip if we've already attempted initialization (prevent redundant mutations)
+            // This ensures we only try once per session, even if refetches still return null
+            if (hasAttemptedInitializationRef.current) return true;
+            
+            return false;
+          };
+          
+          if (shouldSkipInitialization()) {
+            return;
+          }
 
+          // Validate the session is still active and belongs to the same user.
+          if (!validateActiveSession(userId)) {
+            return;
+          }
+
+          // Mark that we've attempted initialization to prevent duplicate calls
+          // Even if the mutation fails, we won't retry automatically - user can refresh
           hasAttemptedInitializationRef.current = true;
 
+          // Determine settings to use for DB initialization
           let settingsToInitialize: { bunk_calculator_enabled: boolean; target_percentage: number };
+          
+          // Check if we have prefetched settings that should be synced to DB
+          // This happens when user just logged in and settings were fetched from /api/auth/save-token
+          // If the backend returned settings but no DB row exists, we need to create the row from prefetched values
+          const legacyKey = "prefetchedSettings";
           const prefetchedFromStorage = loadPrefetchedSettings(userId);
           
           if (prefetchedFromStorage) {
+            // Use prefetched settings from the backend (ensures DB row is created with server values)
             settingsToInitialize = {
               bunk_calculator_enabled: prefetchedFromStorage.bunk_calculator_enabled,
               target_percentage: prefetchedFromStorage.target_percentage
             };
+            // Clean up prefetched settings after using them for initialization
+            // Wrap in try/catch so DB initialization proceeds even if storage cleanup fails
             try {
-              sessionStorage.removeItem("prefetchedSettings");
+              sessionStorage.removeItem(legacyKey);
             } catch (cleanupError) {
-              logger.dev("Failed to clean up prefetchedSettings:", cleanupError);
+              // Ignore cleanup failures - they won't prevent DB initialization
+              logger.dev("Failed to clean up prefetched settings from sessionStorage:", cleanupError);
             }
           } else {
-            // Prefer user-scoped keys; fall back to legacy un-scoped keys for one-time migration.
-            const localBunk = localStorage.getItem(`showBunkCalc_${userId}`) ?? localStorage.getItem("showBunkCalc");
-            const localTarget = localStorage.getItem(`targetPercentage_${userId}`) ?? localStorage.getItem("targetPercentage");
+            // Fall back to localStorage values if they exist, otherwise use defaults
+            // Check user-scoped keys first, then fall back to legacy keys for migration
+            const localBunkKey = `showBunkCalc_${userId}`;
+            const localTargetKey = `targetPercentage_${userId}`;
+            const localBunk = localStorage.getItem(localBunkKey) ?? localStorage.getItem("showBunkCalc");
+            const localTarget = localStorage.getItem(localTargetKey) ?? localStorage.getItem("targetPercentage");
             
-            if (sessionStorage.getItem("legacyKeysCleaned") !== "true") {
-              if (localStorage.getItem("showBunkCalc") !== null) localStorage.removeItem("showBunkCalc");
-              if (localStorage.getItem("targetPercentage") !== null) localStorage.removeItem("targetPercentage");
-              sessionStorage.setItem("legacyKeysCleaned", "true");
+            // Clean up legacy keys after migration
+            const legacyCleanupFlagKey = "legacyKeysCleaned";
+            const hasCleanedLegacyKeysThisSession = sessionStorage.getItem(legacyCleanupFlagKey) === "true";
+            
+            if (!hasCleanedLegacyKeysThisSession) {
+              if (localStorage.getItem("showBunkCalc") !== null) {
+                localStorage.removeItem("showBunkCalc");
+              }
+              if (localStorage.getItem("targetPercentage") !== null) {
+                localStorage.removeItem("targetPercentage");
+              }
+              sessionStorage.setItem(legacyCleanupFlagKey, "true");
             }
             
             settingsToInitialize = {
@@ -436,6 +628,8 @@ export function useUserSettingsState() {
             };
           }
 
+          // Create DB record from determined settings
+          // This runs only once per session when settings is null after initial fetch
           mutateSettings(settingsToInitialize);
         }
       } catch (error) {
@@ -445,32 +639,27 @@ export function useUserSettingsState() {
       }
     })();
 
-    return () => { isMounted = false; };
-    // mutateSettings is stable (useMutation) and doesn't need to be in deps.
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+    // mutateSettings is stable - it's the mutate function from useMutation and doesn't change between renders.
+    // supabase.auth removed from deps: the sync effect no longer calls getUser() so doesn't need it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings, isLoading, isFetching, updateSettingsMutation.isPending]);
 
-  return {
-    settings,
-    // Keep initial-load signal stable; background refetches should not disable UI controls.
-    isLoading,
-    isFetching,
-    updateBunkCalc: (enabled: boolean) => {
-      updateSettingsMutation.mutate({ bunk_calculator_enabled: enabled });
-    },
-    updateTarget: (target: number) => {
-      updateSettingsMutation.mutate({ target_percentage: normalizeTarget(target) });
-    },
-    updateDisabledCourses: async (disabledCourses: DisabledCoursesMap) => {
-      await updateSettingsMutation.mutateAsync({ disabled_courses: disabledCourses });
-    },
-  };
-}
+  const updateBunkCalc = useCallback((enabled: boolean) => mutateSettings({ bunk_calculator_enabled: enabled }), [mutateSettings]);
+  const updateTarget = useCallback((target: number) => mutateSettings({ target_percentage: normalizeTarget(target) }), [mutateSettings]);
+  const updateDisabledCourses = useCallback((disabledCourses: DisabledCoursesMap) => mutateSettings({ disabled_courses: disabledCourses }), [mutateSettings]);
 
-// ---------------------------------------------------------------------------
-// Context — ensures a single auth listener and single React Query subscription
-// regardless of how many components call useUserSettings().
-// ---------------------------------------------------------------------------
+  return useMemo(() => ({
+    settings,
+    isLoading: isLoading || isFetching,
+    updateBunkCalc,
+    updateTarget,
+    updateDisabledCourses,
+  }), [settings, isLoading, isFetching, updateBunkCalc, updateTarget, updateDisabledCourses]);
+}
 
 type UserSettingsContextValue = ReturnType<typeof useUserSettingsState>;
 

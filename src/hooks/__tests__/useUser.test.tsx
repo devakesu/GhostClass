@@ -10,7 +10,7 @@ vi.mock('@/lib/axios', () => ({
     get: vi.fn(),
   },
 }))
-vi.mock('@/lib/auth', () => ({
+vi.mock('@/lib/security/auth', () => ({
   handleLogout: vi.fn(),
 }))
 

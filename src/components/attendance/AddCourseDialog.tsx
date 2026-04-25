@@ -6,6 +6,8 @@ import { useProfile } from "@/hooks/users/profile";
 import Turnstile, { useTurnstile } from "react-turnstile";
 import { addCourseAction } from "@/app/actions/courses";
 import { getCsrfToken } from "@/lib/axios";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 import {
   Dialog,
   DialogContent,
@@ -115,7 +117,8 @@ export function AddCourseDialog({
       turnstile.reset();
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error adding course:", error);
+      logger.error("Error adding course:", error);
+      Sentry.captureException(error, { tags: { type: "course_mutation_error", location: "AddCourseDialog" } });
       toast.error("Failed to add course. Please try again.");
     } finally {
       setIsSubmitting(false);

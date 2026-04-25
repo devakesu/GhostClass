@@ -84,20 +84,6 @@ export default function NotificationsPage() {
   
   // Use mountId-based sync logic (now managed inside useSyncOnMount)
 
-  const { 
-    actionNotifications, 
-    regularNotifications, 
-    unreadCount,
-    isLoading, 
-    toggleRead,
-    markAllAsRead,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage
-  } = useNotifications(true);
-
-  const [readingId, setReadingId] = useState<number | null>(null);
-
   // Sync attendance data on mount; deduplication handled by the hook.
   const { isSyncing, syncCompleted } = useSyncOnMount({
     username: user?.username,
@@ -117,6 +103,20 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
+
+  const { 
+    actionNotifications, 
+    regularNotifications, 
+    unreadCount,
+    isLoading, 
+    toggleRead,
+    markAllAsRead,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useNotifications(syncCompleted);
+
+  const [readingId, setReadingId] = useState<number | null>(null);
 
   // BUILD VIRTUAL LIST WITH HEADERS
   const virtualItems = useMemo<VirtualItem[]>(() => {

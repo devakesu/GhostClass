@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
+import * as Sentry from "@sentry/nextjs";
 import { decrypt } from "@/lib/crypto";
 import { withSecurity } from "@/lib/security/app-check";
 import { logger } from "@/lib/logger";
@@ -120,8 +121,9 @@ const handler = async (req: Request) => {
     return NextResponse.json(responseBody);
   } catch (error) {
     logger.error("API /user/profile: Bundle generation failed:", error);
+    Sentry.captureException(error, { tags: { type: "profile_fetch_error", location: "api/user/profile" } });
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Failed to load profile. Please try again." },
       { status: 500 }
     );
   }

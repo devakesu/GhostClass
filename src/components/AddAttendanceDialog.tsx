@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from "date-fns";
 import { cn, toRoman, formatSessionName } from "@/lib/utils";
@@ -69,26 +71,33 @@ export function AddAttendanceDialog({
   // --- HELPERS ---
   const normalizeSession = (s: string) => {
     if (!s) return "";
-    let norm = s.toString().toLowerCase().replace(/session/g, "").replace(/hour/g, "").trim();
+    const norm = s.toString().toLowerCase().replace(/session/g, "").replace(/hour/g, "").trim();
     const numMap: Record<string, string> = { "1": "i", "2": "ii", "3": "iii", "4": "iv", "5": "v", "6": "vi", "7": "vii" };
     return numMap[norm] || norm;
   };
 
   const getDateKey = (d: Date) => format(d, "yyyyMMdd"); 
 
-  // --- 1. SMART DEFAULTS ---
-  useEffect(() => {
-    if (open && attendanceData) {
+  // --- SMART DEFAULTS (Derived state to avoid cascading renders) ---
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevDate, setPrevDate] = useState(date);
+  
+  if (open !== prevOpen || date !== prevDate) {
+    setPrevOpen(open);
+    setPrevDate(date);
+    
+    if (open && date) {
+      // 1. PREFILL SESSION
       const occupiedSessions = new Set<string>();
       const dateKey = getDateKey(date);
 
       // A. Official Data
-      const officialDay = attendanceData.studentAttendanceData?.[dateKey];
+      const officialDay = attendanceData?.studentAttendanceData?.[dateKey];
       if (officialDay) {
         const sortedKeys = Object.keys(officialDay).sort((a, b) => Number(a) - Number(b));
         sortedKeys.forEach((key, index) => {
            const s = officialDay[key];
-           const lookupName = attendanceData.sessions?.[key]?.name;
+           const lookupName = attendanceData?.sessions?.[key]?.name;
            if (lookupName) occupiedSessions.add(normalizeSession(lookupName));
            if (s.session) occupiedSessions.add(normalizeSession(s.session));
            if (!lookupName && !s.session && index < SESSIONS.length) {
@@ -110,58 +119,62 @@ export function AddAttendanceDialog({
         }
       });
 
-      // C. First Free
+      // C. First Free Session
       const firstFree = SESSIONS.find(s => !occupiedSessions.has(normalizeSession(s)));
-      if (firstFree) setSession(firstFree);
-      else setSession("");
+      const newSession = firstFree || "";
+      setSession(newSession);
+
+      // 2. PREFILL COURSE
+      if (newSession && attendanceData?.studentAttendanceData) {
+        const dayOfWeek = date.getDay();
+        const frequencyMap: Record<string, number> = {};
+        
+        Object.entries(attendanceData.studentAttendanceData).forEach(([dStr, sessions]: [string, any]) => {
+           const y = parseInt(dStr.substring(0, 4));
+           const m = parseInt(dStr.substring(4, 6)) - 1;
+           const d = parseInt(dStr.substring(6, 8));
+           const currentDay = new Date(y, m, d).getDay();
+
+           if (currentDay === dayOfWeek) {
+              const sortedKeys = Object.keys(sessions).sort((a, b) => Number(a) - Number(b));
+              sortedKeys.forEach((key, index) => {
+                 const s = sessions[key];
+                 const lookupName = attendanceData.sessions?.[key]?.name;
+                 const directName = s.session;
+                 const inferredName = SESSIONS[index];
+                 const target = normalizeSession(newSession);
+                 
+                 const isMatch = (lookupName && normalizeSession(lookupName) === target) ||
+                                 (directName && normalizeSession(directName) === target) ||
+                                 (!lookupName && !directName && normalizeSession(inferredName) === target);
+
+                 if (isMatch && s.course) {
+                    const cid = String(s.course);
+                    frequencyMap[cid] = (frequencyMap[cid] || 0) + 1;
+                 }
+              });
+           }
+        });
+
+        let bestCourse = "";
+        let maxCount = 0;
+        Object.entries(frequencyMap).forEach(([cid, count]) => {
+           if (count > maxCount) {
+              maxCount = count;
+              bestCourse = cid;
+           }
+        });
+
+        if (bestCourse) setCourseId(bestCourse);
+        else setCourseId("");
+      } else {
+        setCourseId("");
+      }
+    } else {
+      setSession("");
+      setCourseId("");
     }
-  }, [date, open, attendanceData, trackingData]);
-
-  // --- 2. PREFILL COURSE ---
-  useEffect(() => {
-    if (session && date && attendanceData?.studentAttendanceData) {
-      const dayOfWeek = date.getDay();
-      const frequencyMap: Record<string, number> = {};
-      
-      Object.entries(attendanceData.studentAttendanceData).forEach(([dStr, sessions]: [string, any]) => {
-         const y = parseInt(dStr.substring(0, 4));
-         const m = parseInt(dStr.substring(4, 6)) - 1;
-         const d = parseInt(dStr.substring(6, 8));
-         const currentDay = new Date(y, m, d).getDay();
-
-         if (currentDay === dayOfWeek) {
-            const sortedKeys = Object.keys(sessions).sort((a, b) => Number(a) - Number(b));
-            sortedKeys.forEach((key, index) => {
-               const s = sessions[key];
-               const lookupName = attendanceData.sessions?.[key]?.name;
-               const directName = s.session;
-               const inferredName = SESSIONS[index];
-               const target = normalizeSession(session);
-               
-               const isMatch = (lookupName && normalizeSession(lookupName) === target) ||
-                               (directName && normalizeSession(directName) === target) ||
-                               (!lookupName && !directName && normalizeSession(inferredName) === target);
-
-               if (isMatch && s.course) {
-                  const cid = String(s.course);
-                  frequencyMap[cid] = (frequencyMap[cid] || 0) + 1;
-               }
-            });
-         }
-      });
-
-      let bestCourse = "";
-      let maxCount = 0;
-      Object.entries(frequencyMap).forEach(([cid, count]) => {
-         if (count > maxCount) {
-            maxCount = count;
-            bestCourse = cid;
-         }
-      });
-
-      if (bestCourse) setCourseId(bestCourse);
-    }
-  }, [session, date, attendanceData]);
+  }
 
   // --- 3. VALIDATION ---
   const isSessionBlocked = useMemo(() => {
@@ -245,7 +258,8 @@ export function AddAttendanceDialog({
       onOpenChange(false);
 
     } catch (error) {
-      console.error("Add Record Failed:", error);
+      logger.error("Add Record Failed:", error);
+      Sentry.captureException(error, { tags: { type: "attendance_mutation_error", location: "AddAttendanceDialog" } });
       toast.error("Failed to add record");
     } finally {
       setIsSubmitting(false);
@@ -288,7 +302,7 @@ export function AddAttendanceDialog({
                     {date ? format(date, "PPP") : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[280px] p-3 pointer-events-auto z-[50]" align="start">
+                <PopoverContent className="w-[280px] p-3 pointer-events-auto z-50" align="start">
                   
                   {/* Custom Aesthetic Calendar */}
                   <div className="flex flex-col gap-2">

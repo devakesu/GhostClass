@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Pencil, X, Check } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -93,7 +94,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         },
         onError: (error) => {
           toast.error("Failed to update profile");
-          console.error(error);
+          logger.error("Failed to update profile:", error);
         },
       }
     );
