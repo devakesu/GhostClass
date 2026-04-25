@@ -102,10 +102,11 @@ export function AddCourseDialog({
 
       toast.success(`${courseCode.toUpperCase()} added to your class lineup!`);
 
-      // Invalidate courses query to refresh cards
-      queryClient.invalidateQueries({
-        queryKey: ["courses"],
-      });
+      // Invalidate all relevant queries to refresh dashboard immediately
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
 
       // Reset and close
       setCourseCode("");

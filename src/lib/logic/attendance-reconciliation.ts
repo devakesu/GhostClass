@@ -22,7 +22,18 @@ export const ATTENDANCE_STATUS = {
 export const DUTY_LEAVE_PLACEHOLDER_REMARKS = new Set<string>([
   "Duty Leave",
   "Self-Marked: Duty Leave",
+  "Self-Marked: Present",
+  "Self-Marked: Absent",
 ]);
+
+/** Returns true if a remark string is a legacy/placeholder value that should be hidden. */
+export const isLegacyRemark = (remark: string | null | undefined): boolean => {
+  if (!remark) return true;
+  const trimmed = remark.trim();
+  if (DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed)) return true;
+  if (trimmed.startsWith("Self-Marked:")) return true;
+  return false;
+};
 
 export const isPositive = (code: number) => code === ATTENDANCE_STATUS.PRESENT || code === ATTENDANCE_STATUS.DUTY_LEAVE;
 // code === 0 is NOT treated as Absent: 0 is either an uninitialised value or an unknown

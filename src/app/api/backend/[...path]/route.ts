@@ -100,14 +100,25 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   }
 
   // 2. CSRF Validation
-  if (isWrite && !isPublic && !isMobileApp) {
+  // Enforcement: All state-changing requests (isWrite) from browsers require CSRF.
+  // We do NOT exempt login from CSRF because our hardened client (axios instance) 
+  // can self-heal by fetching a token and retrying if the cookie is missing.
+  if (isWrite && !isMobileApp) {
     const csrfToken = req.headers.get("x-csrf-token");
-    if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ message: "Invalid CSRF token" }, { status: 403 });
+    if (!(await validateCsrfToken(csrfToken))) {
+      return NextResponse.json({ message: "Invalid CSRF token" }, { status: 403 });
+    }
   }
 
   // 3. Authentication (Self-Healing Fallback)
-  const token = isPublic ? undefined : await getAuthTokenWithFallback();
-  if (!isPublic && !token) return NextResponse.json({ message: "No authentication token – please log in again" }, { status: 401 });
+  // Logic: Some paths (like login) are public for Auth but still protected by CSRF.
+  const pathLower = fullPath.toLowerCase().replace(/\/$/, "");
+  const isAuthPublic = isPublic || pathLower === "login" || pathLower === "auth/login";
+  const token = isAuthPublic ? undefined : await getAuthTokenWithFallback();
+  
+  if (!isAuthPublic && !token) {
+    return NextResponse.json({ message: "No authentication token – please log in again" }, { status: 401 });
+  }
 
   // 4. Request Body Preparation
   let body: BodyInit | undefined;
@@ -152,11 +163,17 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
     const result = await ezygoCircuitBreaker.execute(async () => {
       const pathSuffix = `${fullPath}${req.nextUrl.search}`;
       const baseHeaders: Record<string, string> = {
-        ...(isPublic ? {} : { "authorization": `Bearer ${token}` }),
+        ...(isAuthPublic ? {} : { "authorization": `Bearer ${token}` }),
         "content-type": resolvedContentType,
-        "accept": req.headers.get("accept") || "application/json",
+        "accept": "application/json, text/plain, */*",
+        "referer": "https://edu.ezygo.app/",
+        "origin": "https://edu.ezygo.app",
         ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
         ...(clientUserAgent ? { "user-agent": clientUserAgent } : {}),
+        // Forward client-hints if present for better stealth
+        ...(req.headers.get("sec-ch-ua") ? { "sec-ch-ua": req.headers.get("sec-ch-ua")! } : {}),
+        ...(req.headers.get("sec-ch-ua-mobile") ? { "sec-ch-ua-mobile": req.headers.get("sec-ch-ua-mobile")! } : {}),
+        ...(req.headers.get("sec-ch-ua-platform") ? { "sec-ch-ua-platform": req.headers.get("sec-ch-ua-platform")! } : {}),
       };
 
       let lastError: Error | null = null;

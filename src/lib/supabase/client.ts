@@ -294,19 +294,15 @@ export function createClient() {
 
   // Use development overrides if present to ensure dev/prod isolation
   if (process.env.NODE_ENV === "development") {
-    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY) {
       url = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
-    }
-    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY) {
       key = process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
-    }
-
+    } else {
     // Environment Guard: Alert developer if production URL is leaking into development
-    if (url.includes("supabase.co") && !url.includes("dev") && !process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
       import("@/lib/logger").then(({ logger }) => {
         logger.warn(
           "[Supabase Security] Production URL detected in development! ⚠️",
-          `\nTarget: ${url}\nEnsure .env.local or NEXT_PUBLIC_SUPABASE_DEV_URL is correctly configured.`
+          `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY are correctly configured.`
         );
       });
     }

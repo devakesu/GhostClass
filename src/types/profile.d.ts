@@ -31,8 +31,10 @@ export interface UserProfile {
   current_semester?: string | null;
   /** Selected academic year */
   current_year?: string | null;
-  /** Account creation timestamp */
+  /** Account creation timestamp in GhostClass */
   created_at?: string | null;
+  /** Account creation timestamp in EzyGo */
+  ezygo_created_at?: string | null;
   /** Optional class relation included by some profile responses */
   class?: {
     id?: string | number | null;

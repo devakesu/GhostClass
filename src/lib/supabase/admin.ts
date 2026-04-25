@@ -16,11 +16,17 @@ export function getAdminClient() {
 
   // Use development overrides if present
   if (process.env.NODE_ENV === "development") {
-    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL && process.env.SUPABASE_DEV_SECRET_KEY) {
       url = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
-    }
-    if (process.env.SUPABASE_DEV_SECRET_KEY) {
       key = process.env.SUPABASE_DEV_SECRET_KEY;
+    } else {
+      // Environment Guard: Alert developer if production URL is leaking into development
+      import("@/lib/logger").then(({ logger }) => {
+        logger.warn(
+          "[Supabase Security] Production URL detected in development! ⚠️",
+          `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and SUPABASE_DEV_SECRET_KEY are correctly configured.`
+        );
+      });
     }
   }
 

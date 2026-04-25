@@ -116,14 +116,14 @@ export function DeleteAccount() {
 
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 p-4 md:p-5 dark:border-red-900/50 dark:bg-red-950/10">
-      <div className="flex flex-wrap gap-4 md:flex-nowrap md:items-start md:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h3 className="font-medium text-red-900 dark:text-red-200 flex items-center gap-2">
+          <h3 className="font-bold text-red-900 dark:text-red-200 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             Delete Account
           </h3>
-          <p className="text-sm text-red-700 dark:text-red-300/80">
-            Permanently remove your account and all of its data. This action cannot be undone.
+          <p className="text-sm text-red-800/80 dark:text-red-300/70 leading-relaxed max-w-xl">
+            Permanently remove your account and all associated attendance data. This action is irreversible and cannot be undone.
           </p>
         </div>
         
@@ -138,12 +138,16 @@ export function DeleteAccount() {
               Delete Account
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your
-                account, attendance data, settings, and remove your data from our servers. Data at EzyGo is unaffected and has no relation with us.
+          <AlertDialogContent className="max-w-[400px] rounded-[24px] border-destructive/20 shadow-2xl">
+            <AlertDialogHeader className="flex flex-col items-center text-center pt-2">
+              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4 animate-pulse">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl font-bold tracking-tight">Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground text-sm px-2 mt-2">
+                This will permanently erase your <span className="text-foreground font-semibold">GhostClass</span> account, including all attendance logs and personal settings.
+                <br /><br />
+                <span className="text-[11px] opacity-70">Note: Your official EzyGo account remains unaffected.</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             
@@ -160,15 +164,20 @@ export function DeleteAccount() {
               />
             </div>
 
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="sm:justify-center gap-2 pt-2">
+              <AlertDialogCancel 
+                disabled={isDeleting}
+                className="rounded-xl border-border/40 hover:bg-muted"
+              >
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault();
                   handleDelete();
                 }}
                 disabled={confirmation !== "DELETE" || isDeleting}
-                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl px-6"
               >
                 {isDeleting ? (
                   <>
@@ -176,7 +185,7 @@ export function DeleteAccount() {
                     Deleting...
                   </>
                 ) : (
-                  "Delete Account"
+                  "Permanently Delete"
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

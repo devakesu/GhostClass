@@ -321,8 +321,6 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
         return NextResponse.json({ message: "Authentication service unavailable. Please try again." }, { status: 504 });
       }
       
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      logger.error("Ezygo verification error:", errorMessage);
       Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "save_token" }, extra: { userId: redact("id", verifieduserId) } });
       
       return NextResponse.json({ message: "Authentication service error" }, { status: 502 });

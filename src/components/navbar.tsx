@@ -141,6 +141,11 @@ export const Navbar = () => {
   };
 
   const handleAddSuccess = async () => {
+    // Broadly invalidate to update counts, cards, charts and summaries
+    queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+    queryClient.invalidateQueries({ queryKey: ["track_data"] });
+    
     await Promise.all([refetchAttendance(), refetchTracking()]);
   };
 

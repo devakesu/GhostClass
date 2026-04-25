@@ -47,23 +47,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AttendanceReport, AttendanceEvent } from "@/types/attendance";
+import { AttendanceReport, AttendanceEvent, Course } from "@/types";
+import { ClassCourse } from "@/hooks/courses/useFetchClassCourses";
 import { useProfile } from "@/hooks/users/profile";
 import { createClient } from "@/lib/supabase/client"; 
 import { toast } from "sonner";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
-import { useFetchCourses } from "@/hooks/courses/courses";
 import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
 import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
-import { DUTY_LEAVE_PLACEHOLDER_REMARKS } from "@/lib/logic/attendance-reconciliation";
+import { isLegacyRemark } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AttendanceCalendarProps {
   attendanceData: AttendanceReport | undefined;
   semester: "even" | "odd" | null | undefined;
   year: string | null | undefined;
+  coursesData?: { courses: Record<string, Course> };
+  classCourses?: ClassCourse[];
 }
 
 interface ExtendedAttendanceEvent extends AttendanceEvent {
@@ -73,6 +76,7 @@ interface ExtendedAttendanceEvent extends AttendanceEvent {
   originalStatus?: string;
   remarks?: string;
   rawSession?: string;
+  originalSessionId?: string;
 }
 
 const getNormalizedSession = (s: string | number) => parseInt(normalizeSession(s), 10) || 0;
@@ -106,6 +110,8 @@ export function AttendanceCalendar({
   attendanceData,
   semester,
   year,
+  coursesData,
+  classCourses,
 }: AttendanceCalendarProps) {
   const [currentDate, setCurrentDate] = useState<{ year: number | null; month: number | null }>({ 
     year: null, 
@@ -115,12 +121,23 @@ export function AttendanceCalendar({
   const [filter, setFilter] = useState<string>("all");
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<string | null>(null);
-  const [dlReasonOpen, setDlReasonOpen] = useState(false);
-  const [dlReason, setDlReason] = useState("");
-  const [pendingDl, setPendingDl] = useState<{ courseId: string; dbDate: string; sessionForDB: string; buttonKey: string } | null>(null);
+  const [remarkDialogOpen, setRemarkDialogOpen] = useState(false);
+  const [remark, setRemark] = useState("");
+  const [pendingRemarkAction, setPendingRemarkAction] = useState<{ 
+    courseId: string; 
+    dbDate: string; 
+    sessionForDB: string; 
+    buttonKey: string;
+    targetStatus: number;
+    title: string;
+    description: string;
+    placeholder: string;
+    defaultRemark: string;
+  } | null>(null);
   const clickedButtons = useRef<Set<string>>(new Set());
 
   const { data: profile } = useProfile();
+  const queryClient = useQueryClient();
   const { refetch: refetchCount } = useTrackingCount(profile);
   const { data: trackingData, refetch: refetchTrackData } = useTrackingData(profile);
 
@@ -152,11 +169,23 @@ export function AttendanceCalendar({
 
   // Pre-normalize all tracker dates once
   const normalizedTrackingData = useMemo(
-    () => (trackingData ?? []).map((t: any) => ({ ...t, _isoDate: normalizeToISODate(t.date) })),
-    [trackingData]
+    () => (trackingData ?? []).map((t: any) => {
+      let sessionToUse = t.session;
+      // Resolve session ID (e.g. "220") to canonical number (e.g. "1")
+      if (attendanceData?.sessions?.[sessionToUse]) {
+        const resolvedName = attendanceData.sessions[sessionToUse].name;
+        const normalized = normalizeSession(resolvedName);
+        if (!isNaN(parseInt(normalized, 10))) {
+          sessionToUse = normalized;
+        }
+      }
+      return { ...t, _isoDate: normalizeToISODate(t.date), session: sessionToUse };
+    }),
+    [trackingData, attendanceData]
   );
 
-  const { data: coursesData } = useFetchCourses(); 
+  // coursesData and classCourses are now passed from parent to ensure consistency
+  // and correctly scoped data.
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   const { isDisabled: isCourseDisabled } = useDisabledCourses({
@@ -164,14 +193,47 @@ export function AttendanceCalendar({
     semester: semester,
   });
 
-  /** Resolve course code from courseId using available course registries */
+  /** Resolve course code from courseId using available registries */
   const getCourseCodeById = useCallback((id: string): string => {
-    if (coursesData?.courses?.[id]) return id.toUpperCase();
-    const course = Object.values(coursesData?.courses || {}).find(c => String(c.id) === id);
-    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, '');
+    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
+
+    // 1. Check if ID exists in coursesData and has a code
+    if (coursesData?.courses?.[id]) {
+      return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
+    }
+
+    // 2. Otherwise, find match by numeric code or code
+    const course = Object.values(coursesData?.courses || {}).find(c => 
+      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
+    );
+    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
+    
+    // 3. Check Custom (Class) Courses
+    const custom = classCourses?.find(cc => 
+      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
+    );
+    if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
+
+    // 4. Fallback to attendanceData courses
     const altCourse = attendanceData?.courses?.[id];
-    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, '');
-  }, [attendanceData, coursesData]);
+    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
+  }, [attendanceData, coursesData, classCourses]);
+
+  /** Resolve course name from courseId using available registries */
+  const getCourseNameById = useCallback((id: string): string => {
+    if (coursesData?.courses?.[id]) return coursesData.courses[id].name || id;
+    const course = Object.values(coursesData?.courses || {}).find(c => String(c.id) === id);
+    if (course?.name) return course.name;
+
+    const normalizedId = id.replace(/\s+/g, "").toUpperCase();
+    const custom = classCourses?.find(cc => 
+      cc.course_code.replace(/\s+/g, "").toUpperCase() === normalizedId
+    );
+    if (custom) return custom.course_name || custom.course_code;
+
+    const altCourse = attendanceData?.courses?.[id];
+    return (altCourse?.name ?? "Unknown Course");
+  }, [attendanceData, coursesData, classCourses]);
 
   // authUserId initialization
   useEffect(() => {
@@ -270,8 +332,13 @@ export function AttendanceCalendar({
 
         if (error) throw error;
         toast.success("Record deleted");
+        
+        // Broadly invalidate to update counts, cards, charts and summaries
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+        
         await Promise.all([refetchTrackData(), refetchCount()]); 
-      } catch (error: any) {
+      } catch (_error: any) {
         toast.error(
           "We encountered an error while deleting this record. Please try again later. If the issue persists, please contact us.",
         );
@@ -314,6 +381,11 @@ export function AttendanceCalendar({
           throw error;
         }
         toast.success("Added to tracking");
+        
+        // Broadly invalidate to update counts, cards, charts and summaries
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+        
         await refetchTrackData(); 
         await refetchCount();
       } catch (error: any) { 
@@ -333,29 +405,29 @@ export function AttendanceCalendar({
       }
   };
 
-  const handleDlConfirm = () => {
-    if (pendingDl && authUserId) {
+  const handleRemarkConfirm = () => {
+    if (pendingRemarkAction && authUserId) {
       handleWriteTracking(
-        pendingDl.courseId,
-        pendingDl.dbDate,
+        pendingRemarkAction.courseId,
+        pendingRemarkAction.dbDate,
         "correction",
-        pendingDl.sessionForDB,
-        225,
-        dlReason.trim() || "Duty Leave"
+        pendingRemarkAction.sessionForDB,
+        pendingRemarkAction.targetStatus,
+        remark.trim() || (null as any)
       );
     }
-    setDlReasonOpen(false);
-    setDlReason("");
-    setPendingDl(null);
+    setRemarkDialogOpen(false);
+    setRemark("");
+    setPendingRemarkAction(null);
   };
 
-  const handleDlCancel = () => {
-    if (pendingDl) {
-      clickedButtons.current?.delete(pendingDl.buttonKey);
+  const handleRemarkCancel = () => {
+    if (pendingRemarkAction) {
+      clickedButtons.current?.delete(pendingRemarkAction.buttonKey);
     }
-    setDlReasonOpen(false);
-    setDlReason("");
-    setPendingDl(null);
+    setRemarkDialogOpen(false);
+    setRemark("");
+    setPendingRemarkAction(null);
   };
 
   // --- 1. PARSE OFFICIAL API DATA ---
@@ -375,15 +447,36 @@ export function AttendanceCalendar({
             
             // Priority: Unified Registry Name -> EzyGo Registry Name -> Fallback ID
             const courseId = getCourseCodeById(rawId) || rawId;
-            const courseName = coursesData?.courses?.[courseId]?.name || attendanceData.courses?.[rawId]?.name || "Unknown Course";
+            const courseName = getCourseNameById(rawId);
 
             let sessionName = sessionData.session;
-            if (!sessionName || sessionName === "null") {
-               if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
+            
+            // If sessionName is a numeric ID (> 20), treat it as missing to trigger index-based fallback
+            // unless it can be resolved via the registry.
+            const isNumericId = (s: any) => !isNaN(parseInt(s)) && parseInt(s) > 20;
+
+            if (!sessionName || sessionName === "null" || isNumericId(sessionName)) {
+               if (sessionName && isNumericId(sessionName) && attendanceData.sessions?.[sessionName]) {
+                   // Can be resolved via registry
+                   const resolved = attendanceData.sessions[sessionName].name;
+                   const normalized = normalizeSession(resolved);
+                   if (!isNaN(parseInt(normalized, 10))) {
+                       sessionName = normalized;
+                   }
+               } else if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
                    sessionName = sessionKey;
                } else {
                    sessionName = String(index + 1); 
                }
+            } else {
+                // Handle non-numeric ID cases (e.g. "VI")
+                if (attendanceData.sessions?.[sessionName]) {
+                    const resolved = attendanceData.sessions[sessionName].name;
+                    const normalized = normalizeSession(resolved);
+                    if (!isNaN(parseInt(normalized, 10))) {
+                        sessionName = normalized;
+                    }
+                }
             }
 
             let attendanceLabel = "Present";
@@ -407,12 +500,13 @@ export function AttendanceCalendar({
                 statusColor, 
                 courseId, 
                 isExtra: false,
-                isCorrection: false 
+                isCorrection: false,
+                originalSessionId: String(sessionData.session || sessionKey)
             });
         });
     });
     return events;
-  }, [attendanceData, coursesData, getCourseCodeById]);
+  }, [attendanceData, getCourseCodeById, getCourseNameById]);
 
   const handlePreviousMonth = () => { 
     // If the calendar is still initializing, provide feedback instead of appearing unresponsive
@@ -511,10 +605,15 @@ export function AttendanceCalendar({
       let hasOtherLeave = false;
 
       dateEvents.forEach(ev => {
-          const key = generateSlotKey(ev.courseId, date, ev.sessionName);
-          const override = normalizedTrackingData.find((t: any) =>
-             t._isoDate === dbDateStr && generateSlotKey(t.course, t._isoDate, t.session) === key
-          );
+          const override = normalizedTrackingData.find((t: any) => {
+             const isDateMatch = t._isoDate === dbDateStr;
+             const isCourseMatch = String(t.course) === String(ev.courseId);
+             const tSessionNorm = normalizeSession(t.session);
+             const evSessionNorm = normalizeSession(ev.sessionName);
+             const isKeyMatch = tSessionNorm === evSessionNorm;
+             const isIdMatch = String(t.session) === (ev as any).originalSessionId;
+             return isDateMatch && isCourseMatch && (isKeyMatch || isIdMatch);
+          });
 
           let finalStatus = ev.status;
           if (override) {
@@ -551,12 +650,15 @@ export function AttendanceCalendar({
     
     // 2. Process Official Events
     const processedEvents = Array.from(officialsMap.values()).map(ev => {
-        const key = generateSlotKey(ev.courseId, selectedDate, ev.sessionName);
 
         const override = normalizedTrackingData.find((t: any) => {
             const isDateMatch = t._isoDate === dbDateStr;
-            const isKeyMatch = generateSlotKey(t.course, t._isoDate, t.session) === key;
-            return isDateMatch && isKeyMatch;
+            const isCourseMatch = String(t.course) === String(ev.courseId);
+            const tSessionNorm = normalizeSession(t.session);
+            const evSessionNorm = normalizeSession(ev.sessionName);
+            const isKeyMatch = tSessionNorm === evSessionNorm;
+            const isIdMatch = String(t.session) === (ev as any).originalSessionId;
+            return isDateMatch && isCourseMatch && (isKeyMatch || isIdMatch);
         });
 
         if (override) {
@@ -598,7 +700,7 @@ export function AttendanceCalendar({
                     else if (Number(t.attendance) === 225) label = "Duty Leave";
                     
                     const cId = t.course.toString();
-                    const resolvedName = attendanceData?.courses?.[cId]?.name || coursesData?.courses?.[cId]?.name || t.course;
+                    const resolvedName = getCourseNameById(cId);
                     
                     processedEvents.push({
                         title: resolvedName, 
@@ -628,7 +730,7 @@ export function AttendanceCalendar({
     }
 
     return merged.sort((a, b) => getNormalizedSession(a.sessionName) - getNormalizedSession(b.sessionName));
-  }, [selectedDate, rawEvents, filter, normalizedTrackingData, attendanceData, coursesData, semester, year, isSameDay]);
+  }, [selectedDate, rawEvents, filter, normalizedTrackingData, semester, year, isSameDay, getCourseNameById]);
   
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const monthOptions = useMemo(() => {
@@ -893,8 +995,8 @@ export function AttendanceCalendar({
                             return (
                                 <div className="shrink-0 w-full sm:w-auto">
                                     <div className="flex flex-row gap-2 w-full">
-                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (!authUserId) return; if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); setPendingDl({ courseId: event.courseId, dbDate, sessionForDB, buttonKey }); setDlReasonOpen(true); }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
-                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (!authUserId) return; if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); handleWriteTracking(event.courseId, dbDate, "correction", sessionForDB, 110, "Incorrectly marked absent"); }} aria-label={`Mark ${event.title} as Present for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-green-500 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:border-green-500/70 dark:text-green-400 dark:hover:text-green-300"}`}>{isLoading ? "..." : <><CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" /><span>Mark Present</span></>}</Button>
+                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (!authUserId) return; if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); setPendingRemarkAction({ courseId: event.courseId, dbDate, sessionForDB, buttonKey, targetStatus: 225, title: "Duty Leave Reason", description: "Enter the reason for marking this session as duty leave.", placeholder: "Programme/Activity Name", defaultRemark: "Duty Leave" }); setRemark(""); setRemarkDialogOpen(true); }} aria-label={`Mark ${event.title} as Duty Leave for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300"}`}>{isLoading ? "..." : <><Briefcase className="w-3 h-3 shrink-0" aria-hidden="true"/><span>Mark DL</span></>}</Button>
+                                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => { if (!authUserId) return; if (clickedButtons.current?.has(buttonKey)) return; clickedButtons.current?.add(buttonKey); setPendingRemarkAction({ courseId: event.courseId, dbDate, sessionForDB, buttonKey, targetStatus: 110, title: "Correction Remark", description: "Enter a remark for this correction.", placeholder: "Incorrectly marked absent", defaultRemark: "Incorrectly marked absent" }); setRemark("Incorrectly marked absent"); setRemarkDialogOpen(true); }} aria-label={`Mark ${event.title} as Present for ${event.sessionName}`} className={`flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all ${isLoading ? "opacity-70 cursor-wait" : "border-green-500 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:border-green-500/70 dark:text-green-400 dark:hover:text-green-300"}`}>{isLoading ? "..." : <><CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" /><span>Mark Present</span></>}</Button>
                                     </div>
                                 </div>
                             );
@@ -913,7 +1015,7 @@ export function AttendanceCalendar({
                               <Badge variant="outline" className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10">Disabled</Badge>
                             )}
                           </div>
-                          {event.remarks && !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(event.remarks.trim()) && (
+                          {event.remarks && !isLegacyRemark(event.remarks) && (
                             <p className={cn(
                               "text-[11px] italic truncate max-w-50 sm:max-w-xs mt-1",
                               event.status === "Duty Leave"
@@ -971,29 +1073,39 @@ export function AttendanceCalendar({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* DL Reason Dialog */}
-      <Dialog open={dlReasonOpen} onOpenChange={(open) => { if (!open) handleDlCancel(); }}>
+      {/* Remark Dialog */}
+      <Dialog open={remarkDialogOpen} onOpenChange={(open) => { if (!open) handleRemarkCancel(); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Duty Leave Reason</DialogTitle>
+            <DialogTitle>{pendingRemarkAction?.title || "Add Remark"}</DialogTitle>
             <DialogDescription>
-              Enter the reason for marking this session as duty leave.
+              {pendingRemarkAction?.description || "Enter a remark for this action."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <Label htmlFor="dl-reason-calendar" className="text-sm mb-1.5 block">Reason (Optional)</Label>
+            <Label htmlFor="remark-calendar" className="text-sm mb-1.5 block">Remark (Optional)</Label>
             <Input
-              id="dl-reason-calendar"
-              placeholder="Programme/Activity Name"
-              value={dlReason}
-              onChange={(e) => setDlReason(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleDlConfirm(); }}
+              id="remark-calendar"
+              placeholder={pendingRemarkAction?.placeholder || "Enter remark..."}
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRemarkConfirm(); }}
               autoFocus
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleDlCancel}>Cancel</Button>
-            <Button onClick={handleDlConfirm} className="bg-yellow-500 text-white hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700">Confirm</Button>
+            <Button variant="outline" onClick={handleRemarkCancel}>Cancel</Button>
+            <Button 
+              onClick={handleRemarkConfirm} 
+              className={cn(
+                "text-white",
+                pendingRemarkAction?.targetStatus === 225 
+                  ? "bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                  : "bg-green-600 hover:bg-green-700"
+              )}
+            >
+              Confirm
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

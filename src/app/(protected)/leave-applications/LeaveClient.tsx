@@ -69,7 +69,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
   return (
     <div className="space-y-6 pb-24">
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <Card className="bg-background/60 dark:bg-black/40 backdrop-blur-md border border-border/50 dark:border-white/10 rounded-xl overflow-hidden shine-effect">
+        <Card className="custom-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Total Applied</CardTitle>
           </CardHeader>
@@ -80,7 +80,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
           </CardContent>
         </Card>
         
-        <Card className="bg-background/60 dark:bg-black/40 backdrop-blur-md border border-border/50 dark:border-white/10 rounded-xl overflow-hidden shine-effect">
+        <Card className="custom-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Approved</CardTitle>
           </CardHeader>
@@ -118,7 +118,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                 : "N/A";
 
             return (
-              <Card key={leave.id} className="bg-background/60 dark:bg-black/40 backdrop-blur-md border border-border/50 dark:border-white/10 rounded-xl overflow-hidden hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
+              <Card key={leave.id} className="custom-container hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
                 <CardHeader className="pb-3 border-b border-border/30 dark:border-white/5">
                   <div className="flex justify-between items-start mb-2">
                     <Badge variant="outline" className={`flex gap-1.5 items-center ${status.color}`}>
@@ -163,7 +163,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                   {requestedSessions.length > 0 && (
                     <div className="space-y-2">
                       <span className="text-[11px] sm:text-xs text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">Impacted Sessions ({requestedSessions.length})</span>
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
                         {requestedSessions.map((session: any) => (
                           <div key={session.id} className="flex items-start gap-2 bg-muted/50 dark:bg-white/5 rounded-md p-2 border border-border/50 dark:border-white/5">
                             <Badge variant="outline" className="bg-muted dark:bg-white/5 text-[10px] sm:text-xs px-1.5 py-0 border-border/50">S: {session.session?.name}</Badge>
@@ -198,7 +198,7 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
                   <div className="px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/2">
                     <div className="w-full space-y-2.5">
                       <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">Workflow History</span>
-                      <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                      <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-56 overflow-y-auto pr-1 custom-scrollbar">
                         {leave.approvers
                           .filter((a: any) => a.action_by_user)
                           .reduce((acc: any[], current: any) => {

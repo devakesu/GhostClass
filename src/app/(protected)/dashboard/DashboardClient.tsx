@@ -10,6 +10,7 @@ import {
 } from "framer-motion";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import axios from "@/lib/axios";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -431,6 +432,11 @@ export default function DashboardClient(
     queryClient.invalidateQueries({ queryKey: ["courses"] });
     queryClient.invalidateQueries({ queryKey: ["track_data"] });
     queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+    queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+    queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
+    queryClient.invalidateQueries({ queryKey: ["exams"] });
+    queryClient.invalidateQueries({ queryKey: ["exam-questions"] });
+    queryClient.invalidateQueries({ queryKey: ["exam-answers"] });
 
     try {
       if (pendingChange.type === "semester") {
@@ -445,8 +451,12 @@ export default function DashboardClient(
         setSelectedYear(pendingChange.value);
       }
 
-      // The mutations already trigger profile sync and query invalidation.
-      // We just need to wait for the hooks to start fetching then finish.
+      // 2. Wait for EzyGo to finish syncing the profile (including class name)
+      // for the new semester/year. This blocks the transition until sync is done.
+      await axios.get("/api/profile?sync=true", { baseURL: "" });
+
+      // 3. Invalidate profile so hooks get the fresh data from the DB
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     } catch (error) {
       logger.error("Settings Update Failed:", error);
 
@@ -558,7 +568,7 @@ export default function DashboardClient(
   const activeCourseCount = useMemo(() => {
     const activeIds = new Set<string>();
 
-    // 1. Scan Official Data (Check for ACTUAL attendance records in the SELECTED term)
+    // 1. Scan Official Data
     if (attendanceData?.studentAttendanceData) {
       Object.values(attendanceData.studentAttendanceData).forEach(
         (sessions: any) => {
@@ -568,36 +578,28 @@ export default function DashboardClient(
             const isRevision = session.class_type === "Revision";
 
             if (isValidAttendance && !isRevision && session.course) {
-              const cid = String(session.course);
-              if (!disabledCodes.has(getCourseCode(cid))) {
-                activeIds.add(cid);
-              }
+              activeIds.add(String(session.course));
             }
           });
         },
       );
     }
 
-    // 2. Scan Tracking Data (Strict: count only if it has actual numeric logs)
+    // 2. Scan Tracking Data
     if (trackingData) {
       trackingData.forEach((t: any) => {
         const isSameSemester = !selectedSemester ||
           t.semester === selectedSemester;
         const isSameYear = !selectedYear || t.year === selectedYear;
-
-        // Count as active only if it resides in the selected term AND has an attendance mark
         const hasAttendance = t.attendance != null;
 
         if (t.course && isSameSemester && isSameYear && hasAttendance) {
-          const cid = String(t.course);
-          if (!disabledCodes.has(getCourseCode(cid))) {
-            activeIds.add(cid);
-          }
+          activeIds.add(String(t.course));
         }
       });
     }
 
-    // 3. Filter against current catalog to ensure mathematical consistency (no "12/11")
+    // 3. Normalize and categorize
     const catalogCodes = new Set(
       [
         ...(coursesData?.courses
@@ -613,17 +615,23 @@ export default function DashboardClient(
     );
 
     const activeCodes = new Set<string>();
+    const disabledWithDataCodes = new Set<string>();
+
     activeIds.forEach((id) => {
-      const code = getCourseCode(id).toUpperCase().replace(/\s+/g, "");
-      if (code !== "" && catalogCodes.has(code) && !disabledCodes.has(code)) {
-        activeCodes.add(code);
+      const code = (getCourseCode(id) || id).toUpperCase().replace(/\s+/g, "");
+      if (code !== "" && catalogCodes.has(code)) {
+        if (disabledCodes.has(code)) {
+          disabledWithDataCodes.add(code);
+        } else {
+          activeCodes.add(code);
+        }
       }
     });
 
-    // 4. Count no-data courses (in catalog but no records, not disabled)
+    // 4. Count no-data courses (enabled only)
     const noDataCodes = new Set<string>();
     catalogCodes.forEach((code) => {
-      if (!activeCodes.has(code) && !disabledCodes.has(code)) {
+      if (!activeCodes.has(code) && !disabledWithDataCodes.has(code) && !disabledCodes.has(code)) {
         noDataCodes.add(code);
       }
     });
@@ -717,7 +725,8 @@ export default function DashboardClient(
       }
     > = {};
     if (coursesData?.courses) {
-      Object.keys(coursesData.courses).forEach((key) => {
+      Object.keys(coursesData.courses).forEach((id) => {
+        const key = getCourseCode(id).toUpperCase().replace(/\s+/g, "") || id;
         courseStats[key] = {
           present: 0,
           total: 0,
@@ -728,7 +737,7 @@ export default function DashboardClient(
         };
       });
     }
-    // Also seed entries for class-specific custom courses (keyed by normalised code)
+    // Also seed entries for class-specific custom courses
     if (classCourses) {
       classCourses.forEach((cc: any) => {
         const key = cc.course_code.replace(/\s+/g, "").toUpperCase();
@@ -769,21 +778,7 @@ export default function DashboardClient(
               const rawSession = getOfficialSessionRaw(session, sessionKey);
 
               const courseDisabled = isCourseDisabled(cid);
-
-              // Resiliance Fallback: If 'cid' is a numeric ID (old format) but courseStats keys
-              // are alphanumeric (new format), find the matching code from the current catalog.
-              let statsKey = cid;
-              if (!courseStats[statsKey] && coursesData?.courses) {
-                const matchedCourse = Object.values(coursesData.courses).find((
-                  c: any,
-                ) => String(c.id) === cid);
-                if (matchedCourse?.code) {
-                  statsKey = matchedCourse.code.toUpperCase().replace(
-                    /\s+/g,
-                    "",
-                  );
-                }
-              }
+              const statsKey = resolveCode(cid);
 
               const key = generateSlotKey(statsKey, dateStr, rawSession);
               officialMap.set(key, status);
@@ -836,7 +831,8 @@ export default function DashboardClient(
 
         if (!item.course) return;
         const cid = String(item.course);
-        const key = generateSlotKey(cid, item.date, item.session);
+        const statsKey = resolveCode(cid);
+        const key = generateSlotKey(statsKey, item.date, item.session);
 
         let trackerStatus = ATTENDANCE_STATUS.PRESENT;
         if (typeof item.attendance === "number") {
@@ -862,13 +858,13 @@ export default function DashboardClient(
           offPos: boolean,
           trackPos: boolean,
         ) => {
-          if (courseStats[cid]) {
+          if (courseStats[statsKey]) {
             if (isExtraClass) {
-              courseStats[cid].total++;
-              if (trackPos) courseStats[cid].present++;
+              courseStats[statsKey].total++;
+              if (trackPos) courseStats[statsKey].present++;
             } else {
-              if (!offPos && trackPos) courseStats[cid].present++;
-              else if (offPos && !trackPos) courseStats[cid].present--;
+              if (!offPos && trackPos) courseStats[statsKey].present++;
+              else if (offPos && !trackPos) courseStats[statsKey].present--;
             }
           }
         };
@@ -944,14 +940,15 @@ export default function DashboardClient(
   ]);
 
 
-  const sortedCourses = useMemo(() => {
-    // Build a unified registry (Flutter parity): official courses take priority;
-    // class-specific custom courses are appended if not already present by code.
+  const courseRegistry = useMemo(() => {
     const registry: Record<string, any> = {};
     if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([key, course]: [string, any]) => {
-        const codeKey = (course.code ?? key).replace(/\s+/g, "").toUpperCase();
-        registry[codeKey] = { ...course, key };
+      Object.entries(coursesData.courses).forEach(([id, course]: [string, any]) => {
+        registry[id] = { ...course, key: id };
+        const codeKey = (course.code || "").replace(/\s+/g, "").toUpperCase();
+        if (codeKey && !registry[codeKey]) {
+          registry[codeKey] = { ...course, key: id };
+        }
       });
     }
     if (classCourses) {
@@ -968,8 +965,25 @@ export default function DashboardClient(
         }
       });
     }
+    return registry;
+  }, [coursesData, classCourses]);
 
-    return Object.entries(registry).map(([codeKey, course]: [string, any]) => {
+
+  const sortedCourses = useMemo(() => {
+    // For the UI list, we only want unique courses by code.
+    const seenCodes = new Set<string>();
+    const uniqueCourses: any[] = [];
+
+    Object.values(courseRegistry).forEach((course: any) => {
+      const codeKey = (course.code || course.key).replace(/\s+/g, "").toUpperCase();
+      if (!seenCodes.has(codeKey)) {
+        seenCodes.add(codeKey);
+        uniqueCourses.push({ ...course, codeKey });
+      }
+    });
+
+    return uniqueCourses.map((course: any) => {
+      const { codeKey } = course;
       // Stats are keyed by the normalised code for both official and class courses.
       const statsObj = stats.courseStats[codeKey] ||
         stats.courseStats[course.key] ||
@@ -1013,8 +1027,7 @@ export default function DashboardClient(
       return a.name.localeCompare(b.name);
     });
   }, [
-    coursesData,
-    classCourses,
+    courseRegistry,
     stats,
     targetPercentage,
     disabledCodes,
@@ -1272,7 +1285,7 @@ export default function DashboardClient(
                           </span>
                           {diffTotal > 0 && (
                             <span className="text-blue-500 ml-1">
-                              &nbsp;+ {diffTotal}
+                              + ({diffTotal})
                             </span>
                           )}
                           <span>&nbsp;total</span>
@@ -1322,7 +1335,7 @@ export default function DashboardClient(
                           <AttendanceChart
                             attendanceData={filteredChartData}
                             trackingData={trackingData}
-                            coursesData={coursesData ?? undefined}
+                            coursesData={{ courses: courseRegistry }}
                             disabledCodes={disabledCodes}
                           />
                         </ErrorBoundary>
@@ -1646,6 +1659,8 @@ export default function DashboardClient(
                       attendanceData={attendanceData}
                       semester={currentSem}
                       year={currentYear}
+                      coursesData={{ courses: courseRegistry }}
+                      classCourses={classCourses}
                     />
                   )
                   : (

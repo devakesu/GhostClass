@@ -4,6 +4,7 @@ import { getCspHeader } from "./lib/csp";
 import { TERMS_VERSION } from "./app/config/legal";
 import { logger } from "./lib/logger";
 import { isAuthSessionMissingError } from "./lib/security/auth";
+import { decrypt } from "./lib/crypto";
 
 /**
  * Clears all session-related cookies on a redirect response.
@@ -39,6 +40,20 @@ function isRefreshTokenNotFoundError(error: unknown): boolean {
   const authError = error as { code?: unknown; status?: unknown; message?: unknown };
   return authError.code === "refresh_token_not_found"
     || (authError.status === 400 && typeof authError.message === "string" && authError.message.includes("Invalid Refresh Token"));
+}
+
+/**
+ * Attempts to get the user with a single retry on network failure.
+ */
+async function getUserWithRetry(supabase: any) {
+  try {
+    return await supabase.auth.getUser();
+  } catch (error) {
+    // If it's a network error (like timeout), try once more after a short delay
+    logger.warn("Supabase getUser network failure, retrying once...", { error });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return await supabase.auth.getUser();
+  }
 }
 
 export async function proxy(request: NextRequest) {
@@ -107,7 +122,7 @@ export async function proxy(request: NextRequest) {
   let isUnauthenticatedCertain = false;
 
   try {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await getUserWithRetry(supabase);
     if (error) {
       if (isRefreshTokenNotFoundError(error) || isAuthSessionMissingError(error)) {
         isUnauthenticatedCertain = true;
@@ -116,7 +131,35 @@ export async function proxy(request: NextRequest) {
       }
     } else {
       user = data.user;
-      if (!user) isUnauthenticatedCertain = true;
+      if (!user) {
+        isUnauthenticatedCertain = true;
+      } else {
+        // Self-Healing: If user is authenticated in Supabase but EzyGo cookie is missing, restore it.
+        const ezygoCookie = request.cookies.get("ezygo_access_token")?.value;
+        if (!ezygoCookie) {
+          try {
+            const { data: dbUser } = await supabase
+              .from("users")
+              .select("ezygo_token, ezygo_iv")
+              .eq("auth_id", user.id)
+              .maybeSingle();
+
+            if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
+              const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
+              response.cookies.set("ezygo_access_token", token, {
+                httpOnly: true,
+                secure: isProd,
+                sameSite: "lax",
+                path: "/",
+                maxAge: 31 * 24 * 60 * 60, // 31 days
+              });
+              logger.info("EzyGo session cookie self-healed in middleware", { userId: user.id });
+            }
+          } catch (err) {
+            logger.warn("Non-critical: EzyGo self-healing failed in middleware", err);
+          }
+        }
+      }
     }
   } catch (error) {
     logger.warn("Supabase auth getUser threw unexpectedly in middleware", { error });

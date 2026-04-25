@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import {
@@ -64,6 +64,7 @@ import {
 } from "@/lib/error-handling";
 import { AttendanceReport, Course, TrackAttendance } from "@/types";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 
 interface User {
   id: string | number;
@@ -136,7 +137,6 @@ export function AddAttendanceDialog({
   const [statusType, setStatusType] = useState<
     "Present" | "Absent" | "Duty Leave"
   >("Present");
-  const [dlReason, setDlReason] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -150,38 +150,72 @@ export function AddAttendanceDialog({
     semester: selectedSemester,
   });
 
-  const sortedCourses = useMemo(() => {
-    if (!coursesData?.courses) return [];
-    return Object.entries(coursesData.courses)
-      .map(([key, c]) => ({ key, ...c }))
-      .sort((a, b) => {
-        const disabledA = isDisabled(a.key);
-        const disabledB = isDisabled(b.key);
-        // Deprioritize disabled courses: push them to the end
-        if (disabledA && !disabledB) return 1;
-        if (!disabledA && disabledB) return -1;
-        return a.name.localeCompare(b.name);
-      });
-  }, [coursesData, isDisabled]);
+  const { data: classCourses } = useFetchClassCourses({
+    semester: selectedSemester,
+    year: selectedYear,
+    enabled: !!selectedSemester && !!selectedYear,
+  });
 
   /** Resolve course code from EzyGo numeric ID or raw code */
   const getCourseCodeById = useCallback(
     (id: string): string => {
-      // 1. Check if ID itself is already a code in coursesData
-      if (coursesData?.courses?.[id]) return id.toUpperCase();
+      const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
+
+      // 1. Check if ID exists in coursesData and has a code
+      if (coursesData?.courses?.[id]) {
+        return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
+      }
 
       // 2. Otherwise, find match by numeric code
       const course = Object.values(coursesData?.courses || {}).find((c) =>
-        String(c.id) === id
+        String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
       );
       if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
 
-      // 3. Fallback to attendanceData courses
+      // 3. Check Custom (Class) Courses
+      const custom = classCourses?.find(cc => 
+        cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
+      );
+      if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
+
+      // 4. Fallback to attendanceData courses
       const altCourse = attendanceData?.courses?.[id];
       return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
     },
-    [attendanceData, coursesData],
+    [attendanceData, coursesData, classCourses],
   );
+
+  const sortedCourses = useMemo(() => {
+    const courses: { key: string; name: string }[] = [];
+    
+    // 1. Official Courses
+    if (coursesData?.courses) {
+      Object.entries(coursesData.courses).forEach(([key, c]) => {
+        courses.push({ key, name: c.name });
+      });
+    }
+    
+    // 2. Custom (Class) Courses - Add if not already present
+    if (classCourses) {
+      classCourses.forEach(cc => {
+        const code = cc.course_code.toUpperCase().replace(/\s+/g, "");
+        if (!courses.some(c => c.key.toUpperCase().replace(/\s+/g, "") === code)) {
+          courses.push({ key: cc.course_code, name: cc.course_name });
+        }
+      });
+    }
+
+    return courses.sort((a, b) => {
+      const codeA = getCourseCodeById(a.key);
+      const codeB = getCourseCodeById(b.key);
+      const disabledA = isDisabled(codeA);
+      const disabledB = isDisabled(codeB);
+      // Deprioritize disabled courses: push them to the end
+      if (disabledA && !disabledB) return 1;
+      if (!disabledA && disabledB) return -1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [coursesData, classCourses, isDisabled, getCourseCodeById]);
 
   // 1. CALCULATE SEMESTER BOUNDS
   const semesterBounds = useMemo(() => {
@@ -212,36 +246,30 @@ export function AddAttendanceDialog({
     }
   }, [selectedSemester, selectedYear]);
 
-  // 2. VALIDATE AND RESET ON OPEN
-  const [lastProcessedOpen, setLastProcessedOpen] = useState(false);
-
-  useEffect(() => {
-    if (open && !lastProcessedOpen) {
-      setLastProcessedOpen(true);
-      // 1. Clamp date within semester bounds
-      if (semesterBounds.min && semesterBounds.max) {
-        if (isBefore(date, semesterBounds.min)) {
-          const newDate = semesterBounds.min;
-          setDate(newDate);
-          setCurrentMonth(newDate);
-        } else if (isAfter(date, semesterBounds.max)) {
-          const newDate = semesterBounds.max;
-          setDate(newDate);
-          setCurrentMonth(newDate);
-        } else {
-          setCurrentMonth(date);
-        }
+  // 2. VALIDATE AND RESET ON OPEN (Adjusting state during render)
+  const [prevOpenTrigger, setPrevOpenTrigger] = useState(false);
+  if (open && !prevOpenTrigger) {
+    setPrevOpenTrigger(true);
+    // 1. Clamp date within semester bounds
+    if (semesterBounds.min && semesterBounds.max) {
+      if (isBefore(date, semesterBounds.min)) {
+        setDate(semesterBounds.min);
+        setCurrentMonth(semesterBounds.min);
+      } else if (isAfter(date, semesterBounds.max)) {
+        setDate(semesterBounds.max);
+        setCurrentMonth(semesterBounds.max);
+      } else {
+        setCurrentMonth(date);
       }
-      // 2. Reset other fields
-      setSession("");
-      setCourseId("");
-      setRemarks("");
-      setDlReason("");
-      setStatusType("Present");
-    } else if (!open) {
-      setLastProcessedOpen(false);
     }
-  }, [open, semesterBounds, lastProcessedOpen, date]);
+    // 2. Reset other fields
+    setSession("");
+    setCourseId("");
+    setRemarks("");
+    setStatusType("Present");
+  } else if (!open && prevOpenTrigger) {
+    setPrevOpenTrigger(false);
+  }
 
 
   // --- 3. SMART DEFAULTS (Occupancy Check) ---
@@ -426,18 +454,13 @@ export function AddAttendanceDialog({
         return;
       }
 
-      let courseIdToSave = courseId;
+      let courseIdToSave = courseId.trim().toUpperCase().replace(/\s+/g, "");
       const selectedCourse = coursesData?.courses?.[courseId];
       if (selectedCourse?.code) {
-        courseIdToSave = selectedCourse.code.replace(/\s+/g, "").toUpperCase();
+        courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/\s+/g, "");
       }
 
-      const sanitizedDlReason = (dlReason.trim() || "").substring(0, 255);
-      const sanitizedRemarks = (remarks.trim() || "").substring(0, 255);
-
-      const finalRemarks = statusType === "Duty Leave"
-        ? (sanitizedDlReason || "Duty Leave")
-        : (sanitizedRemarks || `Self-Marked: ${statusType}`);
+      const finalRemarks = (remarks.trim() || "").substring(0, 255) || null;
 
       const { error } = await supabase
         .from("tracker")
@@ -713,21 +736,25 @@ export function AddAttendanceDialog({
                   </div>
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
-                  {sortedCourses.map((c: any) => (
-                    <SelectItem
-                      key={c.key}
-                      value={c.key}
-                      className={cn(
-                        "whitespace-normal py-2",
-                        isDisabled(c.key) && "opacity-50 italic",
-                      )}
-                    >
-                      <span className="leading-tight text-left capitalize truncate block">
-                        {c.name.toLowerCase()}
-                        {isDisabled(c.key) && " (Disabled)"}
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {sortedCourses.map((c: any) => {
+                    const code = getCourseCodeById(c.key);
+                    const isCourseDisabled = isDisabled(code);
+                    return (
+                      <SelectItem
+                        key={c.key}
+                        value={c.key}
+                        className={cn(
+                          "whitespace-normal py-2",
+                          isCourseDisabled && "opacity-60 italic",
+                        )}
+                      >
+                        <span className="leading-tight text-left capitalize truncate block">
+                          {c.name.toLowerCase()}
+                          {isCourseDisabled && " (Disabled)"}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -740,7 +767,6 @@ export function AddAttendanceDialog({
               value={statusType}
               onValueChange={(v: any) => {
                 setStatusType(v);
-                if (v !== "Duty Leave") setDlReason("");
               }}
               className="col-span-3 flex gap-4"
               aria-label="Select attendance status"
@@ -787,40 +813,18 @@ export function AddAttendanceDialog({
             </RadioGroup>
           </div>
 
-          {/* DL REASON */}
-          {statusType === "Duty Leave" && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label
-                htmlFor="dl-reason-dialog"
-                className="text-right text-muted-foreground"
-              >
-                Reason (optional)
-              </Label>
-              <div className="col-span-3">
-                <Input
-                  id="dl-reason-dialog"
-                  placeholder="Programme/Activity"
-                  value={dlReason}
-                  onChange={(e) => setDlReason(e.target.value)}
-                  className="bg-accent/20 border-border/50"
-                  maxLength={255}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* REMARKS */}
+          {/* REMARKS / REASON */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label
               htmlFor="remarks-dialog"
               className="text-right text-muted-foreground"
             >
-              Remarks
+              {statusType === "Duty Leave" ? "Reason" : "Remarks"}
             </Label>
             <div className="col-span-3">
               <Input
                 id="remarks-dialog"
-                placeholder="Notes (optional)"
+                placeholder={statusType === "Duty Leave" ? "Programme/Activity" : "Notes (optional)"}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 className="bg-accent/20 border-border/50"

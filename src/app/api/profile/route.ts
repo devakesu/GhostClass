@@ -11,6 +11,8 @@ import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
+import { toTitleCase } from "@/lib/utils";
+import { performProfileSync } from "@/lib/user/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -47,28 +49,53 @@ const getHandler = async (req: Request) => {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: existingUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
+  const searchParams = new URL(req.url).searchParams;
+  const shouldSync = searchParams.get("sync") === "true";
 
   const decryptedGender = existingUser?.gender && existingUser?.gender_iv ? decrypt(existingUser.gender_iv, existingUser.gender) : null;
   const decryptedBirthDate = existingUser?.birth_date && existingUser?.birth_date_iv ? decrypt(existingUser.birth_date_iv, existingUser.birth_date) : null;
   const decryptedPhone = existingUser?.phone && existingUser?.phone_iv ? decrypt(existingUser.phone_iv, existingUser.phone) : null;
 
   if (existingUser && existingUser.first_name) {
+    if (shouldSync) {
+      const syncToken = await getAuthTokenServer();
+      if (syncToken) {
+        try {
+          // Block until EzyGo sync completes
+          await performProfileSync(syncToken, existingUser.id, user.id);
+          
+          // Refetch from DB to return fresh data (e.g. updated class name)
+          const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).single();
+          if (updatedUser) {
+             return NextResponse.json({ 
+                id: updatedUser.id, 
+                username: updatedUser.username, 
+                email: updatedUser.email, 
+                first_name: updatedUser.first_name, 
+                last_name: updatedUser.last_name, 
+                phone: updatedUser.phone && updatedUser.phone_iv ? decrypt(updatedUser.phone_iv, updatedUser.phone) : null,
+                gender: updatedUser.gender && updatedUser.gender_iv ? decrypt(updatedUser.gender_iv, updatedUser.gender) : null,
+                birth_date: updatedUser.birth_date && updatedUser.birth_date_iv ? decrypt(updatedUser.birth_date_iv, updatedUser.birth_date) : null,
+                avatar_url: updatedUser.avatar_url,
+                created_at: updatedUser.created_at,
+                ezygo_created_at: updatedUser.ezygo_created_at,
+                class: Array.isArray(updatedUser.class) ? updatedUser.class[0] : updatedUser.class
+              });
+          }
+        } catch (err) { logger.warn("Synchronous profile sync failed", err); }
+      }
+    }
+
     after(async () => {
       const syncToken = await getAuthTokenServer();
       if (!syncToken) return;
       try {
-        const ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${syncToken}` } });
-        if (ezygoRes.ok) {
-          const json = await ezygoRes.json();
-          const d = json.data ?? json;
-          const enc = (d.mobile || d.user?.mobile) ? encrypt(d.mobile || d.user?.mobile) : null;
-          await supabaseAdmin.from("users").update({
-            first_name: resolve(existingUser.first_name, d.first_name || d.full_name?.split(" ")[0]),
-            last_name: resolve(existingUser.last_name, d.last_name || d.full_name?.split(" ").slice(1).join(" ")),
-            phone: enc?.content, phone_iv: enc?.iv
-          }).eq("id", existingUser.id);
-        }
-      } catch (err) { logger.warn("Sync failed", err); }
+        // Trigger a full background sync (Profile, Class, Courses)
+        // This ensures class label updates correctly after semester/year changes.
+        await performProfileSync(syncToken, existingUser.id, user.id);
+      } catch (err) { 
+        logger.warn("Profile background sync failed", err); 
+      }
     });
     return NextResponse.json({ 
       id: existingUser.id, 
@@ -80,6 +107,8 @@ const getHandler = async (req: Request) => {
       gender: decryptedGender, 
       birth_date: decryptedBirthDate, 
       avatar_url: existingUser.avatar_url,
+      created_at: existingUser.created_at,
+      ezygo_created_at: existingUser.ezygo_created_at,
       class: Array.isArray(existingUser.class) ? existingUser.class[0] : existingUser.class
     });
   }
@@ -91,9 +120,25 @@ const getHandler = async (req: Request) => {
   const json = await ezygoRes.json();
   const d = json.data || json;
   const encPhone = (d.mobile || d.user?.mobile) ? encrypt(d.mobile || d.user?.mobile) : null;
-  const upsertData = { id: d.user_id, auth_id: user.id, first_name: resolve(null, d.first_name || d.full_name?.split(" ")[0]), last_name: resolve(null, d.last_name || d.full_name?.split(" ").slice(1).join(" ")), phone: encPhone?.content, phone_iv: encPhone?.iv };
+  const upsertData = { 
+    id: d.user_id, 
+    auth_id: user.id, 
+    username: d.username || d.user?.username || null,
+    email: d.email || d.user?.email || null,
+    first_name: resolve(null, d.first_name || d.full_name?.split(" ")[0]), 
+    last_name: resolve(null, d.last_name || d.full_name?.split(" ").slice(1).join(" ")), 
+    phone: encPhone?.content, 
+    phone_iv: encPhone?.iv,
+    ezygo_created_at: d.created_at || null
+  };
   await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
-  return NextResponse.json({ ...upsertData, phone: d.mobile || d.user?.mobile });
+  
+  // Return the data with decrypted phone for the client
+  return NextResponse.json({ 
+    ...upsertData, 
+    phone: d.mobile || d.user?.mobile || null,
+    created_at: new Date().toISOString() // Freshly created
+  });
 };
 
 const patchSchema = z.object({
@@ -122,13 +167,16 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422 });
 
   const { first_name, last_name, gender, birth_date } = parsed.data;
-  const up: any = { first_name, last_name: last_name ?? null };
+  const sanitizedFirstName = toTitleCase(first_name);
+  const sanitizedLastName = last_name ? toTitleCase(last_name) : null;
+  
+  const up: any = { first_name: sanitizedFirstName, last_name: sanitizedLastName };
   if (gender) { const enc = encrypt(gender); up.gender = enc.content; up.gender_iv = enc.iv; }
   if (birth_date) { const enc = encrypt(birth_date); up.birth_date = enc.content; up.birth_date_iv = enc.iv; }
 
   const supabaseAdmin = getAdminClient();
   await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
-  return NextResponse.json({ first_name, last_name, gender, birth_date });
+  return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
 };
 
 export const GET = withSecurity(getHandler as any);

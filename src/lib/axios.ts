@@ -97,6 +97,7 @@ const CSRF_TOKEN_HEX_PATTERN = /^[0-9a-f]+$/;
 
 type RetryableRequestConfig = {
   _csrfRetried?: boolean;
+  _authRetried?: boolean;
 };
 
 let csrfRefreshPromise: Promise<string | null> | null = null;
@@ -145,6 +146,47 @@ async function refreshCsrfToken(): Promise<string | null> {
   })();
 
   return csrfRefreshPromise;
+}
+  
+let syncPromise: Promise<boolean> | null = null;
+
+/**
+ * Attempts to heal the EzyGo session by calling the sync endpoint.
+ * This restores the ezygo_access_token cookie if a valid Supabase session exists.
+ */
+async function syncSession(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (syncPromise) return syncPromise;
+
+  syncPromise = (async () => {
+    try {
+      const csrfToken = getCsrfToken();
+      const response = await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+        },
+        // Ensure credentials are included to pass the Supabase session cookies
+        credentials: "include", 
+      });
+
+      if (!response.ok) {
+        logger.warn("[axios] Session sync failed", { status: response.status });
+        return false;
+      }
+
+      const data = await response.json().catch(() => null);
+      return !!data?.success;
+    } catch (error) {
+      logger.warn("[axios] Error during session sync", error);
+      return false;
+    } finally {
+      syncPromise = null;
+    }
+  })();
+
+  return syncPromise;
 }
 
 /**
@@ -330,17 +372,28 @@ axiosInstance.interceptors.response.use(
     }
 
     if (
-      !isLoggingOut401 &&
       error?.response?.status === 401 &&
+      !originalConfig._authRetried &&
       typeof window !== "undefined"
     ) {
-      isLoggingOut401 = true;
-      logger.warn("[axios] 401 received — session/token inconsistency detected, logging out");
-      try {
-        const { handleLogout } = await import("@/lib/security/auth");
-        await handleLogout();
-      } catch {
-        // handleLogout already redirects even on failure; ignore any throw here
+      originalConfig._authRetried = true;
+      logger.info("[axios] 401 received — attempting session recovery...");
+      
+      const isHealed = await syncSession();
+      if (isHealed) {
+        logger.info("[axios] Session recovered successfully, retrying request");
+        return axiosInstance.request(originalConfig as any);
+      }
+      
+      if (!isLoggingOut401) {
+        isLoggingOut401 = true;
+        logger.warn("[axios] Session recovery failed or unauthenticated — logging out");
+        try {
+          const { handleLogout } = await import("@/lib/security/auth");
+          await handleLogout();
+        } catch {
+          // handleLogout already redirects even on failure
+        }
       }
     }
     return Promise.reject(error);
@@ -378,11 +431,16 @@ axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
     if (isInternal && !isPublic) {
       try {
         if (isMutation && config.data) {
-          // Mutation: Encrypt body and include CEK
-          const { jwe, cek } = await encryptRequest(config.data);
-          config.data = jwe;
-          config._jweCek = cek;
-          config.headers.set("Content-Type", "application/jose");
+          // Idempotency: Don't double-encrypt if already a JWE string (from a retry)
+          const isAlreadyJwe = typeof config.data === "string" && config.data.split(".").length === 5;
+          
+          if (!isAlreadyJwe) {
+            // Mutation: Encrypt body and include CEK
+            const { jwe, cek } = await encryptRequest(config.data);
+            config.data = jwe;
+            config._jweCek = cek;
+            config.headers.set("Content-Type", "application/jose");
+          }
         } else if (method === "get") {
           // GET: Encrypt CEK in header
           const { jwe, cek } = await encryptHeader();
