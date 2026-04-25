@@ -10,15 +10,14 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-import axios, { AxiosError } from "axios"; 
-import { getCsrfToken, setCsrfToken } from "@/lib/axios";
+import axios from "@/lib/axios";
+import { AxiosError } from "axios"; 
 import { useCSRFToken } from "@/hooks/use-csrf-token"; 
 
 import { PasswordResetForm } from "./password-reset-form";
 import { motion, HTMLMotionProps, Variants } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
 import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
 import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
@@ -224,44 +223,23 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         return;
       }
 
-      // 1. Login to Ezygo (public endpoint - exempt from CSRF, listed in PUBLIC_PATHS)
-      const response = await axios.post("/api/backend/login", formData);
-      const token = response.data.access_token;
+      // 1. Login to Ezygo (public endpoint)
+      // Base URL is /api/backend/ so we just use 'login'
+      const response = await axios.post("login", {
+        username: formData.username.trim(),
+        password: formData.password.trim(),
+        stay_logged_in: true
+      });
+      
+      // Support both EzyGo response formats ('access_token' or 'token')
+      const token = response.data.access_token || response.data.token;
 
-      if (!token) throw new Error("Invalid response from server");
+      if (!token) throw new Error("Invalid response from server: Access token missing");
 
-      // 2. Securely Save Token (Bridge to GhostClass) - requires CSRF token.
-      // getCsrfToken() reads the stored CSRF token (backed by sessionStorage and
-      // initialized by useCSRFToken()). On very fast submissions (e.g. password manager
-      // autofill) the async CSRF fetch may not have completed yet, which would send no
-      // header and cause a 403. If the token is missing here, attempt a one-time re-fetch
-      // before giving up.
-      let csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        try {
-          // Token not yet available — the async CSRF init may not have finished
-          // (e.g. password manager autofill + instant submit). Re-fetch directly
-          // and store the token so the Axios interceptor also picks it up.
-          const csrfRes = await fetch("/api/csrf", { credentials: "include" });
-          if (csrfRes.ok) {
-            const data = await csrfRes.json();
-            const tokenFromResponse =
-              typeof data?.token === "string" ? data.token : null;
-            csrfToken = tokenFromResponse;
-            if (csrfToken) setCsrfToken(csrfToken);
-          }
-        } catch {
-          // If the re-fetch itself fails, proceed without the token — the server
-          // will reject with 403 and the catch block will surface the right error.
-        }
-      }
-
-      const saveTokenResponse = await axios.post("/api/auth/save-token", 
-        { token }, 
-        { 
-          headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : {}
-        }
-      );
+      // 2. Securely Save Token (Bridge to GhostClass)
+      // Interceptors handle CSRF and JWE automatically for internal routes.
+      // We override baseURL to "/" to ensure it hits our own API, not the EzyGo proxy.
+      const saveTokenResponse = await axios.post("/api/auth/save-token", { token }, { baseURL: "/" });
 
       // 3. Pre-populate settings from save-token response for immediate availability.
       // Use the Supabase auth user ID returned by the server — avoids an extra getUser() round-trip.
@@ -501,7 +479,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   id="login"
                   type={loginMethodProps[loginMethod].type}
                   value={formData.username}
-                  className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors"
+                  className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-primary/50 transition-colors"
                   onChange={handleLoginChange}
                   placeholder={loginMethodProps[loginMethod].placeholder}
                   name={loginMethodProps[loginMethod].label.toLowerCase()}
@@ -530,7 +508,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   required
                   value={formData.password}
                   className={cn(
-                    "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors",
+                    "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-primary/50 transition-colors",
                     passwordError && "border-red-500/50 focus:border-red-500"
                   )}
                   onChange={handlePasswordChange}
@@ -585,9 +563,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
         {/* Disclaimer Section */}
         <div className="mt-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 mb-3">
-            <LockIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-            <span className="text-[11px] font-bold tracking-widest uppercase text-purple-600 dark:text-purple-300/80">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
+            <LockIcon className="h-3 w-3 text-primary" />
+            <span className="text-[11px] font-bold tracking-widest uppercase text-primary">
               Ghosts don&apos;t snoop 😁
             </span>
           </div>

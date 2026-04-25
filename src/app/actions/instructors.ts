@@ -1,33 +1,93 @@
 "use server";
 
 import { logger } from "@/lib/logger";
+import { createClient } from "@/lib/supabase/server";
+import { toTitleCase } from "@/lib/utils";
+import { revalidatePath } from "next/cache";
 
 export async function upsertInstructorAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const courseCode = String(formData.get("courseCode") ?? "").trim();
-  const instructorName = String(formData.get("instructorName") ?? "").trim();
+  // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
+  const courseCode = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  const instructorName = toTitleCase(String(formData.get("instructorName") ?? ""));
+  const semester = String(formData.get("semester") ?? "").trim();
+  const academicYear = String(formData.get("academicYear") ?? "").trim();
+  const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
 
   if (!courseCode || !instructorName) {
     return { error: "Course code and instructor name are required" };
   }
 
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/backend/institutionuser/courses/instructors`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ course_code: courseCode, instructor_name: instructorName }),
-      cache: "no-store",
-    });
+  // 1. Verify Turnstile Security Token
+  if (!turnstileToken) {
+    return { error: "Security verification failed. Please refresh." };
+  }
 
-    if (!response.ok) {
-      const body = await response.text();
-      return { error: body || "Failed to save instructor" };
+  try {
+    const verifyResponse = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${turnstileToken}`,
+      }
+    );
+    const verifyData = await verifyResponse.json();
+    if (!verifyData.success) {
+      logger.warn("Turnstile verification failed", { verifyData, courseCode });
+      return { error: "Security verification failed. Please try again." };
+    }
+  } catch (err) {
+    logger.error("Turnstile verification exception", err);
+    return { error: "Security check failed. Please check your connection." };
+  }
+
+  // 2. Perform Database Update
+  try {
+    const supabase = await createClient();
+    
+    // Get current authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { error: "You must be logged in to update instructors" };
     }
 
+    // Get user's class context from the 'users' table (aliased as profile in types)
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("class_id")
+      .eq("auth_id", user.id)
+      .single();
+
+    if (profileError || !profile?.class_id) {
+      logger.error("Failed to fetch user class for instructor update", profileError);
+      return { error: "No class associated with your profile" };
+    }
+
+    // Upsert into course_instructors (communal mapping shared by the class)
+    const { error: upsertError } = await supabase
+      .from("course_instructors")
+      .upsert({
+        class_id: profile.class_id,
+        course_code: courseCode.toUpperCase().replace(/\s+/g, ""),
+        instructor_name: instructorName,
+        semester,
+        academic_year: academicYear,
+        updated_by: user.id
+      }, {
+        onConflict: "class_id, course_code, semester, academic_year"
+      });
+
+    if (upsertError) {
+      logger.error("Database upsert failed for course_instructors", upsertError);
+      return { error: "Failed to save instructor to database" };
+    }
+
+    revalidatePath("/dashboard");
     return {};
   } catch (error) {
-    logger.error("upsertInstructorAction failed", error);
-    return { error: "Failed to save instructor" };
+    logger.error("upsertInstructorAction failed with exception", error);
+    return { error: "An unexpected error occurred while saving" };
   }
 }

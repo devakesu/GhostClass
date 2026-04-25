@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import React, { useState, forwardRef } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Pencil, X, Check } from "lucide-react";
+import { Loader2, Pencil, X, Check, Calendar, User, Info } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { useUpdateProfile } from "@/hooks/users/profile";
 import { UserProfile } from "@/types";
-import { cn, redact } from "@/lib/utils";
+import { cn, redact, toTitleCase } from "@/lib/utils";
 import { Separator } from "../ui/separator";
 import { DeleteAccount } from "./delete-account";
 
@@ -79,21 +79,23 @@ const ReadOnlyField = forwardRef<HTMLInputElement, ReadOnlyFieldProps>(
     const hasValue = value !== null && value !== undefined && value !== "";
 
     return (
-      <input
-        ref={ref}
-        {...props}
-        readOnly
-        aria-readonly="true"
-        value={hasValue ? value! : ""}
-        placeholder={placeholder}
-        className={cn(
-          "flex h-11 w-full rounded-lg border border-border/40 px-3 py-2 text-sm transition-all",
-          "bg-secondary/30 dark:bg-secondary/50 text-foreground/90 cursor-default",
-          !hasValue && "text-muted-foreground italic",
-          className
-        )}
-        tabIndex={0}
-      />
+      <div className={cn(
+        "flex h-11 w-full items-center rounded-xl border border-border/40 px-3 transition-all",
+        "bg-secondary/15 dark:bg-white/5 text-foreground/90",
+        !hasValue && "opacity-50",
+        className
+      )}>
+        <input
+          ref={ref}
+          {...props}
+          readOnly
+          aria-readonly="true"
+          value={hasValue ? value! : ""}
+          placeholder={placeholder}
+          className="bg-transparent border-none focus:outline-none w-full text-sm font-medium"
+          tabIndex={0}
+        />
+      </div>
     );
   }
 );
@@ -143,11 +145,14 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
   });
 
   function onSubmit(formValues: ProfileFormValues) {
+    const sanitizedFirstName = toTitleCase(formValues.first_name);
+    const sanitizedLastName = formValues.last_name ? toTitleCase(formValues.last_name) : null;
+
     updateProfileMutation.mutate(
       { 
         data: {
-          first_name: formValues.first_name,
-          last_name: formValues.last_name,
+          first_name: sanitizedFirstName,
+          last_name: sanitizedLastName,
           gender: formValues.gender || null,
           birth_date: formValues.birth_date || null,
         } 
@@ -213,20 +218,23 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               control={form.control}
               name="first_name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold text-muted-foreground ml-1">
+                <FormItem className="space-y-1.5">
+                  <FormLabel className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">
                     First Name
                   </FormLabel>
                   <FormControl>
-                    {isEditing ? (
-                      <Input
-                        placeholder="Enter first name"
-                        className="bg-background/50 h-11"
-                        {...field}
-                      />
-                    ) : (
-                      <ReadOnlyField value={field.value} />
-                    )}
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                      {isEditing ? (
+                        <Input
+                          placeholder="Enter first name"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                        />
+                      ) : (
+                        <ReadOnlyField value={field.value} className="pl-9" />
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -239,20 +247,23 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               control={form.control}
               name="last_name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold text-muted-foreground ml-1">
+                <FormItem className="space-y-1.5">
+                  <FormLabel className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">
                     Last Name
                   </FormLabel>
                   <FormControl>
-                    {isEditing ? (
-                      <Input
-                        placeholder="Enter last name"
-                        className="bg-background/50 h-11"
-                        {...field}
-                      />
-                    ) : (
-                      <ReadOnlyField value={field.value} />
-                    )}
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                      {isEditing ? (
+                        <Input
+                          placeholder="Enter last name"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                        />
+                      ) : (
+                        <ReadOnlyField value={field.value} className="pl-9" />
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -265,26 +276,29 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               control={form.control}
               name="gender"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold text-muted-foreground ml-1">
+                <FormItem className="space-y-1.5">
+                  <FormLabel className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">
                     Gender
                   </FormLabel>
-                  {isEditing ? (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-background/50 h-11" aria-label="Select gender">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <ReadOnlyField value={displayGender(field.value)} />
-                  )}
+                  <div className="relative">
+                    <Info className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 z-10" />
+                    {isEditing ? (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="pl-9 custom-input bg-background/50 h-11" aria-label="Select gender">
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="custom-dropdown">
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <ReadOnlyField value={displayGender(field.value)} className="pl-9" />
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -296,22 +310,25 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               control={form.control}
               name="birth_date"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold text-muted-foreground ml-1">
+                <FormItem className="space-y-1.5">
+                  <FormLabel className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">
                     Date of Birth
                   </FormLabel>
                   <FormControl>
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        className="bg-background/50 h-11"
-                        {...field}
-                        value={field.value || ""}
-                        aria-label="Enter date of birth"
-                      />
-                    ) : (
-                      <ReadOnlyField value={field.value} placeholder="YYYY-MM-DD" />
-                    )}
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                      {isEditing ? (
+                        <Input
+                          type="date"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                          value={field.value || ""}
+                          aria-label="Enter date of birth"
+                        />
+                      ) : (
+                        <ReadOnlyField value={field.value} placeholder="YYYY-MM-DD" className="pl-9" />
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -360,16 +377,37 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         </AnimatePresence>
       </motion.form>
       
-      <Separator className="my-8" />
+      <Separator className="my-4" />
+
+      {/* Account Info Footer */}
+      <div className="flex items-center gap-4 py-4 px-1">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Calendar className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            GhostClass Join Date
+          </span>
+          <span className="text-sm font-bold text-foreground/90">
+            {profile?.created_at
+              ? new Date(profile.created_at).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "N/A"}
+          </span>
+        </div>
+      </div>
+
+      <Separator className="my-4" />
       
       {/* Danger Zone */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-destructive">
            <h3 className="text-lg font-medium">Danger Zone</h3>
         </div>
-        <div className="rounded-lg border border-destructive/30 dark:border-destructive/40 bg-destructive/5 dark:bg-destructive/10 p-4">
-            <DeleteAccount />
-        </div>
+        <DeleteAccount />
       </div>
     </Form>
   );

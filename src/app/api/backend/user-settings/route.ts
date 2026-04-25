@@ -22,7 +22,7 @@ const handler = async (_req: Request) => {
     }
 
     return NextResponse.json({ settings });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 };

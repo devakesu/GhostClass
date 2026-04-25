@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { useProfile } from "@/hooks/users/profile";
@@ -36,16 +36,19 @@ import {
   formatSessionName,
   generateSlotKey,
   getSessionNumber,
+  normalizeSession,
+  normalizeToISODate,
   redact,
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import {
-  DUTY_LEAVE_PLACEHOLDER_REMARKS,
+  isLegacyRemark,
   getOfficialSessionRaw,
 } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
+import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import {
   Select,
   SelectContent,
@@ -53,6 +56,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQueryClient } from "@tanstack/react-query";
 
 // --- Helper Functions ---
 
@@ -141,6 +145,7 @@ const parseDateValue = (dateStr: string) => {
 
 export default function TrackingClient() {
   const { data: profile } = useProfile();
+  const queryClient = useQueryClient();
 
   const [deleteId, setDeleteId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -207,10 +212,109 @@ export default function TrackingClient() {
     data: academicYearData,
     isError: isAcademicYearError,
   } = useFetchAcademicYear();
+  const {
+    data: classCourses,
+  } = useFetchClassCourses({
+    semester: semesterData as string | undefined,
+    year: academicYearData as string | undefined,
+    enabled: !!semesterData && !!academicYearData,
+  });
+
   const { isDisabled: isCourseDisabled } = useDisabledCourses({
     academicYear: academicYearData,
     semester: semesterData,
   });
+
+  /** Resolve course code from courseId using available registries */
+  const getCourseCodeById = useCallback((id: string): string => {
+    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
+    
+    // 1. Direct hit in coursesData
+    if (coursesData?.courses?.[id]) {
+      return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
+    }
+    
+    // 2. Find in coursesData by ID or Code
+    const course = Object.values(coursesData?.courses || {}).find(c => 
+      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
+    );
+    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
+
+    // 3. Check Custom (Class) Courses
+    const custom = classCourses?.find(cc => 
+      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
+    );
+    if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
+    
+    // 4. Fallback to attendanceData courses
+    const altCourse = attendanceData?.courses?.[id];
+    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
+  }, [attendanceData, coursesData, classCourses]);
+
+  /** Resolve course name from courseId using available registries */
+  const getCourseNameById = useCallback((id: string): string => {
+    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
+
+    // 1. Direct hit in coursesData
+    if (coursesData?.courses?.[id]) return coursesData.courses[id].name || id;
+
+    // 2. Find in coursesData by ID or Code
+    const course = Object.values(coursesData?.courses || {}).find(c => 
+      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
+    );
+    if (course?.name) return course.name;
+
+    // 3. Check Custom (Class) Courses
+    const custom = classCourses?.find(cc => 
+      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
+    );
+    if (custom) return custom.course_name || custom.course_code;
+
+    // 4. Fallback to attendanceData courses
+    const altCourse = attendanceData?.courses?.[id];
+    return (altCourse?.name ?? id);
+  }, [attendanceData, coursesData, classCourses]);
+
+  /** Pre-calculate session indices for all official records to ensure consistent display */
+  const sessionIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (attendanceData?.studentAttendanceData) {
+      Object.entries(attendanceData.studentAttendanceData).forEach(([dateKey, dateData]) => {
+        const isoDate = normalizeToISODate(dateKey);
+        Object.entries(dateData as any).forEach(([sessionKey, sessionData]: [string, any], index) => {
+          const ordinal = index + 1;
+          const sKey = String(sessionKey).trim().toLowerCase();
+          map.set(`${isoDate}|${sKey}`, ordinal);
+          
+          if (sessionData.session) {
+            const sessVal = String(sessionData.session).trim().toLowerCase();
+            map.set(`${isoDate}|${sessVal}`, ordinal);
+          }
+        });
+      });
+    }
+    return map;
+  }, [attendanceData]);
+
+  /** Resolve session name using available registries and pre-calculated indices */
+  const getResolvedSessionName = useCallback((sessionValue: string, dateStr?: string): string => {
+    if (attendanceData?.sessions?.[sessionValue]) {
+      return attendanceData.sessions[sessionValue].name;
+    }
+
+    // Attempt lookup via pre-calculated index map (parity with AttendanceCalendar)
+    if (dateStr && sessionIndexMap.size > 0) {
+      const isoDate = normalizeToISODate(dateStr);
+      const sVal = String(sessionValue).trim().toLowerCase();
+      const index = sessionIndexMap.get(`${isoDate}|${sVal}`);
+      
+      if (index) {
+        return formatSessionName(String(index));
+      }
+    }
+
+    return formatSessionName(sessionValue);
+  }, [attendanceData, sessionIndexMap]);
 
 
 
@@ -278,10 +382,8 @@ export default function TrackingClient() {
   const allCourseKeys = useMemo(
     () =>
       Object.keys(groupedAllData).sort((a, b) => {
-        const codeA = (attendanceData?.courses?.[a]?.code ??
-          coursesData?.courses?.[a]?.code ?? "").toUpperCase();
-        const codeB = (attendanceData?.courses?.[b]?.code ??
-          coursesData?.courses?.[b]?.code ?? "").toUpperCase();
+        const codeA = getCourseCodeById(a).toUpperCase();
+        const codeB = getCourseCodeById(b).toUpperCase();
         const aDisabled = isCourseDisabled(codeA);
         const bDisabled = isCourseDisabled(codeB);
 
@@ -289,24 +391,18 @@ export default function TrackingClient() {
         if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
 
         // Tier 2: Alphabetical sort by Descriptive Name
-        const nameA = (attendanceData?.courses?.[a]?.name ||
-          coursesData?.courses?.[a]?.name || a).toLowerCase();
-        const nameB = (attendanceData?.courses?.[b]?.name ||
-          coursesData?.courses?.[b]?.name || b).toLowerCase();
+        const nameA = getCourseNameById(a).toLowerCase();
+        const nameB = getCourseNameById(b).toLowerCase();
 
         return nameA.localeCompare(nameB);
       }),
-    [groupedAllData, isCourseDisabled, attendanceData, coursesData],
+    [groupedAllData, isCourseDisabled, getCourseCodeById, getCourseNameById],
   );
 
   const filteredCourseKeys = useMemo(() => {
     if (selectedCourseFilter === "all") {
       return allCourseKeys.filter((k) => {
-        const code = (
-          attendanceData?.courses?.[k]?.code ??
-            coursesData?.courses?.[k]?.code ??
-            ""
-        ).toUpperCase();
+        const code = getCourseCodeById(k).toUpperCase();
         return !isCourseDisabled(code);
       });
     }
@@ -315,8 +411,7 @@ export default function TrackingClient() {
     allCourseKeys,
     selectedCourseFilter,
     isCourseDisabled,
-    attendanceData,
-    coursesData,
+    getCourseCodeById
   ]);
 
   const totalPages = Math.ceil(filteredCourseKeys.length / coursesPerPage);
@@ -335,14 +430,8 @@ export default function TrackingClient() {
     if (!items?.length) return null;
 
     const courseKey = activeCourseKey;
-    const displayCourseName = attendanceData?.courses?.[courseKey]?.name ||
-      coursesData?.courses?.[courseKey]?.name ||
-      courseKey;
-    const courseCode = (
-      attendanceData?.courses?.[courseKey]?.code ??
-        coursesData?.courses?.[courseKey]?.code ??
-        ""
-    ).toUpperCase();
+    const displayCourseName = getCourseNameById(courseKey);
+    const courseCode = getCourseCodeById(courseKey).toUpperCase();
 
     return {
       displayCourseName,
@@ -352,8 +441,8 @@ export default function TrackingClient() {
   }, [
     activeCourseKey,
     groupedAllData,
-    attendanceData,
-    coursesData,
+    getCourseCodeById,
+    getCourseNameById,
     isCourseDisabled,
   ]);
 
@@ -401,6 +490,11 @@ export default function TrackingClient() {
       if (error) throw error;
 
       toast.success("Delete successful");
+      
+      // Broadly invalidate to update counts, cards, charts and summaries
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      
       await Promise.all([refetchTrackingData(), refetchCount()]);
 
       const remainingInCourse = groupedAllData[course]?.length || 0;
@@ -479,6 +573,11 @@ export default function TrackingClient() {
           ? "All records cleared."
           : "Subject records cleared.",
       );
+      
+      // Broadly invalidate to update counts, cards, charts and summaries
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      
       await Promise.all([refetchTrackingData(), refetchCount()]);
       setCurrentPage(0);
     } catch (error) {
@@ -581,9 +680,32 @@ export default function TrackingClient() {
       Object.entries(attendanceData.studentAttendanceData).forEach(
         ([dateStr, dateData]) => {
           Object.entries(dateData as any).forEach(
-            ([sessionKey, session]: [string, any]) => {
+            ([sessionKey, session]: [string, any], index) => {
               if (session.course) {
-                const rawSession = getOfficialSessionRaw(session, sessionKey);
+                let rawSession = getOfficialSessionRaw(session, sessionKey);
+                
+                // If rawSession is a numeric ID (> 20), treat it as missing to trigger index-based fallback
+                const isNumericId = (s: any) => !isNaN(parseInt(s)) && parseInt(s) > 20;
+
+                if (isNumericId(rawSession)) {
+                   if (attendanceData.sessions?.[rawSession]) {
+                       const resolvedName = attendanceData.sessions[rawSession].name;
+                       const normalized = normalizeSession(resolvedName);
+                       if (!isNaN(parseInt(normalized, 10))) {
+                           rawSession = normalized;
+                       }
+                   } else {
+                       // Fallback to index if registry is missing
+                       rawSession = String(index + 1);
+                   }
+                } else if (attendanceData.sessions?.[rawSession]) {
+                  const resolvedName = attendanceData.sessions[rawSession].name;
+                  const normalized = normalizeSession(resolvedName);
+                  if (!isNaN(parseInt(normalized, 10))) {
+                    rawSession = normalized;
+                  }
+                }
+
                 const key = generateSlotKey(
                   session.course,
                   dateStr,
@@ -622,7 +744,7 @@ export default function TrackingClient() {
     )
     : (
       <LazyMotion features={domAnimation}>
-        <div className="flex-1 flex flex-col gap-6 p-4 pt-12 sm:p-8 sm:pt-16 max-w-7xl mx-auto w-full">
+        <div className="flex-1 container mx-auto max-w-7xl px-4 md:px-6 pt-4 md:pt-6">
           {trackingData && allCourseKeys.length > 0
             ? (
               <div className="flex flex-col gap-6">
@@ -631,7 +753,7 @@ export default function TrackingClient() {
                     Attendance Tracker
                   </h1>
                   <p className="text-muted-foreground">
-                    Custom records and leaves reconciliation history
+                    These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.
                   </p>
                 </div>
                   {isSyncing && (
@@ -674,51 +796,28 @@ export default function TrackingClient() {
                               </span>
                             </SelectItem>
                             {allCourseKeys.map((courseKey) => {
-                              const displayCourseName =
-                                attendanceData?.courses?.[courseKey]?.name ||
-                                coursesData?.courses?.[courseKey]?.name ||
-                                courseKey;
+                              const displayCourseName = getCourseNameById(courseKey);
                               const courseCount =
                                 groupedAllData[courseKey]?.length || 0;
+                              const courseCode = getCourseCodeById(courseKey).toUpperCase();
+                              const isDisabled = isCourseDisabled(courseCode);
 
                               return (
                                 <SelectItem
                                   key={courseKey}
                                   value={courseKey}
                                   className="whitespace-normal py-2"
-                                  textValue={`${displayCourseName}${
-                                    isCourseDisabled(
-                                        (attendanceData?.courses?.[courseKey]
-                                          ?.code ??
-                                          coursesData?.courses?.[courseKey]
-                                            ?.code ??
-                                          "").toUpperCase(),
-                                      )
-                                      ? " (Disabled)"
-                                      : ""
-                                  }`}
+                                  textValue={`${displayCourseName}${isDisabled ? " (Disabled)" : ""}`}
                                 >
                                   <div className="flex items-center justify-between gap-4 w-full py-0.5">
                                     <span
                                       className={cn(
                                         "flex-1 leading-tight text-left capitalize whitespace-normal wrap-break-word",
-                                        isCourseDisabled(
-                                          (attendanceData?.courses?.[courseKey]
-                                            ?.code ??
-                                            coursesData?.courses?.[courseKey]
-                                              ?.code ??
-                                            "").toUpperCase(),
-                                        ) && "opacity-60 italic",
+                                        isDisabled && "opacity-60 italic",
                                       )}
                                     >
                                       {displayCourseName.toLowerCase()}
-                                      {isCourseDisabled(
-                                        (attendanceData?.courses?.[courseKey]
-                                          ?.code ??
-                                          coursesData?.courses?.[courseKey]
-                                            ?.code ??
-                                          "").toUpperCase(),
-                                      ) && " (Disabled)"}
+                                      {isDisabled && " (Disabled)"}
                                     </span>
                                     <Badge
                                       variant="secondary"
@@ -780,7 +879,7 @@ export default function TrackingClient() {
                 )}
 
                 {showPinnedCourse && activeCourseMeta && (
-                  <div className="fixed top-22 left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 rounded-md border border-border/70 bg-background/96 px-3 py-2 shadow-md backdrop-blur-sm">
+                  <div className="fixed top-22 left-1/2 z-30 flex w-[min(44rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 custom-container px-3 py-2">
                     <div className="rounded-md bg-primary/10 p-1.5 text-primary">
                       <BookOpen size={16} aria-hidden="true" />
                     </div>
@@ -805,17 +904,9 @@ export default function TrackingClient() {
                   >
                     {currentCourseKeys.map((courseName) => {
                       const items = groupedAllData[courseName];
-                      const displayCourseName =
-                        attendanceData?.courses?.[items[0].course]?.name ||
-                        coursesData?.courses?.[items[0].course]?.name ||
-                        courseName;
-                      const courseCode =
-                        (attendanceData?.courses?.[items[0].course]?.code ??
-                          coursesData?.courses?.[items[0].course]?.code ?? "")
-                          .toUpperCase();
-                      const isCourseCurrentlyDisabled = isCourseDisabled(
-                        courseCode,
-                      );
+                      const displayCourseName = getCourseNameById(courseName);
+                      const courseCode = getCourseCodeById(courseName).toUpperCase();
+                      const isCourseCurrentlyDisabled = isCourseDisabled(courseCode);
 
                       // Performance optimization: limit records per course
                       const isExpanded = expandedCourses.has(courseName);
@@ -846,7 +937,7 @@ export default function TrackingClient() {
                             ref={(el) => {
                               courseHeaderRefs.current[courseName] = el;
                             }}
-                            className="flex items-center gap-2 rounded-md border-b border-border/60 bg-background/95 px-2 py-2 shadow-sm backdrop-blur-sm"
+                            className="flex items-center gap-2 custom-container px-2 py-2"
                           >
                             <div className="p-1.5 rounded-md bg-primary/10 text-primary">
                               <BookOpen size={16} aria-hidden="true" />
@@ -921,10 +1012,18 @@ export default function TrackingClient() {
 
                                       let statusText = userLabel;
                                       if (isCorrection) {
+                                        let sessionToUse = trackingItem.session;
+                                        if (attendanceData?.sessions?.[sessionToUse]) {
+                                          const resolvedName = attendanceData.sessions[sessionToUse].name;
+                                          const normalized = normalizeSession(resolvedName);
+                                          if (!isNaN(parseInt(normalized, 10))) {
+                                            sessionToUse = normalized;
+                                          }
+                                        }
                                         const itemKey = generateSlotKey(
                                           trackingItem.course,
                                           trackingItem.date,
-                                          trackingItem.session,
+                                          sessionToUse,
                                         );
                                         const officialSession =
                                           officialSessionsMap.get(itemKey);
@@ -1002,8 +1101,9 @@ export default function TrackingClient() {
                                             <div className="font-medium text-sm text-foreground/70">
                                               Session:{" "}
                                               <span className="text-foreground capitalize">
-                                                {formatSessionName(
+                                                {getResolvedSessionName(
                                                   trackingItem.session,
+                                                  trackingItem.date,
                                                 )}
                                               </span>
                                             </div>
@@ -1036,7 +1136,7 @@ export default function TrackingClient() {
                                                   trackingId,
                                                 )}
                                               aria-label={`Remove tracking entry for ${
-                                                formatSessionName(
+                                                getResolvedSessionName(
                                                   trackingItem.session,
                                                 )
                                               } session on ${
@@ -1062,9 +1162,7 @@ export default function TrackingClient() {
                                             </m.button>
                                           </div>
                                           {trackingItem.remarks &&
-                                            !DUTY_LEAVE_PLACEHOLDER_REMARKS.has(
-                                              trackingItem.remarks.trim(),
-                                            ) && (
+                                            !isLegacyRemark(trackingItem.remarks) && (
                                             <p
                                               className={cn(
                                                 "text-[11px] mt-1.5 italic truncate",

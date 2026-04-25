@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
@@ -26,6 +27,7 @@ interface DialogUser {
 
 export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Transform user object to match AddAttendanceDialog's expected interface
   const dialogUser: DialogUser = {
@@ -54,6 +56,11 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
 
   // Handle local success, then bubble up
   const handleSuccess = async () => {
+    // Invalidate all attendance-related queries to refresh dashboard immediately
+    queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+    queryClient.invalidateQueries({ queryKey: ["track_data"] });
+    
     await Promise.all([refetchAttendance(), refetchTracking()]);
     await onSuccess();
   };

@@ -49,13 +49,46 @@ ENV PATH="$PATH:$FLUTTER_HOME/bin"
 # 4. Flutter SDK Pre-cache
 RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
     && $FLUTTER_HOME/bin/flutter precache
-
 # 5. Extension & Workspace Injector Script
 # Switch to root to safely write and change file ownership
 USER root
 RUN cat << 'EOF' > /home/vscode/init_workspace.sh
 #!/bin/bash
 echo "🚀 Starting Full Environment Setup..."
+
+# Tell Git to use a writeable file for global settings instead of the busy mount
+export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"
+
+if [ ! -f "$GIT_CONFIG_GLOBAL" ]; then
+    cp /home/vscode/.gitconfig "$GIT_CONFIG_GLOBAL" 2>/dev/null || touch "$GIT_CONFIG_GLOBAL"
+fi
+
+if ! grep -q "GIT_CONFIG_GLOBAL" ~/.bashrc; then
+    echo 'export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"' >> ~/.bashrc
+fi
+
+# 1. Secure Local SSH Key Setup
+MOUNTED_KEY="/home/vscode/.ssh/id_ed25519"
+LOCAL_KEY="/home/vscode/.ssh/id_ed25519_local"
+
+# Use sudo to ensure we can create/fix the directory
+sudo mkdir -p /home/vscode/.ssh
+sudo chown -R vscode:vscode /home/vscode/.ssh
+chmod 700 /home/vscode/.ssh
+
+if [ -f "$MOUNTED_KEY" ]; then
+    cp "$MOUNTED_KEY" "$LOCAL_KEY"
+    chmod 600 "$LOCAL_KEY"
+    
+    git config --global user.signingkey "$LOCAL_KEY"
+    git config --global gpg.format ssh
+    git config --global commit.gpgsign true
+    echo "✅ Dedicated Sub-key secured and Git signing configured."
+else
+    echo "❌ Private key mount missing at $MOUNTED_KEY!"
+fi
+
+git config --global --add safe.directory /workspace
 
 export FLUTTER_HOME="/home/vscode/flutter-sdk"
 export PATH="$PATH:$FLUTTER_HOME/bin"

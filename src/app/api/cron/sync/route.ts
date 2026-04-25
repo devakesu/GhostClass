@@ -568,6 +568,7 @@ export const GET = withSecurity(async (req) => {
             );
           }
           const rawOfficialData = (attData as any).studentAttendanceData;
+          const sessionRegistry = (attData as any).sessions as Record<string, { name: string; id: string }> | undefined;
 
           // B2. Class Detection Logic (Self-Healing)
           const roles = rolesData?.data ?? rolesData;
@@ -642,12 +643,33 @@ export const GET = withSecurity(async (req) => {
                 // fall back to the 1-based index within the day, matching how
                 // AttendanceCalendar derives session names for display.
                 let rawSession: string | number = session.session ?? "";
-                if (!rawSession || rawSession === "null") {
-                  const skNum = parseInt(String(sessionKey), 10);
-                  rawSession = (!isNaN(skNum) && skNum < 20)
-                    ? sessionKey
-                    : String(index + 1);
+                const isNumericId = (s: any) => !isNaN(parseInt(s)) && parseInt(s) > 20;
+
+                if (!rawSession || rawSession === "null" || isNumericId(rawSession)) {
+                  if (rawSession && isNumericId(rawSession) && sessionRegistry?.[String(rawSession)]) {
+                    const resolvedName = sessionRegistry[String(rawSession)].name;
+                    const normalized = normalizeSession(resolvedName);
+                    if (!isNaN(parseInt(normalized, 10))) {
+                      rawSession = normalized;
+                    }
+                  } else {
+                    const skNum = parseInt(String(sessionKey), 10);
+                    rawSession = (!isNaN(skNum) && skNum < 20)
+                      ? sessionKey
+                      : String(index + 1);
+                  }
+                } else {
+                  // Resolve non-numeric IDs via registry if possible
+                  const sessionStr = String(rawSession);
+                  if (sessionRegistry?.[sessionStr]) {
+                    const resolvedName = sessionRegistry[sessionStr].name;
+                    const normalized = normalizeSession(resolvedName);
+                    if (!isNaN(parseInt(normalized, 10))) {
+                      rawSession = normalized;
+                    }
+                  }
                 }
+
                 const normalizedSession = toRoman(
                   parseInt(normalizeSession(rawSession)) || rawSession,
                 );

@@ -175,6 +175,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
         
         const displayedBase = Math.min(officialPct, mergedPct);
         const displayedExtra = parseFloat(Math.abs(mergedPct - officialPct).toFixed(2));
+        const isBelow = mergedPct < safeTarget;
 
         return {
           ...course,
@@ -183,6 +184,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
           displayedBase,
           displayedExtra,
           isLoss,
+          isBelow,
           mergedPresent,
           mergedTotal,
           present: course.present,
@@ -211,9 +213,9 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
   const yAxisMin = Math.max(0, calculatedMin);
 
   return (
-    <div className="h-[300px] w-full">
+    <div className="h-[450px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 30, right: 10, left: -20, bottom: 5 }} barSize={getBarSize()}>
+        <BarChart data={data} margin={{ top: 30, right: 20, left: -10, bottom: 100 }} barSize={getBarSize()}>
           <defs>
             <pattern id="striped-green" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
               <rect width="8" height="8" fill="#10b981" fillOpacity="0.25" />
@@ -225,7 +227,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
             </pattern>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
-          <XAxis dataKey="name" interval={0} textAnchor="end" angle={-45} height={60} tick={{ fontSize: 11, fill: "#888" }} tickMargin={10} />
+          <XAxis dataKey="name" interval={0} textAnchor="end" angle={-45} height={120} tick={{ fontSize: 10, fill: "#888" }} tickMargin={25} />
           <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "#888" }} axisLine={false} tickLine={false} />
           <Tooltip
             contentStyle={{ backgroundColor: "rgba(20, 20, 20, 0.95)", border: "1px solid #333", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)" }}
@@ -257,22 +259,14 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData }: A
             }}
           />
           <Bar dataKey="displayedBase" stackId="a" isAnimationActive={false} shape={<BottomBarShape />}>
-            {data.map((entry: any, index: number) => {
-              const color = entry.totalPercentage < safeTarget ? "#ef4444" : "#10b981";
-              return <Cell key={`cell-base-${index}`} fill={color} />;
-            })}
+            {data.map((entry: any, index: number) => (
+              <Cell key={`cell-base-${index}`} fill={entry.isBelow ? "#ef4444" : "#10b981"} />
+            ))}
           </Bar>
           <Bar dataKey="displayedExtra" stackId="a" isAnimationActive={false} shape={<HatchedBarShape />}>
               {data.map((entry: any, index: number) => {
-               let fillUrl, strokeColor;
-               if (entry.isLoss) {
-                 fillUrl = "url(#striped-red)";
-                 strokeColor = "#ef4444";
-               } else {
-                 const isSafe = entry.totalPercentage >= safeTarget;
-                 fillUrl = isSafe ? "url(#striped-green)" : "url(#striped-red)";
-                 strokeColor = isSafe ? "#10b981" : "#ef4444";
-               }
+               const fillUrl = entry.isLoss ? "url(#striped-red)" : (entry.isBelow ? "url(#striped-red)" : "url(#striped-green)");
+               const strokeColor = entry.isLoss || entry.isBelow ? "#ef4444" : "#10b981";
                return <Cell key={`cell-ext-${index}`} fill={fillUrl} stroke={strokeColor} />;
               })}
           </Bar>

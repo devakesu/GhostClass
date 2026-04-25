@@ -230,28 +230,39 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
 
     const courseAttendance: Record<string, CourseStats> = {};
     const officialSessionMap = new Map<string, number>();
+    const idToCodeMap = new Map<string, string>();
 
-    // 1. Initialize Courses
-    Object.entries(coursesData.courses).forEach(([courseId, course]) => {
-      courseAttendance[courseId] = {
-        id: courseId,
-        code: course.code ?? course.name ?? "",
-        present: 0,
-        absent: 0,
-        total: 0,
-        selfPresent: 0,
-        selfTotal: 0, 
-        name: formatCourseCode(course.code || course.name),
-        fullName: course.name,
-      };
+    // 1. Initialize Courses (Deduplicated by Code)
+    Object.entries(coursesData.courses).forEach(([key, course]) => {
+      const codeKey = (course.code || key).replace(/\s+/g, "").toUpperCase();
+      
+      // Map this ID (key) to the codeKey for later lookup
+      idToCodeMap.set(key, codeKey);
+
+      if (!courseAttendance[codeKey]) {
+        courseAttendance[codeKey] = {
+          id: codeKey,
+          code: course.code ?? course.name ?? "",
+          present: 0,
+          absent: 0,
+          total: 0,
+          selfPresent: 0,
+          selfTotal: 0, 
+          name: formatCourseCode(course.code || course.name),
+          fullName: course.name,
+        };
+      }
     });
 
     // 2. Process Official Data
     Object.entries(attendanceData.studentAttendanceData).forEach(([dateStr, dateData]) => {
       Object.entries(dateData).forEach(([sessionKey, session]: [string, unknown], index) => {
         const sessionData = session as { course: string | number | null; attendance: string | number; session?: string };
-        if (sessionData.course !== null && courseAttendance[sessionData.course.toString()]) {
-          const stats = courseAttendance[sessionData.course.toString()];
+        const rawId = sessionData.course?.toString() || "";
+        const courseId = idToCodeMap.get(rawId) || rawId;
+        
+        if (sessionData.course !== null && courseAttendance[courseId]) {
+          const stats = courseAttendance[courseId];
           const status = Number(sessionData.attendance);
           
           let sessionName = sessionData.session;
@@ -356,10 +367,9 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
         const baseSuccess = isSafe ? displayedBase : 0;
         const baseDanger = !isSafe ? displayedBase : 0;
         
-        // FIX: Decoupled 'extra' coloring from 'isSafe'.
-        // Gains (!isLoss) are always Green. Losses (isLoss) are always Red.
-        const extraSuccess = (displayedExtra > 0 && !isLoss) ? displayedExtra : 0;
-        const extraDanger = (displayedExtra > 0 && isLoss) ? displayedExtra : 0;
+        // Fix: extraSuccess should only be green if the final percentage is safe
+        const extraSuccess = (displayedExtra > 0 && !isLoss && isSafe) ? displayedExtra : 0;
+        const extraDanger = (displayedExtra > 0 && (isLoss || !isSafe)) ? displayedExtra : 0;
 
         return {
           ...course,
@@ -409,7 +419,7 @@ const renderTargetLabel = (props: LabelProps) => {
 return (
   <div
     ref={containerRef}
-    className="w-full h-full min-h-50"
+    className="w-full h-full min-h-[400px]"
     role="img"
     aria-label="Attendance overview bar chart"
   >
@@ -420,7 +430,7 @@ return (
     ) : data.length > 0 ? (
       <BarChart 
         data={data} 
-        margin={{ top: 10, right: 20, left: -12, bottom: isMobile ? 30 : 25 }} 
+        margin={{ top: 20, right: 20, left: -12, bottom: isMobile ? 80 : 60 }} 
         maxBarSize={50}
         width={dimensions.width}
         height={dimensions.height}
@@ -442,9 +452,9 @@ return (
             interval={0} 
             textAnchor="end" 
             angle={isMobile ? -90 : -45} 
-            height={isMobile ? 72 : 58} 
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)", dy: 22 }} 
-            tickMargin={isMobile ? 16 : 16} 
+            height={isMobile ? 100 : 80} 
+            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)", dy: 10 }} 
+            tickMargin={isMobile ? 12 : 8} 
           />
           <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
           <Tooltip

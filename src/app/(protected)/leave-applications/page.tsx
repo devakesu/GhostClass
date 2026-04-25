@@ -40,10 +40,10 @@ export default async function LeaveApplicationsPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-8 space-y-8 animate-in fade-in duration-500">
+    <div className="flex-1 container mx-auto max-w-7xl px-4 md:px-6 pt-4 md:pt-6 space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
             Leave Applications
           </h1>
           <p className="text-muted-foreground mt-1">

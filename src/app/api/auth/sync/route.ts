@@ -8,6 +8,20 @@ import { getClientIp, redact } from "@/lib/utils.server";
 import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto";
+import { UserResponse } from "@supabase/supabase-js";
+
+/**
+ * Attempts to get the user with a single retry on network failure.
+ */
+async function getUserWithRetry(supabaseFn: () => Promise<UserResponse>): Promise<UserResponse> {
+  try {
+    return await supabaseFn();
+  } catch (error) {
+    logger.warn("[sync] Supabase getUser network failure, retrying once...", { error });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return await supabaseFn();
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -64,14 +78,14 @@ const handler = async (req: Request) => {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
       }
       const token = authHeader.split(" ")[1];
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      const { data: { user }, error } = await getUserWithRetry(() => supabaseAdmin.auth.getUser(token));
       if (error || !user) {
         return NextResponse.json({ message: "Invalid session" }, { status: 401 });
       }
       authUser = user;
     } else {
       const supabase = await createClient();
-      const { data: { user }, error } = await supabase.auth.getUser();
+      const { data: { user }, error } = await getUserWithRetry(() => supabase.auth.getUser());
       if (error || !user) {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
       }

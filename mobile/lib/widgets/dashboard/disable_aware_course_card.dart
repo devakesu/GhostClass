@@ -64,6 +64,7 @@ class _DisableAwareCourseCardState
   }
 
   static const List<String> _disableReasons = [
+    'Challenge passed',
     'Course not offered this semester',
     'Already completed/Exempted',
     'External/Non-Portal course',

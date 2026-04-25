@@ -81,6 +81,7 @@ export const useSetSemester = () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] }); // Refetch tracking data
       queryClient.invalidateQueries({ queryKey: ["count"] });      // Refetch stats
+      queryClient.invalidateQueries({ queryKey: ["profile"] });    // Refetch profile (syncs class)
       queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
@@ -114,6 +115,7 @@ export const useSetAcademicYear = () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] });
       queryClient.invalidateQueries({ queryKey: ["count"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache

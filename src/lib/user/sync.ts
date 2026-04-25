@@ -130,8 +130,8 @@ export async function performProfileSync(
     const ezygoData: EzygoProfileResponse = json.data ?? json;
 
     // Use remote ID if local ezygoId is missing or empty
-    const resolvedEzygoId = (ezygoId && ezygoId.trim() !== "")
-      ? ezygoId
+    const resolvedEzygoId = (ezygoId && String(ezygoId).trim() !== "")
+      ? String(ezygoId)
       : String(ezygoData.user_id || ezygoData.user?.id || "");
 
     if (!resolvedEzygoId) {
@@ -205,20 +205,44 @@ export async function performProfileSync(
     // 2b. Class Detection & Catalog Population
     let classId: string | null = null;
     let classInfo: { id: string; name: string } | null = null;
+    
     if (Array.isArray(coursesData)) {
-      // Find the first course with a valid usergroup to identify the student's class
-      // Priority 1: Use definitive subgroupRoles from 'myroles' endpoint
       const roles = rolesData?.data ?? rolesData;
-      const primarySubgroup = roles?.subgroupRoles?.[0];
-
-      if (primarySubgroup) {
-        logger.dev(
-          `Sync: Found primary class in roles: ${primarySubgroup.name} (${primarySubgroup.id})`,
-        );
+      const subgroupRoles = roles?.subgroupRoles || [];
+      
+      // Priority 1: Use courses to identify the class.
+      // EzyGo's courses/withusers endpoint is ALREADY filtered by the default semester setting,
+      // so the group associated with these courses is the most reliable "Active Class".
+      const courseWithGroup = coursesData.find((c: any) => c.usersubgroup?.usergroup?.id);
+      
+      if (courseWithGroup) {
+        const subgroup = courseWithGroup.usersubgroup;
+        logger.dev(`Sync: Detected class from active courses: "${subgroup.name}" (ID: ${subgroup.id})`);
+        
         const { data: classData, error: classError } = await supabaseAdmin
           .from("classes")
           .upsert({
-            external_group_id: primarySubgroup.id,
+            external_group_id: String(subgroup.id),
+            name: subgroup.name,
+          }, { onConflict: "external_group_id" })
+          .select("id")
+          .single();
+
+        if (!classError && classData) {
+          classId = classData.id;
+          classInfo = { id: classData.id, name: subgroup.name };
+        }
+      }
+
+      // Priority 2: Fallback to definitive subgroupRoles from 'myroles' endpoint
+      if (!classId && subgroupRoles.length > 0) {
+        const primarySubgroup = subgroupRoles[0];
+        logger.dev(`Sync: Falling back to primary subgroup role: ${primarySubgroup.name} (${primarySubgroup.id})`);
+        
+        const { data: classData, error: classError } = await supabaseAdmin
+          .from("classes")
+          .upsert({
+            external_group_id: String(primarySubgroup.id),
             name: primarySubgroup.name,
           }, { onConflict: "external_group_id" })
           .select("id")
@@ -227,61 +251,6 @@ export async function performProfileSync(
         if (!classError && classData) {
           classId = classData.id;
           classInfo = { id: classData.id, name: primarySubgroup.name };
-        }
-      }
-
-      // Priority 2: Fallback to searching courses if roles failed
-      if (!classId) {
-        const courseWithGroup = coursesData.find((c: any) =>
-          c.usersubgroup?.usergroup?.id
-        );
-        if (courseWithGroup) {
-          const group = courseWithGroup.usersubgroup.usergroup;
-          logger.dev(
-            `Sync: Detected class from course: "${group.name}" (ID: ${group.id})`,
-          );
-          const { data: classData, error: classError } = await supabaseAdmin
-            .from("classes")
-            .upsert({
-              external_group_id: group.id,
-              name: group.name,
-            }, { onConflict: "external_group_id" })
-            .select("id")
-            .single();
-
-          if (!classError && classData) {
-            classId = classData.id;
-            classInfo = { id: classData.id, name: group.name };
-          }
-        }
-      }
-
-      if (!classId) {
-        // Priority 3: Try to find any group ID in the raw roles data if subgroups aren't explicitly in subgroupRoles
-        const rawGroups = roles?.subgroups || roles?.groups || [];
-        if (Array.isArray(rawGroups) && rawGroups.length > 0) {
-          const group = rawGroups[0];
-          logger.dev(
-            `Sync: Detected class from raw groups: "${
-              group.name || "Unknown"
-            }" (ID: ${group.id})`,
-          );
-          const { data: classData, error: classError } = await supabaseAdmin
-            .from("classes")
-            .upsert({
-              external_group_id: String(group.id),
-              name: group.name || "Default Class",
-            }, { onConflict: "external_group_id" })
-            .select("id")
-            .single();
-
-          if (!classError && classData) {
-            classId = classData.id;
-            classInfo = {
-              id: classData.id,
-              name: group.name || "Default Class",
-            };
-          }
         }
       }
 
@@ -330,7 +299,7 @@ export async function performProfileSync(
       local: string | null | undefined,
       remote: string | number | null | undefined,
     ) => {
-      if (local && local.trim() !== "") return local;
+      if (local && String(local).trim() !== "") return local;
       return remote ? String(remote) : null;
     };
 

@@ -17,12 +17,13 @@ import {
 import Image from "next/image";
 import { motion, Variants } from "framer-motion";
 import {
-  Calendar,
   Camera,
   Fingerprint,
   Loader2,
   Mail,
   Phone,
+  Clock,
+  School,
   UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -211,7 +212,7 @@ export default function ProfileClient() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="container mx-auto pt-4 md:pt-8 px-4 md:px-6"
+        className="container mx-auto pt-4 md:pt-6 px-4 md:px-6"
       >
         <motion.div
           variants={{
@@ -227,7 +228,7 @@ export default function ProfileClient() {
         >
           {/* Left Column: Profile Card */}
           <motion.div className="md:col-span-2 sm:col-span-1 lg:col-span-1 space-y-4 md:space-y-6">
-            <Card className="relative overflow-hidden border-border/50 shadow-sm bg-card/50 backdrop-blur-sm">
+            <Card className="custom-container relative overflow-hidden">
               <CardContent className="flex flex-col items-center md:items-start pt-12">
                 {/* Banner Background */}
                 <div className="h-30 md:h-35 w-full absolute top-0 left-0 right-0 z-0 overflow-hidden pointer-events-none">
@@ -340,7 +341,7 @@ export default function ProfileClient() {
                   animate="visible"
                   variants={tabContentVariants}
                 >
-                  <Card className="border-border/50 py-0 shadow-sm bg-card/50 backdrop-blur-sm">
+                  <Card className="custom-container py-0">
                     <CardHeader className="p-6 pb-2 border-b border-border/40 bg-muted/20">
                       <CardTitle className="text-lg">
                         Personal Information
@@ -453,30 +454,56 @@ export default function ProfileClient() {
                               Mobile
                             </span>
                             <span className="text-sm font-bold text-foreground/90">
-                              +{profile?.mobile}
+                              {profile?.phone ? `+${profile.phone}` : "N/A"}
                             </span>
                           </div>
                         </motion.div>
                         <div className="h-px w-full bg-border/40" />
 
-                        {/* Created At */}
+                        {/* Class */}
+                        {profile?.class && (
+                          <>
+                            <motion.div
+                              custom={4}
+                              variants={fieldVariants}
+                              initial="hidden"
+                              animate="visible"
+                              className="flex items-center gap-4 py-3"
+                            >
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <School className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                  Class
+                                </span>
+                                <span className="text-sm font-bold text-foreground/90">
+                                  {profile.class.name || "N/A"}
+                                </span>
+                              </div>
+                            </motion.div>
+                            <div className="h-px w-full bg-border/40" />
+                          </>
+                        )}
+
+                        {/* EzyGo Created At */}
                         <motion.div
-                          custom={4}
+                          custom={5}
                           variants={fieldVariants}
                           initial="hidden"
                           animate="visible"
                           className="flex items-center gap-4 py-3"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Calendar className="h-5 w-5" />
+                            <Clock className="h-5 w-5" />
                           </div>
                           <div className="flex flex-col">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                              Account Created
+                              Joined EzyGo
                             </span>
                             <span className="text-sm font-bold text-foreground/90">
-                              {profile?.created_at
-                                ? new Date(profile.created_at).toLocaleDateString(
+                              {profile?.ezygo_created_at
+                                ? new Date(profile.ezygo_created_at).toLocaleDateString(
                                   "en-GB",
                                   {
                                     day: "2-digit",
@@ -484,7 +511,16 @@ export default function ProfileClient() {
                                     year: "numeric",
                                   },
                                 )
-                                : "N/A"}
+                                : profile?.created_at 
+                                  ? new Date(profile.created_at).toLocaleDateString(
+                                    "en-GB",
+                                    {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    },
+                                  )
+                                  : "N/A"}
                             </span>
                           </div>
                         </motion.div>

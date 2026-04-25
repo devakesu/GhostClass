@@ -50,6 +50,7 @@ export interface ExtendedCourse extends Course {
 
 /** Pre-defined reasons for disabling a course */
 const DISABLE_REASONS = [
+  "Challenge passed",
   "Course not offered this semester",
   "Already completed/Exempted",
   "External/Non-Portal course",
@@ -317,21 +318,22 @@ export function CourseCard({
       headerBorder: "border-border/60",
       badge: "bg-foreground/10 text-muted-foreground",
     };
-    const pct = stats.displayPercentage;
-    const target = targetPercentage ?? 75;
-    if (pct >= target) return {
+    const metrics = stats.extraMetrics;
+    const isAtRisk = metrics.requiredToAttend > 0;
+    
+    if (!isAtRisk) return {
       card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
-      headerBg: "bg-green-500/10 dark:bg-green-500/15",
-      headerBorder: "border-green-500/20 dark:border-green-500/30",
+      headerBg: "bg-green-500/10 dark:bg-green-500/20",
+      headerBorder: "border-green-500/20 dark:border-green-500/40",
       badge: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
     };
     return {
-      card: "border-t-[3px] border-t-brand-accent/70 dark:border-t-transparent",
-      headerBg: "bg-brand-accent/10 dark:bg-brand-accent/15",
-      headerBorder: "border-brand-accent/20 dark:border-brand-accent/30",
-      badge: "bg-brand-accent/15 text-brand-accent border-brand-accent/30",
+      card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
+      headerBg: "bg-red-500/10 dark:bg-red-500/20",
+      headerBorder: "border-red-500/20 dark:border-red-500/40",
+      badge: "bg-red-500/15 text-red-500 border-red-500/30",
     };
-  }, [hasAttendanceData, stats.displayPercentage, targetPercentage]);
+  }, [hasAttendanceData, stats.extraMetrics]);
 
   const capitalize = useCallback((str: string) => {
     if (!str) return "";
@@ -482,7 +484,7 @@ export function CourseCard({
             <div className="grid grid-cols-3 gap-2 mt-4">
               
               {/* PRESENT */}
-              <div className="text-center p-1 bg-green-500/10 border border-green-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-green-500/10 border border-green-500/25 dark:bg-green-500/10 dark:border-green-500/20 rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Present</span>
                 <div className="flex items-center justify-center gap-1.5 flex-wrap px-1">
                   <span className="text-sm font-medium text-green-500">
@@ -502,7 +504,7 @@ export function CourseCard({
               </div>
 
               {/* ABSENT */}
-              <div className="text-center p-1 bg-red-500/10 border border-red-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-red-500/10 border border-red-500/25 dark:bg-red-500/10 dark:border-red-500/20 rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Absent</span>
                 <div className="flex items-center justify-center gap-0.5">
                   <span className="text-sm font-medium text-red-500">
@@ -524,7 +526,7 @@ export function CourseCard({
               </div>
 
               {/* TOTAL */}
-              <div className="text-center p-1 bg-sky-500/10 border border-sky-500/25 dark:bg-input/60 dark:border-transparent rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-sky-500/10 border border-sky-500/25 dark:bg-sky-500/10 dark:border-sky-500/20 rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Total</span>
                 <div className="flex items-center justify-center gap-0.5">
                   <span className="text-sm font-medium">
@@ -604,9 +606,9 @@ export function CourseCard({
                               You can safely bunk <span className="font-bold text-green-500">{stats.safeMetrics.canBunk}</span> {stats.safeMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
-                            <>
-                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
-                            </>
+                            <span className="text-red-500 dark:text-red-400">
+                              You need to attend <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                            </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
                           )}
@@ -638,9 +640,9 @@ export function CourseCard({
                               You can safely bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
-                            <>
-                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
-                            </>
+                            <span className="text-red-500 dark:text-red-400">
+                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                            </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
                           )}
@@ -659,9 +661,9 @@ export function CourseCard({
                               You can safely bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
-                            <>
-                              You need to attend <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
-                            </>
+                            <span className="text-red-500 dark:text-red-400">
+                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                            </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
                           )}
@@ -687,9 +689,9 @@ export function CourseCard({
                               Bunkable: <span className="font-bold text-green-500">{stats.safeMetrics.canBunk}</span>
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
-                            <>
-                              Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
-                            </>
+                            <span className="text-red-500 dark:text-red-400">
+                              Must Attend: <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
+                            </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}
@@ -710,9 +712,9 @@ export function CourseCard({
                               Bunkable: <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> 🥳
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
-                            <>
-                              Must Attend: <span className="font-bold text-amber-600 dark:text-amber-500">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
-                            </>
+                            <span className="text-red-500 dark:text-red-400">
+                              Must Attend: <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
+                            </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}

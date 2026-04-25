@@ -25,6 +25,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Converts a string to Title Case (e.g. "JOHN DOE" -> "John Doe").
+ * Trims whitespace and handles multiple spaces.
+ */
+export function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+
+/**
  * Redacts sensitive data (email, ID) for safe client-side logging using a
  * deterministic FNV-1a hash.
  *
@@ -288,6 +303,7 @@ export function formatSessionName(sessionName: string): string {
   // Handle numbers
   const num = parseInt(clean, 10);
   if (!isNaN(num) && num > 0) {
+    if (num > 20) return `Session ${num}`;
     const j = num % 10;
     const k = num % 100;
     if (j === 1 && k !== 11) return `${num}st Hour`;

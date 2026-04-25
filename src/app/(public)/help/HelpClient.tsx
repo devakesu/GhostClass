@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 // ─── Section heading ───────────────────────────────────────────────────────────
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-xl font-semibold text-purple-600 dark:text-purple-400 border-l-2 border-purple-500 pl-3">
+    <h2 className="text-xl font-semibold text-primary dark:text-primary border-l-2 border-primary/60 pl-3">
       {children}
     </h2>
   );
@@ -48,7 +48,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
       >
         <span>{question}</span>
         {open ? (
-          <ChevronUp className="shrink-0 size-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <ChevronUp className="shrink-0 size-4 text-primary" aria-hidden="true" />
         ) : (
           <ChevronDown className="shrink-0 size-4 text-muted-foreground" aria-hidden="true" />
         )}
@@ -138,12 +138,12 @@ function MockCourseCard() {
         <div>
           <div className="flex justify-between text-xs text-muted-foreground mb-1">
             <span>Official {officialPct}%</span>
-            <span className="text-purple-600 dark:text-purple-400">Tracking {adjustedPct}%</span>
+            <span className="text-primary font-medium">Tracking {adjustedPct}%</span>
           </div>
           <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
             {/* Official bar */}
             <div
-              className="absolute left-0 top-0 h-full rounded-full bg-purple-600"
+              className="absolute left-0 top-0 h-full rounded-full bg-primary"
               style={{ width: `${officialPct}%` }}
             />
             {/* Gain overlay (striped) */}
@@ -154,7 +154,7 @@ function MockCourseCard() {
                   left: `${officialPct}%`,
                   width: `${adjustedPct - officialPct}%`,
                   backgroundImage:
-                    "repeating-linear-gradient(45deg,rgba(168,85,247,0.6) 0px,rgba(168,85,247,0.6) 4px,transparent 4px,transparent 8px)",
+                    "repeating-linear-gradient(45deg,oklch(0.65 0.23 345 / 0.6) 0px,oklch(0.65 0.23 345 / 0.6) 4px,transparent 4px,transparent 8px)",
                 }}
               />
             )}
@@ -170,8 +170,8 @@ function MockCourseCard() {
             <p className="text-green-600 dark:text-green-400 font-bold text-lg">3</p>
           </div>
           {/* Tracking panel */}
-          <div className="bg-purple-500/10 dark:bg-purple-950/40 border border-purple-500/30 dark:border-purple-700/40 rounded-lg p-3 space-y-1">
-            <p className="text-purple-600 dark:text-purple-300 font-semibold">+ Tracking Data</p>
+          <div className="bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/40 rounded-lg p-3 space-y-1">
+            <p className="text-primary font-semibold">+ Tracking Data</p>
             <p className="text-muted-foreground">Can bunk</p>
             <p className="text-green-600 dark:text-green-400 font-bold text-lg">
               4
@@ -393,7 +393,7 @@ export default function HelpClient() {
       <div className="max-w-3xl mx-auto space-y-12">
         {/* ── Header ── */}
         <div className="flex items-center gap-4 border-b border-border pb-6">
-            <HelpCircle className="size-8 text-purple-600 dark:text-purple-400 shrink-0" aria-hidden="true" />
+            <HelpCircle className="size-8 text-primary shrink-0" aria-hidden="true" />
           <div>
             <h1 className="text-3xl font-bold text-foreground tracking-tight">
               Help & FAQ
@@ -479,19 +479,19 @@ export default function HelpClient() {
             </h3>
             <ul className="space-y-2 text-muted-foreground">
               <li>
-                <span className="inline-block size-3 rounded-sm bg-purple-600 mr-1.5 align-middle" />
-                Solid purple bar = Official attendance percentage
+                <span className="inline-block size-3 rounded-sm bg-primary mr-1.5 align-middle" />
+                Solid pink bar = Official attendance percentage
               </li>
               <li>
                 <span
                   className="inline-block size-3 rounded-sm mr-1.5 align-middle"
                   style={{
                     backgroundImage:
-                      "repeating-linear-gradient(45deg,rgba(168,85,247,0.7) 0px,rgba(168,85,247,0.7) 3px,transparent 3px,transparent 6px)",
-                    backgroundColor: "rgba(168,85,247,0.15)",
+                      "repeating-linear-gradient(45deg,oklch(0.65 0.23 345 / 0.7) 0px,oklch(0.65 0.23 345 / 0.7) 3px,transparent 3px,transparent 6px)",
+                    backgroundColor: "oklch(0.65 0.23 345 / 0.15)",
                   }}
                 />
-                Striped purple overlay (going further right) = Tracking data{" "}
+                Striped pink overlay (going further right) = Tracking data{" "}
                 <strong className="text-foreground/80">GAIN</strong> (adjusted % is
                 higher than official)
               </li>
@@ -523,7 +523,7 @@ export default function HelpClient() {
               </li>
               <li>
                 🟣{" "}
-                <span className="text-purple-600 dark:text-purple-300 font-semibold">
+                <span className="text-primary font-semibold">
                   + Tracking Data
                 </span>{" "}
                 panel = Includes your manually tracked sessions
@@ -661,7 +661,7 @@ export default function HelpClient() {
           <SectionHeading>Need More Help?</SectionHeading>
 
           <div className="bg-muted/30 border border-border/50 rounded-lg p-8 flex flex-col items-center gap-4 text-center">
-            <HelpCircle className="size-10 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+            <HelpCircle className="size-10 text-primary" aria-hidden="true" />
             <p className="text-foreground text-base font-medium">
               Couldn&apos;t find what you were looking for?
             </p>
@@ -669,7 +669,7 @@ export default function HelpClient() {
               Our team is happy to help. Reach out via the contact page and
               we&apos;ll get back to you as soon as possible.
             </p>
-            <Button asChild className="bg-purple-600 hover:bg-purple-500 text-white">
+            <Button asChild className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
               <Link href="/contact">Contact Us →</Link>
             </Button>
           </div>

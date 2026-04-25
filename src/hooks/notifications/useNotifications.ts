@@ -50,7 +50,7 @@ interface FetchResponse {
 export function useNotifications(enabled = true, countOnly = false) {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 20;
 
   // 1. PRIORITY QUERY: Fetch ALL Unread Conflicts (Action Required)
   const { data: actionData, isLoading: isActionLoading } = useQuery({
@@ -124,8 +124,20 @@ export function useNotifications(enabled = true, countOnly = false) {
       const actions = actionData || [];
       const rawFeed = feedData?.pages.flatMap((page) => page.data) || [];
       
-      const actionIds = new Set(actions.map(n => n.id));
-      const regular = rawFeed.filter(n => !actionIds.has(n.id));
+      // Deduplicate feed within itself (handles overlap during shifting)
+      const seenIds = new Set<string>();
+      const uniqueFeed: Notification[] = [];
+      for (const n of rawFeed) {
+          const sid = String(n.id);
+          if (!seenIds.has(sid)) {
+              seenIds.add(sid);
+              uniqueFeed.push(n);
+          }
+      }
+
+      // Filter out items that are already in actions
+      const actionIds = new Set(actions.map(n => String(n.id)));
+      const regular = uniqueFeed.filter(n => !actionIds.has(String(n.id)));
 
       return { actionNotifications: actions, regularNotifications: regular };
   }, [actionData, feedData]);
@@ -159,18 +171,18 @@ export function useNotifications(enabled = true, countOnly = false) {
   });
 
   // 4. MUTATIONS
-  const markReadMutation = useMutation({
-    mutationFn: async (id?: number) => {
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, isRead }: { id?: number; isRead: boolean }) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
       let query = supabase
         .from("notification")
-        .update({ is_read: true })
+        .update({ is_read: isRead })
         .eq("auth_user_id", session.user.id);
 
       if (id) query = query.eq("id", id);
-      else query = query.eq("is_read", false);
+      else query = query.eq("is_read", !isRead);
 
       const { error } = await query;
       if (error) throw error;
@@ -203,8 +215,9 @@ export function useNotifications(enabled = true, countOnly = false) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    markAsRead: (id?: number) => markReadMutation.mutate(id),
-    markAllAsRead: () => markReadMutation.mutate(undefined),
-    isMarkingRead: markReadMutation.isPending
+    markAsRead: (id: number) => updateStatusMutation.mutate({ id, isRead: true }),
+    toggleRead: (id: number, currentStatus: boolean) => updateStatusMutation.mutate({ id, isRead: !currentStatus }),
+    markAllAsRead: () => updateStatusMutation.mutate({ isRead: true }),
+    isMarkingRead: updateStatusMutation.isPending
   };
 }

@@ -82,16 +82,14 @@ class CourseCard extends StatelessWidget {
     final bool isCardInactive = !isEnabled || isDormant;
 
     // Status Color for the tag
-    final double target = bunkResult.targetPercentage;
     final Color statusColor;
     if (isCardInactive) {
       statusColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3);
     } else {
-      final pct = stat.percentage;
-      if (pct >= target) {
-        statusColor = ghostColors.successGreen ?? Colors.green;
-      } else {
+      if (bunkResult.requiredToAttend > 0) {
         statusColor = ghostColors.dangerRed ?? Colors.red;
+      } else {
+        statusColor = ghostColors.successGreen ?? Colors.green;
       }
     }
 
@@ -736,12 +734,11 @@ class SimpleBunkPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBunkable = result.canBunk > 0;
-    final color = isBunkable
-        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
-              Colors.green)
-        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-              Colors.red);
+    final color = result.requiredToAttend > 0
+        ? (Theme.of(context).extension<GhostColors>()?.dangerRed ??
+              Colors.red)
+        : (Theme.of(context).extension<GhostColors>()?.successGreen ??
+              Colors.green);
 
     return Container(
       width: double.infinity,
@@ -755,7 +752,7 @@ class SimpleBunkPanel extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Text(
-            isBunkable
+            result.requiredToAttend == 0
                 ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class 🥳' : 'classes 🥳🥳'}'
                 : result.requiredToAttend > 0
                 ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
@@ -898,15 +895,15 @@ class TrackingBunkPanel extends StatelessWidget {
                       ? '${result.requiredToAttend} 💀💀'
                       : '💀',
                   style: TextStyle(
-                    color: result.canBunk > 0
+                    color: result.requiredToAttend > 0
                         ? (Theme.of(
                                 context,
-                              ).extension<GhostColors>()?.successGreen ??
-                              Colors.green)
+                              ).extension<GhostColors>()?.dangerRed ??
+                              Colors.red)
                         : (Theme.of(
                                 context,
-                              ).extension<GhostColors>()?.dangerRed ??
-                              Colors.red),
+                              ).extension<GhostColors>()?.successGreen ??
+                              Colors.green),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
