@@ -23,6 +23,11 @@ class EzygoBatchFetcher {
   // In-flight request map for deduplication
   static final Map<String, Future<Response>> _inFlight = {};
   
+  // Rate limiting (parity with Next.js MAX_CONCURRENT = 3)
+  static const int _maxConcurrent = 3;
+  static int _activeRequests = 0;
+  static final List<Completer<void>> _queue = [];
+  
   // Local result cache
   static final Map<String, _CacheEntry> _cache = {};
   
@@ -87,62 +92,83 @@ class EzygoBatchFetcher {
       }
     }
 
-    // 2. Handle request deduplication (In-Flight sharing)
-    if (_inFlight.containsKey(cacheKey)) {
-      AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request for $path');
-      return _inFlight[cacheKey]!;
-    }
-
-    // 3. Execute the network request
-    final requestFuture = _executeRequest(
-      path: path,
-      token: token,
-      method: method,
-      data: data,
-    );
-
-    // Store in-flight future
-    _inFlight[cacheKey] = requestFuture;
+    // 3. Rate Limiting: Wait for an available slot
+    await _waitForSlot();
 
     try {
-      final response = await requestFuture;
-      
-      // 4. Cache the result
-      if (response.statusCode == 200) {
-        // Success cache (Longer)
-        _cache[cacheKey] = _CacheEntry(
-          response: response,
-          expiry: DateTime.now().add(_cacheTtl),
-        );
-      } else if (response.statusCode != null && response.statusCode! >= 500) {
-        // NEGATIVE CACHE (Circuit Breaker): 
-        // Remember 5xx failures briefly to prevent Request Storms.
-        _setOutage(true);
-        _cache[cacheKey] = _CacheEntry(
-          response: response,
-          expiry: DateTime.now().add(const Duration(seconds: 15)),
-        );
-      }
-      
-      return response;
-    } on DioException catch (e) {
-      // Treat timeouts and connection errors as outages to trigger the UI barrier
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError) {
-        _setOutage(true);
-        // Short error TTL for transient network issues to recover faster
-        if (e.response != null) {
+      // 4. Execute the network request
+      final requestFuture = _executeRequest(
+        path: path,
+        token: token,
+        method: method,
+        data: data,
+      );
+
+      // Store in-flight future
+      _inFlight[cacheKey] = requestFuture;
+
+      try {
+        final response = await requestFuture;
+        
+        // 5. Cache the result
+        if (response.statusCode == 200) {
+          // Success cache (Longer)
           _cache[cacheKey] = _CacheEntry(
-            response: e.response!,
-            expiry: DateTime.now().add(const Duration(seconds: 5)),
+            response: response,
+            expiry: DateTime.now().add(_cacheTtl),
+          );
+        } else if (response.statusCode != null && response.statusCode! >= 500) {
+          // NEGATIVE CACHE (Circuit Breaker): 
+          // Remember 5xx failures briefly to prevent Request Storms.
+          _setOutage(true);
+          _cache[cacheKey] = _CacheEntry(
+            response: response,
+            expiry: DateTime.now().add(const Duration(seconds: 15)),
           );
         }
+        
+        return response;
+      } on DioException catch (e) {
+        // Treat timeouts and connection errors as outages to trigger the UI barrier
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          _setOutage(true);
+          // Short error TTL for transient network issues to recover faster
+          if (e.response != null) {
+            _cache[cacheKey] = _CacheEntry(
+              response: e.response!,
+              expiry: DateTime.now().add(const Duration(seconds: 5)),
+            );
+          }
+        }
+        rethrow;
+      } finally {
+        // 6. Clean up in-flight map REGARDLESS of outcome
+        unawaited(_inFlight.remove(cacheKey));
       }
-      rethrow;
     } finally {
-      // 5. Clean up in-flight map REGARDLESS of outcome
-      unawaited(_inFlight.remove(cacheKey));
+      // Always release the slot, even if executeRequest fails or throws
+      _releaseSlot();
+    }
+  }
+
+  Future<void> _waitForSlot() async {
+    if (_activeRequests < _maxConcurrent) {
+      _activeRequests++;
+      return;
+    }
+    final completer = Completer<void>();
+    _queue.add(completer);
+    return completer.future;
+  }
+
+  void _releaseSlot() {
+    _activeRequests--;
+    if (_queue.isNotEmpty) {
+      _activeRequests++;
+      final next = _queue.removeAt(0);
+      next.complete();
     }
   }
 

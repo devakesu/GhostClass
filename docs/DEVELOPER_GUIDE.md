@@ -84,7 +84,6 @@ These variables are **not required** for local development but enable additional
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_ENABLE_SW_IN_DEV` | `""` (disabled) | Set `"true"` to enable the service worker in development mode (useful for testing PWA/offline behaviour). |
 | `FORCE_STRICT_CSP` / `NEXT_PUBLIC_FORCE_STRICT_CSP` | `""` (disabled) | Set `"true"` to enforce a stricter CSP in development (removes most uses of `'unsafe-inline'` but still allows it in `script-src-elem` and certain dev style directives so Next.js hydration and dev tooling continue to work; useful for reproducing CSP violations locally). **Note:** `'unsafe-eval'` is NOT removed in dev mode even when set — Next.js HMR requires it. It is only absent in a real production build. Use `npm run build && npm start` to test the production CSP. |
 | `NEXT_PUBLIC_ATTENDANCE_TARGET_MIN` | `75` | Minimum attendance target percentage (1–100). Applies in both development and production. Adjust to match your institution's minimum attendance requirements. |
 
@@ -1146,6 +1145,36 @@ flutter run -d <device-id>
 # Run with verbose output
 flutter run -v
 ```
+
+### Mobile Security Architecture
+
+GhostClass Mobile implements a zero-trust security model to ensure institution-level blocks and forensic analysis cannot compromise user data.
+
+#### 1. Hardware-Backed Storage
+
+We use `flutter_secure_storage` to store sensitive data (EzyGo bearer tokens, encryption keys).
+
+- **Android**: Data is encrypted using AES-GCM-NoPadding in the Android Keystore.
+- **iOS**: Data is stored in the Keychain with `kSecAttrAccessibleAfterFirstUnlock`.
+
+#### 2. Network Security (JWE)
+
+All traffic between the mobile app and the GhostClass API is encrypted bi-directionally using **JSON Web Encryption (JWE)**:
+
+- **Encryption**: RSA-OAEP-256 (for key wrap) + AES-GCM-256 (for payload).
+- **Format**: JWE compact serialization (5-part token).
+- **Security**: Ensures that even if TLS is intercepted (e.g., via a company root CA), the attendance data remains unreadable.
+
+#### 3. Device Integrity (App Check)
+
+We enforce Firebase App Check with:
+
+- **Android**: Play Integrity (verifies app binary, signing cert, and device hardware).
+- **iOS**: DeviceCheck / App Attest.
+
+#### 4. Stealth Headers
+
+The app injects custom, non-standard headers to mimic legitimate browser traffic and bypass simple User-Agent based fingerprinting used by institutional ISPs.
 
 ### Code Generation
 

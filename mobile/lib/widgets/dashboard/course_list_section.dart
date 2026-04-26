@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/course_details.dart';
+import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/widgets/dashboard/disable_aware_course_card.dart';
 
@@ -25,6 +26,8 @@ class CourseListSection extends StatelessWidget {
   final String selectedYear;
   final bool bunkEnabled;
 
+  final List<CourseInstructor> instructors;
+
   const CourseListSection({
     super.key,
     required this.courses,
@@ -32,6 +35,7 @@ class CourseListSection extends StatelessWidget {
     required this.selectedSemester,
     required this.selectedYear,
     required this.bunkEnabled,
+    required this.instructors,
   });
 
   @override
@@ -59,7 +63,7 @@ class CourseListSection extends StatelessWidget {
               bunkEnabled: bunkEnabled,
               selectedSemester: selectedSemester,
               selectedYear: selectedYear,
-              instructors: const [],
+              instructors: instructors,
             ),
           );
         }, childCount: courses.length),

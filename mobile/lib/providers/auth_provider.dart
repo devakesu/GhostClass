@@ -11,7 +11,6 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:ghostclass/services/security_guard.dart';
 import 'package:ghostclass/services/settings_service.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,9 +25,6 @@ class LoginException implements Exception {
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final securityGuardProvider = Provider(
-  (ref) => SecurityGuard(ref.watch(secureStorageProvider)),
-);
 final stealthHeadersServiceProvider = Provider(
   (ref) => StealthHeadersService(ref.watch(secureStorageProvider)),
 );
@@ -303,14 +299,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     final session = ref.read(supabaseClientProvider).auth.currentSession;
     if (session == null) return null;
 
-    if (session.expiresAt != null &&
-        DateTime.fromMillisecondsSinceEpoch(
-          session.expiresAt! * 1000,
-        ).isBefore(DateTime.now())) {
-      await logout();
-      return null;
-    }
-
     final storage = ref.read(secureStorageProvider);
     final ezygoToken = await storage.getEzygoToken();
 
@@ -324,7 +312,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     try {
       final token = await _getFreshSupabaseToken();
       if (token == null) {
-        throw AppException(
+        throw const AppException(
           message: 'Auth session dead',
           type: AppExceptionType.unauthorized,
         );
@@ -342,7 +330,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         await logout();
         return null;
       }
-      rethrow;
+      
+      // If it's a network error or other non-auth issue, return the cached user 
+      // instead of rethrowing, so the app remains usable in offline mode.
+      AppLogger.w('AuthNotifier: Background sync failed during startup. Using cached data.', e);
+      return user;
     } finally {
       api.suppress401 = false;
     }
@@ -696,8 +688,27 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
       return session.accessToken;
     } on AuthException catch (e) {
-      AppLogger.w('AuthNotifier: Token refresh failed (AuthException)', e);
-      return null;
+      // User Request (Verification): Match proxy.ts logic from web app
+      // Only return null (which triggers logout) if the session is definitively dead.
+      // Codes like 'refresh_token_not_found' or 400 with 'Invalid Refresh Token' are terminal.
+      final isTerminal = e.statusCode == '400' || 
+                         e.message.contains('refresh_token_not_found') || 
+                         e.message.contains('Invalid Refresh Token') ||
+                         e.message.contains('not found');
+
+      if (isTerminal) {
+        AppLogger.w('AuthNotifier: Supabase session terminal failure', e);
+        return null;
+      }
+
+      // For other AuthExceptions (e.g. 500s, rate limits), treat as transient 
+      // network errors to avoid logging out the user prematurely.
+      AppLogger.w('AuthNotifier: Supabase transient auth error. Preventing logout.', e);
+      throw AppException(
+        message: 'Supabase service issues: ${e.message}',
+        type: AppExceptionType.network,
+        originalError: e,
+      );
     } catch (e) {
       AppLogger.w(
         'AuthNotifier: Network error during token refresh. Preventing logout.',

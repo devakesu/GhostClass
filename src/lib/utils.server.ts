@@ -270,6 +270,56 @@ export async function egressFetch(
 
     // Merge caller headers then apply per-tier proxy headers (proxy secret takes precedence).
     const headers = new Headers(init?.headers);
+    
+    // 1. Add Default Stealth Headers (if not already set by caller)
+    // These help server-side calls (sync, cron) match the browser proxy logic
+    if (!headers.has("origin")) {
+      headers.set("origin", "https://edu.ezygo.app");
+    }
+    if (!headers.has("referer")) {
+      headers.set("referer", "https://edu.ezygo.app/");
+    }
+
+    // Try to get original user agent from request headers if available
+    let originalUserAgent: string | null = null;
+    let originalSecChUa: string | null = null;
+    try {
+      // Use dynamic import to avoid issues in non-Next.js environments (like tests)
+      // and to satisfy ESLint.
+      const { headers: nextHeaders } = await import("next/headers");
+      const activeHeaders = await nextHeaders();
+      originalUserAgent = activeHeaders.get("user-agent");
+      originalSecChUa = activeHeaders.get("sec-ch-ua");
+    } catch {
+      // Not in a request context (e.g. background job, or non-Next.js env)
+    }
+
+    if (!headers.has("user-agent")) {
+      headers.set("user-agent", originalUserAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
+    }
+    if (!headers.has("sec-ch-ua") && originalSecChUa) {
+      headers.set("sec-ch-ua", originalSecChUa);
+    }
+    
+    if (!headers.has("accept")) {
+      headers.set("accept", "application/json, text/plain, */*");
+    }
+    if (!headers.has("accept-language")) {
+      headers.set("accept-language", "en-GB,en;q=0.9,en;q=0.8");
+    }
+    if (!headers.has("sec-fetch-site")) {
+      headers.set("sec-fetch-site", "same-site");
+    }
+    if (!headers.has("sec-fetch-mode")) {
+      headers.set("sec-fetch-mode", "cors");
+    }
+    if (!headers.has("sec-fetch-dest")) {
+      headers.set("sec-fetch-dest", "empty");
+    }
+    if (!headers.has("priority")) {
+      headers.set("priority", "u=1, i");
+    }
+
     for (const [key, value] of Object.entries(target.proxyHeaders)) {
       headers.set(key, value);
     }
@@ -283,7 +333,7 @@ export async function egressFetch(
     const tierTimeout = setTimeout(() => tierController.abort(), PER_TIER_TIMEOUT_MS);
     const tierSignal: AbortSignal =
       callerSignal !== null
-        ? AbortSignal.any([callerSignal, tierController.signal])
+        ? (AbortSignal as any).any([callerSignal, tierController.signal])
         : tierController.signal;
 
     try {
@@ -336,6 +386,27 @@ const _egressAxios = axios.create({ timeout: 15000 });
 _egressAxios.interceptors.request.use((config) => {
   const { baseUrl, proxyHeaders } = getEgressConfig();
   config.baseURL = baseUrl;
+  
+  // Add Stealth Headers
+  if (!config.headers.has("origin")) {
+    config.headers.set("origin", "https://edu.ezygo.app");
+  }
+  if (!config.headers.has("referer")) {
+    config.headers.set("referer", "https://edu.ezygo.app/");
+  }
+  if (!config.headers.has("user-agent")) {
+    config.headers.set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
+  }
+  if (!config.headers.has("sec-fetch-site")) {
+    config.headers.set("sec-fetch-site", "same-site");
+  }
+  if (!config.headers.has("sec-fetch-mode")) {
+    config.headers.set("sec-fetch-mode", "cors");
+  }
+  if (!config.headers.has("sec-fetch-dest")) {
+    config.headers.set("sec-fetch-dest", "empty");
+  }
+
   for (const [key, value] of Object.entries(proxyHeaders)) {
     config.headers.set(key, value);
   }

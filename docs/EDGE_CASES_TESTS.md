@@ -331,6 +331,71 @@ After 3 timeouts → Circuit OPENS
 
 ---
 
+## Mobile Edge Case 11: JWE Decryption Failure
+
+**Scenario:** Client receives a payload encrypted with a stale or mismatched RSA key
+
+**Expected Behavior:**
+
+- Client fails to decrypt the payload
+- `JweService` throws a `DecryptionException`
+- `ApiService` interceptor catches the error
+- User sees a "Security mismatch" error and is prompted to refresh or re-login
+
+## Mobile Edge Case 12: Play Integrity / App Check Failure
+
+**Scenario:** User runs the app on a rooted device or an unauthorized emulator
+
+**Expected Behavior:**
+
+- `SecurityGuard` detects the integrity failure
+- Firebase App Check refuses to issue a token
+- Backend rejects the request with 401/403
+- User sees a "Device not supported" or "Security violation" dialog
+- App blocks further access to sensitive attendance data
+
+## Mobile Edge Case 13: Biometric/Credential Storage Timeout
+
+**Scenario:** `flutter_secure_storage` takes too long to respond (common on some Android devices)
+
+**Expected Behavior:**
+
+- App shows a "Unlocking secure storage..." loading indicator
+- 10-second timeout on storage operations
+- Graceful fallback to login if storage remains locked
+
+---
+
+## Additional Test Scenarios
+
+### Test 9: Mobile JWE Round-trip
+
+**Setup:**
+
+- Mock the Next.js backend to return a JWE-encrypted response
+- Ensure the mobile app has the corresponding private key
+
+**Assertions:**
+
+- `ApiService` successfully decrypts the response
+- Data is correctly hydrated into the UI
+- No cleartext attendance data is visible in the network logs (only JWE tokens)
+
+### Test 10: App Check Enforcement
+
+**Setup:**
+
+- Enable `ENFORCE_APP_CHECK=true` on the backend
+- Send a request from a mobile client without a valid App Check token
+
+**Assertions:**
+
+- Backend returns 401/403
+- Mobile app displays `SecurityErrorDialog`
+- No data is returned
+
+---
+
 ## Monitoring Checklist
 
 ### Metrics to Track

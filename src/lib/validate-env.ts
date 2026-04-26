@@ -642,15 +642,21 @@ export function validateEnvironment() {
     }
   }
 
-  // Request Signature Max Age
-  const requestSigMaxAge = process.env.REQUEST_SIGNATURE_MAX_AGE;
-  if (requestSigMaxAge) {
-    const maxAgeValue = parseStrictInt(requestSigMaxAge);
-    if (isNaN(maxAgeValue) || maxAgeValue < 60 || maxAgeValue > 3600) {
-      errors.push(
-        "❌ REQUEST_SIGNATURE_MAX_AGE must be a number between 60 and 3600 seconds (default: 600)",
-      );
-    }
+  // Request Signature Keys (Ed25519)
+  const requestPrivateKey = process.env.REQUEST_PRIVATE_KEY;
+  const requestPublicKey = process.env.REQUEST_PUBLIC_KEY;
+
+  if (requestPrivateKey && !requestPrivateKey.includes("PRIVATE KEY")) {
+    errors.push("❌ REQUEST_PRIVATE_KEY must be a valid Ed25519 private key in PEM format");
+  }
+  if (requestPublicKey && !requestPublicKey.includes("PUBLIC KEY")) {
+    errors.push("❌ REQUEST_PUBLIC_KEY must be a valid Ed25519 public key in PEM format");
+  }
+
+  // Play Integrity Enforcement
+  const enforcePlayIntegrity = process.env.ENFORCE_PLAY_INTEGRITY;
+  if (enforcePlayIntegrity === "true" && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true");
   }
 
   // Sentry Replay Rate

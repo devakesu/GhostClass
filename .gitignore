@@ -93,6 +93,7 @@ certificates/
 /mobile/android/**/*.jks
 /mobile/android/**/*.keystore
 /mobile/android/**/*.p12
+/mobile/google-services.json
 
 # iOS Additional
 /mobile/ios/Pods/

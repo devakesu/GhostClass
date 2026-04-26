@@ -51,10 +51,19 @@ Relates to #
 
 ### Tests Performed
 
+#### Web Application
+
 - [ ] Unit tests pass (`npm run test`)
 - [ ] E2E tests pass (`npm run test:e2e`)
 - [ ] Linting passes (`npm run lint`)
-- [ ] Manual testing completed
+
+#### Mobile Application
+
+- [ ] Flutter tests pass (`flutter test`)
+- [ ] Manual testing on Android (Emulator/Physical)
+- [ ] Manual testing on iOS (Simulator/Physical)
+- [ ] JWE encryption/decryption verified
+- [ ] EzyGo direct access verified (mobile)
 
 ### Test Coverage
 

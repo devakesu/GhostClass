@@ -231,6 +231,12 @@ function main() {
     // Leave empty in .env when supabase.co is reachable directly.
     'NEXT_PUBLIC_SUPABASE_CF_PROXY_URL',
     'NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL',
+    // Mobile App Metadata
+    'NEXT_PUBLIC_ANDROID_PACKAGE_NAME',
+    'FIREBASE_APP_ID_ANDROID',
+    'FIREBASE_APP_ID_IOS',
+    'PLAY_INTEGRITY_PROJECT_NUMBER',
+    'PLAY_INTEGRITY_CERT_SHA256',
   ];
 
   // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────
@@ -248,6 +254,14 @@ function main() {
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
     'MOBILE_API_SECRET',
+    'REQUEST_PRIVATE_KEY',
+    'REQUEST_PUBLIC_KEY',
+    'GOOGLE_SERVICE_ACCOUNT_JSON',
+    'SENTRY_HASH_SALT',
+    'CRON_SECRET',
+    'GA_API_SECRET',
+    'UPSTASH_REDIS_REST_URL',
+    'UPSTASH_REDIS_REST_TOKEN',
   ];
 
   let successCount = 0;

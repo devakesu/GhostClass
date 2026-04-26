@@ -592,6 +592,59 @@ jobs:
 
           chmod 600 key.properties ghostclass.p12
 
+      - name: Generate mobile/lib/config/app_secrets.dart
+        working-directory: mobile
+        env:
+          SUPABASE_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_CF_PROXY_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
+          MOBILE_API_SECRET_PROD: ${{ secrets.MOBILE_API_SECRET }}
+          SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
+          APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+          
+          # Encode sensitive strings to Base64 for stealth as per the project's pattern
+          ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
+          ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
+          ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
+          ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
+          
+          GHOSTCLASS_API_URL="https://${APP_DOMAIN}/api"
+
+          cat > lib/config/app_secrets.dart << EOF
+          import 'package:flutter/foundation.dart';
+
+          class AppSecrets {
+            AppSecrets._();
+
+            static const bool isDev = kDebugMode;
+
+            static const String supabaseUrlDev = '';
+            static const String supabasePublishableKeyDev = '';
+
+            static const String supabaseProxyUrlProd = '${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}';
+            static const String supabasePublishableKeyProd = '${SUPABASE_ANON_KEY_PROD}';
+
+            static const String sentryDsn = '${ENCODED_SENTRY_DSN}';
+
+            static const String ghostclassApiUrlDev = '';
+            static const String mobileApiSecretDev = '';
+
+            static const String ghostclassApiUrlProd = '${GHOSTCLASS_API_URL}';
+            static const String mobileApiSecretProd = '${MOBILE_API_SECRET_PROD}';
+
+            static const String ezygoAuthUrl = '${ENCODED_EZYGO_AUTH_URL}';
+            static const String ezygoApiRoot = '${ENCODED_EZYGO_API_ROOT}';
+            static const String ezygoOrigin = '${ENCODED_EZYGO_ORIGIN}';
+
+            static const String supabaseSpoofedOrigin = 'https://${APP_DOMAIN}';
+
+            static const String diagnosticJwksUrl = '';
+          }
+          EOF
+
       - name: Build Android APK
         working-directory: mobile
         env:

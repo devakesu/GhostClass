@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ghostclass/widgets/aesthetic_refresh_indicator.dart';
 
 class ServiceRefreshIndicator extends StatelessWidget {
   final Widget child;
@@ -14,9 +15,9 @@ class ServiceRefreshIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      color: Theme.of(context).colorScheme.primary,
+    return AestheticRefreshIndicator(
       onRefresh: onRefresh,
+      useOverlay: useOverlay,
       child: child,
     );
   }

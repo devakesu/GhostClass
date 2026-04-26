@@ -21,6 +21,8 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 - **Node.js**: 22.12.0+
 - **npm**: 11+
+- **Flutter SDK**: 3.27+ (for mobile development)
+- **Dart SDK**: ^3.11.4 (bundled with Flutter)
 - **Git**: Latest version
 
 **That's it!** External contributors don't need GPG keys, GitHub PAT tokens, or access to secrets.
@@ -38,8 +40,9 @@ npm install --legacy-peer-deps
 # 3. Create feature branch
 git checkout -b feature/your-feature-name
 
-# 4. Start development server
-npm run dev
+# 4. Start development
+npm run dev      # Web development
+cd mobile && flutter run  # Mobile development
 ```
 
 **That's all you need to start developing!** For advanced maintainer setup (GPG, PAT tokens, deployment), see [For Maintainers Only](#for-maintainers-only) at the bottom of this guide.
@@ -47,6 +50,8 @@ npm run dev
 ## Development Workflow
 
 ### Available Commands
+
+#### Web Application
 
 ```bash
 npm run dev              # Development server (HTTP)
@@ -56,6 +61,16 @@ npm run lint             # Run ESLint
 npm run test             # Run unit tests
 npm run test:e2e         # Run end-to-end tests
 npm run test:coverage    # Generate coverage report
+```
+
+#### Mobile Application
+
+```bash
+cd mobile
+flutter pub get          # Install dependencies
+flutter run              # Run on device/emulator
+flutter test             # Run Flutter tests
+flutter build apk        # Build Android APK
 ```
 
 ### Making Changes

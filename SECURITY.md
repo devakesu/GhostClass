@@ -39,7 +39,10 @@ GhostClass implements multiple layers of security:
 - **Circuit Breaker Pattern** - Graceful handling of upstream API failures
 - **Request Deduplication** - Prevents duplicate concurrent requests
 - **Bot Protection** - Cloudflare Turnstile on public endpoints
-- **CSRF Protection** - Custom token-based CSRF protection
+- **CSRF Protection** - Custom token-based CSRF protection for web; `MOBILE_API_SECRET` validation for mobile requests
+- **JWE Encryption (Web & Mobile)** - Bi-directional RSA-OAEP + AES-256-GCM encryption for all client-server traffic (Next.js ↔ Browser/App)
+- **Device Attestation (Mobile)** - Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS)
+- **Anti-Tapjacking (Mobile)** - Android `FLAG_SECURE` implementation to prevent screenshot/overlay attacks on sensitive screens
 
 ### Supply Chain Security
 

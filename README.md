@@ -10,12 +10,15 @@
 [![Security Scan: Trivy](https://img.shields.io/badge/Security-Trivy%20Scanned-blue)](.github/workflows/pipeline.yml)
 [![Build Status](https://img.shields.io/badge/Build-Passing-success)](.github/workflows/pipeline.yml)
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?logo=next.js)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19.2.4-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Node.js](https://img.shields.io/badge/Node.js-22.12.0%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/Tests-Vitest%20%2B%20Playwright-green)](https://vitest.dev/)
+![Web](https://img.shields.io/badge/Web-Next.js%2016.1.6-black?style=for-the-badge&logo=next.js)
+![React](https://img.shields.io/badge/React-19.2.4-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Tailwind](https://img.shields.io/badge/Tailwind-CSS%204-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vitest](https://img.shields.io/badge/Test-Vitest%204.1.5-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Playwright](https://img.shields.io/badge/Test-Playwright%201.59.1-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![Flutter](https://img.shields.io/badge/Mobile-Flutter%203.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
+![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 
 ## Overview
 
@@ -94,10 +97,26 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 ## 📁 Project Structure
 
 ```text
+mobile/                       # Native Flutter mobile application
+├── android/                  # Android host app (Kotlin, Gradle, Anti-tapjacking)
+├── ios/                      # iOS host app (Swift, Xcode)
+├── lib/                      # Flutter source code
+│   ├── config/               # Runtime config & AppSecrets (JWE keys, API URLs)
+│   ├── logic/                # Attendance & bunk algorithms (parity with web)
+│   ├── models/               # Shared data models (attendance, scores, leave)
+│   ├── providers/            # Riverpod state management
+│   ├── screens/              # App screens (Dashboard, Calendar, Scores)
+│   ├── services/             # JWE, App Check, SecureStorage, API services
+│   └── widgets/              # Reusable UI components (CourseCard, StatsGrid)
+└── packages/                 # Vendored Flutter plugins (Play Integrity wrapper)
+
 src/
 ├── instrumentation.ts        # Sentry server instrumentation
 ├── instrumentation-client.ts # Sentry browser instrumentation
-├── proxy.ts                  # Next.js middleware (auth guard, routing, CSP injection)
+├── instrumentation-server.ts # Server-specific instrumentation (Node.js)
+├── instrumentation-edge.ts   # Edge-specific instrumentation (Vercel Edge/Cloudflare)
+├── middleware.ts             # Next.js middleware entry (exports from proxy.ts)
+├── proxy.ts                  # Core middleware logic (auth guard, routing, CSP injection)
 ├── sw.ts                     # Service worker with runtime caching
 ├── app/                      # Next.js app router pages and layouts
 │   ├── (auth)/               # Authentication routes (login, signup)
@@ -231,9 +250,11 @@ supabase/
     ├── 20260224000001_enforce_iv_format.sql                # Enforce AES-IV hex format constraint
     ├── 20260225000001_audit_log.sql                        # Audit log table and triggers
     ├── 20260227000000_fix_check_225_search_path.sql        # Fix search_path in duty leave trigger
-    ├── 20260227000001_audit_log_rls_policy.sql             # RLS policies for audit log
-    ├── 20260304000000_disabled_courses.sql                 # Add disabled_courses JSONB column
-    └── README.md
+    ├── 20260227000001_audit_log_rls_policy.sql
+    ├── 20260304000000_disabled_courses.sql
+    ├── 20260419000000_classes_and_audit.sql
+    ├── 20260420000000_enforce_semester_constraints_and_class_term_rls.sql
+    └── 20260422130005_schema_corrections.sql
 workers/                      # Proxy workers (deployed as standalone CF Workers / Lambda fns)
 ├── ezygo-proxy/              # CF Worker — Tier 1 outbound proxy for EzyGo API (server-side)
 ├── ezygo-proxy-aws/          # AWS Lambda — Tier 2 failover outbound proxy for EzyGo API (server-side)
@@ -490,20 +511,7 @@ GhostClass is optimized for maximum performance:
 
 ### Testing PWA Features Locally
 
-By default, service workers are disabled in development to avoid caching issues. To test PWA functionality (offline mode, caching, install prompts) during development:
 
-```bash
-# Unix/Linux/macOS
-NEXT_PUBLIC_ENABLE_SW_IN_DEV="true" npm run dev
-
-# Windows Command Prompt
-set NEXT_PUBLIC_ENABLE_SW_IN_DEV=true && npm run dev
-
-# Windows PowerShell
-$env:NEXT_PUBLIC_ENABLE_SW_IN_DEV="true"; npm run dev
-```
-
-This enables the service worker in development mode without requiring a production build.
 
 ### Code Splitting & Loading Strategy
 

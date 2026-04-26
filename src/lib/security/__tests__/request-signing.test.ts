@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   signRequest,
@@ -7,16 +8,29 @@ import {
   generateSignedHeaders,
 } from '../request-signing';
 
-describe('Request Signing', () => {
-  const originalSigningSecret = process.env.REQUEST_SIGNING_SECRET;
+describe('Request Signing (Ed25519)', () => {
+  let testPrivateKey: string;
+  let testPublicKey: string;
+
+  const originalPrivateKey = process.env.REQUEST_PRIVATE_KEY;
+  const originalPublicKey = process.env.REQUEST_PUBLIC_KEY;
 
   beforeEach(() => {
-    // Set a test signing secret
-    process.env.REQUEST_SIGNING_SECRET = 'a'.repeat(64); // 64 hex chars
+    // Generate fresh Ed25519 keys for each test
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519', {
+      privateKeyEncoding: { format: 'pem', type: 'pkcs8' },
+      publicKeyEncoding: { format: 'pem', type: 'spki' },
+    });
+    testPrivateKey = privateKey;
+    testPublicKey = publicKey;
+
+    process.env.REQUEST_PRIVATE_KEY = testPrivateKey;
+    process.env.REQUEST_PUBLIC_KEY = testPublicKey;
   });
 
   afterEach(() => {
-    process.env.REQUEST_SIGNING_SECRET = originalSigningSecret;
+    process.env.REQUEST_PRIVATE_KEY = originalPrivateKey;
+    process.env.REQUEST_PUBLIC_KEY = originalPublicKey;
     vi.restoreAllMocks();
   });
 
@@ -29,7 +43,7 @@ describe('Request Signing', () => {
 
       expect(signature).toBeTruthy();
       expect(typeof signature).toBe('string');
-      expect(signature).toHaveLength(64); // HMAC-SHA256 hex digest is 64 chars
+      expect(signature).toHaveLength(128); // Ed25519 signature is 64 bytes -> 128 hex chars
     });
 
     it('should generate different signatures for different payloads', () => {
@@ -58,12 +72,12 @@ describe('Request Signing', () => {
       expect(signature1).toBe(signature2);
     });
 
-    it('should throw error if REQUEST_SIGNING_SECRET is not set', () => {
-      delete process.env.REQUEST_SIGNING_SECRET;
+    it('should throw error if REQUEST_PRIVATE_KEY is not set', () => {
+      delete process.env.REQUEST_PRIVATE_KEY;
 
       expect(() => {
         signRequest('payload', 1000);
-      }).toThrow('REQUEST_SIGNING_SECRET must be configured for request signing');
+      }).toThrow('REQUEST_PRIVATE_KEY must be configured for request signing');
     });
   });
 
