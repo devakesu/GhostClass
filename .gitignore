@@ -92,6 +92,7 @@ certificates/
 # Android Additional
 /mobile/android/**/*.jks
 /mobile/android/**/*.keystore
+/mobile/android/**/*.p12
 
 # iOS Additional
 /mobile/ios/Pods/

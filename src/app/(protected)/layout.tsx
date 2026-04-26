@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { createClient } from "@/lib/supabase/client";
 import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 import { useCSRFToken } from "@/hooks/use-csrf-token";
 
 export default function ProtectedLayout({
@@ -105,6 +106,9 @@ export default function ProtectedLayout({
         if (active) {
           // Log the error for debugging, then attempt logout
           logger.error("Auth check failed:", err instanceof Error ? err.message : String(err));
+          Sentry.captureException(err, {
+            tags: { type: "client_auth_check_failure", location: "protected/layout" },
+          });
           try {
             await handleLogout();
           } catch (logoutErr) {

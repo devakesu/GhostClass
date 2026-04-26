@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,13 @@ const handler = async (req: Request) => {
     return NextResponse.json({ error: "Version is required" }, { status: 400 });
   }
 
+  // Validate version format — must be a short alphanumeric version string (e.g. "1.0", "2024-01")
+  const versionSchema = z.string().min(1).max(50).regex(/^[0-9a-zA-Z._-]+$/, "Invalid version format");
+  const versionResult = versionSchema.safeParse(version);
+  if (!versionResult.success) {
+    return NextResponse.json({ error: "Invalid version format" }, { status: 400 });
+  }
+
   // 3. Update database
   const { error } = await supabaseAdmin
     .from("users")
@@ -55,6 +64,10 @@ const handler = async (req: Request) => {
 
   if (error) {
     logger.error("API /user/accept-terms: Database update failed:", error);
+    Sentry.captureException(error, {
+      tags: { type: "db_update_error", location: "api/user/accept-terms" },
+      extra: { userId: authUser.id, version: versionResult.data },
+    });
     return NextResponse.json({ error: "Failed to update terms acceptance" }, {
       status: 500,
     });

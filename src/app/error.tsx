@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 import { PublicNavbar } from "@/components/layout/public-navbar";
 import { Footer } from "@/components/layout/footer";
@@ -18,7 +19,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry
+    logger.error("[root] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "error.tsx",

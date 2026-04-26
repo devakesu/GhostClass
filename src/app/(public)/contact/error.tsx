@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
 export default function ContactError({
@@ -12,10 +13,11 @@ export default function ContactError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry with contact context
+    logger.error("[contact] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "contact",
+        digest: error.digest,
       },
     });
   }, [error]);

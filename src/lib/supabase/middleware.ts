@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCspHeader } from "../csp";
 import { logger } from "../logger";
+import * as Sentry from "@sentry/nextjs";
+import { getSupabaseConfig, _customFetch } from "./fetch";
 
 export async function updateSession(request: NextRequest, nonce?: string) {
   // 1. Get CSP Header
@@ -15,9 +17,11 @@ export async function updateSession(request: NextRequest, nonce?: string) {
   // 3. Apply CSP to the initial response
   response.headers.set('Content-Security-Policy', cspHeader);
 
+  const { url, key } = getSupabaseConfig('client');
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+    url,
+    key,
     {
       cookies: {
         getAll() {
@@ -35,24 +39,32 @@ export async function updateSession(request: NextRequest, nonce?: string) {
           response.headers.set('Content-Security-Policy', cspHeader);
         },
       },
+      ...(_customFetch ? { global: { fetch: _customFetch } } : {})
     }
   );
 
   try {
     await supabase.auth.getUser();
   } catch (error) {
-    // If token refresh fails (e.g., missing refresh token), clear invalid session cookies
-    // This prevents subsequent requests from attempting to refresh an invalid token
-    const authCookies = request.cookies.getAll()
-      .filter(({ name }) => name.startsWith('sb-') || name.includes('auth'))
+    // If token refresh fails (e.g., missing or expired refresh token), clear invalid
+    // session cookies. Only remove Supabase-managed cookies (sb-* prefix) — the SDK
+    // exclusively uses this prefix, so matching on name.includes('auth') is too broad
+    // and could accidentally delete unrelated cookies.
+    const authCookies = request.cookies
+      .getAll()
+      .filter(({ name }) => name.startsWith("sb-"))
       .map(({ name }) => name);
-    
-    authCookies.forEach(name => {
+
+    authCookies.forEach((name) => {
       response.cookies.delete(name);
     });
 
     logger.warn("Session refresh failed in middleware, clearing invalid session cookies", {
       error: error instanceof Error ? error.message : String(error),
+    });
+    Sentry.captureException(error, {
+      level: "warning",
+      tags: { type: "session_refresh_failure", location: "supabase/middleware" },
     });
   }
 

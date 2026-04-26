@@ -18,13 +18,7 @@ export async function setAuthCookie(token: string, days = 31) {
 }  
 
 export async function clearAuthCookie() {
-  (await cookies()).set("ezygo_access_token", "", {
-    httpOnly: true,
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0),
-  });
+  (await cookies()).delete("ezygo_access_token");
 }
 
 export async function getAuthTokenServer() {

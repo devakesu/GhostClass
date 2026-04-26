@@ -44,42 +44,7 @@ async function safeEzygoJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-/**
- * Derives current academic semester and year based on the current date,
- * falling back to EzyGo metadata if available.
- */
-export function calculateCurrentAcademicInfo(
-  ezygoMetadata?: { year?: string | null; semester?: string | null },
-) {
-  if (ezygoMetadata?.year && ezygoMetadata?.semester) {
-    const sem = ezygoMetadata.semester.toLowerCase();
-    let normalizedSem: "even" | "odd" | null = null;
-    if (sem.includes("odd") || sem === "1") normalizedSem = "odd";
-    else if (sem.includes("even") || sem === "2") normalizedSem = "even";
-
-    if (normalizedSem) {
-      return {
-        current_semester: normalizedSem,
-        current_year: ezygoMetadata.year,
-      };
-    }
-  }
-
-  // Clock-based fallback derivation
-  const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-  const isFirstHalf = month < 6; // Jan-June is usually "Even" semester of previous year
-  const currentSemester: "even" | "odd" = isFirstHalf ? "even" : "odd";
-  const startYear = isFirstHalf ? year - 1 : year;
-  const endYearShort = String(startYear + 1).slice(-2);
-  const currentYearStr = `${startYear}-${endYearShort}`;
-
-  return {
-    current_semester: currentSemester,
-    current_year: currentYearStr,
-  };
-}
+import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 
 /**
  * Centrally performs a full profile sync from EzyGo to Supabase.

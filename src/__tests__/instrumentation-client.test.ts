@@ -15,7 +15,7 @@ describe('instrumentation-client', () => {
 
   describe('onRouterTransitionStart', () => {
     it('calls captureRouterTransitionStart when the method exists on Sentry', async () => {
-      const { onRouterTransitionStart } = await import('../instrumentation-client');
+      const { onRouterTransitionStart } = await import('../../sentry.client.config');
 
       onRouterTransitionStart();
 
@@ -32,7 +32,7 @@ describe('instrumentation-client', () => {
         captureRouterTransitionStart: undefined,
       }));
 
-      const { onRouterTransitionStart } = await import('../instrumentation-client');
+      const { onRouterTransitionStart } = await import('../../sentry.client.config');
 
       expect(() => onRouterTransitionStart()).not.toThrow();
       expect(mockCaptureRouterTransitionStart).not.toHaveBeenCalled();

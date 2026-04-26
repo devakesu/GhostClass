@@ -8,7 +8,15 @@ export function GlobalInit() {
   const { settings } = useUserSettings();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && settings) {
+    // Remove the pre-hydration spinner overlay now that React has mounted.
+    // The element is SSR'd into the initial HTML so it's visible during the
+    // JS parse + hydration gap; removing it here reveals the real app shell.
+    document.getElementById("prehyd-loader")?.remove();
+  }, []);
+
+  useEffect(() => {
+    if (settings) {
+      // Enrich Sentry error reports with user preferences for better debugging context
       Sentry.setContext("user_preferences", { ...settings });
     }
   }, [settings]);

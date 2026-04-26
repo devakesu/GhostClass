@@ -84,7 +84,18 @@ const handler = async (req: Request) => {
       email: dbUser.email,
       first_name: dbUser.first_name,
       last_name: dbUser.last_name,
-      phone: dbUser.phone ? decrypt(dbUser.phone_iv, dbUser.phone) : null, // Decrypt PII if available
+      phone: (() => {
+        if (!dbUser.phone) return null;
+        try {
+          return decrypt(dbUser.phone_iv, dbUser.phone);
+        } catch (e) {
+          logger.error("[profile bundle] Failed to decrypt phone (possible null IV on legacy row)", e);
+          Sentry.captureException(e, {
+            tags: { type: "phone_decryption_failure", location: "api/user/profile" },
+          });
+          return null;
+        }
+      })(),
       avatar_url: dbUser.avatar_url,
       
       // Academic context (cached on the user record for speed)

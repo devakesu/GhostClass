@@ -8,6 +8,8 @@
  * templates.
  */
 
+import { getLogoUrl } from "./styles";
+
 const BRAND_COLOR = "#7b75ff";
 const BG_COLOR = "#f9fafb";
 
@@ -28,13 +30,6 @@ const HEADER_STYLE =
  * the logo must be served from a known public origin. Falls back to an empty string
  * (no <img>) if neither env var is set, which is safe for local dev/test runs.
  */
-const getLogoUrl = (): string => {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
-  if (appUrl) return `${appUrl}/logo.png`;
-  const domain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-  if (domain) return `https://${domain}/logo.png`;
-  return "";
-};
 
 /** Renders a responsive logo <img> for the email header, or an empty string if no URL is configured. */
 const renderLogoImg = (size = 180): string => {
