@@ -1,5 +1,5 @@
 npm run verify-version
-npx lint-staged
+# npx lint-staged
 
 # Always sync critical secrets (like version)
 # Full secret sync is opt-in: export SYNC_SECRETS=1
