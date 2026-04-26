@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
 export default function NotificationsError({
@@ -12,10 +13,11 @@ export default function NotificationsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry with notifications context
+    logger.error("[notifications] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "notifications",
+        digest: error.digest,
       },
     });
   }, [error]);

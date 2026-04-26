@@ -5,7 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
-export default function ScoresError({
+export default function AcceptTermsError({
   error,
   reset,
 }: {
@@ -13,14 +13,11 @@ export default function ScoresError({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error("[scores] Render error:", error.message, error.digest);
+    logger.error("[accept-terms] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
-      tags: {
-        location: "scores",
-        digest: error.digest,
-      },
+      tags: { location: "accept-terms", digest: error.digest },
     });
   }, [error]);
 
-  return <ErrorFallback error={error} reset={reset} />;
+  return <ErrorFallback error={error} reset={reset} homeUrl="/" />;
 }

@@ -84,8 +84,8 @@ export function useSyncOnMount({
   sentryLocation,
   sentryTag,
 }: UseSyncOnMountOptions): UseSyncOnMountReturn {
-  const mountId = useRef(Math.random().toString(36));
-  const lastSyncMountId = useRef<string | null>(null);
+  const [mountId, setMountId] = useState(() => Math.random().toString(36));
+  const [lastSyncMountId, setLastSyncMountId] = useState<string | null>(null);
 
   // Keep callbacks in refs so the sync effect never needs to re-run when the
   // caller re-creates the callback functions.
@@ -104,32 +104,28 @@ export function useSyncOnMount({
   // stable initial ID is used for the first sync and the new ID is ready for the
   // next real mount.
   useEffect(() => {
-    mountId.current = Math.random().toString(36);
+    // Regenerate the mountId on every real navigation.
+    // We defer this to avoid the "setState in effect" synchronous warning.
+    const timer = setTimeout(() => {
+        setMountId(Math.random().toString(36));
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     // Wait until the caller signals all prerequisite queries have loaded.
     if (!enabled) return;
 
-    if (!username) {
-      // User is authenticated but has no EzyGo username – nothing to sync.
-      // Unblock the page immediately.
-      if (userId) setSyncCompleted(true);
-      return;
-    }
+    if (!username) return;
 
     // Dedup: this mount already ran a sync – skip.
-    if (lastSyncMountId.current === mountId.current) {
-      logger.dev(`[${sentryLocation}] Sync already completed for this mount, skipping`);
-      setSyncCompleted(true);
-      return;
-    }
+    if (lastSyncMountId === mountId) return;
 
     const abortController = new AbortController();
     let isCleanedUp = false;
 
     const performSync = async () => {
-      logger.dev(`[${sentryLocation}] Starting sync for mount: ${mountId.current}`);
+      logger.dev(`[${sentryLocation}] Starting sync for mount: ${mountId}`);
       setIsSyncing(true);
 
       try {
@@ -172,8 +168,8 @@ export function useSyncOnMount({
         });
       } finally {
         if (!isCleanedUp) {
-          logger.dev(`[${sentryLocation}] Sync completed for mount: ${mountId.current}`);
-          lastSyncMountId.current = mountId.current;
+          logger.dev(`[${sentryLocation}] Sync completed for mount: ${mountId}`);
+          setLastSyncMountId(mountId);
           setIsSyncing(false);
           setSyncCompleted(true);
         }
@@ -186,7 +182,11 @@ export function useSyncOnMount({
       isCleanedUp = true;
       abortController.abort();
     };
-  }, [enabled, username, userId, sentryLocation, sentryTag]);
+  }, [enabled, username, userId, sentryLocation, sentryTag, mountId, lastSyncMountId, syncCompleted]);
 
-  return { isSyncing, syncCompleted };
+  const isShortCircuited = !username && !!userId;
+  const isAlreadySynced = lastSyncMountId === mountId;
+  const effectiveSyncCompleted = syncCompleted || isShortCircuited || isAlreadySynced;
+
+  return { isSyncing, syncCompleted: effectiveSyncCompleted };
 }

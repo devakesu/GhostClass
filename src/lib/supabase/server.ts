@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
-import { _customFetch } from "./fetch";
+import { getSupabaseConfig, _customFetch } from "./fetch";
 
 /**
  * Creates a Supabase server client with cookie-based session management.
@@ -24,25 +24,7 @@ import { _customFetch } from "./fetch";
  */
 export async function createClient() {
   const cookieStore = await cookies();
-  
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  let key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // Use development overrides if present
-  if (process.env.NODE_ENV === "development") {
-    if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY) {
-      url = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
-      key = process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
-    } else {
-      // Environment Guard: Alert developer if production URL is leaking into development
-      import("@/lib/logger").then(({ logger }) => {
-        logger.warn(
-          "[Supabase Security] Production URL detected in development! ⚠️",
-          `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY are correctly configured.`
-        );
-      });
-    }
-  }
+  const { url, key } = getSupabaseConfig('client');
 
   if (!url || !key) {
       const error = new Error("Supabase Environment Variables missing in Server Client");

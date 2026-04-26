@@ -30,6 +30,7 @@ export default defineConfig({
         'scripts/**',
         '**/__tests__/**',
         '**/*.{test,spec}.*',
+        'mobile/**',
       ],
       include: ['src/**/*.{ts,tsx}'],
       // @ts-expect-error - 'all' is a valid runtime option but not in Vitest 4.x types
@@ -42,7 +43,7 @@ export default defineConfig({
       },
     },
     include: ['**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', '.next', 'supabase', 'e2e'],
+    exclude: ['node_modules', '.next', 'supabase', 'e2e', 'mobile'],
   },
   resolve: {
     alias: {

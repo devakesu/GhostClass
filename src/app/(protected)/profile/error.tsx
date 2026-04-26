@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
 export default function ProfileError({
@@ -12,10 +13,11 @@ export default function ProfileError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry with profile context
+    logger.error("[profile] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "profile",
+        digest: error.digest,
       },
     });
   }, [error]);

@@ -10,6 +10,8 @@
 export const getLogoUrl = (): string => {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
   if (appUrl) return `${appUrl}/logo.png`;
+  const domain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+  if (domain) return `https://${domain}/logo.png`;
   return "";
 };
 

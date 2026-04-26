@@ -369,7 +369,7 @@ export function CourseCard({
           {/* INSTRUCTOR SUBTITLE */}
           <div className="flex items-center gap-1.5 mt-1.5 opacity-60">
             <span className={cn(
-              "text-xs font-semibold truncate max-w-37.5",
+              "text-xs font-semibold truncate max-w-48 pr-1",
               !instructorName && "italic font-medium"
             )}>
               {instructorName || "No instructor assigned"}

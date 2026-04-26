@@ -45,6 +45,9 @@ export async function getAuthLock(
 
 /**
  * Release a previously acquired lock.
+ * Uses a Lua script for atomicity to ensure we only delete the lock if the value
+ * matches our unique ID, preventing us from deleting someone else's lock if ours
+ * has already expired.
  *
  * @param userId - Institutional User ID
  * @param lockValue - The unique value returned by getAuthLock
@@ -56,9 +59,18 @@ export async function releaseAuthLock(
   const lockKey = `auth_lock:${userId}`;
 
   try {
-    const currentValue = await redis.get(lockKey);
-    if (currentValue === lockValue) {
-      await redis.del(lockKey);
+    // Atomic check-and-delete Lua script
+    const script = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `;
+
+    const result = await redis.eval(script, [lockKey], [lockValue]);
+
+    if (result === 1) {
       if (process.env.NODE_ENV === "development") {
         logger.dev(`[Auth-Lock] Released for ${userId}`);
       }

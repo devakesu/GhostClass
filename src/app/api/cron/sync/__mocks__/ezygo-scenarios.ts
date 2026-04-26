@@ -43,7 +43,7 @@
  *   111 = Absent
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 // ---------------------------------------------------------------------------
 // Static courses — same for every scenario

@@ -7,6 +7,7 @@ import { validateCsrfToken } from "@/lib/security/csrf";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
@@ -57,13 +58,17 @@ const getHandler = async (req: Request) => {
   const decryptedPhone = existingUser?.phone && existingUser?.phone_iv ? decrypt(existingUser.phone_iv, existingUser.phone) : null;
 
   if (existingUser && existingUser.first_name) {
+    // Cache the token so it's reused in the after() background sync (avoids a second
+    // getAuthTokenServer() call when shouldSync=true).
+    let resolvedToken: string | null = null;
+
     if (shouldSync) {
-      const syncToken = await getAuthTokenServer();
-      if (syncToken) {
+      resolvedToken = (await getAuthTokenServer()) ?? null;
+      if (resolvedToken) {
         try {
           // Block until EzyGo sync completes
-          await performProfileSync(syncToken, existingUser.id, user.id);
-          
+          await performProfileSync(resolvedToken, existingUser.id, user.id);
+
           // Refetch from DB to return fresh data (e.g. updated class name)
           const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).single();
           if (updatedUser) {
@@ -87,7 +92,8 @@ const getHandler = async (req: Request) => {
     }
 
     after(async () => {
-      const syncToken = await getAuthTokenServer();
+      // Reuse token already fetched in shouldSync block; only fetch fresh for background-only path
+      const syncToken = resolvedToken ?? await getAuthTokenServer();
       if (!syncToken) return;
       try {
         // Trigger a full background sync (Profile, Class, Courses)
@@ -116,7 +122,14 @@ const getHandler = async (req: Request) => {
   const token = await getAuthTokenServer();
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401 });
   const ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-  if (!ezygoRes.ok) return NextResponse.json({ error: "Failed" }, { status: 502 });
+  if (!ezygoRes.ok) {
+    logger.error("[profile GET] EzyGo profile fetch failed:", ezygoRes.status);
+    Sentry.captureException(
+      new Error(`EzyGo profile fetch failed with status ${ezygoRes.status}`),
+      { tags: { type: "ezygo_api_error", location: "api/profile/get" } },
+    );
+    return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502 });
+  }
   const json = await ezygoRes.json();
   const d = json.data || json;
   const encPhone = (d.mobile || d.user?.mobile) ? encrypt(d.mobile || d.user?.mobile) : null;
@@ -175,7 +188,14 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
   if (birth_date) { const enc = encrypt(birth_date); up.birth_date = enc.content; up.birth_date_iv = enc.iv; }
 
   const supabaseAdmin = getAdminClient();
-  await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
+  const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
+  if (updateError) {
+    logger.error("[profile PATCH] Database update failed:", updateError);
+    Sentry.captureException(updateError, {
+      tags: { type: "db_update_error", location: "api/profile/patch" },
+    });
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+  }
   return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
 };
 

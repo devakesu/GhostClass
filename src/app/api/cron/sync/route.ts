@@ -394,10 +394,13 @@ export const GET = withSecurity(async (req) => {
                     
                     // 2. Encrypt and persist the healed token to the DB for future runs
                     const { iv, content } = encrypt(decryptedToken);
-                    await supabaseAdmin.from("users").update({
+                    const { error: healUpdateError } = await supabaseAdmin.from("users").update({
                       ezygo_token: content,
                       ezygo_iv: iv
                     }).eq("auth_id", user.auth_id);
+                    if (healUpdateError) {
+                      logger.warn(`[sync] Self-heal token persist failed for user ${redact("id", user.username)} (non-critical, current run continues):`, healUpdateError);
+                    }
 
                     // 3. Update courseRes and proceed normally
                     courseRes = retryRes;
@@ -549,7 +552,13 @@ export const GET = withSecurity(async (req) => {
                     logger.info(`[sync] Self-healed stale token for user ${redact("id", user.username)} (Attendance).`);
                     decryptedToken = cookieToken;
                     const { iv, content } = encrypt(decryptedToken);
-                    await supabaseAdmin.from("users").update({ ezygo_token: content, ezygo_iv: iv }).eq("auth_id", user.auth_id);
+                    const { error: attHealUpdateError } = await supabaseAdmin
+                      .from("users")
+                      .update({ ezygo_token: content, ezygo_iv: iv })
+                      .eq("auth_id", user.auth_id);
+                    if (attHealUpdateError) {
+                      logger.warn(`[sync] Self-heal token persist failed for user ${redact("id", user.username)} (Attendance, non-critical):`, attHealUpdateError);
+                    }
                     attRes = retryRes;
                   } else {
                     throw new Error(`Attendance API failed: ${attRes.status}`);

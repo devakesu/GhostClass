@@ -160,9 +160,26 @@ export const handler = async (event) => {
   });
 
   // ── 6. Read response body ─────────────────────────────────────────────────
-  // Lambda has a 6 MB response payload limit; this aligns with the app-level
-  // 3 MB MAX_RESPONSE_BYTES guard applied on the Next.js side.
-  const responseBody = await response.text();
+  // Use text() for text/JSON responses (all EzyGo API calls).
+  // Use arrayBuffer() + base64 for binary content as a safety fallback
+  // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
+  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  const isTextResponse =
+    responseContentType === "" ||
+    responseContentType.startsWith("text/") ||
+    responseContentType.startsWith("application/json") ||
+    responseContentType.startsWith("application/xml");
+
+  let responseBody;
+  let isBase64Encoded;
+  if (isTextResponse) {
+    responseBody = await response.text();
+    isBase64Encoded = false;
+  } else {
+    const buffer = await response.arrayBuffer();
+    responseBody = Buffer.from(buffer).toString("base64");
+    isBase64Encoded = true;
+  }
 
   // ── 7. Filter and forward response headers ────────────────────────────────
   const responseHeaders = {};
@@ -176,6 +193,6 @@ export const handler = async (event) => {
     statusCode: response.status,
     headers:    responseHeaders,
     body:       responseBody,
-    isBase64Encoded: false,
+    isBase64Encoded,
   };
 };
