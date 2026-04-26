@@ -1,14 +1,10 @@
 # GhostClass Mobile
 
-<!-- markdownlint-disable MD060 -->
-
-Native Flutter companion to the [GhostClass](../README.md) web application — bringing the same attendance management experience to Android and iOS with full offline support and hardware-backed security.
-
-[![Flutter](https://img.shields.io/badge/Flutter-3.27%2B-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.11%2B-0175C2?logo=dart&logoColor=white)](https://dart.dev)
-[![Android](https://img.shields.io/badge/Android-10%2B_(API_29)-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![iOS](https://img.shields.io/badge/iOS-13%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.6+-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
+![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
+![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
 
 ## Overview
 
@@ -234,18 +230,29 @@ flutter run
 
 ### Secrets Setup
 
-`lib/config/app_secrets.dart` is gitignored because it contains sensitive keys. Create it manually:
+`lib/config/app_secrets.dart` is gitignored because it contains sensitive keys. Create it by copying the example:
+
+```bash
+cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
+```
+
+Then fill in your actual values in the `AppSecrets` class:
 
 ```dart
 // lib/config/app_secrets.dart
-import 'package:flutter/foundation.dart';
+class AppSecrets {
+  AppSecrets._();
 
-const String kSupabaseUrl = 'https://xxxx.supabase.co';
-const String kSupabaseAnonKey = 'your-anon-key';
-const String kSentryDsn = 'https://xxxx@sentry.io/xxxx';
-const String kGhostclassApiUrl = 'https://your-ghostclass-instance.com';
-// Other secret keys as required by AppConfig
+  static const String supabaseProxyUrlProd = 'https://xxxx.supabase.co';
+  static const String supabasePublishableKeyProd = 'your-anon-key';
+  static const String sentryDsn = 'aHR0cHM6Ly94eHh4QHNlbnRyeS5pby94eHh4'; // Base64 encoded
+  static const String ghostclassApiUrlProd = 'https://your-ghostclass-instance.com/api';
+  static const String mobileApiSecretProd = 'your-mobile-api-secret';
+  // ... other keys
+}
 ```
+
+> **Tip:** You can use `node scripts/sync-secrets.js` to sync these to GitHub Actions for CI builds.
 
 ### Firebase Setup
 

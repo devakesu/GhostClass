@@ -8,6 +8,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/config/app_secrets.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -41,25 +42,8 @@ void main() async {
 
   // Apply global Bulletproof Networking overrides
   HttpOverrides.global = MyHttpOverrides();
+  
 
-  // --- Raw Local HTTPS Diagnostic ---
-  // This will confirm if the handshake is possible on your dev machine.
-  Future.microtask(() async {
-    try {
-      final client = HttpClient();
-      client.badCertificateCallback = (cert, host, port) => true;
-      final url = 'http://10.171.141.62:3000/api/.well-known/jwks.json';
-      final request = await client
-          .getUrl(Uri.parse(url))
-          .timeout(const Duration(seconds: 3));
-      final response = await request.close();
-      debugPrint(
-        '[DIAG] Raw Local HTTPS Request Status: ${response.statusCode}',
-      );
-    } catch (e) {
-      debugPrint('[DIAG] Raw Local HTTPS Request FAILED: $e');
-    }
-  });
 
   // 2. Initialize Firebase & App Check
   try {
@@ -73,15 +57,13 @@ void main() async {
 
     if (kDebugMode) {
       await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.debug,
+        providerAndroid: AndroidDebugProvider(),
+        providerApple: AppleDebugProvider(),
       );
-
-      // Force a fresh token fetch to see the exact rejection message
-      final token = await FirebaseAppCheck.instance.getToken(true);
-      debugPrint('🛡️ [FIREBASE SHIELD] SUCCESS! App Check Token: $token');
     } else {
       await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.playIntegrity,
+        providerAndroid: const AndroidPlayIntegrityProvider(),
+        providerApple: const AppleAppAttestProvider(),
       );
     }
   } catch (e) {
@@ -114,7 +96,7 @@ void main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabasePublishableKey.value,
-    headers: {'origin': 'https://ghostclass.devakesu.com'},
+    headers: {'origin': AppSecrets.supabaseSpoofedOrigin},
   );
 
   await GoogleFonts.pendingFonts([GoogleFonts.manrope()]);

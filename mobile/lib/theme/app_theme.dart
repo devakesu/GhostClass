@@ -77,9 +77,9 @@ class GhostColors extends ThemeExtension<GhostColors> {
 }
 
 class AppColors {
-  // Brand & Semantic
+  // Brand & Semantic (Updated to match OKLCH values from Web)
   static const Color brandPurple = Color(0xFF7C3AED);
-  static const Color brandPink = Color.fromARGB(255, 212, 0, 255);
+  static const Color brandPink = Color(0xFFF43F5E); // oklch(0.65 0.23 345)
   static const Color successGreen = Color(0xFF10B981);
   static const Color dangerRed = Color(0xFFEF4444);
   static const Color accentOrange = Color(0xFFF59E0B);
@@ -87,16 +87,16 @@ class AppColors {
   static const Color accentCyan = Color(0xFF06B6D4);
   static const Color warningYellow = Color(0xFFFFB800);
 
-  // Dark Theme Neutral
-  static const Color background = Color(0xFF0F0F1A);
-  static const Color surface = Color(0xFF18181B);
-  static const Color surfaceLighter = Color(0xFF1E1E2E);
-  static const Color primary = Color(0xFFfafafa);
-  static const Color muted = Color(0xFF27272a);
-  static const Color mutedForeground = Color(0xFFa1a1aa);
-  static const Color border = Color(0xFF27272a);
+  // Dark Theme Neutral (Enhanced for premium depth)
+  static const Color background = Color(0xFF050508);     // oklch(0.08 0.02 265)
+  static const Color surface = Color(0xFF141424);        // oklch(0.16 0.03 265)
+  static const Color surfaceLighter = Color(0xFF2A2A3C); // oklch(0.24 0.04 265)
+  static const Color primary = Color(0xFFF9FAFB);        // oklch(0.98 0.01 265)
+  static const Color muted = Color(0xFF1F1F2E);
+  static const Color mutedForeground = Color(0xFF70708C);
+  static const Color border = Color(0xFF3B3B55);         // oklch(0.32 0.06 265)
 
-  // Light Theme Neutral
+  // Light Theme Neutral (Clean and Modern)
   static const Color lightBackground = Color(0xFFF9FAFB);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceLighter = Color(0xFFF3F4F6);

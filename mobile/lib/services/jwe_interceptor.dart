@@ -1,3 +1,4 @@
+import 'package:ghostclass/config/app_config.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/jwe_service.dart';
@@ -16,8 +17,9 @@ class JweInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    // Only encrypt requests to our own API and only if it's a write or explicit proxy
-    final isGhostClassApi = options.path.contains('/api/') || options.baseUrl.contains('/api/');
+    final baseUrl = AppConfig.ghostclassApiUrl;
+    // Every request to our backend must use JWE (except EzyGo)
+    final isGhostClassApi = options.path.startsWith(baseUrl) || options.baseUrl.startsWith(baseUrl);
     final isWrite = options.method == 'POST' || options.method == 'PUT' || options.method == 'PATCH';
 
     if (isGhostClassApi && isWrite && options.data is Map<String, dynamic>) {

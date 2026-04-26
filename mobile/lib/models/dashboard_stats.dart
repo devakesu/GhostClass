@@ -1,5 +1,4 @@
 import 'package:ghostclass/models/attendance.dart';
-import 'package:ghostclass/models/tracking.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 
@@ -39,6 +38,8 @@ class DashboardStats {
 
   final Map<String, CourseStat> courseStats;
 
+  final List<SuspiciousAbsence> suspiciousAbsences;
+
   DashboardStats({
     required this.percentage,
     required this.rawPercentage,
@@ -63,6 +64,7 @@ class DashboardStats {
     required this.activeCourses,
     required this.totalCoursesCount,
     required this.courseStats,
+    this.suspiciousAbsences = const [],
   });
 
   factory DashboardStats.calculate({
@@ -129,8 +131,12 @@ class DashboardStats {
 
     // --- 2. Process Official Data ---
     final Map<String, int> officialMap = {};
+    final List<SuspiciousAbsence> suspiciousAbsences = [];
 
     attendanceData.studentAttendanceData.forEach((date, dailySessions) {
+      final List<String> presentCourses = [];
+      final List<Map<String, dynamic>> absentSessions = [];
+
       dailySessions.forEach((sessionKey, session) {
         if (session.course != null && session.classType != 'Revision') {
           final String rawCid = session.course.toString();
@@ -181,10 +187,36 @@ class DashboardStats {
               }
               if (status == 225) officialDL++;
               if (status == 112) officialOther++;
+
+              // For Suspicious Absence Detection
+              if (_isPositive(status, includeOtherLeave: false)) {
+                presentCourses.add(
+                  attendanceData.courses[rawCid]?.name ?? rawCid,
+                );
+              } else if (status == 111) {
+                absentSessions.add({
+                  'courseId': rawCid,
+                  'courseName': attendanceData.courses[rawCid]?.name ?? rawCid,
+                  'session': session.session ?? sessionKey,
+                });
+              }
             }
           }
         }
       });
+
+      // If marked absent in something but present in something else on the SAME day
+      if (absentSessions.isNotEmpty && presentCourses.isNotEmpty) {
+        for (var abs in absentSessions) {
+          suspiciousAbsences.add(SuspiciousAbsence(
+            date: date,
+            courseId: abs['courseId'] as String,
+            courseName: abs['courseName'] as String,
+            session: abs['session'].toString(),
+            presentIn: List.from(presentCourses),
+          ));
+        }
+      }
     });
 
     // --- 3. Process Tracking Data ---
@@ -322,6 +354,7 @@ class DashboardStats {
       activeCourses: activeCourses,
       totalCoursesCount: catalogCodesSet.length,
       courseStats: courseStats,
+      suspiciousAbsences: suspiciousAbsences,
     );
   }
 

@@ -154,6 +154,22 @@ class TrackingRecord {
   };
 }
 
+class SuspiciousAbsence {
+  final String date;
+  final String courseId;
+  final String courseName;
+  final String session;
+  final List<String> presentIn; // List of courses present in on same day
+
+  const SuspiciousAbsence({
+    required this.date,
+    required this.courseId,
+    required this.courseName,
+    required this.session,
+    required this.presentIn,
+  });
+}
+
 int? _toInt(dynamic value) {
   if (value is int) return value;
   if (value is double) return value.toInt();

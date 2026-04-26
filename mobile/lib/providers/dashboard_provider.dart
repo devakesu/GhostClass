@@ -7,7 +7,6 @@ import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
-import 'package:ghostclass/models/tracking.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';

@@ -13,6 +13,7 @@ import 'package:ghostclass/screens/help_screen.dart';
 import 'package:ghostclass/screens/leaves_screen.dart';
 import 'package:ghostclass/screens/login_screen.dart';
 import 'package:ghostclass/screens/navigation_shell.dart';
+import 'package:ghostclass/screens/notifications_screen.dart';
 import 'package:ghostclass/screens/profile_dump_screen.dart';
 import 'package:ghostclass/screens/profile_screen.dart';
 import 'package:ghostclass/screens/scores_screen.dart';
@@ -165,6 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/ghostclass',
             builder: (context, state) => const GhostClassScreen(),
+          ),
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationsScreen(),
           ),
         ],
       ),

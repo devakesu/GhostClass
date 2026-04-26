@@ -59,11 +59,25 @@ class ApiService {
   static final EncryptedValue _mobileApiKey = AppConfig.mobileApiSecret;
 
   /// Generates a secure random nonce of at least 16 bytes for Play Integrity.
-  String _generateNonce() {
+  /// Note: This is a fallback if the server nonce fetch fails.
+  String _generateLocalNonce() {
     final random = Random.secure();
     final values = List<int>.generate(32, (i) => random.nextInt(256));
-    // Use base64Url to ensure it's a valid string for the native side
     return base64Url.encode(values).replaceAll('=', '');
+  }
+
+  /// Fetches a one-time nonce from the GhostClass server for Play Integrity.
+  /// Security Practice 1: Integrity Nonces (Server-provided)
+  Future<String> _fetchServerNonce() async {
+    try {
+      final response = await _dio.get('$_ghostclassBaseUrl/security/nonce');
+      if (response.statusCode == 200) {
+        return response.data['nonce'] as String;
+      }
+    } catch (e) {
+      AppLogger.w('ApiService: Server nonce fetch failed, falling back to local.');
+    }
+    return _generateLocalNonce();
   }
 
   /// Clears all local network and data caches (EzygoBatchFetcher, sync throttling, etc).
@@ -193,7 +207,7 @@ class ApiService {
                     final String? integrityToken = await _playIntegrity
                         .requestIntegrityToken(
                           cloudProjectNumber: _cloudProjectNumber,
-                          nonce: _generateNonce(),
+                          nonce: await _fetchServerNonce(),
                         );
                     if (integrityToken != null) {
                       _cachedIntegrityToken = integrityToken;
@@ -244,7 +258,7 @@ class ApiService {
       final String? integrityToken = await _playIntegrity
           .requestIntegrityToken(
             cloudProjectNumber: _cloudProjectNumber,
-            nonce: _generateNonce(),
+            nonce: await _fetchServerNonce(),
           )
           .timeout(const Duration(seconds: 20));
 

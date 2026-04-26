@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -52,6 +55,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
+    
+    // Security Practice 5: Debugger Detection (Android-only for now)
+    if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
+       const channel = MethodChannel('com.devakesu.ghostclass/security');
+       try {
+         final bool isDebuggerAttached = await channel.invokeMethod('isDebuggerAttached') ?? false;
+        if (isDebuggerAttached) {
+          // User Request 2: Wipe sensitive keys and exit if debugger detected
+          await _securityGuard.wipeAndExit();
+          return;
+        }
+
+        final bool isWindowObscured = await channel.invokeMethod('isWindowObscured') ?? false;
+        if (isWindowObscured) {
+          if (mounted) {
+            await handleError(
+              'An active overlay was detected. Please close any floating apps (like screen dimmers or chat bubbles) before logging in.',
+              title: 'Security Alert'
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        // Silently ignore MethodChannel errors in prod, or log to Sentry
+      }
+    }
 
     final errors = <String>[];
     if (_usernameController.text.trim().isEmpty) {
@@ -65,6 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
     LoadingOverlay.show(context, message: 'Waking up EzyGo...');
 

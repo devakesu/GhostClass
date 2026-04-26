@@ -553,18 +553,16 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
               ),
               const SizedBox(height: 20),
 
-              if (_status == 'Duty Leave') ...[
-                _buildLabel('Reason (Optional)'),
-                TextField(
-                  controller: _reasonController,
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLength: 255,
-                  decoration: _inputDecoration(LucideIcons.textCursor),
+              _buildLabel(_status == 'Duty Leave' ? 'Reason (Optional)' : 'Remarks (Optional)'),
+              TextField(
+                controller: _reasonController,
+                style: GoogleFonts.manrope(
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
-                const SizedBox(height: 24),
-              ],
+                maxLength: 255,
+                decoration: _inputDecoration(LucideIcons.textCursor),
+              ),
+              const SizedBox(height: 24),
 
               const SizedBox(height: 8),
               SizedBox(

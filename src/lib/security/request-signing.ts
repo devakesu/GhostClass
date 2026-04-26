@@ -1,5 +1,3 @@
-// Request Signing for Sensitive API Calls
-// src/lib/security/request-signing.ts
 import crypto from "crypto";
 
 // Compute default maxAge once at module initialization for performance
@@ -7,31 +5,26 @@ import crypto from "crypto";
 const DEFAULT_MAX_AGE = Number(process.env.REQUEST_SIGNATURE_MAX_AGE) || 600;
 
 /**
- * Signs a request payload with HMAC-SHA256
+ * Signs a request payload with Ed25519 asymmetric signature
  * @param payload Request payload (should be JSON stringified)
  * @param timestamp Unix timestamp in seconds
- * @returns Signature string
+ * @returns Signature string (hex encoded)
  */
 export function signRequest(payload: string, timestamp: number): string {
-  const secret = getSigningSecret();
+  const privateKey = getPrivateKey();
   const message = `${timestamp}.${payload}`;
-  return crypto.createHmac("sha256", secret).update(message).digest("hex");
+  
+  // Use Ed25519 asymmetric signing
+  return crypto.sign(undefined, Buffer.from(message), privateKey).toString("hex");
 }
 
 /**
- * Verifies request signature
+ * Verifies request signature using Ed25519 public key
  * @param payload Original request payload (JSON stringified)
  * @param timestamp Request timestamp
- * @param signature Provided signature
+ * @param signature Provided signature (hex encoded)
  * @param maxAge Maximum age of request in seconds (default: 600 = 10 minutes)
  * @returns true if signature is valid and not expired
- * 
- * NOTE: The default 10-minute window provides tolerance for clock skew and slow connections
- * while still preventing most replay attacks. This can be overridden via REQUEST_SIGNATURE_MAX_AGE
- * environment variable if needed.
- * 
- * CSRF token expiration is handled separately by cookie maxAge (24 hours / 86400 seconds in csrf.ts).
- * The browser automatically removes expired CSRF cookies, making them invalid for validation.
  */
 export function verifyRequestSignature(
   payload: string,
@@ -48,38 +41,43 @@ export function verifyRequestSignature(
       return false; // Request too old or timestamp in future
     }
 
-    // Compute expected signature
-    const expectedSignature = signRequest(payload, timestamp);
+    const publicKey = getPublicKey();
+    const message = `${timestamp}.${payload}`;
+    const signatureBuffer = Buffer.from(signature, "hex");
 
-    // Constant-time comparison to prevent timing attacks
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
-  } catch {
+    // Verify using Ed25519 public key
+    return crypto.verify(undefined, Buffer.from(message), publicKey, signatureBuffer);
+  } catch (_error) {
     return false;
   }
 }
 
 /**
- * Gets the signing secret from environment.
- * Requires a dedicated REQUEST_SIGNING_SECRET (key-separation principle:
- * never reuse the encryption key for HMAC signing).
- * @throws Error if REQUEST_SIGNING_SECRET is not configured
+ * Gets the private key for signing.
+ * @throws Error if REQUEST_PRIVATE_KEY is not configured
  */
-function getSigningSecret(): string {
-  const secret = process.env.REQUEST_SIGNING_SECRET;
-  if (!secret) {
-    throw new Error("REQUEST_SIGNING_SECRET must be configured for request signing");
+function getPrivateKey(): string {
+  const key = process.env.REQUEST_PRIVATE_KEY;
+  if (!key) {
+    throw new Error("REQUEST_PRIVATE_KEY must be configured for request signing");
   }
-  return secret;
+  return key;
+}
+
+/**
+ * Gets the public key for verification.
+ * @throws Error if REQUEST_PUBLIC_KEY is not configured
+ */
+function getPublicKey(): string {
+  const key = process.env.REQUEST_PUBLIC_KEY;
+  if (!key) {
+    throw new Error("REQUEST_PUBLIC_KEY must be configured for request signature verification");
+  }
+  return key;
 }
 
 /**
  * Extracts signature components from request headers
- * Expected headers:
- * - x-signature: The HMAC signature
- * - x-timestamp: Unix timestamp
  */
 export function extractSignatureFromRequest(request: Request): {
   signature: string | null;
@@ -97,8 +95,6 @@ export function extractSignatureFromRequest(request: Request): {
 
 /**
  * Middleware helper: Validates signed request
- * @param request Request object
- * @returns true if signature is valid
  */
 export async function validateSignedRequest(request: Request): Promise<boolean> {
   try {
@@ -120,7 +116,6 @@ export async function validateSignedRequest(request: Request): Promise<boolean> 
 
 /**
  * Client-side helper: Generates headers for signed request
- * Note: This should be used in Server Actions, not client components
  */
 export function generateSignedHeaders(payload: string): {
   "x-signature": string;
