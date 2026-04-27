@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
-![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.6+-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.41+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.11.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -28,34 +28,34 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 ### Framework & Language
 
 | Package | Version | Purpose |
-|---|---|---|
-| Flutter | 3.27+ | Cross-platform UI framework |
-| Dart | ^3.11.4 | Language |
+| :--- | :--- | :--- |
+| **Flutter** | 3.41+ | Cross-platform UI framework |
+| **Dart** | 3.11.5+ | Language |
 
 ### State Management
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `flutter_riverpod` | ^3.3.1 | Reactive state management |
 | `riverpod_annotation` + `build_runner` | ^4.0.2 | Code-gen providers |
 
 ### Networking & Backend
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `dio` | ^5.9.2 | HTTP client with interceptors |
 | `supabase_flutter` | ^2.12.2 | Supabase auth + realtime |
 
 ### Navigation
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `go_router` | ^17.1.0 | Declarative routing |
 
 ### Security
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `firebase_core` | ^4.7.0 | Firebase SDK |
 | `firebase_app_check` | ^0.4.3 | Device integrity attestation |
 | `flutter_play_integrity_wrapper` | local | Vendored Play Integrity plugin |
@@ -66,7 +66,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 ### UI & Charts
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `lucide_icons` | ^0.257.0 | Icon set (matches web) |
 | `google_fonts` | ^8.0.2 | Typography |
 | `flutter_animate` | ^4.5.2 | Declarative animations |
@@ -76,13 +76,13 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 ### Monitoring
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `sentry_flutter` + `sentry_dio` | ^9.18.0 | Error tracking + performance |
 
 ### Utilities
 
 | Package | Version | Purpose |
-|---|---|---|
+| :--- | :--- | :--- |
 | `shared_preferences` | ^2.5.5 | Non-sensitive local preferences |
 | `intl` | ^0.20.2 | Date/number formatting |
 | `url_launcher` | ^6.3.2 | Open external links |
@@ -293,7 +293,7 @@ flutter build ios --release
 GhostClass Mobile implements a zero-trust security model:
 
 | Layer | Mechanism |
-|---|---|
+| :--- | :--- |
 | **Device Attestation** | Firebase App Check → Play Integrity (Android) / DeviceCheck (iOS) |
 | **Network Encryption** | Every API request/response wrapped in JWE (RSA-OAEP + AES-256-GCM) |
 | **Credential Storage** | `flutter_secure_storage` (Android Keystore / iOS Keychain) |
@@ -305,7 +305,7 @@ GhostClass Mobile implements a zero-trust security model:
 ## 📱 Platform Requirements
 
 | Platform | Minimum | Target | Compile |
-|---|---|---|---|
+| :--- | :--- | :--- | :--- |
 | Android | API 29 (Android 10) | API 35 (Android 15) | API 36 |
 | iOS | iOS 13 | latest | latest Xcode |
 

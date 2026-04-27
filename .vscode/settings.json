@@ -29,7 +29,7 @@
   ],
   "java.configuration.updateBuildConfiguration": "automatic",
   "dart.env": {
-    "PUB_CACHE": "${workspaceFolder}\\mobile\\.pub-cache"
+    "PUB_CACHE": "mobile/.pub-cache"
   },
   
   "chat.tools.terminal.autoApprove": {

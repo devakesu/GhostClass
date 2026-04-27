@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
-import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/institution.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
@@ -243,7 +244,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
   }
 
-  Future<void> refreshProfile({bool force = false}) async {
+  Future<void> refreshProfile({bool force = false, bool sync = false}) async {
     final currentUser = state.value;
     if (currentUser == null) return;
 
@@ -266,7 +267,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         return;
       }
 
-      await _fetchAndApplyServerProfile(currentUser, supabaseToken: token);
+      await _fetchAndApplyServerProfile(currentUser, supabaseToken: token, sync: sync);
     } catch (e) {
       if (e is AppException && e.isAuthError) await logout();
     }
@@ -351,8 +352,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         password: password,
       );
 
-      final sessionData =
-          bridgeResponse.data['session'] as Map<String, dynamic>?;
+      if (kDebugMode) {
+        AppLogger.d('AuthNotifier: Bridge response data: ${bridgeResponse.data}');
+      }
+
+      final sessionData = (bridgeResponse.data['session'] ?? bridgeResponse.data) as Map<String, dynamic>?;
       final refreshToken = sessionData?['refresh_token'] as String?;
       if (refreshToken == null) {
         throw AppException(
@@ -588,6 +592,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     AuthenticatedUser user, {
     String? supabaseToken,
     bool updateState = true,
+    bool sync = false,
   }) async {
     final token = supabaseToken ?? await _getFreshSupabaseToken();
     if (token == null) {
@@ -598,7 +603,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
 
     final api = ref.read(apiServiceProvider);
-    final response = await api.refreshProfile(token);
+    final response = await api.refreshProfile(token, sync: sync);
 
     if (response.statusCode != 200 || response.data == null) {
       if (response.statusCode != null && response.statusCode! >= 500) {
@@ -636,14 +641,15 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       academicYear: data['current_year'] ?? baseSettings.academicYear,
     );
 
-    final rawProfile = data['profile'] as Map<String, dynamic>?;
-    if (rawProfile != null) {
-      rawProfile['current_semester'] = data['current_semester'];
-      rawProfile['current_year'] = data['current_year'];
-    }
-    final profile = rawProfile != null
-        ? UserProfile.fromJson(rawProfile)
-        : currentUser.profile;
+    final rawProfile = data.containsKey('profile') 
+        ? Map<String, dynamic>.from(data['profile'] as Map) 
+        : Map<String, dynamic>.from(data);
+        
+    // Ensure current_semester/year are explicitly included in the map passed to fromJson
+    rawProfile['current_semester'] = data['current_semester'] ?? rawProfile['current_semester'];
+    rawProfile['current_year'] = data['current_year'] ?? rawProfile['current_year'];
+    
+    final profile = UserProfile.fromJson(rawProfile);
 
     final mergedUser = currentUser.copyWith(
       settings: settings,
@@ -661,7 +667,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       storage.saveEzygoToken(mergedUser.ezygoToken.value),
       storage.saveSupabaseUserId(mergedUser.supabaseUserId),
       storage.saveSettings(settings),
-      if (profile != null) storage.saveUserProfile(profile),
+      storage.saveUserProfile(profile),
       if (mergedUser.ezygoId != null)
         storage.saveEzygoUserId(mergedUser.ezygoId!),
       if (mergedUser.username != null)

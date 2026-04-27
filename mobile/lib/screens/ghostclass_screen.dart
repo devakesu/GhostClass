@@ -13,6 +13,7 @@ import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:ghostclass/models/institution.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class GhostClassScreen extends ConsumerWidget {
@@ -142,19 +143,15 @@ class GhostClassScreen extends ConsumerWidget {
                         .watch(institutionsProvider)
                         .when(
                           data: (insts) {
-                            final matches = insts.where(
-                              (i) => i.id.toString() == user.ezygoId,
+                            if (insts.isEmpty) return 'SWITCH';
+                            
+                            // Try to match based on the user's ezygoId, or default to the first one.
+                            final match = insts.cast<Institution?>().firstWhere(
+                              (i) => i?.id.toString() == user.ezygoId,
+                              orElse: () => null,
                             );
-                            if (matches.isNotEmpty) {
-                              return matches.first.name;
-                            }
-                            AppLogger.w(
-                              'GhostClassScreen: Institution not found for user id',
-                              user.ezygoId,
-                            );
-                            return insts.isNotEmpty
-                                ? insts.first.name
-                                : 'SWITCH';
+                            
+                            return match?.name ?? insts.first.name;
                           },
                           loading: () => '...',
                           error: (e, _) => 'SWITCH',

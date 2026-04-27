@@ -45,7 +45,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 ### Core Framework
 
 - **Next.js 16.1.6** - React 19 with App Router
-- **TypeScript 5.9.3** - Strict mode for type safety
+- **TypeScript 6.0.3** - Strict mode for type safety
 - **Node.js** - v22.12.0+
 
 ### Styling & UI
@@ -511,7 +511,12 @@ GhostClass is optimized for maximum performance:
 
 ### Testing PWA Features Locally
 
-
+1. Set `NEXT_PUBLIC_ENABLE_SW_IN_DEV=true` in `.env`.
+2. Run `npm run dev`.
+3. Open `http://localhost:3000` in Chrome/Edge.
+4. Open DevTools → Application → Service Workers.
+5. Verify `sw.js` is registered and active.
+6. Test offline mode by checking "Offline" in the Network tab.
 
 ### Code Splitting & Loading Strategy
 
@@ -795,8 +800,8 @@ GhostClass uses a two-tier secret management strategy:
 
 - `ENCRYPTION_KEY` - AES-256-GCM encryption key
 - `CRON_SECRET` - Cron job authentication
-- `REQUEST_SIGNING_SECRET` - API request signature validation (anti-tampering; must be distinct from `ENCRYPTION_KEY`)
-- `SUPABASE_SERVICE_ROLE_KEY` - Admin database access
+- `REQUEST_PRIVATE_KEY` / `REQUEST_PUBLIC_KEY` - Ed25519 key pair for asymmetric request signing (anti-tampering)
+- `SUPABASE_SECRET_KEY` - Admin database access (replaces legacy service_role key)
 - `MOBILE_API_SECRET` - Bypasses CSRF/Origin checks for mobile authentications
 - `UPSTASH_REDIS_REST_*` - Rate limiting credentials
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile validation

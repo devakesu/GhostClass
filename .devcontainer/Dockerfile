@@ -49,7 +49,9 @@ ENV PATH="$PATH:$FLUTTER_HOME/bin"
 # 4. Flutter SDK Pre-cache
 RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
     && $FLUTTER_HOME/bin/flutter precache
-# 5. Extension & Workspace Injector Script
+
+
+# 5. Workspace Injector Script
 # Switch to root to safely write and change file ownership
 USER root
 RUN cat << 'EOF' > /home/vscode/init_workspace.sh
@@ -90,6 +92,34 @@ fi
 
 git config --global --add safe.directory /workspace
 
+# --- Android SDK (Linux Version) Setup ---
+export ANDROID_HOME="/home/vscode/android-sdk"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# Install Java & Dependencies
+sudo apt-get update && sudo apt-get install -y openjdk-17-jdk wget unzip adb
+
+# Download Linux cmdline-tools if missing
+if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+    echo "⬇️ Downloading Linux Android SDK Command-line Tools..."
+    mkdir -p "/home/vscode/android-sdk/cmdline-tools"
+    
+    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
+    unzip -q /tmp/cmdline-tools.zip -d "/home/vscode/android-sdk/cmdline-tools"
+    
+    mv "/home/vscode/android-sdk/cmdline-tools/cmdline-tools" "/home/vscode/android-sdk/cmdline-tools/latest"
+    rm /tmp/cmdline-tools.zip
+    
+    echo "📦 Installing Android Platform Tools..."
+    yes | /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+    /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+fi
+
+if ! grep -q "ANDROID_HOME" ~/.bashrc; then
+    echo "export ANDROID_HOME=\"/home/vscode/android-sdk\"" >> ~/.bashrc
+    echo "export PATH=\"\$PATH:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools\"" >> ~/.bashrc
+fi
+
 export FLUTTER_HOME="/home/vscode/flutter-sdk"
 export PATH="$PATH:$FLUTTER_HOME/bin"
 
@@ -98,6 +128,8 @@ if ! grep -q "flutter-sdk" ~/.bashrc; then
     echo 'export FLUTTER_HOME="/home/vscode/flutter-sdk"' >> ~/.bashrc
     echo "export PATH=\"\$PATH:\$FLUTTER_HOME/bin\"" >> ~/.bashrc
 fi
+
+flutter config --android-sdk "$ANDROID_HOME"
 
 if [ -f "/workspace/package.json" ]; then
     echo "📦 Installing NPM dependencies..."

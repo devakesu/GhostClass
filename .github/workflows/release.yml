@@ -313,12 +313,15 @@ jobs:
             NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
             NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_DEV_URL=${{ vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+            NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
             NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
             NEXT_PUBLIC_GITHUB_URL=${{ vars.NEXT_PUBLIC_GITHUB_URL }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
             NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
             NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_ANDROID_PACKAGE_NAME=${{ vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME }}
             SENTRY_ORG=${{ vars.SENTRY_ORG }}
             SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
             NEXT_PUBLIC_APP_NAME=${{ vars.NEXT_PUBLIC_APP_NAME }}
@@ -597,6 +600,8 @@ jobs:
         env:
           SUPABASE_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL_DEV: ${{ vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+          SUPABASE_ANON_KEY_DEV: ${{ vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
           SUPABASE_CF_PROXY_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
           MOBILE_API_SECRET_PROD: ${{ secrets.MOBILE_API_SECRET }}
           SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
@@ -621,8 +626,8 @@ jobs:
 
             static const bool isDev = kDebugMode;
 
-            static const String supabaseUrlDev = '';
-            static const String supabasePublishableKeyDev = '';
+            static const String supabaseUrlDev = '${SUPABASE_URL_DEV}';
+            static const String supabasePublishableKeyDev = '${SUPABASE_ANON_KEY_DEV}';
 
             static const String supabaseProxyUrlProd = '${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}';
             static const String supabasePublishableKeyProd = '${SUPABASE_ANON_KEY_PROD}';

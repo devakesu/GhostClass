@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import * as Sentry from "@sentry/nextjs";
 import { decrypt } from "@/lib/crypto";
+import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 import { withSecurity } from "@/lib/security/app-check";
 import { logger } from "@/lib/logger";
+import { performProfileSync } from "@/lib/user/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +41,41 @@ const handler = async (req: Request) => {
 
   try {
     // 1. Fetch user profile data from the 'users' table
-    // We fetch everything (*) to ensure we have all fields for the bundle.
-    const { data: dbUser, error: dbError } = await supabaseAdmin
+    const { data: dbUserRaw, error: dbError } = await supabaseAdmin
       .from("users")
       .select("*, class:classes(id, name)")
       .eq("auth_id", user.id)
       .maybeSingle();
 
     if (dbError) throw dbError;
+    if (!dbUserRaw) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+    }
+
+    let dbUser = dbUserRaw;
+    const searchParams = new URL(req.url).searchParams;
+    const shouldSync = searchParams.get("sync") === "true";
+
+    if (shouldSync && dbUser.ezygo_token && dbUser.ezygo_iv) {
+      try {
+        const decryptedToken = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
+        if (decryptedToken) {
+          // Block until EzyGo profile/courses sync completes
+          await performProfileSync(decryptedToken, dbUser.id, user.id);
+          
+          // Refetch to get fresh data
+          const { data: updatedUser } = await supabaseAdmin
+            .from("users")
+            .select("*, class:classes(id, name)")
+            .eq("auth_id", user.id)
+            .single();
+          if (updatedUser) dbUser = updatedUser;
+        }
+      } catch (err) {
+        logger.warn("[profile bundle] Synchronous sync failed", err);
+      }
+    }
+
     if (!dbUser) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 });
     }
@@ -55,17 +84,26 @@ const handler = async (req: Request) => {
     const classData = Array.isArray(dbUser.class) ? dbUser.class[0] : dbUser.class;
 
     // 2. Fetch user settings (bunk calculator config, etc.)
+    // Note: user_settings uses the Supabase Auth UUID (user.id), not the EzyGo bigint ID.
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from("user_settings")
       .select("*")
-      .eq("user_id", dbUser.id)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (settingsError) {
-      logger.warn(`Failed to fetch user settings for user ${dbUser.id}`, settingsError);
+      logger.warn(`Failed to fetch user settings for auth user ${user.id}`, settingsError);
     }
 
-    // 3. Decrypt EzyGo token if present
+    // 3. Resolve Academic Context
+    // We prefer the cached values on the user record, falling back to real-time derivation.
+    // Note: Future migration should ensure these are always synced to the users table.
+    const academic = calculateCurrentAcademicInfo({
+      semester: dbUser.current_semester,
+      year: dbUser.current_year
+    });
+
+    // 4. Decrypt EzyGo token if present
     // This allows the mobile app to sync its local secure storage with the server's state.
     let decryptedEzygoToken: string | null = null;
     if (dbUser.ezygo_token && dbUser.ezygo_iv) {
@@ -76,7 +114,7 @@ const handler = async (req: Request) => {
       }
     }
 
-    // 4. Construct response bundle
+    // 5. Construct response bundle
     // We map the database fields to the mobile-optimized schema.
     const responseBody = {
       id: dbUser.id,
@@ -85,22 +123,37 @@ const handler = async (req: Request) => {
       first_name: dbUser.first_name,
       last_name: dbUser.last_name,
       phone: (() => {
-        if (!dbUser.phone) return null;
+        if (!dbUser.phone || !dbUser.phone_iv) return null;
         try {
           return decrypt(dbUser.phone_iv, dbUser.phone);
         } catch (e) {
-          logger.error("[profile bundle] Failed to decrypt phone (possible null IV on legacy row)", e);
-          Sentry.captureException(e, {
-            tags: { type: "phone_decryption_failure", location: "api/user/profile" },
-          });
+          logger.error("[profile bundle] Failed to decrypt phone", e);
           return null;
         }
       })(),
       avatar_url: dbUser.avatar_url,
+      gender: (() => {
+        if (!dbUser.gender || !dbUser.gender_iv) return null;
+        try {
+          return decrypt(dbUser.gender_iv, dbUser.gender);
+        } catch (e) {
+          logger.error("[profile bundle] Failed to decrypt gender", e);
+          return null;
+        }
+      })(),
+      birth_date: (() => {
+        if (!dbUser.birth_date || !dbUser.birth_date_iv) return null;
+        try {
+          return decrypt(dbUser.birth_date_iv, dbUser.birth_date);
+        } catch (e) {
+          logger.error("[profile bundle] Failed to decrypt birth_date", e);
+          return null;
+        }
+      })(),
       
-      // Academic context (cached on the user record for speed)
-      current_semester: dbUser.current_semester,
-      current_year: dbUser.current_year,
+      // Academic context
+      current_semester: academic.current_semester,
+      current_year: academic.current_year,
       
       // Compliance status
       terms_version: dbUser.terms_version,
@@ -113,9 +166,9 @@ const handler = async (req: Request) => {
       settings: settings ? {
         bunk_calculator_enabled: settings.bunk_calculator_enabled,
         target_percentage: settings.target_percentage,
-        disabled_courses: settings.disabled_courses
+        disabled_courses: settings.disabled_courses || {}
       } : {
-        bunk_calculator_enabled: false,
+        bunk_calculator_enabled: true, // Default to true for better UX
         target_percentage: 75,
         disabled_courses: {}
       },
@@ -126,7 +179,8 @@ const handler = async (req: Request) => {
         name: classData.name
       } : null,
       
-      created_at: dbUser.created_at
+      created_at: dbUser.created_at,
+      ezygo_created_at: dbUser.ezygo_created_at
     };
 
     return NextResponse.json(responseBody);

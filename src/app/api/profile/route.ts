@@ -11,7 +11,7 @@ import * as Sentry from "@sentry/nextjs";
 import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
-import { withSecurity } from "@/lib/security/app-check";
+import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
 
@@ -167,8 +167,11 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
   const { success } = await authRateLimiter.limit(`profile_patch_${ip}`);
   if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-  const csrfToken = req.headers.get(CSRF_HEADER);
-  if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ error: "Invalid CSRF" }, { status: 403 });
+  const mobile = isMobileRequest(req.headers);
+  if (!mobile) {
+    const csrfToken = req.headers.get(CSRF_HEADER);
+    if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ error: "Invalid CSRF" }, { status: 403 });
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
