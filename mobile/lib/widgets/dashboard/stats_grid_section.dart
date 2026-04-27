@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class StatsGridSection extends StatelessWidget {
   final DashboardStats stats;
@@ -13,44 +15,242 @@ class StatsGridSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _StatChip(label: 'Active', value: activeCount.toString()),
-            _StatChip(label: 'Present', value: stats.finalPresent.toString()),
-            _StatChip(label: 'Total', value: stats.finalTotal.toString()),
-          ],
-        ),
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          // 2x2 Grid for Attendance Stats
+          GridView.count(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.7,
+            children: [
+              _StatCard(
+                title: 'Present (+DL)',
+                value: stats.officialPresent,
+                icon: LucideIcons.checkCircle,
+                color: Colors.green,
+                corrections: [
+                  if (stats.corrPresent > 0)
+                    _Correction(value: stats.corrPresent, color: Colors.orange),
+                  if (stats.extraPresent > 0)
+                    _Correction(value: stats.extraPresent, color: Colors.blue),
+                ],
+              ),
+              _StatCard(
+                title: 'Absent',
+                value: stats.officialAbsent,
+                icon: LucideIcons.xCircle,
+                color: Colors.red,
+                corrections: [
+                  if (stats.savedAbsent > 0)
+                    _Correction(value: stats.savedAbsent, color: Colors.orange, isNegative: true),
+                  if (stats.extraAbsent > 0)
+                    _Correction(value: stats.extraAbsent, color: Colors.blue),
+                ],
+              ),
+              _StatCard(
+                title: 'Duty Leave(s)',
+                value: stats.officialDL,
+                icon: LucideIcons.calendarCheck,
+                color: Colors.amber,
+                corrections: [
+                  if (stats.corrDL > 0)
+                    _Correction(value: stats.corrDL, color: Colors.orange),
+                  if (stats.extraDL > 0)
+                    _Correction(value: stats.extraDL, color: Colors.blue),
+                ],
+              ),
+              _StatCard(
+                title: 'Special Leave(s)',
+                value: stats.specialLeaveCount,
+                icon: LucideIcons.star,
+                color: Colors.teal,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Full Width Active Courses Card
+          _StatCard(
+            title: 'Active Courses',
+            value: stats.activeCourses,
+            subtitle: '/ ${stats.totalCoursesCount}',
+            icon: LucideIcons.bookOpen,
+            color: Theme.of(context).colorScheme.primary,
+            isFullWidth: true,
+          ),
+        ]),
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
+class _StatCard extends StatelessWidget {
+  final String title;
+  final int value;
+  final String? subtitle;
+  final List<_Correction> corrections;
+  final Color color;
+  final IconData icon;
+  final bool isFullWidth;
 
-  const _StatChip({required this.label, required this.value});
+  const _StatCard({
+    required this.title,
+    required this.value,
+    this.subtitle,
+    this.corrections = const [],
+    required this.color,
+    required this.icon,
+    this.isFullWidth = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Text(label),
-          Text(value, style: Theme.of(context).textTheme.titleLarge),
+          // Subtle background icon
+          Positioned(
+            right: -8,
+            bottom: -8,
+            child: Opacity(
+              opacity: 0.08,
+              child: Icon(
+                icon,
+                size: isFullWidth ? 80 : 60,
+                color: color,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    size: isFullWidth ? 28 : 20,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$value',
+                            style: GoogleFonts.manrope(
+                              fontSize: isFullWidth ? 24 : 18,
+                              fontWeight: FontWeight.w800,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              subtitle!,
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ],
+                          ...corrections.map((c) => Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Text(
+                                  '${c.isNegative ? "-" : "+"}${c.value}',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: c.color,
+                                  ),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+
+class _Correction {
+  final int value;
+  final Color color;
+  final bool isNegative;
+
+  _Correction({
+    required this.value,
+    required this.color,
+    this.isNegative = false,
+  });
 }

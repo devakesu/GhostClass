@@ -4,11 +4,13 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_play_integrity_wrapper/flutter_play_integrity_wrapper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/config/app_secrets.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
@@ -22,6 +24,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 class ApiService {
   final Ref _ref;
   late final Dio _dio;
+  late final Dio _securityDio;
   late final EzygoBatchFetcher _fetcher;
   final _unauthorizedController = StreamController<void>.broadcast();
 
@@ -70,7 +73,7 @@ class ApiService {
   /// Security Practice 1: Integrity Nonces (Server-provided)
   Future<String> _fetchServerNonce() async {
     try {
-      final response = await _dio.get('$_ghostclassBaseUrl/security/nonce');
+      final response = await _securityDio.get('$_ghostclassBaseUrl/security/nonce');
       if (response.statusCode == 200) {
         return response.data['nonce'] as String;
       }
@@ -98,6 +101,23 @@ class ApiService {
         },
       ),
     );
+
+    // Create a clean Dio instance for internal security calls to avoid recursion
+    _securityDio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+      ),
+    );
+
+    if (kDebugMode) {
+      (_securityDio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback =
+            (X509Certificate cert, String host, int port) => true;
+        return client;
+      };
+    }
 
     // Handle 401 Unauthorized globally
     _dio.interceptors.add(
@@ -177,6 +197,7 @@ class ApiService {
             options.headers.addAll(stealthHeaders);
           } else if (options.path.startsWith(_ghostclassBaseUrl)) {
             options.headers['Accept'] = 'application/json';
+            options.headers['origin'] = AppSecrets.supabaseSpoofedOrigin;
 
             // Note: Firebase App Check and Play Integrity are still added
             // even if the body is JWE-encrypted.
@@ -359,9 +380,13 @@ class ApiService {
     );
   }
 
-  Future<Response<dynamic>> refreshProfile(String supabaseToken) async {
+  Future<Response<dynamic>> refreshProfile(
+    String supabaseToken, {
+    bool sync = false,
+  }) async {
     return _dio.get(
       '$_ghostclassBaseUrl/user/profile',
+      queryParameters: sync ? {'sync': 'true'} : null,
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
@@ -396,6 +421,32 @@ class ApiService {
     return _dio.patch(
       '$_ghostclassBaseUrl/profile',
       data: data,
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $supabaseToken',
+          if (_mobileApiKey.value.isNotEmpty)
+            'x-mobile-api-key': _mobileApiKey.value,
+        },
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> addCourse({
+    required String courseCode,
+    required String courseName,
+    required String semester,
+    required String academicYear,
+    required String supabaseToken,
+  }) async {
+    return _dio.post(
+      '$_ghostclassBaseUrl/courses/add',
+      data: {
+        'courseCode': courseCode,
+        'courseName': courseName,
+        'semester': semester,
+        'academicYear': academicYear,
+      },
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',

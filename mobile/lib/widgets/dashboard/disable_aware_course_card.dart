@@ -46,7 +46,8 @@ class _DisableAwareCourseCardState
     if (semKey == null || code == null) return false;
     final disabled =
         ref.read(authProvider).value?.settings.disabledCourses[semKey] ?? {};
-    return disabled.keys.any((key) => key.toUpperCase() == code);
+    final stdCode = DashboardStats.standardize(code);
+    return disabled.keys.any((key) => DashboardStats.standardize(key) == stdCode);
   }
 
   String? get _disableReason {

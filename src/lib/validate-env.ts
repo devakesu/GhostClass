@@ -71,9 +71,9 @@ export function validateEnvironment() {
   }
 
   // Optional development Supabase Secret Key validation
-  const devSupabaseSecretKey = process.env.SUPABASE_DEV_SECRET_KEY?.trim();
+  const devSupabaseSecretKey = (process.env.SUPABASE_DEV_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
   if (devSupabaseSecretKey && devSupabaseSecretKey.length < 20) {
-    errors.push("❌ SUPABASE_DEV_SECRET_KEY looks invalid");
+    errors.push("❌ SUPABASE_DEV_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY looks invalid");
   }
 
   // Upstash Redis (Rate Limiting)
@@ -298,6 +298,18 @@ export function validateEnvironment() {
         "   Reusing the same secret means a compromise of one proxy compromises both tiers.\n" +
         "   Generate two distinct secrets: openssl rand -hex 32 (run twice).",
     );
+  }
+
+  // Service Worker in Dev
+  const enableSwInDev = process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV;
+  if (enableSwInDev && !["true", "false"].includes(enableSwInDev.toLowerCase())) {
+    errors.push('❌ NEXT_PUBLIC_ENABLE_SW_IN_DEV must be either "true" or "false"');
+  }
+
+  // Test Client IP
+  const testClientIp = process.env.TEST_CLIENT_IP;
+  if (testClientIp && !/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(testClientIp) && !testClientIp.includes(':')) {
+    errors.push("❌ TEST_CLIENT_IP must be a valid IPv4 or IPv6 address");
   }
 
   // Supabase browser proxy — optional CF Worker (Tier 1).
@@ -645,6 +657,15 @@ export function validateEnvironment() {
   // Request Signature Keys (Ed25519)
   const requestPrivateKey = process.env.REQUEST_PRIVATE_KEY;
   const requestPublicKey = process.env.REQUEST_PUBLIC_KEY;
+
+  if (process.env.NODE_ENV === "production") {
+    if (!requestPrivateKey) {
+      errors.push("❌ REQUEST_PRIVATE_KEY is required in production");
+    }
+    if (!requestPublicKey) {
+      errors.push("❌ REQUEST_PUBLIC_KEY is required in production");
+    }
+  }
 
   if (requestPrivateKey && !requestPrivateKey.includes("PRIVATE KEY")) {
     errors.push("❌ REQUEST_PRIVATE_KEY must be a valid Ed25519 private key in PEM format");

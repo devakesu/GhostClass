@@ -33,10 +33,11 @@ class JweInterceptor extends Interceptor {
         
         options.data = result.jwe;
         options.headers['x-jwe'] = 'true';
+        options.headers['Content-Type'] = 'application/jose';
         // The server needs the RCEK to decrypt the request and to encrypt the response
         // In the GhostClass protocol, we send the RCEK encrypted with the server's public key
         final keyResult = await jweService.encryptHeaderKey();
-        options.headers['x-jwe-key'] = keyResult.jwe;
+        options.headers['X-JWE-Key'] = keyResult.jwe;
         
         AppLogger.d('JweInterceptor: Request encrypted for ${options.path}');
       } catch (e) {
@@ -62,19 +63,26 @@ class JweInterceptor extends Interceptor {
 
   @override
   Future<void> onResponse(Response response, ResponseInterceptorHandler handler) async {
-    final isEncrypted = response.headers.value('x-jwe') == 'true';
+    final contentType = response.headers.value('content-type') ?? '';
+    final isEncrypted = contentType.contains('application/jose') || response.headers.value('x-jwe') == 'true';
     final requestId = response.requestOptions.hashCode.toString();
     final rcek = _rcekMap.remove(requestId);
 
-    if (isEncrypted && rcek != null && response.data is String) {
-      try {
-        final jweService = JweService.instance;
-        final decryptedData = await jweService.decryptResponse(response.data as String, rcek);
-        response.data = decryptedData;
-        AppLogger.d('JweInterceptor: Response decrypted for ${response.requestOptions.path}');
-      } catch (e) {
-        AppLogger.e('JweInterceptor: Decryption failed', e);
-        // If decryption fails, it might be a security issue or server error
+    if (isEncrypted && rcek != null) {
+      String? jwe;
+      if (response.data is String) {
+        jwe = response.data as String;
+      }
+
+      if (jwe != null) {
+        try {
+          final jweService = JweService.instance;
+          final decryptedData = await jweService.decryptResponse(jwe, rcek);
+          response.data = decryptedData;
+          AppLogger.d('JweInterceptor: Response decrypted for ${response.requestOptions.path}');
+        } catch (e) {
+          AppLogger.e('JweInterceptor: Decryption failed', e);
+        }
       }
     }
     

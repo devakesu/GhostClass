@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,11 +8,19 @@ class ServiceErrorDialog extends StatelessWidget {
   final String title;
   final List<String> messages;
   final VoidCallback? onRetry;
+  final VoidCallback? onContactSupport;
+  final String? closeLabel;
+  final String? details;
   final bool isDismissible;
 
   const ServiceErrorDialog({
-    required this.title, required this.messages, super.key,
+    required this.title,
+    required this.messages,
+    super.key,
     this.onRetry,
+    this.onContactSupport,
+    this.closeLabel,
+    this.details,
     this.isDismissible = true,
   });
 
@@ -21,6 +30,9 @@ class ServiceErrorDialog extends StatelessWidget {
     String title, 
     List<String> messages, {
     VoidCallback? onRetry,
+    VoidCallback? onContactSupport,
+    String? closeLabel,
+    String? details,
     bool isDismissible = true,
   }) {
     if (messages.isEmpty) return Future.value();
@@ -35,6 +47,9 @@ class ServiceErrorDialog extends StatelessWidget {
           title: title, 
           messages: messages, 
           onRetry: onRetry,
+          onContactSupport: onContactSupport,
+          closeLabel: closeLabel,
+          details: details,
           isDismissible: isDismissible,
         ),
       ),
@@ -69,7 +84,7 @@ class ServiceErrorDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Error Icon with Pulsed Glow (Static version of pulse)
+            // Error Icon with Pulsed Glow
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -151,53 +166,130 @@ class ServiceErrorDialog extends StatelessWidget {
               ),
             ),
             
+            if (details != null && (kDebugMode || details!.isNotEmpty)) ...[
+              const SizedBox(height: 16),
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  title: Text(
+                    'Technical Details',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  tilePadding: EdgeInsets.zero,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SelectableText(
+                        details!,
+                        style: GoogleFonts.robotoMono(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
             const SizedBox(height: 24),
             
             // Actions
             Column(
               children: [
+                // Primary Action: Retry
                 if (onRetry != null)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        onRetry!();
-                      },
-                      icon: const Icon(LucideIcons.refreshCcw, size: 18),
-                      label: Text(
-                        'Try Again',
-                        style: GoogleFonts.manrope(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (isDismissible) Navigator.of(context).pop();
+                          onRetry!();
+                        },
+                        icon: const Icon(LucideIcons.refreshCcw, size: 18),
+                        label: Text(
+                          'Try Again',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                if (isDismissible) ...[
-                  if (onRetry != null) const SizedBox(height: 12),
+                
+                // Secondary Action: Contact Support
+                if (onContactSupport != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: onContactSupport,
+                        icon: const Icon(LucideIcons.mail, size: 18),
+                        label: Text(
+                          'Contact Support',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                // Tertiary Action: Close/Dismiss
+                if (isDismissible || closeLabel != null)
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        if (isDismissible) {
+                          Navigator.of(context).pop();
+                        } else if (onRetry != null) {
+                          // For security dialogs where we want to exit
+                          onRetry!();
+                        }
+                      },
                       style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.onSurface,
+                        foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
                       ),
                       child: Text(
-                        'Dismiss',
+                        closeLabel ?? 'Dismiss',
                         style: GoogleFonts.manrope(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -205,7 +297,6 @@ class ServiceErrorDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ],

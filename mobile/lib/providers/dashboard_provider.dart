@@ -247,7 +247,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final semKey = '${academic.year}-${academic.semester}';
     final Set<String> disabledCodes = (disabledMap[semKey] as Map?)
             ?.keys
-            .map((c) => c.toString().toUpperCase())
+            .map((c) => DashboardStats.standardize(c.toString()))
             .toSet() ??
         <String>{};
 
@@ -377,7 +377,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       
       // 2. Fetch the fresh profile from the server (this updates class_id, label etc)
       // We MUST await this so that the subsequent _fetchAndProcess uses the updated classId!
-      await ref.read(authProvider.notifier).refreshProfile(force: true);
+      await ref.read(authProvider.notifier).refreshProfile(force: true, sync: true);
     }
     
     state = await AsyncValue.guard(() async {

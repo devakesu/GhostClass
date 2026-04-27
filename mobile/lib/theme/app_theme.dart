@@ -79,9 +79,9 @@ class GhostColors extends ThemeExtension<GhostColors> {
 class AppColors {
   // Brand & Semantic (Updated to match OKLCH values from Web)
   static const Color brandPurple = Color(0xFF7C3AED);
-  static const Color brandPink = Color(0xFFF43F5E); // oklch(0.65 0.23 345)
+  static const Color brandPink = Color(0xFFFF2D55); // More distinct Rose Pink
   static const Color successGreen = Color(0xFF10B981);
-  static const Color dangerRed = Color(0xFFEF4444);
+  static const Color dangerRed = Color(0xFFFF3B30); // Pure Red
   static const Color accentOrange = Color(0xFFF59E0B);
   static const Color accentBlue = Color(0xFF3B82F6);
   static const Color accentCyan = Color(0xFF06B6D4);

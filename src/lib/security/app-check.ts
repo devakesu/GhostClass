@@ -187,15 +187,25 @@ export function withSecurity(
         }
 
         const decrypted = await decryptRequest(jwe) as any;
-        decryptedBody = decrypted.payload;
-        // rcek (Response Content Encryption Key) is a sibling of payload in the envelope
-        responseCek = decrypted.rcek || null;
+        
+        // Handle both nested {payload, rcek} and flat {token, ..., rcek} structures
+        if (decrypted && typeof decrypted === 'object' && 'payload' in decrypted) {
+          decryptedBody = decrypted.payload;
+          responseCek = decrypted.rcek || null;
+        } else {
+          decryptedBody = decrypted;
+          responseCek = (decrypted && typeof decrypted === 'object') ? decrypted.rcek : null;
+        }
       } else if (jweKeyHeader) {
         // Support for GET requests or requests without bodies:
         // The client sends the JWE-wrapped CEK in a header.
         const decrypted = await decryptRequest(jweKeyHeader) as any;
         // For header-only JWE, rcek might be direct or in a payload property
-        responseCek = decrypted.rcek || decrypted.payload?.rcek || null;
+        if (decrypted && typeof decrypted === 'object' && 'payload' in decrypted) {
+          responseCek = decrypted.rcek || null;
+        } else {
+          responseCek = (decrypted && typeof decrypted === 'object') ? (decrypted.rcek || decrypted.payload?.rcek || null) : null;
+        }
       }
     } catch (error) {
       logger.error("withSecurity: JWE Decryption error:", error);

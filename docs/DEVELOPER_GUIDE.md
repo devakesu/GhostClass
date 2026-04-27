@@ -26,6 +26,8 @@ Complete guide for development, contribution, and release workflows for GhostCla
 
 - **Node.js**: v22.12.0+
 - **npm**: v11+
+- **Flutter SDK**: 3.41+
+- **Dart SDK**: 3.11.5+
 - **Git**: Latest version
 - **GPG**: For commit signing (optional for local development, required for automated workflows)
 - **Docker**: For containerized deployment (optional)
@@ -86,6 +88,8 @@ These variables are **not required** for local development but enable additional
 | --- | --- | --- |
 | `FORCE_STRICT_CSP` / `NEXT_PUBLIC_FORCE_STRICT_CSP` | `""` (disabled) | Set `"true"` to enforce a stricter CSP in development (removes most uses of `'unsafe-inline'` but still allows it in `script-src-elem` and certain dev style directives so Next.js hydration and dev tooling continue to work; useful for reproducing CSP violations locally). **Note:** `'unsafe-eval'` is NOT removed in dev mode even when set — Next.js HMR requires it. It is only absent in a real production build. Use `npm run build && npm start` to test the production CSP. |
 | `NEXT_PUBLIC_ATTENDANCE_TARGET_MIN` | `75` | Minimum attendance target percentage (1–100). Applies in both development and production. Adjust to match your institution's minimum attendance requirements. |
+| `NEXT_PUBLIC_ENABLE_SW_IN_DEV` | `false` | Set `"true"` to enable Service Worker registration in development mode. Useful for testing PWA features locally. |
+| `TEST_CLIENT_IP` | `""` | Fallback client IP used in development/testing to bypass local network IP detection. Example: `203.0.113.45`. |
 
 > **Source maps:** Production source maps are always generated and uploaded to Sentry (with `sourcesContent` embedded so stack traces resolve correctly), then deleted from the build output automatically. They are never publicly served.
 
@@ -600,6 +604,7 @@ Navigate to the **Variables** tab and create the following:
 | `NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE` | `March 6, 2026` | Legal docs effective date |
 | `SENTRY_ORG` | `devakesu` | Sentry organisation slug |
 | `SENTRY_PROJECT` | `ghostclass` | Sentry project slug |
+| `NEXT_PUBLIC_ANDROID_PACKAGE_NAME` | `com.ghostclass.app` | Android package name for app linking |
 
 Optional Variables (omit to use defaults):
 
@@ -872,60 +877,13 @@ When the ISP block is lifted, **clear both** vars (set to empty) and redeploy. N
 
 ## Known Issues
 
-### Production Vulnerability: minimatch ReDoS (GHSA-3ppc-4f35-3m26)
+### Status: ✅ All Resolved
 
-**Status:** ✅ Fixed via package.json override + `--legacy-peer-deps`
+`npm audit` reports **0 vulnerabilities** across all dependencies.
 
-**Description:**
-
-- `@sentry/nextjs@9.20.0` depends on `@sentry/node` which requires `minimatch < 10.2.2`
-- minimatch < 10.2.2 contains a ReDoS vulnerability (GHSA-3ppc-4f35-3m26)
-- **Risk Level:** MEDIUM
-  - **Attack Surface:** Low (Sentry configuration is application-controlled, not user-input)
-  - **Exploitability:** Requires crafted patterns in app code using Sentry filtering
-
-**Version note (Sentry downgrade 10.x → 9.x):**
-
-The project is pinned to `@sentry/nextjs@9.20.0`. The 10.x line introduced breaking changes with the Next.js 16 App Router + edge runtime integration, causing instability in error reporting. Until the Sentry configuration can be safely migrated, we remain on 9.20.0 with the `minimatch` override below.
-
-**Fix Applied:**
-
-- ✅ Minimatch 10.2.2 available (fixes ReDoS)
-- ✅ Added `"minimatch": "^10.2.2"` override to `package.json` (forces patched version across all transitive dependencies)
-- ✅ All build stages use `--legacy-peer-deps` flag (bypasses peer dependency conflict from override):
-  - **Local development:** `npm install --legacy-peer-deps` ✅
-  - **GitHub Actions (test.yml):** `npm ci --legacy-peer-deps` (2 jobs) ✅
-  - **Docker production:** `npm ci --legacy-peer-deps` ✅
-
-**Next Steps:**
-
-1. **Short-term** (Current): Use package.json override + `--legacy-peer-deps` flag (applied consistently everywhere)
-2. **Long-term** (Watch for Sentry SDK update): Wait for `@sentry/nextjs` to release a version that bumps `minimatch >= 10.2.2` in its dependencies
-   - Once Sentry releases a patched version, run: `npm install @sentry/nextjs@latest`
-   - Package.json override can be removed once Sentry's transitive dependency is fixed
-
-**Verification:**
-
-```bash
-# Check production-only vulnerabilities (dev deps excluded)
-npm audit --omit=dev
-
-# Check all vulnerabilities (including dev)
-npm audit
-
-# Verify --legacy-peer-deps is used across all builds
-# Local: npm install --legacy-peer-deps
-# CI: grep 'npm ci --legacy-peer-deps' .github/workflows/test.yml
-# Docker: grep 'npm ci' Dockerfile | grep legacy-peer-deps
-```
-
-### Dev Dependencies: ESLint/TypeScript Vulnerability Status
-
-**Status**: ✅ Resolved — `npm audit` reports **0 vulnerabilities** across all dependencies.
-
-- `ajv@6.14.0` is still installed as an internal dependency of ESLint (`eslint@9.39.2`), however the advisory GHSA-2g4f-4pwh-qvx6 is no longer flagged by npm audit
-- `minimatch` is fully patched via the `^10.2.2` override in `package.json`
-- No ESLint 10 upgrade or `typescript-eslint` v9 was required to reach zero vulnerabilities
+- **Sentry SDK**: The project has been successfully migrated to `@sentry/nextjs@10.x`. Previous stability issues with the Next.js 16 App Router and Edge Runtime have been resolved.
+- **minimatch**: The ReDoS vulnerability (GHSA-3ppc-4f35-3m26) is fully patched via the `^10.2.2` override in `package.json`.
+- **ESLint/TypeScript**: All dev dependencies are up-to-date and vulnerability-free.
 
 **Verification**:
 
@@ -1070,8 +1028,8 @@ The `mobile/` directory contains the Flutter application for Android and iOS. It
 
 ### Prerequisites
 
-- **Flutter SDK** — 3.27+ ([install guide](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** — ^3.11.4 (bundled with Flutter)
+- **Flutter SDK** — 3.41+ ([install guide](https://docs.flutter.dev/get-started/install))
+- **Dart SDK** — 3.11.5+ (bundled with Flutter)
 - **Android Studio** — For Android emulator, Gradle, and the Android build toolchain
 - **Xcode** (macOS only) — For iOS simulator and iOS builds
 - **Firebase CLI** — For `flutterfire configure` and App Check setup

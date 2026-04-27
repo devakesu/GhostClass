@@ -13,7 +13,6 @@ import 'package:ghostclass/widgets/dashboard/trend_chart.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
-import 'package:ghostclass/widgets/dashboard/suspicious_absences_section.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -86,12 +85,10 @@ class _DashboardContent extends ConsumerWidget {
         slivers: [
           HeaderSection(data: data),
           OverallProgressSection(stats: data.stats, targetValue: targetValue),
-          SliverToBoxAdapter(
-            child: SuspiciousAbsencesSection(
-              absences: data.stats.suspiciousAbsences,
-            ),
+          TrendChartSection(
+            stats: data.stats,
+            targetPercentage: targetValue,
           ),
-          const TrendChartSection(),
           StatsGridSection(stats: data.stats, activeCount: data.courses.length),
           const CourseLineupHeader(),
           CourseListSection(
@@ -100,6 +97,7 @@ class _DashboardContent extends ConsumerWidget {
             selectedSemester: data.selectedSemester,
             selectedYear: data.selectedYear,
             bunkEnabled: bunkEnabled,
+            targetPercentage: targetValue,
             instructors: data.instructors,
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),

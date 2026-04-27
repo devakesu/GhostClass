@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  *
  * Logic matches acceptTermsAction in src/app/actions/user.ts
  */
-const handler = async (req: Request) => {
+const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any }) => {
   const supabaseAdmin = getAdminClient();
 
   // withSecurity handles auth and JWE. We expect a Bearer token or cookie.
@@ -31,14 +31,16 @@ const handler = async (req: Request) => {
   }
 
   // 2. Parse body
-  let body;
-  try {
-    body = await req.json();
-  } catch (_err) {
-    logger.warn(`[accept-terms] Failed to parse request body:`, _err);
-    return NextResponse.json({ error: "Invalid request body" }, {
-      status: 400,
-    });
+  let body = decryptedBody;
+  if (!body) {
+    try {
+      body = await req.json();
+    } catch (_err) {
+      logger.warn(`[accept-terms] Failed to parse request body:`, _err);
+      return NextResponse.json({ error: "Invalid request body" }, {
+        status: 400,
+      });
+    }
   }
 
   const { version } = body;

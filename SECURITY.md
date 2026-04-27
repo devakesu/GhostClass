@@ -125,6 +125,12 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by @sentry/nextjs and other build tools)
 - **Status**: ✅ Patched
 
+#### flatted: ^3.4.2
+
+- **Reason**: Security improvements and dependency resolution
+- **Scope**: Transitive dependency (used by various dev tools)
+- **Status**: ✅ Up-to-date
+
 ### Maintenance Policy
 
 - Overrides are reviewed during each major release

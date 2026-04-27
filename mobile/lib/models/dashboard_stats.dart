@@ -93,13 +93,6 @@ class DashboardStats {
     // --- 1. Robust Identity Resolution System (Web Parity) ---
     // Standardizes ID/Code/Name into a consistent Match Key.
     // Replicates Web's formatCourseCode: splits at hyphens and removes all spaces.
-    String standardize(String input) {
-      String s = input.trim().toUpperCase();
-      if (s.contains('-')) {
-        s = s.split('-')[0].trim();
-      }
-      return s.replaceAll(RegExp(r'\s+'), '');
-    }
 
     final Map<String, String> lookupMap = {}; // StandardizedCode -> SafeId
     final Map<String, String> idToSafeId = {}; // NumericID -> SafeId
@@ -113,7 +106,11 @@ class DashboardStats {
         catalogCodesSet.add(stdCode);
         courseStats.putIfAbsent(
           safeId,
-          () => CourseStat(id: safeId, code: stdCode),
+          () => CourseStat(
+            id: safeId,
+            code: stdCode,
+            name: course.name,
+          ),
         );
 
         idToSafeId[course.id.toString()] = safeId;
@@ -166,18 +163,22 @@ class DashboardStats {
 
             officialMap[key] = status;
 
-            final course = courseStats[cid];
-            if (course != null) {
-              course.officialTotal++;
-              course.finalTotal++;
+            CourseStat? course = courseStats[cid];
+            if (course == null) {
+              final String name = attendanceData.courses[rawCid]?.name ?? rawCid;
+              course = CourseStat(id: cid, code: stdCourseCode, name: name);
+              courseStats[cid] = course;
+            }
+
+            course.officialTotal++;
+            course.finalTotal++;
               // Note: For per-course stats, we use the stricter _isPositive (110, 225)
               if (_isPositive(status, includeOtherLeave: false)) {
                 course.officialPresent++;
                 course.finalPresent++;
               }
-            }
 
-            if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
+              if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
               officialTotal++;
               // Dashboard Overview Parity: Present counter includes 112 (Other Leave)
               if (_isPositive(status, includeOtherLeave: true)) {
@@ -363,16 +364,22 @@ class DashboardStats {
     if (val is int) return val;
     return int.tryParse(val.toString()) ?? 0;
   }
-
   static bool _isPositive(int status, {bool includeOtherLeave = false}) {
     if (includeOtherLeave && status == 112) return true;
     return [110, 225].contains(status);
+  }
+
+  /// Standardizes ID/Code/Name into a consistent Match Key.
+  /// Replicates Web's formatCourseCode: splits at hyphens and removes all spaces.
+  static String standardize(String input) {
+    return input.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
   }
 }
 
 class CourseStat {
   final String id;
   final String code;
+  final String name;
   int officialPresent = 0;
   int officialTotal = 0;
   int finalPresent = 0;
@@ -382,7 +389,11 @@ class CourseStat {
   int extraPresent = 0;
   int extraAbsent = 0;
 
-  CourseStat({required this.id, required this.code});
+  CourseStat({
+    required this.id,
+    required this.code,
+    String? name,
+  }) : name = name ?? '';
 
   int get officialAbsent => officialTotal - officialPresent;
   int get finalAbsent => finalTotal - finalPresent;

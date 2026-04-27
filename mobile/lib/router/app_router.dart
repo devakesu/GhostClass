@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:ghostclass/constants/static_content.dart';
+import 'package:ghostclass/config/app_config.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,7 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLogin = path == '/login';
       final isRoot = path == '/';
       final isLegal = path == '/legal';
-      final isPublic = isLegal || path == '/help' || path == '/contact';
+      final isPublic = isLegal || path == '/help' || path == '/contact' || path == '/about';
       final isAcceptTerms = path == '/accept-terms';
       
       // Always allow Splash
@@ -189,11 +191,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/legal',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: const StaticPageScreen(title: 'Legal'),
+          child: StaticPageScreen(
+            title: 'Legal',
+            body: getLegalPageContent(
+              AppConfig.legalEffectiveDate,
+              AppConfig.appVersion,
+            ),
+          ),
           transitionDuration: const Duration(milliseconds: 380),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-            return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
+            final slide = Tween<Offset>(
+              begin: const Offset(0, 0.06),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            );
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: slide, child: child),
+            );
           },
         ),
       ),

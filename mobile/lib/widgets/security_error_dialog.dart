@@ -5,12 +5,16 @@ class SecurityErrorDialog extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback? onRetry;
+  final VoidCallback? onContactSupport;
+  final String? closeLabel;
 
   const SecurityErrorDialog({
     super.key,
     required this.title,
     required this.message,
     this.onRetry,
+    this.onContactSupport,
+    this.closeLabel,
   });
 
   @override
@@ -21,6 +25,8 @@ class SecurityErrorDialog extends StatelessWidget {
           title: title,
           messages: [message],
           onRetry: onRetry,
+          onContactSupport: onContactSupport,
+          closeLabel: closeLabel,
           isDismissible: false,
         ),
       ),

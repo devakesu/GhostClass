@@ -8,9 +8,9 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/error_handler.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/security_guard.dart';
+import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/app_footer.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
-import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -51,18 +51,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
     super.dispose();
   }
 
-  // Removed internal _showErrorDialog in favor of ErrorHandlerMixin.handleError
-
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
     
-    // Security Practice 5: Debugger Detection (Android-only for now)
     if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
        const channel = MethodChannel('com.devakesu.ghostclass/security');
        try {
          final bool isDebuggerAttached = await channel.invokeMethod('isDebuggerAttached') ?? false;
         if (isDebuggerAttached) {
-          // User Request 2: Wipe sensitive keys and exit if debugger detected
           await _securityGuard.wipeAndExit();
           return;
         }
@@ -71,14 +67,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
         if (isWindowObscured) {
           if (mounted) {
             await handleError(
-              'An active overlay was detected. Please close any floating apps (like screen dimmers or chat bubbles) before logging in.',
+              'An active overlay was detected. Please close any floating apps before logging in.',
               title: 'Security Alert'
             );
           }
           return;
         }
       } catch (e) {
-        // Silently ignore MethodChannel errors in prod, or log to Sentry
+        // Silently ignore
       }
     }
 
@@ -122,142 +118,111 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final ghostColors = theme.extension<GhostColors>();
+    final amber = ghostColors?.accentOrange ?? const Color(0xFFF59E0B);
+
     return Scaffold(
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 24.0,
-              ),
-              child: AutofillGroup(
-                child: Form(
-                  key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Hero(
-                        tag: 'app_logo',
-                        child: Image.asset(
-                          'assets/logo.png',
-                          width: MediaQuery.of(context).size.width * 0.75,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ).animate().fade().scale(
-                          duration: 600.ms,
-                          curve: Curves.easeOutBack,
-                        ),
-                    const SizedBox(height: 20),
+      body: Stack(
+        children: [
+          // Dynamic Background Blobs
+          Positioned(
+            top: -120,
+            right: -60,
+            child: _GlowBlob(
+              color: primaryColor.withValues(alpha: 0.1),
+              size: 320,
+            ),
+          ),
+          Positioned(
+            bottom: -60,
+            left: -100,
+            child: _GlowBlob(
+              color: amber.withValues(alpha: 0.08),
+              size: 280,
+            ),
+          ),
+          Positioned(
+            top: 200,
+            left: -80,
+            child: _GlowBlob(
+              color: primaryColor.withValues(alpha: 0.04),
+              size: 200,
+            ),
+          ),
 
-                    Text(
-                      "Drop your ezygo credentials - we're just the service upgrade you deserved.",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.manrope(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSecondary
-                            .withValues(alpha: 0.85),
-                        letterSpacing: -0.3,
-                        height: 1.4,
-                      ),
-                    ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
-
-                    const SizedBox(height: 18),
-
-                    Center(
-                      child: TransparencyBadge(
-                        onTap: () => context.push('/about'),
-                      ).animate().fadeIn(delay: 140.ms).slideY(begin: 0.08),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Username label
-                    SizedBox(
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0, left: 4.0, right: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Username, Email, or Phone',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.manrope(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
+          GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                  child: AutofillGroup(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Hero(
+                              tag: 'app_logo',
+                              child: Image.asset(
+                                'assets/logo.png',
+                                width: MediaQuery.of(context).size.width * 0.7,
+                                fit: BoxFit.contain,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Row(
-                              children: [
-                                Icon(LucideIcons.user, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                                const SizedBox(width: 8),
-                                Icon(LucideIcons.mail, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                                const SizedBox(width: 8),
-                                Icon(LucideIcons.phone, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // No validator — errors shown via dialog
-                    TextFormField(
-                      controller: _usernameController,
-                      decoration: InputDecoration(
-                        hintText: 'cooked_fr@attendance.edu',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSecondary
-                              .withValues(alpha: 0.7),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [
-                        AutofillHints.username,
-                        AutofillHints.email,
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Password label
-                    SizedBox(
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0, left: 4.0, right: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Password',
-                              style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface,
+                          ).animate().fade().scale(
+                                duration: 600.ms,
+                                curve: Curves.easeOutBack,
                               ),
+                          const SizedBox(height: 8),
+
+                          Text(
+                            "Drop your ezygo credentials - we're just the service upgrade you deserved.",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.onSecondary.withValues(alpha: 0.85),
+                              letterSpacing: -0.3,
+                              height: 1.3,
                             ),
-                            GestureDetector(
+                          ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
+
+                          const SizedBox(height: 24),
+
+                          // Username Field
+                          _FieldLabel(
+                            label: 'Username, Email, or Phone',
+                            icons: const [LucideIcons.user, LucideIcons.mail, LucideIcons.phone],
+                          ),
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: InputDecoration(
+                              hintText: 'cooked_fr@attendance.edu',
+                              hintStyle: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSecondary.withValues(alpha: 0.5),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                              filled: true,
+                              fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+                            ),
+                            keyboardType: TextInputType.text,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.username, AutofillHints.email],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Field
+                          _FieldLabel(
+                            label: 'Password',
+                            trailing: GestureDetector(
                               onTap: () async {
                                 final url = Uri.parse(AppConfig.ezygoOrigin);
                                 if (await canLaunchUrl(url)) {
@@ -268,136 +233,149 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                                 'Forgot password?',
                                 style: GoogleFonts.manrope(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryColor,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      decoration: InputDecoration(
-                        hintText: '*************',
-                        hintStyle: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSecondary
-                              .withValues(alpha: 0.7),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? LucideIcons.eye
-                                : LucideIcons.eyeOff,
-                            color:
-                                Theme.of(context).colorScheme.onSecondary,
-                            size: 20,
                           ),
-                          onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
-                        ),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
-                      onFieldSubmitted: (_) => _handleLogin(),
-                    ),
-                    const SizedBox(height: 24),
-
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: _isLoading ? null : _handleLogin,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w500),
-                            ),
-                    )
-                        .animate()
-                        .fade(delay: 200.ms)
-                        .slideY(begin: 0.1, curve: Curves.easeOutQuad),
-
-                    const SizedBox(height: 32),
-
-                    // Disclaimer
-                    Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                            border: Border.all(
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(LucideIcons.lock,
-                                  size: 12, color: Theme.of(context).colorScheme.primary),
-                              const SizedBox(width: 6),
-                              Text(
-                                "GHOSTS DON'T SNOOP 😁",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.95),
-                                ),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              hintText: '*************',
+                              hintStyle: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSecondary.withValues(alpha: 0.5),
                               ),
-                            ],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                              filled: true,
+                              fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                                  color: theme.colorScheme.onSecondary,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.password],
+                            onFieldSubmitted: (_) => _handleLogin(),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Your EzyGo password is safe. We strictly do not read, store, or share your login password. GhostClass is just here to help you skip. 👻',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSecondary
-                                .withValues(alpha: 0.95),
-                            fontStyle: FontStyle.italic,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ).animate().fade(delay: 500.ms).slideY(begin: 0.1),
+                          const SizedBox(height: 24),
 
-                    const SizedBox(height: 32),
-                    const AppFooter(),
-                  ],
+                          // Login Button with Pink-Amber Gradient
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: LinearGradient(
+                                colors: [primaryColor, amber],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: primaryColor.withValues(alpha: 0.35),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              onPressed: _isLoading ? null : _handleLogin,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                    )
+                                  : const Text(
+                                      'Login',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                                    ),
+                            ),
+                          ).animate().fade(delay: 200.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad),
+
+                          const SizedBox(height: 16),
+                          const AppFooter(),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
-    ),
-  );
+    );
+  }
 }
+
+class _FieldLabel extends StatelessWidget {
+  final String label;
+  final List<IconData>? icons;
+  final Widget? trailing;
+
+  const _FieldLabel({required this.label, this.icons, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0, left: 4.0, right: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.manrope(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+          if (icons != null)
+            Row(
+              children: icons!.map((icon) => Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Icon(icon, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+              )).toList(),
+            ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+class _GlowBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _GlowBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color, blurRadius: 100, spreadRadius: 40),
+        ],
+      ),
+    );
+  }
 }
