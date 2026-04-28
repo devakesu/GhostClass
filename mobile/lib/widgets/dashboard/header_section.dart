@@ -39,7 +39,7 @@ class HeaderSection extends ConsumerWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -124,10 +124,9 @@ class HeaderSection extends ConsumerWidget {
   void _showSemesterPicker(BuildContext context, WidgetRef ref, String current) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => _PickerSheet(
         title: 'Select Semester',
         options: const ['odd', 'even'],
@@ -146,16 +145,15 @@ class HeaderSection extends ConsumerWidget {
   void _showYearPicker(BuildContext context, WidgetRef ref, String current) {
     final currentYear = DateTime.now().year;
     final years = List.generate(
-      (currentYear - 2021) + 2,
+      (currentYear - 2021) + 3,
       (i) => '${2022 + i}-${(2023 + i).toString().substring(2)}',
     );
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => _PickerSheet(
         title: 'Select Academic Year',
         options: years,
@@ -190,18 +188,32 @@ class HeaderSection extends ConsumerWidget {
         title: const Text('Confirm Change'),
         content: Text(
           'You are about to change the ${type == 'semester' ? 'semester' : 'academic year'}. Are you sure you want to continue?',
+          style: GoogleFonts.manrope(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'CANCEL',
+              style: GoogleFonts.manrope(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
           ),
-          FilledButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Confirm'),
+            child: Text(
+              'CONFIRM',
+              style: GoogleFonts.manrope(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -295,37 +307,95 @@ class _PickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.manrope(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
+          // Drag Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 20),
-          ...options.map((opt) => ListTile(
-                onTap: () => onSelected(opt),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                title: Text(
-                  opt.toUpperCase(),
-                  style: GoogleFonts.manrope(
-                    fontSize: 16,
-                    fontWeight: opt == selected ? FontWeight.w800 : FontWeight.w500,
-                    color: opt == selected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface,
-                  ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.manrope(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Flexible(
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  children: options.map((opt) {
+                    final bool isSelected = opt.toLowerCase() == selected.toLowerCase();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => onSelected(opt),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                opt.toUpperCase(),
+                                style: GoogleFonts.manrope(
+                                  fontSize: 16,
+                                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  LucideIcons.checkCircle,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                trailing: opt == selected
-                    ? Icon(LucideIcons.check, color: Theme.of(context).colorScheme.primary)
-                    : null,
-              )),
+              ),
+            ),
+          ),
         ],
       ),
     );

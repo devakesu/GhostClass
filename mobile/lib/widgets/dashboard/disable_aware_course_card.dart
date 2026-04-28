@@ -19,9 +19,10 @@ class DisableAwareCourseCard extends ConsumerStatefulWidget {
   final String selectedSemester;
   final String selectedYear;
   final List<CourseInstructor> instructors;
+  final String? className;
 
   const DisableAwareCourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.selectedSemester, required this.selectedYear, required this.instructors, super.key,
+    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.selectedSemester, required this.selectedYear, required this.instructors, this.className, super.key,
   });
 
   @override
@@ -285,6 +286,7 @@ class _DisableAwareCourseCardState
                 }
               },
         instructors: widget.instructors,
+        className: widget.className,
       ),
     );
   }

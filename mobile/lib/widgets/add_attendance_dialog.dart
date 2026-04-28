@@ -45,6 +45,33 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     });
   }
 
+  String _getSessionName(
+    Map<String, dynamic> sessionMetadata,
+    String key,
+    dynamic sessionObj,
+    int index,
+  ) {
+    // 1. Try metadata
+    final metadata = sessionMetadata[key];
+    if (metadata != null && metadata['name'] != null) {
+      return metadata['name'].toString();
+    }
+
+    // 2. Try session object's internal session field
+    if (sessionObj.session != null &&
+        sessionObj.session.toString() != 'null' &&
+        sessionObj.session.toString() != '0') {
+      return sessionObj.session.toString();
+    }
+
+    // 3. Fallback to key or index-based numbering (matching web app)
+    final keyInt = int.tryParse(key);
+    if (keyInt != null && keyInt < 20) {
+      return key;
+    }
+    return (index + 1).toString();
+  }
+
   void _prefillDefaults() {
     final dashboardAsync = ref.read(dashboardProvider);
     if (dashboardAsync.value == null) return;
@@ -57,9 +84,9 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     final endDate = academic?.endDate ?? DateTime(2030);
 
     if (_selectedDate.isBefore(startDate)) {
-      setState(() => _selectedDate = startDate);
+      _selectedDate = startDate;
     } else if (_selectedDate.isAfter(endDate)) {
-      setState(() => _selectedDate = endDate);
+      _selectedDate = endDate;
     }
 
     final dateKey = DateFormat('yyyyMMdd').format(_selectedDate);
@@ -70,11 +97,20 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     // Official data
     final officialDay = data.attendance.studentAttendanceData[dateKey];
     if (officialDay != null) {
+      int idx = 0;
       officialDay.forEach((key, sessionObj) {
-        if (sessionObj.course != null && sessionObj.course != 0) {
-          final sessionName = sessionObj.session?.toString() ?? key;
+        if (sessionObj.course != null &&
+            sessionObj.course != 0 &&
+            sessionObj.course.toString() != 'null') {
+          final sessionName = _getSessionName(
+            data.attendance.sessions,
+            key,
+            sessionObj,
+            idx,
+          );
           occupiedSessions.add(utils.normalizeSession(sessionName));
         }
+        idx++;
       });
     }
 
@@ -92,10 +128,11 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       orElse: () => '',
     );
 
+    setState(() {
+      _selectedSession = firstFree.isNotEmpty ? firstFree : null;
+    });
+
     if (firstFree.isNotEmpty) {
-      setState(() {
-        _selectedSession = firstFree;
-      });
       _prefillCourse(firstFree);
     }
   }
@@ -116,44 +153,58 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
         final m = int.parse(dStr.substring(4, 6));
         final d = int.parse(dStr.substring(6, 8));
         final date = DateTime(y, m, d);
+
         if (date.weekday == dayOfWeek) {
+          int idx = 0;
           sessions.forEach((key, sessionObj) {
-            if (sessionObj.course != null && sessionObj.course != 0) {
-              final sessionName = sessionObj.session?.toString() ?? key;
+            if (sessionObj.course != null &&
+                sessionObj.course != 0 &&
+                sessionObj.course.toString() != 'null') {
+              final sessionName = _getSessionName(
+                data.attendance.sessions,
+                key,
+                sessionObj,
+                idx,
+              );
+
               if (utils.normalizeSession(sessionName) == target) {
                 final cid = sessionObj.course.toString();
                 frequencyMap[cid] = (frequencyMap[cid] ?? 0) + 1;
               }
             }
+            idx++;
           });
         }
       } catch (e) {
-        AppLogger.w('AddAttendanceDialog: Failed to prefill course from date key', e);
+        AppLogger.w(
+          'AddAttendanceDialog: Failed to prefill course from date key',
+          e,
+        );
       }
     });
 
-    String? bestCourse;
+    String? bestCourseId;
     int maxCount = 0;
     frequencyMap.forEach((cid, count) {
       if (count > maxCount) {
         maxCount = count;
-        bestCourse = cid;
+        bestCourseId = cid;
       }
     });
 
-    if (bestCourse != null) {
+    if (bestCourseId != null) {
       final course = data.courses.firstWhere(
         (c) =>
-            c.id.toString() == bestCourse ||
-            c.code?.toUpperCase() == bestCourse?.toUpperCase(),
+            c.id.toString() == bestCourseId ||
+            c.code?.toUpperCase() == bestCourseId?.toUpperCase() ||
+            c.safeId == bestCourseId,
         orElse: () => data.courses.first,
       );
 
       setState(() {
         _selectedCourseId = course.safeId;
       });
-    } else if (_selectedCourseId == null && data.courses.isNotEmpty) {
-      // Fallback to the first available course if no best match is found
+    } else if (data.courses.isNotEmpty) {
       setState(() {
         _selectedCourseId = data.courses.first.safeId;
       });
@@ -174,12 +225,21 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     final officialDay =
         dashboardAsync.attendance.studentAttendanceData[dateKey];
     if (officialDay != null) {
+      int idx = 0;
       for (var entry in officialDay.entries) {
         final sessionObj = entry.value;
-        if (sessionObj.course != null && sessionObj.course != 0) {
-          final sessionName = sessionObj.session?.toString() ?? entry.key;
+        if (sessionObj.course != null &&
+            sessionObj.course != 0 &&
+            sessionObj.course.toString() != 'null') {
+          final sessionName = _getSessionName(
+            dashboardAsync.attendance.sessions,
+            entry.key,
+            sessionObj,
+            idx,
+          );
           if (utils.normalizeSession(sessionName) == target) return true;
         }
+        idx++;
       }
     }
 
@@ -512,30 +572,44 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
                   color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 13,
                 ),
-                items: data?.courses.map((c) {
-                  final stdCode = utils.standardizeCourseCode(
-                    c.code ?? c.id.toString(),
-                  );
-                  final isDisabled = data.disabledCodes.contains(stdCode);
+                items: (() {
+                  final courses = List<CourseDetails>.from(data?.courses ?? []);
+                  courses.sort((a, b) {
+                    final stdA = utils.standardizeCourseCode(a.code ?? a.id.toString());
+                    final stdB = utils.standardizeCourseCode(b.code ?? b.id.toString());
+                    final disabledA = data?.disabledCodes.contains(stdA) ?? false;
+                    final disabledB = data?.disabledCodes.contains(stdB) ?? false;
+                    
+                    if (disabledA && !disabledB) return 1;
+                    if (!disabledA && disabledB) return -1;
+                    return a.name.compareTo(b.name);
+                  });
 
-                  return DropdownMenuItem(
-                    value: c.safeId,
-                    child: Text(
-                      '${c.name}${isDisabled ? ' (Disabled)' : ''}',
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        color: isDisabled
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.4)
-                            : Theme.of(context).colorScheme.onSurface,
-                        fontStyle: isDisabled
-                            ? FontStyle.italic
-                            : FontStyle.normal,
+                  return courses.map((c) {
+                    final stdCode = utils.standardizeCourseCode(
+                      c.code ?? c.id.toString(),
+                    );
+                    final isDisabled = data?.disabledCodes.contains(stdCode) ?? false;
+
+                    return DropdownMenuItem(
+                      value: c.safeId,
+                      child: Text(
+                        '${c.name}${isDisabled ? ' (Disabled)' : ''}',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          color: isDisabled
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.4)
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontStyle: isDisabled
+                              ? FontStyle.italic
+                              : FontStyle.normal,
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList();
+                })(),
                 onChanged: (val) => setState(() => _selectedCourseId = val),
               ),
               const SizedBox(height: 24),

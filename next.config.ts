@@ -233,6 +233,7 @@ const nextConfig = {
       })),
     ],
   },
+  allowedDevOrigins: ['192.168.0.103']
 } satisfies NextConfig;
 
 const sentryCompatibleConfig = withSerwist(nextConfig) as Parameters<typeof withSentryConfig>[0];
@@ -273,7 +274,7 @@ const sentryPluginOptions = {
   },
 
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring",
+  tunnelRoute: "/monitoring"
 } satisfies Parameters<typeof withSentryConfig>[1];
 
 export default withSentryConfig(sentryCompatibleConfig, sentryPluginOptions);

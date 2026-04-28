@@ -344,14 +344,23 @@ class _FieldLabel extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
-          if (icons != null)
+          if (icons case final i?)
             Row(
-              children: icons!.map((icon) => Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Icon(icon, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-              )).toList(),
+              children: i
+                  .map((icon) => Padding(
+                        padding: const EdgeInsets.only(left: 8.0),
+                        child: Icon(
+                          icon,
+                          size: 14,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.4),
+                        ),
+                      ))
+                  .toList(),
             ),
-          if (trailing != null) trailing!,
+          ...[trailing].nonNulls,
         ],
       ),
     );

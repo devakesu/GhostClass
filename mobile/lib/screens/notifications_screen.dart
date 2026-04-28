@@ -2,16 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      final notifier = ref.read(notificationsProvider.notifier);
+      final state = ref.read(notificationsProvider).value;
+      if (state != null && state.hasNextPage && !ref.read(notificationsProvider).isLoading) {
+        notifier.fetchNextPage();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
 
     return Scaffold(
@@ -27,7 +57,10 @@ class NotificationsScreen extends ConsumerWidget {
             if (data.unreadCount > 0) {
               return IconButton(
                 icon: const Icon(LucideIcons.checkCheck),
-                onPressed: () => ref.read(notificationsProvider.notifier).markAllAsRead(),
+                onPressed: () {
+                  ref.read(notificationsProvider.notifier).markAllAsRead();
+                  ServiceToast.show(context, 'All notifications marked as read');
+                },
                 tooltip: 'Mark all as read',
               );
             }
@@ -49,6 +82,7 @@ class NotificationsScreen extends ConsumerWidget {
   Widget _buildList(BuildContext context, WidgetRef ref, NotificationsState data) {
     if (data.notifications.isEmpty) {
       return ListView(
+        controller: _scrollController,
         children: [
           SizedBox(height: MediaQuery.of(context).size.height * 0.2),
           Center(
@@ -65,31 +99,45 @@ class NotificationsScreen extends ConsumerWidget {
       );
     }
 
-    final actionNotifications = data.actionNotifications;
-    final regularNotifications = data.regularNotifications;
+    final unreadConflicts = List<AppNotification>.from(data.actionNotifications);
+    final unreadRegular = data.regularNotifications.where((n) => !n.isRead).toList();
+    final readNotifications = data.notifications.where((n) => n.isRead).toList();
+
+    // Sorting: Newest first within each group
+    int compareNotifications(AppNotification a, AppNotification b) {
+      return b.createdAt.compareTo(a.createdAt);
+    }
+
+    unreadConflicts.sort(compareNotifications);
+    unreadRegular.sort(compareNotifications);
+    readNotifications.sort(compareNotifications);
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       children: [
-        if (actionNotifications.isNotEmpty) ...[
+        if (unreadConflicts.isNotEmpty) ...[
           _buildSectionHeader(context, 'ACTION REQUIRED', Colors.amber),
           const SizedBox(height: 12),
-          ...actionNotifications.map((n) => _NotificationCard(notification: n)),
+          ...unreadConflicts.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
           const SizedBox(height: 24),
         ],
-        if (regularNotifications.isNotEmpty) ...[
-          _buildSectionHeader(context, 'RECENT ACTIVITY', Colors.grey),
+        if (unreadRegular.isNotEmpty) ...[
+          _buildSectionHeader(context, 'UNREAD', Colors.blue),
           const SizedBox(height: 12),
-          ...regularNotifications.map((n) => _NotificationCard(notification: n)),
+          ...unreadRegular.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
+          const SizedBox(height: 24),
+        ],
+        if (readNotifications.isNotEmpty) ...[
+          _buildSectionHeader(context, 'EARLIER', Colors.grey),
+          const SizedBox(height: 12),
+          ...readNotifications.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
         ],
         if (data.hasNextPage)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(
-              child: TextButton(
-                onPressed: () => ref.read(notificationsProvider.notifier).fetchNextPage(),
-                child: const Text('Load More'),
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
       ],
@@ -119,7 +167,7 @@ class NotificationsScreen extends ConsumerWidget {
 class _NotificationCard extends ConsumerWidget {
   final AppNotification notification;
 
-  const _NotificationCard({required this.notification});
+  const _NotificationCard({required this.notification, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -140,7 +188,14 @@ class _NotificationCard extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: () => ref.read(notificationsProvider.notifier).toggleRead(notification.id, isRead),
+      onTap: () {
+        ref.read(notificationsProvider.notifier).toggleRead(notification.id, isRead);
+        ServiceToast.show(
+          context, 
+          isRead ? 'Marked as unread' : 'Marked as read',
+          duration: const Duration(seconds: 2),
+        );
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

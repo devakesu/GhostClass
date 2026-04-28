@@ -38,9 +38,9 @@ class CourseLineupHeader extends StatelessWidget {
               'Your current courses — organized for easy access.',
               style: GoogleFonts.manrope(
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 fontStyle: FontStyle.italic,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -58,8 +58,8 @@ class CourseListSection extends StatelessWidget {
   final String selectedYear;
   final bool bunkEnabled;
   final double targetPercentage;
-
   final List<CourseInstructor> instructors;
+  final String? className;
 
   const CourseListSection({
     super.key,
@@ -70,6 +70,7 @@ class CourseListSection extends StatelessWidget {
     required this.bunkEnabled,
     required this.targetPercentage,
     required this.instructors,
+    this.className,
   });
 
   @override
@@ -84,6 +85,7 @@ class CourseListSection extends StatelessWidget {
               return _AddCourseCard(
                 semester: selectedSemester,
                 academicYear: selectedYear,
+                className: className,
               );
             }
 
@@ -104,6 +106,7 @@ class CourseListSection extends StatelessWidget {
                 selectedSemester: selectedSemester,
                 selectedYear: selectedYear,
                 instructors: instructors,
+                className: className,
               ),
             );
           },
@@ -117,62 +120,121 @@ class CourseListSection extends StatelessWidget {
 class _AddCourseCard extends StatelessWidget {
   final String semester;
   final String academicYear;
+  final String? className;
 
   const _AddCourseCard({
     required this.semester,
     required this.academicYear,
+    this.className,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showAddCourseDialog(context),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-            width: 2,
-            style: BorderStyle.solid, // Flutter doesn't have native dashed border easily
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      child: InkWell(
+        onTap: () => _showAddCourseDialog(context),
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.03),
+              ],
+            ),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              width: 1.5,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+          child: Stack(
+            children: [
+              // Decorative Background Circle
+              Positioned(
+                right: -20,
+                top: -20,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              child: Icon(
-                LucideIcons.plus,
-                color: Theme.of(context).colorScheme.primary,
-                size: 28,
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    // Icon Container
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        LucideIcons.plusCircle,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    // Text Content
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Can't find a course?",
+                            style: GoogleFonts.manrope(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Add it manually to your lineup\nand start tracking.",
+                            style: GoogleFonts.manrope(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      LucideIcons.chevronRight,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Can\'t find a course?',
-              style: GoogleFonts.manrope(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add it manually to start tracking your attendance immediately.',
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -184,6 +246,7 @@ class _AddCourseCard extends StatelessWidget {
       builder: (context) => AddCourseDialog(
         semester: semester,
         academicYear: academicYear,
+        className: className,
       ),
     );
   }

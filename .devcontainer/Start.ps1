@@ -2,28 +2,48 @@
 $ContainerName = "GhostClass_Sandbox"
 $SSHPort = 7522
 $User = "vscode"
-$ADB_Port = 5037
+$WslConfigPath = "$env:USERPROFILE\.wslconfig"
+$ID_FILE = "$env:USERPROFILE\.ssh\id_ed25519"
 
-# 1. Grab the exact text of your public key (stripping out any Windows newlines)
-$pubKey = (Get-Content "$env:USERPROFILE\.ssh\id_ed25519.pub" -Raw).Trim()
+function Set-WslLimits ($Memory, $Processors) {
+    $ConfigContent = "[wsl2]`nmemory=$Memory`nprocessors=$Processors"
+    Set-Content -Path $WslConfigPath -Value $ConfigContent
+    Write-Host "⚙️ .wslconfig updated: $Memory RAM, $Processors Cores." -ForegroundColor Yellow
+}
 
-# 2. Inject it into the container and enforce strict 700/600 permissions
-wsl docker exec -u vscode GhostClass_Sandbox bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '$pubKey' > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+# ==========================================
+# PHASE 1: WSL LIMITS
+# ==========================================
+Write-Host "🔄 Phase 1: Applying 10GB / 12-Core limits & restarting WSL..." -ForegroundColor Cyan
+Set-WslLimits -Memory "12GB" -Processors 12 -swap "8GB"
+wsl --shutdown
+Start-Sleep -Seconds 3 
 
-Write-Host "🚀 Step 1: Starting Docker Container..." -ForegroundColor Cyan
-# Added 'wsl' prefix here
-$Status = wsl docker inspect -f '{{.State.Status}}' $ContainerName 2>$null
+# ==========================================
+# PHASE 2: START UP (Docker & Emulator)
+# ==========================================
+Write-Host "🚀 Phase 2: Starting dependencies..." -ForegroundColor Cyan
 
+# Running normally without wsl prefix (assuming Docker Desktop integration is active)
+$Status = wsl --exec docker inspect -f '{{.State.Status}}' $ContainerName 2>$null
 if ($Status -ne "running") {
-    # Added 'wsl' prefix here
-    wsl docker start $ContainerName
+    wsl --exec docker start $ContainerName
     Write-Host "✅ Container started." -ForegroundColor Green
 } else {
     Write-Host "ℹ️ Container already running." -ForegroundColor Gray
 }
 
-# --- WAIT FOR SSH SERVER ---
-Write-Host "⏳ Step 2: Waiting for SSH server on port $SSHPort..." -ForegroundColor Cyan
+# Key Injection
+$pubKey = (Get-Content "$env:USERPROFILE\.ssh\id_ed25519.pub" -Raw).Trim()
+wsl --exec docker exec -u vscode $ContainerName bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '$pubKey' > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+
+Write-Host "📱 Starting Android Emulator..."
+$EmulatorProc = Start-Process emulator -ArgumentList "-avd Medium_Phone_API_36.1 -netdelay none -netspeed full" -PassThru -WindowStyle Hidden
+
+# ==========================================
+# PHASE 3: NETWORKING & ADB
+# ==========================================
+Write-Host "⏳ Waiting for SSH server on port $SSHPort..." -ForegroundColor Cyan
 $maxRetries = 10
 $retryCount = 0
 while ($retryCount -lt $maxRetries) {
@@ -34,41 +54,72 @@ while ($retryCount -lt $maxRetries) {
     $retryCount++
     Start-Sleep -Seconds 2
     if ($retryCount -eq $maxRetries) {
-        Write-Error "❌ SSH server failed to start in time. Check container logs."
+        Write-Error "❌ SSH server failed to start."
+        Read-Host "🛑 Script failed. Press Enter to exit..." 
         exit
     }
 }
 
-# --- REVERSE TUNNEL (The Direct Emulator Bridge) ---
-Write-Host "🌉 Step 3: Tunneling the raw Emulator connection..." -ForegroundColor Cyan
-
-$ID_FILE = "$env:USERPROFILE\.ssh\id_ed25519"
-
-# Notice the change here: We are forwarding port 5555 now. No more -L 8181 needed!
-Start-Process ssh -ArgumentList "-N", "-o", "StrictHostKeyChecking=no", "-i", "`"$ID_FILE`"", "-R", "5555:127.0.0.1:5555", "-p", "7522", "vscode@localhost" -WindowStyle Hidden
-
+Write-Host "🌉 Tunneling the raw Emulator connection..." -ForegroundColor Cyan
+$SshProc = Start-Process ssh -ArgumentList "-N", "-o", "StrictHostKeyChecking=no", "-i", "`"$ID_FILE`"", "-R", "5555:127.0.0.1:5555", "-p", "7522", "vscode@localhost" -WindowStyle Hidden -PassThru
 Write-Host "✅ Direct Emulator Tunnel established." -ForegroundColor Green
 
-# --- CLEAN & CONNECT ADB ---
-Write-Host "🧹 Step 4: Initializing Container's native ADB..." -ForegroundColor Cyan
-
-# 1. Kill the container's old ADB instance
-wsl docker exec -u $User $ContainerName adb kill-server
-
-# Give it a second to breathe
+Write-Host "🧹 Initializing Container's native ADB..." -ForegroundColor Cyan
+wsl --exec docker exec -u $User $ContainerName adb kill-server
 Start-Sleep -Seconds 2
-
-# 2. Tell the Container's ADB to connect to the SSH Tunnel
-wsl docker exec -u $User $ContainerName adb connect 127.0.0.1:5555
-
+wsl --exec docker exec -u $User $ContainerName adb connect 127.0.0.1:5555
 Write-Host "✅ Connected! Container now fully controls the emulator." -ForegroundColor Green
 
-Write-Host "`n🎯 All systems go! You can now run 'flutter run' in VS Code." -ForegroundColor Magenta
+# --- ISOLATED ADMIN ELEVATION FOR PORT PROXY ---
+$WslIp = (wsl --exec hostname -I).Trim().Split(" ")[0]
+Write-Host "🛡️ Requesting Admin rights to map Port 3000..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList "-WindowStyle Hidden -Command netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 connectport=3000 connectaddress=$WslIp" -Verb RunAs
+Write-Host "✅ Routing 0.0.0.0:3000 -> $WslIp:3000" -ForegroundColor Green
+
+# ==========================================
+# PHASE 4: HOLD STATE
+# ==========================================
+Write-Host "`n🎯 All systems go!" -ForegroundColor Magenta
+Write-Host "--------------------------------------------------------"
+Read-Host "🛑 PRESS ENTER TO TEARDOWN ENVIRONMENT AND RESTORE WSL LIMITS 🛑"
+Write-Host "--------------------------------------------------------"
+
+# ==========================================
+# PHASE 5: CLEANUP & RESTORE
+# ==========================================
+Write-Host "🗑️ Phase 5: Tearing down..." -ForegroundColor Cyan
+
+wsl --exec docker stop $ContainerName
+
+if ($SshProc) { 
+    Stop-Process -Id $SshProc.Id -Force -ErrorAction SilentlyContinue 
+    Write-Host "✅ SSH Tunnel closed."
+}
+
+adb -e emu kill 2>$null
+if ($EmulatorProc) {
+    Start-Sleep -Seconds 2
+    Stop-Process -Id $EmulatorProc.Id -Force -ErrorAction SilentlyContinue
+    Write-Host "✅ Emulator stopped."
+}
+
+# --- ISOLATED ADMIN ELEVATION FOR CLEANUP ---
+Write-Host "🛡️ Requesting Admin rights to clean up Port 3000..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList "-WindowStyle Hidden -Command netsh interface portproxy delete v4tov4 listenport=3000 listenaddress=0.0.0.0" -Verb RunAs
+
+$TotalCores = (Get-WmiObject -Class Win32_Processor).NumberOfLogicalProcessors
+Write-Host "🔄 Restoring WSL config to 30GB / $TotalCores Cores..." -ForegroundColor Cyan
+Set-WslLimits -Memory "30GB" -Processors $TotalCores
+wsl --shutdown
+
+Write-Host "✅ Done. Environment sanitized." -ForegroundColor Green
+
+
 # SIG # Begin signature block
 # MIIFfQYJKoZIhvcNAQcCoIIFbjCCBWoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCB8YrXCWA+JkMOc
-# Qz7LOnejTeLs1yXt9BrzSJx/L/l8yaCCAvowggL2MIIB3qADAgECAhAgDfxRX/Zk
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDbbyWew8w3c/gP
+# 9AHSWwIi19J295MMO29FkXhqEx8xt6CCAvowggL2MIIB3qADAgECAhAgDfxRX/Zk
 # h0itgCU8KbfCMA0GCSqGSIb3DQEBCwUAMBMxETAPBgNVBAMMCGRldmFrZXN1MB4X
 # DTI2MDQyNzExMTI1NFoXDTI3MDQyNzExMzI1NFowEzERMA8GA1UEAwwIZGV2YWtl
 # c3UwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCrhVn79t4/fP2jtIkb
@@ -87,12 +138,12 @@ Write-Host "`n🎯 All systems go! You can now run 'flutter run' in VS Code." -F
 # fqh6873JOeOS7Wj+cuO9xt5guQMxggHZMIIB1QIBATAnMBMxETAPBgNVBAMMCGRl
 # dmFrZXN1AhAgDfxRX/Zkh0itgCU8KbfCMA0GCWCGSAFlAwQCAQUAoIGEMBgGCisG
 # AQQBgjcCAQwxCjAIoAKAAKECgAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQw
-# HAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwLwYJKoZIhvcNAQkEMSIEIEbF
-# tvAsAyGHtidXMUZikLLn9plp/bybA0W2mB3bfMlxMA0GCSqGSIb3DQEBAQUABIIB
-# ADb3aYMxol9YyeX/058VE/iKqgmPAMyz4NEdaS8t5mUFlh5LZhIdp0Bp3BETVv6v
-# JWjownIBIoSRrE0jywJdnyxEZD9NP8A7ic5L0v2fF2OYj1HGZydG4YLTP903Nd7Y
-# UCeGfs/3/2xv72y4aCCG9c0AIIoi9ZjcC4lLTcjGGWrn2V/erU+ZVxZa8xBfuXft
-# 1bZw1em1qZFKtanOX/H0ZQDU1MVZlqeT7tuMpVssRyEw9CwqZTVZOlqHA0rD8S/8
-# OWYXaUnkfuw/v8pNCrctfdwo7gj+g/F+usQfSdXwBIQRt2Y7RD3GmxuAh9grntlT
-# 43f2/B1RV1XxRMgI0aAZTew=
+# HAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwLwYJKoZIhvcNAQkEMSIEIE9v
+# VoFjNDbGkmyrVvauX2QhJxFxHJnlZ6e/jmD4qS74MA0GCSqGSIb3DQEBAQUABIIB
+# AFm4SelUKAZrPXrfMLr/E2FjGYij5MzdlktgyTFRkGb5vMcdV2E2ukudpeEoGL93
+# 2D6YX4Otvkd6F4pe9P4dfOjkIrr/CK/KWvwjWxSAkLQ5IJKNeOjF5V5/31IEtMuP
+# dMCKOkR99kh5yLIXdz34GfYabHs/4viyUbGlwv7EHuKscmiH/7AAk8IqEvY6yZgV
+# Lcpl1Ztwni0kgMdkHsGTIk8lj74MjJnoOA/v9IsX00HFdWld6/CSbGWOHVNYJU8D
+# twCGdpbHaoD0drrcgMJZg70pFNybwagWuF4ehlleDPTV3d2aixQobBlMu2he/Xrn
+# qQ/NPqdzbPnifeSVg/7RWBg=
 # SIG # End signature block

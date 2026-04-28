@@ -120,7 +120,7 @@ class OverallProgressSection extends StatelessWidget {
                                 Text(
                                   '${stats.rawOfficialPercentage.toStringAsFixed(1)}%',
                                   style: GoogleFonts.manrope(
-                                    fontSize: 14,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white.withValues(alpha: 0.4),
                                     decoration: TextDecoration.lineThrough,
@@ -132,7 +132,7 @@ class OverallProgressSection extends StatelessWidget {
                                 const SizedBox(width: 8),
                               ],
                               Text(
-                                '${stats.rawPercentage.toStringAsFixed(1)}',
+                                stats.rawPercentage.toStringAsFixed(1),
                                 style: GoogleFonts.manrope(
                                   fontSize: 36,
                                   fontWeight: FontWeight.w900,
@@ -184,11 +184,14 @@ class OverallProgressSection extends StatelessWidget {
                                     Color(0xFF9333EA), // Purple 600
                                   ],
                                 ),
-                                borderRadius: BorderRadius.circular(9),
+                                borderRadius: const BorderRadius.horizontal(
+                                  left: Radius.circular(9),
+                                ),
                               ),
                             ),
                             // Diff highlight (Green for gain, Red for loss)
                             Positioned(
+                              top: 0,
                               left:
                                   ((isGain ? officialWidth : currentWidth) -
                                           1.0)
@@ -202,10 +205,11 @@ class OverallProgressSection extends StatelessWidget {
                                               ? officialWidth - 1.0
                                               : currentWidth - 1.0),
                                     ),
-                                height:
-                                    12, // Slightly smaller to stay inside border
+                                height: 14,
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(9),
+                                  borderRadius: const BorderRadius.horizontal(
+                                    right: Radius.circular(9),
+                                  ),
                                   child: _StripedContainer(
                                     color: isGain
                                         ? const Color(0xFF22C55E).withValues(
@@ -292,7 +296,7 @@ class _WhiteCountBadge extends StatelessWidget {
                 child: Text(
                   '${diff > 0 ? "+" : ""}$diff',
                   style: GoogleFonts.manrope(
-                    fontSize: 11,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: diff > 0
                         ? const Color(0xFF4ADE80) // Vibrant Green

@@ -172,7 +172,7 @@ class RefreshGlowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF7C3AED);
+    final primary = Theme.of(context).colorScheme.primary;
 
     // Subtle glow (reduced shadows)
     // Adding a slight border effect as a "different" aesthetic
@@ -199,7 +199,7 @@ class RefreshGlowIcon extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(LucideIcons.refreshCw, color: primary, size: 20),
+            child: Icon(LucideIcons.refreshCw, color: primary, size: 20),
           ),
         ),
       ),

@@ -53,7 +53,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   FutureOr<DashboardData> build() async {
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
     // Using select to prevent rebuilding the dashboard on irrelevant auth updates (e.g. avatar change)
-    ref.watch(authProvider.select((state) => state.value?.supabaseUserId));
+    ref.watch(authProvider.select((state) => state.value?.ezygoToken));
     final isAuthLoading = ref.watch(authProvider.select((state) => state.isLoading));
     final academicAsync = ref.watch(academicProvider);
 
@@ -167,7 +167,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
 
       if (coursesResponse.statusCode == 401 || attendance == null) {
-        await ref.read(authProvider.notifier).logout();
         throw Exception('Not authenticated');
       }
 
@@ -220,6 +219,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       studentAttendanceData: attendance.studentAttendanceData,
       courses: mergedMap,
       attendanceDates: attendance.attendanceDates,
+      sessions: attendance.sessions,
     );
   }
 

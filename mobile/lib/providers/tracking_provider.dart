@@ -248,15 +248,20 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       // LOCAL UPDATE WITHOUT REFRESH
       if (state.hasValue) {
         final current = state.value!;
+        final safeCourseId = _resolveToSafeId(
+          canonicalCourseId,
+          current.officialReport,
+          academic,
+        );
         final newGrouped = Map<String, List<TrackingRecord>>.from(
           current.groupedByCourse,
         );
 
-        if (!newGrouped.containsKey(canonicalCourseId)) {
-          newGrouped[canonicalCourseId] = [];
+        if (!newGrouped.containsKey(safeCourseId)) {
+          newGrouped[safeCourseId] = [];
         }
 
-        final list = List<TrackingRecord>.from(newGrouped[canonicalCourseId]!);
+        final list = List<TrackingRecord>.from(newGrouped[safeCourseId]!);
         list.add(newRecord);
 
         // Mantain Sort (Newest First)
@@ -266,7 +271,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           return b.session.compareTo(a.session);
         });
 
-        newGrouped[canonicalCourseId] = list;
+        newGrouped[safeCourseId] = list;
 
         state = AsyncValue.data(
           current.copyWith(
