@@ -88,6 +88,7 @@ class _DashboardContent extends ConsumerWidget {
           TrendChartSection(
             stats: data.stats,
             targetPercentage: targetValue,
+            disabledCodes: data.disabledCodes,
           ),
           StatsGridSection(stats: data.stats, activeCount: data.courses.length),
           const CourseLineupHeader(),
@@ -99,6 +100,7 @@ class _DashboardContent extends ConsumerWidget {
             bunkEnabled: bunkEnabled,
             targetPercentage: targetValue,
             instructors: data.instructors,
+            className: data.className,
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],

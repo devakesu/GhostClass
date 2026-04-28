@@ -10,11 +10,13 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 class AddCourseDialog extends ConsumerStatefulWidget {
   final String semester;
   final String academicYear;
+  final String? className;
 
   const AddCourseDialog({
     super.key,
     required this.semester,
     required this.academicYear,
+    this.className,
   });
 
   @override
@@ -41,7 +43,8 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
 
     try {
       final api = ref.read(apiServiceProvider);
-      final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+      final supabaseToken =
+          supabase.Supabase.instance.client.auth.currentSession?.accessToken;
 
       if (supabaseToken == null) throw Exception('Not authenticated');
 
@@ -58,7 +61,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       }
 
       if (!mounted) return;
-      
+
       ServiceToast.show(
         context,
         '${_codeController.text.toUpperCase()} added to your lineup! 🥳',
@@ -66,7 +69,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
 
       // Refresh dashboard
       ref.invalidate(dashboardProvider);
-      
+
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
@@ -94,7 +97,9 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -113,11 +118,13 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Adding this course will make it available to everyone in your class for the ${widget.semester.toUpperCase()} ${widget.academicYear} semester.',
+                  'Adding this course will make it available to everyone in ${widget.className ?? "your class"} for the ${widget.semester.toUpperCase()} ${widget.academicYear} semester.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                     fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -128,12 +135,18 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(LucideIcons.alertTriangle, size: 16, color: Colors.amber),
+                      const Icon(
+                        LucideIcons.alertTriangle,
+                        size: 16,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -151,7 +164,9 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                               'Please enter valid data. Spamming is strictly prohibited.',
                               style: GoogleFonts.manrope(
                                 fontSize: 11,
-                                color: Colors.amber.shade800.withValues(alpha: 0.8),
+                                color: Colors.amber.shade800.withValues(
+                                  alpha: 0.8,
+                                ),
                               ),
                             ),
                           ],
@@ -186,13 +201,18 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   child: FilledButton(
                     onPressed: _isSubmitting ? null : _handleSubmit,
                     style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: _isSubmitting
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : Text(
                             'Add Course to Lineup',
@@ -204,11 +224,15 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => Navigator.pop(context),
                   child: Text(
                     'Cancel',
                     style: GoogleFonts.manrope(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -236,7 +260,9 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
           style: GoogleFonts.manrope(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
@@ -247,14 +273,23 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
           style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
+            hintStyle: TextStyle(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.2),
+            ),
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
         ),
       ],

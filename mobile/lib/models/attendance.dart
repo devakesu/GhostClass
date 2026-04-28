@@ -43,45 +43,74 @@ class AttendanceReportDetailed {
   final Map<String, AttendanceCourse> courses;
   final Map<String, Map<String, AttendanceSession>> studentAttendanceData;
   final Map<String, dynamic> attendanceDates;
+  final Map<String, dynamic> sessions;
 
   const AttendanceReportDetailed({
     required this.courses,
     required this.studentAttendanceData,
     required this.attendanceDates,
+    this.sessions = const {},
   });
 
   factory AttendanceReportDetailed.fromJson(Map<String, dynamic> json) {
-    final rawCourses = json['courses'] as Map<String, dynamic>? ?? const {};
-    final rawAttendance =
-        json['studentAttendanceData'] as Map<String, dynamic>? ??
-        json['student_attendance_data'] as Map<String, dynamic>? ??
-        const {};
-    final rawDates =
-        json['attendanceDates'] as Map<String, dynamic>? ??
-        json['attendance_dates'] as Map<String, dynamic>? ??
-        const {};
+    final rawCourses = (json['courses'] is Map)
+        ? Map<String, dynamic>.from(json['courses'] as Map)
+        : const <String, dynamic>{};
+    final rawAttendance = (json['studentAttendanceData'] is Map)
+        ? Map<String, dynamic>.from(json['studentAttendanceData'] as Map)
+        : (json['student_attendance_data'] is Map)
+            ? Map<String, dynamic>.from(
+                json['student_attendance_data'] as Map,
+              )
+            : const <String, dynamic>{};
+    final rawDates = (json['attendanceDates'] is Map)
+        ? Map<String, dynamic>.from(json['attendanceDates'] as Map)
+        : (json['attendance_dates'] is Map)
+            ? Map<String, dynamic>.from(json['attendance_dates'] as Map)
+            : const <String, dynamic>{};
+    final rawSessions = (json['sessions'] is Map)
+        ? Map<String, dynamic>.from(json['sessions'] as Map)
+        : const <String, dynamic>{};
 
     return AttendanceReportDetailed(
       courses: rawCourses.map(
         (key, value) => MapEntry(
           key,
-          AttendanceCourse.fromJson((value as Map).cast<String, dynamic>()),
-        ),
-      ),
-      studentAttendanceData: rawAttendance.map(
-        (date, sessions) => MapEntry(
-          date,
-          (sessions as Map).map(
-            (sessionKey, sessionValue) => MapEntry(
-              sessionKey,
-              AttendanceSession.fromJson(
-                (sessionValue as Map).cast<String, dynamic>(),
-              ),
-            ),
+          AttendanceCourse.fromJson(
+            (value is Map)
+                ? Map<String, dynamic>.from(value)
+                : const <String, dynamic>{},
           ),
         ),
       ),
+      studentAttendanceData: rawAttendance.map(
+        (date, sessions) {
+          if (sessions is! Map) {
+            return MapEntry(date, <String, AttendanceSession>{});
+          }
+          return MapEntry(
+            date,
+            (sessions).map(
+              (sessionKey, sessionValue) {
+                if (sessionValue is! Map) {
+                  return MapEntry(
+                    sessionKey,
+                    const AttendanceSession(course: 0, attendance: 0),
+                  );
+                }
+                return MapEntry(
+                  sessionKey,
+                  AttendanceSession.fromJson(
+                    Map<String, dynamic>.from(sessionValue),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
       attendanceDates: rawDates,
+      sessions: rawSessions,
     );
   }
 
@@ -101,6 +130,7 @@ class AttendanceReportDetailed {
       ),
     ),
     'attendanceDates': attendanceDates,
+    'sessions': sessions,
   };
 }
 

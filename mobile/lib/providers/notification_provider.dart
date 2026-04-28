@@ -45,7 +45,9 @@ class NotificationsState {
       const NotificationsState(notifications: [], unreadCount: 0);
 
   List<AppNotification> get actionNotifications => notifications
-      .where((item) => (item.topic?.contains('conflict') ?? false) && !item.isRead)
+      .where((item) =>
+          (item.topic?.toLowerCase().contains('conflict') ?? false) &&
+          !item.isRead)
       .toList();
 
   List<AppNotification> get regularNotifications {
@@ -106,33 +108,89 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   }
 
   Future<void> fetchNextPage() async {
-    if (state.value?.hasNextPage == false) return;
+    final current = state.value;
+    if (current == null || !current.hasNextPage) return;
+    
     _currentPage++;
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _fetchNotifications(page: _currentPage));
+    // We don't set state to loading to avoid full-screen spinner.
+    final nextState = await _fetchNotifications(page: _currentPage);
+    state = AsyncValue.data(nextState);
   }
 
   Future<void> toggleRead(int id, bool currentStatus) async {
-    final supabase = Supabase.instance.client;
-    await supabase
-        .from('notification')
-        .update({'is_read': !currentStatus})
-        .eq('id', id);
-    
-    ref.invalidateSelf();
+    final previousState = state.value;
+    if (previousState == null) return;
+
+    // Optimistic Update
+    final newNotifications = previousState.notifications.map((n) {
+      if (n.id == id) {
+        return AppNotification(
+          id: n.id,
+          title: n.title,
+          description: n.description,
+          createdAt: n.createdAt,
+          topic: n.topic,
+          isRead: !currentStatus,
+        );
+      }
+      return n;
+    }).toList();
+
+    final unreadChange = currentStatus ? 1 : -1;
+    state = AsyncValue.data(NotificationsState(
+      notifications: newNotifications,
+      unreadCount: previousState.unreadCount + unreadChange,
+      hasNextPage: previousState.hasNextPage,
+    ));
+
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase
+          .from('notification')
+          .update({'is_read': !currentStatus}).eq('id', id);
+    } catch (e) {
+      // Revert on error
+      state = AsyncValue.data(previousState);
+      rethrow;
+    }
   }
 
   Future<void> markAllAsRead() async {
-    final supabase = Supabase.instance.client;
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
+    final previousState = state.value;
+    if (previousState == null) return;
 
-    await supabase
-        .from('notification')
-        .update({'is_read': true})
-        .eq('auth_user_id', userId)
-        .eq('is_read', false);
-    
-    ref.invalidateSelf();
+    // Optimistic Update
+    final newNotifications = previousState.notifications.map((n) {
+      return AppNotification(
+        id: n.id,
+        title: n.title,
+        description: n.description,
+        createdAt: n.createdAt,
+        topic: n.topic,
+        isRead: true,
+      );
+    }).toList();
+
+    state = AsyncValue.data(NotificationsState(
+      notifications: newNotifications,
+      unreadCount: 0,
+      hasNextPage: previousState.hasNextPage,
+    ));
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await supabase
+          .from('notification')
+          .update({'is_read': true})
+          .eq('auth_user_id', userId)
+          .eq('is_read', false);
+    } catch (e) {
+      // Revert on error
+      state = AsyncValue.data(previousState);
+      rethrow;
+    }
   }
 }

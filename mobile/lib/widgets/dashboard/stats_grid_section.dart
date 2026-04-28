@@ -27,7 +27,7 @@ class StatsGridSection extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.7,
+            childAspectRatio: 1.8,
             children: [
               _StatCard(
                 title: 'Present (+DL)',
@@ -36,7 +36,7 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.green,
                 corrections: [
                   if (stats.corrPresent > 0)
-                    _Correction(value: stats.corrPresent, color: Colors.orange),
+                    _Correction(value: stats.corrPresent, color: const Color(0xFFF97316)),
                   if (stats.extraPresent > 0)
                     _Correction(value: stats.extraPresent, color: Colors.blue),
                 ],
@@ -48,7 +48,7 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.red,
                 corrections: [
                   if (stats.savedAbsent > 0)
-                    _Correction(value: stats.savedAbsent, color: Colors.orange, isNegative: true),
+                    _Correction(value: stats.savedAbsent, color: const Color(0xFFF97316), isNegative: true),
                   if (stats.extraAbsent > 0)
                     _Correction(value: stats.extraAbsent, color: Colors.blue),
                 ],
@@ -60,7 +60,7 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.amber,
                 corrections: [
                   if (stats.corrDL > 0)
-                    _Correction(value: stats.corrDL, color: Colors.orange),
+                    _Correction(value: stats.corrDL, color: const Color(0xFFF97316)),
                   if (stats.extraDL > 0)
                     _Correction(value: stats.extraDL, color: Colors.blue),
                 ],
@@ -112,22 +112,16 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withValues(alpha: 0.15),
-            color.withValues(alpha: 0.05),
-          ],
-        ),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: color.withValues(alpha: 0.2),
+          color: color.withValues(alpha: 0.4),
+          width: 2.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.03),
-            blurRadius: 10,
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
@@ -155,15 +149,11 @@ class _StatCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: color.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Icon(
                     icon,
@@ -181,14 +171,13 @@ class _StatCard extends StatelessWidget {
                         title,
                         style: GoogleFonts.manrope(
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w900,
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withValues(alpha: 0.5),
+                              .withValues(alpha: 0.7),
+                          letterSpacing: 0.8,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -199,8 +188,8 @@ class _StatCard extends StatelessWidget {
                             '$value',
                             style: GoogleFonts.manrope(
                               fontSize: isFullWidth ? 24 : 18,
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w900,
+                              color: color,
                             ),
                           ),
                           if (subtitle != null) ...[
@@ -213,7 +202,7 @@ class _StatCard extends StatelessWidget {
                                 color: Theme.of(context)
                                     .colorScheme
                                     .onSurface
-                                    .withValues(alpha: 0.3),
+                                    .withValues(alpha: 0.4),
                               ),
                             ),
                           ],
@@ -222,8 +211,8 @@ class _StatCard extends StatelessWidget {
                                 child: Text(
                                   '${c.isNegative ? "-" : "+"}${c.value}',
                                   style: GoogleFonts.manrope(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
                                     color: c.color,
                                   ),
                                 ),

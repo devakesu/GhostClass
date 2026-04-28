@@ -1,16 +1,19 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
+import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrendChartSection extends StatefulWidget {
   final DashboardStats stats;
   final double targetPercentage;
+  final Set<String> disabledCodes;
 
   const TrendChartSection({
     super.key,
     required this.stats,
     required this.targetPercentage,
+    this.disabledCodes = const {},
   });
 
   @override
@@ -21,6 +24,23 @@ class _TrendChartSectionState extends State<TrendChartSection> {
   OverlayEntry? _tooltipOverlay;
   final GlobalKey _chartKey = GlobalKey();
   List<CourseStat> _courses = [];
+
+  double _calculateYMin() {
+    final nonZero = _courses
+        .expand((s) => [s.percentage, s.officialPercentage])
+        .where((p) => p > 0)
+        .toList();
+
+    double minRef = widget.targetPercentage;
+    if (nonZero.isNotEmpty) {
+      final absMin = nonZero.reduce((a, b) => a < b ? a : b);
+      minRef = absMin < widget.targetPercentage
+          ? absMin
+          : widget.targetPercentage;
+    }
+
+    return ((minRef / 5).floor() * 5.0 - 5.0).clamp(0, 95);
+  }
 
   @override
   void dispose() {
@@ -63,7 +83,21 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 
     final box = _chartKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
-    final globalPos = box.localToGlobal(localPos);
+
+    // Calculate fixed vertical position at the top of the bar
+    final yMinVal = _calculateYMin();
+    const double maxYVal = 100.0;
+    final chartSize = box.size;
+    const bottomReserved =
+        80.0; // Based on titlesData.bottomTitles.reservedSize
+    final dataAreaHeight = chartSize.height - bottomReserved;
+
+    final barValue = spot.touchedRodData.toY;
+    final barHeightRatio = (barValue - yMinVal) / (maxYVal - yMinVal);
+    final barPixelHeight = barHeightRatio * dataAreaHeight;
+    final localBarTopY = chartSize.height - bottomReserved - barPixelHeight;
+
+    final globalPos = box.localToGlobal(Offset(localPos.dx, localBarTopY));
 
     _hideTooltip();
     _tooltipOverlay = OverlayEntry(
@@ -78,27 +112,19 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 
   @override
   Widget build(BuildContext context) {
-    _courses = widget.stats.courseStats.values
-        .where((s) => s.finalTotal > 0)
-        .toList()
-      ..sort((a, b) => a.percentage.compareTo(b.percentage));
+    _courses =
+        widget.stats.courseStats.values.where((s) {
+          final isTracked = s.finalTotal > 0;
+          final isDisabled = widget.disabledCodes.contains(s.code);
+          return isTracked && !isDisabled;
+        }).toList()
+          ..sort((a, b) => a.percentage.compareTo(b.percentage));
 
     if (_courses.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
-    final nonZero = _courses
-        .expand((s) => [s.percentage, s.officialPercentage])
-        .where((p) => p > 0)
-        .toList();
-
-    double minRef = widget.targetPercentage;
-    if (nonZero.isNotEmpty) {
-      final absMin = nonZero.reduce((a, b) => a < b ? a : b);
-      minRef = absMin < widget.targetPercentage ? absMin : widget.targetPercentage;
-    }
-
-    final double yMin = (minRef / 5).floor() * 5.0 - 5.0;
+    final double yMin = _calculateYMin();
     const double maxY = 100.0;
 
     return SliverToBoxAdapter(
@@ -106,22 +132,47 @@ class _TrendChartSectionState extends State<TrendChartSection> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Container(
           height: 320,
-          padding: const EdgeInsets.fromLTRB(12, 24, 20, 12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 20, 12),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.4),
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 20),
-                child: Text(
-                  'Attendance Overview',
-                  style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800),
+                padding: const EdgeInsets.only(left: 8, bottom: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attendance Overview',
+                      style: GoogleFonts.manrope(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "See where you've been keeping up!",
+                      style: GoogleFonts.manrope(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
@@ -134,7 +185,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                     barTouchData: BarTouchData(
                       enabled: true,
                       touchTooltipData: BarTouchTooltipData(
-                        getTooltipItem: (_, __, ___, ____) => null, // Disable built-in tooltip
+                        getTooltipItem: (_, _, _, _) =>
+                            null, // Disable built-in tooltip
                         getTooltipColor: (_) => Colors.transparent,
                       ),
                       touchCallback: _onTouch,
@@ -147,9 +199,13 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                           reservedSize: 80,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
-                            if (index < 0 || index >= _courses.length) return const SizedBox.shrink();
+                            if (index < 0 || index >= _courses.length) {
+                              return const SizedBox.shrink();
+                            }
                             final code = _courses[index].code;
-                            final display = code.length > 10 ? '${code.substring(0, 8)}..' : code;
+                            final display = code.length > 10
+                                ? '${code.substring(0, 8)}..'
+                                : code;
                             return SideTitleWidget(
                               meta: meta,
                               space: 12,
@@ -160,7 +216,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                   style: GoogleFonts.manrope(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -181,21 +240,29 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                               style: GoogleFonts.manrope(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
                       horizontalInterval: 5,
                       getDrawingHorizontalLine: (_) => FlLine(
-                        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.2),
                         strokeWidth: 1,
                       ),
                     ),
@@ -231,28 +298,53 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                       final i = entry.key;
                       final s = entry.value;
                       final isSafe = s.percentage >= widget.targetPercentage;
-                      final baseVal = s.percentage < s.officialPercentage ? s.percentage : s.officialPercentage;
-                      final extraVal = (s.percentage - s.officialPercentage).abs();
+                      final baseVal = s.percentage < s.officialPercentage
+                          ? s.percentage
+                          : s.officialPercentage;
+                      final extraVal = (s.percentage - s.officialPercentage)
+                          .abs();
                       final totalVal = baseVal + extraVal;
-                      final Color color = isSafe ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-                      final double split = totalVal > 0 ? baseVal / totalVal : 1.0;
+                      final ghostColors = Theme.of(
+                        context,
+                      ).extension<GhostColors>();
+                      final Color color = isSafe
+                          ? (ghostColors?.successGreen ??
+                                const Color(0xFF10B981))
+                          : (ghostColors?.dangerRed ?? const Color(0xFFEF4444));
+                      final double split = totalVal > 0
+                          ? baseVal / totalVal
+                          : 1.0;
 
                       final colors = <Color>[];
                       final stops = <double>[];
-                      colors.add(color); stops.add(0.0);
-                      colors.add(color); stops.add(split);
+                      colors.add(color);
+                      stops.add(0.0);
+                      colors.add(color);
+                      stops.add(split);
 
+                      final bool isDark = Theme.of(context).brightness == Brightness.dark;
+                      // Keep the base color but make it stand out slightly
+                      final Color brightLine = Color.lerp(color, Colors.white, isDark ? 0.15 : 0.05)!;
+                      final Color faintGap = color.withValues(alpha: isDark ? 0.1 : 0.2);
+                      
+                      final List<Color> hatchColors = [faintGap, faintGap];
+                      final List<double> hatchStops = [0.0, 1.0];
+                      
                       if (extraVal > 0) {
-                        const int n = 30;
-                        final double seg = (1.0 - split) / n;
+                        // Moderate frequency for better distinctness
+                        final int n = 24; 
                         for (int j = 0; j < n; j++) {
-                          final s0 = split + j * seg;
-                          final mid = s0 + seg * 0.5;
-                          final s1 = split + (j + 1) * seg;
-                          colors.add(color.withValues(alpha: 0.6)); stops.add(s0);
-                          colors.add(color.withValues(alpha: 0.6)); stops.add(mid);
-                          colors.add(color.withValues(alpha: 0.1)); stops.add(mid);
-                          colors.add(color.withValues(alpha: 0.1)); stops.add(s1);
+                          final double s0 = j / n;
+                          final double mid = (j + 0.5) / n;
+                          final double s1 = (j + 1) / n;
+                          hatchColors.add(brightLine);
+                          hatchStops.add(s0);
+                          hatchColors.add(brightLine);
+                          hatchStops.add(mid);
+                          hatchColors.add(faintGap);
+                          hatchStops.add(mid);
+                          hatchColors.add(faintGap);
+                          hatchStops.add(s1);
                         }
                       }
 
@@ -260,14 +352,23 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                         x: i,
                         barRods: [
                           BarChartRodData(
-                            toY: totalVal,
+                            toY: baseVal,
                             width: 18,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(extraVal > 0 ? 1 : 4)),
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: colors,
-                              stops: stops,
+                            color: color,
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(extraVal > 0 ? 0 : 3),
+                              bottom: const Radius.circular(1),
+                            ),
+                            backDrawRodData: BackgroundBarChartRodData(
+                              show: extraVal > 0,
+                              toY: totalVal,
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomLeft,
+                                end: Alignment.topRight,
+                                colors: hatchColors,
+                                stops: hatchStops,
+                                tileMode: TileMode.repeated,
+                              ),
                             ),
                           ),
                         ],
@@ -298,14 +399,26 @@ class _ChartTooltip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double w = 220;
+    const double h = 85; // Estimated height for safety
     final screen = MediaQuery.of(context).size;
-    // Appear above the touch point
-    final double left = (touchGlobal.dx - w / 2).clamp(8.0, screen.width - w - 8);
-    final double bottomFromScreen = screen.height - touchGlobal.dy + 16;
+    final double safeTop = MediaQuery.of(context).padding.top + 60; // Margin for header
+
+    // Calculate ideal horizontal position
+    final double left = (touchGlobal.dx - w / 2).clamp(
+      8.0,
+      screen.width - w - 8,
+    );
+
+    // Dynamic vertical positioning: flip below if no space at top
+    double top = touchGlobal.dy - h - 12;
+    if (top < safeTop) {
+      // Flip below the bar top
+      top = touchGlobal.dy + 12;
+    }
 
     return Positioned(
       left: left,
-      bottom: bottomFromScreen,
+      top: top,
       child: IgnorePointer(
         child: Material(
           color: Colors.transparent,
@@ -313,7 +426,7 @@ class _ChartTooltip extends StatelessWidget {
             width: w,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -339,19 +452,25 @@ class _ChartTooltip extends StatelessWidget {
                 Text(
                   'Official: ${stat.officialPercentage.toStringAsFixed(2)}% (${stat.officialPresent}/${stat.officialTotal})',
                   style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w500,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w700,
                     fontSize: 11,
                   ),
                 ),
-                Text(
-                  'Adjusted: ${stat.percentage.toStringAsFixed(2)}% (${stat.finalPresent}/${stat.finalTotal})',
-                  style: GoogleFonts.manrope(
-                    color: stat.percentage >= targetPercentage ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                if ((stat.percentage - stat.officialPercentage).abs() > 0.01 ||
+                    stat.finalTotal != stat.officialTotal)
+                  Text(
+                    'Adjusted: ${stat.percentage.toStringAsFixed(2)}% (${stat.finalPresent}/${stat.finalTotal})',
+                    style: GoogleFonts.manrope(
+                      color: stat.percentage >= targetPercentage
+                          ? Colors.green
+                          : Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
                   ),
-                ),
               ],
             ),
           ),

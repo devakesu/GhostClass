@@ -42,6 +42,7 @@ class ApiService {
   Future<Response<dynamic>>? _syncInFlight;
   DateTime? _lastSyncTime;
   static const _syncCooldown = Duration(seconds: 30);
+  DateTime? _last401Broadcast;
 
   /// Stream of 401 Unauthorized events from EzyGo.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
@@ -93,7 +94,7 @@ class ApiService {
   ApiService(this._ref) {
     _dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
           'Content-Type': 'application/json',
@@ -105,8 +106,8 @@ class ApiService {
     // Create a clean Dio instance for internal security calls to avoid recursion
     _securityDio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
       ),
     );
 
@@ -132,10 +133,15 @@ class ApiService {
               'ezygo.app',
             );
             if (isEzygoRequest && !isLoginRequest && !suppress401) {
-              AppLogger.w(
-                'ApiService: Core 401 DETECTED. Broadcasting onUnauthorized.',
-              );
-              _unauthorizedController.add(null);
+              final now = DateTime.now();
+              if (_last401Broadcast == null || 
+                  now.difference(_last401Broadcast!) > const Duration(seconds: 2)) {
+                _last401Broadcast = now;
+                AppLogger.w(
+                  'ApiService: Core 401 DETECTED for ${response.requestOptions.path}. Broadcasting onUnauthorized.',
+                );
+                _unauthorizedController.add(null);
+              }
             }
           }
           return handler.next(response);
@@ -148,11 +154,16 @@ class ApiService {
 
             final isEzygoRequest = e.requestOptions.path.contains('ezygo.app');
             if (isEzygoRequest && !isLoginRequest && !suppress401) {
-              AppLogger.e(
-                'ApiService: Core 401 ERROR DETECTED. Broadcasting onUnauthorized.',
-                e,
-              );
-              _unauthorizedController.add(null);
+              final now = DateTime.now();
+              if (_last401Broadcast == null || 
+                  now.difference(_last401Broadcast!) > const Duration(seconds: 2)) {
+                _last401Broadcast = now;
+                AppLogger.e(
+                  'ApiService: Core 401 ERROR DETECTED for ${e.requestOptions.path}. Broadcasting onUnauthorized.',
+                  e,
+                );
+                _unauthorizedController.add(null);
+              }
             }
           }
 
@@ -349,7 +360,11 @@ class ApiService {
 
     return _dio.post(
       _ezygoLoginUrl,
-      data: {'username': username.trim(), 'password': password.trim()},
+      data: {
+        'username': username.trim(),
+        'password': password.trim(),
+        'stay_logged_in': true,
+      },
       options: Options(validateStatus: (s) => s != null && s < 600),
     );
   }

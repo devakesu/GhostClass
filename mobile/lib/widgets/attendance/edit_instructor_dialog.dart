@@ -14,14 +14,19 @@ class EditInstructorDialog extends ConsumerStatefulWidget {
   final String courseCode;
   final String courseName;
   final String? initialName;
+  final String? className;
 
   const EditInstructorDialog({
-    required this.courseCode, required this.courseName, super.key,
+    required this.courseCode,
+    required this.courseName,
+    super.key,
     this.initialName,
+    this.className,
   });
 
   @override
-  ConsumerState<EditInstructorDialog> createState() => _EditInstructorDialogState();
+  ConsumerState<EditInstructorDialog> createState() =>
+      _EditInstructorDialogState();
 }
 
 class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
@@ -53,7 +58,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       if (academic == null || auth == null) throw Exception('Missing context');
 
       final client = supabase.Supabase.instance.client;
-      
+
       await client.from('course_instructors').upsert({
         'class_id': auth.profile?.classField?.id,
         'course_code': widget.courseCode.toUpperCase().replaceAll(' ', ''),
@@ -65,17 +70,14 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
 
       // Refresh dashboard to show new name
       await ref.read(dashboardProvider.notifier).refresh();
-      
+
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       AppLogger.eWithContext(
         'EditInstructorDialog: Save failed',
         error: e,
         stackTrace: st,
-        tags: {
-          'feature': 'attendance_instructor',
-          'action': 'save_instructor',
-        },
+        tags: {'feature': 'attendance_instructor', 'action': 'save_instructor'},
         extras: {
           'course.code': widget.courseCode,
           'course.name': widget.courseName,
@@ -98,7 +100,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surface;
 
     return Dialog(
@@ -114,7 +117,10 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
               // Header Graphic Section
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 40,
+                  horizontal: 24,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -140,7 +146,11 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                           ),
                         ],
                       ),
-                      child: Icon(LucideIcons.userPlus, size: 36, color: primary),
+                      child: Icon(
+                        LucideIcons.userPlus,
+                        size: 36,
+                        color: primary,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(
@@ -160,7 +170,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                       style: GoogleFonts.manrope(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
@@ -176,10 +188,12 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: (ghostColors?.accentOrange ?? Colors.orange).withValues(alpha: 0.05),
+                        color: (ghostColors?.accentOrange ?? Colors.orange)
+                            .withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: (ghostColors?.accentOrange ?? Colors.orange).withValues(alpha: 0.1),
+                          color: (ghostColors?.accentOrange ?? Colors.orange)
+                              .withValues(alpha: 0.1),
                         ),
                       ),
                       child: Row(
@@ -203,16 +217,21 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                   style: GoogleFonts.manrope(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w900,
-                                    color: ghostColors?.accentOrange ?? Colors.orange,
+                                    color:
+                                        ghostColors?.accentOrange ??
+                                        Colors.orange,
                                     letterSpacing: 1,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'This name is shared with your entire class. Please ensure it is accurate and respectful.',
+                                  'This name is shared with your entire class${widget.className != null ? " ${widget.className}" : ""}. Please ensure it is accurate and respectful.',
                                   style: GoogleFonts.manrope(
                                     fontSize: 12,
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.5),
                                     fontWeight: FontWeight.w600,
                                     height: 1.4,
                                   ),
@@ -224,36 +243,65 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    
+
                     Form(
                       child: Builder(
                         builder: (formContext) => TextFormField(
                           controller: _controller,
                           maxLength: 60,
                           autofocus: true,
-                          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w700,
+                          ),
                           autovalidateMode: AutovalidateMode.onUserInteraction,
                           decoration: InputDecoration(
                             labelText: 'Instructor Name',
                             hintText: 'e.g. Dr. Jane Smith',
                             counterText: '',
-                            prefixIcon: Icon(LucideIcons.user, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)),
-                            labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-                            floatingLabelStyle: GoogleFonts.manrope(fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary),
+                            prefixIcon: Icon(
+                              LucideIcons.user,
+                              size: 20,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.6),
+                            ),
+                            labelStyle: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.4),
+                            ),
+                            floatingLabelStyle: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w800,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
+                              borderSide: BorderSide(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.1),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
-                            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.02),
+                            fillColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.02),
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Required';
-                            if (!RegExp(r'^[a-zA-Z\s.]+$').hasMatch(val.trim())) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            if (!RegExp(
+                              r'^[a-zA-Z\s.]+$',
+                            ).hasMatch(val.trim())) {
                               return 'Letters, spaces, and dots only';
                             }
                             return null;
@@ -262,12 +310,14 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    
+
                     Row(
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: _isSaving ? null : () => Navigator.pop(context),
+                            onPressed: _isSaving
+                                ? null
+                                : () => Navigator.pop(context),
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
@@ -278,7 +328,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                               'CANCEL',
                               style: GoogleFonts.manrope(
                                 fontWeight: FontWeight.w800,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.4),
                               ),
                             ),
                           ),
@@ -288,38 +340,44 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                           flex: 2,
                           child: Builder(
                             builder: (btnContext) => ElevatedButton(
-                              onPressed: _isSaving ? null : () {
-                                if (Form.of(btnContext).validate()) {
-                                  _handleSave();
-                                }
-                              },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primary,
-                              foregroundColor: Colors.white,
-                              elevation: 8,
-                              shadowColor: primary.withValues(alpha: 0.4),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: _isSaving 
-                              ? const SizedBox(
-                                  height: 20, 
-                                  width: 20, 
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2, 
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  'SAVE CHANGES',
-                                  style: GoogleFonts.manrope(fontWeight: FontWeight.w900),
+                              onPressed: _isSaving
+                                  ? null
+                                  : () {
+                                      if (Form.of(btnContext).validate()) {
+                                        _handleSave();
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: Colors.white,
+                                elevation: 8,
+                                shadowColor: primary.withValues(alpha: 0.4),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      'SAVE CHANGES',
+                                      style: GoogleFonts.manrope(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
                     ),
                   ],
                 ),

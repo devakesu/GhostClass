@@ -79,21 +79,21 @@ class GhostColors extends ThemeExtension<GhostColors> {
 class AppColors {
   // Brand & Semantic (Updated to match OKLCH values from Web)
   static const Color brandPurple = Color(0xFF7C3AED);
-  static const Color brandPink = Color(0xFFFF2D55); // More distinct Rose Pink
+  static const Color brandPink = Color(0xFFEC4899); // Vibrant Pink (Tailwind Pink 500)
   static const Color successGreen = Color(0xFF10B981);
-  static const Color dangerRed = Color(0xFFFF3B30); // Pure Red
+  static const Color dangerRed = Color(0xFFFF3B30); // Semantic Red (Clear contrast with Pink)
   static const Color accentOrange = Color(0xFFF59E0B);
   static const Color accentBlue = Color(0xFF3B82F6);
   static const Color accentCyan = Color(0xFF06B6D4);
   static const Color warningYellow = Color(0xFFFFB800);
 
-  // Dark Theme Neutral (Enhanced for premium depth)
-  static const Color background = Color(0xFF050508);     // oklch(0.08 0.02 265)
-  static const Color surface = Color(0xFF141424);        // oklch(0.16 0.03 265)
-  static const Color surfaceLighter = Color(0xFF2A2A3C); // oklch(0.24 0.04 265)
+  // Dark Theme Neutral (Aesthetic Midnight-Indigo for a lively, vibrant experience)
+  static const Color background = Color(0xFF0F0F1E);     // Deep Midnight Indigo
+  static const Color surface = Color(0xFF1B1B38);        // Vibrant Navy-Indigo Surface
+  static const Color surfaceLighter = Color(0xFF2E2E5D); // Indigo Highlight Color
   static const Color primary = Color(0xFFF9FAFB);        // oklch(0.98 0.01 265)
   static const Color muted = Color(0xFF1F1F2E);
-  static const Color mutedForeground = Color(0xFF70708C);
+  static const Color mutedForeground = Color(0xFF94A3B8); // Brighter slate for lively text
   static const Color border = Color(0xFF3B3B55);         // oklch(0.32 0.06 265)
 
   // Light Theme Neutral (Clean and Modern)
@@ -102,7 +102,7 @@ class AppColors {
   static const Color lightSurfaceLighter = Color(0xFFF3F4F6);
   static const Color lightPrimary = Color(0xFF18181B);
   static const Color lightMuted = Color(0xFFF3F4F6);
-  static const Color lightMutedForeground = Color(0xFF6B7280);
+  static const Color lightMutedForeground = Color(0xFF475569); // Sharper contrast for light mode
   static const Color lightBorder = Color(0xFFE5E7EB);
 }
 
@@ -128,7 +128,7 @@ class AppTheme {
       ),
       extensions: const [
         GhostColors(
-          brandPurple: AppColors.brandPink,
+          brandPurple: AppColors.brandPurple,
           brandPink: AppColors.brandPink,
           accentOrange: AppColors.accentOrange,
           accentBlue: AppColors.accentBlue,
@@ -213,7 +213,7 @@ class AppTheme {
       ),
       extensions: const [
         GhostColors(
-          brandPurple: AppColors.brandPink,
+          brandPurple: AppColors.brandPurple,
           brandPink: AppColors.brandPink,
           accentOrange: Color(0xFFD97706),
           accentBlue: Color(0xFF2563EB),

@@ -17,9 +17,10 @@ class CourseCard extends StatelessWidget {
   final bool isEnabled;
   final VoidCallback? onToggleTap;
   final List<CourseInstructor> instructors;
+  final String? className;
 
   const CourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.instructors, super.key,
+    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.instructors, this.className, super.key,
     this.isEnabled = true,
     this.onToggleTap,
   });
@@ -108,7 +109,6 @@ class CourseCard extends StatelessWidget {
             GoRouter.of(context).push('/course/${course.code}');
           },
           child: Container(
-            margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
@@ -138,9 +138,9 @@ class CourseCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             decoration: BoxDecoration(
               color: isEnabled && !noDataAtAll
-                  ? colors.first.withValues(alpha: isDark ? 0.35 : 0.08)
+                  ? colors.first.withValues(alpha: isDark ? 0.45 : 0.12)
                   : Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: isDark ? 0.7 : 0.3),
+                        .withValues(alpha: isDark ? 0.8 : 0.4),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
@@ -186,17 +186,19 @@ class CourseCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.12),
+                            color: statusColor,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (course.id == 0) ...[
-                                Icon(
-                                  LucideIcons.user2,
-                                  size: 10,
-                                  color: statusColor,
+                                const IgnorePointer(
+                                  child: Icon(
+                                    LucideIcons.user2,
+                                    size: 10,
+                                    color: Colors.white,
+                                  ),
                                 ),
                                 const SizedBox(width: 4),
                               ],
@@ -205,10 +207,7 @@ class CourseCard extends StatelessWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,
-                                  color: isEnabled
-                                      ? statusColor
-                                      : Theme.of(context).colorScheme.onSurface
-                                            .withValues(alpha: 0.6),
+                                  color: Colors.white,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -281,14 +280,16 @@ class CourseCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                if (instructor != null) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    LucideIcons.userCog,
-                                    size: 12,
-                                    color: accent,
-                                  ),
-                                ],
+                                  if (instructor != null) ...[
+                                    const SizedBox(width: 4),
+                                    IgnorePointer(
+                                      child: Icon(
+                                        LucideIcons.userCog,
+                                        size: 12,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  ],
                               ],
                             ),
                           ),
@@ -305,6 +306,7 @@ class CourseCard extends StatelessWidget {
                                   courseCode: course.code ?? '',
                                   courseName: course.name,
                                   initialName: instructor?.instructorName,
+                                  className: className,
                                 ),
                               ),
                               borderRadius: BorderRadius.circular(8),
@@ -644,15 +646,15 @@ class StatBox extends StatelessWidget {
         decoration: BoxDecoration(
           color: color.withValues(
             alpha: Theme.of(context).brightness == Brightness.dark
-                ? 0.12
-                : 0.18,
+                ? 0.15
+                : 0.22,
           ),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: color.withValues(
               alpha: Theme.of(context).brightness == Brightness.dark
-                  ? 0.35
-                  : 0.6,
+                  ? 0.4
+                  : 0.7,
             ),
           ),
         ),
@@ -744,9 +746,9 @@ class SimpleBunkPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -781,9 +783,9 @@ class SafeBunkPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: blue.withValues(alpha: 0.08),
+        color: blue.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: blue.withValues(alpha: 0.15)),
+        border: Border.all(color: blue.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,9 +850,9 @@ class TrackingBunkPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: purple.withValues(alpha: 0.08),
+        color: purple.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: purple.withValues(alpha: 0.15)),
+        border: Border.all(color: purple.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

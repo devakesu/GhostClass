@@ -130,6 +130,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   DateTime? _lastBackgroundedAt;
   bool _isRefreshing = false;
   bool _isInitializing = false;
+  int _consecutiveHealFailures = 0;
 
   @override
   FutureOr<AuthenticatedUser?> build() async {
@@ -223,22 +224,27 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         }
       }
 
-      await refreshProfile(force: true);
+      await refreshProfile(force: true, sync: true);
       final newToken = state.value?.ezygoToken;
 
       if (newToken != null && newToken != oldToken) {
         AppLogger.i('AuthNotifier: SELF-HEALING SUCCESSFUL.');
+        _consecutiveHealFailures = 0;
       } else {
-        // If the token is still the same after a refresh, or null, it's unrecoverable.
-        AppLogger.w('AuthNotifier: Self-healing failed. Token remains dead.');
-        await logout();
+        _consecutiveHealFailures++;
+        AppLogger.w('AuthNotifier: Self-healing did not produce a new token. Failures: $_consecutiveHealFailures');
+        
+        if (_consecutiveHealFailures >= 3) {
+          AppLogger.e('AuthNotifier: Terminal 401 loop detected. Logging out to protect state.');
+          await logout();
+        }
       }
     } catch (e) {
       AppLogger.e('AuthNotifier: Self-healing error', e);
       if (e is AppException && e.isAuthError) await logout();
     } finally {
-      // Small cooldown before allowing next 401 triggers to prevent cascades
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Cooldown before allowing next 401 triggers to prevent tight cascades
+      await Future.delayed(const Duration(milliseconds: 1000));
       api.suppress401 = false;
       _isRefreshing = false;
     }
