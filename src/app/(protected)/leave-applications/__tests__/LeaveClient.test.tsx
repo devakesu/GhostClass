@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 import LeaveClient from '../LeaveClient'
 
 // --- Mocks ---
@@ -13,6 +15,9 @@ vi.mock('lucide-react', () => ({
   XCircle: () => <div data-testid="icon-x-circle" />,
   ArrowRight: () => <div data-testid="icon-arrow-right" />,
   User: () => <div data-testid="icon-user" />,
+  AlertTriangle: () => <div data-testid="icon-alert-triangle" />,
+  Home: () => <div data-testid="icon-home" />,
+  RefreshCcw: () => <div data-testid="icon-refresh-ccw" />,
 }))
 
 // Mock the settings hooks used for semester filtering
@@ -58,13 +63,25 @@ const createMockLeave = (id: number, actionType: string | null = null, overrides
 
 describe('LeaveClient', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks()
     mockUseFetchSemester.mockReturnValue({ data: 'even', isLoading: false } as any)
     mockUseFetchAcademicYear.mockReturnValue({ data: '2025-26', isLoading: false } as any)
   })
 
+  const renderWithClient = (ui: React.ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        {ui}
+      </QueryClientProvider>
+    );
+  };
+
   it('renders error state when initialData is missing', () => {
-    render(<LeaveClient initialData={null} />)
+    renderWithClient(<LeaveClient initialData={null} />)
     expect(screen.getByText(/Failed to load leave data/i)).toBeInTheDocument()
   })
 
@@ -78,7 +95,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    render(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData} />)
     
     // Total should be 0, and empty card should show
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
@@ -97,7 +114,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    render(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData} />)
 
     // Total should be 3 (1, 2, 3)
     expect(screen.getAllByText('3').length).toBeGreaterThan(0)

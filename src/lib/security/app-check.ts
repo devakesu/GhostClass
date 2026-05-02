@@ -219,7 +219,8 @@ export function withSecurity(
 
     // SAFETY CHECK: Ensure we actually have a response object
     if (!response) {
-       return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+       console.error("SECURITY HOF DEBUG: Crash - Handler returned no response");
+      return NextResponse.json({ error: "Internal security error" }, { status: 500 });
     }
 
     // 4. Handle JWE Response Encryption

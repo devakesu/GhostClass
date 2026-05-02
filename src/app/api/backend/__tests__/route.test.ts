@@ -7,17 +7,26 @@ vi.mock('server-only', () => ({}));
 // Set environment variables BEFORE any imports using vi.hoisted
 // This ensures they're available when the route module's top-level constants are initialized
 vi.hoisted(() => {
-  vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NODE_ENV', 'production');
   vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
 });
 
 // Mock the security modules before importing route
 vi.mock('@/lib/security/auth-cookie', () => ({
   getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
+  setAuthCookie: vi.fn(),
+  clearAuthCookie: vi.fn(),
 }));
 
 vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+ 
+vi.mock('@/lib/ratelimit', () => ({
+  proxyRateLimiter: {
+    limit: vi.fn(() => Promise.resolve({ success: true, limit: 100, remaining: 99, reset: Date.now() })),
+  },
 }));
 
 // Mock fetch for upstream API calls
@@ -49,36 +58,25 @@ describe('Backend Proxy Route', () => {
   }
 
   beforeEach(async () => {
-    // Defensive: restore real timers first. The timeout test in this file uses
-    // vi.useFakeTimers() with a real AbortSignal.timeout(15s) internally, which
-    // can leave a dangling real timer that fires after the test times out. If
-    // that timer fires while another test's beforeEach is running an async
-    // import, it can corrupt the Vitest worker state. Restoring timers here
-    // proactively prevents that from affecting later tests.
     vi.useRealTimers();
+    vi.resetModules();
     vi.clearAllMocks();
     
-    // Ensure env vars are set for each test (in case global afterEach clears them)
-    // Note: This won't affect module-level constants that were already initialized,
-    // but ensures env vars are available for any runtime checks
-    vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
+    vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
     
-    // Import module in beforeEach to ensure it uses the correct env vars
-    if (!GET) {
-      const routeModule = await import('../[...path]/route');
-      GET = routeModule.GET;
-      POST = routeModule.POST;
-      PUT = routeModule.PUT;
-      PATCH = routeModule.PATCH;
-      DELETE = routeModule.DELETE;
-      HEAD = routeModule.HEAD;
-    }
+    const { __resetAllowedHostsCache } = await import('@/lib/security/origin-validation');
+    __resetAllowedHostsCache();
+    
+    const routeModule = await import('../[...path]/route');
+    GET = routeModule.GET;
+    POST = routeModule.POST;
+    PUT = routeModule.PUT;
+    PATCH = routeModule.PATCH;
+    DELETE = routeModule.DELETE;
+    HEAD = routeModule.HEAD;
 
-    // Always reset the circuit breaker before each test. The circuit breaker is
-    // a module-level singleton; tests that mock 5xx responses can trip it and
-    // leave it OPEN, making subsequent tests fail with 503 / 0 fetch calls when
-    // Vitest runs multiple files in the same worker thread.
     const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
     ezygoCircuitBreaker.reset();
   });
@@ -530,7 +528,7 @@ describe('Backend Proxy Route', () => {
       
       // Should return generic "Upstream fetch failed" message (not timeout-specific)
       const body = await response.json();
-      expect(body.message).toBe('Upstream fetch failed');
+      expect(body.message).toContain('EzyGo servers are having technical issues');
     });
   });
 
@@ -818,7 +816,7 @@ describe('Backend Proxy Route', () => {
         })
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/login', {
+      const request = new NextRequest('http://localhost:3000/api/backend/auth/login', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -828,7 +826,7 @@ describe('Backend Proxy Route', () => {
         body: JSON.stringify({ username: 'user', password: 'pass' }),
       });
 
-      await forward(request, 'POST', ['login']);
+      await forward(request, 'POST', ['auth', 'login']);
 
       expect(mockFetch).toHaveBeenCalledOnce();
       const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;

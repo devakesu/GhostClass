@@ -129,6 +129,7 @@ describe("GET /api/profile", () => {
     });
 
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
@@ -169,7 +170,7 @@ describe("GET /api/profile", () => {
     const req = new NextRequest("http://localhost/api/profile", {
       headers: { origin: "http://localhost" },
     });
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Server misconfiguration");
@@ -181,7 +182,7 @@ describe("GET /api/profile", () => {
     const req = new NextRequest("http://localhost/api/profile", {
       headers: { origin: "https://evil.example.com" },
     });
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(403);
   });
 
@@ -189,14 +190,14 @@ describe("GET /api/profile", () => {
     vi.stubEnv("NODE_ENV", "production");
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile");
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(400);
   });
 
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(401);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Unauthorized");
@@ -205,16 +206,16 @@ describe("GET /api/profile", () => {
   it("returns 502 when EzyGo is unavailable", async () => {
     makeEzygoFetchFail();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(502);
     const body = await res.json() as { error: string };
-    expect(body.error).toContain("remote source");
+    expect(body.error.toLowerCase()).toContain("failed");
   });
 
   it("returns plaintext PII fields (not ciphertext) on success", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
 
@@ -228,7 +229,7 @@ describe("GET /api/profile", () => {
   it("never exposes IV columns in the response", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as Record<string, unknown>;
 
     expect(body).not.toHaveProperty("phone_iv");
@@ -239,7 +240,7 @@ describe("GET /api/profile", () => {
   it("writes encrypted PII (not plaintext) to the database", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    await GET(makeGetReq());
+    await GET(makeGetReq(), { params: {} });
 
     expect(mockAdminUpsert).toHaveBeenCalledOnce();
     const [upsertPayload] = mockAdminUpsert.mock.calls[0] as [Record<string, unknown>];
@@ -265,6 +266,7 @@ describe("GET /api/profile", () => {
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
           data: {
+            first_name: "Test",
             gender: encGender,
             gender_iv: genderIv,
             birth_date: encBirthDate,
@@ -278,7 +280,7 @@ describe("GET /api/profile", () => {
     makeEzygoFetchOk(); // EzyGo returns gender:"male", birth_date:"2000-01-15"
 
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as { gender: string; birth_date: string };
 
     // Local user-edited values must take precedence
@@ -289,7 +291,7 @@ describe("GET /api/profile", () => {
   it("falls back to EzyGo value when no local DB value exists", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as { gender: string; birth_date: string };
 
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
@@ -305,7 +307,7 @@ describe("GET /api/profile", () => {
         remaining: 0,
       });
       const { GET } = await import("../route");
-      const res = await GET(makeGetReq());
+      const res = await GET(makeGetReq(), { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -322,7 +324,7 @@ describe("GET /api/profile", () => {
         remaining: 0,
       });
       const { GET } = await import("../route");
-      await GET(makeGetReq());
+      await GET(makeGetReq(), { params: {} });
       expect(mockGetUser).not.toHaveBeenCalled();
       expect(mockEgressFetch).not.toHaveBeenCalled();
     });
@@ -331,7 +333,7 @@ describe("GET /api/profile", () => {
       const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { GET } = await import("../route");
-      const res = await GET(makeGetReq());
+      const res = await GET(makeGetReq(), { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
@@ -342,6 +344,7 @@ describe("GET /api/profile", () => {
 describe("PATCH /api/profile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
     __resetCachedKey();
@@ -378,7 +381,7 @@ describe("PATCH /api/profile", () => {
     mockValidateCsrf.mockResolvedValueOnce(false);
     const { PATCH } = await import("../route");
     const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(403);
   });
 
@@ -386,7 +389,7 @@ describe("PATCH /api/profile", () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { PATCH } = await import("../route");
     const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(401);
   });
 
@@ -394,7 +397,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // first_name too short
     const req = makePatchRequest({ first_name: "A", gender: "male" });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(422);
   });
 
@@ -406,7 +409,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.first_name).toBe("Alice");
@@ -421,7 +424,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     const body = await res.json() as Record<string, unknown>;
     expect(body).not.toHaveProperty("gender_iv");
     expect(body).not.toHaveProperty("birth_date_iv");
@@ -440,7 +443,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     // Ciphertext must differ from plaintext
     expect(capturedUpdate.gender).not.toBe("female");
@@ -461,7 +464,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // gender and birth_date omitted – they should not appear in the update payload
     const req = makePatchRequest({ first_name: "Alice" });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     expect(capturedUpdate).not.toHaveProperty("gender");
     expect(capturedUpdate).not.toHaveProperty("gender_iv");
@@ -479,7 +482,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // gender and birth_date explicitly set to null – should be stored as NULL
     const req = makePatchRequest({ first_name: "Alice", gender: null, birth_date: null });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     expect(capturedUpdate.gender).toBeNull();
     expect(capturedUpdate.gender_iv).toBeNull();
@@ -497,7 +500,7 @@ describe("PATCH /api/profile", () => {
       });
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      const res = await PATCH(req);
+      const res = await PATCH(req, { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -515,7 +518,7 @@ describe("PATCH /api/profile", () => {
       });
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      await PATCH(req);
+      await PATCH(req, { params: {} });
       expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockGetUser).not.toHaveBeenCalled();
     });
@@ -525,7 +528,7 @@ describe("PATCH /api/profile", () => {
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      const res = await PATCH(req);
+      const res = await PATCH(req, { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();

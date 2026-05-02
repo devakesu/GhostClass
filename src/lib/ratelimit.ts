@@ -65,12 +65,11 @@ if (!Number.isFinite(PROXY_LIMIT) || PROXY_LIMIT < 1 || PROXY_LIMIT > 5000) {
 if (!Number.isFinite(PROXY_WINDOW) || PROXY_WINDOW < 1 || PROXY_WINDOW > 3600) {
   throw new Error(`PROXY_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
 }
-// Log configuration in development
-if (process.env.NODE_ENV === 'development') {
-  logger.dev(`[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`);
-  logger.dev(`[Auth Rate Limit] ${AUTH_LIMIT} requests per ${AUTH_WINDOW}s`);
-  logger.dev(`[Proxy Rate Limit] ${PROXY_LIMIT} requests per ${PROXY_WINDOW}s`);
-}
+
+// Log configuration (logger.dev handles environment-specific suppression)
+logger.dev(`[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`);
+logger.dev(`[Auth Rate Limit] ${AUTH_LIMIT} requests per ${AUTH_WINDOW}s`);
+logger.dev(`[Proxy Rate Limit] ${PROXY_LIMIT} requests per ${PROXY_WINDOW}s`);
 
 // Create rate limiter instances once at module load time.
 // Separate prefixes ensure that contact-form traffic cannot starve the cron-sync

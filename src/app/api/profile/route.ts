@@ -27,27 +27,53 @@ function resolve(
 
 const getHandler = async (req: Request) => {
   const ip = getClientIp(req.headers);
-  if (!ip) return NextResponse.json({ error: "No IP" }, { status: 400 });
-  const { success, reset } = await authRateLimiter.limit(`profile_get_${ip}`);
-  if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(reset) } });
+  if (!ip) {
+    return NextResponse.json(
+      { error: "Could not determine client IP" },
+      { 
+        status: 400,
+        headers: { "Cache-Control": "no-store" }
+      },
+    );
+  }
+
+  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
 
   if (process.env.NODE_ENV !== "development") {
     const allowedHosts = getAllowedHosts();
+    if (!allowedHosts) {
+      logger.error("[profile GET] Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing");
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    }
     const origin = req.headers.get("origin");
     if (!origin) {
       const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
       const requestHostname = resolveRequestHostname(req as any);
-      if (!(secFetchSite === "same-origin" && !!requestHostname && allowedHosts?.has(requestHostname))) return NextResponse.json({ error: "Origin required" }, { status: 400 });
+      if (!(secFetchSite === "same-origin" && !!requestHostname && allowedHosts?.has(requestHostname))) return NextResponse.json({ error: "Origin required" }, { status: 400, headers: { "Cache-Control": "no-store" } });
     } else {
       const originHostname = new URL(origin).hostname.toLowerCase();
-      if (!allowedHosts?.has(originHostname)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (!allowedHosts?.has(originHostname)) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
     }
   }
 
   const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
   const { data: existingUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
   const searchParams = new URL(req.url).searchParams;
@@ -120,19 +146,29 @@ const getHandler = async (req: Request) => {
   }
 
   const token = await getAuthTokenServer();
-  if (!token) return NextResponse.json({ error: "No token" }, { status: 401 });
-  const ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-  if (!ezygoRes.ok) {
-    logger.error("[profile GET] EzyGo profile fetch failed:", ezygoRes.status);
-    Sentry.captureException(
-      new Error(`EzyGo profile fetch failed with status ${ezygoRes.status}`),
-      { tags: { type: "ezygo_api_error", location: "api/profile/get" } },
-    );
-    return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502 });
+  if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  let ezygoRes: Response;
+  try {
+    ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
+    if (!ezygoRes.ok) {
+      logger.error("[profile GET] EzyGo profile fetch failed:", ezygoRes.status);
+      Sentry.captureException(
+        new Error(`EzyGo profile fetch failed with status ${ezygoRes.status}`),
+        { tags: { type: "ezygo_api_error", location: "api/profile/get" } },
+      );
+      return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    }
+  } catch (err) {
+    logger.error("[profile GET] EzyGo profile fetch exception:", err);
+    Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "api/profile/get" } });
+    return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
   const json = await ezygoRes.json();
   const d = json.data || json;
   const encPhone = (d.mobile || d.user?.mobile) ? encrypt(d.mobile || d.user?.mobile) : null;
+  const encGender = d.gender ? encrypt(d.gender) : null;
+  const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
   const upsertData = { 
     id: d.user_id, 
     auth_id: user.id, 
@@ -142,16 +178,28 @@ const getHandler = async (req: Request) => {
     last_name: resolve(null, d.last_name || d.full_name?.split(" ").slice(1).join(" ")), 
     phone: encPhone?.content, 
     phone_iv: encPhone?.iv,
+    gender: encGender?.content,
+    gender_iv: encGender?.iv,
+    birth_date: encBirthDate?.content,
+    birth_date_iv: encBirthDate?.iv,
     ezygo_created_at: d.created_at || null
   };
   await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
   
   // Return the data with decrypted phone for the client
-  return NextResponse.json({ 
-    ...upsertData, 
-    phone: d.mobile || d.user?.mobile || null,
-    created_at: new Date().toISOString() // Freshly created
-  });
+    // Filter out internal _iv columns before returning to client
+    const safeData = { ...upsertData } as Record<string, any>;
+    delete safeData.phone_iv;
+    delete safeData.gender_iv;
+    delete safeData.birth_date_iv;
+
+    return NextResponse.json({ 
+      ...safeData, 
+      phone: d.mobile || d.user?.mobile || null,
+      gender: d.gender || null,
+      birth_date: d.birth_date || null,
+      created_at: new Date().toISOString() // Freshly created
+    });
 };
 
 const patchSchema = z.object({
@@ -163,32 +211,72 @@ const patchSchema = z.object({
 
 const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: any }) => {
   const ip = getClientIp(req.headers);
-  if (!ip) return NextResponse.json({ error: "No IP" }, { status: 400 });
-  const { success } = await authRateLimiter.limit(`profile_patch_${ip}`);
-  if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  if (!ip) {
+    return NextResponse.json(
+      { error: "Could not determine client IP" },
+      { 
+        status: 400,
+        headers: { "Cache-Control": "no-store" }
+      },
+    );
+  }
+
+  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
 
   const mobile = isMobileRequest(req.headers);
   if (!mobile) {
     const csrfToken = req.headers.get(CSRF_HEADER);
-    if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ error: "Invalid CSRF" }, { status: 403 });
+    if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ error: "Invalid CSRF" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
   let body = decryptedBody;
   if (!body) { body = await req.json(); }
   const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422 });
+  if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
 
   const { first_name, last_name, gender, birth_date } = parsed.data;
   const sanitizedFirstName = toTitleCase(first_name);
   const sanitizedLastName = last_name ? toTitleCase(last_name) : null;
   
   const up: any = { first_name: sanitizedFirstName, last_name: sanitizedLastName };
-  if (gender) { const enc = encrypt(gender); up.gender = enc.content; up.gender_iv = enc.iv; }
-  if (birth_date) { const enc = encrypt(birth_date); up.birth_date = enc.content; up.birth_date_iv = enc.iv; }
+  if (gender !== undefined) {
+    if (gender === null) {
+      up.gender = null;
+      up.gender_iv = null;
+    } else {
+      const enc = encrypt(gender);
+      up.gender = enc.content;
+      up.gender_iv = enc.iv;
+    }
+  }
+  if (birth_date !== undefined) {
+    if (birth_date === null) {
+      up.birth_date = null;
+      up.birth_date_iv = null;
+    } else {
+      const enc = encrypt(birth_date);
+      up.birth_date = enc.content;
+      up.birth_date_iv = enc.iv;
+    }
+  }
 
   const supabaseAdmin = getAdminClient();
   const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
@@ -197,7 +285,7 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
     Sentry.captureException(updateError, {
       tags: { type: "db_update_error", location: "api/profile/patch" },
     });
-    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
   return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
 };

@@ -9,6 +9,14 @@ let cachedPublicKey: any | null = null;
 let publicKeyPromise: Promise<any> | null = null;
 
 /**
+ * FOR TESTING ONLY: Resets the cached public key and its fetch promise.
+ */
+export function __resetJweClientCache() {
+  cachedPublicKey = null;
+  publicKeyPromise = null;
+}
+
+/**
  * Fetches the server's public key (JWKS) for encryption.
  */
 async function getPublicKey() {

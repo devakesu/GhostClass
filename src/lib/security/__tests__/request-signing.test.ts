@@ -430,5 +430,27 @@ describe('Request Signing (Ed25519)', () => {
 
       expect(isValid).toBe(false);
     });
+
+    it('should return false if REQUEST_PUBLIC_KEY is missing', () => {
+      delete process.env.REQUEST_PUBLIC_KEY;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const isValid = verifyRequestSignature('p', timestamp, 's');
+      expect(isValid).toBe(false);
+    });
+
+    it('should handle body reading failure in validateSignedRequest', async () => {
+      const request = {
+        headers: new Headers({
+          'x-signature': 'sig',
+          'x-timestamp': '100',
+        }),
+        clone: () => ({
+          text: () => Promise.reject(new Error('Clone fail'))
+        })
+      } as unknown as Request;
+
+      const isValid = await validateSignedRequest(request);
+      expect(isValid).toBe(false);
+    });
   });
 });

@@ -47,12 +47,26 @@ function isRefreshTokenNotFoundError(error: unknown): boolean {
  */
 async function getUserWithRetry(supabase: any) {
   try {
-    return await supabase.auth.getUser();
-  } catch (error) {
-    // If it's a network error (like timeout), try once more after a short delay
-    logger.warn("Supabase getUser network failure, retrying once...", { error });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return await supabase.auth.getUser();
+    const res = await supabase.auth.getUser();
+    return res;
+  } catch (error: any) {
+    const isTransient = error?.message?.includes('fetch') || 
+                       error?.message?.includes('Network') || 
+                       error?.status === 502 || 
+                       error?.status === 503 || 
+                       error?.status === 504;
+
+    if (isTransient) {
+      logger.warn("Supabase getUser network failure, retrying once...", { error });
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        return await supabase.auth.getUser();
+      } catch (retryError) {
+        return { data: { user: null }, error: retryError };
+      }
+    }
+    
+    return { data: { user: null }, error };
   }
 }
 
@@ -127,7 +141,8 @@ export async function proxy(request: NextRequest) {
       if (isRefreshTokenNotFoundError(error) || isAuthSessionMissingError(error)) {
         isUnauthenticatedCertain = true;
       } else {
-        logger.warn("Supabase auth refresh failed in middleware; proceeding as potentially authenticated.", { error });
+        logger.warn("Supabase auth refresh failed in middleware; treating as unauthenticated.", { error });
+        isUnauthenticatedCertain = true;
       }
     } else {
       user = data.user;

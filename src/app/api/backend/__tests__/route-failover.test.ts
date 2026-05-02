@@ -32,10 +32,17 @@ vi.hoisted(() => {
 
 vi.mock('@/lib/security/auth-cookie', () => ({
   getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
 }));
 
 vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock('@/lib/ratelimit', () => ({
+  proxyRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true, reset: 0, limit: 100, remaining: 99 }),
+  },
 }));
 
 // Provide a lightweight pass-through circuit breaker so that:
@@ -80,6 +87,7 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
     // Defensive: restore real timers first in case a sibling file in the same
     // Vitest worker left fake timers active. This prevents module imports from
     // hanging due to Sentry's timer-based initialization code.
+    vi.resetModules();
     vi.useRealTimers();
     vi.clearAllMocks();
 
@@ -124,7 +132,7 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
     expect(response.status).toBe(200);
     // CF was tried first, AWS succeeded second
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(response.headers.get('x-egress-target')).toBe('secondary (AWS)');
+    expect(response.headers.get('x-egress-target')).toBe('secondary');
   });
 
   it('should failover from CF (network error) to AWS and return 200', async () => {
@@ -142,7 +150,7 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
 
     expect(response.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(response.headers.get('x-egress-target')).toBe('secondary (AWS)');
+    expect(response.headers.get('x-egress-target')).toBe('secondary');
   });
 
   it('should NOT failover on non-retryable 4xx — returns 401 after a single attempt', async () => {

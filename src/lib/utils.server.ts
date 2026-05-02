@@ -21,6 +21,18 @@ import axios from "axios";
 // DO NOT write to these variables outside getSecret().
 let SECRET: string | null = null;
 let secretWarningShown = false;
+let hasLoggedDevIpWarning = false;
+
+/**
+ * TEST ONLY — Resets module-level state.
+ * Allows tests to verify environment-dependent initialization logic
+ * without requiring full Vitest module resets which break coverage tracking.
+ */
+export function _resetModuleState() {
+  SECRET = null;
+  secretWarningShown = false;
+  hasLoggedDevIpWarning = false;
+}
 
 function getSecret(): string {
   if (SECRET !== null) return SECRET;
@@ -74,9 +86,6 @@ export const redact = (type: "email" | "id", value: string): string =>
 // ---------------------------------------------------------------------------
 // getClientIp — server only (reads request headers)
 // ---------------------------------------------------------------------------
-
-// Track if we've already logged the development IP warning to avoid spam
-let hasLoggedDevIpWarning = false;
 
 /**
  * Extracts the client IP address from request headers.
@@ -413,4 +422,3 @@ _egressAxios.interceptors.request.use((config) => {
   return config;
 });
 export { _egressAxios as egressAxios };
-

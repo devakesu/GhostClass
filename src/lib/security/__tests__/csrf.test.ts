@@ -25,6 +25,20 @@ vi.mock("next/headers", () => ({
   cookies: vi.fn(() => mockCookieStore),
 }));
 
+// Mock crypto to allow spying on timingSafeEqual
+vi.mock("crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("crypto")>();
+  const mockTimingSafeEqual = vi.fn().mockImplementation(actual.timingSafeEqual);
+  return {
+    ...actual,
+    timingSafeEqual: mockTimingSafeEqual,
+    default: {
+      ...actual,
+      timingSafeEqual: mockTimingSafeEqual,
+    },
+  };
+});
+
 describe("CSRF Protection", () => {
   beforeEach(() => {
     // Create fresh mock cookie store for each test
@@ -334,6 +348,39 @@ describe("CSRF Protection", () => {
       expect(mockCookieStore.set).toHaveBeenCalledWith(
         expect.objectContaining({ path: "/" })
       );
+    });
+  });
+
+  describe("Branch Coverage", () => {
+    it("should skip logging in production when validation fails", async () => {
+      vi.resetModules();
+      const originalEnv = process.env.NODE_ENV;
+      vi.stubEnv("NODE_ENV", "production");
+      
+      const { validateCsrfToken } = await import("../csrf");
+      
+      mockCookieStore.get.mockReturnValue({ value: "short" });
+      const isValid = await validateCsrfToken("longer-token");
+      
+      expect(isValid).toBe(false);
+      
+      vi.stubEnv("NODE_ENV", originalEnv);
+    });
+
+    it("should handle non-Error objects in catch block", async () => {
+      const originalEnv = process.env.NODE_ENV;
+      vi.stubEnv("NODE_ENV", "development");
+      
+      const crypto = await import("crypto");
+      vi.mocked(crypto.timingSafeEqual).mockImplementationOnce(() => {
+        throw "not-an-error-object";
+      });
+      
+      mockCookieStore.get.mockReturnValue({ value: "token" });
+      const isValid = await validateCsrfToken("token");
+      
+      expect(isValid).toBe(false);
+      vi.stubEnv("NODE_ENV", originalEnv);
     });
   });
 });

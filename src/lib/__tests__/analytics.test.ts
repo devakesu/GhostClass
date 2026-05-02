@@ -76,15 +76,23 @@ describe("Analytics Library", () => {
   });
 
   describe("Cookie Security", () => {
-    it("should include conditional Secure attribute logic", () => {
-      // The getOrCreateClientId function includes logic to set the Secure attribute
-      // in production environments. This is verified through code review as testing
-      // cookie attributes in JSDOM has limitations. The API route tests comprehensively
-      // validate the analytics functionality including security aspects.
+    it("should include conditional Secure attribute logic in production", async () => {
+      vi.stubEnv('NODE_ENV', 'production');
       
-      // Generate a client ID to verify basic functionality works
-      const clientId = getOrCreateClientId();
-      expect(clientId).toMatch(/^\d+\.[a-z0-9]+$/);
+      // We need a fresh import or just trust that it reads process.env.NODE_ENV each time
+      // The current implementation reads it inside the function.
+      
+      const spy = vi.spyOn(document, 'cookie', 'set');
+      getOrCreateClientId();
+      
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("; Secure"));
+    });
+
+    it("should not include Secure attribute in development", () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const spy = vi.spyOn(document, 'cookie', 'set');
+      getOrCreateClientId();
+      expect(spy).not.toHaveBeenCalledWith(expect.stringContaining("; Secure"));
     });
   });
 

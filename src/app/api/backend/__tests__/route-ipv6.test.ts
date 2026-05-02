@@ -28,10 +28,17 @@ vi.hoisted(() => {
 
 vi.mock('@/lib/security/auth-cookie', () => ({
   getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
 }));
 
 vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock('@/lib/ratelimit', () => ({
+  proxyRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true, remaining: 10, reset: Date.now() + 1000 }),
+  },
 }));
 
 // Same lightweight pass-through circuit breaker as in route-failover.test.ts.

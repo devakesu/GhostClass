@@ -22,22 +22,37 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
+  if (typeof window !== 'undefined') {
+    localStorage.clear()
+    sessionStorage.clear()
+  }
 })
 
 // Mock window.matchMedia (not available in jsdom)
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
+// Mock ResizeObserver
+if (typeof window !== 'undefined' && !window.ResizeObserver) {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -83,3 +98,41 @@ vi.mock('@/lib/supabase/client', () => ({
   })),
 }))
 
+// Mock CircuitBreaker to prevent interference with unit tests
+vi.mock('@/lib/circuit-breaker', () => {
+  class MockCircuitBreaker {
+    async execute(fn: any) { return await fn(); }
+    on() {}
+    getState() { return 'CLOSED'; }
+    getStatus() { return { state: 'CLOSED', failures: 0, timeUntilReset: 0, successCount: 0, isOpen: false }; }
+    reset() {}
+  }
+  return {
+    CircuitBreaker: MockCircuitBreaker,
+    ezygoCircuitBreaker: new MockCircuitBreaker(),
+    CircuitBreakerOpenError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'CircuitBreakerOpenError';
+      }
+    },
+    NonBreakerError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'NonBreakerError';
+      }
+    },
+    UpstreamServerError: class extends Error {
+      constructor(
+        message: string,
+        public readonly status: number,
+        public readonly statusText?: string,
+        public readonly body?: string,
+        public readonly headers?: Headers,
+      ) {
+        super(message);
+        this.name = 'UpstreamServerError';
+      }
+    },
+  };
+});

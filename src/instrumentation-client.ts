@@ -34,4 +34,6 @@ Sentry.init({
 /**
  * Capture router transitions (Sentry v8+ requirement for App Router)
  */
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export const onRouterTransitionStart = (pathname: string, type: "push" | "replace") => {
+  Sentry.captureRouterTransitionStart?.(pathname, type);
+};

@@ -36,10 +36,10 @@ export default defineConfig({
       // @ts-expect-error - 'all' is a valid runtime option but not in Vitest 4.x types
       all: true,
       thresholds: {
-        lines: 7,
-        functions: 8,
-        branches: 5,
-        statements: 7,
+        lines: 10,
+        functions: 10,
+        branches: 10,
+        statements: 10,
       },
     },
     include: ['**/*.{test,spec}.{ts,tsx}'],

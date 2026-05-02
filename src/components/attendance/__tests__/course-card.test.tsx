@@ -18,6 +18,13 @@ vi.mock('@/hooks/users/user', () => ({
   }),
 }));
 
+vi.mock('@/hooks/users/profile', () => ({
+  useProfile: () => ({
+    data: { id: '123', email: 'test@example.com' },
+    isLoading: false,
+  }),
+}));
+
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
   useTrackingData: vi.fn(() => ({
     data: null,
@@ -74,6 +81,7 @@ vi.mock('@/hooks/courses/useDisabledCourses', () => ({
 vi.mock('@/hooks/users/settings', () => ({
   useFetchSemester: () => ({ data: 'even' }),
   useFetchAcademicYear: () => ({ data: '2025-2026' }),
+  useFetchUserSettings: () => ({ data: { semester: 'even', academicYear: '2025-2026' } }),
 }));
 
 vi.mock('sonner', () => ({
@@ -231,7 +239,7 @@ describe('CourseCard', () => {
       });
       const { container } = render(<CourseCard course={sampleCourse} />);
       const card = container.querySelector('.custom-container');
-      expect(card?.className).toContain('opacity-60');
+      expect(card?.className).toContain('opacity-50');
     });
 
     it('calls disableCourse with courseCode and selected reason when Disable button is clicked', async () => {

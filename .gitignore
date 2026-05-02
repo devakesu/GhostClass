@@ -38,6 +38,7 @@ node_modules/
 .stylelintcache
 /Temp
 *.ps1:*
+temp_cmd_logs/
 
 # debug
 npm-debug.log*

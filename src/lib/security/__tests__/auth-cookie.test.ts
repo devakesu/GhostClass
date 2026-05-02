@@ -1,4 +1,5 @@
 /**
+ * @vitest-environment node
  * Tests for auth-cookie.ts
  *
  * [SEC-02] ezygo_access_token must always be written with HttpOnly, Secure (in
@@ -8,17 +9,65 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setAuthCookie, clearAuthCookie } from "../auth-cookie";
+import { setAuthCookie, clearAuthCookie, getAuthTokenServer, getAuthTokenWithFallback } from "../auth-cookie";
 
 // Mock the Next.js cookies module (same pattern as csrf.test.ts)
 let mockSet: ReturnType<typeof vi.fn>;
+let mockDelete: ReturnType<typeof vi.fn>;
+let mockGet: ReturnType<typeof vi.fn>;
 vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({ set: mockSet })),
+  cookies: vi.fn(async () => ({ 
+    set: mockSet,
+    delete: mockDelete,
+    get: mockGet
+  })),
 }));
+
+// Mock Supabase
+const mockSupabaseUser = { id: "user-123" };
+const mockGetUser = vi.fn(async () => ({ data: { user: mockSupabaseUser } }));
+const mockMaybeSingle = vi.fn(async () => ({ data: { ezygo_token: "enc-token", ezygo_iv: "iv" } }));
+const mockFrom = vi.fn(() => ({
+  select: vi.fn(() => ({
+    eq: vi.fn(() => ({
+      maybeSingle: mockMaybeSingle
+    }))
+  }))
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: { getUser: mockGetUser }
+  }))
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  getAdminClient: vi.fn(() => ({
+    from: mockFrom
+  }))
+}));
+
+// Mock crypto
+vi.mock("@/lib/crypto", () => ({
+  decrypt: vi.fn(() => "decrypted-token")
+}));
+
+// Mock logger
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn()
+  }
+}));
+
+// Mock server-only to prevent import errors in Vitest
+vi.mock("server-only", () => ({}));
 
 describe("auth-cookie security attributes (SEC-02)", () => {
   beforeEach(() => {
     mockSet = vi.fn();
+    mockDelete = vi.fn();
+    mockGet = vi.fn();
   });
 
   afterEach(() => {
@@ -83,28 +132,64 @@ describe("auth-cookie security attributes (SEC-02)", () => {
   });
 
   describe("clearAuthCookie", () => {
-    it("sets the cookie with httpOnly: true", async () => {
-      await clearAuthCookie();
-      const [, , opts] = mockSet.mock.calls[0];
-      expect(opts.httpOnly).toBe(true);
-    });
-
-    it("sets the cookie with sameSite: 'lax'", async () => {
-      await clearAuthCookie();
-      const [, , opts] = mockSet.mock.calls[0];
-      expect(opts.sameSite).toBe("lax");
-    });
-
     it("uses the cookie name 'ezygo_access_token'", async () => {
       await clearAuthCookie();
-      const [name] = mockSet.mock.calls[0];
-      expect(name).toBe("ezygo_access_token");
+      expect(mockDelete).toHaveBeenCalledWith("ezygo_access_token");
+    });
+  });
+
+  describe("getAuthTokenServer", () => {
+    it("returns token value if cookie exists", async () => {
+      mockGet.mockReturnValue({ value: "stored-token" });
+      const token = await getAuthTokenServer();
+      expect(token).toBe("stored-token");
+      expect(mockGet).toHaveBeenCalledWith("ezygo_access_token");
     });
 
-    it("sets an expiry in the past to delete the cookie", async () => {
-      await clearAuthCookie();
-      const [, , opts] = mockSet.mock.calls[0];
-      expect(opts.expires.getTime()).toBe(0);
+    it("returns undefined if cookie does not exist", async () => {
+      mockGet.mockReturnValue(undefined);
+      const token = await getAuthTokenServer();
+      expect(token).toBeUndefined();
+    });
+  });
+
+  describe("getAuthTokenWithFallback", () => {
+    it("returns cookie token if available", async () => {
+      mockGet.mockReturnValue({ value: "cookie-token" });
+      const token = await getAuthTokenWithFallback();
+      expect(token).toBe("cookie-token");
+      expect(mockGetUser).not.toHaveBeenCalled();
+    });
+
+    it("heals token from database if cookie is missing", async () => {
+      mockGet.mockReturnValue(undefined);
+      const token = await getAuthTokenWithFallback();
+      expect(token).toBe("decrypted-token");
+      expect(mockGetUser).toHaveBeenCalled();
+      expect(mockMaybeSingle).toHaveBeenCalled();
+      // Should also attempt to restore cookie
+      expect(mockSet).toHaveBeenCalledWith("ezygo_access_token", "decrypted-token", expect.any(Object));
+    });
+
+    it("returns undefined if no user is found in fallback", async () => {
+      mockGet.mockReturnValue({ value: undefined });
+      mockGetUser.mockResolvedValueOnce({ data: { user: null } } as any);
+      const token = await getAuthTokenWithFallback();
+      expect(token).toBeUndefined();
+    });
+
+    it("returns undefined if database record is missing", async () => {
+      mockGet.mockReturnValue({ value: undefined });
+      mockMaybeSingle.mockResolvedValueOnce({ data: null } as any);
+      const token = await getAuthTokenWithFallback();
+      expect(token).toBeUndefined();
+    });
+
+    it("handles exceptions gracefully", async () => {
+      mockGet.mockReturnValue(undefined);
+      mockGetUser.mockRejectedValueOnce(new Error("Supabase error"));
+      const token = await getAuthTokenWithFallback();
+      expect(token).toBeUndefined();
     });
   });
 });

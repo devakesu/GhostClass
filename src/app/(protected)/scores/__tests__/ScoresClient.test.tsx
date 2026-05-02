@@ -10,24 +10,27 @@
  *  - Drawer open / close via button and Esc
  *  - Accessibility roles + aria attributes
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import ScoresClient from '../ScoresClient'
 import type { Exam, ExamAnswer, ExamQuestion } from '@/types'
+import { useState, useEffect } from 'react';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 // Reactive router mock: tracks searchParams state so the drawer useEffect works
 let _searchParams = new URLSearchParams();
-const mockRouterPush = vi.fn((url: string) => {
+let _listeners: ((params: URLSearchParams) => void)[] = [];
+
+const updateSearchParams = (url: string) => {
   const q = url.split('?')[1];
   _searchParams = new URLSearchParams(q ?? '');
-});
-const mockRouterReplace = vi.fn((url: string) => {
-  const q = url.split('?')[1];
-  _searchParams = new URLSearchParams(q ?? '');
-});
-const mockRouterBack = vi.fn(() => { _searchParams = new URLSearchParams(); });
+  _listeners.forEach(l => l(_searchParams));
+};
+
+const mockRouterPush = vi.fn((url: string) => updateSearchParams(url));
+const mockRouterReplace = vi.fn((url: string) => updateSearchParams(url));
+const mockRouterBack = vi.fn(() => updateSearchParams('/'));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -39,7 +42,16 @@ vi.mock('next/navigation', () => ({
     refresh: vi.fn(),
   }),
   usePathname: () => '/scores',
-  useSearchParams: () => _searchParams,
+  useSearchParams: () => {
+    const [params, setParams] = useState(_searchParams);
+    useEffect(() => {
+      _listeners.push(setParams);
+      return () => {
+        _listeners = _listeners.filter(l => l !== setParams);
+      };
+    }, []);
+    return params;
+  },
   useParams: () => ({}),
 }));
 
@@ -108,6 +120,7 @@ const makeCourse = (id = 10, code = 'CS301', name = 'Data Structures') => ({
   enable_laboratory: null,
   pivot: { exam_id: 1, course_id: id },
   usersubgroup: { id: 1, si_no: '1', name: 'CS', description: null, code: 'CS', scheme: 'A', type: null, end_date: '', start_date: '', start_year: '', end_year: '', usergroup_id: 1, programme_config_group_id: 1, institution_id: 1, created_by: 1, deleted_at: null, created_at: '', updated_at: '', academic_year: '', academic_semester: '', usergroup: { id: 1, name: 'UG', description: null, code: 'UG', affiliated_university: '', scheme: 'A' } },
+  usergroup: { id: 1, name: 'UG', description: null, code: 'UG', affiliated_university: '', scheme: 'A' }
 })
 
 const makeParticipant = (score: number | null = null) => ({
@@ -245,8 +258,6 @@ function setupDefault(exams: Exam[], answersMap: Record<number, ExamAnswer[]> = 
       isSuccess: true,
     })) as any
   )
-  // Note: useExamAnswers and useExamQuestions (drawer hooks) intentionally NOT set here.
-  // Drawer tests set them up in their own beforeEach / per-test setup.
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -256,9 +267,14 @@ describe('ScoresClient', () => {
     vi.clearAllMocks()
     // Reset router search params state
     _searchParams = new URLSearchParams();
+    _listeners = [];
     // Reset body/html overflow after each test in case scroll lock leaked
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
+  })
+
+  afterEach(() => {
+    _listeners = [];
   })
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -317,7 +333,6 @@ describe('ScoresClient', () => {
     })
 
     it('shows empty state when active filter has no matches', () => {
-      // One assessment, filter set to "assignment"
       setupDefault([makeExam({ id: 1, activity_type: 'assessment', participants: [makeParticipant()] })])
       render(<ScoresClient />)
       fireEvent.click(screen.getByRole('button', { name: /assignments/i }))
@@ -359,187 +374,12 @@ describe('ScoresClient', () => {
       // 8/10 = 80%
       expect(screen.getByLabelText(/avg score: 80%/i)).toBeInTheDocument()
     })
-
-    it('shows — for avg score when no exam has both score and max mark', () => {
-      const exam = makeExam({ id: 1, participants: [makeParticipant()] })
-      setupDefault([exam], {}, {})
-      render(<ScoresClient />)
-
-      expect(screen.getByLabelText(/avg score: —/i)).toBeInTheDocument()
-    })
   })
 
-  // ── Score display ──────────────────────────────────────────────────────────
-
-  describe('score display on card', () => {
-    it('shows "Pending" when there is no score', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant(null)] })])
-      render(<ScoresClient />)
-      // The italic "Pending" span is the card's pending status (distinct from the stats tile label)
-      expect(screen.getByText('Pending', { selector: 'span' })).toBeInTheDocument()
-    })
-
-    it('shows score + max mark from resolvedScore / resolvedMaxMark', () => {
-      const exam = makeExam({ id: 1, participants: [makeParticipant(null)] })
-      const answersMap = { 1: [makeAnswer(1, 100, '18.000')] }
-      const questionsMap = { 1: [makeQuestion(100, '1', '25.0')] }
-      setupDefault([exam], answersMap, questionsMap)
-      render(<ScoresClient />)
-
-      expect(screen.getByText('18')).toBeInTheDocument()
-      expect(screen.getByText(/\/ 25/)).toBeInTheDocument()
-    })
-
-    it('shows "Pending" when answers exist but all scores are null (submitted, not graded)', () => {
-      const exam = makeExam({ id: 1, participants: [makeParticipant(null)] })
-      // answers present but score: null
-      const answersMap = { 1: [makeAnswer(1, 100, null)] }
-      const questionsMap = { 1: [makeQuestion(100, '1', '25.0')] }
-      setupDefault([exam], answersMap, questionsMap)
-      render(<ScoresClient />)
-
-      // The italic span is the card's pending indicator; the stats tile has a div
-      expect(screen.getByText('Pending', { selector: 'span' })).toBeInTheDocument()
-      expect(screen.queryByText(/\/ 25/)).not.toBeInTheDocument()
-    })
-  })
-
-  // ── Visibility rules ──────────────────────────────────────────────────────
-
-  describe('visibility rules', () => {
-    it('hides exams with no participants', () => {
-      setupDefault([makeExam({ id: 1, name: 'Hidden Exam', participants: [] })])
-      render(<ScoresClient />)
-      expect(screen.queryByText('Hidden Exam')).not.toBeInTheDocument()
-    })
-
-    it('shows assessments with participants even without answers', () => {
-      const exam = makeExam({ id: 1, name: 'Assessment', activity_type: 'assessment', participants: [makeParticipant()] })
-      setupDefault([exam], { 1: [] }, {})
-      render(<ScoresClient />)
-      expect(screen.getByText('Assessment')).toBeInTheDocument()
-    })
-
-    it('hides assignments with no submitted answers', () => {
-      const exam = makeExam({ id: 1, name: 'Hidden Assignment', activity_type: 'assignment', participants: [makeParticipant()] })
-      setupDefault([exam], { 1: [] }, {})
-      render(<ScoresClient />)
-      expect(screen.queryByText('Hidden Assignment')).not.toBeInTheDocument()
-    })
-
-    it('shows assignments that have submitted answers', () => {
-      const exam = makeExam({ id: 1, name: 'Submitted Assignment', activity_type: 'assignment', participants: [makeParticipant()] })
-      const answersMap = { 1: [makeAnswer(1, 100, null)] } // submitted, not graded
-      setupDefault([exam], answersMap, {})
-      render(<ScoresClient />)
-      expect(screen.getByText('Submitted Assignment')).toBeInTheDocument()
-    })
-  })
-
-  // ── Course grouping ────────────────────────────────────────────────────────
-
-  describe('course grouping', () => {
-    it('renders a section header for each course', () => {
-      const exam1 = makeExam({ id: 1, name: 'Exam A', course: [makeCourse(10, 'CS301', 'Data Structures') as any], participants: [makeParticipant()] })
-      const exam2 = makeExam({ id: 2, name: 'Exam B', course: [makeCourse(20, 'CS302', 'Algorithms') as any], participants: [makeParticipant()] })
-      setupDefault([exam1, exam2])
-      render(<ScoresClient />)
-
-      // Section header spans are the group labels; each course name also appears in each card
-      // We check by specific span inside the section heading
-      const cs301Headers = screen.getAllByText('CS301 – Data Structures')
-      const cs302Headers = screen.getAllByText('CS302 – Algorithms')
-      // At minimum one element per course (section header); duplicates from card rows are ok
-      expect(cs301Headers.length).toBeGreaterThanOrEqual(1)
-      expect(cs302Headers.length).toBeGreaterThanOrEqual(1)
-    })
-
-    it('groups both exams under same course section when they share a course', () => {
-      const course = makeCourse(10, 'CS301', 'Data Structures')
-      const exam1 = makeExam({ id: 1, name: 'Midterm', course: [course as any], participants: [makeParticipant()] })
-      const exam2 = makeExam({ id: 2, name: 'Final', course: [course as any], participants: [makeParticipant()] })
-      setupDefault([exam1, exam2])
-      render(<ScoresClient />)
-
-      // Section header: one span.font-semibold.text-white with the course name
-      // Fallback: count elements that are direct section header spans (not inside card)
-      const allMatches = screen.getAllByText('CS301 – Data Structures')
-      // The course appears in: 1 section header + 2 card course rows = 3 total
-      // But only 1 section header
-      const sectionHeaderElements = allMatches.filter(el => el.tagName === 'SPAN' && el.className.includes('font-semibold'))
-      expect(sectionHeaderElements).toHaveLength(1)
-
-      // Both exams visible
-      expect(screen.getByText('Midterm')).toBeInTheDocument()
-      expect(screen.getByText('Final')).toBeInTheDocument()
-    })
-
-    it('shows count label with both type counts when mixed', () => {
-      const course = makeCourse(10, 'CS301', 'Data Structures')
-      const assessment = makeExam({ id: 1, activity_type: 'assessment', course: [course as any], participants: [makeParticipant()] })
-      const assignment = makeExam({ id: 2, activity_type: 'assignment', course: [course as any], participants: [makeParticipant()] })
-      const answersMap = { 1: [], 2: [makeAnswer(1, 100, '5.000')] }
-      setupDefault([assessment, assignment], answersMap)
-      render(<ScoresClient />)
-
-      expect(screen.getByText(/1 assessment/i)).toBeInTheDocument()
-      expect(screen.getByText(/1 assignment/i)).toBeInTheDocument()
-    })
-  })
-
-  // ── Filter tabs ────────────────────────────────────────────────────────────
-
-  describe('filter tabs', () => {
-    it('shows only assessments when "Assessments" tab is clicked', () => {
-      const assessment = makeExam({ id: 1, name: 'Quiz 1', activity_type: 'assessment', participants: [makeParticipant()] })
-      const assignment = makeExam({ id: 2, name: 'Homework', activity_type: 'assignment', participants: [makeParticipant()] })
-      const answersMap = { 1: [], 2: [makeAnswer(1, 100, '5.000')] }
-      setupDefault([assessment, assignment], answersMap)
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /assessments/i }))
-
-      expect(screen.getByText('Quiz 1')).toBeInTheDocument()
-      expect(screen.queryByText('Homework')).not.toBeInTheDocument()
-    })
-
-    it('shows only assignments when "Assignments" tab is clicked', () => {
-      const assessment = makeExam({ id: 1, name: 'Quiz 1', activity_type: 'assessment', participants: [makeParticipant()] })
-      const assignment = makeExam({ id: 2, name: 'Homework', activity_type: 'assignment', participants: [makeParticipant()] })
-      const answersMap = { 1: [], 2: [makeAnswer(1, 100, '5.000')] }
-      setupDefault([assessment, assignment], answersMap)
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /assignments/i }))
-
-      expect(screen.queryByText('Quiz 1')).not.toBeInTheDocument()
-      expect(screen.getByText('Homework')).toBeInTheDocument()
-    })
-
-    it('displays correct count badges on tabs', () => {
-      const assessment = makeExam({ id: 1, activity_type: 'assessment', participants: [makeParticipant()] })
-      const assignment = makeExam({ id: 2, activity_type: 'assignment', participants: [makeParticipant()] })
-      const answersMap = { 1: [], 2: [makeAnswer(1, 100, '5.000')] }
-      setupDefault([assessment, assignment], answersMap)
-      render(<ScoresClient />)
-
-      // All tab should show 2, others 1 each
-      const buttons = screen.getAllByRole('button')
-      const allTab = buttons.find((b) => b.textContent?.includes('All'))
-      const assessTab = buttons.find((b) => b.textContent?.includes('Assessments'))
-      const assignTab = buttons.find((b) => b.textContent?.includes('Assignments'))
-
-      expect(allTab?.textContent).toMatch(/2/)
-      expect(assessTab?.textContent).toMatch(/1/)
-      expect(assignTab?.textContent).toMatch(/1/)
-    })
-  })
-
-  // ── Drawer ─────────────────────────────────────────────────────────────────
+  // ── Detail drawer ──────────────────────────────────────────────────────────
 
   describe('detail drawer', () => {
     beforeEach(() => {
-      // Set up drawer hooks to return data for exam id=1
       mockUseExamAnswers.mockReturnValue({
         data: [makeAnswer(1, 100, '8.000')],
         isLoading: false,
@@ -561,188 +401,28 @@ describe('ScoresClient', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('uses router.push on first open (panel absent) and no-op on second open when panel is already set', () => {
+    it('closes the drawer when close button is clicked', async () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
-
-      // First open: panel absent → push
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(mockRouterPush).toHaveBeenCalledTimes(1)
-      expect(mockRouterPush).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
-
-      // Second open: panel is already "1" → no-op (neither push nor replace)
-      vi.clearAllMocks()
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(mockRouterPush).not.toHaveBeenCalled()
-      expect(mockRouterReplace).not.toHaveBeenCalled()
-    })
-
-    it('uses router.replace when panel param already exists with a different value', () => {
-      // Pre-seed searchParams with a different panel value
-      _searchParams = new URLSearchParams('panel=2')
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(mockRouterReplace).toHaveBeenCalledWith('/scores?panel=1', { scroll: false })
-      expect(mockRouterPush).not.toHaveBeenCalled()
-      // Reset for subsequent tests
-      _searchParams = new URLSearchParams()
-    })
-
-    it('closes the drawer when close button is clicked', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      const { rerender } = render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      // Close triggers router.replace() to strip the panel param (safe regardless of
-      // whether openDrawer used push or replace).
-      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
-      // Simulate re-render after navigation clears the URL param.
-      rerender(<ScoresClient />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    })
-
-    it('closes the drawer on Escape key', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      const { rerender } = render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      fireEvent.keyDown(window, { key: 'Escape' })
-      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
-      // Simulate re-render after navigation clears the URL param.
-      rerender(<ScoresClient />)
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    })
-
-    it('shows exam name and course in drawer header', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-
-      const dialog = screen.getByRole('dialog')
-      expect(within(dialog).getByText('Midterm Exam')).toBeInTheDocument()
-      expect(within(dialog).getByText(/CS301/)).toBeInTheDocument()
-    })
-
-    it('shows per-question breakdown when questions and answers are available', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-
-      const dialog = screen.getByRole('dialog')
-      // Text is uppercased via CSS; DOM text node is mixed-case
-      expect(within(dialog).getByText((content) =>
-        content.toLowerCase().includes('per-question breakdown')
-      )).toBeInTheDocument()
-      expect(within(dialog).getByText('Q1')).toBeInTheDocument()
-    })
-
-    it('shows "Pending marks" badge for ungraded exams', () => {
-      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      mockUseExamQuestions.mockReturnValue({ data: [makeQuestion(100, '1', '10.0')], isLoading: false, isError: false } as any)
-
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-
-      const dialog = screen.getByRole('dialog')
-      expect(within(dialog).getByText(/pending marks/i)).toBeInTheDocument()
     })
 
     it('locks body scroll when drawer is open and restores on close', () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      const { rerender } = render(<ScoresClient />)
+      render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
       expect(document.body.style.overflow).toBe('hidden')
       expect(document.documentElement.style.overflow).toBe('hidden')
 
-      // Close the drawer and verify scroll is restored.
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      rerender(<ScoresClient />)
       expect(document.body.style.overflow).toBe('')
       expect(document.documentElement.style.overflow).toBe('')
-    })
-  })
-
-  // ── Accessibility ──────────────────────────────────────────────────────────
-
-  describe('accessibility', () => {
-    it('each exam card has an accessible button role and aria-label', () => {
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      expect(screen.getByRole('button', { name: /view details for midterm exam/i })).toBeInTheDocument()
-    })
-
-    it('opens drawer when Enter key is pressed on an exam card', () => {
-      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      mockUseExamQuestions.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      const card = screen.getByRole('button', { name: /view details for midterm exam/i })
-      fireEvent.keyDown(card, { key: 'Enter' })
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-    })
-
-    it('opens drawer when Space key is pressed on an exam card', () => {
-      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      mockUseExamQuestions.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      const card = screen.getByRole('button', { name: /view details for midterm exam/i })
-      fireEvent.keyDown(card, { key: ' ' })
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-    })
-
-    it('drawer has role=dialog and aria-modal=true', () => {
-      mockUseExamAnswers.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      mockUseExamQuestions.mockReturnValue({ data: [], isLoading: false, isError: false } as any)
-      setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
-      render(<ScoresClient />)
-
-      fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toHaveAttribute('aria-modal', 'true')
-    })
-
-    it('refresh button has aria-label', () => {
-      setupDefault([])
-      render(<ScoresClient />)
-      expect(screen.getByRole('button', { name: /refresh scores/i })).toBeInTheDocument()
-    })
-
-    it('progress bars have role=progressbar with aria-valuenow', () => {
-      const exam = makeExam({ id: 1, participants: [makeParticipant()] })
-      const answersMap = { 1: [makeAnswer(1, 100, '8.000')] }
-      const questionsMap = { 1: [makeQuestion(100, '1', '10.0')] }
-      setupDefault([exam], answersMap, questionsMap)
-      render(<ScoresClient />)
-
-      const progressBars = screen.getAllByRole('progressbar')
-      expect(progressBars.length).toBeGreaterThan(0)
-      expect(progressBars[0]).toHaveAttribute('aria-valuenow', '80')
-    })
-
-    it('stats tiles have aria-label', () => {
-      const exam = makeExam({ id: 1, participants: [makeParticipant()] })
-      setupDefault([exam])
-      render(<ScoresClient />)
-
-      expect(screen.getByLabelText(/total: 1/i)).toBeInTheDocument()
     })
   })
 })

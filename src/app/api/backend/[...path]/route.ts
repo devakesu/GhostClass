@@ -5,7 +5,7 @@ import { validateCsrfToken } from "@/lib/security/csrf";
 import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
-import { ezygoCircuitBreaker, CircuitBreakerOpenError, UpstreamServerError } from "@/lib/circuit-breaker";
+import { ezygoCircuitBreaker, UpstreamServerError } from "@/lib/circuit-breaker";
 import { getClientIp } from "@/lib/utils.server";
 import { fetchEzygoData, invalidateEzygoCacheForUser } from "@/lib/ezygo-batch-fetcher";
 import { proxyRateLimiter } from "@/lib/ratelimit";
@@ -14,9 +14,7 @@ import { proxyRateLimiter } from "@/lib/ratelimit";
 import { 
   PUBLIC_PATHS, MAX_RESPONSE_BYTES, MAX_ERROR_BODY_LOG_LENGTH, RETRYABLE_UPSTREAM_STATUSES 
 } from "@/lib/proxy/constants";
-import { 
-  buildEgressTargets, resolveSafeUpstreamErrorMessage, readWithLimit, UpstreamResponseTooLargeError 
-} from "@/lib/proxy/proxy-utils";
+import { buildEgressTargets, resolveSafeUpstreamErrorMessage, readWithLimit } from "@/lib/proxy/proxy-utils";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
 const EGRESS_TARGETS = buildEgressTargets();
@@ -237,27 +235,31 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
     });
 
   } catch (err) {
-    const error = err as Error;
+    const error = (err || new Error("Unknown error")) as Error;
     const egressHeader = { "x-egress-target": lastAttemptedEgressName };
-    if (error instanceof CircuitBreakerOpenError) {
+    
+    if (error.name === "CircuitBreakerOpenError") {
       return NextResponse.json({ message: "Exception: EzyGo servers are having technical issues." }, { status: 503, headers: egressHeader });
     }
-    if (error instanceof UpstreamServerError) {
-      const sanitizedErrorHeaders = error.headers ? Object.fromEntries(
-        Array.from(error.headers.entries()).filter(([k]) => k.toLowerCase() !== "content-encoding")
-      ) : {};
+    if (error.name === "UpstreamServerError") {
+      const upstreamError = error as any;
+      const headers = upstreamError.headers instanceof Headers ? upstreamError.headers : new Headers(upstreamError.headers as any);
+      const sanitizedErrorHeaders = Object.fromEntries(
+        Array.from(headers.entries() as any).filter(([k]) => (k as string).toLowerCase() !== "content-encoding")
+      );
       
-      const logMethod = error.status === 429 ? "warn" : "error";
-      const logMsg = error.status === 429 ? "Proxy upstream rate limit (429)" : "Proxy upstream error";
-      logger[logMethod](logMsg, { status: error.status, path: fullPath, bodyPreview: error.body?.substring(0, MAX_ERROR_BODY_LOG_LENGTH) });
-
-      const clientMessage = (IS_PRODUCTION && error.status >= 500) ? "An error occurred while processing your request" : resolveSafeUpstreamErrorMessage(error.body, error.status);
+      const logMethod = upstreamError.status === 429 ? "warn" : "error";
+      const logMsg = upstreamError.status === 429 ? "Proxy upstream rate limit (429)" : "Proxy upstream error";
+      logger[logMethod](logMsg, { status: upstreamError.status, path: fullPath, bodyPreview: upstreamError.body?.substring(0, MAX_ERROR_BODY_LOG_LENGTH) });
+ 
+      const clientMessage = (IS_PRODUCTION && upstreamError.status >= 500) ? "An error occurred while processing your request" : resolveSafeUpstreamErrorMessage(upstreamError.body, upstreamError.status);
       return NextResponse.json(
-        { message: clientMessage, status: error.status }, 
-        { status: error.status, headers: { ...sanitizedErrorHeaders, ...egressHeader } }
+        { message: clientMessage, status: upstreamError.status }, 
+        { status: upstreamError.status, headers: { ...sanitizedErrorHeaders, ...egressHeader } }
       );
     }
-    if (error instanceof UpstreamResponseTooLargeError) return NextResponse.json({ message: "Upstream response too large" }, { status: 502, headers: egressHeader });
+    if (error.name === "UpstreamResponseTooLargeError") return NextResponse.json({ message: "Upstream response too large" }, { status: 502, headers: egressHeader });
+    if (error.name === "AbortError") return NextResponse.json({ message: "Upstream timed out" }, { status: 502, headers: egressHeader });
     
     logger.error("Proxy fetch failed", { path: fullPath, error: error?.message });
     return NextResponse.json(

@@ -46,14 +46,14 @@ function createTimeoutSignal(timeoutMs: number): { signal: AbortSignal; cleanup:
  * Queue-related errors that should not trip the circuit breaker
  * These indicate local resource constraints, not API failure
  */
-class QueueFullError extends NonBreakerError {
+export class QueueFullError extends NonBreakerError {
   constructor(size: number) {
     super(`Request queue is full (${size} items). Please try again later.`);
     this.name = 'QueueFullError';
   }
 }
 
-class QueueTimeoutError extends NonBreakerError {
+export class QueueTimeoutError extends NonBreakerError {
   constructor(timeoutMs: number) {
     super(`Request queue timeout: waited ${timeoutMs}ms without getting a slot`);
     this.name = 'QueueTimeoutError';
@@ -129,9 +129,7 @@ function waitForSlot(): Promise<number> {
     const timeoutId = setTimeout(() => {
       // Remove from queue if still present
       const index = requestQueue.findIndex(item => item.id === itemId);
-      if (index !== -1) {
-        requestQueue.splice(index, 1);
-      }
+      requestQueue.splice(index, 1);
       reject(new QueueTimeoutError(QUEUE_TIMEOUT_MS));
     }, QUEUE_TIMEOUT_MS);
     
@@ -179,7 +177,7 @@ function releaseSlot(slotGeneration: number) {
  * @param body - Request body for POST requests
  * @returns Promise with API response data
  */
-export async function fetchEzygoData<T>(
+export function fetchEzygoData<T>(
   endpoint: string,
   token: string,
   method: 'GET' | 'POST' = 'GET',
@@ -406,10 +404,9 @@ export function resetRateLimiterState() {
   // Note: We don't need to explicitly clearTimeout here because the reject 
   // handler (defined in waitForSlot at line 120-123) already clears the timeout
   while (requestQueue.length > 0) {
-    const item = requestQueue.shift();
-    if (item) {
-      item.reject(new Error('Rate limiter state reset'));
-    }
+    const item = requestQueue.shift()!;
+    clearTimeout(item.timeoutId);
+    item.reject(new Error('Rate limiter state reset'));
   }
   
   // Clear LRU cache

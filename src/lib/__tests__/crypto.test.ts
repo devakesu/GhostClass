@@ -1,159 +1,126 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { encrypt, decrypt, __resetCachedKey } from '../crypto'
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { encrypt, decrypt, __resetCachedKey } from "../crypto";
 
-describe('crypto', () => {
-  const originalEnv = process.env.ENCRYPTION_KEY
+describe("crypto.ts", () => {
+  const VALID_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
   beforeEach(() => {
-    // Reset cached key to allow environment changes to take effect
-    __resetCachedKey()
-    // Set a valid test encryption key (64 hex chars = 32 bytes)
-    process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-  })
+    vi.resetModules();
+    process.env.ENCRYPTION_KEY = VALID_KEY;
+    __resetCachedKey();
+  });
 
-  afterEach(() => {
-    // Reset cached key to prevent state leakage to other test files
-    __resetCachedKey()
-    if (originalEnv === undefined) {
-      delete process.env.ENCRYPTION_KEY
-    } else {
-      process.env.ENCRYPTION_KEY = originalEnv
+  it("encrypts and decrypts correctly using object form", () => {
+    const text = "Hello, world!";
+    const encrypted = encrypt(text);
+    
+    expect(encrypted.iv).toHaveLength(24); // 12 bytes = 24 hex chars
+    expect(encrypted.content).toContain(":");
+    
+    const decrypted = decrypt(encrypted);
+    expect(decrypted).toBe(text);
+  });
+
+  it("decrypts correctly using deprecated two-argument form", () => {
+    const text = "Secret data";
+    const encrypted = encrypt(text);
+    
+    const decrypted = decrypt(encrypted.iv, encrypted.content);
+    expect(decrypted).toBe(text);
+  });
+
+  it("throws error if ENCRYPTION_KEY is missing", () => {
+    delete process.env.ENCRYPTION_KEY;
+    __resetCachedKey();
+    expect(() => encrypt("test")).toThrow("ENCRYPTION_KEY is not defined");
+  });
+
+  it("throws error if ENCRYPTION_KEY is invalid length", () => {
+    process.env.ENCRYPTION_KEY = "too-short";
+    __resetCachedKey();
+    expect(() => encrypt("test")).toThrow("ENCRYPTION_KEY must be 64 hex characters");
+  });
+
+  it("throws error for empty input in encrypt", () => {
+    expect(() => encrypt("")).toThrow("Invalid input: text must be a non-empty string");
+    // @ts-expect-error - Testing invalid input
+    expect(() => encrypt(null)).toThrow("Invalid input");
+  });
+
+  it("throws error for too long input in encrypt", () => {
+    const longText = "a".repeat(100001);
+    expect(() => encrypt(longText)).toThrow("Input text too long");
+  });
+
+  it("throws error for invalid IV format in decrypt", () => {
+    expect(() => decrypt("invalid-iv", "tag:content")).toThrow("Invalid IV format");
+  });
+
+  it("throws error for invalid content format (missing separator) in decrypt", () => {
+    const iv = "0".repeat(24);
+    expect(() => decrypt(iv, "no-separator")).toThrow("Invalid content format (missing separator)");
+  });
+
+  it("throws error for invalid content format (too many separators) in decrypt", () => {
+    const iv = "0".repeat(24);
+    expect(() => decrypt(iv, "tag:content:extra")).toThrow("Invalid content format (unexpected separators)");
+  });
+
+  it("throws error for non-hex characters in decrypt", () => {
+    const iv = "0".repeat(24);
+    expect(() => decrypt(iv, "tag:content-with-non-hex!")).toThrow("Invalid content format (non-hex characters)");
+  });
+
+  it("throws error for invalid auth tag length in decrypt", () => {
+    const iv = "0".repeat(24);
+    expect(() => decrypt(iv, "0123456789abcdef:0123456789abcdef")).toThrow("Invalid auth tag length");
+  });
+
+  it("throws generic error when decryption fails (e.g. wrong key)", () => {
+    const text = "test";
+    const encrypted = encrypt(text);
+    
+    // Change key and reset cache
+    process.env.ENCRYPTION_KEY = "a".repeat(64);
+    __resetCachedKey();
+    
+    expect(() => decrypt(encrypted)).toThrow("Decryption failed");
+  });
+
+  it("caches the encryption key after first use", () => {
+    const text = "test";
+    encrypt(text);
+    
+    // Changing the env var should NOT affect encryption/decryption until reset
+    process.env.ENCRYPTION_KEY = "f".repeat(64);
+    const encrypted2 = encrypt(text);
+    expect(decrypt(encrypted2)).toBe(text);
+    
+    __resetCachedKey();
+    // Now it should throw or use new key (and fail decrypting old data)
+    expect(() => decrypt(encrypted2)).toThrow("Decryption failed");
+  });
+
+  it("does not reset cache in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      encrypt("test");
+      process.env.ENCRYPTION_KEY = "f".repeat(64);
+      __resetCachedKey(); // Should be a no-op
+      expect(decrypt(encrypt("test"))).toBe("test"); // Still uses original cached key
+    } finally {
+      vi.stubEnv("NODE_ENV", "test");
     }
-  })
+  });
 
-  describe('encrypt', () => {
-    it('should encrypt a string successfully', () => {
-      const text = 'Hello, World!'
-      const result = encrypt(text)
+  it("should throw error for non-hex IV", () => {
+    expect(() => decrypt("not-a-hex-value-at-all--", "tag:content")).toThrow("Invalid IV format");
+  });
 
-      expect(result).toHaveProperty('iv')
-      expect(result).toHaveProperty('content')
-      expect(result.iv).toMatch(/^[a-f0-9]{24}$/i)
-      expect(result.content).toContain(':')
-    })
-
-    it('should generate different IV for each encryption', () => {
-      const text = 'test'
-      const result1 = encrypt(text)
-      const result2 = encrypt(text)
-
-      expect(result1.iv).not.toBe(result2.iv)
-      expect(result1.content).not.toBe(result2.content)
-    })
-
-    it('should throw error for empty string', () => {
-      expect(() => encrypt('')).toThrow('Invalid input')
-    })
-
-    it('should throw error for non-string input', () => {
-      expect(() => encrypt(123 as any)).toThrow('Invalid input')
-    })
-
-    it('should throw error for text longer than 100KB', () => {
-      const longText = 'a'.repeat(100001)
-      expect(() => encrypt(longText)).toThrow('Input text too long')
-    })
-
-    // Note: These tests are commented out due to module caching of the encryption key
-    // The crypto module caches the validated key, so changing env vars mid-test doesn't work
-    // These scenarios are validated at server startup by validate-env.ts
-    /*
-    it('should throw error when ENCRYPTION_KEY is not set', () => {
-      delete process.env.ENCRYPTION_KEY
-      expect(() => encrypt('test')).toThrow('ENCRYPTION_KEY is not defined')
-    })
-
-    it('should throw error when ENCRYPTION_KEY is invalid', () => {
-      process.env.ENCRYPTION_KEY = 'invalid-key'
-      expect(() => encrypt('test')).toThrow('ENCRYPTION_KEY must be 64 hex characters')
-    })
-    */
-  })
-
-  describe('decrypt', () => {
-    it('should decrypt encrypted text successfully', () => {
-      const text = 'Secret Message'
-      const { iv, content } = encrypt(text)
-      const decrypted = decrypt(iv, content)
-
-      expect(decrypted).toBe(text)
-    })
-
-    it('should decrypt special characters correctly', () => {
-      const text = '!@#$%^&*()_+-=[]{}|;:,.<>?'
-      const { iv, content } = encrypt(text)
-      const decrypted = decrypt(iv, content)
-
-      expect(decrypted).toBe(text)
-    })
-
-    it('should decrypt unicode characters correctly', () => {
-      const text = '你好世界 🌍 مرحبا'
-      const { iv, content } = encrypt(text)
-      const decrypted = decrypt(iv, content)
-
-      expect(decrypted).toBe(text)
-    })
-
-    it('should throw error for missing IV', () => {
-      expect(() => decrypt('', 'content')).toThrow('Invalid input')
-    })
-
-    it('should throw error for missing content', () => {
-      expect(() => decrypt('0123456789abcdef01234567', '')).toThrow('Invalid input')
-    })
-
-    it('should throw error for invalid IV format', () => {
-      expect(() => decrypt('invalid', 'content')).toThrow('Invalid IV format')
-    })
-
-    it('should throw error for content without separator', () => {
-      const validIV = '0123456789abcdef01234567'
-      expect(() => decrypt(validIV, 'noseparator')).toThrow('Invalid content format (missing separator)')
-    })
-
-    it('should throw error for content with multiple separators', () => {
-      const validIV = '0123456789abcdef01234567'
-      expect(() => decrypt(validIV, 'tag:content:extra')).toThrow('Invalid content format (unexpected separators)')
-    })
-
-    it('should throw error for non-hex content', () => {
-      const validIV = '0123456789abcdef01234567'
-      expect(() => decrypt(validIV, 'zzz:abc')).toThrow('Invalid content format (non-hex characters)')
-    })
-
-    it('should throw error for tampered content', () => {
-      const { iv, content } = encrypt('test')
-      const lastChar = content.slice(-1)
-      const tampered =
-        content.slice(0, -1) + (lastChar === '0' ? '1' : '0')
-      
-      expect(() => decrypt(iv, tampered)).toThrow('Decryption failed')
-    })
-
-    it('should throw error when using wrong IV', () => {
-      const { content } = encrypt('test')
-      const wrongIV = '0123456789abcdef01234567'
-      
-      expect(() => decrypt(wrongIV, content)).toThrow('Decryption failed')
-    })
-  })
-
-  describe('encryption/decryption round-trip', () => {
-    it('should handle long text correctly', () => {
-      const text = 'a'.repeat(10000)
-      const { iv, content } = encrypt(text)
-      const decrypted = decrypt(iv, content)
-
-      expect(decrypted).toBe(text)
-    })
-
-    it('should handle empty-looking strings', () => {
-      const text = '   '
-      const { iv, content } = encrypt(text)
-      const decrypted = decrypt(iv, content)
-
-      expect(decrypted).toBe(text)
-    })
-  })
-})
+  it("throws error for missing IV or content in decrypt", () => {
+    expect(() => decrypt(null as any, null as any)).toThrow("Invalid input: IV and content are required");
+    expect(() => decrypt("", "")).toThrow("Invalid input: IV and content are required");
+    expect(() => decrypt({ iv: "", content: "test" })).toThrow("Invalid input: IV and content are required");
+    expect(() => decrypt({ iv: "123456789012345678901234", content: "" })).toThrow("Invalid input: IV and content are required");
+  });
+});

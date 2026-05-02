@@ -1,96 +1,85 @@
-import { describe, it, expect, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { type ReactNode } from 'react'
-import { useFetchCourses } from '@/hooks/courses/courses'
-import axiosInstance from '@/lib/axios'
+import { renderHook, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useFetchCourses } from "../courses";
+import axios from "@/lib/axios";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   default: {
     get: vi.fn(),
   },
-}))
+}));
 
-describe('useFetchCourses', () => {
-  const createWrapper = () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
+vi.mock("@/lib/query-utils", () => ({
+  retryOnce: false,
+}));
+
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
       },
-    })
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'QueryClientWrapper'
-    return Wrapper
-  }
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
 
-  it('should fetch courses data successfully', async () => {
+describe("useFetchCourses", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should fetch and format courses", async () => {
     const mockCourses = [
-      { id: 1, name: 'Course 1', code: 'CS101' },
-      { id: 2, name: 'Course 2', code: 'CS102' },
-    ]
+      { id: 1, name: "Math" },
+      { id: 2, name: "Science" },
+    ];
+    (axios.get as any).mockResolvedValueOnce({ data: mockCourses });
 
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce({
-      data: mockCourses,
-    })
-
-    const { result } = renderHook(() => useFetchCourses(), {
+    const { result } = renderHook(() => useFetchCourses({ enabled: true }), {
       wrapper: createWrapper(),
-    })
+    });
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true)
-    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    
+    expect(result.current.data?.courses["1"]).toEqual(mockCourses[0]);
+    expect(result.current.data?.courses["2"]).toEqual(mockCourses[1]);
+    expect(axios.get).toHaveBeenCalledWith("/institutionuser/courses/withusers");
+  });
 
-    expect(result.current.data?.courses).toBeDefined()
-    expect(result.current.data?.courses['1']).toEqual(mockCourses[0])
-    expect(result.current.data?.courses['2']).toEqual(mockCourses[1])
-  })
+  it("should handle empty data", async () => {
+    (axios.get as any).mockResolvedValueOnce({ data: null });
 
-  it('should handle error state', async () => {
-    vi.mocked(axiosInstance.get).mockRejectedValueOnce(new Error('Network error'))
-      .mockRejectedValueOnce(new Error('Network error')) // Second rejection for retry
-
-    const { result } = renderHook(() => useFetchCourses(), {
+    const { result } = renderHook(() => useFetchCourses({ enabled: true }), {
       wrapper: createWrapper(),
-    })
+    });
 
-    // Wait longer than retry delay (1000ms) + processing time
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true)
-    }, { timeout: 3000 })
-  })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.courses).toEqual({});
+  });
 
-  it('should respect enabled option', () => {
-    const { result } = renderHook(() => useFetchCourses({ enabled: false }), {
+  it("should handle fetch error", async () => {
+    (axios.get as any).mockRejectedValueOnce(new Error("API Error"));
+
+    const { result } = renderHook(() => useFetchCourses({ enabled: true }), {
       wrapper: createWrapper(),
-    })
+    });
 
-    expect(result.current.status).toBe('pending')
-    expect(result.current.fetchStatus).toBe('idle')
-  })
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
 
-  it('should format courses into a map by id', async () => {
-    const mockCourses = [
-      { id: 10, name: 'Math', code: 'MATH101' },
-      { id: 20, name: 'Physics', code: 'PHYS101' },
-    ]
+  it("should throw error if response is null", async () => {
+    (axios.get as any).mockResolvedValueOnce(null);
 
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce({
-      data: mockCourses,
-    })
-
-    const { result } = renderHook(() => useFetchCourses(), {
+    const { result } = renderHook(() => useFetchCourses({ enabled: true }), {
       wrapper: createWrapper(),
-    })
+    });
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true)
-    })
-
-    expect(Object.keys(result.current.data?.courses || {})).toHaveLength(2)
-    expect(result.current.data?.courses['10'].name).toBe('Math')
-    expect(result.current.data?.courses['20'].name).toBe('Physics')
-  })
-})
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe("Failed to fetch courses data");
+  });
+});

@@ -51,6 +51,16 @@ vi.mock("@/lib/error-handling", () => ({
   getDutyLeaveErrorMessage: vi.fn(() => "DL limit reached"),
 }));
 
+vi.mock("@/providers/user-settings", () => ({
+  useUserSettings: vi.fn(() => ({
+    settings: { disabled_courses: {} },
+    isLoading: false,
+    updateBunkCalc: vi.fn(),
+    updateTarget: vi.fn(),
+    updateDisabledCourses: vi.fn(),
+  })),
+}));
+
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: any) => <div>{children}</div>,
@@ -58,6 +68,12 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogTitle: ({ children }: any) => <h2>{children}</h2>,
   DialogFooter: ({ children }: any) => <div>{children}</div>,
   DialogDescription: ({ children }: any) => <p>{children}</p>,
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: vi.fn(() => ({ data: null, isLoading: false })),
+  useMutation: vi.fn(() => ({ mutate: vi.fn(), isLoading: false })),
+  useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -145,6 +161,7 @@ vi.mock("lucide-react", () => ({
   Calendar: () => <span data-testid="calendar-icon" />,
   ChevronLeft: () => <span data-testid="chevron-left-icon" />,
   ChevronRight: () => <span data-testid="chevron-right-icon" />,
+  BookOpen: () => <span data-testid="book-open-icon" />,
 }));
 
 // ---------------------------------------------------------------------------
@@ -167,6 +184,7 @@ const defaultProps = {
 // Tests
 // ---------------------------------------------------------------------------
 describe("AddAttendanceDialog", () => {
+    vi.resetModules();
   beforeEach(() => {
     vi.clearAllMocks();
     radioGroupCallbackRef.current = null;
@@ -288,7 +306,7 @@ describe("AddAttendanceDialog", () => {
 
     await waitFor(() => {
       expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({ remarks: "Self-Marked: Present" }),
+        expect.objectContaining({ remarks: null }),
       );
     });
   });
