@@ -100,10 +100,6 @@ export function getHumanReadableError(error: unknown, context: string = "operati
     return "Too many requests. Please wait a few moments and try again.";
   }
 
-  // Fallback guard against leaking RLS details
-  if (lower.includes("row-level security")) {
-    return "Permission denied. Please verify your account settings.";
-  }
 
   return message || `Failed to complete ${context}`;
 }

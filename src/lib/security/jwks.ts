@@ -11,6 +11,14 @@ import { logger } from "@/lib/logger";
 let cachedJwks: { keys: any[] } | null = null;
 let cachedPrivateKey: any | null = null;
 
+/**
+ * FOR TESTING ONLY: Resets the cached JWKS and private key.
+ */
+export function __resetJwksCache() {
+  cachedJwks = null;
+  cachedPrivateKey = null;
+}
+
 const ALG = "RSA-OAEP-256";
 const KID = "ghostclass-v1"; // Hardcoded for simplified rotation in this version
 

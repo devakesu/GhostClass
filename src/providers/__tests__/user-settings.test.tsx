@@ -159,14 +159,14 @@ describe('UserSettingsProvider', () => {
     expect(screen.getByTestId('loading').textContent).toBe('true');
   });
 
-  it('keeps isLoading=false during background fetching', () => {
+  it('provides isLoading=true during background fetching (isFetching=true)', () => {
     vi.mocked(useQuery).mockReturnValue({
       data: undefined,
       isLoading: false,
       isFetching: true,
     } as any);
     render(<WrappedConsumer />);
-    expect(screen.getByTestId('loading').textContent).toBe('false');
+    expect(screen.getByTestId('loading').textContent).toBe('true');
   });
 
   it('provides settings when query returns data', () => {
@@ -189,19 +189,14 @@ describe('UserSettingsProvider', () => {
     expect(screen.getByTestId('settings').textContent).toBe('no-settings');
   });
 
-  it('configures refetch policy for cross-device settings sync', () => {
+  it('configures stable refetch policy for user settings', () => {
     render(<WrappedConsumer />);
 
-    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as unknown as
-      | Record<string, unknown>
-      | undefined;
+    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as any;
 
     expect(firstCallArgs).toBeDefined();
-    expect(firstCallArgs?.refetchOnMount).toBe('always');
-    expect(firstCallArgs?.refetchOnWindowFocus).toBe('always');
-    expect(firstCallArgs?.refetchOnReconnect).toBe('always');
-    expect(firstCallArgs?.refetchInterval).toBe(60 * 1000);
-    expect(firstCallArgs?.refetchIntervalInBackground).toBe(false);
+    expect(firstCallArgs?.refetchOnWindowFocus).toBe(false);
+    expect(firstCallArgs?.refetchInterval).toBe(false);
   });
 
   describe('useUserSettings guard', () => {
@@ -257,7 +252,7 @@ describe('UserSettingsProvider', () => {
         </UserSettingsProvider>
       );
       screen.getByRole('button').click();
-      expect(mockMutateAsync).toHaveBeenCalledWith({ disabled_courses: map });
+      expect(mockMutate).toHaveBeenCalledWith({ disabled_courses: map });
     });
   });
 

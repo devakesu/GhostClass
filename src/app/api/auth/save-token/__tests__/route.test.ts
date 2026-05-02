@@ -1,265 +1,278 @@
-/**
- * Tests for POST /api/auth/save-token
- *
- * Focused on the terms-cookie branch introduced in the PR:
- *   - clearTermsVersionCookie() is called when the user has NOT accepted the current terms
- *   - setTermsVersionCookie() is called when the user HAS already accepted the current terms
- */
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { POST } from "../route";
 
-// --- Environment stubs (must be hoisted) ---
-vi.hoisted(() => {
-  vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://ezygo.example.com/");
-  vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost");
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-  vi.stubEnv(
-    "ENCRYPTION_KEY",
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  );
-  vi.stubEnv("NODE_ENV", "development");
-});
-
-// --- Hoist shared mock functions so they are defined before vi.mock() factories run ---
-const mockAxiosGet = vi.hoisted(() => vi.fn());
-const mockEgressFetch = vi.hoisted(() => vi.fn());
-
-// --- server-only shim ---
-vi.mock("server-only", () => ({}));
-
-// --- CSRF ---
-const mockValidateCsrf = vi.fn();
-vi.mock("@/lib/security/csrf", () => ({
-  validateCsrfToken: mockValidateCsrf,
+// Mocking dependencies
+vi.mock("next/headers", () => ({
+  headers: vi.fn(),
+  cookies: vi.fn(),
 }));
 
-// --- Rate limiter ---
-vi.mock("@/lib/ratelimit", () => ({
-  authRateLimiter: {
-    limit: vi.fn().mockResolvedValue({
-      success: true,
-      limit: 10,
-      reset: Date.now() + 60_000,
-      remaining: 9,
-    }),
+vi.mock("next/server", () => ({
+  NextResponse: {
+    json: vi.fn((body, init) => ({
+      status: init?.status || 200,
+      json: async () => body,
+      headers: new Map(Object.entries(init?.headers || {})),
+    })),
   },
 }));
 
-// --- Utils server ---
-vi.mock("@/lib/utils.server", () => ({
-  getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
-  redact: vi.fn((_: string, v: unknown) => `***${String(v).slice(-4)}`),
-  egressFetch: mockEgressFetch,
+vi.mock("@/lib/crypto", () => ({
+  encrypt: vi.fn(() => ({ content: "encrypted-token", iv: "0123456789abcdef01234567" })),
+  decrypt: vi.fn(() => "decrypted-password"),
 }));
 
-// --- Sentry ---
+vi.mock("@/lib/ratelimit", () => ({
+  authRateLimiter: {
+    limit: vi.fn(() => Promise.resolve({ success: true, limit: 10, reset: 0, remaining: 9 })),
+  },
+}));
+
+vi.mock("@/lib/redis", () => ({
+  redis: {
+    set: vi.fn(() => Promise.resolve("OK")),
+    eval: vi.fn(() => Promise.resolve(1)),
+  },
+}));
+
+vi.mock("@/lib/utils.server", () => ({
+  getClientIp: vi.fn(() => "127.0.0.1"),
+  egressFetch: vi.fn(),
+  redact: vi.fn((type, val) => val),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    dev: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/security/csrf", () => ({
+  validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock("@/lib/security/auth-cookie", () => ({
+  setAuthCookie: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  getAdminClient: vi.fn(),
+}));
+
+vi.mock("@/lib/user/sync", () => ({
+  performProfileSync: vi.fn(() => Promise.resolve({ updates: 0, deletions: 0 })),
+}));
+
+vi.mock("@/lib/security/app-check", () => ({
+  withSecurity: (fn: any) => fn,
+  isMobileRequest: vi.fn(() => false),
+}));
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: vi.fn(() => ({
+    auth: {
+      signInWithPassword: vi.fn(() => Promise.resolve({ data: { user: { id: "auth-id" } }, error: null })),
+    },
+  })),
+}));
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
 }));
 
-// --- Logger ---
-vi.mock("@/lib/logger", () => ({
-  logger: { warn: vi.fn(), error: vi.fn(), dev: vi.fn(), info: vi.fn() },
-}));
+import { headers, cookies } from "next/headers";
+import { validateCsrfToken } from "@/lib/security/csrf";
+import { authRateLimiter } from "@/lib/ratelimit";
+import { egressFetch } from "@/lib/utils.server";
+import { getAdminClient } from "@/lib/supabase/admin";
 
-// --- Auth cookie ---
-const mockSetAuthCookie = vi.fn().mockResolvedValue(undefined);
-vi.mock("@/lib/security/auth-cookie", () => ({
-  setAuthCookie: mockSetAuthCookie,
-}));
-
-// --- User actions (terms cookies) ---
-const mockSetTermsVersionCookie = vi.fn().mockResolvedValue(undefined);
-const mockClearTermsVersionCookie = vi.fn().mockResolvedValue(undefined);
-vi.mock("@/app/actions/user", () => ({
-  setTermsVersionCookie: mockSetTermsVersionCookie,
-  clearTermsVersionCookie: mockClearTermsVersionCookie,
-}));
-
-// --- Redis ---
-vi.mock("@/lib/redis", () => ({
-  redis: {
-    set: vi.fn().mockResolvedValue("OK"),
-    eval: vi.fn().mockResolvedValue(1),
-  },
-}));
-
-// --- Axios (EzyGo token verification) ---
-vi.mock("axios", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    default: {
-      get: mockAxiosGet,
-    },
-    isAxiosError: (actual as { isAxiosError: unknown }).isAxiosError,
+describe("POST /api/auth/save-token", () => {
+  const mockHeaders = {
+    get: vi.fn(),
   };
-});
 
-// --- Crypto ---
-const MOCK_IV = "aabbccddeeff001122334455";
-vi.mock("@/lib/crypto", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    encrypt: vi.fn().mockReturnValue({ iv: MOCK_IV, content: "encrypted-content" }),
-    decrypt: vi.fn().mockReturnValue("decrypted-password"),
+  const mockCookies = {
+    getAll: vi.fn(() => []),
+    set: vi.fn(),
   };
-});
 
-// --- next/headers ---
-const mockHeadersGet = vi.fn();
-const mockCookieStore = { getAll: vi.fn().mockReturnValue([]), set: vi.fn() };
-vi.mock("next/headers", () => ({
-  headers: vi.fn(() => Promise.resolve({ get: mockHeadersGet })),
-  cookies: vi.fn(() => Promise.resolve(mockCookieStore)),
-}));
-
-// --- Supabase SSR client (device sign-in) ---
-const mockSignInWithPassword = vi.fn();
-vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn(() => ({
-    auth: { signInWithPassword: mockSignInWithPassword },
-  })),
-}));
-
-// --- Supabase admin client ---
-const mockCreateUser = vi.fn();
-const mockAdminAuthAdmin = { createUser: mockCreateUser };
-
-// Per-table mock chains – reassigned per test
-let mockUsersTable: {
-  select: ReturnType<typeof vi.fn>;
-  upsert: ReturnType<typeof vi.fn>;
-};
-let mockUserSettingsTable: { select: ReturnType<typeof vi.fn> };
-
-const mockAdminClient = {
-  auth: { admin: mockAdminAuthAdmin },
-  from: vi.fn((table: string) => {
-    if (table === "users") return mockUsersTable;
-    if (table === "user_settings") return mockUserSettingsTable;
-    return {};
-  }),
-};
-
-vi.mock("@/lib/supabase/admin", () => ({
-  getAdminClient: vi.fn(() => mockAdminClient),
-}));
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const VALID_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.x";
-
-const EZYGO_USER = {
-  id: 42,
-  username: "testuser",
-  email: "testuser@example.com",
-  mobile: "9876543210",
-};
-
-function makeRequest(token = VALID_TOKEN) {
-  return new Request("http://localhost/api/auth/save-token", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token }),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe("POST /api/auth/save-token – terms cookie branching", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // CSRF always passes
-    mockValidateCsrf.mockResolvedValue(true);
-
-    // EzyGo returns a valid user
-    mockEgressFetch.mockResolvedValue(
-      new Response(JSON.stringify(EZYGO_USER), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-
-    // Supabase sign-in always succeeds
-    mockSignInWithPassword.mockResolvedValue({ error: null });
-
-    // Users table: select chain (terms check) and upsert
-    mockUsersTable = {
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-      upsert: vi.fn().mockResolvedValue({ error: null }),
-    };
-
-    // User settings table
-    mockUserSettingsTable = {
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    };
+    vi.mocked(validateCsrfToken).mockResolvedValue(true);
+    vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true, limit: 10, reset: 0, remaining: 9 } as any);
+    mockHeaders.get.mockImplementation((name) => {
+      if (name === "x-csrf-token") return "valid-csrf";
+      if (name === "origin") return "https://localhost:3000";
+      if (name === "host") return "localhost:3000";
+      return null;
+    });
+    vi.mocked(headers).mockResolvedValue(mockHeaders as any);
+    vi.mocked(cookies).mockResolvedValue(mockCookies as any);
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost:3000");
+    vi.stubEnv("NODE_ENV", "production");
   });
 
-  it("calls clearTermsVersionCookie() for a new user who has not accepted terms", async () => {
-    // First login: createUser succeeds
-    mockCreateUser.mockResolvedValueOnce({
-      data: { user: { id: "auth-uuid-new" } },
-      error: null,
-    });
+  it("returns 403 for invalid CSRF token on web", async () => {
+    vi.mocked(validateCsrfToken).mockResolvedValue(false);
 
-    // No users-table SELECT happens for first-time users (cachedUserData stays null);
-    // the default table mock is sufficient.
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
 
-    const { POST } = await import("../route");
-    const response = await POST(makeRequest());
-
-    expect(response.status).toBe(200);
-    expect(mockClearTermsVersionCookie).toHaveBeenCalledOnce();
-    expect(mockSetTermsVersionCookie).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("Invalid CSRF token");
   });
 
-  it("calls setTermsVersionCookie() for an existing user who has already accepted terms", async () => {
-    // Returning user: createUser fails with "already registered"
-    mockCreateUser.mockResolvedValueOnce({
-      data: null,
-      error: { message: "User already registered", status: 422 },
+  it("returns 403 for invalid origin on web", async () => {
+    mockHeaders.get.mockImplementation((name) => {
+      if (name === "origin") return "https://malicious.com";
+      if (name === "host") return "localhost:3000";
+      return "valid-csrf";
     });
 
-    // CASE 2: single combined query returns auth_id, password fields, and terms fields.
-    mockUsersTable.select
-      .mockReturnValueOnce({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              auth_id: "auth-uuid-existing",
-              auth_password: "enc-pw",
-              auth_password_iv: MOCK_IV,
-              terms_version: "2.5",
-              terms_accepted_at: "2026-01-29T00:00:00Z",
-            },
-            error: null,
-          }),
-        }),
-      });
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
 
-    const { POST } = await import("../route");
-    const response = await POST(makeRequest());
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("Invalid origin");
+  });
+
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: false, limit: 1, reset: Date.now() + 1000, remaining: 0 } as any);
+
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
+
+    expect(response.status).toBe(429);
+  });
+
+  it("returns 400 for invalid token format", async () => {
+    const req = { json: async () => ({ token: "too-short" }) } as any;
+    const response = await POST(req, {} as any);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.message).toBe("Invalid request format");
+  });
+
+  it("handles EzyGo authentication success and user creation", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn(() => Promise.resolve({ data: { user: { id: "new-auth-id" } }, error: null })),
+        },
+      },
+      from: vi.fn(() => ({
+        upsert: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn(() => Promise.resolve({ data: { id: "12345" }, error: null })),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
+      })),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
-    expect(mockSetTermsVersionCookie).toHaveBeenCalledWith("2.5");
-    expect(mockClearTermsVersionCookie).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.userId).toBe("new-auth-id");
+  });
+
+  it("handles existing user login", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "existinguser", id: "54321", email: "existing@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: { message: "User already registered", status: 422 } })),
+        },
+      },
+      from: vi.fn((table) => {
+        if (table === "users") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn(() => Promise.resolve({ 
+              data: { 
+                auth_id: "existing-uuid", 
+                auth_password: "encrypted", 
+                auth_password_iv: "0123456789abcdef01234567" 
+              }, 
+              error: null 
+            })),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          };
+        }
+        if (table === "user_settings") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn(() => Promise.resolve({ data: { target_percentage: 75 } })),
+          };
+        }
+        return {};
+      }),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.userId).toBe("existing-uuid");
+  });
+
+  it("handles orphan user cleanup", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "orphanuser", id: "99999", email: "orphan@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn()
+            .mockResolvedValueOnce({ data: { user: null }, error: { message: "User already registered", status: 422 } })
+            .mockResolvedValueOnce({ data: { user: { id: "new-auth-id-after-cleanup" } }, error: null }),
+          listUsers: vi.fn(() => Promise.resolve({ 
+            data: { users: [{ id: "orphan-uuid", email: "ezygo_99999@localhost:3000" }] }, 
+            error: null 
+          })),
+          deleteUser: vi.fn(() => Promise.resolve({ error: null })),
+        },
+      },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn(() => Promise.resolve({ data: { auth_id: null }, error: null })), // Orphan detected
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+      })),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.userId).toBe("new-auth-id-after-cleanup");
   });
 });

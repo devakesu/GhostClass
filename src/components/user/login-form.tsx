@@ -223,6 +223,21 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         return;
       }
 
+      // Ensure CSRF token is present before starting the login flow.
+      // Although useCSRFToken() runs on mount, the form might be submitted before it finishes.
+      const { getCsrfToken, setCsrfToken } = await import("@/lib/axios");
+      if (!getCsrfToken()) {
+        try {
+          const csrfResponse = await fetch("/api/csrf", { credentials: "include" });
+          if (csrfResponse.ok) {
+            const { token } = await csrfResponse.json();
+            setCsrfToken(token);
+          }
+        } catch (csrfErr) {
+          logger.dev("CSRF pre-fetch failed during login submission; proceeding with default interceptor logic", csrfErr);
+        }
+      }
+
       // 1. Login to Ezygo (public endpoint)
       // Base URL is /api/backend/ so we just use 'login'
       const response = await axios.post("login", {

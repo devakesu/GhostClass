@@ -11,6 +11,7 @@ vi.mock('@/hooks/notifications/useNotifications', () => ({
     isLoading: false,
     error: null,
     markAsRead: vi.fn(),
+    toggleRead: vi.fn(),
     markAllAsRead: vi.fn(),
     fetchNextPage: vi.fn(),
     hasNextPage: false,
@@ -76,6 +77,13 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/hooks/use-sync-on-mount', () => ({
+  useSyncOnMount: vi.fn(() => ({
+    isSyncing: false,
+    syncCompleted: true,
+  })),
+}));
+
 describe('NotificationsClient', () => {
   const originalFetch = global.fetch;
 
@@ -108,6 +116,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -155,6 +164,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -202,6 +212,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -250,6 +261,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -287,6 +299,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -307,9 +320,9 @@ describe('NotificationsClient', () => {
   });
 
   describe('Notification click and keyboard interaction', () => {
-    it('calls markAsRead when an unread notification is clicked', async () => {
+    it('calls toggleRead when an unread notification is clicked', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -327,7 +340,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -346,12 +360,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.click(card);
-      expect(mockMarkAsRead).toHaveBeenCalledWith(7);
+      expect(mockToggleRead).toHaveBeenCalledWith(7, false);
     });
 
-    it('calls markAsRead on Enter keydown for an unread notification', async () => {
+    it('calls toggleRead on Enter keydown for an unread notification', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -369,7 +383,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -388,12 +403,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.keyDown(card, { key: 'Enter' });
-      expect(mockMarkAsRead).toHaveBeenCalledWith(8);
+      expect(mockToggleRead).toHaveBeenCalledWith(8, false);
     });
 
-    it('calls markAsRead on Space keydown for an unread notification', async () => {
+    it('calls toggleRead on Space keydown for an unread notification', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -411,7 +426,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -430,12 +446,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.keyDown(card, { key: ' ' });
-      expect(mockMarkAsRead).toHaveBeenCalledWith(9);
+      expect(mockToggleRead).toHaveBeenCalledWith(9, false);
     });
 
-    it('does not call markAsRead when a read notification is clicked', async () => {
+    it('does not call toggleRead when a read notification is clicked', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -453,7 +469,8 @@ describe('NotificationsClient', () => {
         unreadCount: 0,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -470,7 +487,7 @@ describe('NotificationsClient', () => {
       const notification = await screen.findByText('Already Read Notification', {}, { timeout: 3000 });
       const card = notification.closest('div[role="button"]') as HTMLElement;
       if (card) fireEvent.click(card);
-      expect(mockMarkAsRead).not.toHaveBeenCalled();
+      expect(mockToggleRead).toHaveBeenCalledWith(10, true);
     });
   });
 });

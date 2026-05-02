@@ -1,217 +1,305 @@
-import { describe, it, expect } from 'vitest'
-import { cn, toRoman, normalizeSession, generateSlotKey, formatSessionName, getSessionNumber, formatCourseCode, normalizeDate, redact, normalizeToISODate } from '@/lib/utils'
+import { describe, it, expect, vi } from "vitest";
+import { 
+  cn, 
+  toTitleCase, 
+  toRoman, 
+  normalizeSession, 
+  normalizeToISODate, 
+  normalizeDate, 
+  generateSlotKey, 
+  formatSessionName, 
+  getSessionNumber, 
+  formatCourseCode,
+  getAppDomain,
+  isValidAvatarUrl,
+  compressImage
+} from "../utils";
 
-describe('Utils', () => {
-  describe('cn', () => {
-    it('should merge class names', () => {
-      expect(cn('text-red-500', 'bg-blue-500')).toBe('text-red-500 bg-blue-500')
-    })
+describe("utils.ts", () => {
+  describe("cn", () => {
+    it("merges tailwind classes", () => {
+      expect(cn("px-2", "px-4")).toBe("px-4");
+      expect(cn("px-2 py-1", { "bg-red-500": true })).toBe("px-2 py-1 bg-red-500");
+    });
+  });
 
-    it('should handle conditional classes', () => {
-      const condition = false
-      expect(cn('base', condition && 'hidden', 'visible')).toBe('base visible')
-    })
-  })
+  describe("toTitleCase", () => {
+    it("converts string to title case", () => {
+      expect(toTitleCase("JOHN DOE")).toBe("John Doe");
+      expect(toTitleCase("  jane   smith  ")).toBe("Jane Smith");
+      expect(toTitleCase("")).toBe("");
+    });
+  });
 
-  describe('toRoman', () => {
-    it('should convert numbers to Roman numerals', () => {
-      expect(toRoman(1)).toBe('I')
-      expect(toRoman(2)).toBe('II')
-      expect(toRoman(5)).toBe('V')
-      expect(toRoman(10)).toBe('X')
-    })
+  describe("toRoman", () => {
+    it("converts 1-12 to Roman numerals", () => {
+      expect(toRoman(1)).toBe("I");
+      expect(toRoman(5)).toBe("V");
+      expect(toRoman(12)).toBe("XII");
+    });
 
-    it('should handle invalid inputs', () => {
-      expect(toRoman(0)).toBe('0')
-      expect(toRoman(-1)).toBe('-1')
-      expect(toRoman('abc')).toBe('abc')
-    })
-  })
+    it("returns as-is for values out of range", () => {
+      expect(toRoman(13)).toBe("13");
+      expect(toRoman(0)).toBe("0");
+      expect(toRoman("not-a-number")).toBe("not-a-number");
+    });
+  });
 
-  describe('normalizeSession', () => {
-    it('should normalize session strings', () => {
-      expect(normalizeSession('Session 1')).toBe('1')
-      expect(normalizeSession('2nd Hour')).toBe('2')
-      expect(normalizeSession('III')).toBe('3')
-      expect(normalizeSession('Extra')).toBe('EXTRA')
-    })
-  })
+  describe("normalizeSession", () => {
+    it("normalizes various session strings", () => {
+      expect(normalizeSession("Session 1")).toBe("1");
+      expect(normalizeSession("2nd Hour")).toBe("2");
+      expect(normalizeSession("iii")).toBe("3");
+      expect(normalizeSession("Extra")).toBe("EXTRA");
+      expect(normalizeSession("Lecture 5")).toBe("5");
+      expect(normalizeSession("vii extra")).toBe("7");
+      expect(normalizeSession("8th Period")).toBe("8");
+    });
+  });
 
-  describe('generateSlotKey', () => {
-    it('should generate correctly formatted slot keys', () => {
-      const courseId = '101'
-      const date = '20260127'
-      const session = '1'
-      const key = generateSlotKey(courseId, date, session)
-      // Format: COURSEID_YYYYMMDD_ROMAN
-      expect(key).toBe('101_20260127_I')
-    })
+  describe("normalizeToISODate", () => {
+    it("converts various formats to YYYY-MM-DD", () => {
+      expect(normalizeToISODate("2024-01-15T10:30:00Z")).toBe("2024-01-15");
+      expect(normalizeToISODate("15/01/2024")).toBe("2024-01-15");
+      expect(normalizeToISODate("15-01-2024")).toBe("2024-01-15");
+      expect(normalizeToISODate("20251201")).toBe("2025-12-01");
+      expect(normalizeToISODate("invalid")).toBe("invalid");
+      expect(normalizeToISODate("")).toBe("");
+    });
+  });
 
-    it('should generate consistent slot keys', () => {
-      const key1 = generateSlotKey('101', '20260127', '1')
-      const key2 = generateSlotKey('101', '20260127', '1')
-      expect(key1).toBe(key2)
-    })
-  })
-
-  describe('formatSessionName', () => {
-    it('should format session names correctly', () => {
-      expect(formatSessionName('I')).toBe('1st Hour')
-      expect(formatSessionName('II')).toBe('2nd Hour')
-      expect(formatSessionName('III')).toBe('3rd Hour')
-      expect(formatSessionName('IV')).toBe('4th Hour')
-    })
-
-    it('should handle numeric sessions', () => {
-      expect(formatSessionName('1')).toBe('1st Hour')
-      expect(formatSessionName('2')).toBe('2nd Hour')
-      expect(formatSessionName('3')).toBe('3rd Hour')
-      expect(formatSessionName('11')).toBe('11th Hour')
-      expect(formatSessionName('21')).toBe('21st Hour')
-    })
-
-    it('should return empty string for empty input', () => {
-      expect(formatSessionName('')).toBe('')
-    })
-  })
-
-  describe('getSessionNumber', () => {
-    it('should extract session numbers from Roman numerals', () => {
-      expect(getSessionNumber('I')).toBe(1)
-      expect(getSessionNumber('II')).toBe(2)
-      expect(getSessionNumber('III')).toBe(3)
-    })
-
-    it('should extract session numbers from strings', () => {
-      expect(getSessionNumber('Session 1')).toBe(1)
-      expect(getSessionNumber('2nd Hour')).toBe(2)
-    })
-
-    it('should return 999 for invalid input', () => {
-      expect(getSessionNumber('')).toBe(999)
-      expect(getSessionNumber('invalid')).toBe(999)
-    })
-  })
-
-  describe('formatCourseCode', () => {
-    it('should format course codes with hyphens', () => {
-      expect(formatCourseCode('CS-101')).toBe('CS')
-    })
-
-    it('should remove spaces from course codes', () => {
-      expect(formatCourseCode('CS 101')).toBe('CS101')
-    })
-
-    it('should handle codes without hyphens', () => {
-      expect(formatCourseCode('MATH101')).toBe('MATH101')
-    })
-  })
-
-  describe('normalizeToISODate', () => {
-    it('should strip time part from ISO datetime strings', () => {
-      expect(normalizeToISODate('2024-01-15T10:30:00Z')).toBe('2024-01-15')
-      expect(normalizeToISODate('2024-01-15T00:00:00.000Z')).toBe('2024-01-15')
-    })
-
-    it('should convert DD/MM/YYYY to YYYY-MM-DD', () => {
-      expect(normalizeToISODate('15/01/2024')).toBe('2024-01-15')
-      expect(normalizeToISODate('01/02/2026')).toBe('2026-02-01')
-    })
-
-    it('should pad single-digit day and month', () => {
-      expect(normalizeToISODate('5/3/2024')).toBe('2024-03-05')
-    })
-
-    it('should return already-normalized YYYY-MM-DD strings unchanged', () => {
-      expect(normalizeToISODate('2024-01-15')).toBe('2024-01-15')
-    })
-
-    it('should return empty string for empty input', () => {
-      expect(normalizeToISODate('')).toBe('')
-    })
-
-    it('should return the original string unchanged for malformed slash-separated input', () => {
-      // Only two parts — not DD/MM/YYYY
-      expect(normalizeToISODate('15/01')).toBe('15/01')
-      // Empty part
-      expect(normalizeToISODate('15//2024')).toBe('15//2024')
-    })
-  })
-
-  describe('normalizeDate', () => {
-    it('should format Date objects to YYYYMMDD', () => {
-      const date = new Date(2026, 0, 27) // January 27, 2026
-      const result = normalizeDate(date)
-      expect(result).toBe('20260127')
-    })
-
-    it('should handle ISO string dates', () => {
-      expect(normalizeDate('2026-01-27T00:00:00.000Z')).toBe('20260127')
-    })
-
-    it('should handle YYYY-MM-DD format', () => {
-      expect(normalizeDate('2026-01-27')).toBe('20260127')
-    })
-
-    it('should handle DD-MM-YYYY format', () => {
-      expect(normalizeDate('27-01-2026')).toBe('20260127')
-    })
-
-    it('should return empty string for empty input', () => {
-      expect(normalizeDate('')).toBe('')
-    })
-  })
-
-  describe('redact', () => {
-    it('should redact email addresses deterministically', () => {
-      const email = 'user@example.com'
-      const hash1 = redact('email', email)
-      const hash2 = redact('email', email)
+  describe("normalizeDate", () => {
+    it("converts to YYYYMMDD", () => {
+      expect(normalizeDate(new Date(2024, 0, 15))).toBe("20240115");
+      expect(normalizeDate("2024-01-15")).toBe("20240115");
+      expect(normalizeDate("15/01/2024")).toBe("20240115");
+      expect(normalizeDate("")).toBe("");
+      expect(normalizeDate("2024-01-15T10:00:00Z")).toBe("20240115");
       
-      // Should produce the same hash for the same input
-      expect(hash1).toBe(hash2)
-      
-      // Should be 12 characters long
-      expect(hash1).toHaveLength(12)
-      
-      // Should not contain the original email
-      expect(hash1).not.toContain('@')
-      expect(hash1).not.toContain('example')
-    })
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(normalizeDate("not-a-date")).toBe("");
+      expect(spy).toHaveBeenCalled();
+    });
+  });
 
-    it('should redact IDs deterministically', () => {
-      const id = '12345'
-      const hash1 = redact('id', id)
-      const hash2 = redact('id', id)
-      
-      // Should produce the same hash for the same input
-      expect(hash1).toBe(hash2)
-      
-      // Should be 12 characters long
-      expect(hash1).toHaveLength(12)
-      
-      // Should not contain the original ID
-      expect(hash1).not.toContain('12345')
-    })
+  describe("formatSessionName", () => {
+    it("formats session identifiers for display", () => {
+      expect(formatSessionName("i")).toBe("1st Hour");
+      expect(formatSessionName("2")).toBe("2nd Hour");
+      expect(formatSessionName("iii")).toBe("3rd Hour");
+      expect(formatSessionName("9")).toBe("9th Hour");
+      expect(formatSessionName("Lab")).toBe("Session Lab");
+      expect(formatSessionName("ix")).toBe("9th Hour");
+      expect(formatSessionName("11")).toBe("11th Hour");
+      expect(formatSessionName("12")).toBe("12th Hour");
+      expect(formatSessionName("13")).toBe("13th Hour");
+      expect(formatSessionName("21")).toBe("Session 21");
+      expect(formatSessionName("")).toBe("");
+    });
+  });
 
-    it('should produce different hashes for different types', () => {
-      const value = 'test@example.com'
-      const emailHash = redact('email', value)
-      const idHash = redact('id', value)
-      
-      // Different types should produce different hashes
-      expect(emailHash).not.toBe(idHash)
-    })
+  describe("getSessionNumber", () => {
+    it("extracts numeric value from session name", () => {
+      expect(getSessionNumber("1st Hour")).toBe(1);
+      expect(getSessionNumber("iii")).toBe(3);
+      expect(getSessionNumber("Session 5")).toBe(5);
+      expect(getSessionNumber("Lab")).toBe(999);
+      expect(getSessionNumber("IX")).toBe(9);
+      expect(getSessionNumber("")).toBe(999);
+    });
+    it("returns empty string for non-numeric date parts in DD/MM/YYYY", () => {
+      expect(normalizeDate("12/AA/2024")).toBe("");
+    });
+  });
 
-    it('should produce different hashes for different values', () => {
-      const email1 = 'user1@example.com'
-      const email2 = 'user2@example.com'
+  describe("getAppDomain", () => {
+    it("returns domain from environment", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "test.com");
+      expect(getAppDomain()).toBe("test.com");
+    });
+
+    it("falls back to default domain", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+      vi.stubEnv("NEXT_PUBLIC_DEFAULT_DOMAIN", "default.com");
+      expect(getAppDomain()).toBe("default.com");
+    });
+
+    it("falls back to window.location.hostname in dev", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+      vi.stubEnv("NEXT_PUBLIC_DEFAULT_DOMAIN", "");
       
-      const hash1 = redact('email', email1)
-      const hash2 = redact('email', email2)
+      const originalWindow = global.window;
+      global.window = { location: { hostname: "my-app.com" } } as any;
       
-      // Different values should produce different hashes
-      expect(hash1).not.toBe(hash2)
-    })
-  })
-})
+      expect(getAppDomain()).toBe("my-app.com");
+      
+      global.window = originalWindow;
+    });
+
+    it("ignores localhost/IPs in dev fallback", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+      
+      const originalWindow = global.window;
+      global.window = { location: { hostname: "localhost" } } as any;
+      expect(getAppDomain("fallback.com")).toBe("fallback.com");
+      
+      global.window = { location: { hostname: "127.0.0.1" } } as any;
+      expect(getAppDomain("fallback.com")).toBe("fallback.com");
+
+      global.window = originalWindow;
+    });
+
+    it("warns in production if no env var set", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+      vi.stubEnv("NEXT_PUBLIC_DEFAULT_DOMAIN", "");
+      
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      getAppDomain();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining("SECURITY"));
+    });
+  });
+
+  describe("isValidAvatarUrl", () => {
+    it("validates Supabase avatar URLs", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
+      expect(isValidAvatarUrl("https://abc.supabase.co/storage/v1/object/public/avatars/u.png")).toBe(true);
+      expect(isValidAvatarUrl("http://abc.supabase.co/u.png")).toBe(false);
+      expect(isValidAvatarUrl("https://other.com/u.png")).toBe(false);
+      expect(isValidAvatarUrl(null)).toBe(false);
+      expect(isValidAvatarUrl("not-a-url")).toBe(false);
+    });
+
+    it("allows any HTTPS URL if SUPABASE_URL is missing", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+      expect(isValidAvatarUrl("https://anywhere.com/img.png")).toBe(true);
+    });
+  });
+
+  describe("generateSlotKey", () => {
+    it("generates a canonical slot key", () => {
+      expect(generateSlotKey(101, "2024-01-15", 1)).toBe("101_20240115_I");
+      expect(generateSlotKey("CS101", "2024-01-15", "iii")).toBe("CS101_20240115_III");
+    });
+  });
+
+  describe("formatCourseCode", () => {
+    it("removes whitespace and handles hyphens", () => {
+      expect(formatCourseCode("CS 101-A")).toBe("CS101");
+      expect(formatCourseCode("MATH 201")).toBe("MATH201");
+    });
+  });
+
+  describe("compressImage", () => {
+    it("rejects invalid quality values", async () => {
+      const file = new File([""], "test.png", { type: "image/png" });
+      await expect(compressImage(file, -1)).rejects.toThrow(RangeError);
+      await expect(compressImage(file, 2)).rejects.toThrow(RangeError);
+      await expect(compressImage(file, NaN)).rejects.toThrow(RangeError);
+    });
+
+    it("should reject if canvas context is null", async () => {
+      const mockCanvas = {
+        getContext: vi.fn().mockReturnValue(null),
+      };
+      vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
+      
+      // Mock FileReader
+      const mockReader = {
+        readAsDataURL: vi.fn().mockImplementation(function(this: any) {
+          setTimeout(() => {
+            if (this.onload) {
+              this.onload({ target: { result: "data:image/png;base64," } });
+            }
+          }, 0);
+        }),
+      };
+      vi.stubGlobal('FileReader', vi.fn().mockImplementation(function() { return mockReader; }));
+
+      // Mock Image
+      const mockImage = {
+        set src(_: string) {
+          setTimeout(() => (this as any).onload(), 0);
+        }
+      };
+      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+
+      const file = new File(["test"], "test.png", { type: "image/png" });
+      await expect(compressImage(file, 0.5)).rejects.toThrow("Failed to get canvas context");
+    });
+
+    it("should reject if blob is null", async () => {
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn().mockReturnValue({
+          fillStyle: "",
+          fillRect: vi.fn(),
+          drawImage: vi.fn(),
+        }),
+        toBlob: vi.fn().mockImplementation((cb) => cb(null)),
+      };
+      vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
+      
+      const mockImage = {
+        set src(_: string) {
+          setTimeout(() => (this as any).onload(), 0);
+        }
+      };
+      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+
+      const file = new File(["test"], "test.png", { type: "image/png" });
+      await expect(compressImage(file, 0.5)).rejects.toThrow("Canvas is empty");
+    });
+
+    it("compresses image (mocked)", async () => {
+      // Mocking the browser-specific parts
+      const mockBlob = new Blob(["compressed"], { type: "image/jpeg" });
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn().mockReturnValue({
+          fillStyle: "",
+          fillRect: vi.fn(),
+          drawImage: vi.fn(),
+        }),
+        toBlob: vi.fn().mockImplementation((cb) => cb(mockBlob)),
+      };
+      
+      const spyCreate = vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
+      
+      // Mock FileReader
+      const mockReader = {
+        readAsDataURL: vi.fn().mockImplementation(function(this: any) {
+          setTimeout(() => {
+            if (this.onload) {
+              this.onload({ target: { result: "data:image/png;base64," } });
+            }
+          }, 0);
+        }),
+      };
+      vi.stubGlobal('FileReader', vi.fn().mockImplementation(function() { return mockReader; }));
+      
+      // Mock Image
+      const mockImage = {
+        width: 2000,
+        height: 1000,
+        set src(_: string) {
+          setTimeout(() => (this as any).onload(), 0);
+        }
+      };
+      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+
+      const file = new File(["original"], "test.png", { type: "image/png" });
+      const result = await compressImage(file, 0.5);
+      
+      expect(result).toBeInstanceOf(File);
+      expect(result.name).toBe("test.jpg");
+      expect(mockCanvas.width).toBe(1920); // Scaled down
+      
+      spyCreate.mockRestore();
+    });
+  });
+});

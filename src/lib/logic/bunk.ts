@@ -52,9 +52,7 @@ export function calculateAttendance(
 
   if (Math.abs(currentPercentage - safeTarget) < PERCENTAGE_EPSILON) {
     result.isExact = true;
-    return result;
-  }
-  if (currentPercentage < safeTarget) {
+  } else if (currentPercentage < safeTarget) {
     if (safeTarget >= 100) {
       result.requiredToAttend = total - present;
     } else {
@@ -63,8 +61,8 @@ export function calculateAttendance(
       );
       result.requiredToAttend = Math.max(0, required);
     }
-    return result;
-  } else if (currentPercentage > safeTarget) {
+  } else {
+    // currentPercentage > safeTarget
     const bunkableExact = (100 * present - safeTarget * total) / safeTarget;
     const bunkable = Math.floor(bunkableExact);
     
@@ -73,8 +71,6 @@ export function calculateAttendance(
     if (bunkableExact > 0 && bunkableExact < BORDERLINE_THRESHOLD && bunkable === 0) {
       result.isBorderline = true;
     }
-    
-    return result;
   }
 
   return result;

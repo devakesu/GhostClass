@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 
 
-const AUTHORIZED_SHA256_DIGESTS = [
+const getAuthorizedDigests = () => [
   process.env.PLAY_INTEGRITY_CERT_SHA256 || "PLACEHOLDER_SHA256_FINGERPRINT",
 ];
 
@@ -106,7 +106,7 @@ export async function verifyPlayIntegrity(
     if (enforceCert) {
       const certs = appIntegrity?.certificateSha256Digest || [];
       const hasAuthorizedCert = certs.some((cert: string) =>
-        AUTHORIZED_SHA256_DIGESTS.includes(cert)
+        getAuthorizedDigests().includes(cert)
       );
 
       if (!hasAuthorizedCert) {

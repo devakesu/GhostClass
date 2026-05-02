@@ -318,6 +318,7 @@ export function CourseCard({
       headerBorder: "border-border/60",
       badge: "bg-foreground/10 text-muted-foreground",
     };
+    
     const metrics = stats.extraMetrics;
     const isAtRisk = metrics.requiredToAttend > 0;
     
@@ -327,13 +328,25 @@ export function CourseCard({
       headerBorder: "border-green-500/20 dark:border-green-500/40",
       badge: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
     };
+
+    // Attendance is below target (At Risk)
+    // Within 10% points of target -> Amber/Warning
+    const isAmber = stats.displayPercentage >= (targetPercentage - 10);
+    
+    if (isAmber) return {
+      card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
+      headerBg: "bg-amber-500/10 dark:bg-amber-500/20",
+      headerBorder: "border-amber-500/20 dark:border-amber-500/40",
+      badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    };
+
     return {
       card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
       headerBg: "bg-red-500/10 dark:bg-red-500/20",
       headerBorder: "border-red-500/20 dark:border-red-500/40",
       badge: "bg-red-500/15 text-red-500 border-red-500/30",
     };
-  }, [hasAttendanceData, stats.extraMetrics]);
+  }, [hasAttendanceData, stats.extraMetrics, stats.displayPercentage, targetPercentage]);
 
   const capitalize = useCallback((str: string) => {
     if (!str) return "";

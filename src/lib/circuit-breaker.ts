@@ -183,7 +183,7 @@ class CircuitBreaker {
         this.successCount = 0;
         this.halfOpenInFlight = 0;
       }
-    } else if (this.state === 'CLOSED') {
+    } else {
       // Reset failure count on success
       if (this.failures > 0) {
         logger.dev('[Circuit Breaker] Resetting failure count', {

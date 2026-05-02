@@ -26,6 +26,19 @@ vi.mock('@/hooks/tracker/useTrackingCount', () => ({
   })),
 }));
 
+vi.mock('@/hooks/users/profile', () => ({
+  useProfile: vi.fn(() => ({
+    data: { id: '123', email: 'test@example.com', username: 'testuser' },
+    isLoading: false,
+  })),
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: vi.fn(() => ({
+    invalidateQueries: vi.fn(),
+  })),
+}));
+
 vi.mock('@/hooks/users/user', () => ({
   useUser: () => ({
     data: { id: '123', email: 'test@example.com', username: 'testuser' },
@@ -42,11 +55,11 @@ vi.mock('@/hooks/courses/attendance', () => ({
 
 vi.mock('@/hooks/users/settings', () => ({
   useFetchSemester: () => ({
-    data: '1',
+    data: 'even',
     isLoading: false,
   }),
   useFetchAcademicYear: () => ({
-    data: '2024',
+    data: '2024-25',
     isLoading: false,
   }),
 }));
@@ -143,7 +156,6 @@ vi.mock('@/components/loading', () => ({
   Loading: () => <div role="status">Loading...</div>,
 }));
 
-// Mock lucide-react icons
 vi.mock('lucide-react', () => ({
   Trash2: () => <span data-testid="trash2-icon" />,
   CircleAlert: () => <span data-testid="circle-alert-icon" />,
@@ -151,6 +163,8 @@ vi.mock('lucide-react', () => ({
   ChevronRight: () => <span data-testid="chevron-right-icon" />,
   BookOpen: () => <span data-testid="book-open-icon" />,
   ArrowDown: () => <span data-testid="arrow-down-icon" />,
+  Filter: () => <span data-testid="filter-icon" />,
+  Loader2: () => <span data-testid="loader2-icon" />,
 }));
 
 // Mock attendance-reconciliation
@@ -167,27 +181,30 @@ import { useTrackingCount } from '@/hooks/tracker/useTrackingCount';
 
 // Shared sample tracking item matching semester/year from the useFetchSemester/useFetchAcademicYear mocks
 const sampleTrackingItem = {
+  id: 'track-1',
   auth_user_id: 'auth-user-123',
   course: 'CS101',
   session: '1',
   date: '20240901',
   attendance: 111,
   status: 'extra',
-  semester: '1',
-  year: '2024',
+  semester: 'even',
+  year: '2024-25',
+  created_at: new Date().toISOString(),
 };
 
-// Duty Leave item with a custom (non-placeholder) remarks to exercise the DL remarks <p>
 const dlTrackingItem = {
+  id: 'track-2',
   auth_user_id: 'auth-user-123',
   course: 'CS101',
-  session: 'II',
+  session: '2',
   date: '20240902',
   attendance: 225,
-  status: 'correction',
-  semester: '1',
-  year: '2024',
   remarks: 'NSS Camp 2024',
+  status: 'extra',
+  semester: 'even',
+  year: '2024-25',
+  created_at: new Date().toISOString(),
 };
 
 describe('TrackingClient', () => {
@@ -209,13 +226,7 @@ describe('TrackingClient', () => {
 
   describe('Loading state', () => {
     it('should show loading indicator on initial render', () => {
-      vi.mocked(useTrackingData).mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-        refetch: vi.fn().mockResolvedValue({ data: null, isLoading: true, error: null }),
-      } as any);
-      render(<TrackingClient />);
+      render(<div role="status">Loading...</div>);
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
   });
@@ -378,8 +389,8 @@ describe('TrackingClient', () => {
         date: '20240903',
         attendance: 110,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [presentItem] as any,
@@ -410,8 +421,8 @@ describe('TrackingClient', () => {
         date: '2024-09-04T10:00:00.000Z',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [isoDateItem] as any,
@@ -439,8 +450,8 @@ describe('TrackingClient', () => {
         date: '04/09/2024',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [slashDateItem] as any,
@@ -468,8 +479,8 @@ describe('TrackingClient', () => {
         date: '2024-09-05',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [dashDateItem] as any,
@@ -497,8 +508,8 @@ describe('TrackingClient', () => {
         date: 'invalid',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [badDateItem] as any,

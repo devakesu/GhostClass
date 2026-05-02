@@ -28,7 +28,14 @@ vi.mock("@/hooks/users/user", () => ({
 }));
 
 vi.mock("@/hooks/users/profile", () => ({
-  useProfile: () => ({ data: { avatar_url: null }, isLoading: false }),
+  useProfile: () => ({ 
+    data: { 
+      username: "testuser", 
+      email: "test@example.com", 
+      avatar_url: null 
+    }, 
+    isLoading: false 
+  }),
 }));
 
 vi.mock("@/providers/user-settings", () => ({

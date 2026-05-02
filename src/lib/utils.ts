@@ -163,6 +163,10 @@ function parseDateParts(str: string): { y: string; m: string; d: string } | null
     const parts = base.split('-');
     if (parts.length === 3) {
       const [a, b, c] = parts.map((p) => p.trim());
+      // Ensure all parts are numeric to avoid false positives (e.g. "not-a-date")
+      if (!/^\d+$/.test(a) || !/^\d+$/.test(b) || !/^\d+$/.test(c)) {
+        return null;
+      }
       if (a.length === 4) {
         // YYYY-MM-DD
         return { y: a, m: b.padStart(2, '0'), d: c.padStart(2, '0') };
@@ -178,6 +182,10 @@ function parseDateParts(str: string): { y: string; m: string; d: string } | null
     const parts = base.split('/');
     if (parts.length === 3) {
       const [rawD, rawM, rawY] = parts.map((p) => p.trim());
+      // Ensure all parts are numeric to avoid false positives
+      if (!/^\d+$/.test(rawD) || !/^\d+$/.test(rawM) || !/^\d+$/.test(rawY)) {
+        return null;
+      }
       if (rawD && rawM && rawY) {
         // DD/MM/YYYY
         return { y: rawY, m: rawM.padStart(2, '0'), d: rawD.padStart(2, '0') };
@@ -533,7 +541,7 @@ export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string 
   }
   
   // Final fallback
-  return appDomain ?? defaultDomain;
+  return appDomain || defaultDomain;
 }
 
 /**

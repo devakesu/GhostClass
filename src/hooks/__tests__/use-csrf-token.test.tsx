@@ -387,16 +387,16 @@ describe('useCSRFToken', () => {
     })
 
     // First component starts initialization (will fail)
+    // We don't use await renderHook here because we want to mount the second one concurrently
     const { unmount: unmount1 } = renderHook(() => useCSRFToken())
 
-    // Wait for first fetch to be called
+    // Second component mounts while first is still in-flight
+    const { unmount: unmount2 } = renderHook(() => useCSRFToken())
+
+    // Wait for first fetch to be called (both should be waiting/retrying)
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(1)
     })
-
-    // Second component mounts while first is failing
-    // It should wait for the first promise, then retry
-    const { unmount: unmount2 } = renderHook(() => useCSRFToken())
 
     // Wait for second fetch (retry)
     await waitFor(
@@ -413,5 +413,38 @@ describe('useCSRFToken', () => {
 
     unmount1()
     unmount2()
+  })
+
+  it('should skip if token exists after waiting for existing promise', async () => {
+    // Other component is initializing
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValueOnce(null).mockReturnValue('token-from-other')
+    
+    global.fetch = vi.fn().mockImplementation(() => new Promise(resolve => {
+      setTimeout(() => resolve({ ok: true, json: async () => ({ token: 'token-from-other' }) }), 50)
+    }))
+
+    // First mount starts fetch
+    renderHook(() => useCSRFToken())
+    
+    // Second mount waits for fetch
+    renderHook(() => useCSRFToken())
+    
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+    
+    // Should NOT call fetch a second time because token-from-other was found
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('should skip if already initialized in current component', async () => {
+    vi.mocked(axiosModule.getCsrfToken).mockReturnValue(null)
+    const { rerender } = renderHook(() => useCSRFToken())
+    
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+    
+    rerender()
+    expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,4 +1,4 @@
-import { getEgressConfig } from "@/lib/utils.server";
+// proxy-utils.ts
 
 export interface EgressTarget {
   readonly baseUrl: string;
@@ -42,11 +42,11 @@ export function buildEgressTargets(): EgressTarget[] {
     });
   }
 
-  const { baseUrl, proxyHeaders } = getEgressConfig();
-  if (baseUrl) {
+  const directUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+  if (directUrl) {
     targets.push({
-      baseUrl,
-      proxyHeaders,
+      baseUrl: directUrl,
+      proxyHeaders: {},
       secret: undefined,
       name: "direct",
       timeoutMs: 10_000,

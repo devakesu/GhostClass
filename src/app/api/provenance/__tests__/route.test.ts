@@ -62,6 +62,7 @@ describe("Provenance API Route", () => {
     } else {
       delete process.env.NEXT_PUBLIC_GITHUB_URL;
     }
+    vi.resetModules();
     if (originalBuildTimestamp !== undefined) {
       process.env.BUILD_TIMESTAMP = originalBuildTimestamp;
     } else {

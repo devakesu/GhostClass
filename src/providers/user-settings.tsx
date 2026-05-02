@@ -286,6 +286,7 @@ function useUserSettingsState() {
               if (previousUserId) {
                 localStorage.removeItem(`showBunkCalc_${previousUserId}`);
                 localStorage.removeItem(`targetPercentage_${previousUserId}`);
+                localStorage.removeItem(`disabledCourses_${previousUserId}`);
               }
 
               // Also clear non-scoped prefetched settings to avoid cross-user leakage

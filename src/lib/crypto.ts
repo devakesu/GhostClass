@@ -91,6 +91,9 @@ export function decrypt(data: EncryptedData): string;
 /** @deprecated Prefer `decrypt(encryptedData)` to prevent iv/content swap. */
 export function decrypt(ivHex: string, content: string): string;
 export function decrypt(ivHexOrData: string | EncryptedData, contentArg?: string): string {
+  if (!ivHexOrData) {
+    throw new Error("Invalid input: IV and content are required");
+  }
   const ivHex = typeof ivHexOrData === 'string' ? ivHexOrData : ivHexOrData.iv;
   const content = typeof ivHexOrData === 'string' ? contentArg! : ivHexOrData.content;
 
