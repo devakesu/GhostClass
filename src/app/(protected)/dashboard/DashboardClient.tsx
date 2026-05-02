@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   AnimatePresence,
@@ -181,31 +181,48 @@ export default function DashboardClient(
   >(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
-  // --- INITIALIZATION LOGIC (DURING RENDER) ---
-  // We use this pattern to avoid synchronous setState inside useEffect (react-hooks/set-state-in-effect).
-  // This effectively "hydrates" the state from EzyGo settings as soon as they are available.
-  const [isInitialized, setIsInitialized] = useState(false);
-  if (!isInitialized && !isSettingsLoading && ezygoSemester !== undefined && ezygoYear !== undefined) {
-    setIsInitialized(true);
-    if (selectedSemester === null) {
-      if (ezygoSemester) {
-        setSelectedSemester(ezygoSemester);
-      } else if (profile && !setSemesterMutation.isPending) {
-        const info = calculateCurrentAcademicInfo();
-        setSelectedSemester(info.current_semester);
-        // Mutations are side effects and should stay in useEffect or event handlers.
-        // We'll trigger them below in a sanitized effect.
-      }
+  // --- INITIALIZATION LOGIC ---
+  // We use useEffect to hydrate the state from EzyGo settings as soon as they are available.
+  // Using an effect instead of the render body prevents "Router action dispatched before initialization"
+  // errors and ensures the component is mounted before state updates are performed.
+  const isInitializedRef = useRef(false);
+  
+  useEffect(() => {
+    logger.dev("[DashboardClient] Mounted", {
+      hasInitialData: !!initialData,
+      serverError: !!serverError,
+    });
+    return () => logger.dev("[DashboardClient] Unmounted");
+  }, [initialData, serverError]);
+
+  useEffect(() => {
+    if (!isInitializedRef.current && !isSettingsLoading && ezygoSemester !== undefined && ezygoYear !== undefined) {
+      logger.dev("[DashboardClient] Initializing settings state", { ezygoSemester, ezygoYear });
+      isInitializedRef.current = true;
+      
+      // Defer state updates to the next microtask to avoid cascading renders during the same
+      // execution tick, which satisfies React's performance recommendations and prevents
+      // router initialization conflicts.
+      Promise.resolve().then(() => {
+        if (selectedSemester === null) {
+          if (ezygoSemester) {
+            setSelectedSemester(ezygoSemester);
+          } else if (profile && !setSemesterMutation.isPending) {
+            const info = calculateCurrentAcademicInfo();
+            setSelectedSemester(info.current_semester);
+          }
+        }
+        if (selectedYear === null) {
+          if (ezygoYear) {
+            setSelectedYear(ezygoYear);
+          } else if (profile && !setAcademicYearMutation.isPending) {
+            const info = calculateCurrentAcademicInfo();
+            setSelectedYear(info.current_year);
+          }
+        }
+      });
     }
-    if (selectedYear === null) {
-      if (ezygoYear) {
-        setSelectedYear(ezygoYear);
-      } else if (profile && !setAcademicYearMutation.isPending) {
-        const info = calculateCurrentAcademicInfo();
-        setSelectedYear(info.current_year);
-      }
-    }
-  }
+  }, [isSettingsLoading, ezygoSemester, ezygoYear, profile, selectedSemester, selectedYear, setSemesterMutation.isPending, setAcademicYearMutation.isPending]);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
@@ -481,7 +498,7 @@ export default function DashboardClient(
   // 3. Term Synchronization Effect
   // Handles the side-effect of persistence when a default is calculated at runtime.
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitializedRef.current) {
       if (selectedSemester && ezygoSemester === null && profile && !setSemesterMutation.isPending) {
         setSemesterMutation.mutate({ default_semester: selectedSemester });
       }
@@ -490,7 +507,6 @@ export default function DashboardClient(
       }
     }
   }, [
-    isInitialized,
     selectedSemester,
     selectedYear,
     ezygoSemester,

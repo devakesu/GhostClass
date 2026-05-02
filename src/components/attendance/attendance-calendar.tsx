@@ -604,28 +604,27 @@ export function AttendanceCalendar({
       let hasDutyLeave = false;
       let hasOtherLeave = false;
 
-      dateEvents.forEach(ev => {
-          const override = normalizedTrackingData.find((t: any) => {
-             const isDateMatch = t._isoDate === dbDateStr;
-             const isCourseMatch = String(t.course) === String(ev.courseId);
-             const tSessionNorm = normalizeSession(t.session);
-             const evSessionNorm = normalizeSession(ev.sessionName);
-             const isKeyMatch = tSessionNorm === evSessionNorm;
-             const isIdMatch = String(t.session) === (ev as any).originalSessionId;
-             return isDateMatch && isCourseMatch && (isKeyMatch || isIdMatch);
+      if (dateEvents.length > 0) {
+          dateEvents.forEach(ev => {
+              const finalStatus = ev.status;
+
+              if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) hasAbsent = true;
+              else if (finalStatus === "Duty Leave") hasDutyLeave = true;
+              else if (finalStatus.includes("Leave")) hasOtherLeave = true;
           });
-
-          let finalStatus = ev.status;
-          if (override) {
-             if (Number(override.attendance) === 111) finalStatus = "Absent";
-             else if (Number(override.attendance) === 225) finalStatus = "Duty Leave";
-             else finalStatus = "Present";
-          }
-
-          if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) hasAbsent = true;
-          else if (finalStatus === "Duty Leave") hasDutyLeave = true;
-          else if (finalStatus.includes("Leave")) hasOtherLeave = true;
-      });
+      } else if (hasExtra) {
+          const dayExtras = normalizedTrackingData.filter(t =>
+              t._isoDate === dbDateStr && t.status === 'extra' && t.semester === semester && t.year === year
+          );
+          dayExtras.forEach(t => {
+              let label = "Present";
+              if (Number(t.attendance) === 111) label = "Absent";
+              else if (Number(t.attendance) === 225) label = "Duty Leave";
+              
+              if (label === "Absent" && !isCourseDisabled(getCourseCodeById(t.course))) hasAbsent = true;
+              else if (label === "Duty Leave") hasDutyLeave = true;
+          });
+      }
 
       if (dateEvents.length === 0 && !hasExtra) return null;
       if (hasAbsent) return "absent";

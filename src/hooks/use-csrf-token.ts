@@ -36,6 +36,7 @@
 import { useEffect, useRef } from "react";
 import { setCsrfToken, getCsrfToken } from "@/lib/axios";
 import { logger } from "@/lib/logger";
+import { safeResponseJson } from "@/lib/json";
 
 // Per-tab throttle: after a successful /api/csrf call the timestamp is stored in
 // sessionStorage. On subsequent mounts within CSRF_REINIT_INTERVAL_MS, the fetch is
@@ -138,9 +139,11 @@ export function useCSRFToken() {
           // which prevents unauthorized script execution and XSS attacks.
           const response = await fetch("/api/csrf", { credentials: "include" });
           if (response.ok && isMounted) {
-            const data = await response.json();
-            // Store token in sessionStorage for use in subsequent requests
-            setCsrfToken(data.token);
+            const data = await safeResponseJson<{ token: string }>(response);
+            if (data?.token) {
+              // Store token in sessionStorage for use in subsequent requests
+              setCsrfToken(data.token);
+            }
             // Clean up stale keys from previous versions to avoid unbounded sessionStorage growth.
             // This runs first, independently of the setItem below, so that cleanup still happens
             // even if writing the current key fails (e.g. QuotaExceededError).

@@ -261,18 +261,23 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     );
 
     // --- CLASS NAME EXTRACTION ---
-    // Extract the most frequent non-null userGroupName from official courses
-    String? derivedClassName;
-    final Map<String, int> groupCounts = {};
-    for (var c in courses) {
-      if (c.userGroupName != null && c.userGroupName!.isNotEmpty) {
-        groupCounts[c.userGroupName!] = (groupCounts[c.userGroupName!] ?? 0) + 1;
+    // We prioritize the explicit class name from the user's profile.
+    // If not available, we fall back to deriving it from the courses' userGroupName.
+    final profileClassName = auth?.profile?.classField?.name;
+    String? finalClassName = (profileClassName != null && profileClassName.trim().isNotEmpty) ? profileClassName : null;
+
+    if (finalClassName == null) {
+      final Map<String, int> groupCounts = {};
+      for (var c in courses) {
+        if (c.userGroupName != null && c.userGroupName!.isNotEmpty) {
+          groupCounts[c.userGroupName!] = (groupCounts[c.userGroupName!] ?? 0) + 1;
+        }
       }
-    }
-    if (groupCounts.isNotEmpty) {
-      derivedClassName = groupCounts.entries
-          .reduce((a, b) => a.value > b.value ? a : b)
-          .key;
+      if (groupCounts.isNotEmpty) {
+        finalClassName = groupCounts.entries
+            .reduce((a, b) => a.value > b.value ? a : b)
+            .key;
+      }
     }
 
     // --- SORTING LOGIC (WEBSITE PARITY) ---
@@ -352,7 +357,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       selectedSemester: academic.semester,
       selectedYear: academic.year,
       instructors: instructors,
-      className: derivedClassName,
+      className: finalClassName,
       disabledCodes: disabledCodes,
     );
   }

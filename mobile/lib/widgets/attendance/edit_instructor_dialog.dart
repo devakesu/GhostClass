@@ -32,11 +32,13 @@ class EditInstructorDialog extends ConsumerStatefulWidget {
 class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
   late final TextEditingController _controller;
   bool _isSaving = false;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialName);
+    _controller.addListener(() => setState(() {}));
   }
 
   @override
@@ -103,6 +105,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
     final primary =
         ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surface;
+
+    final hasChanged = _controller.text.trim() != (widget.initialName ?? '').trim();
 
     return Dialog(
       backgroundColor: surface,
@@ -245,8 +249,11 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                     const SizedBox(height: 28),
 
                     Form(
-                      child: Builder(
-                        builder: (formContext) => TextFormField(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
                           controller: _controller,
                           maxLength: 60,
                           autofocus: true,
@@ -306,78 +313,76 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                             }
                             return null;
                           },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _isSaving
-                                ? null
-                                : () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: Text(
-                              'CANCEL',
-                              style: GoogleFonts.manrope(
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.4),
-                              ),
-                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 2,
-                          child: Builder(
-                            builder: (btnContext) => ElevatedButton(
-                              onPressed: _isSaving
-                                  ? null
-                                  : () {
-                                      if (Form.of(btnContext).validate()) {
-                                        _handleSave();
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                elevation: 8,
-                                shadowColor: primary.withValues(alpha: 0.4),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Text(
-                                      'SAVE CHANGES',
-                                      style: GoogleFonts.manrope(
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: _isSaving
+                                      ? null
+                                      : () => Navigator.pop(context),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                            ),
+                                  ),
+                                  child: Text(
+                                    'CANCEL',
+                                    style: GoogleFonts.manrope(
+                                      fontWeight: FontWeight.w800,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton(
+                                  onPressed: (_isSaving || !hasChanged)
+                                      ? null
+                                      : () {
+                                          if (_formKey.currentState?.validate() ?? false) {
+                                            _handleSave();
+                                          }
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 8,
+                                    shadowColor: primary.withValues(alpha: 0.4),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'SAVE CHANGES',
+                                          style: GoogleFonts.manrope(
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -227,15 +227,35 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/contact',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const ContactScreen(),
-          transitionDuration: const Duration(milliseconds: 380),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-            return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
-          },
-        ),
+        pageBuilder: (context, state) {
+          final Map<String, dynamic>? extra = (state.extra is Map)
+              ? (state.extra as Map).cast<String, dynamic>()
+              : null;
+          final subject =
+              extra?['subject'] as String? ?? state.uri.queryParameters['subject'];
+          final message =
+              extra?['message'] as String? ?? state.uri.queryParameters['message'];
+
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: ContactScreen(
+              prefilledSubject: subject,
+              prefilledMessage: message,
+            ),
+            transitionDuration: const Duration(milliseconds: 380),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              final slide =
+                  Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
+                      .animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              );
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: slide, child: child),
+              );
+            },
+          );
+        },
       ),
     ],
   );

@@ -5,7 +5,7 @@ USER root
 
 # 1. System Dependencies, Java 17, and SSH Setup
 RUN apt-get update && apt-get install -y \
-    openssh-server curl git unzip openjdk-17-jdk-headless apt-transport-https \
+    openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https \
     && mkdir /var/run/sshd \
     && echo 'vscode:root' | chpasswd \
     && echo 'root:root' | chpasswd \
@@ -44,6 +44,7 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
 USER vscode
 ENV HOME="/home/vscode"
 ENV FLUTTER_HOME="$HOME/flutter-sdk"
+ENV NODE_OPTIONS="--max-old-space-size=9216"
 ENV PATH="$PATH:$FLUTTER_HOME/bin"
 
 # 4. Flutter SDK Pre-cache
@@ -60,6 +61,7 @@ echo "🚀 Starting Full Environment Setup..."
 
 # Tell Git to use a writeable file for global settings instead of the busy mount
 export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"
+export NODE_OPTIONS="--max-old-space-size=9216"
 
 if [ ! -f "$GIT_CONFIG_GLOBAL" ]; then
     cp /home/vscode/.gitconfig "$GIT_CONFIG_GLOBAL" 2>/dev/null || touch "$GIT_CONFIG_GLOBAL"
@@ -95,9 +97,6 @@ git config --global --add safe.directory /workspace
 # --- Android SDK (Linux Version) Setup ---
 export ANDROID_HOME="/home/vscode/android-sdk"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-
-# Install Java & Dependencies
-sudo apt-get update && sudo apt-get install -y openjdk-17-jdk wget unzip adb
 
 # Download Linux cmdline-tools if missing
 if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
@@ -173,5 +172,5 @@ RUN chmod +x /home/vscode/init_workspace.sh && chown vscode:vscode /home/vscode/
 
 # Start the SSH Daemon
 WORKDIR /workspace
-EXPOSE 22 7522
+EXPOSE 22 3000
 CMD ["/usr/sbin/sshd", "-D"]

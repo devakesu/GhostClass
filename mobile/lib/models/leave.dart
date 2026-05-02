@@ -6,7 +6,7 @@ class Leave {
   final Event? event;
   final List<LeaveApprover> approvers;
   final UserSubgroup? userSubgroup;
-  final List<dynamic>? files;
+  final List<LeaveFile>? files;
 
   Leave({
     required this.id,
@@ -21,20 +21,44 @@ class Leave {
 
   factory Leave.fromJson(Map<String, dynamic> json) {
     return Leave(
-      id: json['id'] as int,
+      id: int.parse(json['id'].toString()),
       leaveReason: json['leave_reason'] as String?,
       createdAt: json['created_at'] as String,
       attendanceType: json['attendancetype'] != null
           ? AttendanceType.fromJson(json['attendancetype'])
           : null,
       event: json['event'] != null ? Event.fromJson(json['event']) : null,
-      approvers: (json['approvers'] as List? ?? [])
-          .map((a) => LeaveApprover.fromJson(a))
-          .toList(),
+      approvers: List<LeaveApprover>.from(
+        (json['approvers'] as List? ?? []).map(
+          (a) => LeaveApprover.fromJson(a as Map<String, dynamic>),
+        ),
+      ),
       userSubgroup: json['usersubgroup'] != null
           ? UserSubgroup.fromJson(json['usersubgroup'])
           : null,
-      files: json['files'] as List?,
+      files: json['files'] != null
+          ? List<LeaveFile>.from(
+              (json['files'] as List).map(
+                (f) => LeaveFile.fromJson(f as Map<String, dynamic>),
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class LeaveFile {
+  final int id;
+  final String fileName;
+  final int sizeByte;
+
+  LeaveFile({required this.id, required this.fileName, required this.sizeByte});
+
+  factory LeaveFile.fromJson(Map<String, dynamic> json) {
+    return LeaveFile(
+      id: int.parse(json['id'].toString()),
+      fileName: json['file_name'] as String? ?? 'file',
+      sizeByte: int.parse((json['size_byte'] ?? 0).toString()),
     );
   }
 }
@@ -47,7 +71,7 @@ class AttendanceType {
 
   factory AttendanceType.fromJson(Map<String, dynamic> json) {
     return AttendanceType(
-      id: json['id'] as int,
+      id: int.parse(json['id'].toString()),
       name: json['name'] as String? ?? 'Leave',
     );
   }
@@ -61,7 +85,7 @@ class Event {
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      id: json['id'] as int,
+      id: int.parse(json['id'].toString()),
       name: json['name'] as String? ?? 'Event',
     );
   }
@@ -133,7 +157,7 @@ class LeaveSession {
 
   factory LeaveSession.fromJson(Map<String, dynamic> json) {
     return LeaveSession(
-      id: json['id'] as int,
+      id: int.parse(json['id'].toString()),
       date: json['date'] as String,
       session: json['session'] != null ? Session.fromJson(json['session']) : null,
       course: json['course'] != null ? Course.fromJson(json['course']) : null,

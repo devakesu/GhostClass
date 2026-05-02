@@ -3,6 +3,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { egressFetch, redact } from "@/lib/utils.server";
 import { decrypt, encrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
+import { safeResponseJson } from "@/lib/json";
 
 interface EzygoProfileResponse {
   user_id: string | number;
@@ -81,7 +82,7 @@ export async function performProfileSync(
         egressFetch("institutionuser/myroles", {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
-        }).then((res) => res.ok ? res.json() : null),
+        }).then(safeResponseJson),
       ]);
 
     if (!ezygoRes.ok) {
@@ -91,7 +92,10 @@ export async function performProfileSync(
       throw new Error(`EzyGo Profile failed: ${ezygoRes.status}`);
     }
 
-    const json = await ezygoRes.json();
+    const json = await safeResponseJson<any>(ezygoRes);
+    if (!json) {
+      throw new Error(`EzyGo Profile returned empty or invalid JSON: ${ezygoRes.status}`);
+    }
     const ezygoData: EzygoProfileResponse = json.data ?? json;
 
     // Use remote ID if local ezygoId is missing or empty
@@ -110,9 +114,9 @@ export async function performProfileSync(
     // Build Courses Map & Process Catalog
     const coursesMap: Record<string, any> = {};
     let coursesData: any[] = [];
-    if (coursesRes.ok) {
       try {
-        const parsed = await coursesRes.json();
+        const parsed = await safeResponseJson<any>(coursesRes);
+        if (!parsed) throw new Error("Empty courses response");
         coursesData = Array.isArray(parsed) ? parsed : (parsed.data ?? []);
 
         logger.dev(
@@ -137,9 +141,6 @@ export async function performProfileSync(
         );
         coursesData = [];
       }
-    } else {
-      logger.warn(`Sync: Courses API returned ${coursesRes.status}.`);
-    }
 
     // 2. Resolve Academic Info (with robust parsing and derivation)
     let ezygoAcademicSemester: string | null = null;
@@ -172,7 +173,7 @@ export async function performProfileSync(
     let classInfo: { id: string; name: string } | null = null;
     
     if (Array.isArray(coursesData)) {
-      const roles = rolesData?.data ?? rolesData;
+      const roles = (rolesData as any)?.data ?? rolesData;
       const subgroupRoles = roles?.subgroupRoles || [];
       
       // Priority 1: Use courses to identify the class.

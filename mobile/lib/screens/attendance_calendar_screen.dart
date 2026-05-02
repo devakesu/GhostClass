@@ -494,7 +494,7 @@ class _CalendarContent extends ConsumerWidget {
             displaySessionName: displaySessionName,
             rawSessionKey: rawSessionKey,
             status: isCorrection
-                ? _getStatusLabel(override.attendance)
+                ? _getStatusLabel(override.attendance, isCorrection: true)
                 : status,
             originalStatus: isCorrection ? status : null,
             color: isCorrection
@@ -611,11 +611,22 @@ class _CalendarContent extends ConsumerWidget {
     return events;
   }
 
-  String _getStatusLabel(dynamic code) {
+  String _getStatusLabel(dynamic code, {bool isCorrection = false}) {
     final c = int.tryParse(code.toString()) ?? 110;
-    if (c == 225) return 'Duty Leave';
-    if (c == 112) return 'Other Leave';
-    return 'Present';
+    String label = 'Present';
+    if (c == 111) {
+      label = 'Absent';
+    } else if (c == 225) {
+      label = 'Duty Leave';
+    } else if (c == 112) {
+      label = 'Other Leave';
+    }
+
+    if (isCorrection) {
+      // Logic for adding labels removed per user request
+    }
+
+    return label;
   }
 
   Color _getStatusColor(dynamic code, BuildContext context) {
@@ -850,18 +861,6 @@ class _CalendarWidget extends StatelessWidget {
     return source.replaceAll(RegExp(r'\s+'), '').toUpperCase();
   }
 
-  List<TrackingRecord> _trackingRecordsForKeys(Iterable<String> keys) {
-    final normalizedKeys = keys
-        .where((k) => k.trim().isNotEmpty)
-        .map((k) => k.trim().toUpperCase())
-        .toSet();
-    if (normalizedKeys.isEmpty) return const [];
-
-    return tracking.groupedByCourse.entries
-        .where((entry) => normalizedKeys.contains(entry.key.trim().toUpperCase()))
-        .expand((entry) => entry.value)
-        .toList();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -991,7 +990,6 @@ class _CalendarWidget extends StatelessWidget {
   String? _getDayStatus(DateTime date, BuildContext context) {
     final dateStr = DateFormat('yyyyMMdd').format(date);
     final dbDate = DateFormat('yyyy-MM-dd').format(date);
-
     final sessions = dashboard.attendance.studentAttendanceData[dateStr];
     final extraTracking = tracking.groupedByCourse.values
         .expand((e) => e)
@@ -1017,37 +1015,19 @@ class _CalendarWidget extends StatelessWidget {
         mergedCourse: mergedCourse,
         officialReport: dashboard.attendance,
       );
-      final canonicalCourse = _canonicalTrackerCourseCode(
+      _canonicalTrackerCourseCode(
         resolvedCode: resolvedCode,
         fallback: courseId,
       );
       final courseDisabled = disabledCodes.contains(
         (resolvedCode ?? '').toUpperCase(),
       );
-      final trackingRecords = _trackingRecordsForKeys([
-        courseId,
-        mergedCourse.safeId,
-        canonicalCourse,
-      ]);
-      TrackingRecord? override;
-      final normSession = utils.normalizeSession(rawSession);
-      for (final t in trackingRecords) {
-        if (t.date == dbDate && utils.normalizeSession(t.session) == normSession) {
-          override = t;
-          break;
-        }
-      }
-
-      final finalCode = override != null
-          ? (int.tryParse(override.attendance.toString()) ?? 110)
-          : cNum;
-
-      if (finalCode == 111 && !courseDisabled) hasAbsent = true;
-      if (finalCode == 225) hasDutyLeave = true;
-      if (finalCode == 112) hasOtherLeave = true;
+      if (cNum == 111 && !courseDisabled) hasAbsent = true;
+      if (cNum == 225) hasDutyLeave = true;
+      if (cNum == 112) hasOtherLeave = true;
     }
 
-    if (sessions != null) {
+    if (sessions != null && sessions.isNotEmpty) {
       sessions.forEach((key, data) {
         checkStatus(
           data.attendance,
@@ -1056,23 +1036,24 @@ class _CalendarWidget extends StatelessWidget {
           context,
         );
       });
+    } else {
+      for (final tr in extraTracking) {
+        final code = int.tryParse(tr.attendance.toString()) ?? 110;
+        final mergedCourse = _resolveMergedCourse(tr.course);
+        final resolvedCode = utils.resolveCourseDisplayCode(
+          courseKey: tr.course,
+          mergedCourse: mergedCourse,
+          officialReport: dashboard.attendance,
+        );
+        final courseDisabled = disabledCodes.contains(
+          (resolvedCode ?? '').toUpperCase(),
+        );
+        if (code == 111 && !courseDisabled) hasAbsent = true;
+        if (code == 225) hasDutyLeave = true;
+        if (code == 112) hasOtherLeave = true;
+      }
     }
 
-    for (final tr in extraTracking) {
-      final code = int.tryParse(tr.attendance.toString()) ?? 110;
-      final mergedCourse = _resolveMergedCourse(tr.course);
-      final resolvedCode = utils.resolveCourseDisplayCode(
-        courseKey: tr.course,
-        mergedCourse: mergedCourse,
-        officialReport: dashboard.attendance,
-      );
-      final courseDisabled = disabledCodes.contains(
-        (resolvedCode ?? '').toUpperCase(),
-      );
-      if (code == 111 && !courseDisabled) hasAbsent = true;
-      if (code == 225) hasDutyLeave = true;
-      if (code == 112) hasOtherLeave = true;
-    }
 
     if (hasAbsent) return 'absent';
     if (hasDutyLeave) return 'dutyLeave';
@@ -1435,51 +1416,41 @@ class _SessionCard extends ConsumerWidget {
               event.status == 'Absent' &&
               !event.isDisabled) ...[
             const SizedBox(height: 16),
-            Builder(
-              builder: (context) {
-                bool isProcessing = false;
-                return StatefulBuilder(
-                  builder: (context, setCardState) {
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: _ActionButton(
-                            icon: LucideIcons.briefcase,
-                            label: 'MARK DL',
-                            color: const Color(0xFFF59E0B),
-                            onTap: isProcessing
-                                ? () {}
-                                : () =>
-                                      _showDlReasonDialog(context, ref, event),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _ActionButton(
-                            icon: LucideIcons.checkCircle2,
-                            label: isProcessing ? 'ADDING...' : 'MARK PRESENT',
-                            color: const Color(0xFF10B981),
-                            onTap: isProcessing
-                                ? () {}
-                                : () async {
-                                    setCardState(() => isProcessing = true);
-                                    try {
-                                      await _markPresent(context, ref, event);
-                                    } finally {
-                                      if (context.mounted) {
-                                        setCardState(
-                                          () => isProcessing = false,
-                                        );
-                                      }
-                                    }
-                                  },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    icon: LucideIcons.briefcase,
+                    label: 'MARK DL',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => _showCorrectionDialog(
+                      context: context,
+                      ref: ref,
+                      event: event,
+                      title: 'Mark as Duty Leave',
+                      hint: 'Event Name',
+                      attendance: 225,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionButton(
+                    icon: LucideIcons.checkCircle2,
+                    label: 'MARK PRESENT',
+                    color: const Color(0xFF10B981),
+                    onTap: () => _showCorrectionDialog(
+                      context: context,
+                      ref: ref,
+                      event: event,
+                      title: 'Correction Remark',
+                      hint: 'Incorrectly marked absent',
+                      attendance: 110,
+                      initialValue: 'Incorrectly marked absent',
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
           if ((event.isCorrection || event.isExtra) &&
@@ -1498,48 +1469,6 @@ class _SessionCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _markPresent(
-    BuildContext context,
-    WidgetRef ref,
-    _CalendarEvent event,
-  ) async {
-    try {
-      await ref
-          .read(trackingProvider.notifier)
-          .insertRecord(
-            date: event.dbDate,
-            session: event.rawSessionKey,
-            status: 'correction',
-            attendance: 110,
-            courseId: event.courseId,
-          );
-      if (context.mounted) {
-        ServiceToast.show(context, 'Marked as present');
-      }
-    } catch (e, st) {
-      AppLogger.eWithContext(
-        'AttendanceCalendarScreen: Failed to mark present',
-        error: e,
-        stackTrace: st,
-        tags: {
-          'feature': 'attendance_calendar',
-          'action': 'mark_present',
-        },
-        extras: {
-          'attendance.date': event.dbDate,
-          'attendance.session': event.rawSessionKey,
-          'attendance.course_id': event.courseId,
-        },
-      );
-      if (context.mounted) {
-        ServiceToast.show(
-          context,
-          'We encountered an error while updating attendance. Please try again later. If the issue persists, please contact us.',
-          isError: true,
-        );
-      }
-    }
-  }
 
   void _deleteRecord(BuildContext context, WidgetRef ref, int id) {
     showDialog(
@@ -1665,21 +1594,25 @@ class _SessionCard extends ConsumerWidget {
     );
   }
 
-  void _showDlReasonDialog(
-    BuildContext context,
-    WidgetRef ref,
-    _CalendarEvent event,
-  ) {
-    final controller = TextEditingController();
+  void _showCorrectionDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required _CalendarEvent event,
+    required String title,
+    required String hint,
+    required int attendance,
+    String? initialValue,
+  }) {
+    final controller = TextEditingController(text: initialValue);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
-          'Mark as Duty Leave',
+          title,
           style: GoogleFonts.manrope(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1688,7 +1621,7 @@ class _SessionCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter reason for on-duty leave:',
+              'Enter a remark for this correction:',
               style: GoogleFonts.manrope(
                 color: Theme.of(
                   context,
@@ -1700,11 +1633,15 @@ class _SessionCard extends ConsumerWidget {
             TextField(
               controller: controller,
               autofocus: true,
-              style: GoogleFonts.manrope(color: Colors.white),
+              style: GoogleFonts.manrope(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               decoration: InputDecoration(
-                hintText: 'Event Name',
+                hintText: hint,
                 hintStyle: GoogleFonts.manrope(
-                  color: Colors.white24,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: 0.4,
+                  ),
                   fontSize: 13,
                 ),
                 filled: true,
@@ -1736,8 +1673,8 @@ class _SessionCard extends ConsumerWidget {
                           'Cancel',
                           style: GoogleFonts.manrope(
                             color: isSubmitting
-                                ? Colors.white10
-                                : Colors.white38,
+                                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -1754,30 +1691,31 @@ class _SessionCard extends ConsumerWidget {
                                         date: event.dbDate,
                                         session: event.rawSessionKey,
                                         status: 'correction',
-                                        attendance: 225,
+                                        attendance: attendance,
                                         courseId: event.courseId,
-                                        remarks: controller.text,
+                                        remarks: controller.text.trim().isEmpty ? null : controller.text.trim(),
                                       );
                                   if (context.mounted) {
                                     Navigator.pop(context);
                                     ServiceToast.show(
                                       context,
-                                      'Marked as duty leave',
+                                      attendance == 225 ? 'Marked as duty leave' : 'Marked as present',
                                     );
                                   }
                                 } catch (e, st) {
                                   AppLogger.eWithContext(
-                                    'AttendanceCalendarScreen: Failed to mark duty leave',
+                                    'AttendanceCalendarScreen: Failed to mark correction',
                                     error: e,
                                     stackTrace: st,
                                     tags: {
                                       'feature': 'attendance_calendar',
-                                      'action': 'mark_duty_leave',
+                                      'action': 'mark_correction',
                                     },
                                     extras: {
                                       'attendance.date': event.dbDate,
                                       'attendance.session': event.rawSessionKey,
                                       'attendance.course_id': event.courseId,
+                                      'attendance.code': attendance,
                                     },
                                   );
                                   if (context.mounted) {
@@ -1791,12 +1729,11 @@ class _SessionCard extends ConsumerWidget {
                                 }
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(
-                                context,
-                              ).extension<GhostColors>()?.accentOrange ??
-                              const Color(0xFFF59E0B),
+                          backgroundColor: attendance == 225 
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF10B981),
                           foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

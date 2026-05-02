@@ -481,7 +481,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
               child: Container(
                 color: bg.withValues(alpha: 0.9), // More opaque background
                 child: ServiceErrorView(
-                  title: 'Service Maintenance',
                   error: (dashboardAsync.error ?? trackingAsync.error),
                   onRetry: () async {
                     ref.read(apiServiceProvider).clearCaches();

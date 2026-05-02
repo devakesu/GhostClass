@@ -9,22 +9,33 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContactScreen extends ConsumerStatefulWidget {
-  const ContactScreen({super.key});
+  final String? prefilledSubject;
+  final String? prefilledMessage;
+
+  const ContactScreen({this.prefilledSubject, this.prefilledMessage, super.key});
 
   @override
   ConsumerState<ContactScreen> createState() => _ContactScreenState();
 }
 
 class _ContactScreenState extends ConsumerState<ContactScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _subjectController = TextEditingController();
-  final _messageController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _subjectController;
+  late final TextEditingController _messageController;
   bool _sending = false;
 
   @override
   void initState() {
     super.initState();
+    // Initialize controllers with pre-filled values from constructor
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _subjectController =
+        TextEditingController(text: widget.prefilledSubject);
+    _messageController =
+        TextEditingController(text: widget.prefilledMessage);
+
     // Pre-fill name/email if logged in using our custom authProvider
     final authAsync = ref.read(authProvider);
     final user = authAsync.value;
