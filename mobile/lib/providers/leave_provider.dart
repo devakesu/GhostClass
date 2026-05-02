@@ -27,29 +27,26 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
-    try {
-      final data = await api.fetchLeaveData(storage);
-      final rawLeaves = data['studentLeaves']?['student_leaves'] as List? ?? [];
-      final rawSessions = data['studentLeaves']?['student_leave_sessions'] as Map? ?? {};
+    final data = await api.fetchLeaveData(storage);
+    final rawLeaves = data['studentLeaves']?['student_leaves'] as List? ?? [];
+    final rawSessions =
+        data['studentLeaves']?['student_leave_sessions'] as Map? ?? {};
 
-      final leaves = rawLeaves
-          .map((l) => Leave.fromJson(l as Map<String, dynamic>))
-          .where((l) =>
-              l.userSubgroup?.academicSemester == academic.semester &&
-              l.userSubgroup?.academicYear == academic.year)
-          .toList();
+    final leaves = rawLeaves
+        .map((l) => Leave.fromJson(l as Map<String, dynamic>))
+        .where((l) =>
+            l.userSubgroup?.academicSemester == academic.semester &&
+            l.userSubgroup?.academicYear == academic.year)
+        .toList();
 
-      final sessions = rawSessions.map((key, value) => MapEntry(
-            int.parse(key.toString()),
-            (value as List)
-                .map((s) => LeaveSession.fromJson(s as Map<String, dynamic>))
-                .toList(),
-          ));
+    final sessions = rawSessions.map((key, value) => MapEntry(
+          int.parse(key.toString()),
+          (value as List)
+              .map((s) => LeaveSession.fromJson(s as Map<String, dynamic>))
+              .toList(),
+        ));
 
-      return LeaveState(leaves: leaves, sessions: sessions);
-    } catch (e) {
-      return LeaveState.empty();
-    }
+    return LeaveState(leaves: leaves, sessions: sessions);
   }
 
   Future<void> refresh() async {

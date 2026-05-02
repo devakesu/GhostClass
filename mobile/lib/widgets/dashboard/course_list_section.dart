@@ -27,6 +27,9 @@ class CourseLineupHeader extends StatelessWidget {
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     fontStyle: FontStyle.italic,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -76,7 +79,7 @@ class CourseListSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {

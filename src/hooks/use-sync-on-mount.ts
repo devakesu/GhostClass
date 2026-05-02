@@ -20,6 +20,7 @@ import { useState, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
 import { captureSentryException, captureSentryMessage } from "@/lib/sentry-lazy";
+import { safeResponseJson } from "@/lib/json";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -133,7 +134,8 @@ export function useSyncOnMount({
           signal: abortController.signal,
         });
 
-        const data: SyncResponse = await res.json();
+        const data = await safeResponseJson<SyncResponse>(res);
+        if (!data) throw new Error("Sync response was empty or invalid JSON");
 
         if (isCleanedUp) return;
 

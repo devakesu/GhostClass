@@ -21,9 +21,10 @@ class TrendChartSection extends StatefulWidget {
 }
 
 class _TrendChartSectionState extends State<TrendChartSection> {
-  OverlayEntry? _tooltipOverlay;
   final GlobalKey _chartKey = GlobalKey();
   List<CourseStat> _courses = [];
+  int _touchedIndex = -1;
+  Offset? _touchedOffset;
 
   double _calculateYMin() {
     final nonZero = _courses
@@ -42,15 +43,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
     return ((minRef / 5).floor() * 5.0 - 5.0).clamp(0, 95);
   }
 
-  @override
-  void dispose() {
-    _hideTooltip();
-    super.dispose();
-  }
-
   void _hideTooltip() {
-    _tooltipOverlay?.remove();
-    _tooltipOverlay = null;
+    if (_touchedIndex != -1) {
+      setState(() => _touchedIndex = -1);
+    }
   }
 
   void _onTouch(FlTouchEvent event, BarTouchResponse? response) {
@@ -70,16 +66,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 
     final idx = spot.touchedBarGroupIndex;
     if (idx < 0 || idx >= _courses.length) return;
-    final stat = _courses[idx];
-
-    Offset? localPos;
-    if (event is FlPanStartEvent) localPos = event.localPosition;
-    if (event is FlPanUpdateEvent) localPos = event.localPosition;
-    if (event is FlTapDownEvent) localPos = event.localPosition;
-    if (event is FlLongPressStart) localPos = event.localPosition;
-    if (event is FlLongPressMoveUpdate) localPos = event.localPosition;
-
-    if (localPos == null) return;
 
     final box = _chartKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
@@ -88,8 +74,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
     final yMinVal = _calculateYMin();
     const double maxYVal = 100.0;
     final chartSize = box.size;
-    const bottomReserved =
-        80.0; // Based on titlesData.bottomTitles.reservedSize
+    const double bottomReserved = 80.0;
     final dataAreaHeight = chartSize.height - bottomReserved;
 
     final barValue = spot.touchedRodData.toY;
@@ -97,17 +82,11 @@ class _TrendChartSectionState extends State<TrendChartSection> {
     final barPixelHeight = barHeightRatio * dataAreaHeight;
     final localBarTopY = chartSize.height - bottomReserved - barPixelHeight;
 
-    final globalPos = box.localToGlobal(Offset(localPos.dx, localBarTopY));
-
-    _hideTooltip();
-    _tooltipOverlay = OverlayEntry(
-      builder: (_) => _ChartTooltip(
-        stat: stat,
-        targetPercentage: widget.targetPercentage,
-        touchGlobal: globalPos,
-      ),
-    );
-    Overlay.of(context).insert(_tooltipOverlay!);
+    setState(() {
+      _touchedIndex = idx;
+      // We want the X to be the center of the bar
+      _touchedOffset = Offset(spot.offset.dx, localBarTopY);
+    });
   }
 
   @override
@@ -132,7 +111,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Container(
           height: 320,
-          padding: const EdgeInsets.fromLTRB(12, 12, 20, 12),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
@@ -142,9 +120,15 @@ class _TrendChartSectionState extends State<TrendChartSection> {
               ).colorScheme.outlineVariant.withValues(alpha: 0.4),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               Padding(
                 padding: const EdgeInsets.only(left: 8, bottom: 28),
                 child: Column(
@@ -178,6 +162,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
               Expanded(
                 child: BarChart(
                   key: _chartKey,
+                  duration: Duration.zero, // Prevent blinking on state changes
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
                     maxY: maxY,
@@ -298,76 +283,69 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                       final i = entry.key;
                       final s = entry.value;
                       final isSafe = s.percentage >= widget.targetPercentage;
-                      final baseVal = s.percentage < s.officialPercentage
-                          ? s.percentage
-                          : s.officialPercentage;
-                      final extraVal = (s.percentage - s.officialPercentage)
-                          .abs();
-                      final totalVal = baseVal + extraVal;
+                      final isLoss = s.percentage < s.officialPercentage;
+                      final displayedBase = isLoss ? s.percentage : s.officialPercentage;
+                      final displayedExtra = (s.percentage - s.officialPercentage).abs();
+                      final totalVal = displayedBase + displayedExtra;
+
                       final ghostColors = Theme.of(
                         context,
                       ).extension<GhostColors>();
-                      final Color color = isSafe
-                          ? (ghostColors?.successGreen ??
-                                const Color(0xFF10B981))
+                      
+                      final Color baseColor = isSafe
+                          ? (ghostColors?.successGreen ?? const Color(0xFF10B981))
                           : (ghostColors?.dangerRed ?? const Color(0xFFEF4444));
-                      final double split = totalVal > 0
-                          ? baseVal / totalVal
-                          : 1.0;
-
-                      final colors = <Color>[];
-                      final stops = <double>[];
-                      colors.add(color);
-                      stops.add(0.0);
-                      colors.add(color);
-                      stops.add(split);
-
-                      final bool isDark = Theme.of(context).brightness == Brightness.dark;
-                      // Keep the base color but make it stand out slightly
-                      final Color brightLine = Color.lerp(color, Colors.white, isDark ? 0.15 : 0.05)!;
-                      final Color faintGap = color.withValues(alpha: isDark ? 0.1 : 0.2);
                       
-                      final List<Color> hatchColors = [faintGap, faintGap];
-                      final List<double> hatchStops = [0.0, 1.0];
+                      final bool extraIsDanger = isLoss || !isSafe;
+                      final Color extraColor = extraIsDanger
+                          ? (ghostColors?.dangerRed ?? const Color(0xFFEF4444))
+                          : (ghostColors?.successGreen ?? const Color(0xFF10B981));
+
+                      final Color brightLine = extraColor.withValues(alpha: 0.75);
+                      final Color faintGap = extraColor.withValues(alpha: 0.15);
                       
-                      if (extraVal > 0) {
-                        // Moderate frequency for better distinctness
-                        final int n = 24; 
-                        for (int j = 0; j < n; j++) {
-                          final double s0 = j / n;
-                          final double mid = (j + 0.5) / n;
-                          final double s1 = (j + 1) / n;
-                          hatchColors.add(brightLine);
-                          hatchStops.add(s0);
-                          hatchColors.add(brightLine);
-                          hatchStops.add(mid);
-                          hatchColors.add(faintGap);
-                          hatchStops.add(mid);
-                          hatchColors.add(faintGap);
-                          hatchStops.add(s1);
-                        }
+                      final List<Color> hatchColors = [];
+                      final List<double> hatchStops = [];
+                      
+                      const int n = 32; // Higher frequency for thinner look
+                      for (int j = 0; j < n; j++) {
+                        final double s0 = j / n;
+                        final double mid = (j + 0.25) / n; // 25% line, 75% gap for better visibility
+                        final double s1 = (j + 1) / n;
+                        
+                        hatchColors.add(brightLine);
+                        hatchStops.add(s0);
+                        hatchColors.add(brightLine);
+                        hatchStops.add(mid);
+                        
+                        hatchColors.add(faintGap);
+                        hatchStops.add(mid);
+                        hatchColors.add(faintGap);
+                        hatchStops.add(s1);
                       }
 
                       return BarChartGroupData(
                         x: i,
                         barRods: [
                           BarChartRodData(
-                            toY: baseVal,
+                            toY: totalVal,
                             width: 18,
-                            color: color,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(extraVal > 0 ? 0 : 3),
-                              bottom: const Radius.circular(1),
+                            color: Colors.transparent,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(3),
+                              bottom: Radius.circular(1),
                             ),
+                            rodStackItems: [
+                              BarChartRodStackItem(0, displayedBase, baseColor),
+                            ],
                             backDrawRodData: BackgroundBarChartRodData(
-                              show: extraVal > 0,
+                              show: totalVal > 0,
                               toY: totalVal,
                               gradient: LinearGradient(
-                                begin: Alignment.bottomLeft,
-                                end: Alignment.topRight,
+                                begin: const Alignment(-1.0, 1.0),
+                                end: const Alignment(1.0, -1.0),
                                 colors: hatchColors,
                                 stops: hatchStops,
-                                tileMode: TileMode.repeated,
                               ),
                             ),
                           ),
@@ -377,7 +355,19 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                   ),
                 ),
               ),
-            ],
+                    ],
+                  ),
+                ),
+                if (_touchedIndex != -1 && _touchedOffset != null)
+                  _LocalChartTooltip(
+                    stat: _courses[_touchedIndex],
+                    targetPercentage: widget.targetPercentage,
+                    chartOffset: _touchedOffset!,
+                    // Offset of chart inside the card (padding is 12, 12, 20, 12)
+                    chartOriginInCard: const Offset(12, 12),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -385,36 +375,56 @@ class _TrendChartSectionState extends State<TrendChartSection> {
   }
 }
 
-class _ChartTooltip extends StatelessWidget {
+class _LocalChartTooltip extends StatelessWidget {
   final CourseStat stat;
   final double targetPercentage;
-  final Offset touchGlobal;
+  final Offset chartOffset;
+  final Offset chartOriginInCard;
 
-  const _ChartTooltip({
+  const _LocalChartTooltip({
     required this.stat,
     required this.targetPercentage,
-    required this.touchGlobal,
+    required this.chartOffset,
+    required this.chartOriginInCard,
   });
 
   @override
   Widget build(BuildContext context) {
     const double w = 220;
-    const double h = 85; // Estimated height for safety
-    final screen = MediaQuery.of(context).size;
-    final double safeTop = MediaQuery.of(context).padding.top + 60; // Margin for header
+    const double h = 85; 
+    
+    // The touch position in card coordinates
+    final double centerX = chartOriginInCard.dx + chartOffset.dx;
+    final double barTopY = chartOriginInCard.dy + chartOffset.dy;
 
-    // Calculate ideal horizontal position
-    final double left = (touchGlobal.dx - w / 2).clamp(
-      8.0,
-      screen.width - w - 8,
-    );
+    // Card constraints: 320 height, width is screen.width - 40
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = screenWidth - 40;
+    final cardHeight = 320.0;
 
-    // Dynamic vertical positioning: flip below if no space at top
-    double top = touchGlobal.dy - h - 12;
-    if (top < safeTop) {
-      // Flip below the bar top
-      top = touchGlobal.dy + 12;
+    // Horizontal positioning clamped inside the card
+    double left = (centerX - w / 2).clamp(8.0, cardWidth - w - 8);
+
+    // Vertical positioning: Prefer above the bar top
+    double top = barTopY - h - 12;
+    if (top < 8) {
+      // Flip below if not enough space at top of card
+      top = barTopY + 12;
     }
+    // Final vertical clamp to stay inside card
+    top = top.clamp(8.0, cardHeight - h - 8);
+
+    final ghostColors = Theme.of(context).extension<GhostColors>();
+    final successColor = ghostColors?.successGreen ?? const Color(0xFF10B981);
+    final dangerColor = ghostColors?.dangerRed ?? const Color(0xFFEF4444);
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tooltipBg = isDark 
+        ? Colors.white 
+        : Theme.of(context).colorScheme.surfaceContainerHigh;
+    final onTooltipSurface = isDark 
+        ? const Color(0xFF1A1A2E) 
+        : Theme.of(context).colorScheme.onSurface;
 
     return Positioned(
       left: left,
@@ -426,7 +436,7 @@ class _ChartTooltip extends StatelessWidget {
             width: w,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              color: tooltipBg,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -442,35 +452,84 @@ class _ChartTooltip extends StatelessWidget {
               children: [
                 Text(
                   stat.name.isNotEmpty ? stat.name : stat.code,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                   style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: onTooltipSurface,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
+                    height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Official: ${stat.officialPercentage.toStringAsFixed(2)}% (${stat.officialPresent}/${stat.officialTotal})',
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Official: ',
+                        style: TextStyle(color: onTooltipSurface),
+                      ),
+                      TextSpan(
+                        text: '${stat.officialPercentage.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                          color: stat.officialPercentage >= targetPercentage
+                              ? successColor
+                              : dangerColor,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' (${stat.officialPresent}/${stat.officialTotal})',
+                        style: TextStyle(color: onTooltipSurface),
+                      ),
+                    ],
+                  ),
                   style: GoogleFonts.manrope(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 11,
                   ),
                 ),
                 if ((stat.percentage - stat.officialPercentage).abs() > 0.01 ||
-                    stat.finalTotal != stat.officialTotal)
-                  Text(
-                    'Adjusted: ${stat.percentage.toStringAsFixed(2)}% (${stat.finalPresent}/${stat.finalTotal})',
+                    stat.finalTotal != stat.officialTotal) ...[
+                  const SizedBox(height: 2),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Adjusted (',
+                          style: TextStyle(color: onTooltipSurface),
+                        ),
+                        TextSpan(
+                          text: stat.percentage < stat.officialPercentage ? 'Loss' : 'Gain',
+                          style: TextStyle(
+                            color: stat.percentage < stat.officialPercentage
+                                ? dangerColor
+                                : successColor,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '): ',
+                          style: TextStyle(color: onTooltipSurface),
+                        ),
+                        TextSpan(
+                          text: '${stat.percentage.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            color: stat.percentage >= targetPercentage
+                                ? successColor
+                                : dangerColor,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' (${stat.finalPresent}/${stat.finalTotal})',
+                          style: TextStyle(color: onTooltipSurface),
+                        ),
+                      ],
+                    ),
                     style: GoogleFonts.manrope(
-                      color: stat.percentage >= targetPercentage
-                          ? Colors.green
-                          : Colors.red,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                       fontSize: 11,
                     ),
                   ),
+                ],
               ],
             ),
           ),

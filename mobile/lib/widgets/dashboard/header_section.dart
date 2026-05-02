@@ -48,19 +48,19 @@ class HeaderSection extends ConsumerWidget {
                 const SizedBox(height: 12),
                 // 2. Class Badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.08),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.15),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.15),
                     ),
                   ),
                   child: Text(
@@ -81,10 +81,9 @@ class HeaderSection extends ConsumerWidget {
                   'Track your classes, manage attendance, and stay ahead!',
                   style: GoogleFonts.manrope(
                     fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w500,
                     fontStyle: FontStyle.italic,
                   ),
@@ -100,8 +99,11 @@ class HeaderSection extends ConsumerWidget {
                   child: _SelectorButton(
                     label: data.selectedSemester.toUpperCase(),
                     icon: LucideIcons.calendar,
-                    onTap: () =>
-                        _showSemesterPicker(context, ref, data.selectedSemester),
+                    onTap: () => _showSemesterPicker(
+                      context,
+                      ref,
+                      data.selectedSemester,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -121,7 +123,11 @@ class HeaderSection extends ConsumerWidget {
     );
   }
 
-  void _showSemesterPicker(BuildContext context, WidgetRef ref, String current) {
+  void _showSemesterPicker(
+    BuildContext context,
+    WidgetRef ref,
+    String current,
+  ) {
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -145,7 +151,7 @@ class HeaderSection extends ConsumerWidget {
   void _showYearPicker(BuildContext context, WidgetRef ref, String current) {
     final currentYear = DateTime.now().year;
     final years = List.generate(
-      (currentYear - 2021) + 3,
+      (currentYear - 2022) + 1,
       (i) => '${2022 + i}-${(2023 + i).toString().substring(2)}',
     );
 
@@ -189,7 +195,9 @@ class HeaderSection extends ConsumerWidget {
         content: Text(
           'You are about to change the ${type == 'semester' ? 'semester' : 'academic year'}. Are you sure you want to continue?',
           style: GoogleFonts.manrope(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         actions: [
@@ -199,7 +207,9 @@ class HeaderSection extends ConsumerWidget {
               'CANCEL',
               style: GoogleFonts.manrope(
                 fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -208,7 +218,9 @@ class HeaderSection extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: Text(
               'CONFIRM',
@@ -263,11 +275,7 @@ class _SelectorButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               label,
@@ -283,7 +291,9 @@ class _SelectorButton extends StatelessWidget {
             Icon(
               LucideIcons.chevronDown,
               size: 14,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
           ],
         ),
@@ -321,7 +331,9 @@ class _PickerSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -344,7 +356,8 @@ class _PickerSheet extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 8),
                 child: Column(
                   children: options.map((opt) {
-                    final bool isSelected = opt.toLowerCase() == selected.toLowerCase();
+                    final bool isSelected =
+                        opt.toLowerCase() == selected.toLowerCase();
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
@@ -357,12 +370,16 @@ class _PickerSheet extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.1)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withValues(alpha: 0.2)
                                   : Colors.transparent,
                             ),
                           ),
@@ -373,7 +390,9 @@ class _PickerSheet extends StatelessWidget {
                                 opt.toUpperCase(),
                                 style: GoogleFonts.manrope(
                                   fontSize: 16,
-                                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
                                   color: isSelected
                                       ? Theme.of(context).colorScheme.primary
                                       : Theme.of(context).colorScheme.onSurface,
@@ -401,5 +420,3 @@ class _PickerSheet extends StatelessWidget {
     );
   }
 }
-
-

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
+import { safeResponseJson } from "@/lib/json";
 
 /**
  * Checks if an error is related to a missing authentication session.
@@ -102,7 +103,7 @@ async function fetchFreshCsrfToken(): Promise<string | null> {
       logger.error("[handleLogout] Failed to fetch CSRF token:", response.statusText);
       return null;
     }
-    const data = await response.json();
+    const data = await safeResponseJson<{ token: string }>(response);
     return typeof data?.token === "string" ? data.token : null;
   } catch (err) {
     logger.error("[handleLogout] Error fetching CSRF token:", err);

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
+import { safeResponseJson } from "@/lib/json";
 
 export const dynamic = "force-dynamic";
 
@@ -163,7 +164,10 @@ const getHandler = async (req: Request) => {
     Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "api/profile/get" } });
     return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
-  const json = await ezygoRes.json();
+  const json = await safeResponseJson<any>(ezygoRes);
+  if (!json) {
+    return NextResponse.json({ error: "EzyGo profile returned empty or invalid JSON" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
   const d = json.data || json;
   const encPhone = (d.mobile || d.user?.mobile) ? encrypt(d.mobile || d.user?.mobile) : null;
   const encGender = d.gender ? encrypt(d.gender) : null;
@@ -248,7 +252,13 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
   let body = decryptedBody;
-  if (!body) { body = await req.json(); }
+  if (!body) { 
+    try {
+      body = await req.json(); 
+    } catch {
+      return NextResponse.json({ error: "Invalid or empty JSON body" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
+  }
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
 

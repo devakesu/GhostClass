@@ -162,53 +162,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           parent: AlwaysScrollableScrollPhysics(),
         ),
         slivers: [
-          // --- Modal Header with SafeArea ---
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Semantics(
-                    button: true,
-                    label: 'Close bottom sheet',
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.05),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant.withValues(alpha: 0.1),
-                        ),
-                      ),
-                      child: Icon(
-                        LucideIcons.x,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.4),
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  ),
-                ],
-              ),
+          // --- Sticky Modal Header ---
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _ModalHeaderDelegate(
+              onClose: () => Navigator.pop(context),
             ),
           ),
 
@@ -426,8 +384,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final scopeLabel = isFiltered
         ? subjectName
         : (academic == null
-            ? 'the currently selected semester and year'
-            : '${academic.semester.toUpperCase()} ${academic.year}');
+              ? 'the currently selected semester and year'
+              : '${academic.semester.toUpperCase()} ${academic.year}');
 
     final title = isFiltered ? 'Clear Subject Records' : 'Delete All Records';
     final buttonText = isFiltered ? 'CLEAR SUBJECT' : 'DELETE ALL';
@@ -498,7 +456,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             );
                           }
                         } catch (e, st) {
-                          AppLogger.e('TrackingScreen: Clear records failed', e, st);
+                          AppLogger.e(
+                            'TrackingScreen: Clear records failed',
+                            e,
+                            st,
+                          );
                           if (context.mounted) {
                             setDialogState(() => isDeleting = false);
                             ServiceToast.show(
@@ -611,7 +573,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             );
                           }
                         } catch (e, st) {
-                          AppLogger.e('TrackingScreen: Delete record failed', e, st);
+                          AppLogger.e(
+                            'TrackingScreen: Delete record failed',
+                            e,
+                            st,
+                          );
                           if (context.mounted) {
                             setDialogState(() => isDeleting = false);
                             ServiceToast.show(
@@ -672,7 +638,8 @@ class _SubjectPickerSheet extends ConsumerWidget {
     required this.selectedCourse,
     required this.courseKeys,
     required this.groupedByCourse,
-    required this.onSelected, this.officialReport,
+    required this.onSelected,
+    this.officialReport,
     this.allCourses,
   });
 
@@ -803,7 +770,10 @@ class _PickerChip extends StatelessWidget {
     required this.label,
     required this.count,
     required this.isSelected,
-    required this.onTap, required this.primary, required this.surface, this.isDisabled = false,
+    required this.onTap,
+    required this.primary,
+    required this.surface,
+    this.isDisabled = false,
   });
 
   @override
@@ -825,7 +795,7 @@ class _PickerChip extends StatelessWidget {
                     alpha: isDark ? 0.2 : 0.1,
                   )
                 : Theme.of(context).colorScheme.outlineVariant.withValues(
-                    alpha: isDark ? 0.6 : 0.35,
+                    alpha: isDark ? 0.25 : 0.35,
                   ),
           ),
           boxShadow: isSelected && !isDark
@@ -894,7 +864,9 @@ class _FilterChip extends StatelessWidget {
 
   const _FilterChip({
     required this.selectedCourse,
-    required this.onTap, required this.onClear, this.officialReport,
+    required this.onTap,
+    required this.onClear,
+    this.officialReport,
     this.allCourses,
   });
 
@@ -922,83 +894,87 @@ class _FilterChip extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isFiltered
-              ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ??
-                        Theme.of(context).colorScheme.primary)
-                    .withValues(alpha: 0.1)
-              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
             color: isFiltered
                 ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ??
                           Theme.of(context).colorScheme.primary)
-                      .withValues(alpha: 0.45)
+                      .withValues(alpha: 0.1)
                 : Theme.of(
                     context,
-                  ).colorScheme.outlineVariant.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isFiltered ? LucideIcons.filter : LucideIcons.slidersHorizontal,
-              size: 14,
+                  ).colorScheme.onSurface.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
               color: isFiltered
                   ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ??
-                        Theme.of(context).colorScheme.primary)
+                            Theme.of(context).colorScheme.primary)
+                        .withValues(alpha: 0.45)
                   : Theme.of(
                       context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.35),
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: isFiltered
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isFiltered ? LucideIcons.filter : LucideIcons.slidersHorizontal,
+                size: 14,
+                color: isFiltered
+                    ? (Theme.of(
+                            context,
+                          ).extension<GhostColors>()?.brandPrimary ??
+                          Theme.of(context).colorScheme.primary)
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
-            ),
-            if (isFiltered) ...[
               const SizedBox(width: 8),
-              Semantics(
-                button: true,
-                label: 'Clear filter $label',
-                child: GestureDetector(
-                  onTap: () {
-                    onClear();
-                  },
-                  child: Icon(
-                    LucideIcons.x,
-                    size: 14,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.2),
+              Flexible(
+                child: Text(
+                  label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: isFiltered
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ),
-            ] else ...[
-              const SizedBox(width: 4),
-              Icon(
-                LucideIcons.chevronDown,
-                size: 12,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.2),
-              ),
+              if (isFiltered) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  label: 'Clear filter $label',
+                  child: GestureDetector(
+                    onTap: () {
+                      onClear();
+                    },
+                    child: Icon(
+                      LucideIcons.x,
+                      size: 14,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(width: 4),
+                Icon(
+                  LucideIcons.chevronDown,
+                  size: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.2),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1117,7 +1093,8 @@ class _CourseSection extends StatelessWidget {
   const _CourseSection({
     required this.courseKey,
     required this.records,
-    required this.onDelete, this.officialReport,
+    required this.onDelete,
+    this.officialReport,
     this.allCourses,
   });
 
@@ -1206,8 +1183,6 @@ class _CourseSection extends StatelessWidget {
                             letterSpacing: 0.2,
                             height: 1.1,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         if (courseCode != null)
                           Text(
@@ -1340,7 +1315,8 @@ class _TrackingCard extends StatelessWidget {
 
   const _TrackingCard({
     required this.record,
-    required this.onDelete, this.officialReport,
+    required this.onDelete,
+    this.officialReport,
   });
 
   @override
@@ -1591,22 +1567,22 @@ class _DeleteButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onPressed,
         child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color:
-              (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-                      Theme.of(context).colorScheme.error)
-                  .withValues(alpha: 0.15),
-          shape: BoxShape.circle,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color:
+                (Theme.of(context).extension<GhostColors>()?.dangerRed ??
+                        Theme.of(context).colorScheme.error)
+                    .withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            LucideIcons.trash2,
+            color:
+                Theme.of(context).extension<GhostColors>()?.dangerRed ??
+                Theme.of(context).colorScheme.error,
+            size: 14,
+          ),
         ),
-        child: Icon(
-          LucideIcons.trash2,
-          color:
-              Theme.of(context).extension<GhostColors>()?.dangerRed ??
-              Theme.of(context).colorScheme.error,
-          size: 14,
-        ),
-      ),
       ),
     );
   }
@@ -1656,6 +1632,71 @@ class _EmptyTrackingState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final VoidCallback onClose;
+
+  _ModalHeaderDelegate({required this.onClose});
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox(
+      height: 64,
+      child: Container(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Image.asset('assets/logo.png', height: 60, fit: BoxFit.contain),
+            Semantics(
+              button: true,
+              label: 'Close bottom sheet',
+              child: GestureDetector(
+                onTap: onClose,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Icon(
+                    LucideIcons.x,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 64.0;
+
+  @override
+  double get minExtent => 64.0;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
+      false;
 }
 
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {

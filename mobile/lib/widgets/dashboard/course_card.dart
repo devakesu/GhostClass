@@ -5,7 +5,6 @@ import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/attendance/edit_instructor_dialog.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -105,9 +104,7 @@ class CourseCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           borderRadius: BorderRadius.circular(28),
-          onTap: () {
-            GoRouter.of(context).push('/course/${course.code}');
-          },
+          onTap: null, // Removed navigation as requested
           child: Container(
             decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,

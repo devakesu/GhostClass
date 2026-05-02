@@ -475,8 +475,14 @@ return (
                       </div>
                       {(d.displayedExtra > 0) && (
                           <div className="flex justify-between gap-4">
-                            <span className="text-primary">{d.isLoss ? "Adjusted (Loss):" : "Adjusted (Gain):"}</span>
-                            <span className={`font-mono font-bold ${d.isLoss ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                            <span className="text-muted-foreground/60">
+                              Adjusted (
+                              <span className={d.isLoss ? "text-red-500" : "text-green-500"}>
+                                {d.isLoss ? "Loss" : "Gain"}
+                              </span>
+                              ):
+                            </span>
+                            <span className={`font-mono font-bold ${d.totalPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                               {d.totalPercentage}% <span className="text-muted-foreground/40 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
                             </span>
                           </div>
