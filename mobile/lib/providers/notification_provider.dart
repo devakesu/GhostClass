@@ -31,29 +31,26 @@ class AppNotification {
 }
 
 class NotificationsState {
-  final List<AppNotification> notifications;
+  final List<AppNotification> actionNotifications;
+  final List<AppNotification> regularNotifications;
   final int unreadCount;
   final bool hasNextPage;
 
   const NotificationsState({
-    required this.notifications,
+    required this.actionNotifications,
+    required this.regularNotifications,
     required this.unreadCount,
     this.hasNextPage = false,
   });
 
-  factory NotificationsState.empty() =>
-      const NotificationsState(notifications: [], unreadCount: 0);
+  factory NotificationsState.empty() => const NotificationsState(
+        actionNotifications: [],
+        regularNotifications: [],
+        unreadCount: 0,
+      );
 
-  List<AppNotification> get actionNotifications => notifications
-      .where((item) =>
-          (item.topic?.toLowerCase().contains('conflict') ?? false) &&
-          !item.isRead)
-      .toList();
-
-  List<AppNotification> get regularNotifications {
-    final actionIds = actionNotifications.map((n) => n.id).toSet();
-    return notifications.where((n) => !actionIds.contains(n.id)).toList();
-  }
+  List<AppNotification> get allNotifications =>
+      [...actionNotifications, ...regularNotifications];
 }
 
 final notificationsProvider =
@@ -67,13 +64,70 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
   @override
   Future<NotificationsState> build() async {
-    return _fetchNotifications(page: 0);
+    return _fetchInitialData();
   }
 
-  Future<NotificationsState> _fetchNotifications({required int page}) async {
+  Future<NotificationsState> _fetchInitialData() async {
     final supabase = Supabase.instance.client;
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return NotificationsState.empty();
+
+    // 1. Fetch ALL Unread Conflicts (Action Required)
+    final actionResponse = await supabase
+        .from('notification')
+        .select()
+        .eq('auth_user_id', userId)
+        .ilike('topic', '%conflict%')
+        .eq('is_read', false)
+        .order('created_at', ascending: false);
+
+    final actionNotifications = (actionResponse as List)
+        .map((n) => AppNotification.fromJson(n))
+        .toList();
+
+    // 2. Fetch First Page of General Feed
+    const from = 0;
+    const to = _pageSize - 1;
+
+    final feedResponse = await supabase
+        .from('notification')
+        .select()
+        .eq('auth_user_id', userId)
+        .order('created_at', ascending: false)
+        .range(from, to);
+
+    final feedNotifications = (feedResponse as List)
+        .map((n) => AppNotification.fromJson(n))
+        .toList();
+
+    // 3. Fetch Total Unread Count
+    final countRes = await supabase
+        .from('notification')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .eq('is_read', false);
+
+    final unreadCount = (countRes as List).length;
+
+    // Deduplicate: Remove actions from the regular feed
+    final actionIds = actionNotifications.map((n) => n.id).toSet();
+    final regularNotifications =
+        feedNotifications.where((n) => !actionIds.contains(n.id)).toList();
+
+    _currentPage = 0;
+
+    return NotificationsState(
+      actionNotifications: actionNotifications,
+      regularNotifications: regularNotifications,
+      unreadCount: unreadCount,
+      hasNextPage: feedNotifications.length == _pageSize,
+    );
+  }
+
+  Future<NotificationsState> _fetchNextPage({required int page}) async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return state.value ?? NotificationsState.empty();
 
     final from = page * _pageSize;
     final to = from + _pageSize - 1;
@@ -85,35 +139,39 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         .order('created_at', ascending: false)
         .range(from, to);
 
-    final List<AppNotification> newNotifications =
+    final List<AppNotification> newFeedItems =
         (response as List).map((n) => AppNotification.fromJson(n)).toList();
 
-    // Fetch unread count
-    final countRes = await supabase
-        .from('notification')
-        .select('id')
-        .eq('auth_user_id', userId)
-        .eq('is_read', false);
-    
-    final unreadCount = (countRes as List).length;
+    final current = state.value!;
+    final actionIds = current.actionNotifications.map((n) => n.id).toSet();
 
-    final existingNotifications = page == 0 ? <AppNotification>[] : state.value?.notifications ?? <AppNotification>[];
-    final allNotifications = [...existingNotifications, ...newNotifications];
+    // Filter out actions and existing regular items
+    final existingRegularIds =
+        current.regularNotifications.map((n) => n.id).toSet();
+    final filteredNewItems = newFeedItems
+        .where(
+          (n) => !actionIds.contains(n.id) && !existingRegularIds.contains(n.id),
+        )
+        .toList();
 
     return NotificationsState(
-      notifications: allNotifications,
-      unreadCount: unreadCount,
-      hasNextPage: newNotifications.length == _pageSize,
+      actionNotifications: current.actionNotifications,
+      regularNotifications: [
+        ...current.regularNotifications,
+        ...filteredNewItems
+      ],
+      unreadCount: current.unreadCount,
+      hasNextPage: newFeedItems.length == _pageSize,
     );
   }
 
   Future<void> fetchNextPage() async {
     final current = state.value;
     if (current == null || !current.hasNextPage) return;
-    
+
     _currentPage++;
     // We don't set state to loading to avoid full-screen spinner.
-    final nextState = await _fetchNotifications(page: _currentPage);
+    final nextState = await _fetchNextPage(page: _currentPage);
     state = AsyncValue.data(nextState);
   }
 
@@ -121,24 +179,59 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final previousState = state.value;
     if (previousState == null) return;
 
-    // Optimistic Update
-    final newNotifications = previousState.notifications.map((n) {
+    final newIsRead = !currentStatus;
+
+    // 1. Update in actionNotifications
+    final List<AppNotification> updatedActions = [];
+    AppNotification? movedToRegular;
+
+    for (final n in previousState.actionNotifications) {
       if (n.id == id) {
-        return AppNotification(
+        final updated = AppNotification(
           id: n.id,
           title: n.title,
           description: n.description,
           createdAt: n.createdAt,
           topic: n.topic,
-          isRead: !currentStatus,
+          isRead: newIsRead,
         );
+        if (newIsRead) {
+          movedToRegular = updated;
+        } else {
+          updatedActions.add(updated);
+        }
+      } else {
+        updatedActions.add(n);
       }
-      return n;
-    }).toList();
+    }
+
+    // 2. Update in regularNotifications
+    final List<AppNotification> updatedRegular = [];
+    for (final n in previousState.regularNotifications) {
+      if (n.id == id) {
+        updatedRegular.add(AppNotification(
+          id: n.id,
+          title: n.title,
+          description: n.description,
+          createdAt: n.createdAt,
+          topic: n.topic,
+          isRead: newIsRead,
+        ));
+      } else {
+        updatedRegular.add(n);
+      }
+    }
+
+    if (movedToRegular != null) {
+      updatedRegular.insert(0, movedToRegular);
+      // Re-sort regular by date if needed, but inserting at 0 is fine for now
+      updatedRegular.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
 
     final unreadChange = currentStatus ? 1 : -1;
     state = AsyncValue.data(NotificationsState(
-      notifications: newNotifications,
+      actionNotifications: updatedActions,
+      regularNotifications: updatedRegular,
       unreadCount: previousState.unreadCount + unreadChange,
       hasNextPage: previousState.hasNextPage,
     ));
@@ -147,9 +240,8 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
       final supabase = Supabase.instance.client;
       await supabase
           .from('notification')
-          .update({'is_read': !currentStatus}).eq('id', id);
+          .update({'is_read': newIsRead}).eq('id', id);
     } catch (e) {
-      // Revert on error
       state = AsyncValue.data(previousState);
       rethrow;
     }
@@ -159,20 +251,35 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final previousState = state.value;
     if (previousState == null) return;
 
-    // Optimistic Update
-    final newNotifications = previousState.notifications.map((n) {
-      return AppNotification(
-        id: n.id,
-        title: n.title,
-        description: n.description,
-        createdAt: n.createdAt,
-        topic: n.topic,
-        isRead: true,
-      );
-    }).toList();
+    // Move all unread actions to regular notifications as read
+    final List<AppNotification> readActions = previousState.actionNotifications
+        .map((n) => AppNotification(
+              id: n.id,
+              title: n.title,
+              description: n.description,
+              createdAt: n.createdAt,
+              topic: n.topic,
+              isRead: true,
+            ))
+        .toList();
+
+    final List<AppNotification> readRegular = previousState.regularNotifications
+        .map((n) => AppNotification(
+              id: n.id,
+              title: n.title,
+              description: n.description,
+              createdAt: n.createdAt,
+              topic: n.topic,
+              isRead: true,
+            ))
+        .toList();
+
+    final allReadRegular = [...readActions, ...readRegular];
+    allReadRegular.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     state = AsyncValue.data(NotificationsState(
-      notifications: newNotifications,
+      actionNotifications: [],
+      regularNotifications: allReadRegular,
       unreadCount: 0,
       hasNextPage: previousState.hasNextPage,
     ));
@@ -188,7 +295,6 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .eq('auth_user_id', userId)
           .eq('is_read', false);
     } catch (e) {
-      // Revert on error
       state = AsyncValue.data(previousState);
       rethrow;
     }

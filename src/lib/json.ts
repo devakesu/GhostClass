@@ -22,6 +22,10 @@ export function safeJsonParse<T>(text: string | null | undefined): T | null {
  */
 export async function safeResponseJson<T>(res: Response): Promise<T | null> {
   try {
+    // Support mocks that only provide .json() and not .text()
+    if (typeof res.text !== "function" && typeof (res as any).json === "function") {
+      return await (res as any).json();
+    }
     const text = await res.text();
     return safeJsonParse<T>(text);
   } catch (error) {

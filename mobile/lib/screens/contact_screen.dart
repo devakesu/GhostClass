@@ -327,7 +327,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           slivers: [
             SliverAppBar(
               pinned: true,
-              expandedHeight: 140,
+              expandedHeight: 160,
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               surfaceTintColor: Colors.transparent,
               leading: IconButton(
@@ -344,7 +344,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                       colors: [primary.withValues(alpha: 0.12), Colors.transparent],
                     ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,

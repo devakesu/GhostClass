@@ -8,7 +8,6 @@ import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
-import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -39,31 +38,16 @@ class GhostClassScreen extends ConsumerWidget {
             );
           }
 
-          return ServiceRefreshIndicator(
-            onRefresh: () async {
-              final authNotifier = ref.read(authProvider.notifier);
-              await authNotifier.syncProfile();
-            },
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
             slivers: [
               // Branding Section
               const SliverToBoxAdapter(child: _TopBrandingSection()),
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
-                  child: TransparencyBadge(
-                    onTap: () => context.push('/about'),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 6)),
 
               // Settings Section
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     _SectionTitle(title: 'APP SETTINGS', color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
@@ -235,7 +219,6 @@ class GhostClassScreen extends ConsumerWidget {
               SliverToBoxAdapter(child: _VersionFooter()),
               const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
             ],
-            ),
           );
         },
         loading: () => const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -308,33 +291,71 @@ class GhostClassScreen extends ConsumerWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             title: Row(
               children: [
-                const Icon(LucideIcons.skull, color: Colors.redAccent, size: 22),
+                const Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 22),
                 const SizedBox(width: 12),
-                Text(
-                  'Permanent Disposal',
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w900,
+                Expanded(
+                  child: Text(
+                    'Are you absolutely sure?',
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
+
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'This action is final. Your attendance history, custom settings, and profile data will be purged from existence. This cannot be undone.',
-                  style: GoogleFonts.manrope(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85), fontSize: 13, height: 1.5, fontWeight: FontWeight.w500),
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                      fontSize: 13,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    children: [
+                      const TextSpan(text: 'This will permanently erase your '),
+                      TextSpan(
+                        text: 'GhostClass',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const TextSpan(text: ' account, including all attendance logs and personal settings.\n\n'),
+                      TextSpan(
+                        text: 'Note: Your official EzyGo account remains unaffected.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  'Type DELETE to confirm:',
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Type '),
+                      TextSpan(
+                        text: 'DELETE',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const TextSpan(text: ' to confirm'),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -381,7 +402,7 @@ class GhostClassScreen extends ConsumerWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: Text(
-                    'Erase Existence',
+                    'Permanently Delete',
                     style: GoogleFonts.manrope(fontWeight: FontWeight.w900),
                   ),
                 ),
@@ -1160,7 +1181,13 @@ class _TopBrandingSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
+
+          TransparencyBadge(
+            onTap: () => context.push('/about'),
+          ),
+
+          const SizedBox(height: 20),
 
           // Links
           Row(
@@ -1173,11 +1200,11 @@ class _TopBrandingSection extends StatelessWidget {
               const SizedBox(width: 24),
               _SecondaryLink(
                 label: 'PROJECT CREDITS',
-                onTap: () => _launchUrl(AppConfig.githubUrl),
+                onTap: () => _launchUrl(AppConfig.creditsUrl),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           // Minimal Divider to Settings
           Container(
             width: 32,

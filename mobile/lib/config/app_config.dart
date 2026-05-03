@@ -78,13 +78,19 @@ class AppConfig {
   static String get authorUrl => 'https://devakesu.com';
 
   /// Project source URL.
-  static String get githubUrl => 'https://github.com/ABHAY-100/Bunkr';
+  static String get githubUrl => 'https://github.com/devakesu/GhostClass';
+
+  /// Original project credits URL.
+  static String get creditsUrl => 'https://github.com/ABHAY-100/Bunkr';
 
   /// Optional donation URL.
   static String get donateUrl => 'https://pages.razorpay.com/devakesu';
 
   /// Display name of the application.
   static String get appName => 'GhostClass';
+
+  /// The Play Store URL for the application.
+  static String get playStoreUrl => 'https://play.google.com/store/apps/details?id=com.devakesu.ghostclass';
 
   /// The GhostClass public web app URL.
   static String get ghostclassWebUrl => 'https://ghostclass.devakesu.com';

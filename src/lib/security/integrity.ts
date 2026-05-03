@@ -13,6 +13,7 @@ const getAuthorizedDigests = () => [
 export interface IntegrityResult {
   isValid: boolean;
   error?: string;
+  verdict?: any;
 }
 
 /**
@@ -149,7 +150,7 @@ export async function verifyPlayIntegrity(
       }
     }
 
-    return { isValid: true };
+    return { isValid: true, verdict };
   } catch (error: any) {
     logger.error("Play Integrity: Verification exception:", error.message);
     if (error.response?.data) {

@@ -329,24 +329,13 @@ export function CourseCard({
       badge: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
     };
 
-    // Attendance is below target (At Risk)
-    // Within 10% points of target -> Amber/Warning
-    const isAmber = stats.displayPercentage >= (targetPercentage - 10);
-    
-    if (isAmber) return {
-      card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
-      headerBg: "bg-amber-500/10 dark:bg-amber-500/20",
-      headerBorder: "border-amber-500/20 dark:border-amber-500/40",
-      badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
-    };
-
     return {
       card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
       headerBg: "bg-red-500/10 dark:bg-red-500/20",
       headerBorder: "border-red-500/20 dark:border-red-500/40",
       badge: "bg-red-500/15 text-red-500 border-red-500/30",
     };
-  }, [hasAttendanceData, stats.extraMetrics, stats.displayPercentage, targetPercentage]);
+  }, [hasAttendanceData, stats.extraMetrics]);
 
   const capitalize = useCallback((str: string) => {
     if (!str) return "";
@@ -539,7 +528,7 @@ export function CourseCard({
               </div>
 
               {/* TOTAL */}
-              <div className="text-center p-1 bg-sky-500/10 border border-sky-500/25 dark:bg-sky-500/10 dark:border-sky-500/20 rounded-md py-2.5 flex gap-1 flex-col">
+              <div className="text-center p-1 bg-primary/10 border border-primary/25 dark:bg-primary/10 dark:border-primary/20 rounded-md py-2.5 flex gap-1 flex-col">
                 <span className="text-xs text-muted-foreground block">Total</span>
                 <div className="flex items-center justify-center gap-0.5">
                   <span className="text-sm font-medium">
@@ -559,31 +548,30 @@ export function CourseCard({
               <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-secondary">
                 {isGain ? (
                   <>
-                    {/* SCENARIO 1: GAIN (Merged > Official) */}
                     <div
-                      className="absolute top-0 left-0 h-full bg-primary/40 transition-all duration-500 ease-in-out"
+                      className="absolute top-0 left-0 h-full bg-green-500 rounded-r-full transition-all duration-500 ease-in-out"
                       style={{ width: `${Math.min(stats.displayPercentage, 100)}%` }}
-                    >
-                      <div className="h-full w-full opacity-30 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-size-[8px_8px]" />
-                    </div>
-                    <div
-                      className="absolute top-0 left-0 h-full bg-primary transition-all duration-500 ease-in-out"
-                      style={{ width: `${Math.min(stats.officialPercentage, 100)}%` }}
                     />
+                    <div
+                      className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
+                      style={{ width: `${Math.min(stats.officialPercentage, 100)}%` }}
+                    >
+                      <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
+                    </div>
                   </>
                 ) : (
                   <>
                     {/* SCENARIO 2: LOSS (Merged < Official) */}
                     <div
-                      className="absolute top-0 left-0 h-full bg-red-500/80 transition-all duration-500 ease-in-out"
+                      className="absolute top-0 left-0 h-full bg-red-600 rounded-r-full transition-all duration-500 ease-in-out"
                       style={{ width: `${Math.min(stats.officialPercentage, 100)}%` }}
-                    >
-                        <div className="h-full w-full opacity-30 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-size-[8px_8px]" />
-                    </div>
-                    <div
-                      className="absolute top-0 left-0 h-full bg-primary transition-all duration-500 ease-in-out"
-                      style={{ width:`${Math.min(stats.displayPercentage, 100)}%` }}
                     />
+                    <div
+                      className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
+                      style={{ width:`${Math.min(stats.displayPercentage, 100)}%` }}
+                    >
+                      <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
+                    </div>
                   </>
                 )}
               </div>
@@ -596,7 +584,7 @@ export function CourseCard({
                       {stats.officialPercentage}% <span className="mx-0.5">→</span>
                     </span>
                   )}
-                  <span className={(stats.correctionPresent > 0 || stats.extras > 0) ? (isGain ? "text-primary font-bold" : "text-red-500 dark:text-red-400 font-bold") : ""}>
+                  <span className={(stats.correctionPresent > 0 || stats.extras > 0) ? (isGain ? "text-green-600 dark:text-green-400 font-bold" : "text-red-500 dark:text-red-400 font-bold") : ""}>
                     {stats.displayPercentage}%
                   </span>
                 </div>
@@ -689,12 +677,12 @@ export function CourseCard({
                   return (
                     <div className="grid grid-cols-2 gap-2">
                       {/* SAFE COUNT */}
-                      <div className="bg-primary/10 border border-primary/35 dark:border-primary/20 rounded-md p-2">
+                      <div className="bg-blue-600/10 border border-blue-600/35 dark:border-blue-600/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Safe (Official)</span>
+                          <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">Safe (Official)</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.safeMetrics.canBunk > 0 ? (
@@ -702,9 +690,9 @@ export function CourseCard({
                               Bunkable: <span className="font-bold text-green-500">{stats.safeMetrics.canBunk}</span>
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
-                            <span className="text-red-500 dark:text-red-400">
-                              Must Attend: <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
-                            </span>
+                            <>
+                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
+                            </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}
@@ -712,12 +700,12 @@ export function CourseCard({
                       </div>
 
                       {/* OPTIMISTIC COUNT */}
-                      <div className="bg-brand-accent/10 border border-brand-accent/35 dark:border-brand-accent/20 rounded-md p-2">
+                      <div className="bg-primary/15 border border-primary/30 dark:border-primary/20 rounded-md p-2">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <svg className="w-3.5 h-3.5 text-brand-accent dark:text-brand-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          <span className="text-[10px] font-semibold text-brand-accent dark:text-brand-accent uppercase tracking-wide">+ Tracking Data</span>
+                          <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">+ Tracking Data</span>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium leading-tight">
                           {stats.extraMetrics.canBunk > 0 ? (
@@ -725,9 +713,9 @@ export function CourseCard({
                               Bunkable: <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> 🥳
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
-                            <span className="text-red-500 dark:text-red-400">
-                              Must Attend: <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
-                            </span>
+                            <>
+                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
+                            </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
                           )}

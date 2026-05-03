@@ -43,7 +43,7 @@ function isValidCommitSha(sha: string | undefined): sha is string {
 }
 
 function getBuildMeta(): BuildMeta {
-  const commitSha = process.env.APP_COMMIT_SHA ?? "dev";
+  const commitSha = process.env.APP_COMMIT_SHA || "dev";
   const githubRepo =
     process.env.GITHUB_REPOSITORY ??
     (process.env.NEXT_PUBLIC_GITHUB_URL?.replace("https://github.com/", "") ?? "");
@@ -253,6 +253,56 @@ export default function BuildInfoPage() {
               )}
             </div>
           </Card>
+
+          {/* Security & Provenance Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Audit Status
+              </span>
+              <span
+                className={`text-sm font-black ${
+                  meta.audit_status?.includes("PASSED")
+                    ? "text-green-500"
+                    : "text-yellow-500"
+                }`}
+              >
+                {meta.audit_status}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Provenance
+              </span>
+              <span
+                className={`text-sm font-black ${
+                  meta.signature_status === "SLSA_PROVENANCE_GENERATED"
+                    ? "text-blue-500"
+                    : "text-yellow-500"
+                }`}
+              >
+                {meta.signature_status === "SLSA_PROVENANCE_GENERATED"
+                  ? "VERIFIED (SLSA L3)"
+                  : "DEVELOPMENT"}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Environment
+              </span>
+              <span className="text-sm font-black text-sky-500">
+                {meta.node_env?.toUpperCase()}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Platform
+              </span>
+              <span className="text-sm font-black text-purple-500">
+                {meta.container ? "CONTAINER" : "NODE.JS"}
+              </span>
+            </div>
+          </div>
 
           {/* Info Cards Grid */}
           <div className="grid md:grid-cols-2 gap-4">

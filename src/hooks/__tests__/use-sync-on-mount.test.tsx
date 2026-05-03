@@ -1,4 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
+vi.unmock("../use-sync-on-mount");
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useSyncOnMount } from "../use-sync-on-mount";
 import { logger } from "@/lib/logger";

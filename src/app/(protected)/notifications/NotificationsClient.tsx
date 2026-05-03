@@ -13,6 +13,17 @@ import {
   CheckCheck, BellOff, Loader2, RefreshCcw, 
   AlertTriangle, Info, CalendarClock, AlertCircle 
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { cn, redact } from "@/lib/utils";
 import { Loading } from "@/components/loading";
@@ -123,9 +134,10 @@ export default function NotificationsPage() {
     const items: VirtualItem[] = [];
 
     // Add Action Required section
-    if (actionNotifications.length > 0) {
+    const unreadActions = actionNotifications.filter(n => !n.is_read);
+    if (unreadActions.length > 0) {
       items.push({ type: 'header', id: 'action-header', label: 'ACTION REQUIRED' });
-      actionNotifications.forEach(n => {
+      unreadActions.forEach(n => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
@@ -235,17 +247,34 @@ export default function NotificationsPage() {
             </h1>
           </div>
           {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                markAllAsRead();
-                toast.success("Marked all as read");
-              }} 
-              className="text-xs text-muted-foreground hover:text-primary"
-            >
-              <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Mark all read
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs text-muted-foreground hover:text-primary"
+                >
+                  <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Mark all read
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Mark all as read?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will mark all current notifications as read. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    markAllAsRead();
+                    toast.success("Marked all as read");
+                  }}>
+                    Mark all read
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </header>

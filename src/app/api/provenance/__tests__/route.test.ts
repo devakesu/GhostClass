@@ -2,7 +2,7 @@
  * Tests for Provenance API Route
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { GET } from "../route";
 import { NextRequest } from "next/server";
 

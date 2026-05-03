@@ -109,47 +109,52 @@ class OverallProgressSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              if (showChange) ...[
-                                Text(
-                                  '${stats.rawOfficialPercentage.toStringAsFixed(1)}%',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white.withValues(alpha: 0.4),
-                                    decoration: TextDecoration.lineThrough,
-                                    decorationColor: Colors.white.withValues(
-                                      alpha: 0.4,
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  if (showChange) ...[
+                                    Text(
+                                      '${stats.rawOfficialPercentage.toStringAsFixed(2)}%',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white.withValues(alpha: 0.4),
+                                        decoration: TextDecoration.lineThrough,
+                                        decorationColor: Colors.white.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Text(
+                                    stats.rawPercentage.toStringAsFixed(2),
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              Text(
-                                stats.rawPercentage.toStringAsFixed(1),
-                                style: GoogleFonts.manrope(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
+                                  Text(
+                                    '%',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                '%',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -174,19 +179,33 @@ class OverallProgressSection extends StatelessWidget {
                         return Stack(
                           children: [
                             // Base progress (Purple)
-                            Container(
+                            SizedBox(
                               width: (isGain ? officialWidth : currentWidth)
                                   .clamp(0.0, totalWidth),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFA855F7), // Purple 500
-                                    Color(0xFF9333EA), // Purple 600
-                                  ],
-                                ),
-                                borderRadius: const BorderRadius.horizontal(
-                                  left: Radius.circular(9),
-                                ),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFA855F7), // Purple 500
+                                          Color(0xFF9333EA), // Purple 600
+                                        ],
+                                      ),
+                                      borderRadius: const BorderRadius.horizontal(
+                                        left: Radius.circular(9),
+                                      ),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      width: 1.5,
+                                      height: 14,
+                                      color: Colors.white.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             // Diff highlight (Green for gain, Red for loss)
@@ -210,16 +229,14 @@ class OverallProgressSection extends StatelessWidget {
                                   borderRadius: const BorderRadius.horizontal(
                                     right: Radius.circular(9),
                                   ),
-                                  child: _StripedContainer(
-                                    color: isGain
-                                        ? const Color(0xFF22C55E).withValues(
-                                            alpha: 0.9,
-                                          ) // Green 500
-                                        : const Color(
-                                            0xFFEF4444,
-                                          ).withValues(alpha: 0.9), // Red 500
-                                    stripeColor: Colors.white.withValues(
-                                      alpha: 0.2,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: isGain
+                                          ? const Color(0xFF22C55E) // Green 500
+                                          : const Color(0xFFB91C1C), // Deep Red 700
+                                      borderRadius: const BorderRadius.horizontal(
+                                        right: Radius.circular(9),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -319,46 +336,3 @@ class _WhiteCountBadge extends StatelessWidget {
   }
 }
 
-class _StripedContainer extends StatelessWidget {
-  final Color color;
-  final Color stripeColor;
-
-  const _StripedContainer({required this.color, required this.stripeColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _StripedPainter(color: color, stripeColor: stripeColor),
-      child: Container(),
-    );
-  }
-}
-
-class _StripedPainter extends CustomPainter {
-  final Color color;
-  final Color stripeColor;
-
-  _StripedPainter({required this.color, required this.stripeColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
-
-    final stripePaint = Paint()
-      ..color = stripeColor
-      ..strokeWidth = 2;
-
-    const double gap = 6;
-    for (double i = -size.height; i < size.width; i += gap) {
-      canvas.drawLine(
-        Offset(i, size.height),
-        Offset(i + size.height, 0),
-        stripePaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -1,5 +1,6 @@
 import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+vi.unmock('@/hooks/use-sync-on-mount');
 import TrackingClient from '../TrackingClient';
 import { createClient } from '@/lib/supabase/client';
 
@@ -33,11 +34,16 @@ vi.mock('@/hooks/users/profile', () => ({
   })),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: vi.fn(() => ({
-    invalidateQueries: vi.fn(),
-  })),
-}));
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQueryClient: vi.fn(() => ({
+      invalidateQueries: vi.fn(),
+    })),
+    useQuery: vi.fn(),
+  };
+});
 
 vi.mock('@/hooks/users/user', () => ({
   useUser: () => ({
@@ -90,7 +96,9 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
   })),
 }));
 
-vi.mock('@/lib/supabase/client', () => ({
+
+
+vi.mock('../../../lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
     auth: {
       getUser: vi.fn().mockResolvedValue({
@@ -125,15 +133,26 @@ vi.mock('sonner', () => ({
 }));
 
 // Mock framer-motion
-vi.mock('framer-motion', () => ({
-  LazyMotion: ({ children }: any) => children,
-  domAnimation: {},
-  m: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  },
-  AnimatePresence: ({ children }: any) => children,
-}));
+vi.mock('framer-motion', () => {
+  const MockComponent = ({ children, ...props }: any) => <div {...props}>{children}</div>;
+  return {
+    LazyMotion: ({ children }: any) => children,
+    domAnimation: {},
+    m: {
+      div: MockComponent,
+      button: MockComponent,
+      p: MockComponent,
+      span: MockComponent,
+    },
+    motion: {
+      div: MockComponent,
+      button: MockComponent,
+      p: MockComponent,
+      span: MockComponent,
+    },
+    AnimatePresence: ({ children }: any) => children,
+  };
+});
 
 // Mock UI components
 vi.mock('@/components/ui/badge', () => ({
@@ -156,16 +175,18 @@ vi.mock('@/components/loading', () => ({
   Loading: () => <div role="status">Loading...</div>,
 }));
 
-vi.mock('lucide-react', () => ({
-  Trash2: () => <span data-testid="trash2-icon" />,
-  CircleAlert: () => <span data-testid="circle-alert-icon" />,
-  ChevronLeft: () => <span data-testid="chevron-left-icon" />,
-  ChevronRight: () => <span data-testid="chevron-right-icon" />,
-  BookOpen: () => <span data-testid="book-open-icon" />,
-  ArrowDown: () => <span data-testid="arrow-down-icon" />,
-  Filter: () => <span data-testid="filter-icon" />,
-  Loader2: () => <span data-testid="loader2-icon" />,
-}));
+vi.mock('lucide-react', () => {
+  const Icon = () => null;
+  const commonIcons = [
+    'Trash2', 'CircleAlert', 'ChevronLeft', 'ChevronRight', 'ChevronDown',
+    'ChevronDownIcon', 'BookOpen', 'ArrowDown', 'Filter', 'Loader2', 'ChevronUpIcon', 'CheckIcon'
+  ];
+  const mock: any = { __esModule: true };
+  commonIcons.forEach(icon => {
+    mock[icon] = Icon;
+  });
+  return mock;
+});
 
 // Mock attendance-reconciliation
 vi.mock('@/lib/logic/attendance-reconciliation', () => ({
@@ -249,7 +270,7 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for enabled effect to switch from Loading to full UI
-      const clearBtn = await screen.findByRole('button', { name: /clear all 1 tracked class/i });
+      const clearBtn = await screen.findByRole('button', { name: /delete all 1 tracked class/i });
       fireEvent.click(clearBtn);
 
       // Dialog should now be open with "record" (singular)
@@ -273,7 +294,7 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for full UI, then open dialog
-      const clearBtn = await screen.findByRole('button', { name: /clear all 2 tracked classes/i });
+      const clearBtn = await screen.findByRole('button', { name: /delete all 2 tracked classes/i });
       fireEvent.click(clearBtn);
 
       // Dialog should show "records" (plural)

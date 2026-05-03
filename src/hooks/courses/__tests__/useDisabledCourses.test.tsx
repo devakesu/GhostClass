@@ -1,4 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
+vi.unmock('@/hooks/courses/useDisabledCourses')
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useDisabledCourses, makeSemesterKey } from "../useDisabledCourses";
 import { useUserSettings } from "@/providers/user-settings";

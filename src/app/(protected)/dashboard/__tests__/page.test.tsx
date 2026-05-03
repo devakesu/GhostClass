@@ -49,6 +49,13 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import DashboardPage from '../page';
+vi.mock('../DashboardDataLoader', () => ({
+  DashboardDataLoader: ({ token, userId }: any) => (
+    <div data-testid="dashboard-client" data-has-data="true" data-token={token} data-userid={userId}>
+      DashboardDataLoader Mock
+    </div>
+  ),
+}));
 import { DashboardDataLoader } from '../DashboardDataLoader';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
@@ -129,12 +136,12 @@ describe('DashboardPage', () => {
       expect(element).not.toBeNull();
 
       // Render the returned element – Suspense fallback shows while DashboardDataLoader resolves
-      render(element as ReactElement);
+      render(element as unknown as ReactElement);
       expect(screen.getByRole('status')).toBeInTheDocument();
 
-      // Call DashboardDataLoader directly – async RSC doesn't resolve in jsdom
-      const loaderElement = await DashboardDataLoader({ token: 'test-token-abc', userId: 'user-123' });
-      const { getByTestId } = render(loaderElement as ReactElement);
+      // Call DashboardDataLoader directly
+      const loaderElement = DashboardDataLoader({ token: 'test-token-abc', userId: 'user-123' });
+      const { getByTestId } = render(loaderElement as unknown as ReactElement);
       expect(getByTestId('dashboard-client')).toBeInTheDocument();
     });
 

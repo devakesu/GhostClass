@@ -94,69 +94,63 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
       onNotification: (notification) {
         if (notification.depth != 0) return false;
 
+        final metrics = notification.metrics;
+
+
+
         if (notification is ScrollUpdateNotification && !_isRefreshing) {
-          final metrics = notification.metrics;
-
-          // CRITICAL GUARD: Only allow refresh if the user is at the top AND moving downwards.
-          // If we have scrolled down at all (pixels > 0), kill any pull active.
-          if (metrics.pixels >= 0) {
-            if (_pullDistance > 0) {
-              _safeSetState(() => _pullDistance = 0.0);
-            }
-            return false;
-          }
-
-          // EXTREME STICKINESS: Only allow the pull animation if we are in an overscroll state.
-          // This ensures that the Glow Icon only appears when the user is explicitly pulling
-          // beyond the edge.
           if (metrics.pixels < 0) {
-            _safeSetState(() {
-              // Threshold 140px for very high tension - native feel
-              _pullDistance = (metrics.pixels.abs() / 140).clamp(0.0, 1.0);
-            });
+            final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
+            _safeSetState(() => _pullDistance = distance);
+
+            // Trigger refresh exactly when user releases (dragDetails becomes null)
+            // and we are past the threshold.
+            if (notification.dragDetails == null && distance >= 0.8) {
+              _handleRefresh();
+            }
+          } else if (_pullDistance > 0) {
+            _safeSetState(() => _pullDistance = 0.0);
           }
         }
 
-        // When the user stops dragging or starts scrolling up, reset the pull distance
-        if (notification is UserScrollNotification) {
-          if (notification.direction == ScrollDirection.reverse ||
-              notification.direction == ScrollDirection.idle) {
-            if (_pullDistance > 0 && !_isRefreshing) {
-              _safeSetState(() => _pullDistance = 0.0);
+        if (notification is OverscrollNotification && !_isRefreshing) {
+          if (metrics.pixels < 0) {
+            final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
+            _safeSetState(() => _pullDistance = distance);
+            
+            if (notification.dragDetails == null && distance >= 0.8) {
+              _handleRefresh();
             }
           }
         }
+
+        if (notification is UserScrollNotification && notification.direction == ScrollDirection.idle) {
+          if (!_isRefreshing) {
+            _safeSetState(() => _pullDistance = 0.0);
+          }
+        }
+
+        if (notification is ScrollEndNotification) {
+          if (!_isRefreshing) {
+            _safeSetState(() => _pullDistance = 0.0);
+          }
+        }
+
         return false;
       },
       child: Stack(
         children: [
-          RefreshIndicator(
-            onRefresh: _handleRefresh,
-            displacement: 0.0, // We handle the visual position with our Stack
-            edgeOffset: 0.0,
-            color: Colors.transparent,
-            backgroundColor: Colors.transparent,
-            strokeWidth: 0,
-            triggerMode: RefreshIndicatorTriggerMode.anywhere,
-            notificationPredicate: (notification) {
-              // ONLY allow if we are truly overscrolling (pulling past the edge)
-              // This is the absolute atomic guard.
-              if (notification.metrics.pixels < -40 &&
-                  notification is ScrollUpdateNotification) {
-                return true;
-              }
-              return false;
-            },
-            child: widget.child,
-          ),
-
-          if (_pullDistance > 0.05 && !_isRefreshing)
+          widget.child,
+          if (_pullDistance > 0.1 && !_isRefreshing)
             Positioned(
               top: 40,
               left: 0,
               right: 0,
               child: Center(
-                child: RefreshGlowIcon(pullDistance: _pullDistance),
+                child: Visibility(
+                  visible: _pullDistance > 0.1,
+                  child: RefreshGlowIcon(pullDistance: _pullDistance),
+                ),
               ),
             ),
         ],
@@ -186,16 +180,16 @@ class RefreshGlowIcon extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: primary.withValues(alpha: 0.12),
+              color: primary.withValues(alpha: 0.12 * pullDistance),
               border: Border.all(
                 color: primary.withValues(alpha: 0.3 * pullDistance),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primary.withValues(alpha: 0.15 * pullDistance),
-                  blurRadius: 10 * pullDistance,
-                  spreadRadius: 1 * pullDistance,
+                  color: primary.withValues(alpha: 0.1 * pullDistance),
+                  blurRadius: 12 * pullDistance,
+                  spreadRadius: 0,
                 ),
               ],
             ),

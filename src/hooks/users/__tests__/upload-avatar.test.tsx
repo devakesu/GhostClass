@@ -20,7 +20,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/utils", () => ({
-  redact: vi.fn((key, val) => val),
+  redact: vi.fn((_, val) => val),
 }));
 
 describe("uploadUserAvatar", () => {

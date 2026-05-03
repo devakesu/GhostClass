@@ -13,6 +13,8 @@ vi.mock("@/components/ui/separator", () => ({
   Separator: () => React.createElement('hr'),
 }));
 vi.mock("lucide-react", () => ({
+  ArrowLeft: () => null,
+  ExternalLink: () => null,
   Info: () => null,
   GitBranch: () => null,
   Github: () => null,
@@ -26,7 +28,7 @@ vi.mock("lucide-react", () => ({
   Check: () => null,
 }));
 vi.mock("date-fns", () => ({
-  format: vi.fn((d, f) => "formatted-date"),
+  format: vi.fn((_d, _f) => "formatted-date"),
 }));
 vi.mock("../copy-button", () => ({
   CopyButton: () => React.createElement('div', {}, 'MockCopyButton'),
@@ -39,6 +41,6 @@ describe('Mocked BuildInfoPage', () => {
   it('should render', () => {
     vi.stubEnv('APP_COMMIT_SHA', 'abc123d');
     render(<BuildInfoPage />);
-    expect(screen.getByText(/Build Metadata/i)).toBeInTheDocument();
+    expect(screen.getByText(/Build Information/i)).toBeInTheDocument();
   });
 });

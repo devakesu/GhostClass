@@ -17,9 +17,11 @@ vi.mock("@/lib/query-utils", () => ({
 }));
 
 const createWrapper = (queryClient: QueryClient) => {
-  return ({ children }: { children: React.ReactNode }) => (
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
 };
 
 describe("institutions hooks", () => {
@@ -93,7 +95,6 @@ describe("institutions hooks", () => {
   describe("useDefaultInstitutionUser", () => {
     it("should fetch and auto-correct if default is not a student institution", async () => {
       const studentInst = { id: 10, institution_role: { name: "student" } };
-      const otherInst = { id: 20, institution_role: { name: "staff" } };
       
       // First, useInstitutions is called (internally)
       // We need to mock useQuery behavior or pre-populate cache
@@ -162,7 +163,9 @@ describe("institutions hooks", () => {
           await act(async () => {
               try {
                   await result.current.mutateAsync(123);
-              } catch (e) {}
+              } catch (_e) {
+                  // Expected error
+              }
           });
           await waitFor(() => expect(result.current.isError).toBe(true));
       });

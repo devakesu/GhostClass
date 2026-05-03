@@ -517,6 +517,21 @@ class ApiService {
     );
   }
 
+  Future<Response<dynamic>> fetchAttestationDetails(String supabaseToken) async {
+    return _dio.get(
+      '$_ghostclassBaseUrl/security/attestation',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $supabaseToken',
+          if (_mobileApiKey.value.isNotEmpty)
+            'x-mobile-api-key': _mobileApiKey.value,
+        },
+        extra: {'useLimitedToken': true},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
   // ─── Authenticated EzyGo Requests ─────────────────────────────────────────
 
   Future<Response<dynamic>> getInstitutions(

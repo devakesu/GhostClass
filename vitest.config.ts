@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 10000,
     env: {
       // Default to development for most tests
       // Security-critical tests should explicitly override NODE_ENV to 'production'

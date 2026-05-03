@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import BuildInfoPage from '../page';
 
 // Mock navigator.clipboard
@@ -42,7 +41,7 @@ describe('BuildInfoPage', () => {
   it('should render build metadata from environment variables', () => {
     render(<BuildInfoPage />);
 
-    expect(screen.getByText('v1.8.0')).toBeInTheDocument();
+    expect(screen.getAllByText('v1.8.0')[0]).toBeInTheDocument();
     expect(screen.getByText('#42')).toBeInTheDocument();
     expect(screen.getByText('abc123d')).toBeInTheDocument();
     expect(screen.getByText('2026-02-18')).toBeInTheDocument();
@@ -58,10 +57,11 @@ describe('BuildInfoPage', () => {
     vi.stubEnv('GITHUB_RUN_ID', '');
     vi.stubEnv('GITHUB_RUN_NUMBER', '');
     vi.stubEnv('IMAGE_DIGEST', '');
+    vi.stubEnv('AUDIT_STATUS', '');
     
     render(<BuildInfoPage />);
 
-    expect(screen.getByText('v1.8.0')).toBeInTheDocument();
+    expect(screen.getAllByText('v1.8.0')[0]).toBeInTheDocument();
     expect(screen.getAllByText('#dev')).toHaveLength(1); // One in BUILD_ID
     expect(screen.getByText('UNKNOWN')).toBeInTheDocument(); // Image digest fallback or similar
   });

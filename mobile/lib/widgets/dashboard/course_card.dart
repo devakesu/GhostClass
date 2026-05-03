@@ -428,17 +428,20 @@ class CourseCard extends StatelessWidget {
                             ),
                           ),
                           if (isGain) ...[
-                            // Striped Extra Gain Bar
+                            // Solid Extra Gain Bar
                             FractionallySizedBox(
                               widthFactor: (stat.percentage / 100).clamp(
                                 0.0,
                                 1.0,
                               ),
-                              child: CustomPaint(
-                                painter: StripedBarPainter(
-                                  color: primary.withValues(alpha: 0.5),
+                              child: Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: primaryGreen,
+                                  borderRadius: const BorderRadius.horizontal(
+                                    right: Radius.circular(10),
+                                  ),
                                 ),
-                                child: Container(height: 10),
                               ),
                             ),
                             // Solid Official Bar
@@ -447,26 +450,40 @@ class CourseCard extends StatelessWidget {
                                 0.0,
                                 1.0,
                               ),
-                              child: Container(
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: primary,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0EA5E9),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      width: 1.5,
+                                      height: 10,
+                                      color: Colors.white.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ] else ...[
-                            // Striped Official Loss Bar
+                            // Solid Official Loss Bar
                             FractionallySizedBox(
                               widthFactor: (stat.officialPercentage / 100).clamp(
                                 0.0,
                                 1.0,
                               ),
-                              child: CustomPaint(
-                                painter: StripedBarPainter(
-                                  color: primaryRed.withValues(alpha: 0.8),
+                              child: Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: primaryRed.withValues(alpha: 0.95),
+                                  borderRadius: const BorderRadius.horizontal(
+                                    right: Radius.circular(10),
+                                  ),
                                 ),
-                                child: Container(height: 10),
                               ),
                             ),
                             // Solid Final Bar
@@ -475,12 +492,23 @@ class CourseCard extends StatelessWidget {
                                 0.0,
                                 1.0,
                               ),
-                              child: Container(
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: primary,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0EA5E9),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      width: 1.5,
+                                      height: 10,
+                                      color: Colors.white.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -509,49 +537,54 @@ class CourseCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            if (hasModifications &&
-                                stat.officialPercentage != stat.percentage) ...[
-                              Text(
-                                '${stat.officialPercentage.toStringAsFixed(2)}%',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.3),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                if (hasModifications &&
+                                    stat.officialPercentage != stat.percentage) ...[
+                                  Text(
+                                    '${stat.officialPercentage.toStringAsFixed(2)}%',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 12,
+                                      color: Theme.of(context).colorScheme.onSurface
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.arrowRight,
+                                      size: 10,
+                                      color: Theme.of(context).colorScheme.onSurface
+                                          .withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                ],
+                                Semantics(
+                                  label:
+                                      'Attendance percentage: ${stat.percentage.toStringAsFixed(2)}%',
+                                  child: Text(
+                                    '${stat.percentage.toStringAsFixed(2)}%',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: hasModifications
+                                          ? (isGain
+                                              ? primary
+                                              : primaryRed.withValues(alpha: 0.8))
+                                          : Theme.of(context).colorScheme.onSurface,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                ),
-                                child: Icon(
-                                  LucideIcons.arrowRight,
-                                  size: 10,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.1),
-                                ),
-                              ),
-                            ],
-                            Semantics(
-                              label:
-                                  'Attendance percentage: ${stat.percentage.toStringAsFixed(2)}%',
-                              child: Text(
-                                '${stat.percentage.toStringAsFixed(2)}%',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: hasModifications
-                                      ? (isGain
-                                          ? primary
-                                          : primaryRed.withValues(alpha: 0.8))
-                                      : Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -733,11 +766,11 @@ class SimpleBunkPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = result.requiredToAttend > 0
-        ? (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-              Colors.red)
-        : (Theme.of(context).extension<GhostColors>()?.successGreen ??
-              Colors.green);
+    final color = result.canBunk > 0
+        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
+              Colors.green)
+        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
+              Colors.red);
 
     return Container(
       width: double.infinity,
@@ -751,7 +784,7 @@ class SimpleBunkPanel extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Text(
-            result.requiredToAttend == 0
+            result.canBunk > 0
                 ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class 🥳' : 'classes 🥳🥳'}'
                 : result.requiredToAttend > 0
                 ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
@@ -813,15 +846,25 @@ class SafeBunkPanel extends StatelessWidget {
                 ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               children: [
-                const TextSpan(text: 'Bunkable: '),
                 TextSpan(
-                  text: result.canBunk.toString(),
+                  text: result.canBunk > 0
+                      ? 'Bunkable: '
+                      : result.requiredToAttend > 0
+                      ? 'Must Attend: '
+                      : 'Edge ',
+                ),
+                TextSpan(
+                  text: result.canBunk > 0
+                      ? '${result.canBunk}'
+                      : result.requiredToAttend > 0
+                      ? '${result.requiredToAttend} 💀💀'
+                      : '💀',
                   style: TextStyle(
-                    color:
-                        Theme.of(
-                          context,
-                        ).extension<GhostColors>()?.successGreen ??
-                        Colors.green,
+                    color: result.canBunk > 0
+                        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
+                            Colors.green)
+                        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
+                            Colors.red),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -894,15 +937,11 @@ class TrackingBunkPanel extends StatelessWidget {
                       ? '${result.requiredToAttend} 💀💀'
                       : '💀',
                   style: TextStyle(
-                    color: result.requiredToAttend > 0
-                        ? (Theme.of(
-                                context,
-                              ).extension<GhostColors>()?.dangerRed ??
-                              Colors.red)
-                        : (Theme.of(
-                                context,
-                              ).extension<GhostColors>()?.successGreen ??
-                              Colors.green),
+                    color: result.canBunk > 0
+                        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
+                            Colors.green)
+                        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
+                            Colors.red),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -915,47 +954,6 @@ class TrackingBunkPanel extends StatelessWidget {
   }
 }
 
-class StripedBarPainter extends CustomPainter {
-  final Color color;
-  StripedBarPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rRect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
-
-    // Clip to rounded rect shape
-    canvas.save();
-    canvas.clipRRect(rRect);
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    // Background color
-    canvas.drawRect(rect, paint);
-
-    // Overlay Stripes
-    final stripePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-
-    const stripeSpacing = 10.0;
-    for (double i = -size.height; i < size.width; i += stripeSpacing) {
-      canvas.drawLine(
-        Offset(i, size.height),
-        Offset(i + size.height, 0),
-        stripePaint,
-      );
-    }
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 class CourseToggleBadge extends StatelessWidget {
   final bool isEnabled;

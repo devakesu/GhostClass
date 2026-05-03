@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "../route";
-import { NextResponse } from "next/server";
+import { } from "next/server";
 import { isMobileRequest } from "@/lib/security/app-check";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -62,7 +62,7 @@ vi.mock("@sentry/nextjs", () => ({
 
 vi.mock("@/lib/utils.server", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
-  redact: vi.fn((t, v) => v),
+  redact: vi.fn((_t, v) => v),
 }));
 
 vi.mock("@/lib/security/auth-cookie", () => ({
@@ -83,7 +83,7 @@ describe("POST /api/auth/sync", () => {
     } as any);
 
     const req = new Request("http://localhost/api/auth/sync", { method: "POST" });
-    const response: any = await POST(req);
+    const response: any = await POST(req, {} as any);
 
     expect(response.status).toBe(429);
     expect(response.data.message).toContain("Too many requests");
@@ -98,7 +98,7 @@ describe("POST /api/auth/sync", () => {
       method: "POST",
       headers: { "x-csrf-token": "invalid" },
     });
-    const response: any = await POST(req);
+    const response: any = await POST(req, {} as any);
 
     expect(response.status).toBe(403);
     expect(response.data.message).toBe("Invalid CSRF token");
@@ -129,7 +129,7 @@ describe("POST /api/auth/sync", () => {
     vi.mocked(decrypt).mockReturnValue("decrypted-token");
 
     const req = new Request("http://localhost/api/auth/sync", { method: "POST" });
-    const response: any = await POST(req);
+    const response: any = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
     expect(response.data.success).toBe(true);
@@ -159,7 +159,7 @@ describe("POST /api/auth/sync", () => {
       method: "POST",
       headers: { "authorization": "Bearer valid-token" },
     });
-    const response: any = await POST(req);
+    const response: any = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
     expect(response.data.ezygo_token).toBe("decrypted-token");
@@ -171,7 +171,7 @@ describe("POST /api/auth/sync", () => {
     vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true } as any);
 
     const req = new Request("http://localhost/api/auth/sync", { method: "POST" });
-    const response: any = await POST(req);
+    const response: any = await POST(req, {} as any);
 
     expect(response.status).toBe(401);
     expect(response.data.message).toBe("Unauthorized");

@@ -58,8 +58,27 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               return IconButton(
                 icon: const Icon(LucideIcons.checkCheck),
                 onPressed: () {
-                  ref.read(notificationsProvider.notifier).markAllAsRead();
-                  ServiceToast.show(context, 'All notifications marked as read');
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Mark all as read?', style: GoogleFonts.manrope(fontWeight: FontWeight.w800)),
+                      content: const Text('This will mark all current notifications as read.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            ref.read(notificationsProvider.notifier).markAllAsRead();
+                            Navigator.pop(context);
+                            ServiceToast.show(context, 'All notifications marked as read');
+                          },
+                          child: const Text('Mark all read'),
+                        ),
+                      ],
+                    ),
+                  );
                 },
                 tooltip: 'Mark all as read',
               );
@@ -70,7 +89,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       ),
       body: notificationsAsync.when(
         data: (data) => ServiceRefreshIndicator(
-          onRefresh: () async => ref.read(notificationsProvider.notifier).fetchNextPage(),
+          onRefresh: () async => ref.invalidate(notificationsProvider),
           child: _buildList(context, ref, data),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -80,9 +99,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   Widget _buildList(BuildContext context, WidgetRef ref, NotificationsState data) {
-    if (data.notifications.isEmpty) {
+    if (data.allNotifications.isEmpty) {
       return ListView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(height: MediaQuery.of(context).size.height * 0.2),
           Center(
@@ -99,9 +119,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       );
     }
 
-    final unreadConflicts = List<AppNotification>.from(data.actionNotifications);
+    final unreadConflicts = data.actionNotifications.where((n) => !n.isRead).toList();
     final unreadRegular = data.regularNotifications.where((n) => !n.isRead).toList();
-    final readNotifications = data.notifications.where((n) => n.isRead).toList();
+    final readNotifications = data.allNotifications.where((n) => n.isRead).toList();
 
     // Sorting: Newest first within each group
     int compareNotifications(AppNotification a, AppNotification b) {

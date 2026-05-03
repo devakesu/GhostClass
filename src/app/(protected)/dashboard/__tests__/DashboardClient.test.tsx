@@ -107,7 +107,7 @@ describe("DashboardClient", () => {
     },
   });
 
-  it("renders the dashboard without crashing", () => {
+  it("renders the dashboard without crashing", async () => {
     render(
       <QueryClientProvider client={queryClient}>
         <AttendanceSettingsProvider>
@@ -116,9 +116,11 @@ describe("DashboardClient", () => {
       </QueryClientProvider>
     );
 
-    // Basic assertions to ensure some content is rendered
-    expect(screen.getByText(/Semester/i)).toBeDefined();
-    expect(screen.getByText(/Academic Year/i)).toBeDefined();
+    // Wait for the dashboard content to be rendered after initialization
+    await waitFor(() => {
+      expect(screen.getByText(/Semester/i)).toBeInTheDocument();
+      expect(screen.getByText(/Academic Year/i)).toBeInTheDocument();
+    });
   });
 
   it("handles serverError prop by showing toast", async () => {

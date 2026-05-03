@@ -136,3 +136,194 @@ vi.mock('@/lib/circuit-breaker', () => {
     },
   };
 });
+// Mock hooks
+vi.mock('@/hooks/tracker/useTrackingData', () => ({
+  useTrackingData: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn().mockResolvedValue({ data: [], isLoading: false, error: null }),
+  })),
+}));
+
+vi.mock('@/hooks/tracker/useTrackingCount', () => ({
+  useTrackingCount: vi.fn(() => ({
+    data: 0,
+    isLoading: false,
+    refetch: vi.fn().mockResolvedValue({ data: 0, isLoading: false }),
+  })),
+}));
+
+vi.mock('@/hooks/users/profile', () => ({
+  useProfile: vi.fn(() => ({
+    data: { 
+      id: '123', 
+      email: 'test@example.com', 
+      username: 'testuser',
+      class: { id: 'class-123', name: 'Test Class' }
+    },
+    isLoading: false,
+  })),
+  useUpdateProfile: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+}));
+
+vi.mock('@/hooks/users/user', () => ({
+  useUser: () => ({
+    data: { id: '123', email: 'test@example.com', username: 'testuser' },
+    isLoading: false,
+  }),
+}));
+
+vi.mock('@/hooks/courses/attendance', () => ({
+  useAttendanceReport: () => ({
+    data: null,
+    isLoading: false,
+  }),
+  useCourseDetails: vi.fn(() => ({
+    data: null,
+    isLoading: false,
+  })),
+  useAllCourseDetails: vi.fn(() => ({
+    data: {},
+    isLoading: false,
+  })),
+}));
+
+vi.mock('@/hooks/users/settings', () => ({
+  useFetchSemester: () => ({
+    data: 'even',
+    isLoading: false,
+  }),
+  useFetchAcademicYear: () => ({
+    data: '2024-25',
+    isLoading: false,
+  }),
+  useSetSemester: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+  useSetAcademicYear: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+  useFetchUserSettings: vi.fn(() => ({
+    data: { semester: 'even', academicYear: '2024-25' },
+    isLoading: false,
+  })),
+}));
+
+vi.mock('@/hooks/courses/courses', () => ({
+  useFetchCourses: () => ({
+    data: { courses: {} },
+    isLoading: false,
+  }),
+}));
+
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: vi.fn(() => ({
+    disabledCoursesMap: {},
+    disabledCodes: new Set<string>(),
+    isDisabled: vi.fn(() => false),
+    getDisableReason: vi.fn(() => null),
+    disableCourse: vi.fn(),
+    enableCourse: vi.fn(),
+    isLoading: false,
+  })),
+  makeSemesterKey: vi.fn((sem, year) => `${sem}-${year}`),
+}));
+
+vi.mock('@/hooks/use-sync-on-mount', () => ({
+  useSyncOnMount: vi.fn(() => ({
+    isSyncing: false,
+    syncCompleted: true,
+  })),
+}));
+
+vi.mock('@/hooks/courses/useFetchClassCourses', () => ({
+  useFetchClassCourses: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+  })),
+}));
+
+vi.mock('@/hooks/use-build-info', () => ({
+  useBuildInfo: () => ({
+    data: {
+      version: '1.0.0',
+      branch: 'main',
+      commit: 'test-commit',
+      isLegacy: false,
+    },
+    isLoading: false,
+  }),
+}));
+
+// Mock framer-motion
+vi.mock('framer-motion', () => {
+  const MockDiv = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('div', { ref, ...props }, children));
+  MockDiv.displayName = 'MotionDiv';
+  
+  const MockButton = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('button', { ref, ...props }, children));
+  MockButton.displayName = 'MotionButton';
+  
+  const MockP = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('p', { ref, ...props }, children));
+  MockP.displayName = 'MotionP';
+  
+  const MockSpan = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('span', { ref, ...props }, children));
+  MockSpan.displayName = 'MotionSpan';
+  
+  const MockSection = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('section', { ref, ...props }, children));
+  MockSection.displayName = 'MotionSection';
+  
+  const MockNav = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('nav', { ref, ...props }, children));
+  MockNav.displayName = 'MotionNav';
+  
+  const MockHeader = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('header', { ref, ...props }, children));
+  MockHeader.displayName = 'MotionHeader';
+  
+  const MockFooter = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('footer', { ref, ...props }, children));
+  MockFooter.displayName = 'MotionFooter';
+
+  return {
+    LazyMotion: ({ children }: any) => children,
+    domAnimation: {},
+    m: {
+      div: MockDiv,
+      button: MockButton,
+      p: MockP,
+      span: MockSpan,
+      section: MockSection,
+      nav: MockNav,
+      header: MockHeader,
+      footer: MockFooter,
+    },
+    AnimatePresence: ({ children }: any) => children,
+    motion: {
+      div: MockDiv,
+      button: MockButton,
+      p: MockP,
+      span: MockSpan,
+      section: MockSection,
+      nav: MockNav,
+      header: MockHeader,
+      footer: MockFooter,
+    },
+  };
+});
+
+// Global mock for lucide-react to prevent missing icon errors in UI components
+vi.mock('lucide-react', () => {
+  const Icon = () => null;
+  const commonIcons = [
+    'ChevronUpIcon', 'ChevronDownIcon', 'ChevronDown', 'CheckIcon', 'Trash2', 'X', 'Download',
+    'BookOpen', 'Filter', 'Loader2', 'ArrowDown', 'ChevronLeft', 'ChevronRight', 'CircleAlert'
+  ];
+  const mock: any = { __esModule: true };
+  commonIcons.forEach(icon => {
+    mock[icon] = Icon;
+  });
+  return mock;
+});

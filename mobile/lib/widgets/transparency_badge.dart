@@ -8,16 +8,13 @@ class TransparencyBadge extends StatelessWidget {
   final VoidCallback? onTap;
   final bool expanded;
 
-  const TransparencyBadge({
-    super.key,
-    this.onTap,
-    this.expanded = false,
-  });
+  const TransparencyBadge({super.key, this.onTap, this.expanded = false});
 
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final accent = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final accent =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final bg = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final muted = Theme.of(context).colorScheme.onSecondary;
@@ -25,10 +22,18 @@ class TransparencyBadge extends StatelessWidget {
     final content = AnimatedContainer(
       duration: 220.ms,
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 18 : 14, vertical: expanded ? 14 : 11),
+      padding: EdgeInsets.symmetric(
+        horizontal: expanded ? 22 : 20,
+        vertical: expanded ? 10 : 9,
+      ),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accent.withValues(alpha: 0.18), accent.withValues(alpha: 0.06), bg.withValues(alpha: 0.96)],
+          colors: [
+            accent.withValues(alpha: 0.18),
+            accent.withValues(alpha: 0.06),
+            bg.withValues(alpha: 0.96),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -44,6 +49,7 @@ class TransparencyBadge extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: 32,
@@ -58,7 +64,7 @@ class TransparencyBadge extends StatelessWidget {
           Flexible(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   'Build transparency',
@@ -68,6 +74,7 @@ class TransparencyBadge extends StatelessWidget {
                     color: onSurface,
                     height: 1.1,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 if (expanded) ...[
                   const SizedBox(height: 3),
@@ -79,6 +86,7 @@ class TransparencyBadge extends StatelessWidget {
                       color: muted.withValues(alpha: 0.9),
                       height: 1.2,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ],
@@ -92,7 +100,12 @@ class TransparencyBadge extends StatelessWidget {
       ),
     );
 
-    final child = expanded ? content : ConstrainedBox(constraints: const BoxConstraints(maxWidth: 320), child: content);
+    final child = expanded
+        ? content
+        : ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 280, maxWidth: 360),
+            child: content,
+          );
 
     if (onTap == null) return child;
 

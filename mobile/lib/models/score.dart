@@ -107,11 +107,15 @@ class ExamQuestion {
   final int id;
   final String questionNo;
   final double maximumMark;
+  final int? subquestionParentId;
+  final int? orQuestionGroupId;
 
   ExamQuestion({
     required this.id,
     required this.questionNo,
     required this.maximumMark,
+    this.subquestionParentId,
+    this.orQuestionGroupId,
   });
 
   factory ExamQuestion.fromJson(Map<String, dynamic> json) {
@@ -119,6 +123,8 @@ class ExamQuestion {
       id: _toInt(json['id']) ?? 0,
       questionNo: json['question_no'] as String? ?? '?',
       maximumMark: _toDouble(json['maximum_mark']) ?? 0.0,
+      subquestionParentId: _toInt(json['subquestion_parent_id']),
+      orQuestionGroupId: _toInt(json['orquestion_group_id']),
     );
   }
 }
