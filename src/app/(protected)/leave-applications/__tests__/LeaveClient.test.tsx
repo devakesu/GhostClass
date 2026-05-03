@@ -82,7 +82,7 @@ describe('LeaveClient', () => {
 
   it('renders error state when initialData is missing', () => {
     renderWithClient(<LeaveClient initialData={null} />)
-    expect(screen.getByText(/Failed to load leave data/i)).toBeInTheDocument()
+    expect(screen.getByText(/Leave Data Sync Unavailable/i)).toBeInTheDocument()
   })
 
   it('renders empty state when there are no leaves after filtering', () => {

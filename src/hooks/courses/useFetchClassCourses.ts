@@ -6,6 +6,7 @@ import { useProfile } from "@/hooks/users/profile";
 import { logger } from "@/lib/logger";
 
 export interface ClassCourse {
+  id: number;
   course_code: string;
   course_name: string;
   semester: string;
@@ -38,7 +39,7 @@ export function useFetchClassCourses(
         const supabase = createClient();
         const { data, error } = await supabase
           .from("class_courses")
-          .select("course_code, course_name, semester, academic_year")
+          .select("id, course_code, course_name, semester, academic_year")
           .eq("class_id", classId!)
           .eq("semester", semester!)
           .eq("academic_year", year!);

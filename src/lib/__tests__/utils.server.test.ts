@@ -60,6 +60,36 @@ describe('utils.server.ts', () => {
   });
 
   describe('redact', () => {
+    it('uses SENTRY_HASH_SALT if provided', () => {
+      vi.stubEnv('SENTRY_HASH_SALT', 'custom-salt');
+      const h1 = redact('id', 'v');
+      _resetModuleState();
+      vi.stubEnv('SENTRY_HASH_SALT', 'other-salt');
+      const h2 = redact('id', 'v');
+      expect(h1).not.toBe(h2);
+    });
+
+    it('throws in production if SENTRY_HASH_SALT is missing', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('SENTRY_HASH_SALT', '');
+      expect(() => redact('id', 'v')).toThrow('SENTRY_HASH_SALT is required in production');
+    });
+
+    it('warns in development if SENTRY_HASH_SALT is missing', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv('SENTRY_HASH_SALT', '');
+      const spy = vi.spyOn(console, 'warn');
+      const h = redact('id', 'v');
+      expect(h).toBeDefined();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('SECURITY WARNING'));
+    });
+
+    it('throws if NODE_ENV is neither production nor development/test', () => {
+      vi.stubEnv('NODE_ENV', 'other');
+      vi.stubEnv('SENTRY_HASH_SALT', '');
+      expect(() => redact('id', 'v')).toThrow('SENTRY_HASH_SALT is required in production');
+    });
+
     it('redacts deterministically', () => {
       const h1 = redact('id', '123');
       const h2 = redact('id', '123');
@@ -93,6 +123,22 @@ describe('utils.server.ts', () => {
       vi.stubEnv('CF_PROXY_SECRET', '');
       expect(getEgressConfig().proxyHeaders).toEqual({});
     });
+
+    it('prioritizes AWS if CF is missing', () => {
+      vi.stubEnv('CF_PROXY_URL', '');
+      vi.stubEnv('AWS_SECONDARY_URL', 'https://aws');
+      vi.stubEnv('AWS_SECONDARY_SECRET', 'aws-secret');
+      const config = getEgressConfig();
+      expect(config.baseUrl).toBe('https://aws');
+      expect(config.proxyHeaders).toEqual({ 'x-proxy-secret': 'aws-secret' });
+    });
+
+    it('falls back to direct backend if both CF and AWS are missing', () => {
+      vi.stubEnv('CF_PROXY_URL', '');
+      vi.stubEnv('AWS_SECONDARY_URL', '');
+      vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://direct');
+      expect(getEgressConfig().baseUrl).toBe('https://direct');
+    });
   });
 
   describe('egressFetch', () => {
@@ -102,6 +148,21 @@ describe('utils.server.ts', () => {
       vi.stubEnv('CF_PROXY_SECRET', 'cf-secret');
       vi.stubEnv('AWS_SECONDARY_URL', 'https://aws');
     });
+
+    it('throws if no targets are configured', async () => {
+      vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', '');
+      vi.stubEnv('CF_PROXY_URL', '');
+      vi.stubEnv('AWS_SECONDARY_URL', '');
+      await expect(egressFetch('/test')).rejects.toThrow('No egress targets configured');
+    });
+
+    it('rethrows AbortError if caller signal is aborted', async () => {
+      (global.fetch as any).mockRejectedValue(new (class AbortError extends Error { name = 'AbortError'; })());
+      const controller = new AbortController();
+      controller.abort();
+      await expect(egressFetch('/test', { signal: controller.signal })).rejects.toThrow();
+    });
+
 
     it('fails over on retryable statuses (429, 502, etc)', async () => {
       (global.fetch as any)

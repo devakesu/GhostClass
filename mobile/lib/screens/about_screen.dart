@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
   Future<void> _launchUrl(String url) async {
@@ -32,7 +35,7 @@ class AboutScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
     final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final accent = ghostColors?.brandAccent ?? Theme.of(context).colorScheme.primary;
@@ -138,20 +141,24 @@ class AboutScreen extends StatelessWidget {
                         label: 'Version',
                         value: AppConfig.appVersion,
                         accent: primary,
-                        onTap: () => _copy(context, AppConfig.appVersion, 'Version'),
+                        onTap: AppConfig.isReleaseBuild ? () => _launchUrl(AppConfig.playStoreUrl) : null,
+                        onLongPress: () => _copy(context, AppConfig.appVersion, 'Version'),
                       ),
                       _MetricCard(
                         icon: LucideIcons.fileDigit,
                         label: 'Commit',
                         value: _shortSha(AppConfig.appCommitSha),
                         accent: accent,
-                        onTap: () => _copy(context, AppConfig.appCommitSha, 'Commit SHA'),
+                        onTap: (AppConfig.appCommitSha != 'local' && AppConfig.appCommitSha.isNotEmpty)
+                            ? () => _launchUrl('${AppConfig.githubUrl}/commit/${AppConfig.appCommitSha}')
+                            : null,
+                        onLongPress: () => _copy(context, AppConfig.appCommitSha, 'Commit SHA'),
                       ),
                       _MetricCard(
                         icon: LucideIcons.clock3,
                         label: 'Built',
                         value: AppConfig.buildTimestamp,
-                        accent: ghostColors?.accentCyan ?? const Color(0xFF06B6D4),
+                        accent: const Color(0xFF0EA5E9),
                         onTap: () => _copy(context, AppConfig.buildTimestamp, 'Build timestamp'),
                       ),
                       _MetricCard(
@@ -159,7 +166,10 @@ class AboutScreen extends StatelessWidget {
                         label: 'Run',
                         value: AppConfig.githubRunNumber,
                         accent: ghostColors?.successGreen ?? const Color(0xFF10B981),
-                        onTap: () => _copy(context, AppConfig.githubRunId, 'Workflow run'),
+                        onTap: (AppConfig.githubRunId != 'local' && AppConfig.githubRunId.isNotEmpty)
+                            ? () => _launchUrl('${AppConfig.githubUrl}/actions/runs/${AppConfig.githubRunId}')
+                            : null,
+                        onLongPress: () => _copy(context, AppConfig.githubRunId, 'Workflow run'),
                       ),
                     ]),
                   ),
@@ -181,11 +191,26 @@ class AboutScreen extends StatelessWidget {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+                    child: _AttestationSection(
+                      onLaunch: _launchUrl,
+                      onCopy: _copy,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
                     child: _SectionCard(
                       title: 'Pointers',
                       subtitle: 'These links should point to the same release lineage as the binary on your device.',
                       children: [
+                        _LinkRow(
+                          icon: LucideIcons.playCircle,
+                          title: 'Google Play Store',
+                          value: AppConfig.playStoreUrl,
+                          onTap: () => _launchUrl(AppConfig.playStoreUrl),
+                        ),
                         _LinkRow(
                           icon: LucideIcons.github,
                           title: 'GitHub repository',
@@ -224,22 +249,143 @@ class AboutScreen extends StatelessWidget {
   }
 }
 
-class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
+class _AttestationSection extends ConsumerStatefulWidget {
+  final Future<void> Function(String) onLaunch;
+  final Future<void> Function(BuildContext, String, String) onCopy;
 
-  const _GlowBlob({required this.color, required this.size});
+  const _AttestationSection({required this.onLaunch, required this.onCopy});
+
+  @override
+  ConsumerState<_AttestationSection> createState() => _AttestationSectionState();
+}
+
+class _AttestationSectionState extends ConsumerState<_AttestationSection> {
+  bool _isLoading = false;
+  Map<String, dynamic>? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verify();
+    });
+  }
+
+  Future<void> _verify() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final supabaseToken = supabase.auth.currentSession?.accessToken;
+      if (supabaseToken == null) throw 'Not logged in';
+
+      final api = ref.read(apiServiceProvider);
+      final response = await api.fetchAttestationDetails(supabaseToken);
+
+      if (response.statusCode == 200) {
+        if (mounted) setState(() => _data = response.data);
+      } else {
+        if (mounted) setState(() => _error = 'Verification failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(color: color, blurRadius: 70, spreadRadius: 20),
+    final theme = Theme.of(context);
+
+    return _SectionCard(
+      title: 'Live Attestation',
+      subtitle: 'Dynamic verification of the app instance against Google Play Integrity.',
+      children: [
+        if (_isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              _error!,
+              style: GoogleFonts.manrope(fontSize: 12, color: theme.colorScheme.error, fontWeight: FontWeight.w600),
+            ),
+          ),
+        if (_data != null) ...[
+          _StatusItem(
+            label: 'App License',
+            status: _data!['details']?['accountIntegrity']?['appLicensingVerdict'] == 'LICENSED' ? 'VERIFIED' : 'UNRECOGNIZED',
+            isSuccess: _data!['details']?['accountIntegrity']?['appLicensingVerdict'] == 'LICENSED',
+          ),
+          _StatusItem(
+            label: 'Integrity Level',
+            status: (_data!['details']?['deviceIntegrity']?['deviceRecognitionVerdict'] as List?)?.join(', ') ?? 'NONE',
+            isSuccess: (_data!['details']?['deviceIntegrity']?['deviceRecognitionVerdict'] as List?)?.contains('MEETS_DEVICE_INTEGRITY') ?? false,
+          ),
+          _StatusItem(
+            label: 'App Check',
+            status: _data!['appCheck'] == true ? 'SECURE' : 'INSECURE',
+            isSuccess: _data!['appCheck'] == true,
+          ),
+          _StatusItem(
+            label: 'Recognition',
+            status: _data!['details']?['appIntegrity']?['appRecognitionVerdict'] ?? 'UNKNOWN',
+            isSuccess: _data!['details']?['appIntegrity']?['appRecognitionVerdict'] == 'PLAY_RECOGNIZED',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Last verified: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+            style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w700, color: theme.colorScheme.onSecondary),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatusItem extends StatelessWidget {
+  final String label;
+  final String status;
+  final bool isSuccess;
+
+  const _StatusItem({required this.label, required this.status, required this.isSuccess});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ghostColors = theme.extension<GhostColors>();
+    final color = isSuccess 
+      ? (ghostColors?.successGreen ?? Colors.green) 
+      : (ghostColors?.dangerRed ?? Colors.red);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              status,
+              style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w900, color: color),
+            ),
+          ),
         ],
       ),
     );
@@ -351,9 +497,17 @@ class _MetricCard extends StatelessWidget {
   final String label;
   final String value;
   final Color accent;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
-  const _MetricCard({required this.icon, required this.label, required this.value, required this.accent, required this.onTap});
+  const _MetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    this.onTap,
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -363,6 +517,7 @@ class _MetricCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(18),
@@ -577,6 +732,27 @@ class _LinkRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+class _GlowBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _GlowBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color, blurRadius: 70, spreadRadius: 20),
+        ],
       ),
     );
   }

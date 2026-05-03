@@ -907,7 +907,7 @@ export default function DashboardClient(
       : 0;
     const formatPct = (
       val: number,
-    ) => (val % 1 === 0 ? Math.round(val) : parseFloat(val.toFixed(1)));
+    ) => (val % 1 === 0 ? Math.round(val) : parseFloat(val.toFixed(2)));
 
     return {
       percentage: formatPct(percentage),
@@ -1209,7 +1209,7 @@ export default function DashboardClient(
                       )}
                     <span
                       className={stats.rawPercentage >= targetPercentage
-                        ? "text-primary"
+                        ? "text-sky-600 dark:text-sky-400"
                         : "text-red-600 dark:text-red-400"}
                     >
                       {isLoadingAttendance
@@ -1229,7 +1229,7 @@ export default function DashboardClient(
                       ? (
                         <>
                           <div
-                            className="bg-primary h-full transition-all duration-500 ease-in-out"
+                            className="bg-sky-500 h-full transition-all duration-500 ease-in-out"
                             style={{
                               width: `${Math.min(officialWidth, 100)}%`,
                             }}
@@ -1245,7 +1245,7 @@ export default function DashboardClient(
                       : (
                         <>
                           <div
-                            className="bg-primary h-full transition-all duration-500 ease-in-out"
+                            className="bg-sky-500 h-full transition-all duration-500 ease-in-out"
                             style={{
                               width: `${Math.min(stats.rawPercentage, 100)}%`,
                             }}

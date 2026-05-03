@@ -7,6 +7,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -34,9 +35,9 @@ class _LoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF0F0F1A),
-      body: Center(child: CircularProgressIndicator()),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }
@@ -74,8 +75,9 @@ class _ProfileDumpContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const primary = Color(0xFF7C3AED);
-    const bg = Color(0xFF0F0F1A);
+    final ghostColors = Theme.of(context).extension<GhostColors>();
+    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
 
     final institutionsAsync = ref.watch(institutionsProvider);
     final String institutionName = institutionsAsync.when(
@@ -100,7 +102,7 @@ class _ProfileDumpContent extends ConsumerWidget {
         backgroundColor: bg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.chevronLeft, color: Colors.white70),
+          icon: Icon(LucideIcons.chevronLeft, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -108,7 +110,7 @@ class _ProfileDumpContent extends ConsumerWidget {
           style: GoogleFonts.manrope(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -128,7 +130,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                     style: GoogleFonts.manrope(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: -0.8,
                     ),
                   ),
@@ -136,7 +138,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                     'Detailed account and session metadata',
                     style: GoogleFonts.manrope(
                       fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -367,7 +369,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                     _InfoRow(
                       label: 'Disabled Courses',
                       value: user.settings.disabledCount == 0 ? 'None' : '${user.settings.disabledCount} courses',
-                      valueColor: user.settings.disabledCount == 0 ? Colors.white.withValues(alpha: 0.3) : Colors.orangeAccent,
+                      valueColor: user.settings.disabledCount == 0 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3) : Colors.orangeAccent,
                       onTap: user.settings.disabledCount > 0 ? () => _showDisabledCoursesBottomSheet(context, user.settings) : null,
                       trailingIcon: user.settings.disabledCount > 0 ? LucideIcons.chevronRight : null,
                     ),
@@ -386,7 +388,7 @@ class _ProfileDumpContent extends ConsumerWidget {
   void _showDisabledCoursesBottomSheet(BuildContext context, UserSettings settings) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1C1C2E),
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -401,7 +403,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -416,7 +418,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                   style: GoogleFonts.manrope(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -426,9 +428,9 @@ class _ProfileDumpContent extends ConsumerWidget {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: settings.disabledCourses.entries.length,
-                separatorBuilder: (context, index) => const Divider(
+                separatorBuilder: (context, index) => Divider(
                   height: 24,
-                  color: Color(0x14FFFFFF),
+                  color: Theme.of(context).dividerColor,
                 ),
                 itemBuilder: (context, index) {
                   final semesterEntry =
@@ -463,81 +465,42 @@ class _ProfileDumpContent extends ConsumerWidget {
                       ...courses.map((courseEntry) {
                         final courseCodeRaw = courseEntry.key.trim();
                         final courseCode = courseCodeRaw.toUpperCase();
-                        String? courseName =
-                            settings.courseCatalog[courseCode] ??
-                            settings.courseCatalog[courseCodeRaw];
-                        if (courseName == null) {
-                          for (final entry in settings.courseCatalog.entries) {
-                            if (entry.key.toUpperCase() == courseCode) {
-                              courseName = entry.value;
-                              break;
-                            }
-                          }
-                        }
-
-                        // Defensive: If values are stringified objects (Map.toString()), extract name field
-                        if (courseName != null && courseName.startsWith('{') && courseName.contains('name:')) {
-                           try {
-                             final match = RegExp(r'name: ([^,}]*)').firstMatch(courseName);
-                             if (match != null) {
-                               courseName = match.group(1)?.trim();
-                             }
-                           } catch (e) {
-                             AppLogger.w('ProfileDumpScreen: Failed to parse catalog course name', e);
-                           }
-                        }
 
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.only(bottom: 18),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  courseCode,
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFFFACC15),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (courseName != null) ...[
-                                      Text(
-                                        _capitalize(courseName),
-                                        style: GoogleFonts.manrope(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      courseCode,
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                        letterSpacing: 0.2,
                                       ),
-                                      const SizedBox(height: 4),
-                                    ],
-                                    Text(
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
                                       courseEntry.value.isEmpty
                                           ? 'No reason provided'
                                           : courseEntry.value,
                                       style: GoogleFonts.manrope(
                                         fontSize: 13,
-                                        color: Colors.white.withValues(alpha: 0.6),
-                                        height: 1.4,
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                         );
                       }),
                     ],
@@ -570,12 +533,12 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const surface = Color(0xFF1C1C2E);
+    final surface = Theme.of(context).cardColor;
     return Container(
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,14 +561,14 @@ class _InfoCard extends StatelessWidget {
                   style: GoogleFonts.manrope(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -0.2,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0x14FFFFFF)),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
           ...rows.map((row) => row._buildRow(context)),
           const SizedBox(height: 4),
         ],
@@ -656,7 +619,7 @@ class _InfoRow {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -673,7 +636,7 @@ class _InfoRow {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: valueColor ?? Colors.white,
+                        color: valueColor ?? Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -682,7 +645,7 @@ class _InfoRow {
                     Icon(
                       trailingIcon ?? LucideIcons.copy,
                       size: 14,
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
                   ],
                 ],

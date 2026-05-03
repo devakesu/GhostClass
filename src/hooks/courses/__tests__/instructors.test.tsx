@@ -28,9 +28,11 @@ const createWrapper = () => {
       },
     },
   });
-  return ({ children }: { children: React.ReactNode }) => (
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
 };
 
 describe("useFetchCourseInstructors", () => {

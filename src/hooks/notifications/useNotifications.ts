@@ -65,7 +65,7 @@ export function useNotifications(enabled = true, countOnly = false) {
         .from("notification")
         .select("*")
         .eq("auth_user_id", session.user.id)
-        .ilike("topic", "conflict%") // Only conflicts
+        .ilike("topic", "%conflict%") // Only conflicts
         .eq("is_read", false)        // Only unread
         .order("created_at", { ascending: false });
 

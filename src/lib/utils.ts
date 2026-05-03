@@ -560,15 +560,20 @@ export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string 
  */
 export function isValidAvatarUrl(url: string | null | undefined): url is string {
   if (!url) return false;
+  // Handle local assets (relative paths or imported images)
+  if (url.startsWith('/') || url.startsWith('blob:') || url.startsWith('data:')) return true;
+
   try {
     const parsed = new URL(url);
+    // Standardize on HTTPS for remote images.
+    // If a URL is HTTP, it's blocked for security and because next.config.ts only allows https.
     if (parsed.protocol !== 'https:') return false;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    // If the env var is absent at runtime (should not happen in production due to
-    // validate-env.ts), fall through and allow any HTTPS URL rather than blocking
-    // all avatars — a broken avatar is worse UX than a permissive fallback.
-    if (!supabaseUrl) return true;
-    return parsed.hostname === new URL(supabaseUrl).hostname;
+
+    // We no longer strictly check the hostname against Supabase URL here.
+    // Hostname validation is centrally managed in next.config.ts remotePatterns.
+    // If a hostname is valid but not in next.config.ts, Next.js will handle the error.
+    // If it IS in next.config.ts (e.g. Google/GitHub/Supabase), it will now load in the Navbar.
+    return true;
   } catch {
     return false;
   }

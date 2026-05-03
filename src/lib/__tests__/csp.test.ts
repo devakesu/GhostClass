@@ -402,7 +402,7 @@ describe("Content Security Policy", () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
       
-      const loggerSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
       // In csp.ts it uses lib/logger, which we might need to mock or just check the output
       getCspHeader("nonce");
       // Since it's production and no nonce was handled in a previous test, 

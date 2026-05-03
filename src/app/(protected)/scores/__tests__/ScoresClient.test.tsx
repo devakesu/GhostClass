@@ -11,7 +11,7 @@
  *  - Accessibility roles + aria attributes
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import ScoresClient from '../ScoresClient'
 import type { Exam, ExamAnswer, ExamQuestion } from '@/types'
 import { useState, useEffect } from 'react';

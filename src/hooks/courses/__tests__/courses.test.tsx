@@ -1,4 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
+vi.unmock('@/hooks/courses/courses')
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useFetchCourses } from "../courses";
 import axios from "@/lib/axios";
@@ -23,9 +24,11 @@ const createWrapper = () => {
       },
     },
   });
-  return ({ children }: { children: React.ReactNode }) => (
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
 };
 
 describe("useFetchCourses", () => {

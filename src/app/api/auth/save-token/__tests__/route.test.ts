@@ -38,7 +38,7 @@ vi.mock("@/lib/redis", () => ({
 vi.mock("@/lib/utils.server", () => ({
   getClientIp: vi.fn(() => "127.0.0.1"),
   egressFetch: vi.fn(),
-  redact: vi.fn((type, val) => val),
+  redact: vi.fn((_, val) => val),
 }));
 
 vi.mock("@/lib/logger", () => ({

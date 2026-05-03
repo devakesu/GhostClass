@@ -106,7 +106,7 @@ export async function decryptResponse(jwe: string, cek: Uint8Array): Promise<any
     // Import the raw CEK as a CryptoKey for decryption
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
-      cek,
+      cek as any,
       { name: "AES-GCM", length: 256 },
       false,
       ["decrypt"]

@@ -245,7 +245,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
       const upstreamError = error as any;
       const headers = upstreamError.headers instanceof Headers ? upstreamError.headers : new Headers(upstreamError.headers as any);
       const sanitizedErrorHeaders = Object.fromEntries(
-        Array.from(headers.entries() as any).filter(([k]) => (k as string).toLowerCase() !== "content-encoding")
+        (Array.from(headers.entries()) as [string, string][]).filter(([k]) => k.toLowerCase() !== "content-encoding")
       );
       
       const logMethod = upstreamError.status === 429 ? "warn" : "error";

@@ -473,12 +473,12 @@ return (
                           {d.officialPercentage}% <span className="text-muted-foreground/40 font-normal">({d.present}/{d.total})</span>
                         </span>
                       </div>
-                      {(d.displayedExtra > 0) && (
+                      {(d.mergedTotal !== d.total || d.mergedPresent !== d.present) && (
                           <div className="flex justify-between gap-4">
                             <span className="text-muted-foreground/60">
                               Adjusted (
-                              <span className={d.isLoss ? "text-red-500" : "text-green-500"}>
-                                {d.isLoss ? "Loss" : "Gain"}
+                              <span className={d.totalPercentage > d.officialPercentage ? "text-green-500" : (d.totalPercentage < d.officialPercentage ? "text-red-500" : "text-muted-foreground")}>
+                                {d.totalPercentage > d.officialPercentage ? "Gain" : (d.totalPercentage < d.officialPercentage ? "Loss" : "Neutral")}
                               </span>
                               ):
                             </span>

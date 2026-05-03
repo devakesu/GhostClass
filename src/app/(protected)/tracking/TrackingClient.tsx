@@ -47,8 +47,8 @@ import {
   getOfficialSessionRaw,
 } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
-import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
+import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import {
   Select,
   SelectContent,
@@ -373,7 +373,7 @@ export default function TrackingClient() {
     return filteredCourseKeys.slice(startIndex, startIndex + coursesPerPage);
   }, [currentPage, filteredCourseKeys, coursesPerPage]);
 
-  // Reset to first page when filter changes
+  // No effect needed here, using render-based sync below to avoid cascading renders.
 
 
   const activeCourseMeta = useMemo(() => {
@@ -558,6 +558,22 @@ export default function TrackingClient() {
 
   // Adjust state for empty course keys during render to avoid useEffect warning.
   const [prevKeysLen, setPrevKeysLen] = useState(currentCourseKeys.length);
+  const [prevTrackingData, setPrevTrackingData] = useState(trackingData);
+
+  if (trackingData !== prevTrackingData) {
+    setPrevTrackingData(trackingData);
+    
+    // Auto-revert filter if subject no longer has records
+    if (
+      selectedCourseFilter !== "all" &&
+      (!groupedAllData[selectedCourseFilter] ||
+        groupedAllData[selectedCourseFilter].length === 0)
+    ) {
+      setSelectedCourseFilter("all");
+      setCurrentPage(0);
+    }
+  }
+
   if (currentCourseKeys.length !== prevKeysLen) {
     setPrevKeysLen(currentCourseKeys.length);
     if (currentCourseKeys.length === 0) {
@@ -809,7 +825,7 @@ export default function TrackingClient() {
                         <button
                           onClick={() => setDeleteAllConfirmOpen(true)}
                           aria-label={selectedCourseFilter === "all"
-                            ? `Delete all ${count} tracked records`
+                            ? `Delete all ${count} tracked class${count === 1 ? "" : "es"}`
                             : `Clear all records for this subject`}
                           className="text-sm cursor-pointer justify-between items-center gap-2 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/15 duration-300 border border-brand-accent/40 dark:border-brand-accent/20 py-1 px-3 rounded-md flex"
                         >
@@ -1278,7 +1294,7 @@ export default function TrackingClient() {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {selectedCourseFilter === "all"
-                  ? `This will permanently delete all ${count} tracking records for the ${semesterData?.toUpperCase()} ${academicYearData} academic term.`
+                  ? `This will permanently delete all ${count} tracking record${count === 1 ? "" : "s"} for the ${semesterData?.toUpperCase()} ${academicYearData} academic term.`
                   : `This will permanently delete all tracking records for ${
                     activeCourseMeta?.displayCourseName || selectedCourseFilter
                   }.`} This action cannot be undone.

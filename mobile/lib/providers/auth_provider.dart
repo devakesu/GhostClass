@@ -479,6 +479,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     bool? bunkEnabled,
     int? targetPercentage,
     Map<String, Map<String, String>>? disabledCourses,
+    Map<String, String>? catalogOverride,
   }) async {
     final user = state.value;
     if (user == null) return;
@@ -488,12 +489,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       bunkEnabled: bunkEnabled,
       targetPercentage: targetPercentage,
       disabledCourses: disabledCourses,
+      catalogOverride: catalogOverride,
     );
 
     final updatedSettings = user.settings.copyWith(
       bunkCalculatorEnabled: bunkEnabled,
       targetPercentage: targetPercentage,
       disabledCourses: disabledCourses,
+      courseCatalog: catalogOverride,
     );
     await service.saveSettingsLocally(updatedSettings);
     state = AsyncValue.data(user.copyWith(settings: updatedSettings));
@@ -553,7 +556,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       throw Exception(formatApiError(response.data, 'Institution Fetch'));
     }
 
-    return (response.data as List).map((i) => Institution.fromJson(i)).toList();
+    final all =
+        (response.data as List).map((i) => Institution.fromJson(i)).toList();
+
+    // Achieve parity with web app: Only show institutions where user is a student
+    return all.where((i) => i.role.toLowerCase() == 'student').toList();
   }
 
   // ─── Private Handlers ───────────────────────────────────────────────────────

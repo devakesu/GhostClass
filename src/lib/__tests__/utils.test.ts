@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { 
   cn, 
   toTitleCase, 
@@ -12,7 +12,8 @@ import {
   formatCourseCode,
   getAppDomain,
   isValidAvatarUrl,
-  compressImage
+  compressImage,
+  redact
 } from "../utils";
 
 describe("utils.ts", () => {
@@ -32,16 +33,32 @@ describe("utils.ts", () => {
   });
 
   describe("toRoman", () => {
-    it("converts 1-12 to Roman numerals", () => {
+    it("converts numbers to Roman numerals", () => {
       expect(toRoman(1)).toBe("I");
-      expect(toRoman(5)).toBe("V");
+      expect(toRoman("5")).toBe("V");
       expect(toRoman(12)).toBe("XII");
     });
 
-    it("returns as-is for values out of range", () => {
-      expect(toRoman(13)).toBe("13");
+    it("returns original value for out-of-range or invalid inputs", () => {
       expect(toRoman(0)).toBe("0");
-      expect(toRoman("not-a-number")).toBe("not-a-number");
+      expect(toRoman(13)).toBe("13");
+      expect(toRoman("invalid")).toBe("invalid");
+    });
+  });
+
+  describe("redact", () => {
+    it("redacts email and id deterministically", () => {
+      const email = "test@example.com";
+      const h1 = redact("email", email);
+      const h2 = redact("email", email);
+      expect(h1).toBe(h2);
+      expect(h1).toHaveLength(12);
+      expect(h1).toMatch(/^[0-9a-f]{12}$/);
+
+      const id = "12345";
+      const h3 = redact("id", id);
+      expect(h3).not.toBe(h1);
+      expect(h3).toHaveLength(12);
     });
   });
 
@@ -83,18 +100,59 @@ describe("utils.ts", () => {
   });
 
   describe("formatSessionName", () => {
-    it("formats session identifiers for display", () => {
-      expect(formatSessionName("i")).toBe("1st Hour");
+    it("formats small numbers as ordinals", () => {
+      expect(formatSessionName("1")).toBe("1st Hour");
       expect(formatSessionName("2")).toBe("2nd Hour");
-      expect(formatSessionName("iii")).toBe("3rd Hour");
-      expect(formatSessionName("9")).toBe("9th Hour");
-      expect(formatSessionName("Lab")).toBe("Session Lab");
-      expect(formatSessionName("ix")).toBe("9th Hour");
+      expect(formatSessionName("3")).toBe("3rd Hour");
+      expect(formatSessionName("4")).toBe("4th Hour");
       expect(formatSessionName("11")).toBe("11th Hour");
       expect(formatSessionName("12")).toBe("12th Hour");
       expect(formatSessionName("13")).toBe("13th Hour");
-      expect(formatSessionName("21")).toBe("Session 21");
+    });
+
+    it("handles roman numerals and edge cases", () => {
+      expect(formatSessionName("i")).toBe("1st Hour");
+      expect(formatSessionName("iii")).toBe("3rd Hour");
+      expect(formatSessionName("ix")).toBe("9th Hour");
+      expect(formatSessionName("Lab")).toBe("Session Lab");
+      expect(formatSessionName("Session 1")).toBe("Session 1");
       expect(formatSessionName("")).toBe("");
+    });
+
+    it("formats large numbers with prefix", () => {
+      expect(formatSessionName("21")).toBe("Session 21");
+    });
+  });
+
+  describe("isValidAvatarUrl", () => {
+    const supabaseUrl = "https://project.supabase.co";
+
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", supabaseUrl);
+    });
+
+    it("returns false for empty or non-URL strings", () => {
+      expect(isValidAvatarUrl(null)).toBe(false);
+      expect(isValidAvatarUrl("")).toBe(false);
+      expect(isValidAvatarUrl("not-a-url")).toBe(false);
+    });
+
+    it("returns false for non-https protocols", () => {
+      expect(isValidAvatarUrl("http://example.com")).toBe(false);
+    });
+
+    it("returns true if it matches the Supabase hostname", () => {
+      expect(isValidAvatarUrl("https://project.supabase.co/storage/v1/object/public/avatars/test.png")).toBe(true);
+    });
+
+    it("returns false if it points to a different hostname", () => {
+      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png")).toBe(false);
+      expect(isValidAvatarUrl("https://evil.com/test.png")).toBe(false);
+    });
+
+    it("is permissive if NEXT_PUBLIC_SUPABASE_URL is missing", () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+      expect(isValidAvatarUrl("https://any-domain.com/test.png")).toBe(true);
     });
   });
 

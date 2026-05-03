@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
+vi.unmock('@/hooks/users/profile')
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useProfile, useUpdateProfile } from "../profile";
 import axiosInstance from "@/lib/axios";
@@ -22,9 +23,11 @@ vi.mock("@/lib/query-utils", () => ({
 }));
 
 const createWrapper = (queryClient: QueryClient) => {
-  return ({ children }: { children: React.ReactNode }) => (
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
 };
 
 describe("profile hooks", () => {
@@ -100,7 +103,7 @@ describe("profile hooks", () => {
         await act(async () => {
           await result.current.mutateAsync({ data: updateData });
         });
-      } catch (e) {
+      } catch (_e) {
         // expected
       }
 
@@ -123,7 +126,9 @@ describe("profile hooks", () => {
             await act(async () => {
                 await result.current.mutateAsync({ data: { first_name: "New" } });
             });
-        } catch (e) {}
+        } catch (_e) {
+            // Expected error
+        }
 
         expect(queryClient.getQueryData(["profile"])).toBeUndefined();
     });

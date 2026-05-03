@@ -262,7 +262,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                           label: HorizontalLineLabel(
                             show: true,
                             alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(right: 40),
                             style: GoogleFonts.manrope(
                               color: Colors.white,
                               fontSize: 11,
@@ -499,11 +499,17 @@ class _LocalChartTooltip extends StatelessWidget {
                           style: TextStyle(color: onTooltipSurface),
                         ),
                         TextSpan(
-                          text: stat.percentage < stat.officialPercentage ? 'Loss' : 'Gain',
+                          text: stat.percentage > stat.officialPercentage + 0.01
+                              ? 'Gain'
+                              : (stat.percentage < stat.officialPercentage - 0.01
+                                  ? 'Loss'
+                                  : 'Neutral'),
                           style: TextStyle(
-                            color: stat.percentage < stat.officialPercentage
-                                ? dangerColor
-                                : successColor,
+                            color: stat.percentage > stat.officialPercentage + 0.01
+                                ? successColor
+                                : (stat.percentage < stat.officialPercentage - 0.01
+                                    ? dangerColor
+                                    : onTooltipSurface),
                           ),
                         ),
                         TextSpan(

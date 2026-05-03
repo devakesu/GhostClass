@@ -14,6 +14,7 @@ export interface AppCheckResult {
   isValid: boolean;
   error?: string;
   alreadyLogged?: boolean;
+  integrity?: any;
 }
 
 /**
@@ -109,15 +110,19 @@ export async function verifyAppCheckToken(
     const userAgent = headerList.get("user-agent") || "";
     const isAndroid = userAgent.toLowerCase().includes("android");
 
+    let integrity: any = null;
+
     if (playIntegrityToken) {
       // The mobile app uses the project number as a static nonce for basic attestation.
       const expectedNonce = process.env.PLAY_INTEGRITY_PROJECT_NUMBER || "424804867878";
       const integrityResult = await verifyPlayIntegrity(playIntegrityToken, expectedNonce);
+      integrity = integrityResult.verdict;
       
       if (!integrityResult.isValid) {
         return {
           isValid: false,
           error: integrityResult.error || "Device integrity check failed",
+          integrity,
         };
       }
     } else if (isAndroid && isProd) {
@@ -136,7 +141,7 @@ export async function verifyAppCheckToken(
       }
     }
 
-    return { isValid: true };
+    return { isValid: true, integrity };
   } catch (error: any) {
     logger.error("App Check verification failed:", error.message);
     Sentry.captureException(error, {

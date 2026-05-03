@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+vi.unmock('@/hooks/users/user')
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode } from 'react'

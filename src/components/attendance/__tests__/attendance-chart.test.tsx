@@ -436,7 +436,9 @@ describe('AttendanceChart', () => {
         capturedTooltipContent!({ active: true, payload: [{ payload: lossPayload }] }) as React.ReactElement
       );
 
-      const adjustedLabel = getByText('Adjusted (Loss):');
+      const adjustedLabel = getByText((_content, element) => {
+        return element?.textContent === 'Adjusted (Loss):';
+      });
       const adjustedRow = adjustedLabel.closest('div')!;
       const valueSpan = adjustedRow.querySelector('span.font-mono');
       expect(valueSpan).toHaveClass('text-red-600');
@@ -463,7 +465,9 @@ describe('AttendanceChart', () => {
         capturedTooltipContent!({ active: true, payload: [{ payload: gainPayload }] }) as React.ReactElement
       );
 
-      const adjustedLabel = getByText('Adjusted (Gain):');
+      const adjustedLabel = getByText((_content, element) => {
+        return element?.textContent === 'Adjusted (Gain):';
+      });
       const adjustedRow = adjustedLabel.closest('div')!;
       const valueSpan = adjustedRow.querySelector('span.font-mono');
       expect(valueSpan).toHaveClass('text-green-600');

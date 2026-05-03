@@ -105,7 +105,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), {} as any);
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -123,7 +123,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      await POST(makePostReq());
+      await POST(makePostReq(), {} as any);
       expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
     });
@@ -132,7 +132,7 @@ describe("POST /api/logout", () => {
       const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), {} as any);
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe("POST /api/logout", () => {
     it("returns 403 when CSRF token is invalid", async () => {
       mockValidateCsrf.mockResolvedValueOnce(false);
       const { POST } = await import("../route");
-      const res = await POST(makePostReq("bad-token"));
+      const res = await POST(makePostReq("bad-token"), {} as any);
       expect(res.status).toBe(403);
       const body = await res.json() as { message: string };
       expect(body.message).toMatch(/invalid csrf/i);
@@ -153,7 +153,7 @@ describe("POST /api/logout", () => {
     it("does not clear cookies when CSRF check fails", async () => {
       mockValidateCsrf.mockResolvedValueOnce(false);
       const { POST } = await import("../route");
-      await POST(makePostReq("bad-token"));
+      await POST(makePostReq("bad-token"), {} as any);
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
       expect(mockRemoveCsrfToken).not.toHaveBeenCalled();
     });
@@ -162,7 +162,7 @@ describe("POST /api/logout", () => {
   describe("successful logout", () => {
     it("returns 200 ok when rate limit and CSRF both pass", async () => {
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), {} as any);
       expect(res.status).toBe(200);
       const body = await res.json() as { ok: boolean };
       expect(body.ok).toBe(true);
@@ -170,7 +170,7 @@ describe("POST /api/logout", () => {
 
     it("clears auth cookie, CSRF token, and terms cookies on success", async () => {
       const { POST } = await import("../route");
-      await POST(makePostReq());
+      await POST(makePostReq(), {} as any);
       expect(mockClearAuthCookie).toHaveBeenCalledOnce();
       expect(mockRemoveCsrfToken).toHaveBeenCalledOnce();
       expect(mockClearTermsVersionCookie).toHaveBeenCalledOnce();

@@ -79,6 +79,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     };
 
     final courseKeys = uniqueKeys.toList();
+
+    // Auto-revert filter if subject no longer has records
+    if (_selectedCourse != 'all' && !uniqueKeys.contains(_selectedCourse)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _selectedCourse != 'all') {
+          setState(() => _selectedCourse = 'all');
+        }
+      });
+    }
     courseKeys.sort((a, b) {
       final mergedA = (dashboard?.courses ?? [])
           .cast<CourseDetails?>()

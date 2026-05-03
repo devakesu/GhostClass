@@ -40,8 +40,12 @@ const withSerwist = withSerwistInit({
 
 // Resolve the Supabase storage hostnames at build time.
 // Allowing both production and development hostnames ensures images work across environments.
-const supabaseImageHostnames = (() => {
-  const hosts = [];
+const allowedImageHostnames = (() => {
+  const hosts = [
+    "lh3.googleusercontent.com",     // Google
+    "avatars.githubusercontent.com", // GitHub
+    "secure.gravatar.com",           // Gravatar
+  ];
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
     try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname); } catch { /* ignore */ }
   }
@@ -49,13 +53,14 @@ const supabaseImageHostnames = (() => {
     try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_DEV_URL).hostname); } catch { /* ignore */ }
   }
   
-  if (hosts.length === 0) {
+  if (hosts.length === 3 && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    // We only throw if even Supabase is missing, as that's the primary storage
     throw new Error(
       '[next.config.ts] At least one Supabase URL (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_DEV_URL) ' +
       'is required at build time for images.remotePatterns.'
     );
   }
-  // Deduplicate in case they are the same
+  // Deduplicate
   return Array.from(new Set(hosts));
 })();
 
@@ -225,12 +230,17 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      ...supabaseImageHostnames.map(hostname => ({
-        protocol: 'https' as const,
-        hostname,
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      })),
+      ...allowedImageHostnames.map((hostname: string) => {
+        const isSupabase = hostname.includes('supabase');
+        return {
+          protocol: 'https' as const,
+          hostname,
+          port: '',
+          // Supabase storage is strictly nested under /storage/v1/object/public/
+          // while OAuth providers (Google, GitHub) serve images from various root paths.
+          pathname: isSupabase ? '/storage/v1/object/public/**' : '/**',
+        };
+      }),
     ],
   },
   allowedDevOrigins: ['192.168.0.103']

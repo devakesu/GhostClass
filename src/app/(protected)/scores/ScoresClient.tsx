@@ -879,12 +879,12 @@ export default function ScoresClient() {
   }, [participatedExams]);
 
   const stats = useMemo(() => {
-    if (participatedExams.length === 0) return null;
-    const scored = participatedExams.filter(
+    if (filtered.length === 0) return null;
+    const scored = filtered.filter(
       (e) => (resolvedScores[e.id] ?? getScore(e)) != null
     ).length;
-    const pending = participatedExams.length - scored;
-    const percentages = participatedExams
+    const pending = filtered.length - scored;
+    const percentages = filtered
       .map((e) => {
         const s = resolvedScores[e.id] ?? getScore(e);
         const m = resolvedMaxMarks[e.id];
@@ -896,8 +896,8 @@ export default function ScoresClient() {
       percentages.length > 0
         ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
         : null;
-    return { total: participatedExams.length, scored, pending, avg };
-  }, [participatedExams, resolvedScores, resolvedMaxMarks]);
+    return { total: filtered.length, scored, pending, avg };
+  }, [filtered, resolvedScores, resolvedMaxMarks]);
 
   if (isLoading || (!exams && !isError)) {
     return (
@@ -914,13 +914,13 @@ export default function ScoresClient() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-4 mb-8"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 border border-primary/50 dark:border-primary/30 shrink-0">
-            <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 border border-primary/50 dark:border-primary/30 shrink-0">
+            <GraduationCap className="h-6 w-6 text-primary" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight mb-1">
               Scores
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -935,7 +935,7 @@ export default function ScoresClient() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8"
           >
             {[
               { label: "Total", value: String(stats.total) },
@@ -964,7 +964,7 @@ export default function ScoresClient() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="flex items-center gap-2 flex-wrap mb-2"
+          className="flex items-center gap-3 flex-wrap mb-6"
         >
           {TABS.map((tab) => (
             <Button

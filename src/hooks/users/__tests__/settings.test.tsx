@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
+vi.unmock('@/hooks/users/settings')
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useFetchSemester, useFetchAcademicYear, useSetSemester, useSetAcademicYear, useFetchUserSettings } from "../settings";
 import axios from "@/lib/axios";
@@ -38,9 +39,11 @@ vi.mock("axios", async () => {
 });
 
 const createWrapper = (queryClient: QueryClient) => {
-  return ({ children }: { children: React.ReactNode }) => (
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
 };
 
 describe("settings hooks", () => {
@@ -147,7 +150,9 @@ describe("settings hooks", () => {
             await act(async () => {
                 await result.current.mutateAsync({ default_semester: "odd" });
             });
-        } catch (e) {}
+        } catch (_e) {
+            // Expected error
+        }
 
         expect(logger.error).toHaveBeenCalled();
         expect(Sentry.captureException).toHaveBeenCalledWith(error, expect.any(Object));
@@ -183,7 +188,9 @@ describe("settings hooks", () => {
             await act(async () => {
                 await result.current.mutateAsync({ default_academic_year: "2024" });
             });
-        } catch (e) {}
+        } catch (_e) {
+            // Expected error
+        }
 
         expect(logger.error).toHaveBeenCalled();
         expect(Sentry.captureException).toHaveBeenCalled();
