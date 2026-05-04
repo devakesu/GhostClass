@@ -12,21 +12,6 @@ vi.mock("@/components/ui/badge", () => ({
 vi.mock("@/components/ui/separator", () => ({
   Separator: () => React.createElement('hr'),
 }));
-vi.mock("lucide-react", () => ({
-  ArrowLeft: () => null,
-  ExternalLink: () => null,
-  Info: () => null,
-  GitBranch: () => null,
-  Github: () => null,
-  History: () => null,
-  Globe: () => null,
-  Shield: () => null,
-  Activity: () => null,
-  Hash: () => null,
-  Layers: () => null,
-  Copy: () => null,
-  Check: () => null,
-}));
 vi.mock("date-fns", () => ({
   format: vi.fn((_d, _f) => "formatted-date"),
 }));

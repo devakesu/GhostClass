@@ -1,60 +1,59 @@
-/**
- * Tests for ScoresClient — covers:
- *  - Loading / error / empty states
- *  - Stats strip (total, scored, pending, avg %)
- *  - Course-grouped sections
- *  - Filter tabs (all / assessments / assignments) + counts
- *  - Visibility rules (assessments vs assignments)
- *  - Score display: resolvedScore > pivot.score, maxMark fallback
- *  - Ungraded submissions show "Pending" not "0 / max"
- *  - Drawer open / close via button and Esc
- *  - Accessibility roles + aria attributes
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+
 import ScoresClient from '../ScoresClient'
 import type { Exam, ExamAnswer, ExamQuestion } from '@/types'
-import { useState, useEffect } from 'react';
+
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-// Reactive router mock: tracks searchParams state so the drawer useEffect works
-let _searchParams = new URLSearchParams();
-let _listeners: ((params: URLSearchParams) => void)[] = [];
+// Global state for next/navigation mock to allow reactivity in tests
+let currentSearchParams = new URLSearchParams();
+const navListeners = new Set<(p: URLSearchParams) => void>();
 
-const updateSearchParams = (url: string) => {
-  const q = url.split('?')[1];
-  _searchParams = new URLSearchParams(q ?? '');
-  _listeners.forEach(l => l(_searchParams));
-};
+const mockPush = vi.fn((url: string) => {
+  const [_, search] = url.split('?');
+  currentSearchParams = new URLSearchParams(search || '');
+  // Notify all active useSearchParams hooks synchronously
+  navListeners.forEach(l => l(currentSearchParams));
+});
 
-const mockRouterPush = vi.fn((url: string) => updateSearchParams(url));
-const mockRouterReplace = vi.fn((url: string) => updateSearchParams(url));
-const mockRouterBack = vi.fn(() => updateSearchParams('/'));
+vi.mock('next/navigation', async () => {
+  const React = await import('react');
+  return {
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockPush,
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+    }),
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockRouterPush,
-    replace: mockRouterReplace,
-    prefetch: vi.fn(),
-    back: mockRouterBack,
-    forward: vi.fn(),
-    refresh: vi.fn(),
-  }),
-  usePathname: () => '/scores',
-  useSearchParams: () => {
-    const [params, setParams] = useState(_searchParams);
-    useEffect(() => {
-      _listeners.push(setParams);
-      return () => {
-        _listeners = _listeners.filter(l => l !== setParams);
-      };
-    }, []);
-    return params;
-  },
-  useParams: () => ({}),
-}));
+    usePathname: () => '/scores',
+    useSearchParams: () => {
+      const [params, setParams] = React.useState(() => currentSearchParams);
+      React.useEffect(() => {
+        const handler = (p: URLSearchParams) => {
+          setParams(new URLSearchParams(p.toString()));
+        };
+        navListeners.add(handler);
+        return () => { navListeners.delete(handler); };
+      }, []);
+      return params;
+    },
+    useParams: () => ({}),
+  };
+});
 
+
+
+
+
+
+
+// Local mock removed to use global one from vitest.setup.ts
+/*
 vi.mock('framer-motion', () => ({
   m: {
     div: ({ children, ...p }: any) => <div {...p}>{children}</div>,
@@ -63,20 +62,25 @@ vi.mock('framer-motion', () => ({
   domAnimation: {},
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }))
+*/
 
 vi.mock('@/components/loading', () => ({
   Loading: () => <div data-testid="loading-spinner" />,
 }))
 
+const MOCK_SEM_VAL = { data: 'even', isLoading: false };
+const MOCK_YEAR_VAL = { data: '2025-2026', isLoading: false };
 vi.mock('@/hooks/users/settings', () => ({
-  useFetchSemester: vi.fn(() => ({ data: 'even', isLoading: false })),
-  useFetchAcademicYear: vi.fn(() => ({ data: '2025-2026', isLoading: false })),
+  useFetchSemester: vi.fn(() => MOCK_SEM_VAL),
+  useFetchAcademicYear: vi.fn(() => MOCK_YEAR_VAL),
 }))
 
+const MOCK_DISABLED_MAP = {};
+const MOCK_DISABLED_CODES = new Set<string>();
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({
   useDisabledCourses: vi.fn(() => ({
-    disabledCoursesMap: {},
-    disabledCodes: new Set<string>(),
+    disabledCoursesMap: MOCK_DISABLED_MAP,
+    disabledCodes: MOCK_DISABLED_CODES,
     isDisabled: vi.fn(() => false),
     getDisableReason: vi.fn(() => null),
     disableCourse: vi.fn(),
@@ -265,16 +269,20 @@ function setupDefault(exams: Exam[], answersMap: Record<number, ExamAnswer[]> = 
 describe('ScoresClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset router search params state
-    _searchParams = new URLSearchParams();
-    _listeners = [];
     // Reset body/html overflow after each test in case scroll lock leaked
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
+    // Clear search params
+    currentSearchParams = new URLSearchParams();
+    navListeners.clear();
   })
 
+
+
+
+
+
   afterEach(() => {
-    _listeners = [];
   })
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -392,13 +400,13 @@ describe('ScoresClient', () => {
       } as any)
     })
 
-    it('opens the drawer when a card is clicked', () => {
+    it('opens the drawer when a card is clicked', async () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
+      expect(await screen.findByRole('dialog')).toBeInTheDocument()
 
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('closes the drawer when close button is clicked', async () => {
@@ -406,23 +414,35 @@ describe('ScoresClient', () => {
       render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(await screen.findByRole('dialog')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      }, { timeout: 2000 })
+
+
     })
 
-    it('locks body scroll when drawer is open and restores on close', () => {
+    it('locks body scroll when drawer is open and restores on close', async () => {
       setupDefault([makeExam({ id: 1, participants: [makeParticipant()] })])
       render(<ScoresClient />)
 
       fireEvent.click(screen.getByRole('button', { name: /view details for midterm exam/i }))
-      expect(document.body.style.overflow).toBe('hidden')
-      expect(document.documentElement.style.overflow).toBe('hidden')
+      expect(await screen.findByRole('dialog')).toBeInTheDocument()
+      
+      await waitFor(() => {
+        expect(document.body.style.overflow).toBe('hidden')
+        expect(document.documentElement.style.overflow).toBe('hidden')
+      })
 
       fireEvent.click(screen.getByRole('button', { name: /close details/i }))
-      expect(document.body.style.overflow).toBe('')
-      expect(document.documentElement.style.overflow).toBe('')
+      await waitFor(() => {
+        expect(document.body.style.overflow).toBe('')
+        expect(document.documentElement.style.overflow).toBe('')
+      }, { timeout: 2000 })
+
+
     })
   })
 })

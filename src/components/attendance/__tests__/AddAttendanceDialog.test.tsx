@@ -155,14 +155,6 @@ vi.mock("@/components/ui/popover", () => ({
   PopoverContent: ({ children }: any) => <div>{children}</div>,
 }));
 
-vi.mock("lucide-react", () => ({
-  Loader2: () => <span data-testid="loader2-icon" />,
-  Plus: () => <span data-testid="plus-icon" />,
-  Calendar: () => <span data-testid="calendar-icon" />,
-  ChevronLeft: () => <span data-testid="chevron-left-icon" />,
-  ChevronRight: () => <span data-testid="chevron-right-icon" />,
-  BookOpen: () => <span data-testid="book-open-icon" />,
-}));
 
 // ---------------------------------------------------------------------------
 // Default props

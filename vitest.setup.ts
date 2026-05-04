@@ -136,6 +136,21 @@ vi.mock('@/lib/circuit-breaker', () => {
     },
   };
 });
+
+// Mock Loading component
+vi.mock('@/components/loading', async () => {
+  const React = await import('react');
+  return {
+    Loading: ({ minimal, message }: any) => {
+      return React.createElement('div', { 'data-testid': 'loading-spinner' },
+        minimal ? 'Minimal Loading...' : 'Full Loading...',
+        message ? React.createElement('span', null, message) : null
+      );
+    },
+  };
+});
+
+
 // Mock hooks
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
   useTrackingData: vi.fn(() => ({
@@ -313,17 +328,34 @@ vi.mock('framer-motion', () => {
     },
   };
 });
-
 // Global mock for lucide-react to prevent missing icon errors in UI components
-vi.mock('lucide-react', () => {
-  const Icon = () => null;
-  const commonIcons = [
-    'ChevronUpIcon', 'ChevronDownIcon', 'ChevronDown', 'CheckIcon', 'Trash2', 'X', 'Download',
-    'BookOpen', 'Filter', 'Loader2', 'ArrowDown', 'ChevronLeft', 'ChevronRight', 'CircleAlert'
-  ];
-  const mock: any = { __esModule: true };
-  commonIcons.forEach(icon => {
-    mock[icon] = Icon;
+vi.mock('lucide-react', async () => {
+  const React = await import('react');
+
+  const Icon = React.forwardRef((props: any, ref: any) => 
+    React.createElement('div', { ...props, ref })
+  );
+  Icon.displayName = 'LucideIcon';
+
+  return new Proxy({}, {
+    get: (_target, prop) => {
+      if (prop === '__esModule') return true;
+      if (prop === 'default') return { __esModule: true };
+      return Icon;
+    },
+    // Vitest checks if properties exist for named exports
+    has: () => true,
+    // Provide a reasonable set of keys if something iterates over them
+    ownKeys: () => ['__esModule', 'default', 'Calendar', 'Loader2', 'Plus', 'ChevronLeft', 'ChevronRight', 'BookOpen'],
+    getOwnPropertyDescriptor: (_target, prop) => ({
+      enumerable: true,
+      configurable: true,
+      value: prop === '__esModule' ? true : Icon,
+    }),
   });
-  return mock;
 });
+
+
+
+
+
