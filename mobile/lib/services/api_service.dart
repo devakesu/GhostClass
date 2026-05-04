@@ -248,16 +248,15 @@ class ApiService {
                     }
                   }
                 } catch (e) {
-                  AppLogger.d(
-                    'ApiService: Play Integrity skip (expected on emulator/iOS).',
-                  );
+                  rethrow;
                 }
               }
             } catch (e) {
               if (kDebugMode) {
                 AppLogger.w(
-                  'ApiService: Security attestation failed (expected on emulator). Proceeding without token...',
+                  'ApiService: Security attestation failed.',
                 );
+                rethrow;
               } else {
                 AppLogger.e('ApiService: Security attestation failed.', e);
                 rethrow;

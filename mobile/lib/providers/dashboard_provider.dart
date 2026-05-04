@@ -195,26 +195,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = _mergeAttendanceCourses(attendance, sharedCourses);
       _cachedInstructors = sharedInstructors;
 
-      // --- PERSIST CATALOG TO SETTINGS ---
-      final user = ref.read(authProvider).value;
-      if (user != null) {
-        final Map<String, String> newCatalog = Map.from(user.settings.courseCatalog);
-        bool changed = false;
-        for (var c in _cachedCourses!) {
-          final code = (c.code ?? '').toUpperCase();
-          if (code.isNotEmpty && (!newCatalog.containsKey(code) || newCatalog[code] != c.name)) {
-            newCatalog[code] = c.name;
-            changed = true;
-          }
-        }
-        if (changed) {
-          // Fire and forget update to persist the catalog
-          unawaited(ref.read(authProvider.notifier).updateSettings(
-            catalogOverride: newCatalog,
-          ));
-        }
-      }
-
       return _processData(_cachedCourses!, _cachedAttendance!, tracking, academic, sharedInstructors);
     } catch (e) {
       AppLogger.e('DashboardNotifier: Server fetch failed', e);

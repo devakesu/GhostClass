@@ -340,6 +340,21 @@ describe('validate-env utility', () => {
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true'));
     });
 
+    it('fails if granular Play Integrity flags are enabled but master switch is false', () => {
+      vi.stubEnv('ENFORCE_PLAY_INTEGRITY', 'false');
+      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'true');
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Conflicting Config: Granular PLAY_INTEGRITY_ENFORCE_* flags are enabled, but ENFORCE_PLAY_INTEGRITY is false'));
+    });
+
+    it('fails if granular Play Integrity flags are enabled but service account is missing', () => {
+      vi.stubEnv('ENFORCE_PLAY_INTEGRITY', 'true');
+      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'true');
+      vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', '');
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true'));
+    });
+
     it('validates Ed25519 PEM key formats strictly', () => {
       vi.stubEnv('REQUEST_PRIVATE_KEY', 'invalid key');
       vi.stubEnv('REQUEST_PUBLIC_KEY', 'invalid key');
@@ -559,11 +574,9 @@ describe('validate-env utility', () => {
 
     it('validates boolean flags for App Check and Integrity', () => {
       vi.stubEnv('ENFORCE_APP_CHECK', 'maybe');
-      vi.stubEnv('DISABLE_APP_CHECK', 'maybe');
       vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'maybe');
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('ENFORCE_APP_CHECK must be either "true" or "false"'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('DISABLE_APP_CHECK must be either "true" or "false"'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('PLAY_INTEGRITY_ENFORCE_BASIC must be either "true" or "false"'));
     });
 

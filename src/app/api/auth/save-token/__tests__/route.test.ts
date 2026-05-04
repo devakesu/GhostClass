@@ -51,7 +51,6 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/security/csrf", () => ({
-  validateCsrfToken: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("@/lib/security/auth-cookie", () => ({
@@ -85,7 +84,6 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 import { headers, cookies } from "next/headers";
-import { validateCsrfToken } from "@/lib/security/csrf";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { egressFetch } from "@/lib/utils.server";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -102,7 +100,6 @@ describe("POST /api/auth/save-token", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(validateCsrfToken).mockResolvedValue(true);
     vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true, limit: 10, reset: 0, remaining: 9 } as any);
     mockHeaders.get.mockImplementation((name) => {
       if (name === "x-csrf-token") return "valid-csrf";
@@ -114,17 +111,6 @@ describe("POST /api/auth/save-token", () => {
     vi.mocked(cookies).mockResolvedValue(mockCookies as any);
     vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost:3000");
     vi.stubEnv("NODE_ENV", "production");
-  });
-
-  it("returns 403 for invalid CSRF token on web", async () => {
-    vi.mocked(validateCsrfToken).mockResolvedValue(false);
-
-    const req = { json: async () => ({ token: "test-token" }) } as any;
-    const response = await POST(req, {} as any);
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe("Invalid CSRF token");
   });
 
   it("returns 403 for invalid origin on web", async () => {

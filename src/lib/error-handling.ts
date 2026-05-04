@@ -92,7 +92,7 @@ export function getHumanReadableError(error: unknown, context: string = "operati
 
   // Circuit Breaker (503)
   if (status === 503 || lower.includes("technical issues")) {
-    return "EzyGo servers are currently down. Please try again later.";
+    return "Ezygo is down, connection failed";
   }
 
   // Rate limiting

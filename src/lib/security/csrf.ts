@@ -57,12 +57,42 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { logger } from "@/lib/logger";
+import { redis } from "@/lib/redis";
 
 // Configuration
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_TOKEN_LENGTH = 32;
 const CSRF_COOKIE_MAX_AGE = 60 * 60 * 24; // 24 hours
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SESSION_COOKIE_NAMES = ["__Secure-authjs.session-token", "authjs.session-token"];
+
+async function getSessionIdFromCookie(): Promise<string | null> {
+  const cookieStore = await cookies();
+
+  for (const cookieName of SESSION_COOKIE_NAMES) {
+    const sessionCookie = cookieStore.get(cookieName);
+    if (sessionCookie?.value) {
+      return sessionCookie.value;
+    }
+  }
+
+  return null;
+}
+
+async function bindCsrfTokenToCurrentSession(token: string): Promise<void> {
+  const sessionId = await getSessionIdFromCookie();
+  if (!sessionId) {
+    return;
+  }
+
+  await redis.set(`csrf:token:${token}:session`, sessionId, {
+    ex: CSRF_COOKIE_MAX_AGE,
+  });
+}
+
+async function removeCsrfSessionBinding(token: string): Promise<void> {
+  await redis.del(`csrf:token:${token}:session`);
+}
 
 /**
  * Generate a cryptographically secure random CSRF token
@@ -162,6 +192,7 @@ export async function initializeCsrfToken(): Promise<string> {
   // When an existing token is reused its value is unchanged; only its expiry extends.
   const token = existingToken ?? generateCsrfToken();
   await setCsrfCookie(token);
+  await bindCsrfTokenToCurrentSession(token);
 
   return token;
 }
@@ -174,6 +205,7 @@ export async function initializeCsrfToken(): Promise<string> {
 export async function regenerateCsrfToken(): Promise<string> {
   const newToken = generateCsrfToken();
   await setCsrfCookie(newToken);
+  await bindCsrfTokenToCurrentSession(newToken);
   
   return newToken;
 }
@@ -184,5 +216,9 @@ export async function regenerateCsrfToken(): Promise<string> {
  */
 export async function removeCsrfToken(): Promise<void> {
   const cookieStore = await cookies();
+  const token = cookieStore.get(CSRF_COOKIE_NAME)?.value;
+  if (token) {
+    await removeCsrfSessionBinding(token);
+  }
   cookieStore.delete(CSRF_COOKIE_NAME);
 }

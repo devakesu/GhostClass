@@ -64,6 +64,15 @@ vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: mockValidateCsrf,
 }));
 
+vi.mock("@/lib/security/app-check", async () => {
+  const actual = await vi.importActual<any>("@/lib/security/app-check");
+  return {
+    ...actual,
+    withSecurity: vi.fn((handler) => handler),
+    isMobileRequest: vi.fn(() => false),
+  };
+});
+
 // --- Mock auth cookie ---
 const mockGetAuthToken = vi.fn();
 vi.mock("@/lib/security/auth-cookie", () => ({
@@ -376,14 +385,6 @@ describe("PATCH /api/profile", () => {
       body: JSON.stringify(body),
     });
   }
-
-  it("returns 403 when CSRF token is invalid", async () => {
-    mockValidateCsrf.mockResolvedValueOnce(false);
-    const { PATCH } = await import("../route");
-    const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-    const res = await PATCH(req, { params: {} });
-    expect(res.status).toBe(403);
-  });
 
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });

@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers as nextHeaders } from "next/headers";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 import {
   processContactSubmission,
   contactSchema,
 } from "@/lib/contact/service";
 import { getClientIp } from "@/lib/utils.server";
 import { contactRateLimiter } from "@/lib/ratelimit";
-import { validateCsrfToken } from "@/lib/security/csrf";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 
@@ -57,21 +55,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     );
   }
 
-  // 2. CSRF validation for web callers
-  // Mobile clients use App Check + JWE (handled by withSecurity) instead of CSRF.
-  const mobile = isMobileRequest(headerList);
-  if (!mobile) {
-    const csrfToken = headerList.get(CSRF_HEADER);
-    if (!(await validateCsrfToken(csrfToken))) {
-      logger.warn("[contact] CSRF validation failed");
-      return NextResponse.json(
-        { error: "Invalid CSRF token" },
-        { status: 403 },
-      );
-    }
-  }
-
-  // 3. Resolve Payload (JWE or JSON)
+  // 2. Resolve Payload (JWE or JSON)
   let body = decryptedBody;
   if (!body) {
     try {
@@ -84,7 +68,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     }
   }
 
-  // 4. Validate Input
+  // 3. Validate Input
   const result = contactSchema.safeParse(body);
   if (!result.success) {
     return NextResponse.json(
@@ -93,7 +77,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     );
   }
 
-  // 5. Resolve Auth Context
+  // 4. Resolve Auth Context
   const supabaseAdmin = getAdminClient();
   const authHeader = headerList.get("authorization");
   let userId: string | null = null;
@@ -107,7 +91,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     userId = user?.id || null;
   }
 
-  // 6. Delegate to Shared Service (Full lifecycle: DB + Emails + Rollback)
+  // 5. Delegate to Shared Service (Full lifecycle: DB + Emails + Rollback)
   const flowResult = await processContactSubmission(
     supabaseAdmin,
     supabaseAdmin,

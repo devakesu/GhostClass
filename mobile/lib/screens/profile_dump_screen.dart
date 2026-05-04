@@ -363,10 +363,6 @@ class _ProfileDumpContent extends ConsumerWidget {
                       valueColor: primary,
                     ),
                     _InfoRow(
-                      label: 'Catalog Size',
-                      value: '${user.settings.courseCatalog.length} entries',
-                    ),
-                    _InfoRow(
                       label: 'Disabled Courses',
                       value: user.settings.disabledCount == 0 ? 'None' : '${user.settings.disabledCount} courses',
                       valueColor: user.settings.disabledCount == 0 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3) : Colors.orangeAccent,

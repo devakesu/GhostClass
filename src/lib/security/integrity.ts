@@ -32,10 +32,7 @@ export async function verifyPlayIntegrity(
     logger.error(
       "Play Integrity: Missing GOOGLE_SERVICE_ACCOUNT_JSON in environment",
     );
-    // Fail-open in development if requested, otherwise block
-    return process.env.NODE_ENV === "development"
-      ? { isValid: true }
-      : { isValid: false, error: "Server configuration error" };
+    return { isValid: false, error: "Server configuration error" };
   }
 
   try {
@@ -85,16 +82,9 @@ export async function verifyPlayIntegrity(
     const enforceCert = process.env.PLAY_INTEGRITY_ENFORCE_SIGNING_CERT === "true";
 
     // A. App Recognition Verdict
-    const isProd = process.env.NODE_ENV === "production";
     if (enforceRecognized && appIntegrity?.appRecognitionVerdict !== "PLAY_RECOGNIZED") {
-      // In development/local testing, the app is often UNEVALUATED because it's not from the Play Store.
-      // We skip this check group to allow developers to run the app with integrity active.
-      if (!isProd) {
-        logger.info(`Play Integrity: Skipping appRecognitionVerdict check (${appIntegrity?.appRecognitionVerdict}) in development.`);
-      } else {
-        logger.error(`Play Integrity Failure: appRecognitionVerdict is ${appIntegrity?.appRecognitionVerdict} (Enforced)`);
-        return { isValid: false, error: "App not recognized by Play Store" };
-      }
+      logger.error(`Play Integrity Failure: appRecognitionVerdict is ${appIntegrity?.appRecognitionVerdict} (Enforced)`);
+      return { isValid: false, error: "App not recognized by Play Store" };
     }
 
     // B. App Licensing Verdict
@@ -111,12 +101,8 @@ export async function verifyPlayIntegrity(
       );
 
       if (!hasAuthorizedCert) {
-        if (!isProd) {
-          logger.info(`Play Integrity: Skipping certificate check (No match for: ${certs.join(", ")}) in development.`);
-        } else {
-          logger.error(`Play Integrity Failure: Unauthorized certificate. Got: ${certs.join(", ")} (Enforced)`);
-          return { isValid: false, error: "App signing certificate mismatch" };
-        }
+        logger.error(`Play Integrity Failure: Unauthorized certificate. Got: ${certs.join(", ")} (Enforced)`);
+        return { isValid: false, error: "App signing certificate mismatch" };
       }
     }
 
@@ -124,12 +110,8 @@ export async function verifyPlayIntegrity(
     const deviceVerdicts = deviceIntegrity?.deviceRecognitionVerdict || [];
     
     if (enforceBasic && !deviceVerdicts.includes("MEETS_BASIC_INTEGRITY")) {
-      if (!isProd) {
-        logger.info(`Play Integrity: Skipping BASIC_INTEGRITY check (${deviceVerdicts.join(", ")}) in development.`);
-      } else {
-        logger.error(`Play Integrity Failure: Device does not meet BASIC_INTEGRITY: ${deviceVerdicts.join(", ")} (Enforced)`);
-        return { isValid: false, error: "Device failed basic integrity check" };
-      }
+      logger.error(`Play Integrity Failure: Device does not meet BASIC_INTEGRITY: ${deviceVerdicts.join(", ")} (Enforced)`);
+      return { isValid: false, error: "Device failed basic integrity check" };
     }
 
     if (enforceDevice && !deviceVerdicts.includes("MEETS_DEVICE_INTEGRITY")) {

@@ -3,7 +3,6 @@
  *
  * These tests verify that:
  * - Rate limiting (429) is enforced before any other logic
- * - CSRF validation (403) is enforced before clearing session cookies
  * - A valid request clears all session cookies and returns 200
  */
 
@@ -51,6 +50,7 @@ const mockCookieSet = vi.fn();
 const mockCookieGetAll = vi.fn().mockReturnValue([]);
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({
+    get: vi.fn(),
     set: mockCookieSet,
     getAll: mockCookieGetAll,
   }),
@@ -124,7 +124,6 @@ describe("POST /api/logout", () => {
       });
       const { POST } = await import("../route");
       await POST(makePostReq(), {} as any);
-      expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
     });
 
@@ -136,31 +135,11 @@ describe("POST /api/logout", () => {
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
-      expect(mockValidateCsrf).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("CSRF protection", () => {
-    it("returns 403 when CSRF token is invalid", async () => {
-      mockValidateCsrf.mockResolvedValueOnce(false);
-      const { POST } = await import("../route");
-      const res = await POST(makePostReq("bad-token"), {} as any);
-      expect(res.status).toBe(403);
-      const body = await res.json() as { message: string };
-      expect(body.message).toMatch(/invalid csrf/i);
-    });
-
-    it("does not clear cookies when CSRF check fails", async () => {
-      mockValidateCsrf.mockResolvedValueOnce(false);
-      const { POST } = await import("../route");
-      await POST(makePostReq("bad-token"), {} as any);
-      expect(mockClearAuthCookie).not.toHaveBeenCalled();
-      expect(mockRemoveCsrfToken).not.toHaveBeenCalled();
     });
   });
 
   describe("successful logout", () => {
-    it("returns 200 ok when rate limit and CSRF both pass", async () => {
+    it("returns 200 ok when rate limit passes", async () => {
       const { POST } = await import("../route");
       const res = await POST(makePostReq(), {} as any);
       expect(res.status).toBe(200);

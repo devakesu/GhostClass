@@ -10,7 +10,7 @@ import { logger } from "@/lib/logger";
  * - SYNC_RATE_LIMIT_REQUESTS / SYNC_RATE_LIMIT_WINDOW   — cron sync endpoint (default 10/10 s)
  * - CONTACT_RATE_LIMIT_REQUESTS / CONTACT_RATE_LIMIT_WINDOW — contact form (default 10/10 s)
  * - AUTH_RATE_LIMIT_REQUESTS / AUTH_RATE_LIMIT_WINDOW   — auth endpoints (default 5/60 s)
- * - PROXY_RATE_LIMIT_REQUESTS / PROXY_RATE_LIMIT_WINDOW — backend proxy (default 120/60 s)
+ * - PROXY_RATE_LIMIT_REQUESTS / PROXY_RATE_LIMIT_WINDOW — high-throughput proxy-style routes (default 300/60 s)
  *
  * Sync and contact limits are now independently configurable. Previously both
  * shared RATE_LIMIT_REQUESTS/RATE_LIMIT_WINDOW, meaning tightening one tightened the
@@ -55,8 +55,8 @@ if (!Number.isFinite(AUTH_WINDOW) || AUTH_WINDOW < 1 || AUTH_WINDOW > 3600) {
   throw new Error(`AUTH_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
 }
 
-// Backend-proxy-specific limits (higher throughput than auth endpoints)
-const PROXY_LIMIT = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "120", 10);
+// High-throughput limits (used by proxy-style routes such as batch fetchers)
+const PROXY_LIMIT = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10);
 const PROXY_WINDOW = parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10);
 
 if (!Number.isFinite(PROXY_LIMIT) || PROXY_LIMIT < 1 || PROXY_LIMIT > 5000) {

@@ -11,6 +11,9 @@ import * as Sentry from "@sentry/nextjs";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+  })),
 }));
 
 vi.mock("@/lib/firebase/admin", () => ({
@@ -37,6 +40,25 @@ vi.mock("@/lib/security/integrity", () => ({
 vi.mock("@/lib/security/jwe", () => ({
   decryptRequest: vi.fn(),
   encryptResponse: vi.fn(),
+}));
+
+vi.mock("@/lib/security/csrf", () => ({
+  validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+  getCsrfToken: vi.fn(),
+}));
+
+vi.mock("@/lib/security/device-check", () => ({
+  verifyDeviceCheckToken: vi.fn(),
+}));
+
+vi.mock("@/lib/utils.server", () => ({
+  getClientIp: vi.fn(() => "192.168.1.1"),
+}));
+
+vi.mock("@/lib/redis", () => ({
+  redis: {
+    get: vi.fn(),
+  },
 }));
 
 describe("App Check Security", () => {
@@ -77,14 +99,6 @@ describe("App Check Security", () => {
   describe("verifyAppCheckToken", () => {
     const validToken = "app-check-token";
 
-    it("handles development mode bypass (DISABLE_APP_CHECK)", async () => {
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("DISABLE_APP_CHECK", "true");
-      const h = new Headers();
-      const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(true);
-    });
-
     it("handles development mode bypass (ENFORCE_PLAY_INTEGRITY false)", async () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "false");
@@ -100,21 +114,18 @@ describe("App Check Security", () => {
       expect(result.isValid).toBe(true);
     });
     
-    it("returns error in production if mobile request missing token", async () => {
+    it("allows mobile requests without a token when App Check enforcement is off", async () => {
       const h = new Headers({ "x-mobile-api-key": mockSecret });
       const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Missing mandatory App Check token");
+      expect(result.isValid).toBe(true);
     });
 
-    it("handles isMobile branch coverage (mandatory token in production)", async () => {
-      vi.stubEnv("NODE_ENV", "production");
+    it("respects the env flag for mobile requests with no token", async () => {
       vi.stubEnv("MOBILE_API_SECRET", "secret");
       
       const h = new Headers({ "x-mobile-api-key": "secret" });
       const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain("Missing mandatory App Check token");
+      expect(result.isValid).toBe(true);
     });
 
     it("hits line 207 branch with nested payload.rcek", async () => {
@@ -123,7 +134,12 @@ describe("App Check Security", () => {
       const handler = vi.fn().mockResolvedValue(new Response("ok"));
       const secureHandler = withSecurity(handler);
       
-      const req = new Request("http://localhost", { headers: { "X-JWE-Key": "some-jwe" } });
+      const req = new Request("http://localhost", { 
+        headers: { 
+          "X-JWE-Key": "some-jwe",
+          "x-csrf-token": "valid-csrf-token" 
+        } 
+      });
       await secureHandler(req, {});
       expect(handler).toHaveBeenCalled();
     });
@@ -133,7 +149,12 @@ describe("App Check Security", () => {
       const handler = vi.fn().mockResolvedValue(new Response("ok"));
       const secureHandler = withSecurity(handler);
       
-      const req = new Request("http://localhost", { headers: { "X-JWE-Key": "some-jwe" } });
+      const req = new Request("http://localhost", { 
+        headers: { 
+          "X-JWE-Key": "some-jwe",
+          "x-csrf-token": "valid-csrf-token" 
+        } 
+      });
       await secureHandler(req, {});
       expect(handler).toHaveBeenCalled();
     });
@@ -484,8 +505,8 @@ describe("App Check Security", () => {
   });
 
   describe("Branch Coverage", () => {
-    it("requires token for mobile requests in production", async () => {
-      vi.stubEnv("NODE_ENV", "production");
+    it("requires token when App Check enforcement is enabled", async () => {
+      vi.stubEnv("ENFORCE_APP_CHECK", "true");
       vi.stubEnv("MOBILE_API_SECRET", "secret");
       
       const req = new Request("http://localhost", {
@@ -500,19 +521,26 @@ describe("App Check Security", () => {
     it("handles JWE without nested payload property in withSecurity", async () => {
       const { decryptRequest } = await import("@/lib/security/jwe");
       (decryptRequest as any).mockResolvedValue({ rcek: "test-cek", some: "data" });
+      (getAppCheck as any).mockReturnValue({
+        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
+      });
       
       const handler = vi.fn().mockResolvedValue(new Response("ok"));
       const wrapped = withSecurity(handler);
       
       const req = new Request("http://localhost", {
         method: "POST",
-        headers: { "content-type": "application/jose" },
+        headers: { 
+          "content-type": "application/jose",
+          "X-Firebase-AppCheck": "app-check-token"
+        },
         body: "a.b.c.d.e"
       });
       
       await wrapped(req, {});
       expect(handler).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-          decryptedBody: expect.objectContaining({ rcek: "test-cek" })
+          decryptedBody: expect.objectContaining({ rcek: "test-cek" }),
+          authType: "app-check"
       }));
     });
 
@@ -524,7 +552,10 @@ describe("App Check Security", () => {
       const wrapped = withSecurity(handler);
       
       const req = new Request("http://localhost", {
-        headers: { "X-JWE-Key": "a.b.c.d.e" }
+        headers: { 
+          "X-JWE-Key": "a.b.c.d.e",
+          "x-csrf-token": "valid-token"
+        }
       });
       
       await wrapped(req, {});
@@ -539,7 +570,10 @@ describe("App Check Security", () => {
         const wrapped = withSecurity(handler);
         
         const req = new Request("http://localhost", {
-          headers: { "X-JWE-Key": "a.b.c.d.e" }
+          headers: { 
+            "X-JWE-Key": "a.b.c.d.e",
+            "x-csrf-token": "valid-token"
+          }
         });
         
         await wrapped(req, {});
@@ -554,7 +588,10 @@ describe("App Check Security", () => {
         const wrapped = withSecurity(handler);
         
         const req = new Request("http://localhost", {
-          headers: { "X-JWE-Key": "a.b.c.d.e" }
+          headers: { 
+            "X-JWE-Key": "a.b.c.d.e",
+            "x-csrf-token": "valid-token"
+          }
         });
         
         await wrapped(req, {});
@@ -591,18 +628,16 @@ describe("App Check Security", () => {
 
     it('covers development mode with ENFORCE_PLAY_INTEGRITY=true', async () => {
       vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("DISABLE_APP_CHECK", "false");
       vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
       const h = new Headers();
       const result = await verifyAppCheckToken({ headers: h } as Request);
       expect(result.isValid).toBe(true);
     });
 
-    it('covers Android non-prod branch (line 128 false)', async () => {
-      vi.stubEnv("NODE_ENV", "development");
+    it('allows mobile request when App Check is valid and ENFORCE_PLAY_INTEGRITY is off', async () => {
+      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "false");
       const h = new Headers({ 
-        "X-Firebase-AppCheck": "token",
-        "user-agent": "Android"
+        "X-Firebase-AppCheck": "token"
       });
       (getAppCheck as any).mockReturnValue({
         verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
@@ -611,69 +646,55 @@ describe("App Check Security", () => {
       expect(result.isValid).toBe(true);
     });
 
-    it('covers line 133 false branch (isAndroid=true, isProd=true, shouldEnforceIntegrity=false)', async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "false");
-      vi.stubEnv("MOBILE_API_SECRET", "secret");
-      
+    it('enforces Play Integrity when App Check present and ENFORCE_PLAY_INTEGRITY=true (mobile request)', async () => {
+      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
+      const h = new Headers({ 
+        "X-Firebase-AppCheck": "token"
+      });
+      (getAppCheck as any).mockReturnValue({
+        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
+      });
+      const result = await verifyAppCheckToken({ headers: h } as Request);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe("Missing mandatory integrity attestation");
+    });
+    it('mobile request with ENFORCE_PLAY_INTEGRITY=true but missing Play Integrity token fails', async () => {
+      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
+      const h = new Headers({ 
+        "X-Firebase-AppCheck": "token"
+      });
+      (getAppCheck as any).mockReturnValue({
+        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
+      });
+      const result = await verifyAppCheckToken({ headers: h } as Request);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe("Missing mandatory integrity attestation");
+    });
+
+    it('any App Check request with ENFORCE_PLAY_INTEGRITY=true requires Play Integrity (no user-agent spoofing bypass)', async () => {
+      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
       const h = new Headers({ 
         "X-Firebase-AppCheck": "token",
-        "user-agent": "Android",
-        "x-mobile-api-key": "wrong-secret" // isMobileApp = false
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" // Spoof as web
+      });
+      (getAppCheck as any).mockReturnValue({
+        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
+      });
+      const result = await verifyAppCheckToken({ headers: h } as Request);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe("Missing mandatory integrity attestation");
+    });
+
+    it('mobile request succeeds when ENFORCE_PLAY_INTEGRITY=false (even without token)', async () => {
+      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "false");
+      const h = new Headers({ 
+        "X-Firebase-AppCheck": "token"
       });
       (getAppCheck as any).mockReturnValue({
         verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
       });
       const result = await verifyAppCheckToken({ headers: h } as Request);
       expect(result.isValid).toBe(true);
-    });
-    it('covers line 131 permutations (T || T) - expected fail due to missing integrity token', async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
-      vi.stubEnv("MOBILE_API_SECRET", "secret");
-      const h = new Headers({ 
-        "X-Firebase-AppCheck": "token",
-        "user-agent": "Android",
-        "x-mobile-api-key": "secret" // isMobileApp = true
-      });
-      (getAppCheck as any).mockReturnValue({
-        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
-      });
-      const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Missing mandatory integrity attestation");
-    });
-
-    it('covers line 131 permutations (F || T) - expected fail due to missing integrity token', async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "true");
-      const h = new Headers({ 
-        "X-Firebase-AppCheck": "token",
-        "user-agent": "Android" // isMobileApp = false
-      });
-      (getAppCheck as any).mockReturnValue({
-        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
-      });
-      const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Missing mandatory integrity attestation");
-    });
-
-    it('covers line 131 permutations (T || F) - expected fail due to missing integrity token', async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENFORCE_PLAY_INTEGRITY", "false");
-      vi.stubEnv("MOBILE_API_SECRET", "secret");
-      const h = new Headers({ 
-        "X-Firebase-AppCheck": "token",
-        "user-agent": "Android",
-        "x-mobile-api-key": "secret" // isMobileApp = true
-      });
-      (getAppCheck as any).mockReturnValue({
-        verifyToken: vi.fn().mockResolvedValue({ appId: validAppId })
-      });
-      const result = await verifyAppCheckToken({ headers: h } as Request);
-      expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Missing mandatory integrity attestation");
     });
   });
 });

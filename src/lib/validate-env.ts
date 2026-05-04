@@ -398,14 +398,6 @@ export function validateEnvironment() {
     errors.push('❌ ENFORCE_APP_CHECK must be either "true" or "false"');
   }
 
-  const disableAppCheck = process.env.DISABLE_APP_CHECK;
-  if (
-    disableAppCheck &&
-    !["true", "false"].includes(disableAppCheck.toLowerCase())
-  ) {
-    errors.push('❌ DISABLE_APP_CHECK must be either "true" or "false"');
-  }
-
   // Play Integrity Granular Enforcement
   const integrityFlags = [
     "PLAY_INTEGRITY_ENFORCE_BASIC",
@@ -416,12 +408,27 @@ export function validateEnvironment() {
     "PLAY_INTEGRITY_ENFORCE_SIGNING_CERT",
   ];
 
+  const anyGranularEnforcement = integrityFlags.some((flag) => process.env[flag] === "true");
+  const enforcePlayIntegrityMaster = process.env.ENFORCE_PLAY_INTEGRITY === "true";
+
   integrityFlags.forEach((flag) => {
     const value = process.env[flag];
     if (value && !["true", "false"].includes(value.toLowerCase())) {
       errors.push(`❌ ${flag} must be either "true" or "false"`);
     }
   });
+
+  if (anyGranularEnforcement && !enforcePlayIntegrityMaster) {
+    errors.push(
+      "❌ Conflicting Config: Granular PLAY_INTEGRITY_ENFORCE_* flags are enabled, but ENFORCE_PLAY_INTEGRITY is false.\n" +
+        "   Either set ENFORCE_PLAY_INTEGRITY=true to enable integrity enforcement, or disable all granular flags.",
+    );
+  }
+
+  if ((enforcePlayIntegrityMaster || anyGranularEnforcement) && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const cause = enforcePlayIntegrityMaster ? "ENFORCE_PLAY_INTEGRITY=true" : "granular PLAY_INTEGRITY_ENFORCE_* flags are enabled";
+    errors.push(`❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ${cause}`);
+  }
 
   // Application Identity
   if (process.env.NODE_ENV === "production") {
@@ -674,11 +681,7 @@ export function validateEnvironment() {
     errors.push("❌ REQUEST_PUBLIC_KEY must be a valid Ed25519 public key in PEM format");
   }
 
-  // Play Integrity Enforcement
-  const enforcePlayIntegrity = process.env.ENFORCE_PLAY_INTEGRITY;
-  if (enforcePlayIntegrity === "true" && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true");
-  }
+
 
   // Sentry Replay Rate
   const sentryReplayRate = process.env.NEXT_PUBLIC_SENTRY_REPLAY_RATE;

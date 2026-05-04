@@ -67,7 +67,6 @@ jobs:
       NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/123456"
       GOOGLE_SERVICE_ACCOUNT_JSON: '{"project_id":"test","private_key":"test","client_email":"test"}'
       ENFORCE_APP_CHECK: "false"
-      DISABLE_APP_CHECK: "true"
       NEXT_PUBLIC_ANDROID_PACKAGE_NAME: "com.test.app"
       PLAY_INTEGRITY_PROJECT_NUMBER: "123456789"
       FIREBASE_APP_ID_ANDROID: "1:123:android:abc"

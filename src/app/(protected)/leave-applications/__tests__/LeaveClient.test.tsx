@@ -18,6 +18,8 @@ vi.mock('lucide-react', () => ({
   AlertTriangle: () => <div data-testid="icon-alert-triangle" />,
   Home: () => <div data-testid="icon-home" />,
   RefreshCcw: () => <div data-testid="icon-refresh-ccw" />,
+  MessageSquare: () => <div data-testid="icon-message-square" />,
+  LogOut: () => <div data-testid="icon-log-out" />,
 }))
 
 // Mock the settings hooks used for semester filtering

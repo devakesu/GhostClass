@@ -328,32 +328,7 @@ vi.mock('framer-motion', () => {
     },
   };
 });
-// Global mock for lucide-react to prevent missing icon errors in UI components
-vi.mock('lucide-react', async () => {
-  const React = await import('react');
 
-  const Icon = React.forwardRef((props: any, ref: any) => 
-    React.createElement('div', { ...props, ref })
-  );
-  Icon.displayName = 'LucideIcon';
-
-  return new Proxy({}, {
-    get: (_target, prop) => {
-      if (prop === '__esModule') return true;
-      if (prop === 'default') return { __esModule: true };
-      return Icon;
-    },
-    // Vitest checks if properties exist for named exports
-    has: () => true,
-    // Provide a reasonable set of keys if something iterates over them
-    ownKeys: () => ['__esModule', 'default', 'Calendar', 'Loader2', 'Plus', 'ChevronLeft', 'ChevronRight', 'BookOpen'],
-    getOwnPropertyDescriptor: (_target, prop) => ({
-      enumerable: true,
-      configurable: true,
-      value: prop === '__esModule' ? true : Icon,
-    }),
-  });
-});
 
 
 
