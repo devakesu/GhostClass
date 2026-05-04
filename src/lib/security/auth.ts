@@ -207,7 +207,10 @@ export const handleLogout = async (csrfToken?: string | null) => {
     // Force redirect anyway so user isn't stuck on a broken page
     if (typeof window !== "undefined") {
       // Best-effort cleanup of known app cookies
-      const fallbackToken = token ?? await fetchFreshCsrfToken().catch(() => null);
+      let fallbackToken = token;
+      if (!fallbackToken) {
+        fallbackToken = await fetchFreshCsrfToken();
+      }
       if (fallbackToken) {
         try {
           await fetch("/api/logout", {

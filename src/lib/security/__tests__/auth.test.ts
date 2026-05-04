@@ -552,9 +552,58 @@ describe('handleLogout', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/logout', expect.anything());
     expect(global.window.location.href).toBe('/');
   });
-});
 
-describe('isSupabaseLockTimeoutError', () => {
+  it('should handle window undefined in try block (line 189/195)', async () => {
+    const windowBackup = global.window;
+    try {
+      // @ts-expect-error - testing undefined window
+      delete global.window;
+      mockSignOut.mockResolvedValue({ error: null });
+      
+      await handleLogout();
+      // Should not throw, should just return
+    } finally {
+      global.window = windowBackup;
+    }
+  });
+
+  it('should handle window undefined in catch block', async () => {
+    const windowBackup = global.window;
+    try {
+      // @ts-expect-error - testing undefined window
+      delete global.window;
+      mockSignOut.mockRejectedValue(new Error('Auth failure'));
+      
+      await handleLogout();
+      // Should not throw, should just return
+    } finally {
+      global.window = windowBackup;
+    }
+  });
+
+    it('should handle fetch error in catch block (line 217)', async () => {
+      mockSignOut.mockRejectedValue(new Error('Auth failure'));
+      mockGetCsrfToken.mockReturnValue('token');
+      
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url === '/api/logout') {
+          return Promise.reject(new Error('Final logout fail'));
+        }
+        return Promise.resolve({ ok: true });
+      }) as any;
+
+      await handleLogout();
+      // Should not throw
+      expect(global.window.location.href).toBe('/');
+    });
+
+    it('should cover auth.ts line 32 (F || T)', () => {
+      const error = { message: 'Something something auth session' };
+      expect(isAuthSessionMissingError(error)).toBe(true);
+    });
+  });
+
+  describe('isSupabaseLockTimeoutError', () => {
   it('should identify lock timeout errors', () => {
     expect(isSupabaseLockTimeoutError({ message: 'Navigator LockManager timeout' })).toBe(true);
     expect(isSupabaseLockTimeoutError({ message: 'exclusive Navigator LockManager lock' })).toBe(true);

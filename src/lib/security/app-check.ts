@@ -64,7 +64,8 @@ export async function verifyAppCheckToken(
 
   // In production, App Check is mandatory for ALL mobile traffic.
   // We identify mobile traffic via the x-mobile-api-key (isMobileApp).
-  if (isMobileApp && isProd && !token) {
+  const isMobileInProd = isMobileApp && isProd;
+  if (isMobileInProd && !token) {
     logger.warn("App Check verification failed: Absolute requirement for mobile requests, but token is missing");
     return { isValid: false, error: "Missing mandatory App Check token" };
   }
