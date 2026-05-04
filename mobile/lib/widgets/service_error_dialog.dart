@@ -10,6 +10,7 @@ class ServiceErrorDialog extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onContactSupport;
   final String? closeLabel;
+  final String? retryLabel;
   final String? details;
   final bool isDismissible;
 
@@ -20,6 +21,7 @@ class ServiceErrorDialog extends StatelessWidget {
     this.onRetry,
     this.onContactSupport,
     this.closeLabel,
+    this.retryLabel,
     this.details,
     this.isDismissible = true,
   });
@@ -32,6 +34,7 @@ class ServiceErrorDialog extends StatelessWidget {
     VoidCallback? onRetry,
     VoidCallback? onContactSupport,
     String? closeLabel,
+    String? retryLabel,
     String? details,
     bool isDismissible = true,
   }) {
@@ -49,6 +52,7 @@ class ServiceErrorDialog extends StatelessWidget {
           onRetry: onRetry,
           onContactSupport: onContactSupport,
           closeLabel: closeLabel,
+          retryLabel: retryLabel,
           details: details,
           isDismissible: isDismissible,
         ),
@@ -220,7 +224,7 @@ class ServiceErrorDialog extends StatelessWidget {
                         },
                         icon: const Icon(LucideIcons.refreshCcw, size: 18),
                         label: Text(
-                          'Try Again',
+                          retryLabel ?? 'Try Again',
                           style: GoogleFonts.manrope(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
@@ -275,12 +279,7 @@ class ServiceErrorDialog extends StatelessWidget {
                     height: 56,
                     child: TextButton(
                       onPressed: () {
-                        if (isDismissible) {
-                          Navigator.of(context).pop();
-                        } else if (onRetry != null) {
-                          // For security dialogs where we want to exit
-                          onRetry!();
-                        }
+                        Navigator.of(context).pop();
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),

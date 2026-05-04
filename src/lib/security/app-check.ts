@@ -1,7 +1,6 @@
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
-import * as Sentry from "@sentry/nextjs";
 import { verifyPlayIntegrity } from "@/lib/security/integrity";
 import { verifyDeviceCheckToken } from "@/lib/security/device-check";
 import { validateCsrfToken } from "@/lib/security/csrf";
@@ -17,6 +16,8 @@ import { redis } from "@/lib/redis";
 export interface AppCheckResult {
   isValid: boolean;
   error?: string;
+  reason?: string;
+  action?: string;
   alreadyLogged?: boolean;
   integrity?: any;
 }
@@ -57,6 +58,8 @@ export interface AppCheckOptions {
 export interface AuthResult {
   isValid: boolean;
   error?: string;
+  reason?: string;
+  action?: string;
   alreadyLogged?: boolean;
   integrity?: any;
   authType: "csrf" | "app-check" | "none"; // 'csrf' for web, 'app-check' for mobile
@@ -102,8 +105,8 @@ async function verifyCsrfTokenWithSessionBinding(
           error: "CSRF token session mismatch",
         };
       }
-    } catch (error) {
-      logger.warn("CSRF session binding check unavailable");
+  } catch (_error) {
+    logger.warn("CSRF session binding check unavailable");
       return {
         isValid: false,
         error: "CSRF session binding unavailable",
@@ -125,10 +128,17 @@ export async function verifyAppCheckToken(
   const headerList = req ? req.headers : await nextHeaders();
   const token = headerList.get("X-Firebase-AppCheck");
 
+
+
   // App Check is mandatory only when the corresponding env flag enables it.
   if (!token && process.env.ENFORCE_APP_CHECK === "true") {
     logger.warn("App Check verification failed: Missing token (enforced)");
-    return { isValid: false, error: "Missing mandatory App Check token" };
+    return { 
+      isValid: false, 
+      error: "Missing mandatory App Check token",
+      reason: "Device verification was skipped or blocked by a firewall.",
+      action: "Please ensure your internet connection is stable and you are not using a VPN or custom DNS."
+    };
   }
 
   // If no token and enforcement is off, proceed
@@ -139,6 +149,7 @@ export async function verifyAppCheckToken(
     logger.error(
       "App Check verification skipped: Firebase Admin not initialized",
     );
+
     return { isValid: true, alreadyLogged: true };
   }
 
@@ -147,6 +158,8 @@ export async function verifyAppCheckToken(
     const decodedToken = await appCheck.verifyToken(token, {
       consume: options.consume,
     });
+
+
 
     const authorizedAppIds = [
       process.env.FIREBASE_APP_ID_ANDROID || "1:424804867878:android:015bb34927f1dd8e21abe7",
@@ -158,12 +171,20 @@ export async function verifyAppCheckToken(
       logger.error(
         `App Check verification failed: Unauthorized App ID: ${decodedToken.appId}`,
       );
-      return { isValid: false, error: "Unauthorized App ID" };
+      return { 
+        isValid: false, 
+        error: "Unauthorized App ID",
+        reason: "The application signature does not match our security records.",
+        action: "Please reinstall the official GhostClass app from the Google Play Store or Apple App Store."
+      };
     }
 
     // Determine which platform (Android or iOS) based on App ID
     const isAndroid = decodedToken.appId.includes("android");
     const isIOS = decodedToken.appId.includes("ios");
+
+
+    logger.warn(`[App Check] Platform detected - Android: ${isAndroid}, iOS: ${isIOS}`);
 
     let integrity: any = null;
 
@@ -172,15 +193,18 @@ export async function verifyAppCheckToken(
       const playIntegrityToken = headerList.get("X-Play-Integrity");
       const shouldEnforceIntegrity = process.env.ENFORCE_PLAY_INTEGRITY === "true";
 
+      logger.warn(`[Play Integrity] Token: ${!!playIntegrityToken}, Enforce: ${shouldEnforceIntegrity}, Env: ${process.env.ENFORCE_PLAY_INTEGRITY}`);
+
       if (playIntegrityToken) {
-        const expectedNonce = process.env.PLAY_INTEGRITY_PROJECT_NUMBER || "424804867878";
-        const integrityResult = await verifyPlayIntegrity(playIntegrityToken, expectedNonce);
+        const integrityResult = await verifyPlayIntegrity(playIntegrityToken);
         integrity = integrityResult.verdict;
 
         if (!integrityResult.isValid) {
           return {
             isValid: false,
             error: integrityResult.error || "Device integrity check failed",
+            reason: integrityResult.reason || "Android Play Integrity check failed (Device may be compromised or uncertified).",
+            action: integrityResult.action || "Please ensure your device is not rooted and you are using the official version of the app.",
             integrity,
           };
         }
@@ -191,6 +215,8 @@ export async function verifyAppCheckToken(
         return {
           isValid: false,
           error: "Missing mandatory integrity attestation",
+          reason: "Play Integrity token was not provided by the Android system.",
+          action: "Please ensure your device is not rooted and is running a certified version of Android."
         };
       }
     }
@@ -209,6 +235,8 @@ export async function verifyAppCheckToken(
           return {
             isValid: false,
             error: deviceCheckResult.error || "Device integrity check failed",
+            reason: "iOS DeviceCheck verification failed (Device integrity cannot be guaranteed).",
+            action: "Please ensure your device is not jailbroken and is using an official iOS release.",
             integrity,
           };
         }
@@ -219,17 +247,21 @@ export async function verifyAppCheckToken(
         return {
           isValid: false,
           error: "Missing mandatory device check",
+          reason: "DeviceCheck token was not provided by the iOS system.",
+          action: "Please ensure your device is not jailbroken and is using an official iOS release."
         };
       }
     }
 
     return { isValid: true, integrity };
-  } catch (error: any) {
-    logger.error("App Check verification failed:", error.message);
-    Sentry.captureException(error, {
-      tags: { type: "app_check_failure" },
-    });
-    return { isValid: false, error: "Invalid App Check token" };
+  } catch (_error: any) {
+
+    return { 
+      isValid: false, 
+      error: "Invalid App Check token",
+      reason: "The security token provided by your device has expired or is invalid.",
+      action: "Please restart the app. If the issue persists after repeated attempts, please contact support."
+    };
   }
 }
 
@@ -241,6 +273,8 @@ export async function verifyAppCheckToken(
 async function verifyAuthentication(req: Request): Promise<AuthResult> {
   const headerList = req.headers;
 
+
+
   // Check for App Check token (mobile)
   const hasAppCheckToken = headerList.has("X-Firebase-AppCheck");
   const csrfToken = headerList.get("x-csrf-token");
@@ -251,6 +285,8 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
     return {
       isValid: false,
       error: "Unauthenticated request",
+      reason: "Missing device verification token.",
+      action: "Please restart the app and ensure you are using a secure internet connection. If this persists, please contact support.",
       authType: "none",
     };
   }
@@ -264,6 +300,8 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
       return {
         isValid: false,
         error: appCheckResult.error,
+        reason: appCheckResult.reason,
+        action: appCheckResult.action,
         authType: "app-check",
         isMobileRequest: true,
         alreadyLogged: appCheckResult.alreadyLogged,
@@ -294,6 +332,8 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
       return {
         isValid: false,
         error: csrfResult.error,
+        reason: "Web security check failed (CSRF mismatch).",
+        action: "Please refresh your browser and try again.",
         authType: "csrf",
         isWebRequest: true,
       };
@@ -311,6 +351,8 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
   return {
     isValid: false,
     error: "Authentication verification failed",
+    reason: "Internal security routing failure.",
+    action: "Please restart the app and try again.",
     authType: "none",
   };
 }
@@ -338,7 +380,7 @@ export function withSecurity(
     try {
       const headersList = await nextHeaders();
       clientIp = getClientIp(headersList);
-    } catch (error) {
+    } catch (_error) {
       logger.dev("Could not determine client IP");
     }
 
@@ -366,12 +408,14 @@ export function withSecurity(
           );
         }
       }
-    } catch (error) {
+    } catch (_error) {
       logger.dev("Rate limiting unavailable, proceeding without check");
     }
 
     // 2. Enforce unified authentication (CSRF or App Check)
     const authResult = await verifyAuthentication(req);
+
+
 
     if (!authResult.isValid) {
       logger.warn("Authentication failed", {
@@ -379,8 +423,15 @@ export function withSecurity(
         error: authResult.error,
         ip: clientIp,
       });
+      
+      const appCheckRes = authResult as any;
       return NextResponse.json(
-        { error: authResult.error || "Unauthenticated" },
+        { 
+          error: authResult.error || "Unauthenticated",
+          reason: appCheckRes.reason || "The security handshake failed or timed out.",
+          action: appCheckRes.action || "Please try again in a few moments.",
+          type: "security"
+        },
         { status: 401 },
       );
     }
@@ -441,8 +492,8 @@ export function withSecurity(
               : null;
         }
       }
-    } catch (error) {
-      logger.error("withSecurity: JWE Decryption error:", error);
+    } catch (_error) {
+      logger.error("withSecurity: JWE Decryption error:", _error);
       return NextResponse.json(
         { error: "Security Handshake Failed" },
         {
@@ -492,8 +543,8 @@ export function withSecurity(
           status: response.status,
           headers: newHeaders,
         });
-      } catch (error) {
-        logger.error("withSecurity: Response encryption failure:", error);
+    } catch (_error) {
+        logger.error("withSecurity: Response encryption failure:", _error);
         // Fallback to error if encryption fails
         return NextResponse.json(
           { error: "Secure Transmission Failed" },

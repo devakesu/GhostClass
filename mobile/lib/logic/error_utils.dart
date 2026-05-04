@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ghostclass/logic/app_exception.dart';
 
 String formatApiError(dynamic response, String context) {
   if (response == null) return 'Failed to complete $context';
@@ -30,6 +31,9 @@ String formatApiError(dynamic response, String context) {
     code = (response['code'] ?? '').toString();
     message = (response['message'] ?? response['error'] ?? response['detail'] ?? '').toString();
     status = response['status'] as int?;
+  } else if (response is AppException) {
+    message = response.message;
+    status = response.statusCode;
   }
 
   final lower = message.toLowerCase();

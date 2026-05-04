@@ -9,6 +9,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
+import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/screens/notifications_screen.dart';
@@ -175,6 +176,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     final isDashboardOutage = dashboardAsync.hasError && hasOutage;
     final isTrackingOutage = trackingAsync.hasError && hasOutage;
     final showOutageBarrier = isDashboardOutage || isTrackingOutage;
+
+    // --- SECURITY BARRIER ---
+    final securityFailure = ref.watch(securityFailureProvider);
+    final showSecurityBarrier = securityFailure != null;
 
     Future<void> showAddAttendanceDialog() async {
       ref.read(uiModalOpenProvider.notifier).setOpen(true);
@@ -445,10 +450,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         Positioned(
           bottom: 75 + bottomPadding, // Account for bottom safe area/notch
           child: IgnorePointer(
-            ignoring: isModalOpen || (selectedIndex > 1) || showOutageBarrier,
+            ignoring: isModalOpen || (selectedIndex > 1) || showOutageBarrier || showSecurityBarrier,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
-              opacity: (isModalOpen || (selectedIndex > 1) || showOutageBarrier)
+              opacity: (isModalOpen || (selectedIndex > 1) || showOutageBarrier || showSecurityBarrier)
                   ? 0
                   : 1,
               child: GestureDetector(
@@ -511,6 +516,94 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
               ),
             ),
           ).animate().fadeIn(duration: 300.ms),
+
+        // --- GLOBAL SECURITY BARRIER ---
+        if (showSecurityBarrier)
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.5),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                      ),
+                      child: const Icon(
+                        LucideIcons.shieldAlert,
+                        size: 48,
+                        color: Colors.red,
+                      ),
+                    ).animate(onPlay: (controller) => controller.repeat(reverse: true))
+                     .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), duration: 1000.ms),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Security Verification Failed',
+                      style: GoogleFonts.manrope(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      securityFailure,
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 48),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () async {
+                           // Clear lock and retry
+                           ref.read(apiServiceProvider).clearCaches();
+                           ref.read(securityFailureProvider.notifier).setFailure(null);
+                           try {
+                             await ref.read(authProvider.notifier).refreshProfile(force: true);
+                           } catch (e) {
+                             // The 401 interceptor will catch it again if it still fails
+                           }
+                        },
+                        child: Text(
+                          'Retry Verification',
+                          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => ref.read(authProvider.notifier).logout(),
+                      child: Text(
+                        'Logout of GhostClass',
+                        style: GoogleFonts.manrope(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms),
       ],
     );
   }

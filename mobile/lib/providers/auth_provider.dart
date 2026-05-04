@@ -11,6 +11,7 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
+import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
@@ -358,15 +359,30 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         password: password,
       );
 
+      if (bridgeResponse.statusCode != 200 && bridgeResponse.statusCode != 201) {
+        final data = bridgeResponse.data as Map<String, dynamic>?;
+        final errorMsg = formatApiError(data, 'Secure Session');
+        throw AppException(
+          message: errorMsg,
+          type: bridgeResponse.statusCode == 401
+              ? AppExceptionType.unauthorized
+              : AppExceptionType.server,
+          statusCode: bridgeResponse.statusCode,
+          details: data,
+        );
+      }
+
       if (kDebugMode) {
         AppLogger.d('AuthNotifier: Bridge response data: ${bridgeResponse.data}');
       }
 
-      final sessionData = (bridgeResponse.data['session'] ?? bridgeResponse.data) as Map<String, dynamic>?;
+      final sessionData =
+          (bridgeResponse.data['session'] ?? bridgeResponse.data)
+              as Map<String, dynamic>?;
       final refreshToken = sessionData?['refresh_token'] as String?;
       if (refreshToken == null) {
-        throw AppException(
-          message: 'Secure session failed',
+        throw const AppException(
+          message: 'Secure session failed: No refresh token returned.',
           type: AppExceptionType.unauthorized,
         );
       }
@@ -429,6 +445,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
   Future<void> logout({bool force = false}) async {
     final storage = ref.read(secureStorageProvider);
+    // Reset security failure state on logout to ensure a clean slate for next login
+    ref.read(securityFailureProvider.notifier).setFailure(null);
+    
     state = const AsyncValue.data(null);
     try {
       await Future.wait([
@@ -614,6 +633,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     final api = ref.read(apiServiceProvider);
     final response = await api.refreshProfile(token, sync: sync);
+
+    if (response.statusCode == 401) {
+      throw const AppException(
+        message: 'Security verification failed. Please try again or re-login.',
+        type: AppExceptionType.unauthorized,
+        statusCode: 401,
+      );
+    }
 
     if (response.statusCode != 200 || response.data == null) {
       if (response.statusCode != null && response.statusCode! >= 500) {

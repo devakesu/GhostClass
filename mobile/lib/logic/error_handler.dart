@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -6,24 +8,63 @@ import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 
 mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
-  Future<void> handleError(dynamic error, {String title = 'Error', String errorContext = 'operation'}) async {
+  Future<void> handleError(
+    dynamic error, {
+    String title = 'Error',
+    String errorContext = 'operation',
+  }) async {
     if (!mounted) return;
-    
+
     // 1. Detect Security/App Check Failures from the Bridge
-    if (error is AppException && error.type == AppExceptionType.forbidden) {
-      await SecurityUtils.showSecurityFailureDialog(
-        context,
-        title: 'Security Attestation Failed',
-        message: 'GhostClass servers could not verify the integrity of this request. This can happen if your app version is outdated or your device environment is restricted.',
-        technicalDetails: 'AppException[Forbidden]: ${error.message}',
-        closeLabel: 'Dismiss',
-      );
-      return;
+    if (error is AppException) {
+      final data = error.details;
+
+      // Prioritize structured security errors from the backend
+      if (data != null && data['type'] == 'security') {
+        final reason = data['reason'] ?? 'Device verification failed';
+        final action = data['action'] ?? 'Please try again later';
+
+        await SecurityUtils.showSecurityFailureDialog(
+          context,
+          title: 'Security Attestation Failed',
+          message: '$reason\n\n $action',
+          technicalDetails: error.message,
+          retryLabel: 'Restart App',
+          onRetry: () => exit(0),
+          isDismissible: false,
+        );
+        return;
+      }
+
+      // Fallback: Keyword detection for backward compatibility or unplanned security errors
+      if (error.type == AppExceptionType.forbidden ||
+          error.type == AppExceptionType.unauthorized) {
+        final isSecurityFailure =
+            error.message.contains('App Check') ||
+            error.message.contains('integrity') ||
+            error.message.contains('verification') ||
+            error.message.contains('Handshake');
+
+        if (isSecurityFailure) {
+          await SecurityUtils.showSecurityFailureDialog(
+            context,
+            title: 'Security Attestation Failed',
+            message:
+                'GhostClass servers could not verify the integrity of this request. This can happen if your app version is outdated, or your device environment is restricted (Root/Jailbreak/Emulator).',
+            technicalDetails:
+                '${error.type.name.toUpperCase()}: ${error.message}',
+            retryLabel: 'Restart App',
+            onRetry: () => exit(0),
+            isDismissible: false,
+          );
+          return;
+        }
+      }
     }
 
     // 2. Standard Error Handling
     final message = formatApiError(error, errorContext);
-    
+
     // In debug mode, include the full error object as technical details
     String? details;
     if (kDebugMode) {
@@ -33,11 +74,6 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
       }
     }
 
-    await ServiceErrorDialog.show(
-      context, 
-      title, 
-      [message],
-      details: details,
-    );
+    await ServiceErrorDialog.show(context, title, [message], details: details);
   }
 }

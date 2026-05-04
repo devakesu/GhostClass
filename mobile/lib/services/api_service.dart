@@ -16,6 +16,7 @@ import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
+import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/services/jwe_interceptor.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -30,8 +31,8 @@ class ApiService {
 
   // Create an instance of the wrapper
   final _playIntegrity = FlutterPlayIntegrityWrapper();
-  static final String _cloudProjectNumber = AppConfig.firebaseCloudProjectNumber;
-
+  static final String _cloudProjectNumber =
+      AppConfig.firebaseCloudProjectNumber;
 
   // Cache for Play Integrity tokens to prevent per-request latency
   String? _cachedIntegrityToken;
@@ -43,12 +44,16 @@ class ApiService {
   DateTime? _lastSyncTime;
   static const _syncCooldown = Duration(seconds: 30);
   DateTime? _last401Broadcast;
+  bool _backendUnauthorized = false;
 
   /// Stream of 401 Unauthorized events from EzyGo.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
 
   /// Whether to suppress the onUnauthorized broadcast (used during self-healing).
   bool suppress401 = false;
+
+  /// Returns whether the backend is currently reporting App Check failures.
+  bool get isBackendUnauthorized => _backendUnauthorized;
 
   /// GhostClass web app's API origin. Token bridge lives here.
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
@@ -74,12 +79,16 @@ class ApiService {
   /// Security Practice 1: Integrity Nonces (Server-provided)
   Future<String> _fetchServerNonce() async {
     try {
-      final response = await _securityDio.get('$_ghostclassBaseUrl/security/nonce');
+      final response = await _securityDio.get(
+        '$_ghostclassBaseUrl/security/nonce',
+      );
       if (response.statusCode == 200) {
         return response.data['nonce'] as String;
       }
     } catch (e) {
-      AppLogger.w('ApiService: Server nonce fetch failed, falling back to local.');
+      AppLogger.w(
+        'ApiService: Server nonce fetch failed, falling back to local.',
+      );
     }
     return _generateLocalNonce();
   }
@@ -112,12 +121,13 @@ class ApiService {
     );
 
     if (kDebugMode) {
-      (_securityDio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.badCertificateCallback =
-            (X509Certificate cert, String host, int port) => true;
-        return client;
-      };
+      (_securityDio.httpClientAdapter as IOHttpClientAdapter).createHttpClient =
+          () {
+            final client = HttpClient();
+            client.badCertificateCallback =
+                (X509Certificate cert, String host, int port) => true;
+            return client;
+          };
     }
 
     // Handle 401 Unauthorized globally
@@ -134,14 +144,61 @@ class ApiService {
             );
             if (isEzygoRequest && !isLoginRequest && !suppress401) {
               final now = DateTime.now();
-              if (_last401Broadcast == null || 
-                  now.difference(_last401Broadcast!) > const Duration(seconds: 2)) {
+              if (_last401Broadcast == null ||
+                  now.difference(_last401Broadcast!) >
+                      const Duration(seconds: 2)) {
                 _last401Broadcast = now;
                 AppLogger.w(
                   'ApiService: Core 401 DETECTED for ${response.requestOptions.path}. Broadcasting onUnauthorized.',
                 );
                 _unauthorizedController.add(null);
               }
+            }
+
+            final isGhostclassRequest = response.requestOptions.path.startsWith(
+              _ghostclassBaseUrl,
+            );
+
+            // Handle GhostClass Backend 401s (Security/App Check Failure)
+            if (isGhostclassRequest && !isLoginRequest && !suppress401) {
+              final errorMsg = response.data is Map
+                  ? response.data['error']?.toString()
+                  : null;
+              final isAppCheckFailure =
+                  errorMsg?.contains('App Check') == true ||
+                  errorMsg?.contains('integrity') == true ||
+                  errorMsg?.contains('Unauthenticated') == true;
+
+              if (isAppCheckFailure) {
+                _backendUnauthorized = true;
+                final data = response.data as Map<String, dynamic>?;
+                String friendlyMsg;
+                if (data != null && data['type'] == 'security') {
+                  friendlyMsg = "${data['reason']}\n\n ${data['action']}";
+                } else {
+                  friendlyMsg = errorMsg ?? 'Device verification failed';
+                }
+
+                _ref
+                    .read(securityFailureProvider.notifier)
+                    .setFailure(friendlyMsg);
+                AppLogger.e(
+                  'ApiService: SECURITY FAILURE (App Check) for ${response.requestOptions.path}',
+                );
+                _unauthorizedController.add(
+                  null,
+                ); // Trigger healing/logout logic
+              }
+            }
+          } else if (response.statusCode == 200 &&
+              response.requestOptions.path.startsWith(_ghostclassBaseUrl)) {
+            // Success! Reset security lock
+            if (_backendUnauthorized) {
+              _backendUnauthorized = false;
+              _ref.read(securityFailureProvider.notifier).setFailure(null);
+              AppLogger.i(
+                'ApiService: Security lock cleared via successful request.',
+              );
             }
           }
           return handler.next(response);
@@ -155,12 +212,47 @@ class ApiService {
             final isEzygoRequest = e.requestOptions.path.contains('ezygo.app');
             if (isEzygoRequest && !isLoginRequest && !suppress401) {
               final now = DateTime.now();
-              if (_last401Broadcast == null || 
-                  now.difference(_last401Broadcast!) > const Duration(seconds: 2)) {
+              if (_last401Broadcast == null ||
+                  now.difference(_last401Broadcast!) >
+                      const Duration(seconds: 2)) {
                 _last401Broadcast = now;
                 AppLogger.e(
                   'ApiService: Core 401 ERROR DETECTED for ${e.requestOptions.path}. Broadcasting onUnauthorized.',
                   e,
+                );
+                _unauthorizedController.add(null);
+              }
+            }
+
+            // Handle GhostClass Backend 401 Errors
+            final isGhostclassRequest = e.requestOptions.path.startsWith(
+              _ghostclassBaseUrl,
+            );
+            if (isGhostclassRequest && !isLoginRequest && !suppress401) {
+              final responseData = e.response?.data;
+              final errorMsg = responseData is Map
+                  ? responseData['error']?.toString()
+                  : null;
+              final isAppCheckFailure =
+                  errorMsg?.contains('App Check') == true ||
+                  errorMsg?.contains('integrity') == true ||
+                  errorMsg?.contains('Unauthenticated') == true;
+
+              if (isAppCheckFailure) {
+                _backendUnauthorized = true;
+                final data = responseData as Map<String, dynamic>?;
+                String friendlyMsg;
+                if (data != null && data['type'] == 'security') {
+                  friendlyMsg = "${data['reason']}\n\n ${data['action']}";
+                } else {
+                  friendlyMsg = errorMsg ?? 'Device verification failed';
+                }
+
+                _ref
+                    .read(securityFailureProvider.notifier)
+                    .setFailure(friendlyMsg);
+                AppLogger.e(
+                  'ApiService: SECURITY ERROR (App Check) for ${e.requestOptions.path}',
                 );
                 _unauthorizedController.add(null);
               }
@@ -206,6 +298,17 @@ class ApiService {
                 .read(stealthHeadersServiceProvider)
                 .getHeaders(url: options.path);
             options.headers.addAll(stealthHeaders);
+
+            // Block EzyGo requests if backend is unauthorized (Security Lock)
+            if (_backendUnauthorized) {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.cancel,
+                  message: 'Security Verification Required',
+                ),
+              );
+            }
           } else if (options.path.startsWith(_ghostclassBaseUrl)) {
             options.headers['Accept'] = 'application/json';
             options.headers['origin'] = AppSecrets.supabaseSpoofedOrigin;
@@ -253,9 +356,7 @@ class ApiService {
               }
             } catch (e) {
               if (kDebugMode) {
-                AppLogger.w(
-                  'ApiService: Security attestation failed.',
-                );
+                AppLogger.w('ApiService: Security attestation failed.');
                 rethrow;
               } else {
                 AppLogger.e('ApiService: Security attestation failed.', e);
@@ -276,6 +377,7 @@ class ApiService {
       _dio,
       getOutage: () => _ref.read(outageProvider),
       setOutage: (v) => _ref.read(outageProvider.notifier).update(v),
+      isBackendUnauthorized: () => _backendUnauthorized,
     );
   }
 
@@ -316,7 +418,7 @@ class ApiService {
         type: AppExceptionType.network,
       ),
     );
-    
+
     if (ezygoResponse.statusCode != 200) return ezygoResponse;
 
     final ezygoToken =
@@ -330,9 +432,9 @@ class ApiService {
 
     // 2. Provision session in GhostClass bridge
     try {
-      final ghostResponse = await provisionGhostClassSession(ezygoToken).timeout(
-        const Duration(seconds: 20),
-      );
+      final ghostResponse = await provisionGhostClassSession(
+        ezygoToken,
+      ).timeout(const Duration(seconds: 20));
       return ghostResponse;
     } on TimeoutException {
       throw AppException(
@@ -516,12 +618,14 @@ class ApiService {
     );
   }
 
-  Future<Response<dynamic>> fetchAttestationDetails(String supabaseToken) async {
+  Future<Response<dynamic>> fetchAttestationDetails([
+    String? supabaseToken,
+  ]) async {
     return _dio.get(
       '$_ghostclassBaseUrl/security/attestation',
       options: Options(
         headers: {
-          'Authorization': 'Bearer $supabaseToken',
+          if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken',
           if (_mobileApiKey.value.isNotEmpty)
             'x-mobile-api-key': _mobileApiKey.value,
         },
@@ -529,6 +633,55 @@ class ApiService {
         validateStatus: (s) => s != null && s < 600,
       ),
     );
+  }
+
+  /// Performs a full server-side integrity check.
+  /// Throws a security-typed AppException if verification fails.
+  Future<void> verifyIntegrity() async {
+    try {
+      final response = await fetchAttestationDetails();
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final bool verified = data['verified'] ?? false;
+
+        if (!verified) {
+          final String reason = data['reason'] ?? data['playIntegrityError'] ?? 'Device integrity check failed.';
+          final String action = data['action'] ?? 'Please ensure you are using a genuine version of GhostClass from the Play Store.';
+
+          throw AppException(
+            message: reason,
+            type: AppExceptionType.unauthorized,
+            details: {'type': 'security', 'reason': reason, 'action': action},
+          );
+        }
+      } else {
+        // Handle 401 or other errors from the security endpoint
+        final data = response.data as Map<String, dynamic>?;
+        if (data != null && data['type'] == 'security') {
+          throw AppException(
+            message: data['error'] ?? 'Security handshake failed',
+            type: AppExceptionType.unauthorized,
+            details: data,
+          );
+        }
+        throw AppException(
+          message: 'Security verification unavailable (${response.statusCode})',
+          type: AppExceptionType.server,
+        );
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        final data = e.response?.data as Map<String, dynamic>?;
+        if (data != null && data['type'] == 'security') {
+          throw AppException(
+            message: data['error'] ?? 'Security handshake failed',
+            type: AppExceptionType.unauthorized,
+            details: data,
+          );
+        }
+      }
+      rethrow;
+    }
   }
 
   // ─── Authenticated EzyGo Requests ─────────────────────────────────────────
@@ -843,10 +996,12 @@ class ApiService {
               'Woah, slow down! EzyGo rate limited your request. Please wait a minute before trying again.';
           type = AppExceptionType.rateLimit;
         } else if (status == 503) {
-          message = 'EzyGo is currently undergoing maintenance or is overloaded. Please try again later.';
+          message =
+              'EzyGo is currently undergoing maintenance or is overloaded. Please try again later.';
           type = AppExceptionType.server;
         } else if (status == 502 || status == 504) {
-          message = 'The server is currently unreachable. This is likely a temporary network issue.';
+          message =
+              'The server is currently unreachable. This is likely a temporary network issue.';
           type = AppExceptionType.network;
         } else if (status == 500) {
           message = 'EzyGo is having technical issues (Internal Server Error).';

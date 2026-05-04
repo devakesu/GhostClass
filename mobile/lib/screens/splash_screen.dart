@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/constants/content_cache.dart';
+import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
@@ -36,12 +39,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // 2. Minimum animation duration and opportunistic cache warming
     try {
+      final api = ref.read(apiServiceProvider);
+
+      // Perform full server-side integrity check on app opening
+      final integrityCheck = api.verifyIntegrity();
+
       await Future.wait([
         Future.delayed(const Duration(milliseconds: 1800)),
         jwePreWarm,
         apiPreWarm,
+        integrityCheck,
         authTask.then((user) {
-          if (!mounted || user == null || user.profile?.avatarUrl == null) return;
+          if (!mounted || user == null || user.profile?.avatarUrl == null) {
+            return;
+          }
           try {
             precacheImage(NetworkImage(user.profile!.avatarUrl!), context);
           } catch (e, st) {
@@ -51,12 +62,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ]);
     } catch (e) {
       AppLogger.e('SplashScreen: Initialization error', e);
-      
+
       if (!mounted) return;
 
       final api = ref.read(apiServiceProvider);
+
+      // Handle Security Failures specifically
+      if (e is AppException && e.details?['type'] == 'security') {
+        final reason = e.details?['reason'] ?? e.message;
+        final action = e.details?['action'] ?? 'Please restart the app.';
+
+        SecurityUtils.showSecurityFailureDialog(
+          context,
+          title: 'Security Verification Failed',
+          message: '$reason\n\n $action',
+          technicalDetails: e.toString(),
+          retryLabel: 'Exit App',
+          onRetry: () => exit(0),
+          isDismissible: false,
+        );
+        return;
+      }
+
       List<String> messages = ['We encountered a problem during startup.'];
-      
+
       if (e is DioException) {
         final appEx = api.mapDioError(e);
         messages = [appEx.message];
@@ -65,8 +94,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
 
       await ServiceErrorDialog.show(
-        context, 
-        'Connectivity Issue', 
+        context,
+        'Connectivity Issue',
         messages,
         isDismissible: false,
         onRetry: () {
@@ -106,10 +135,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .animate()
             .fade(duration: 400.ms)
             .scale(
-              begin: const Offset(0.7, 0.7), 
+              begin: const Offset(0.7, 0.7),
               end: const Offset(1.0, 1.0),
-              duration: 400.ms, 
-              curve: Curves.easeOutBack
+              duration: 400.ms,
+              curve: Curves.easeOutBack,
             )
             .then() // Chain effects after the entrance
             .animate(onPlay: (controller) => controller.repeat(reverse: true))
@@ -121,8 +150,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             )
             .animate(onPlay: (controller) => controller.repeat())
             .shimmer(
-              duration: 600.ms, 
-              color: Colors.white.withValues(alpha: 0.4)
+              duration: 600.ms,
+              color: Colors.white.withValues(alpha: 0.4),
             ),
       ),
     );
