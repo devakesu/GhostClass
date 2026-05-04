@@ -176,5 +176,49 @@ describe("POST /api/logout", () => {
       expect(mockClearTermsVersionCookie).toHaveBeenCalledOnce();
       expect(mockClearTermsRedirectCountCookie).toHaveBeenCalledOnce();
     });
+
+    it("clears chunked Supabase cookies on success", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+      mockCookieGetAll.mockReturnValueOnce([
+        { name: "sb-project-auth-token.0" },
+        { name: "sb-project-auth-token.1" },
+        { name: "other-cookie" },
+      ]);
+      
+      const { POST } = await import("../route");
+      await POST(makePostReq(), {} as any);
+      
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        "sb-project-auth-token.0",
+        "",
+        expect.any(Object)
+      );
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        "sb-project-auth-token.1",
+        "",
+        expect.any(Object)
+      );
+    });
+
+    it("sets secure cookie flag when HTTPS is enabled", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+      vi.stubEnv("HTTPS", "true");
+      
+      const { POST } = await import("../route");
+      await POST(makePostReq(), {} as any);
+      
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        expect.any(String),
+        "",
+        expect.objectContaining({ secure: true })
+      );
+    });
+
+    it("handles Supabase URL parsing failure gracefully", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "invalid-url-no-protocol");
+      const { POST } = await import("../route");
+      const res = await POST(makePostReq(), {} as any);
+      expect(res.status).toBe(200); // Should still succeed even if cookie cleanup fails
+    });
   });
 });
