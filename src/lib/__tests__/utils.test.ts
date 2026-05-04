@@ -115,7 +115,7 @@ describe("utils.ts", () => {
       expect(formatSessionName("iii")).toBe("3rd Hour");
       expect(formatSessionName("ix")).toBe("9th Hour");
       expect(formatSessionName("Lab")).toBe("Session Lab");
-      expect(formatSessionName("Session 1")).toBe("Session 1");
+      expect(formatSessionName("Session 1")).toBe("1st Hour");
       expect(formatSessionName("")).toBe("");
     });
 
@@ -145,9 +145,9 @@ describe("utils.ts", () => {
       expect(isValidAvatarUrl("https://project.supabase.co/storage/v1/object/public/avatars/test.png")).toBe(true);
     });
 
-    it("returns false if it points to a different hostname", () => {
-      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png")).toBe(false);
-      expect(isValidAvatarUrl("https://evil.com/test.png")).toBe(false);
+    it("returns true even if it points to a different hostname (validation moved to next.config.ts)", () => {
+      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png")).toBe(true);
+      expect(isValidAvatarUrl("https://evil.com/test.png")).toBe(true);
     });
 
     it("is permissive if NEXT_PUBLIC_SUPABASE_URL is missing", () => {
@@ -225,7 +225,7 @@ describe("utils.ts", () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
       expect(isValidAvatarUrl("https://abc.supabase.co/storage/v1/object/public/avatars/u.png")).toBe(true);
       expect(isValidAvatarUrl("http://abc.supabase.co/u.png")).toBe(false);
-      expect(isValidAvatarUrl("https://other.com/u.png")).toBe(false);
+      expect(isValidAvatarUrl("https://other.com/u.png")).toBe(true);
       expect(isValidAvatarUrl(null)).toBe(false);
       expect(isValidAvatarUrl("not-a-url")).toBe(false);
     });

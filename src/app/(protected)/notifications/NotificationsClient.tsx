@@ -253,6 +253,7 @@ export default function NotificationsPage() {
                   variant="ghost" 
                   size="sm" 
                   className="text-xs text-muted-foreground hover:text-primary"
+                  aria-label="Mark all as read"
                 >
                   <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Mark all read
                 </Button>

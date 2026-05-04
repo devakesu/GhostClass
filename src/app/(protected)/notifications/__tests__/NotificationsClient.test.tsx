@@ -1,29 +1,31 @@
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import NotificationsPage from '../NotificationsClient';
 
 // Mock all required hooks and dependencies
+const MOCK_NOTIFICATIONS_VAL = {
+  actionNotifications: [],
+  regularNotifications: [],
+  unreadCount: 0,
+  isLoading: false,
+  error: null,
+  markAsRead: vi.fn(),
+  toggleRead: vi.fn(),
+  markAllAsRead: vi.fn(),
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+};
+
 vi.mock('@/hooks/notifications/useNotifications', () => ({
-  useNotifications: vi.fn(() => ({
-    actionNotifications: [],
-    regularNotifications: [],
-    unreadCount: 0,
-    isLoading: false,
-    error: null,
-    markAsRead: vi.fn(),
-    toggleRead: vi.fn(),
-    markAllAsRead: vi.fn(),
-    fetchNextPage: vi.fn(),
-    hasNextPage: false,
-    isFetchingNextPage: false,
-  })),
+  useNotifications: vi.fn(() => MOCK_NOTIFICATIONS_VAL),
 }));
 
+const MOCK_USER_DATA = { id: '123', email: 'test@example.com', username: 'testuser' };
+const MOCK_USER_VAL = { data: MOCK_USER_DATA, isLoading: false };
 vi.mock('@/hooks/users/user', () => ({
-  useUser: () => ({
-    data: { id: '123', email: 'test@example.com', username: 'testuser' },
-    isLoading: false,
-  }),
+  useUser: () => MOCK_USER_VAL,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -32,31 +34,24 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
-vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: () => ({
-    getTotalSize: () => 100,
-    getVirtualItems: () => [
-      {
-        key: 0,
-        index: 0,
-        size: 50,
-        start: 0,
-        end: 50,
-        measureElement: vi.fn(),
-      },
-      {
-        key: 1,
-        index: 1,
-        size: 50,
-        start: 50,
-        end: 100,
-        measureElement: vi.fn(),
-      },
-    ],
-    scrollToIndex: vi.fn(),
-    measureElement: vi.fn(),
-    measure: vi.fn(),
-  }),
+const MOCK_MEASURE_EL = vi.fn();
+const MOCK_MEASURE = vi.fn();
+const MOCK_SCROLL = vi.fn();
+
+vi.mock('@/hooks/notifications/use-notification-virtualizer', () => ({
+  useNotificationVirtualizer: vi.fn(({ virtualItems }) => ({
+    getTotalSize: () => virtualItems.length * 100,
+    getVirtualItems: () => virtualItems.map((item: any, index: number) => ({
+      index,
+      start: index * 100,
+      size: 100,
+      key: item.id,
+      measureElement: MOCK_MEASURE_EL,
+    })),
+    measureElement: MOCK_MEASURE_EL,
+    measure: MOCK_MEASURE,
+    scrollToIndex: MOCK_SCROLL,
+  })),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -82,6 +77,10 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
     isSyncing: false,
     syncCompleted: true,
   })),
+}));
+
+vi.mock('@/components/loading', () => ({
+  Loading: () => <div role="status">Loading...</div>,
 }));
 
 describe('NotificationsClient', () => {

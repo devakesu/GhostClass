@@ -482,7 +482,7 @@ return (
                               </span>
                               ):
                             </span>
-                            <span className={`font-mono font-bold ${d.totalPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                            <span className={`font-mono font-bold ${d.totalPercentage < d.officialPercentage ? 'text-red-600 dark:text-red-400' : (d.totalPercentage > d.officialPercentage ? 'text-green-600 dark:text-green-400' : (d.totalPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'))}`}>
                               {d.totalPercentage}% <span className="text-muted-foreground/40 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
                             </span>
                           </div>

@@ -49,7 +49,7 @@ describe("HelpClient", () => {
       render(<HelpClient />);
       const faqSection = screen.getByTestId("faq-section");
       const buttons = within(faqSection).getAllByRole("button");
-      expect(buttons.length).toBe(9);
+      expect(buttons.length).toBe(13);
       buttons.forEach((btn) => {
         expect(btn).toHaveAttribute("aria-expanded", "false");
       });
@@ -58,12 +58,14 @@ describe("HelpClient", () => {
     it("expands a FAQ item when clicked", () => {
       render(<HelpClient />);
       const faqSection = screen.getByTestId("faq-section");
-      const firstButton = within(faqSection).getAllByRole("button")[0];
-      expect(firstButton).toHaveAttribute("aria-expanded", "false");
+      const buttons = within(faqSection).getAllByRole("button");
+      // Index 2 is "Why is my attendance percentage different from EzyGo?"
+      const diffButton = buttons[2];
+      expect(diffButton).toHaveAttribute("aria-expanded", "false");
 
-      fireEvent.click(firstButton);
+      fireEvent.click(diffButton);
 
-      expect(firstButton).toHaveAttribute("aria-expanded", "true");
+      expect(diffButton).toHaveAttribute("aria-expanded", "true");
       // Panel is always in DOM; check it becomes visible
       expect(
         screen.getByText(
@@ -75,7 +77,8 @@ describe("HelpClient", () => {
     it("collapses a FAQ item when clicked again", () => {
       render(<HelpClient />);
       const faqSection = screen.getByTestId("faq-section");
-      const firstButton = within(faqSection).getAllByRole("button")[0];
+      const buttons = within(faqSection).getAllByRole("button");
+      const firstButton = buttons[0];
 
       fireEvent.click(firstButton);
       expect(firstButton).toHaveAttribute("aria-expanded", "true");
@@ -84,7 +87,7 @@ describe("HelpClient", () => {
       expect(firstButton).toHaveAttribute("aria-expanded", "false");
     });
 
-    it("renders all six FAQ questions", () => {
+    it("renders key FAQ questions", () => {
       render(<HelpClient />);
       expect(
         screen.getByText(

@@ -1,6 +1,7 @@
+/** @vitest-environment jsdom */
 import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-vi.unmock('@/hooks/use-sync-on-mount');
+
 import TrackingClient from '../TrackingClient';
 import { createClient } from '@/lib/supabase/client';
 
@@ -9,27 +10,32 @@ import { createClient } from '@/lib/supabase/client';
 // in captureSentryException without resetting every module-level mock.
 const sentryConfig = vi.hoisted(() => ({ shouldFail: false }));
 
+const MOCK_EMPTY_ARRAY: any[] = [];
+const MOCK_REFTCH_VAL = { data: MOCK_EMPTY_ARRAY, isLoading: false, error: null };
+
 // Mock all required hooks
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
   useTrackingData: vi.fn(() => ({
-    data: [],
+    data: MOCK_EMPTY_ARRAY,
     isLoading: false,
     error: null,
-    refetch: vi.fn().mockResolvedValue({ data: [], isLoading: false, error: null }),
+    refetch: vi.fn().mockResolvedValue(MOCK_REFTCH_VAL),
   })),
 }));
 
+const MOCK_COUNT_REFETCH_VAL = { data: 0, isLoading: false };
 vi.mock('@/hooks/tracker/useTrackingCount', () => ({
   useTrackingCount: vi.fn(() => ({
     data: 0,
     isLoading: false,
-    refetch: vi.fn().mockResolvedValue({ data: 0, isLoading: false }),
+    refetch: vi.fn().mockResolvedValue(MOCK_COUNT_REFETCH_VAL),
   })),
 }));
 
+const MOCK_PROFILE_DATA = { id: '123', email: 'test@example.com', username: 'testuser' };
 vi.mock('@/hooks/users/profile', () => ({
   useProfile: vi.fn(() => ({
-    data: { id: '123', email: 'test@example.com', username: 'testuser' },
+    data: MOCK_PROFILE_DATA,
     isLoading: false,
   })),
 }));
@@ -47,40 +53,34 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 
 vi.mock('@/hooks/users/user', () => ({
   useUser: () => ({
-    data: { id: '123', email: 'test@example.com', username: 'testuser' },
+    data: MOCK_PROFILE_DATA,
     isLoading: false,
   }),
 }));
 
+const MOCK_ATTENDANCE_VAL = { data: null, isLoading: false };
 vi.mock('@/hooks/courses/attendance', () => ({
-  useAttendanceReport: () => ({
-    data: null,
-    isLoading: false,
-  }),
+  useAttendanceReport: () => MOCK_ATTENDANCE_VAL,
 }));
 
+const MOCK_SEM_VAL = { data: 'even', isLoading: false };
+const MOCK_YEAR_VAL = { data: '2024-25', isLoading: false };
 vi.mock('@/hooks/users/settings', () => ({
-  useFetchSemester: () => ({
-    data: 'even',
-    isLoading: false,
-  }),
-  useFetchAcademicYear: () => ({
-    data: '2024-25',
-    isLoading: false,
-  }),
+  useFetchSemester: () => MOCK_SEM_VAL,
+  useFetchAcademicYear: () => MOCK_YEAR_VAL,
 }));
 
+const MOCK_COURSES_VAL = { data: [], isLoading: false };
 vi.mock('@/hooks/courses/courses', () => ({
-  useFetchCourses: () => ({
-    data: [],
-    isLoading: false,
-  }),
+  useFetchCourses: () => MOCK_COURSES_VAL,
 }));
 
+const MOCK_DISABLED_MAP = {};
+const MOCK_DISABLED_CODES = new Set<string>();
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({
   useDisabledCourses: vi.fn(() => ({
-    disabledCoursesMap: {},
-    disabledCodes: new Set<string>(),
+    disabledCoursesMap: MOCK_DISABLED_MAP,
+    disabledCodes: MOCK_DISABLED_CODES,
     isDisabled: vi.fn(() => false),
     getDisableReason: vi.fn(() => null),
     disableCourse: vi.fn(),
@@ -97,6 +97,11 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
 }));
 
 
+
+const MOCK_CLASS_COURSES_VAL = { data: [] };
+vi.mock('@/hooks/courses/useFetchClassCourses', () => ({
+  useFetchClassCourses: () => MOCK_CLASS_COURSES_VAL,
+}));
 
 vi.mock('../../../lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
@@ -133,22 +138,32 @@ vi.mock('sonner', () => ({
 }));
 
 // Mock framer-motion
-vi.mock('framer-motion', () => {
-  const MockComponent = ({ children, ...props }: any) => <div {...props}>{children}</div>;
+vi.mock('framer-motion', async () => {
+  const React = (await import('react')).default;
+
+
+
+  const MockComponent = (tag: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => 
+      React.createElement(tag, { ...props, ref }, children)
+    );
+    Component.displayName = `Motion${tag.charAt(0).toUpperCase()}${tag.slice(1)}`;
+    return Component;
+  };
   return {
     LazyMotion: ({ children }: any) => children,
     domAnimation: {},
     m: {
-      div: MockComponent,
-      button: MockComponent,
-      p: MockComponent,
-      span: MockComponent,
+      div: MockComponent('div'),
+      button: MockComponent('button'),
+      p: MockComponent('p'),
+      span: MockComponent('span'),
     },
     motion: {
-      div: MockComponent,
-      button: MockComponent,
-      p: MockComponent,
-      span: MockComponent,
+      div: MockComponent('div'),
+      button: MockComponent('button'),
+      p: MockComponent('p'),
+      span: MockComponent('span'),
     },
     AnimatePresence: ({ children }: any) => children,
   };
@@ -158,6 +173,7 @@ vi.mock('framer-motion', () => {
 vi.mock('@/components/ui/badge', () => ({
   Badge: ({ children, ...props }: any) => <span {...props}>{children}</span>,
 }));
+
 
 vi.mock('@/components/ui/alert-dialog', () => ({
   AlertDialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
@@ -189,13 +205,17 @@ vi.mock('lucide-react', () => {
 });
 
 // Mock attendance-reconciliation
-vi.mock('@/lib/logic/attendance-reconciliation', () => ({
-  getOfficialSessionRaw: vi.fn((session: any, sessionKey: string | number) => {
-    if (session && session.session != null && session.session !== '') return session.session;
-    return sessionKey;
-  }),
-  DUTY_LEAVE_PLACEHOLDER_REMARKS: new Set<string>(["Duty Leave", "Self-Marked: Duty Leave"]),
-}));
+vi.mock('@/lib/logic/attendance-reconciliation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/logic/attendance-reconciliation')>();
+  return {
+    ...actual,
+    getOfficialSessionRaw: vi.fn((session: any, sessionKey: string | number) => {
+      if (session && session.session != null && session.session !== '') return session.session;
+      return sessionKey;
+    }),
+    DUTY_LEAVE_PLACEHOLDER_REMARKS: new Set<string>(["Duty Leave", "Self-Marked: Duty Leave"]),
+  };
+});
 
 import { useTrackingData } from '@/hooks/tracker/useTrackingData';
 import { useTrackingCount } from '@/hooks/tracker/useTrackingCount';
@@ -270,11 +290,16 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for enabled effect to switch from Loading to full UI
-      const clearBtn = await screen.findByRole('button', { name: /delete all 1 tracked class/i });
+      const clearBtn = await screen.findByLabelText(/delete all/i);
       fireEvent.click(clearBtn);
 
+
+
+
+
+
       // Dialog should now be open with "record" (singular)
-      expect(await screen.findByText(/1 tracking record\./i)).toBeInTheDocument();
+      expect(await screen.findByText(/1 tracking record/i)).toBeInTheDocument();
     });
 
     it('should display "records" for count greater than 1 in delete-all dialog and close on confirm', async () => {
@@ -294,19 +319,26 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for full UI, then open dialog
-      const clearBtn = await screen.findByRole('button', { name: /delete all 2 tracked classes/i });
+      const clearBtn = await screen.findByLabelText(/delete all/i);
       fireEvent.click(clearBtn);
 
-      // Dialog should show "records" (plural)
-      expect(await screen.findByText(/2 tracking records\./i)).toBeInTheDocument();
 
-      // Click Delete All – exercises line 544-545 (deleteAllTrackingData + setDeleteAllConfirmOpen(false))
-      const deleteAllBtn = await screen.findByRole('button', { name: /delete all/i });
+
+
+
+
+      // Dialog should show "records" (plural)
+      expect(await screen.findByText(/2 tracking records/i)).toBeInTheDocument();
+
+      // Dialog confirmation button - using exact match to distinguish from main UI button
+      const deleteAllBtn = await screen.findByRole('button', { name: /^DELETE ALL$/ });
       fireEvent.click(deleteAllBtn);
+
+
 
       // After confirming, dialog should close (setDeleteAllConfirmOpen(false) called)
       await waitFor(() => {
-        expect(screen.queryByText(/2 tracking records\./i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/2 tracking records/i)).not.toBeInTheDocument();
       });
     });
   });

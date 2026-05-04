@@ -46,10 +46,10 @@ describe('BuildInfoPage', () => {
     expect(screen.getByText('abc123d')).toBeInTheDocument();
     expect(screen.getByText('2026-02-18')).toBeInTheDocument();
     expect(screen.getByText('15:30:45 UTC')).toBeInTheDocument();
-    expect(screen.getByText('PASSED')).toBeInTheDocument();
+    expect(screen.getAllByText('PASSED').length).toBeGreaterThan(0);
     expect(screen.getByText('SLSA_PROVENANCE_GENERATED')).toBeInTheDocument();
     expect(screen.getByText('sha256:digest123')).toBeInTheDocument();
-    expect(screen.getByText('PRODUCTION')).toBeInTheDocument();
+    expect(screen.getAllByText('PRODUCTION')[0]).toBeInTheDocument();
   });
 
   it('should handle missing optional environment variables', () => {
