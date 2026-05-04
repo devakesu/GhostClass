@@ -16,6 +16,7 @@ class EzygoBatchFetcher {
   final Dio _dio;
   final bool Function() _getOutage;
   final void Function(bool) _setOutage;
+  final bool Function() _isBackendUnauthorized;
   
   // Cache for 60 seconds (parity with Next.js implementation)
   static const Duration _cacheTtl = Duration(seconds: 60);
@@ -37,8 +38,10 @@ class EzygoBatchFetcher {
   EzygoBatchFetcher(this._dio, {
     required bool Function() getOutage,
     required void Function(bool) setOutage,
+    required bool Function() isBackendUnauthorized,
   }) : _getOutage = getOutage, 
-       _setOutage = setOutage;
+       _setOutage = setOutage,
+       _isBackendUnauthorized = isBackendUnauthorized;
 
   /// Executes an authenticated request with deduplication and caching.
   /// 
@@ -55,7 +58,21 @@ class EzygoBatchFetcher {
     // Generate a unique cache key based on the request identity
     final cacheKey = '$method|$path|$token';
 
-    // 0. Circuit Breaker: If an outage is active, block ALL network requests immediately.
+    // 0. Security Barrier: If the backend connection is compromised, block immediately.
+    if (_isBackendUnauthorized()) {
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        type: DioExceptionType.cancel,
+        message: 'Security Verification Required: App Check failed.',
+        response: Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 401,
+          statusMessage: 'Security Handshake Required',
+        ),
+      );
+    }
+
+    // 0.5. Circuit Breaker: If an outage is active, block ALL network requests immediately.
     // This state is only cleared when the user manually presses 'Retry' (clearAll()).
     if (_getOutage()) {
       // Throttle the warning log to once per minute to avoid console flooding

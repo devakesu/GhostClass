@@ -3,12 +3,14 @@ class AppException implements Exception {
   final AppExceptionType type;
   final Object? originalError;
   final int? statusCode;
+  final Map<String, dynamic>? details;
 
   const AppException({
     required this.message,
     required this.type,
     this.originalError,
     this.statusCode,
+    this.details,
   });
 
   bool get isAuthError =>

@@ -7,6 +7,8 @@ class SecurityErrorDialog extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onContactSupport;
   final String? closeLabel;
+  final String? retryLabel;
+  final bool isDismissible;
 
   const SecurityErrorDialog({
     super.key,
@@ -15,21 +17,20 @@ class SecurityErrorDialog extends StatelessWidget {
     this.onRetry,
     this.onContactSupport,
     this.closeLabel,
+    this.retryLabel,
+    this.isDismissible = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: ServiceErrorDialog(
-          title: title,
-          messages: [message],
-          onRetry: onRetry,
-          onContactSupport: onContactSupport,
-          closeLabel: closeLabel,
-          isDismissible: false,
-        ),
-      ),
+    return ServiceErrorDialog(
+      title: title,
+      messages: [message],
+      onRetry: onRetry,
+      onContactSupport: onContactSupport,
+      closeLabel: closeLabel,
+      retryLabel: retryLabel,
+      isDismissible: isDismissible,
     );
   }
 }

@@ -48,8 +48,9 @@ Future<void> _handleSecurityFailure(Object error) async {
               title: 'Security Handshake Failed',
               message: friendlyMessage,
               technicalDetails: errorMessage,
-              closeLabel: 'Close App',
+              retryLabel: 'Close App',
               onRetry: () => exit(0),
+              isDismissible: false,
             );
           });
           return const Scaffold(body: Center(child: CircularProgressIndicator()));

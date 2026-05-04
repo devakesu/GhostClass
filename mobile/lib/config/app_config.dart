@@ -15,20 +15,35 @@ class AppConfig {
   // ─── Supabase Config ───────────────────────────────────────────────────────
 
   /// The Supabase API endpoint (Proxied via ghostclass.devakesu.com for ISP bypass).
-  static String get supabaseUrl => _d(AppSecrets.isDev ? AppSecrets.supabaseUrlDev : AppSecrets.supabaseProxyUrlProd);
+  static String get supabaseUrl => _d(
+    AppSecrets.isDev
+        ? AppSecrets.supabaseUrlDev
+        : AppSecrets.supabaseProxyUrlProd,
+  );
 
   /// The Supabase publishable public key (previously anon key).
   static EncryptedValue get supabasePublishableKey =>
-      EncryptedValue.fromPlaintext(_d(AppSecrets.isDev ? AppSecrets.supabasePublishableKeyDev : AppSecrets.supabasePublishableKeyProd));
+      EncryptedValue.fromPlaintext(
+        _d(
+          AppSecrets.isDev
+              ? AppSecrets.supabasePublishableKeyDev
+              : AppSecrets.supabasePublishableKeyProd,
+        ),
+      );
 
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
   /// The GhostClass web app's API origin (Auth Bridge).
-  static String get ghostclassApiUrl => AppSecrets.isDev ? AppSecrets.ghostclassApiUrlDev : AppSecrets.ghostclassApiUrlProd;
+  static String get ghostclassApiUrl => AppSecrets.isDev
+      ? AppSecrets.ghostclassApiUrlDev
+      : AppSecrets.ghostclassApiUrlProd;
 
   /// Secret key used in the x-mobile-api-key header for the GhostClass bridge.
-  static EncryptedValue get mobileApiSecret =>
-      EncryptedValue.fromPlaintext(AppSecrets.isDev ? AppSecrets.mobileApiSecretDev : AppSecrets.mobileApiSecretProd);
+  static EncryptedValue get mobileApiSecret => EncryptedValue.fromPlaintext(
+    AppSecrets.isDev
+        ? AppSecrets.mobileApiSecretDev
+        : AppSecrets.mobileApiSecretProd,
+  );
 
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
@@ -47,23 +62,26 @@ class AppConfig {
   /// Firebase Cloud Project Number for Play Integrity
   static String get firebaseCloudProjectNumber => '424804867878';
 
-
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
   /// Current application version.
   static String get appVersion => '3.0.8';
 
   /// Commit SHA injected by CI for release builds.
-  static String get appCommitSha => const String.fromEnvironment('APP_COMMIT_SHA', defaultValue: 'local');
+  static String get appCommitSha =>
+      const String.fromEnvironment('APP_COMMIT_SHA', defaultValue: 'local');
 
   /// Build timestamp injected by CI for release builds.
-  static String get buildTimestamp => const String.fromEnvironment('BUILD_TIMESTAMP', defaultValue: 'local');
+  static String get buildTimestamp =>
+      const String.fromEnvironment('BUILD_TIMESTAMP', defaultValue: 'local');
 
   /// GitHub Actions run ID injected by CI.
-  static String get githubRunId => const String.fromEnvironment('GITHUB_RUN_ID', defaultValue: 'local');
+  static String get githubRunId =>
+      const String.fromEnvironment('GITHUB_RUN_ID', defaultValue: 'local');
 
   /// GitHub Actions run number injected by CI.
-  static String get githubRunNumber => const String.fromEnvironment('GITHUB_RUN_NUMBER', defaultValue: 'local');
+  static String get githubRunNumber =>
+      const String.fromEnvironment('GITHUB_RUN_NUMBER', defaultValue: 'local');
 
   /// Whether this binary was produced as a release build.
   static bool get isReleaseBuild => kReleaseMode;
@@ -90,13 +108,17 @@ class AppConfig {
   static String get appName => 'GhostClass';
 
   /// The Play Store URL for the application.
-  static String get playStoreUrl => 'https://play.google.com/store/apps/details?id=com.devakesu.ghostclass';
+  static String get playStoreUrl =>
+      'https://play.google.com/store/apps/details?id=com.devakesu.ghostclass';
 
   /// The GhostClass public web app URL.
   static String get ghostclassWebUrl => 'https://ghostclass.devakesu.com';
 
   /// Official legal contact email.
   static String get legalEmail => 'legal@ghostclass.devakesu.com';
+
+  /// Official support email.
+  static String get supportEmail => 'contact@ghostclass.devakesu.com';
 
   /// The governing law region for terms.
   static String get governingLawRegion => 'India';
@@ -121,7 +143,7 @@ class AppConfig {
       final trimmed = encoded.trim();
       if (trimmed.isEmpty) return '';
 
-      if (trimmed.startsWith('http') || 
+      if (trimmed.startsWith('http') ||
           trimmed.startsWith('sb_') ||
           trimmed.contains('://')) {
         return trimmed;
