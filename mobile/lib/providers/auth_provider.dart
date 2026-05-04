@@ -479,7 +479,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     bool? bunkEnabled,
     int? targetPercentage,
     Map<String, Map<String, String>>? disabledCourses,
-    Map<String, String>? catalogOverride,
   }) async {
     final user = state.value;
     if (user == null) return;
@@ -489,14 +488,12 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       bunkEnabled: bunkEnabled,
       targetPercentage: targetPercentage,
       disabledCourses: disabledCourses,
-      catalogOverride: catalogOverride,
     );
 
     final updatedSettings = user.settings.copyWith(
       bunkCalculatorEnabled: bunkEnabled,
       targetPercentage: targetPercentage,
       disabledCourses: disabledCourses,
-      courseCatalog: catalogOverride,
     );
     await service.saveSettingsLocally(updatedSettings);
     state = AsyncValue.data(user.copyWith(settings: updatedSettings));

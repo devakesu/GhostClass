@@ -42,9 +42,9 @@ describe("error-handling.ts", () => {
     });
 
     it("handles circuit breaker/503 errors", () => {
-      expect(getHumanReadableError({ status: 503, message: "" })).toBe("EzyGo servers are currently down. Please try again later.");
-      expect(getHumanReadableError({ message: "technical issues" })).toBe("EzyGo servers are currently down. Please try again later.");
-      expect(getHumanReadableError({ response: { status: 503 }, message: "" })).toBe("EzyGo servers are currently down. Please try again later.");
+      expect(getHumanReadableError({ status: 503, message: "" })).toBe("Ezygo is down, connection failed");
+      expect(getHumanReadableError({ message: "technical issues" })).toBe("Ezygo is down, connection failed");
+      expect(getHumanReadableError({ response: { status: 503 }, message: "" })).toBe("Ezygo is down, connection failed");
     });
 
     it("handles rate limiting", () => {

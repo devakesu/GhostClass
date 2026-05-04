@@ -3,15 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
-import { validateCsrfToken } from "@/lib/security/csrf";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
 import { safeResponseJson } from "@/lib/json";
@@ -239,12 +237,6 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
         },
       },
     );
-  }
-
-  const mobile = isMobileRequest(req.headers);
-  if (!mobile) {
-    const csrfToken = req.headers.get(CSRF_HEADER);
-    if (!(await validateCsrfToken(csrfToken))) return NextResponse.json({ error: "Invalid CSRF" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
 
   const supabase = await createClient();

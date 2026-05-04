@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
+
 import { createRoot } from 'react-dom/client';
 
 describe('DOM Sanity', () => {

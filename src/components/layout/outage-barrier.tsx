@@ -24,8 +24,6 @@ export function OutageBarrier() {
           className="fixed inset-0 z-100 flex items-center justify-center bg-background"
         >
           <ServiceErrorView
-            title="EzyGo Sync Unavailable"
-            description="Exception: EzyGo servers are having technical issues. Please try again later, contact us if still not resolved."
             onRetry={resetOutage}
             showHome={false}
           />

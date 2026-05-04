@@ -10,7 +10,6 @@ import { z } from "zod";
 import { redis } from "@/lib/redis";
 import { redact, getClientIp, egressFetch } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
-import { validateCsrfToken } from "@/lib/security/csrf";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { TERMS_VERSION } from "@/app/config/legal";
 import { setTermsVersionCookie, clearTermsVersionCookie } from "@/app/actions/user";
@@ -131,20 +130,9 @@ async function releaseAuthLock(userId: string, lockValue: string): Promise<void>
 export const POST = withSecurity(async (req, { decryptedBody }) => {
   const supabaseAdmin = getAdminClient();
 
-  // 1. CSRF Protection
-  // Extract CSRF token from request header
+  // 1. Origin/Host Validation
   const headerList = await headers();
   const isMobileApp = isMobileRequest(headerList);
-
-  if (!isMobileApp) {
-    const csrfToken = headerList.get("x-csrf-token");
-    const csrfValid = await validateCsrfToken(csrfToken);
-    if (!csrfValid) {
-      return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
-    }
-  }
-
-  // 2. Origin/Host Validation
   // Note: Rate limiting is performed later in this handler after client IP extraction.
   // SKIP origin validation in development mode for easier local testing.
   // This is safe in dev because: (1) the CSRF token still validates the request,
@@ -947,4 +935,4 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
       }
     }
   }
-}, { consume: true });
+});

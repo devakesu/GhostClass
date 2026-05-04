@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "../route";
 import { } from "next/server";
 import { isMobileRequest } from "@/lib/security/app-check";
-import { validateCsrfToken } from "@/lib/security/csrf";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -26,10 +25,6 @@ vi.mock("@/lib/security/app-check", async () => {
     withSecurity: vi.fn((handler) => handler),
   };
 });
-
-vi.mock("@/lib/security/csrf", () => ({
-  validateCsrfToken: vi.fn(),
-}));
 
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: {
@@ -89,25 +84,9 @@ describe("POST /api/auth/sync", () => {
     expect(response.data.message).toContain("Too many requests");
   });
 
-  it("returns 403 for invalid CSRF token on web", async () => {
-    vi.mocked(isMobileRequest).mockReturnValue(false);
-    vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true } as any);
-    vi.mocked(validateCsrfToken).mockResolvedValue(false);
-
-    const req = new Request("http://localhost/api/auth/sync", {
-      method: "POST",
-      headers: { "x-csrf-token": "invalid" },
-    });
-    const response: any = await POST(req, {} as any);
-
-    expect(response.status).toBe(403);
-    expect(response.data.message).toBe("Invalid CSRF token");
-  });
-
   it("handles successful web sync", async () => {
     vi.mocked(isMobileRequest).mockReturnValue(false);
     vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true } as any);
-    vi.mocked(validateCsrfToken).mockResolvedValue(true);
 
     const mockSupabase = {
       auth: {

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "buffer";
 import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
-import { validateCsrfToken } from "@/lib/security/csrf";
 import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, UpstreamServerError } from "@/lib/circuit-breaker";
 import { getClientIp } from "@/lib/utils.server";
 import { fetchEzygoData, invalidateEzygoCacheForUser } from "@/lib/ezygo-batch-fetcher";
-import { proxyRateLimiter } from "@/lib/ratelimit";
 
 // Modular proxy imports
 import { 
@@ -43,33 +41,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   const isWrite = method !== "GET" && method !== "HEAD";
   const clientIp = getClientIp(req.headers);
 
-  // 1.5 Rate limiting for proxy traffic (defense in depth against burst abuse)
-  if (clientIp) {
-    const { success, reset, limit, remaining } = await proxyRateLimiter.limit(
-      `backend_proxy:${method}:${clientIp}`,
-    );
-    if (!success) {
-      return NextResponse.json(
-        {
-          message: "Too many requests. Please try again later.",
-          retryAfter: reset,
-        },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
-            "X-RateLimit-Limit": limit.toString(),
-            "X-RateLimit-Remaining": remaining.toString(),
-            "X-RateLimit-Reset": reset.toString(),
-          },
-        },
-      );
-    }
-  } else {
-    logger.warn("[backend-proxy] Unable to determine client IP for rate limiting", { path: fullPath, method });
-  }
-
-  // 2. Origin & Access Validation
+  // 1.5 Origin & Access Validation
   if (!isPublic && !isMobileApp && !IS_PRODUCTION) {
     // Basic development check
   } else if (!isPublic && !isMobileApp && IS_PRODUCTION) {
@@ -97,18 +69,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
     }
   }
 
-  // 2. CSRF Validation
-  // Enforcement: All state-changing requests (isWrite) from browsers require CSRF.
-  // We do NOT exempt login from CSRF because our hardened client (axios instance) 
-  // can self-heal by fetching a token and retrying if the cookie is missing.
-  if (isWrite && !isMobileApp) {
-    const csrfToken = req.headers.get("x-csrf-token");
-    if (!(await validateCsrfToken(csrfToken))) {
-      return NextResponse.json({ message: "Invalid CSRF token" }, { status: 403 });
-    }
-  }
-
-  // 3. Authentication (Self-Healing Fallback)
+  // 2. Authentication (Self-Healing Fallback)
   // Logic: Some paths (like login) are public for Auth but still protected by CSRF.
   const pathLower = fullPath.toLowerCase().replace(/\/$/, "");
   const isAuthPublic = isPublic || pathLower === "login" || pathLower === "auth/login";
@@ -118,7 +79,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
     return NextResponse.json({ message: "No authentication token – please log in again" }, { status: 401 });
   }
 
-  // 4. Request Body Preparation
+  // 3. Request Body Preparation
   let body: BodyInit | undefined;
   let resolvedContentType = "application/json";
   if (isWrite) {
@@ -143,7 +104,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   }
 
   try {
-    // 5. Batch Fetcher Shortcut (GETs or Empty POSTs)
+    // 4. Batch Fetcher Shortcut (GETs or Empty POSTs)
     const isBatchablePost = method === "POST" && (!body || body === "{}");
     const isTest = !!process.env.VITEST;
     if ((method === "GET" || isBatchablePost) && !isPublic && token && !isTest) {
@@ -157,7 +118,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
       } catch (err) { logger.warn(`[backend-proxy] Batch fetcher failed for ${fullPath}, falling back to direct:`, err); }
     }
 
-    // 6. Egress Failover Chain Execution
+    // 5. Egress Failover Chain Execution
     const result = await ezygoCircuitBreaker.execute(async () => {
       const pathSuffix = `${fullPath}${req.nextUrl.search}`;
       const baseHeaders: Record<string, string> = {
@@ -208,7 +169,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
       throw lastError ?? new Error("All egress targets failed");
     });
 
-    // 7. Response Construction & Sanitization
+    // 6. Response Construction & Sanitization
     const { res, text, egressName } = result;
     const sanitizedHeaders = Object.fromEntries(
       Array.from(res.headers.entries())

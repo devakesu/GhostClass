@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // --- Mocks ---
 const mockGetUser = vi.fn();
@@ -8,7 +8,7 @@ const mockMaybeSingle = vi.fn();
 const mockSingle = vi.fn();
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn((url, key, options) => {
+  createServerClient: vi.fn((_url, _key, options) => {
     // Call getAll to cover the branch in proxy.ts
     options.cookies.getAll();
     // Call setAll to cover the branch in proxy.ts
@@ -22,7 +22,7 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 vi.mock("../lib/crypto", () => ({
-  decrypt: vi.fn((iv, token) => "decrypted-token"),
+  decrypt: vi.fn((_iv, _token) => "decrypted-token"),
 }));
 
 vi.mock("../lib/logger", () => ({

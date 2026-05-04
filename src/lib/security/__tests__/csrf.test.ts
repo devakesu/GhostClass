@@ -20,9 +20,23 @@ let mockCookieStore: {
   delete: ReturnType<typeof vi.fn>;
 };
 
+const { mockRedisGet, mockRedisSet, mockRedisDel } = vi.hoisted(() => ({
+  mockRedisGet: vi.fn(),
+  mockRedisSet: vi.fn(),
+  mockRedisDel: vi.fn(),
+}));
+
 // Mock the Next.js cookies module
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => mockCookieStore),
+}));
+
+vi.mock("@/lib/redis", () => ({
+  redis: {
+    get: mockRedisGet,
+    set: mockRedisSet,
+    del: mockRedisDel,
+  },
 }));
 
 // Mock crypto to allow spying on timingSafeEqual
@@ -47,6 +61,9 @@ describe("CSRF Protection", () => {
       set: vi.fn(),
       delete: vi.fn(),
     };
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockResolvedValue("OK");
+    mockRedisDel.mockResolvedValue(1);
   });
 
   afterEach(() => {
@@ -242,6 +259,23 @@ describe("CSRF Protection", () => {
       );
     });
 
+    it("should bind token to current session when session cookie exists", async () => {
+      mockCookieStore.get.mockImplementation((name) => {
+        if (name === "csrf_token") return undefined;
+        if (name === "__Secure-authjs.session-token") return { value: "session-123" } as any;
+        return undefined;
+      });
+
+      const token = await initializeCsrfToken();
+
+      expect(token).toHaveLength(64);
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        `csrf:token:${token}:session`,
+        "session-123",
+        expect.objectContaining({ ex: 86400 })
+      );
+    });
+
     it("should generate valid hex token", async () => {
       mockCookieStore.get.mockReturnValue(undefined);
 
@@ -253,9 +287,15 @@ describe("CSRF Protection", () => {
 
   describe("removeCsrfToken", () => {
     it("should delete the CSRF cookie", async () => {
+      mockCookieStore.get.mockImplementation((name) => {
+        if (name === "csrf_token") return { value: "token-123" } as any;
+        return undefined;
+      });
+
       await removeCsrfToken();
       
       expect(mockCookieStore.delete).toHaveBeenCalledWith("csrf_token");
+      expect(mockRedisDel).toHaveBeenCalledWith("csrf:token:token-123:session");
     });
   });
 
@@ -271,6 +311,22 @@ describe("CSRF Protection", () => {
           name: "csrf_token",
           value: token,
         })
+      );
+    });
+
+    it("should bind regenerated token to current session when available", async () => {
+      mockCookieStore.get.mockImplementation((name) => {
+        if (name === "csrf_token") return { value: "old-token" } as any;
+        if (name === "authjs.session-token") return { value: "session-456" } as any;
+        return undefined;
+      });
+
+      const token = await regenerateCsrfToken();
+
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        `csrf:token:${token}:session`,
+        "session-456",
+        expect.objectContaining({ ex: 86400 })
       );
     });
 

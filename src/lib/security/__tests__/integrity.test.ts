@@ -59,13 +59,14 @@ describe("Play Integrity Security", () => {
     expect(result.error).toBe("Server configuration error");
   });
 
-  it("returns true if config missing in development (fail-open)", async () => {
+  it("returns error if config missing in development", async () => {
     const { verifyPlayIntegrity } = await getSut();
     vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", "");
     vi.stubEnv("NODE_ENV", "development");
     
     const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe("Server configuration error");
   });
 
   it("successfully verifies a valid token", async () => {
@@ -308,7 +309,7 @@ describe("Play Integrity Security", () => {
     expect(result.isValid).toBe(false);
   });
 
-  it("skips checks in development if not production", async () => {
+  it("enforces checks regardless of NODE_ENV when env flags are enabled", async () => {
     const { verifyPlayIntegrity } = await getSut();
     vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
     vi.stubEnv("NODE_ENV", "development");
@@ -326,7 +327,8 @@ describe("Play Integrity Security", () => {
     });
 
     const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe("App not recognized by Play Store");
   });
 
   it("handles exceptions and logs API error details", async () => {

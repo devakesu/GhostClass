@@ -1,11 +1,15 @@
-import { headers as nextHeaders } from "next/headers";
+import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { verifyPlayIntegrity } from "@/lib/security/integrity";
+import { verifyDeviceCheckToken } from "@/lib/security/device-check";
+import { validateCsrfToken } from "@/lib/security/csrf";
 import { decryptRequest, encryptResponse } from "@/lib/security/jwe";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { getClientIp } from "@/lib/utils.server";
+import { redis } from "@/lib/redis";
 
 /**
  * Result of App Check verification
@@ -15,6 +19,13 @@ export interface AppCheckResult {
   error?: string;
   alreadyLogged?: boolean;
   integrity?: any;
+}
+
+/**
+ * Options for App Check verification
+ */
+export interface AppCheckOptions {
+  consume?: boolean; // If true, the token is invalidated after use (Replay Protection)
 }
 
 /**
@@ -41,42 +52,86 @@ export interface AppCheckOptions {
 }
 
 /**
- * Verifies the Firebase App Check token from the request headers.
+ * Authentication result - either CSRF (web) or App Check (mobile)
+ */
+export interface AuthResult {
+  isValid: boolean;
+  error?: string;
+  alreadyLogged?: boolean;
+  integrity?: any;
+  authType: "csrf" | "app-check" | "none"; // 'csrf' for web, 'app-check' for mobile
+  isWebRequest?: boolean;
+  isMobileRequest?: boolean;
+}
+
+/**
+ * Verifies CSRF token with session binding
+ * @param headerList - Request headers
+ * @param sessionId - Session ID from cookie (optional, for additional binding)
+ * @returns CSRF validation result
+ */
+async function verifyCsrfTokenWithSessionBinding(
+  headerList: Headers,
+  sessionId?: string,
+): Promise<{ isValid: boolean; error?: string }> {
+  const csrfToken = headerList.get("x-csrf-token");
+
+  if (!csrfToken) {
+    return { isValid: false, error: "Missing CSRF token" };
+  }
+
+  // Validate CSRF token against httpOnly cookie
+  const isValid = await validateCsrfToken(csrfToken);
+
+  if (!isValid) {
+    logger.warn("CSRF token validation failed");
+    return { isValid: false, error: "Invalid CSRF token" };
+  }
+
+  // Strict session binding: if a session cookie exists, the CSRF token must be
+  // bound to that exact session ID in Redis.
+  if (sessionId) {
+    try {
+      const tokenSessionKey = `csrf:token:${csrfToken}:session`;
+      const boundSession = await redis.get(tokenSessionKey);
+
+      if (!boundSession || boundSession !== sessionId) {
+        logger.warn("CSRF token session binding mismatch", { sessionId });
+        return {
+          isValid: false,
+          error: "CSRF token session mismatch",
+        };
+      }
+    } catch (error) {
+      logger.warn("CSRF session binding check unavailable");
+      return {
+        isValid: false,
+        error: "CSRF session binding unavailable",
+      };
+    }
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Verifies Firebase App Check token and mobile device integrity
+ * Supports both Android (Play Integrity) and iOS (DeviceCheck)
  */
 export async function verifyAppCheckToken(
   req?: Request,
   options: AppCheckOptions = {},
 ): Promise<AppCheckResult> {
-  // If in development and APP_CHECK_DISABLED is set, allow all (for testing)
-  if (
-    process.env.NODE_ENV === "development" &&
-    (process.env.DISABLE_APP_CHECK === "true" ||
-      process.env.ENFORCE_PLAY_INTEGRITY !== "true")
-  ) {
-    // Note: We still allow local testing without full integrity enforcement
-    // but the token presence might still be checked by callers.
-  }
-
   const headerList = req ? req.headers : await nextHeaders();
   const token = headerList.get("X-Firebase-AppCheck");
-  const isMobileApp = isMobileRequest(headerList);
-  const isProd = process.env.NODE_ENV === "production";
 
-  // In production, App Check is mandatory for ALL mobile traffic.
-  // We identify mobile traffic via the x-mobile-api-key (isMobileApp).
-  const isMobileInProd = isMobileApp && isProd;
-  if (isMobileInProd && !token) {
-    logger.warn("App Check verification failed: Absolute requirement for mobile requests, but token is missing");
+  // App Check is mandatory only when the corresponding env flag enables it.
+  if (!token && process.env.ENFORCE_APP_CHECK === "true") {
+    logger.warn("App Check verification failed: Missing token (enforced)");
     return { isValid: false, error: "Missing mandatory App Check token" };
   }
 
-  // Fallback for non-mobile traffic if enforcement is explicitly turned on
-  if (!token && isProd && process.env.ENFORCE_APP_CHECK === "true") {
-    logger.warn("App Check verification failed: Missing token (enforced)");
-    return { isValid: false, error: "Missing App Check token" };
-  }
-
-  // If no token and not mobile/not enforced, proceed
+  // If no token and enforcement is off, proceed
   if (!token) return { isValid: true };
 
   const appCheck = getAppCheck();
@@ -106,38 +161,64 @@ export async function verifyAppCheckToken(
       return { isValid: false, error: "Unauthorized App ID" };
     }
 
-    // 2. Secondary deep attestation for Android (Play Integrity)
-    const playIntegrityToken = headerList.get("X-Play-Integrity");
-    const userAgent = headerList.get("user-agent") || "";
-    const isAndroid = userAgent.toLowerCase().includes("android");
+    // Determine which platform (Android or iOS) based on App ID
+    const isAndroid = decodedToken.appId.includes("android");
+    const isIOS = decodedToken.appId.includes("ios");
 
     let integrity: any = null;
 
-    if (playIntegrityToken) {
-      // The mobile app uses the project number as a static nonce for basic attestation.
-      const expectedNonce = process.env.PLAY_INTEGRITY_PROJECT_NUMBER || "424804867878";
-      const integrityResult = await verifyPlayIntegrity(playIntegrityToken, expectedNonce);
-      integrity = integrityResult.verdict;
-      
-      if (!integrityResult.isValid) {
-        return {
-          isValid: false,
-          error: integrityResult.error || "Device integrity check failed",
-          integrity,
-        };
-      }
-    } else if (isAndroid && isProd) {
-      // MANDATORY for Android mobile requests in production if enforcement is enabled.
-      // We check ENFORCE_PLAY_INTEGRITY as the master switch for mandatory token presence.
-      const shouldEnforceIntegrity = isMobileApp || process.env.ENFORCE_PLAY_INTEGRITY === "true";
-      
-      if (shouldEnforceIntegrity) {
+    // Android: Verify with Play Integrity
+    if (isAndroid) {
+      const playIntegrityToken = headerList.get("X-Play-Integrity");
+      const shouldEnforceIntegrity = process.env.ENFORCE_PLAY_INTEGRITY === "true";
+
+      if (playIntegrityToken) {
+        const expectedNonce = process.env.PLAY_INTEGRITY_PROJECT_NUMBER || "424804867878";
+        const integrityResult = await verifyPlayIntegrity(playIntegrityToken, expectedNonce);
+        integrity = integrityResult.verdict;
+
+        if (!integrityResult.isValid) {
+          return {
+            isValid: false,
+            error: integrityResult.error || "Device integrity check failed",
+            integrity,
+          };
+        }
+      } else if (shouldEnforceIntegrity) {
         logger.warn(
-          "App Check: Missing mandatory Play Integrity token for Android client",
+          "App Check: Android client missing mandatory Play Integrity token (ENFORCE_PLAY_INTEGRITY=true)",
         );
         return {
           isValid: false,
           error: "Missing mandatory integrity attestation",
+        };
+      }
+    }
+
+    // iOS: Verify with DeviceCheck
+    if (isIOS) {
+      const deviceCheckToken = headerList.get("X-Device-Check");
+      const shouldEnforceDeviceCheck = process.env.ENFORCE_DEVICE_CHECK === "true";
+
+      if (deviceCheckToken) {
+        const nonce = headerList.get("X-Device-Check-Nonce");
+        const deviceCheckResult = await verifyDeviceCheckToken(deviceCheckToken, nonce || undefined);
+        integrity = deviceCheckResult.verdict;
+
+        if (!deviceCheckResult.isValid) {
+          return {
+            isValid: false,
+            error: deviceCheckResult.error || "Device integrity check failed",
+            integrity,
+          };
+        }
+      } else if (shouldEnforceDeviceCheck) {
+        logger.warn(
+          "App Check: iOS client missing mandatory DeviceCheck token (ENFORCE_DEVICE_CHECK=true)",
+        );
+        return {
+          isValid: false,
+          error: "Missing mandatory device check",
         };
       }
     }
@@ -153,24 +234,155 @@ export async function verifyAppCheckToken(
 }
 
 /**
+ * Unified authentication verification
+ * Checks for EITHER CSRF token (web) OR App Check token (mobile)
+ * Both must be valid for the request to proceed
+ */
+async function verifyAuthentication(req: Request): Promise<AuthResult> {
+  const headerList = req.headers;
+
+  // Check for App Check token (mobile)
+  const hasAppCheckToken = headerList.has("X-Firebase-AppCheck");
+  const csrfToken = headerList.get("x-csrf-token");
+
+  // If neither token present, reject
+  if (!hasAppCheckToken && !csrfToken) {
+    logger.warn("Authentication failed: Neither App Check nor CSRF token present");
+    return {
+      isValid: false,
+      error: "Unauthenticated request",
+      authType: "none",
+    };
+  }
+
+  // Prioritize App Check (mobile) if both present (defensive)
+  if (hasAppCheckToken) {
+    const appCheckResult = await verifyAppCheckToken(req);
+
+    if (!appCheckResult.isValid) {
+      logger.warn("App Check verification failed", { error: appCheckResult.error });
+      return {
+        isValid: false,
+        error: appCheckResult.error,
+        authType: "app-check",
+        isMobileRequest: true,
+        alreadyLogged: appCheckResult.alreadyLogged,
+      };
+    }
+
+    logger.dev("Mobile request (App Check) authenticated");
+    return {
+      isValid: true,
+      authType: "app-check",
+      isMobileRequest: true,
+      integrity: appCheckResult.integrity,
+    };
+  }
+
+  // Web request: Validate CSRF token with session binding
+  if (csrfToken) {
+    // Try to get session ID from cookies if available
+    const cookieStore = await nextCookies();
+    const sessionCookie = cookieStore.get("__Secure-authjs.session-token") || 
+                          cookieStore.get("authjs.session-token");
+    const sessionId = sessionCookie?.value;
+
+    const csrfResult = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
+
+    if (!csrfResult.isValid) {
+      logger.warn("CSRF token verification failed", { error: csrfResult.error });
+      return {
+        isValid: false,
+        error: csrfResult.error,
+        authType: "csrf",
+        isWebRequest: true,
+      };
+    }
+
+    logger.dev("Web request (CSRF) authenticated");
+    return {
+      isValid: true,
+      authType: "csrf",
+      isWebRequest: true,
+    };
+  }
+
+  // Should not reach here, but failsafe
+  return {
+    isValid: false,
+    error: "Authentication verification failed",
+    authType: "none",
+  };
+}
+
+/**
  * withSecurity (HOF)
  * -----------------
  * Wraps a Next.js API route handler to provide:
- * 1. Global App Check & Integrity enforcement
- * 2. Bi-directional JWE Decryption & Encryption
+ * 1. Unified authentication (CSRF for web, App Check for mobile)
+ * 2. Mobile device integrity (Play Integrity for Android, DeviceCheck for iOS)
+ * 3. Bi-directional JWE Decryption & Encryption (mobile only)
+ * 4. Rate limiting (more restrictive for web to compensate for lack of device attestation)
  */
 export function withSecurity(
   handler: (
     req: Request,
-    context: { params: any; decryptedBody?: any },
+    context: { params: any; decryptedBody?: any; authType?: string },
   ) => Promise<Response>,
-  options: AppCheckOptions = {},
 ) {
   return async (req: Request, context: any) => {
-    // 1. Enforce App Check / Integrity
-    const authResult = await verifyAppCheckToken(req, options);
-    if (!authResult.isValid && process.env.ENFORCE_APP_CHECK === "true") {
-      return NextResponse.json({ error: authResult.error }, { status: 401 });
+    const headerList = req.headers;
+
+    // Get client IP for rate limiting
+    let clientIp: string | null = null;
+    try {
+      const headersList = await nextHeaders();
+      clientIp = getClientIp(headersList);
+    } catch (error) {
+      logger.dev("Could not determine client IP");
+    }
+
+    // 1. Rate limiting - Web requests get stricter limits due to no device attestation
+    try {
+      const isWebRequest = !headerList.has("X-Firebase-AppCheck");
+
+      if (isWebRequest && clientIp) {
+        // Web requests: stricter rate limiting (10 req/min per IP)
+        // This compensates for lack of device attestation by preventing
+        // automated attacks that use CSRF token bypass techniques
+        const { Ratelimit } = await import("@upstash/ratelimit");
+        const webLimiter = new Ratelimit({
+          redis,
+          limiter: Ratelimit.slidingWindow(10, "60 s"),
+          prefix: "@ghostclass/web-api",
+        });
+
+        const rateLimitResult = await webLimiter.limit(`web:${clientIp}`);
+        if (!rateLimitResult.success) {
+          logger.warn("Web request rate limit exceeded", { ip: clientIp });
+          return NextResponse.json(
+            { error: "Rate limit exceeded" },
+            { status: 429, headers: { "Retry-After": "60" } },
+          );
+        }
+      }
+    } catch (error) {
+      logger.dev("Rate limiting unavailable, proceeding without check");
+    }
+
+    // 2. Enforce unified authentication (CSRF or App Check)
+    const authResult = await verifyAuthentication(req);
+
+    if (!authResult.isValid) {
+      logger.warn("Authentication failed", {
+        authType: authResult.authType,
+        error: authResult.error,
+        ip: clientIp,
+      });
+      return NextResponse.json(
+        { error: authResult.error || "Unauthenticated" },
+        { status: 401 },
+      );
     }
 
     let decryptedBody: any = null;
@@ -179,64 +391,90 @@ export function withSecurity(
     const jweKeyHeader = req.headers.get("X-JWE-Key");
 
     try {
-      // 2. Handle JWE Request Decryption
+      // 3. Handle JWE Request Decryption (mobile only)
       // Only process body decryption for mutation methods with content-type 'application/jose'
-      const isMutationMethod = ['POST', 'PUT', 'PATCH'].includes(req.method.toUpperCase());
-      
-      if (contentType.includes("application/jose") && isMutationMethod) {
+      // This is only used for mobile requests
+      const isMutationMethod = ["POST", "PUT", "PATCH"].includes(
+        req.method.toUpperCase(),
+      );
+
+      if (
+        contentType.includes("application/jose") &&
+        isMutationMethod &&
+        authResult.isMobileRequest
+      ) {
         const jwe = await req.text();
-        
+
         // Basic segments check (JWE has 5 parts / 4 dots)
-        if (!jwe || jwe.split('.').length !== 5) {
-          logger.warn(`withSecurity: Received 'application/jose' content-type but body is not a valid JWE structure. (Length: ${jwe?.length})`);
-          return NextResponse.json({ error: "Invalid secure payload structure" }, { status: 400 });
+        if (!jwe || jwe.split(".").length !== 5) {
+          logger.warn(
+            `withSecurity: Received 'application/jose' content-type but body is not a valid JWE structure. (Length: ${jwe?.length})`,
+          );
+          return NextResponse.json(
+            { error: "Invalid secure payload structure" },
+            { status: 400 },
+          );
         }
 
-        const decrypted = await decryptRequest(jwe) as any;
-        
+        const decrypted = (await decryptRequest(jwe)) as any;
+
         // Handle both nested {payload, rcek} and flat {token, ..., rcek} structures
-        if (decrypted && typeof decrypted === 'object' && 'payload' in decrypted) {
+        if (decrypted && typeof decrypted === "object" && "payload" in decrypted) {
           decryptedBody = decrypted.payload;
           responseCek = decrypted.rcek || null;
         } else {
           decryptedBody = decrypted;
-          responseCek = (decrypted && typeof decrypted === 'object') ? decrypted.rcek : null;
+          responseCek =
+            decrypted && typeof decrypted === "object" ? decrypted.rcek : null;
         }
-      } else if (jweKeyHeader) {
+      } else if (jweKeyHeader && authResult.isMobileRequest) {
         // Support for GET requests or requests without bodies:
         // The client sends the JWE-wrapped CEK in a header.
-        const decrypted = await decryptRequest(jweKeyHeader) as any;
+        const decrypted = (await decryptRequest(jweKeyHeader)) as any;
         // For header-only JWE, rcek might be direct or in a payload property
-        if (decrypted && typeof decrypted === 'object' && 'payload' in decrypted) {
+        if (decrypted && typeof decrypted === "object" && "payload" in decrypted) {
           responseCek = decrypted.rcek || null;
         } else {
-          responseCek = (decrypted && typeof decrypted === 'object') ? (decrypted.rcek || decrypted.payload?.rcek || null) : null;
+          responseCek =
+            decrypted && typeof decrypted === "object"
+              ? decrypted.rcek || decrypted.payload?.rcek || null
+              : null;
         }
       }
     } catch (error) {
       logger.error("withSecurity: JWE Decryption error:", error);
-      return NextResponse.json({ error: "Security Handshake Failed" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { error: "Security Handshake Failed" },
+        {
+          status: 400,
+        },
+      );
     }
 
-    // 3. Execute the handler
-    const response = await handler(req, { ...context, decryptedBody });
+    // 4. Execute the handler
+    const response = await handler(req, {
+      ...context,
+      decryptedBody,
+      authType: authResult.authType,
+    });
 
     // SAFETY CHECK: Ensure we actually have a response object
     if (!response) {
-       console.error("SECURITY HOF DEBUG: Crash - Handler returned no response");
-      return NextResponse.json({ error: "Internal security error" }, { status: 500 });
+      console.error("SECURITY HOF DEBUG: Crash - Handler returned no response");
+      return NextResponse.json(
+        { error: "Internal security error" },
+        { status: 500 },
+      );
     }
 
-    // 4. Handle JWE Response Encryption
-    if (responseCek && response.ok) {
+    // 5. Handle JWE Response Encryption (mobile only)
+    if (responseCek && response.ok && authResult.isMobileRequest) {
       try {
         // Only attempt to encrypt if the client provided a response CEK
         // and the handler returned a successful response.
         let responseData: any;
         const responseText = await response.text();
-        
+
         try {
           responseData = JSON.parse(responseText);
         } catch {
@@ -245,10 +483,7 @@ export function withSecurity(
           responseData = responseText;
         }
 
-        const encryptedResponse = await encryptResponse(
-          responseData,
-          responseCek,
-        );
+        const encryptedResponse = await encryptResponse(responseData, responseCek);
 
         const newHeaders = new Headers(response.headers);
         newHeaders.set("Content-Type", "application/jose");
@@ -260,9 +495,12 @@ export function withSecurity(
       } catch (error) {
         logger.error("withSecurity: Response encryption failure:", error);
         // Fallback to error if encryption fails
-        return NextResponse.json({ error: "Secure Transmission Failed" }, {
-          status: 500,
-        });
+        return NextResponse.json(
+          { error: "Secure Transmission Failed" },
+          {
+            status: 500,
+          },
+        );
       }
     }
 
