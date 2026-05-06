@@ -9,9 +9,11 @@ import React from "react";
 
 // Mock next/dynamic so the dynamic import resolves synchronously in tests.
 vi.mock("next/dynamic", () => ({
-  default: (_loader: unknown, options?: { loading?: () => React.ReactElement }) => {
-    // Return the loading component immediately so the rendered output is
-    // testable without async resolution of the actual LoginForm module.
+  default: (loader: unknown, options?: { loading?: () => React.ReactElement }) => {
+    // Execute the loader to cover the dynamic import logic in the host component.
+    if (typeof loader === "function") {
+      loader();
+    }
     const LoadingFallback = options?.loading ?? (() => React.createElement("div", null, "loading"));
     return LoadingFallback;
   },

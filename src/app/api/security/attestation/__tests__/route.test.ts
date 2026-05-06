@@ -40,6 +40,7 @@ describe('GET /api/security/attestation', () => {
   });
 
   it('verifies App Check and Play Integrity tokens when provided', async () => {
+    const authorizedAppId = "1:424804867878:android:015bb34927f1dd8e21abe7";
     const req = {
       headers: {
         get: vi.fn().mockImplementation((name) => {
@@ -51,7 +52,7 @@ describe('GET /api/security/attestation', () => {
     } as any;
 
     const mockAppCheck = {
-      verifyToken: vi.fn().mockResolvedValue({ appId: 'test-app-id' }),
+      verifyToken: vi.fn().mockResolvedValue({ appId: authorizedAppId }),
     };
     vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
 
@@ -63,7 +64,7 @@ describe('GET /api/security/attestation', () => {
     const response = await GET(req) as any;
 
     expect(response.data.verified).toBe(true);
-    expect(response.data.appId).toBe('test-app-id');
+    expect(response.data.appId).toBe(authorizedAppId);
     expect(response.data.playIntegrityVerified).toBe(true);
     expect(response.data.details).toEqual({ healthy: true });
   });
@@ -90,14 +91,21 @@ describe('GET /api/security/attestation', () => {
   });
 
   it('handles Play Integrity verification failure', async () => {
+    const authorizedAppId = "1:424804867878:android:015bb34927f1dd8e21abe7";
     const req = {
       headers: {
         get: vi.fn().mockImplementation((name) => {
+          if (name === 'X-Firebase-AppCheck') return 'ac-token';
           if (name === 'X-Play-Integrity') return 'invalid-pi-token';
           return null;
         }),
       },
     } as any;
+
+    const mockAppCheck = {
+      verifyToken: vi.fn().mockResolvedValue({ appId: authorizedAppId }),
+    };
+    vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
 
     vi.mocked(verifyPlayIntegrity).mockResolvedValue({
       isValid: false,

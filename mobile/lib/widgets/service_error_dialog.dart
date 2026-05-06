@@ -222,7 +222,14 @@ class ServiceErrorDialog extends StatelessWidget {
                           if (isDismissible) Navigator.of(context).pop();
                           onRetry!();
                         },
-                        icon: const Icon(LucideIcons.refreshCcw, size: 18),
+                        icon: Icon(
+                          // Use an 'x' icon for exit flows (label contains "Exit"),
+                          // otherwise keep the restart/refresh icon.
+                          (retryLabel?.toLowerCase().contains('exit') ?? false)
+                              ? LucideIcons.x
+                              : LucideIcons.refreshCcw,
+                          size: 18,
+                        ),
                         label: Text(
                           retryLabel ?? 'Try Again',
                           style: GoogleFonts.manrope(

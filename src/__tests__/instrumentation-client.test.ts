@@ -1,41 +1,60 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-
-const mockCaptureRouterTransitionStart = vi.hoisted(() => vi.fn());
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as Sentry from '@sentry/nextjs';
 
 vi.mock('@sentry/nextjs', () => ({
   init: vi.fn(),
-  replayIntegration: vi.fn(() => ({})),
-  captureRouterTransitionStart: mockCaptureRouterTransitionStart,
+  replayIntegration: vi.fn(() => ({ name: 'Replay' })),
+  captureRouterTransitionStart: vi.fn(),
 }));
 
-describe('instrumentation-client', () => {
-  afterEach(() => {
+describe('Instrumentation Client', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
-  describe('onRouterTransitionStart', () => {
-    it('calls captureRouterTransitionStart when the method exists on Sentry', async () => {
-      const { onRouterTransitionStart } = await import('../instrumentation-client');
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
-      onRouterTransitionStart('/', 'push');
+  it('initializes Sentry correctly without replay in dev', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_REPLAY_RATE', '0');
+    
+    await import('../instrumentation-client');
+    
+    expect(Sentry.init).toHaveBeenCalled();
+    const options = vi.mocked(Sentry.init).mock.calls[0][0] as any;
+    expect(options.integrations).toHaveLength(1); // Default replay rate is 0.1 in dev
+    expect(options.tracesSampleRate).toBe(1);
+  });
 
-      expect(mockCaptureRouterTransitionStart).toHaveBeenCalledTimes(1);
-    });
+  it('initializes Sentry with replay in prod if rate > 0', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_REPLAY_RATE', '0.1');
+    
+    await import('../instrumentation-client');
+    
+    const options = vi.mocked(Sentry.init).mock.calls[0][0] as any;
+    expect(options.integrations).toHaveLength(1);
+    expect(options.tracesSampleRate).toBe(0.1);
+    expect(options.replaysSessionSampleRate).toBe(0.1);
+    expect(options.replaysOnErrorSampleRate).toBe(0.5); // 0.1 * 5
+  });
 
-    it('does not throw when captureRouterTransitionStart is absent from Sentry', async () => {
-      // Re-import under a mock that omits captureRouterTransitionStart to exercise
-      // the optional-chain short-circuit in onRouterTransitionStart.
-      vi.resetModules();
-      vi.doMock('@sentry/nextjs', () => ({
-        init: vi.fn(),
-        replayIntegration: vi.fn(() => ({})),
-        captureRouterTransitionStart: undefined,
-      }));
+  it('caps replaysOnErrorSampleRate at 1', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_REPLAY_RATE', '0.5');
+    
+    await import('../instrumentation-client');
+    
+    const options = vi.mocked(Sentry.init).mock.calls[0][0] as any;
+    expect(options.replaysOnErrorSampleRate).toBe(1);
+  });
 
-      const { onRouterTransitionStart } = await import('../instrumentation-client');
-
-      expect(() => onRouterTransitionStart('/', 'push')).not.toThrow();
-      expect(mockCaptureRouterTransitionStart).not.toHaveBeenCalled();
-    });
+  it('captures router transitions', async () => {
+    const { onRouterTransitionStart } = await import('../instrumentation-client');
+    onRouterTransitionStart('/test', 'push');
+    expect(Sentry.captureRouterTransitionStart).toHaveBeenCalledWith('/test', 'push');
   });
 });

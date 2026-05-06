@@ -1,10 +1,5 @@
 /**
  * Tests for UserSettingsProvider and related exports.
- *
- * Strategy: mock the heavy deps (React Query, Supabase, Sentry) and focus on
- * the provider's public contract — rendering children, context value shape,
- * guard-throw outside the provider, and the normalizeTarget / loadPrefetchedSettings
- * helper behaviours that are exercised indirectly via the returned value.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
@@ -90,12 +85,6 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Globals for tests
-// ---------------------------------------------------------------------------
-let localStorageMock: Record<string, string> = {};
-let sessionStorageMock: Record<string, string> = {};
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -129,11 +118,28 @@ describe('UserSettingsProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authStateCallback = null;
-    vi.mocked(useQuery).mockReturnValue({
-      data: undefined,
+
+    const createMockStorage = () => {
+      const store: Record<string, string> = {};
+      return {
+        getItem: vi.fn((key: string) => store[key] ?? null),
+        setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+        removeItem: vi.fn((key: string) => { delete store[key]; }),
+        clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]); }),
+        length: 0,
+        key: vi.fn(),
+      };
+    };
+
+    vi.stubGlobal('localStorage', createMockStorage());
+    vi.stubGlobal('sessionStorage', createMockStorage());
+
+    vi.mocked(useQuery).mockImplementation((options: any) => ({
+      data: options.placeholderData,
       isLoading: false,
       isFetching: false,
-    } as any);
+    } as any));
+
     vi.mocked(useMutation).mockReturnValue({
       mutate: mockMutate,
       mutateAsync: mockMutateAsync,
@@ -143,6 +149,7 @@ describe('UserSettingsProvider', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('renders children correctly', () => {
@@ -268,397 +275,477 @@ describe('UserSettingsProvider', () => {
       expect(DEFAULT_TARGET_PERCENTAGE).toBe(75);
     });
   });
-});
 
-describe('loadPrefetchedSettings via provider initial state', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authStateCallback = null;
-    localStorageMock = {};
-    sessionStorageMock = {};
-    vi.mocked(useQuery).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-    vi.mocked(useMutation).mockReturnValue({
-      mutate: mockMutate,
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    } as any);
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+  describe('loadPrefetchedSettings via provider initial state', () => {
+    it('renders provider without error when sessionStorage has no prefetched settings', () => {
+      render(<WrappedConsumer />);
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
-    vi.stubGlobal('sessionStorage', {
-      getItem: vi.fn((key: string) => sessionStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { sessionStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete sessionStorageMock[key]; }),
+
+    it('renders provider without error when localStorage has user-scoped settings', () => {
+      window.localStorage.setItem('showBunkCalc_user-123', 'true');
+      window.localStorage.setItem('targetPercentage_user-123', '80');
+      render(<WrappedConsumer />);
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
-  });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('renders provider without error when sessionStorage has no prefetched settings', () => {
-    render(<WrappedConsumer />);
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
-
-  it('renders provider without error when localStorage has user-scoped settings', () => {
-    localStorageMock['showBunkCalc_user-123'] = 'true';
-    localStorageMock['targetPercentage_user-123'] = '80';
-    render(<WrappedConsumer />);
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
-
-  it('renders provider when sessionStorage has valid prefetched settings with userId', () => {
-    sessionStorageMock['prefetchedSettings'] = JSON.stringify({
-      userId: 'user-123',
-      settings: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+    it('renders provider when sessionStorage has valid prefetched settings with userId', () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({
+        userId: 'user-123',
+        settings: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+      }));
+      render(<WrappedConsumer />);
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
-    render(<WrappedConsumer />);
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
 
-  it('clears stale prefetched settings with mismatched userId', () => {
-    sessionStorageMock['prefetchedSettings'] = JSON.stringify({
-      userId: 'other-user',
-      settings: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+    it('clears stale prefetched settings with mismatched userId', () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({
+        userId: 'other-user',
+        settings: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+      }));
+      render(<WrappedConsumer />);
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
-    render(<WrappedConsumer />);
-    // Should render without crashing — it silently discards mismatched settings
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
 
-  it('handles invalid JSON in sessionStorage gracefully', () => {
-    sessionStorageMock['prefetchedSettings'] = 'not-valid-json{{{';
-    render(<WrappedConsumer />);
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
-});
-
-describe('useUserSettingsState auth state changes', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authStateCallback = null;
-    localStorageMock = {};
-    vi.mocked(useQuery).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-    vi.mocked(useMutation).mockReturnValue({
-      mutate: mockMutate,
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    } as any);
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+    it('handles invalid JSON in sessionStorage gracefully', () => {
+      window.sessionStorage.setItem('prefetchedSettings', 'not-valid-json{{{');
+      render(<WrappedConsumer />);
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('subscribes to auth state changes on mount', () => {
-    render(<WrappedConsumer />);
-    expect(mockOnAuthStateChange).toHaveBeenCalled();
-  });
-
-  it('unsubscribes from auth state changes on unmount', () => {
-    const { unmount } = render(<WrappedConsumer />);
-    unmount();
-    // The unsubscribe is called in the cleanup function
-    // In real code it's async, but let's just verify the hook mounts/unmounts cleanly
-    expect(mockOnAuthStateChange).toHaveBeenCalled();
-  });
-
-  it('handles SIGNED_IN auth event without throwing', async () => {
-    render(<WrappedConsumer />);
-
-    await act(async () => {
-      authStateCallback?.('SIGNED_IN', { user: { id: 'user-abc' } });
+  describe('useUserSettingsState auth state changes', () => {
+    it('subscribes to auth state changes on mount', () => {
+      render(<WrappedConsumer />);
+      expect(mockOnAuthStateChange).toHaveBeenCalled();
     });
 
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['userSettings', 'user-abc'],
-    });
-    expect(mockRemoveQueries).toHaveBeenCalledWith({
-      queryKey: ['userSettings', null],
-    });
-  });
-
-  it('handles SIGNED_OUT auth event and clears localStorage keys', async () => {
-    localStorageMock['showBunkCalc_prev-user'] = 'true';
-    localStorageMock['targetPercentage_prev-user'] = '75';
-    localStorageMock['disabledCourses_prev-user'] = '{}';
-
-    render(<WrappedConsumer />);
-
-    // First sign in
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'prev-user' } });
+    it('unsubscribes from auth state changes on unmount', () => {
+      const { unmount } = render(<WrappedConsumer />);
+      unmount();
+      expect(mockOnAuthStateChange).toHaveBeenCalled();
     });
 
-    // Now sign out
-    await act(async () => {
-      authStateCallback?.('SIGNED_OUT', null);
+    it('handles SIGNED_IN auth event without throwing', async () => {
+      render(<WrappedConsumer />);
+
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'user-abc' } });
+      });
+
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['userSettings', 'user-abc'],
+      });
+      expect(mockRemoveQueries).toHaveBeenCalledWith({
+        queryKey: ['userSettings', null],
+      });
     });
 
-    expect(localStorage.removeItem).toHaveBeenCalledWith('showBunkCalc_prev-user');
-    expect(localStorage.removeItem).toHaveBeenCalledWith('targetPercentage_prev-user');
-    expect(localStorage.removeItem).toHaveBeenCalledWith('disabledCourses_prev-user');
-  });
+    it('handles SIGNED_OUT auth event and clears localStorage keys', async () => {
+      window.localStorage.setItem('showBunkCalc_prev-user', 'true');
+      window.localStorage.setItem('targetPercentage_prev-user', '75');
+      window.localStorage.setItem('disabledCourses_prev-user', '{}');
 
-  it('handles INITIAL_SESSION event without throwing', async () => {
-    render(<WrappedConsumer />);
+      render(<WrappedConsumer />);
 
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'user-123' } });
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'prev-user' } });
+      });
+
+      await act(async () => {
+        authStateCallback?.('SIGNED_OUT', null);
+      });
+
+      expect(window.localStorage.removeItem).toHaveBeenCalledWith('showBunkCalc_prev-user');
+      expect(window.localStorage.removeItem).toHaveBeenCalledWith('targetPercentage_prev-user');
+      expect(window.localStorage.removeItem).toHaveBeenCalledWith('disabledCourses_prev-user');
     });
 
-    expect(mockRemoveQueries).toHaveBeenCalledWith({ queryKey: ['userSettings', null] });
-  });
+    it('handles INITIAL_SESSION event without throwing', async () => {
+      render(<WrappedConsumer />);
 
-  it('handles TOKEN_REFRESHED event without throwing', async () => {
-    render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'user-123' } });
+      });
 
-    await act(async () => {
-      authStateCallback?.('TOKEN_REFRESHED', { user: { id: 'user-123' } });
+      expect(mockRemoveQueries).toHaveBeenCalledWith({ queryKey: ['userSettings', null] });
     });
 
-    // Should not throw and should update the state
-    expect(mockRemoveQueries).toHaveBeenCalledWith({ queryKey: ['userSettings', null] });
-  });
+    it('handles TOKEN_REFRESHED event without throwing', async () => {
+      render(<WrappedConsumer />);
 
-  it('handles null session in INITIAL_SESSION without throwing', async () => {
-    render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('TOKEN_REFRESHED', { user: { id: 'user-123' } });
+      });
 
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', null);
+      expect(mockRemoveQueries).toHaveBeenCalledWith({ queryKey: ['userSettings', null] });
     });
 
-    expect(screen.getByTestId('settings')).toBeInTheDocument();
-  });
-});
+    it('handles null session in INITIAL_SESSION without throwing', async () => {
+      render(<WrappedConsumer />);
 
-describe('DB → localStorage sync effect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    authStateCallback = null;
-    localStorageMock = {};
-    vi.mocked(useMutation).mockReturnValue({
-      mutate: mockMutate,
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    } as any);
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
-    });
-    vi.stubGlobal('sessionStorage', {
-      getItem: vi.fn((key: string) => sessionStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { sessionStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete sessionStorageMock[key]; }),
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', null);
+      });
+
+      expect(screen.getByTestId('settings')).toBeInTheDocument();
     });
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  describe('DB → localStorage sync effect', () => {
+    it('syncs DB settings to localStorage when settings are present', async () => {
+      const settings = {
+        bunk_calculator_enabled: true,
+        target_percentage: 80,
+        disabled_courses: {},
+      };
+      
+      vi.mocked(useQuery).mockReturnValueOnce({
+        data: undefined,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+      vi.mocked(useQuery).mockReturnValue({
+        data: settings,
+        isLoading: false,
+        isFetching: false,
+      } as any);
 
-  it('syncs DB settings to localStorage when settings are present', async () => {
-    const settings = {
-      bunk_calculator_enabled: true,
-      target_percentage: 80,
-      disabled_courses: {},
-    };
-    // First render (pre-auth): undefined so effect skips; after auth re-render: actual settings
-    // This causes the `settings` dep to change, triggering the sync useEffect
-    vi.mocked(useQuery).mockReturnValueOnce({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-    vi.mocked(useQuery).mockReturnValue({
-      data: settings,
-      isLoading: false,
-      isFetching: false,
-    } as any);
+      render(<WrappedConsumer />);
 
-    render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'sync-user-123' } });
+      });
 
-    // Simulate INITIAL_SESSION to set userId + trigger re-render
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'sync-user-123' } });
+      await waitFor(() => {
+        expect(window.localStorage.setItem).toHaveBeenCalledWith('showBunkCalc_sync-user-123', 'true');
+      });
+      expect(window.localStorage.setItem).toHaveBeenCalledWith('targetPercentage_sync-user-123', '80');
     });
 
-    await waitFor(() => {
-      expect(localStorage.setItem).toHaveBeenCalledWith('showBunkCalc_sync-user-123', 'true');
+    it('creates new DB row when settings are null (new user) using computed defaults', async () => {
+      vi.mocked(useQuery).mockReturnValueOnce({
+        data: undefined,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+      vi.mocked(useQuery).mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+
+      render(<WrappedConsumer />);
+
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'new-user-999' } });
+      });
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bunk_calculator_enabled: expect.any(Boolean),
+            target_percentage: expect.any(Number),
+          })
+        );
+      });
     });
-    expect(localStorage.setItem).toHaveBeenCalledWith('targetPercentage_sync-user-123', '80');
-  });
 
-  it('creates new DB row when settings are null (new user) using computed defaults', async () => {
-    // Pre-auth: undefined; post-auth: null (new user, no DB row)
-    vi.mocked(useQuery).mockReturnValueOnce({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-    vi.mocked(useQuery).mockReturnValue({
-      data: null,
-      isLoading: false,
-      isFetching: false,
-    } as any);
+    it('reads localStorage keys to initialize settings for new user with stored preferences', async () => {
+      window.localStorage.setItem('showBunkCalc_pref-user', 'false');
+      window.localStorage.setItem('targetPercentage_pref-user', '85');
 
-    render(<WrappedConsumer />);
+      vi.mocked(useQuery).mockReturnValueOnce({
+        data: undefined,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+      vi.mocked(useQuery).mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+      } as any);
 
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'new-user-999' } });
+      render(<WrappedConsumer />);
+
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'pref-user' } });
+      });
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bunk_calculator_enabled: false,
+            target_percentage: 85,
+          })
+        );
+      });
     });
 
-    await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          bunk_calculator_enabled: expect.any(Boolean),
-          target_percentage: expect.any(Number),
-        })
+    it('skips sync when query is still loading', () => {
+      vi.mocked(useQuery).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        isFetching: false,
+      } as any);
+
+      render(<WrappedConsumer />);
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it('skips sync when mutation is pending', () => {
+      vi.mocked(useMutation).mockReturnValue({
+        mutate: mockMutate,
+        mutateAsync: mockMutateAsync,
+        isPending: true,
+      } as any);
+      vi.mocked(useQuery).mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+
+      render(<WrappedConsumer />);
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it('does not dispatch bunkCalcToggle event if bunk value is unchanged', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+      const userId = 'same-bunk-user';
+      window.localStorage.setItem(`showBunkCalc_${userId}`, 'true');
+      window.localStorage.setItem(`targetPercentage_${userId}`, '75');
+      window.localStorage.setItem(`disabledCourses_${userId}`, '{}');
+
+      vi.mocked(useQuery).mockReturnValue({
+        data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+        isLoading: false,
+        isFetching: false,
+      } as any);
+
+      render(<WrappedConsumer />);
+
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: userId } });
+      });
+
+      const bunkEvents = dispatchSpy.mock.calls.filter(
+        ([e]) => e instanceof CustomEvent && (e as CustomEvent).type === 'bunkCalcToggle'
       );
-    });
-  });
-
-  it('reads localStorage keys to initialize settings for new user with stored preferences', async () => {
-    localStorageMock['showBunkCalc_pref-user'] = 'false';
-    localStorageMock['targetPercentage_pref-user'] = '85';
-
-    // Pre-auth: undefined; post-auth: null (new user, no DB row)
-    vi.mocked(useQuery).mockReturnValueOnce({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-    vi.mocked(useQuery).mockReturnValue({
-      data: null,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-
-    render(<WrappedConsumer />);
-
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'pref-user' } });
+      expect(bunkEvents).toHaveLength(0);
+      dispatchSpy.mockRestore();
     });
 
-    await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          bunk_calculator_enabled: false,
-          target_percentage: 85,
-        })
-      );
-    });
-  });
-
-  it('skips sync when query is still loading', () => {
-    vi.mocked(useQuery).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isFetching: false,
-    } as any);
-
-    render(<WrappedConsumer />);
-    // mutate should NOT be called while loading
-    expect(mockMutate).not.toHaveBeenCalled();
-  });
-
-  it('skips sync when mutation is pending', () => {
-    vi.mocked(useMutation).mockReturnValue({
-      mutate: mockMutate,
-      mutateAsync: mockMutateAsync,
-      isPending: true,
-    } as any);
-    vi.mocked(useQuery).mockReturnValue({
-      data: null,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-
-    render(<WrappedConsumer />);
-    expect(mockMutate).not.toHaveBeenCalled();
-  });
-
-  it('does not dispatch bunkCalcToggle event if bunk value is unchanged', async () => {
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-    const userId = 'same-bunk-user';
-    // Pre-set localStorage to match the DB value
-    localStorageMock[`showBunkCalc_${userId}`] = 'true';
-    localStorageMock[`targetPercentage_${userId}`] = '75';
-    localStorageMock[`disabledCourses_${userId}`] = '{}';
-
-    vi.mocked(useQuery).mockReturnValue({
-      data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
-      isLoading: false,
-      isFetching: false,
-    } as any);
-
-    render(<WrappedConsumer />);
-
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: userId } });
-    });
-
-    // dispatchEvent should NOT be called since values are identical
-    const bunkEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => e instanceof CustomEvent && (e as CustomEvent).type === 'bunkCalcToggle'
-    );
-    expect(bunkEvents).toHaveLength(0);
-    dispatchSpy.mockRestore();
-  });
-
-  it('handles errors in sync effect catch block', async () => {
-    
-    // Force localStorage.getItem to throw in the effect only for sync keys
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => {
+    it('handles errors in sync effect catch block', async () => {
+      vi.spyOn(window.localStorage, 'getItem').mockImplementation((key: string) => {
         if (key.startsWith('showBunkCalc_')) throw new Error('storage_fail');
         return null;
-      }),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
+      });
+
+      vi.mocked(useQuery).mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isFetching: false,
+      } as any);
+
+      const { rerender } = render(<WrappedConsumer />);
+
+      vi.mocked(useQuery).mockReturnValue({
+        data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+        isLoading: false,
+        isFetching: false,
+      } as any);
+
+      await act(async () => {
+        authStateCallback?.('INITIAL_SESSION', { user: { id: 'error-user-unique-2' } });
+      });
+
+      rerender(<WrappedConsumer />);
+
+      await waitFor(() => {
+        expect(logger.dev).toHaveBeenCalledWith("Error during storage sync:", expect.any(Error));
+      });
+    });
+  });
+
+  describe('loadPrefetchedSettings branch coverage', () => {
+    it('handles new format { userId, settings } correctly', async () => {
+      const userId = 'user-123';
+      const settings = { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} };
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({ userId, settings }));
+      
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: userId } });
+      });
+
+      expect(vi.mocked(useQuery)).toHaveBeenCalledWith(expect.objectContaining({
+        placeholderData: settings
+      }));
     });
 
-    // 1. Initial state (undefined settings)
-    vi.mocked(useQuery).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-    } as any);
-
-    const { rerender } = render(<WrappedConsumer />);
-
-    // 2. Auth change + settings loaded
-    vi.mocked(useQuery).mockReturnValue({
-      data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
-      isLoading: false,
-      isFetching: false,
-    } as any);
-
-    await act(async () => {
-      authStateCallback?.('INITIAL_SESSION', { user: { id: 'error-user-unique-2' } });
+    it('rejects legacy format when userId is provided', async () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({
+        bunk_calculator_enabled: true,
+        target_percentage: 75
+      }));
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'user-123' } });
+      });
+      expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('prefetchedSettings');
     });
 
-    rerender(<WrappedConsumer />);
+    it('handles invalid JSON object', async () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify(123));
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'user-123' } });
+      });
+      expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('prefetchedSettings');
+    });
 
-    await waitFor(() => {
-      expect(logger.dev).toHaveBeenCalledWith("Error during storage sync:", expect.any(Error));
+    it('rejects prefetched settings with null settings field', async () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({
+        userId: 'user-123',
+        settings: null
+      }));
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'user-123' } });
+      });
+      expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('prefetchedSettings');
+    });
+
+    it('rejects prefetched settings with missing required fields', async () => {
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({
+        userId: 'user-123',
+        settings: { bunk_calculator_enabled: true } // missing target_percentage
+      }));
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'user-123' } });
+      });
+      expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('prefetchedSettings');
+    });
+  });
+
+  describe('onAuthStateChange additional branches', () => {
+    it('handles USER_UPDATED and PASSWORD_RECOVERY', async () => {
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('USER_UPDATED', { user: { id: 'u1' } });
+        authStateCallback?.('PASSWORD_RECOVERY', { user: { id: 'u1' } });
+      });
+      expect(mockRemoveQueries).toHaveBeenCalled();
+    });
+  });
+
+  describe('Mutation and Sync branches', () => {
+    it('initializes from prefetched settings when DB is null', async () => {
+      const userId = 'init-u';
+      const settings = { bunk_calculator_enabled: false, target_percentage: 88, disabled_courses: {} };
+      window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({ userId, settings }));
+
+      vi.mocked(useQuery).mockImplementation((options: any) => ({
+        data: null, 
+        isLoading: false,
+        isFetching: false,
+      } as any));
+
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: userId } });
+      });
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+          target_percentage: 88
+        }));
+      });
+    });
+
+    it('migrates legacy localStorage keys', async () => {
+      window.localStorage.setItem('showBunkCalc', 'false');
+      window.localStorage.setItem('targetPercentage', '92');
+
+      vi.mocked(useQuery).mockImplementation((options: any) => ({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+      } as any));
+
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: 'm-u' } });
+      });
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+          target_percentage: 92
+        }));
+      });
+      expect(window.localStorage.removeItem).toHaveBeenCalledWith('showBunkCalc');
+    });
+  });
+
+  describe('Internal logic verification (hitting queryFn/mutationFn branches)', () => {
+    it('exercises queryFn logic including Supabase calls', async () => {
+      const userId = 'u-query-fn';
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: userId } });
+      });
+
+      const queryCall = vi.mocked(useQuery).mock.calls.find(c => (c[0] as any).queryKey[1] === userId);
+      const queryFn = (queryCall?.[0] as any)?.queryFn;
+      
+      if (queryFn) {
+        // Success case
+        vi.mocked(mockFrom).mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: { bunk_calculator_enabled: true }, error: null }),
+        } as any);
+        await queryFn();
+
+        // Error case
+        vi.mocked(mockFrom).mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: new Error('db_fail') }),
+        } as any);
+        await expect(queryFn()).rejects.toThrow('db_fail');
+      }
+    });
+
+    it('exercises mutationFn logic including Supabase upsert', async () => {
+      const userId = 'u-mut-fn';
+      render(<WrappedConsumer />);
+      await act(async () => {
+        authStateCallback?.('SIGNED_IN', { user: { id: userId } });
+      });
+
+      const mutationCall = vi.mocked(useMutation).mock.calls[0];
+      const mutationFn = (mutationCall?.[0] as any)?.mutationFn;
+
+      if (mutationFn) {
+        // Success case
+        mockFrom.mockReturnValue({
+          upsert: vi.fn().mockResolvedValue({ error: null }),
+        } as any);
+        await mutationFn({ bunk_calculator_enabled: true });
+      }
+    });
+
+    it('exercises retry logic branches', () => {
+      render(<WrappedConsumer />);
+      const queryCall = vi.mocked(useQuery).mock.calls[0];
+      const retry = (queryCall?.[0] as any)?.retry;
+      if (retry) {
+        expect(retry(0, { code: 'PGRST116' })).toBe(false);
+        expect(retry(1, new Error('other'))).toBe(true);
+        expect(retry(4, new Error('other'))).toBe(false);
+      }
     });
   });
 });

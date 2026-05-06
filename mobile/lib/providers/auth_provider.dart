@@ -445,8 +445,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
   Future<void> logout({bool force = false}) async {
     final storage = ref.read(secureStorageProvider);
-    // Reset security failure state on logout to ensure a clean slate for next login
-    ref.read(securityFailureProvider.notifier).setFailure(null);
+    // Reset security failure state on normal logout so the next login starts clean.
+    if (!force) {
+      ref.read(securityFailureProvider.notifier).clearFailure();
+    }
+    ref.read(apiServiceProvider).clearCaches();
     
     state = const AsyncValue.data(null);
     try {

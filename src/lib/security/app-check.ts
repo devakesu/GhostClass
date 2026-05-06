@@ -19,6 +19,7 @@ export interface AppCheckResult {
   error?: string;
   reason?: string;
   action?: string;
+  criticalRisk?: boolean;
   alreadyLogged?: boolean;
   integrity?: any;
 }
@@ -54,6 +55,7 @@ export interface AuthResult {
   error?: string;
   reason?: string;
   action?: string;
+  criticalRisk?: boolean;
   alreadyLogged?: boolean;
   integrity?: any;
   authType: "csrf" | "app-check" | "none"; // 'csrf' for web, 'app-check' for mobile
@@ -129,7 +131,8 @@ export async function verifyAppCheckToken(
       isValid: false, 
       error: "Missing mandatory App Check token",
       reason: "Device verification was skipped or blocked by a firewall.",
-      action: "Please ensure your internet connection is stable and you are not using a VPN or custom DNS."
+      action: "Please ensure your internet connection is stable and you are not using a VPN or custom DNS.",
+      criticalRisk: false,
     };
   }
 
@@ -165,7 +168,8 @@ export async function verifyAppCheckToken(
         isValid: false, 
         error: "Unauthorized App ID",
         reason: "The application signature does not match our security records.",
-        action: "Please reinstall the official GhostClass app from the Google Play Store or Apple App Store."
+        action: "Please reinstall the official GhostClass app from the Google Play Store or Apple App Store.",
+        criticalRisk: true,
       };
     }
 
@@ -190,6 +194,7 @@ export async function verifyAppCheckToken(
             error: integrityResult.error || "Device integrity check failed",
             reason: integrityResult.reason || "Android Play Integrity check failed (Device may be compromised or uncertified).",
             action: integrityResult.action || "Please ensure your device is not rooted and you are using the official version of the app.",
+            criticalRisk: integrityResult.criticalRisk ?? false,
             integrity,
           };
         }
@@ -201,7 +206,8 @@ export async function verifyAppCheckToken(
           isValid: false,
           error: "Missing mandatory integrity attestation",
           reason: "Play Integrity token was not provided by the Android system.",
-          action: "Please ensure your device is not rooted and is running a certified version of Android."
+          action: "Please ensure your device is not rooted and is running a certified version of Android.",
+          criticalRisk: false,
         };
       }
     }
@@ -222,6 +228,7 @@ export async function verifyAppCheckToken(
             error: deviceCheckResult.error || "Device integrity check failed",
             reason: "iOS DeviceCheck verification failed (Device integrity cannot be guaranteed).",
             action: "Please ensure your device is not jailbroken and is using an official iOS release.",
+            criticalRisk: false,
             integrity,
           };
         }
@@ -233,7 +240,8 @@ export async function verifyAppCheckToken(
           isValid: false,
           error: "Missing mandatory device check",
           reason: "DeviceCheck token was not provided by the iOS system.",
-          action: "Please ensure your device is not jailbroken and is using an official iOS release."
+          action: "Please ensure your device is not jailbroken and is using an official iOS release.",
+          criticalRisk: false,
         };
       }
     }
@@ -248,7 +256,8 @@ export async function verifyAppCheckToken(
       isValid: false, 
       error: "Invalid App Check token",
       reason: "The security token provided by your device has expired or is invalid.",
-      action: "Please restart the app. If the issue persists after repeated attempts, please contact support."
+      action: "Please restart the app. If the issue persists after repeated attempts, please contact support.",
+      criticalRisk: false,
     };
   }
 }
@@ -424,17 +433,16 @@ export function withSecurity(
         error: authResult.error,
         ip: clientIp,
       });
-      
-      const appCheckRes = authResult as any;
       const status = authResult.authType === "csrf" ? 403 : 401;
       
       return NextResponse.json(
         { 
           error: authResult.error || "Unauthenticated",
           message: authResult.error || "Unauthenticated",
-          reason: appCheckRes.reason || "The security handshake failed or timed out.",
-          action: appCheckRes.action || "Please try again in a few moments.",
-          type: "security"
+          reason: authResult.reason || "The security handshake failed or timed out.",
+          action: authResult.action || "Please try again in a few moments.",
+          criticalRisk: authResult.criticalRisk ?? false,
+          type: "security",
         },
         { status },
       );

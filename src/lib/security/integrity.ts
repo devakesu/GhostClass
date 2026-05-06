@@ -47,7 +47,18 @@ export interface IntegrityResult {
   error?: string;
   reason?: string;
   action?: string;
+  criticalRisk?: boolean;
   verdict?: any;
+}
+
+function failureResult(
+  error: string,
+  reason: string,
+  action: string,
+  verdict: any,
+  criticalRisk = false,
+): IntegrityResult {
+  return { isValid: false, error, reason, action, criticalRisk, verdict };
 }
 
 /**
@@ -67,7 +78,8 @@ export async function verifyPlayIntegrity(
       isValid: false, 
       error: "Server configuration error",
       reason: "The server is missing necessary security credentials to verify Android devices.",
-      action: "Please report this issue to GhostClass support."
+      action: "Please report this issue to GhostClass support.",
+      criticalRisk: false,
     };
   }
 
@@ -103,12 +115,12 @@ export async function verifyPlayIntegrity(
 
     const verdict = response.data.tokenPayloadExternal;
     if (!verdict) {
-      return { 
-        isValid: false, 
-        error: "Empty integrity verdict",
-        reason: "The Play Integrity system returned an empty or malformed result.",
-        action: "Please check your internet connection and try again."
-      };
+      return failureResult(
+        "Empty integrity verdict",
+        "The Play Integrity system returned an empty or malformed result.",
+        "Please check your internet connection and try again.",
+        verdict,
+      );
     }
 
     const { appIntegrity, deviceIntegrity, accountIntegrity } = verdict;
@@ -125,25 +137,24 @@ export async function verifyPlayIntegrity(
     // A. App Recognition Verdict
     if (enforceRecognized && appIntegrity?.appRecognitionVerdict !== "PLAY_RECOGNIZED") {
       logger.error(`Play Integrity Failure: appRecognitionVerdict is ${appIntegrity?.appRecognitionVerdict} (Enforced)`);
-      return { 
-        isValid: false, 
-        error: "App not recognized by Play Store",
-        reason: "The app was not installed via the official Google Play Store.",
-        action: "Please uninstall this version and reinstall GhostClass from the official Play Store.",
-        verdict 
-      };
+      return failureResult(
+        "App not recognized by Play Store",
+        "The app was not installed via the official Google Play Store.",
+        "Please uninstall this version and reinstall GhostClass from the official Play Store.",
+        verdict,
+        true,
+      );
     }
 
     // B. App Licensing Verdict
     if (enforceLicensed && accountIntegrity?.appLicensingVerdict !== "LICENSED") {
       logger.error(`Play Integrity Failure: appLicensingVerdict is ${accountIntegrity?.appLicensingVerdict} (Enforced)`);
-      return { 
-        isValid: false, 
-        error: "App not licensed for this user",
-        reason: "The Google account on this device does not own this application.",
-        action: "Please ensure you are signed into the Play Store with the account used to download the app.",
-        verdict 
-      };
+      return failureResult(
+        "App not licensed for this user",
+        "The Google account on this device does not own this application.",
+        "Please ensure you are signed into the Play Store with the account used to download the app.",
+        verdict,
+      );
     }
 
     // C. Certificate Digest Check
@@ -155,13 +166,13 @@ export async function verifyPlayIntegrity(
 
       if (!hasAuthorizedCert) {
         logger.error(`Play Integrity Failure: Unauthorized certificate. Got: ${certs.join(", ")} (Enforced)`);
-        return { 
-          isValid: false, 
-          error: "App signing certificate mismatch",
-          reason: "The application's digital signature does not match the official GhostClass release.",
-          action: "This is a critical security risk. Please reinstall the app immediately from the Play Store.",
-          verdict 
-        };
+        return failureResult(
+          "App signing certificate mismatch",
+          "The application's digital signature does not match the official GhostClass release.",
+          "This is a critical security risk. Please reinstall the app immediately from the Play Store.",
+          verdict,
+          true,
+        );
       }
     }
 
@@ -170,35 +181,32 @@ export async function verifyPlayIntegrity(
     
     if (enforceBasic && !deviceVerdicts.includes("MEETS_BASIC_INTEGRITY")) {
       logger.error(`Play Integrity Failure: Device does not meet BASIC_INTEGRITY: ${deviceVerdicts.join(", ")} (Enforced)`);
-      return { 
-        isValid: false, 
-        error: "Device failed basic integrity check",
-        reason: "Your device failed basic system integrity checks. This often indicates a custom ROM or severe system modifications.",
-        action: "GhostClass cannot run on this device configuration. Please use a certified Android device. If this issue persists, please contact support.",
-        verdict 
-      };
+      return failureResult(
+        "Device failed basic integrity check",
+        "Your device failed basic system integrity checks. This often indicates a custom ROM or severe system modifications.",
+        "GhostClass cannot run on this device configuration. Please use a certified Android device. If this issue persists, please contact support.",
+        verdict,
+      );
     }
 
     if (enforceDevice && !deviceVerdicts.includes("MEETS_DEVICE_INTEGRITY")) {
       logger.error(`Play Integrity Failure: Device does not meet DEVICE_INTEGRITY: ${deviceVerdicts.join(", ")} (Enforced)`);
-      return { 
-        isValid: false, 
-        error: "Device failed verified device check",
-        reason: "Your device failed the verified device check. This usually means the device is rooted or has an unlocked bootloader.",
-        action: "Please disable root access and lock your bootloader to use GhostClass. If this issue persists, please contact support.",
-        verdict 
-      };
+      return failureResult(
+        "Device failed verified device check",
+        "Your device failed the verified device check. This usually means the device is rooted or has an unlocked bootloader.",
+        "Please disable root access and lock your bootloader to use GhostClass. If this issue persists, please contact support.",
+        verdict,
+      );
     }
 
     if (enforceStrong && !deviceVerdicts.includes("MEETS_STRONG_INTEGRITY")) {
       logger.error(`Play Integrity Failure: Device does not meet STRONG_INTEGRITY: ${deviceVerdicts.join(", ")} (Enforced)`);
-      return { 
-        isValid: false, 
-        error: "Device failed hardware-backed integrity check",
-        reason: "Your device does not meet strong, hardware-backed integrity requirements.",
-        action: "GhostClass requires a secure device with a working Trusted Execution Environment (TEE). If this issue persists, please contact support.",
-        verdict 
-      };
+      return failureResult(
+        "Device failed hardware-backed integrity check",
+        "Your device does not meet strong, hardware-backed integrity requirements.",
+        "GhostClass requires a secure device with a working Trusted Execution Environment (TEE). If this issue persists, please contact support.",
+        verdict,
+      );
     }
     
     // D. Nonce verification (Replay Protection)
@@ -206,34 +214,31 @@ export async function verifyPlayIntegrity(
     
     if (expectedNonce) {
       if (receivedNonce !== expectedNonce) {
-        return { 
-          isValid: false, 
-          error: "Integrity handshake replay detected",
-          reason: "The security handshake nonce did not match the expected value.",
-          action: "Please restart the app and try again.",
-          verdict 
-        };
+        return failureResult(
+          "Integrity handshake replay detected",
+          "The security handshake nonce did not match the expected value.",
+          "Please restart the app and try again.",
+          verdict,
+        );
       }
     } else if (receivedNonce) {
       // If no explicit expectedNonce, validate the signed nonce statelessly
       const isNonceValid = validateSignedNonce(receivedNonce);
       if (!isNonceValid) {
-        return {
-          isValid: false,
-          error: "Integrity handshake invalid or expired",
-          reason: "The security handshake token is malformed, expired, or was not issued by our server.",
-          action: "Please restart the app and try again.",
-          verdict
-        };
+        return failureResult(
+          "Integrity handshake invalid or expired",
+          "The security handshake token is malformed, expired, or was not issued by our server.",
+          "Please restart the app and try again.",
+          verdict,
+        );
       }
     } else if (process.env.ENFORCE_PLAY_INTEGRITY_NONCE === "true") {
-       return {
-          isValid: false,
-          error: "Missing integrity nonce",
-          reason: "The security handshake did not include a required cryptographic nonce.",
-          action: "Please restart the app and try again.",
-          verdict
-       };
+       return failureResult(
+          "Missing integrity nonce",
+          "The security handshake did not include a required cryptographic nonce.",
+          "Please restart the app and try again.",
+          verdict,
+       );
     }
 
     return { isValid: true, verdict };
