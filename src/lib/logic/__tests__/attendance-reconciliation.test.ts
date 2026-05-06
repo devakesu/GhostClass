@@ -1,258 +1,267 @@
-import { describe, it, expect } from "vitest";
-import { getReconciledStats, isLegacyRemark, isPositive, isAbsent, getOfficialSessionRaw } from "../attendance-reconciliation";
-import { ATTENDANCE_STATUS } from "../attendance-reconciliation";
+import { describe, it, expect } from 'vitest';
+import { 
+  isLegacyRemark, 
+  isPositive, 
+  isAbsent, 
+  getOfficialSessionRaw, 
+  getReconciledStats,
+  ATTENDANCE_STATUS
+} from '../attendance-reconciliation';
+import { TrackAttendance } from '@/types';
 
-describe("Attendance Reconciliation Logic", () => {
-  describe("isLegacyRemark", () => {
-    it("returns true for empty or placeholder remarks", () => {
-      expect(isLegacyRemark("")).toBe(true);
+describe('attendance-reconciliation logic', () => {
+  describe('isLegacyRemark', () => {
+    it('returns true for null/undefined/empty', () => {
       expect(isLegacyRemark(null)).toBe(true);
-      expect(isLegacyRemark("Duty Leave")).toBe(true);
-      expect(isLegacyRemark("Self-Marked: Present")).toBe(true);
+      expect(isLegacyRemark(undefined)).toBe(true);
+      expect(isLegacyRemark('')).toBe(true);
     });
 
-    it("returns false for custom remarks", () => {
-      expect(isLegacyRemark("Participated in Tech Fest")).toBe(false);
+    it('returns true for placeholders', () => {
+      expect(isLegacyRemark('Duty Leave')).toBe(true);
+      expect(isLegacyRemark('Self-Marked: Present')).toBe(true);
+      expect(isLegacyRemark('Self-Marked: Something')).toBe(true);
+    });
+
+    it('returns false for real remarks', () => {
+      expect(isLegacyRemark('Participated in hackathon')).toBe(false);
     });
   });
 
-  describe("Status Checks", () => {
-    it("identifies positive status (Present or DL)", () => {
+  describe('isPositive and isAbsent', () => {
+    it('identifies positive statuses', () => {
       expect(isPositive(ATTENDANCE_STATUS.PRESENT)).toBe(true);
       expect(isPositive(ATTENDANCE_STATUS.DUTY_LEAVE)).toBe(true);
       expect(isPositive(ATTENDANCE_STATUS.ABSENT)).toBe(false);
     });
 
-    it("identifies absent status", () => {
+    it('identifies absent status', () => {
       expect(isAbsent(ATTENDANCE_STATUS.ABSENT)).toBe(true);
-      expect(isAbsent(0)).toBe(false);
+      expect(isAbsent(ATTENDANCE_STATUS.PRESENT)).toBe(false);
     });
   });
 
-  describe("getReconciledStats", () => {
-    const courseId = "course-123";
-    const defaultAggregate = { present: 10, absent: 2, total: 12 };
+  describe('getOfficialSessionRaw', () => {
+    it('returns session if present', () => {
+      expect(getOfficialSessionRaw({ session: 'S1' }, 'K1')).toBe('S1');
+    });
 
-    it("uses aggregate fallback when sessions are missing", () => {
-      const stats = getReconciledStats(courseId, defaultAggregate, undefined, undefined);
+    it('returns sessionKey as fallback', () => {
+      expect(getOfficialSessionRaw(null, 'K1')).toBe('K1');
+      expect(getOfficialSessionRaw({ session: '' }, 'K1')).toBe('K1');
+    });
+  });
+
+  describe('getReconciledStats', () => {
+    const courseId = 'CS101';
+    const officialAggregate = { present: 10, absent: 2, total: 12 };
+
+    it('uses fallback when officialSessions is empty', () => {
+      const sessions: any[] = [];
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, []);
       expect(stats.realPresent).toBe(10);
       expect(stats.realTotal).toBe(12);
-      expect(stats.officialPercentage).toBe(83.33);
+      expect(stats.finalPercentage).toBe(83.33);
     });
 
-    it("reconciles corrections (Official Absent -> Tracker Present)", () => {
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.ABSENT }
-      ];
-      const tracking = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, status: "normal" }
+    it('calculates stats correctly from official sessions', () => {
+      const sessions: any[] = [
+        { course: 'CS101', date: '2023-01-01', session: 1, attendance: 110 },
+        { course: 'CS101', date: '2023-01-01', session: 2, attendance: 111 },
+        { course: 'CS101', date: '2023-01-01', session: 3, attendance: 225 }, // DL
+        { course: 'OTHER', date: '2023-01-01', session: 4, attendance: 110 }, // Other course
+        { course: 'CS101', date: '2023-01-01', session: 5, attendance: 110, class_type: 'Revision' }, // Revision
       ];
 
-      const stats = getReconciledStats(courseId, { present: 0, absent: 1, total: 1 }, sessions, tracking as any);
-      
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, []);
+      expect(stats.realPresent).toBe(2); // 110 and 225
+      expect(stats.realTotal).toBe(3);   // 110, 111, 225
+      expect(stats.realDL).toBe(1);
+    });
+
+    it('reconciles tracker data (corrections)', () => {
+      const sessions: any[] = [
+        { course: 'CS101', date: '2023-01-01', session: 1, attendance: 111 }, // Official Absent
+      ];
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 110, // Marked as Present in tracker
+          status: 'sync',
+          created_at: '',
+          user_id: ''
+        } as any,
+      ];
+
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
       expect(stats.realPresent).toBe(0);
       expect(stats.correctionPresent).toBe(1);
-      expect(stats.finalPresent).toBe(1);
       expect(stats.savedAbsent).toBe(1);
+      expect(stats.finalPresent).toBe(1);
     });
 
-    it("handles extra DL sessions", () => {
-      const courseId = "course-123";
-      const tracking = [
-        { course: courseId, date: "2024-01-02", session: 1, attendance: ATTENDANCE_STATUS.DUTY_LEAVE, status: "extra" }
+    it('reconciles tracker data (extras present)', () => {
+      const sessions: any[] = [];
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 110, 
+          status: 'extra', // Truly extra
+          created_at: '',
+          user_id: ''
+        } as any,
       ];
-      // No sessions, so it's extra
-      const stats = getReconciledStats(courseId, { present: 0, absent: 0, total: 0 }, [], tracking as any);
-      expect(stats.extraDL).toBe(1);
+
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      expect(stats.realPresent).toBe(10); // From fallback
       expect(stats.extraPresent).toBe(1);
       expect(stats.extrasCount).toBe(1);
+      expect(stats.finalTotal).toBe(13);
+      expect(stats.finalPresent).toBe(11);
     });
 
-    it("ignores official present sessions in reconciliation loop", () => {
-      const courseId = "course-123";
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT }
+    it('reconciles tracker data (extras absent)', () => {
+      const sessions: any[] = [];
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 111, // Absent
+          status: 'extra', 
+          created_at: '',
+          user_id: ''
+        } as any,
       ];
-      const tracking = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.ABSENT, status: "normal" }
-      ];
-      const stats = getReconciledStats(courseId, { present: 1, absent: 0, total: 1 }, sessions, tracking as any);
-      expect(stats.correctionPresent).toBe(0);
-      expect(stats.finalPresent).toBe(1);
+
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      expect(stats.extraAbsent).toBe(1);
+      expect(stats.extrasCount).toBe(1);
+      expect(stats.finalTotal).toBe(13);
+      expect(stats.finalPresent).toBe(10); // From fallback
     });
 
-    it("handles correction DL sessions", () => {
-      const courseId = "course-123";
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.ABSENT }
+    it('handles OTHER_LEAVE and extraDL', () => {
+      const sessions: any[] = [
+        { course: 'CS101', date: '2023-01-01', session: 1, attendance: 112 }, // OTHER_LEAVE
       ];
-      const tracking = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.DUTY_LEAVE, status: "normal" }
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-02', 
+          session: 1, 
+          attendance: 225, // DL
+          status: 'extra',
+          created_at: '',
+          user_id: ''
+        } as any,
+        { 
+          id: 't2', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 'INVALID', // Should be ignored
+          status: 'sync',
+          created_at: '',
+          user_id: ''
+        } as any,
       ];
-      const stats = getReconciledStats(courseId, { present: 0, absent: 1, total: 1 }, sessions, tracking as any);
+
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      expect(stats.realOther).toBe(1);
+      expect(stats.extraDL).toBe(1);
+      expect(stats.extraPresent).toBe(1); // DL is positive
+    });
+
+    it('handles correctionDL', () => {
+      const sessions: any[] = [
+        { course: 'CS101', date: '2023-01-01', session: 1, attendance: 111 }, // Official Absent
+      ];
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 225, // DL correction
+          status: 'sync',
+          created_at: '',
+          user_id: ''
+        } as any,
+      ];
+
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
       expect(stats.correctionDL).toBe(1);
       expect(stats.correctionPresent).toBe(1);
     });
 
-    it("handles missing official session data gracefully", () => {
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT }
+    it('handles offPos return and offPos false/trackPos false', () => {
+      const sessions: any[] = [
+        { course: 'CS101', date: '2023-01-01', session: 1, attendance: 110 }, // Official Present
+        { course: 'CS101', date: '2023-01-01', session: 2, attendance: 111 }, // Official Absent
       ];
-      const tracking = [
-        { course: courseId, date: "2024-01-02", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, status: "extra" }
-      ];
-
-      const stats = getReconciledStats(courseId, { present: 1, absent: 0, total: 1 }, sessions, tracking as any);
-      
-      expect(stats.realTotal).toBe(1);
-      expect(stats.extrasCount).toBe(1);
-      expect(stats.extraPresent).toBe(1);
-      expect(stats.finalTotal).toBe(2);
-      expect(stats.finalPresent).toBe(2);
-    });
-
-    it("ignores 'Revision' sessions", () => {
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, class_type: "Revision" }
-      ];
-      const stats = getReconciledStats(courseId, { present: 1, absent: 0, total: 1 }, sessions, undefined);
-      expect(stats.realTotal).toBe(0);
-    });
-
-    it("ignores tracking data for other courses", () => {
-      const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.ABSENT }
-      ];
-      const tracking = [
-        { course: "other-course", date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, status: "normal" }
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 111, // Ignored because offPos is true
+          status: 'sync',
+          created_at: '',
+          user_id: ''
+        } as any,
+        { 
+          id: 't2', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 2, 
+          attendance: 111, // Both absent
+          status: 'sync',
+          created_at: '',
+          user_id: ''
+        } as any,
       ];
 
-      const stats = getReconciledStats(courseId, { present: 0, absent: 1, total: 1 }, sessions, tracking as any);
-      expect(stats.correctionPresent).toBe(0);
-      expect(stats.finalPresent).toBe(0);
-    });
-
-    it("handles extra absent sessions correctly", () => {
-      const tracking = [
-        { course: courseId, date: "2024-01-02", session: 1, attendance: ATTENDANCE_STATUS.ABSENT, status: "extra" }
-      ];
-
-      const stats = getReconciledStats(courseId, { present: 0, absent: 0, total: 0 }, undefined, tracking as any);
-      
-      expect(stats.extrasCount).toBe(1);
-      expect(stats.extraAbsent).toBe(1);
-      expect(stats.extraPresent).toBe(0);
-      expect(stats.finalTotal).toBe(1);
-      expect(stats.finalPresent).toBe(0);
-    });
-
-    it("handles non-finite attendance code in tracking", () => {
-      const tracking = [
-        { course: courseId, date: "2024-01-02", session: 1, attendance: "not-a-number", status: "extra" }
-      ];
-      const stats = getReconciledStats(courseId, { present: 0, absent: 0, total: 0 }, undefined, tracking as any);
-      expect(stats.extrasCount).toBe(0); // Should skip non-finite
-    });
-
-    it("handles branch where officialStatus is undefined in else if", () => {
-      // Line 163: else if (officialStatus !== undefined)
-      // We want isTrulyExtra=false AND officialStatus=undefined
-      const tracking = [
-        { course: courseId, date: "2024-01-02", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, status: "normal" }
-      ];
-      // officialSessions empty -> officialStatus undefined
-      // status: "normal" -> isTrulyExtra false
-      const stats = getReconciledStats(courseId, { present: 0, absent: 0, total: 0 }, [], tracking as any);
-      expect(stats.extrasCount).toBe(0);
-    });
-
-    it("hits correction else branches", () => {
-       const sessions = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT }
-      ];
-      const tracking = [
-        { course: courseId, date: "2024-01-01", session: 1, attendance: ATTENDANCE_STATUS.PRESENT, status: "normal" }
-      ];
-      // offPos=true, trackPos=true -> hits 'if (offPos) return' at line 165
-      const stats = getReconciledStats(courseId, { present: 1, absent: 0, total: 1 }, sessions, tracking as any);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
       expect(stats.correctionPresent).toBe(0);
     });
-  });
 
-  describe("getOfficialSessionRaw", () => {
-    it("returns session if provided and valid", () => {
-      expect(getOfficialSessionRaw({ session: 123 }, "key")).toBe(123);
-      expect(getOfficialSessionRaw({ session: "s1" }, "key")).toBe("s1");
+    it('handles zero totals for percentages', () => {
+      const stats = getReconciledStats(courseId, { present: 0, absent: 0, total: 0 }, [], []);
+      expect(stats.officialPercentage).toBe(0);
+      expect(stats.finalPercentage).toBe(0);
     });
 
-    it("returns sessionKey if session is missing, null, or empty", () => {
-      expect(getOfficialSessionRaw(null, "key")).toBe("key");
-      expect(getOfficialSessionRaw(undefined, "key")).toBe("key");
-      expect(getOfficialSessionRaw({ session: null }, "key")).toBe("key");
-      expect(getOfficialSessionRaw({ session: "" }, "key")).toBe("key");
-    });
+    it('handles undefined trackingData and missing official for sync status', () => {
+      // 1. undefined trackingData
+      const stats1 = getReconciledStats(courseId, officialAggregate, [], undefined);
+      expect(stats1.finalPresent).toBe(10);
 
-    it("should ignore Revision classes and classes from other courses", () => {
-      const sessions = [
-        { course: "target", date: "2023-01-01", session: 1, attendance: 110 },
-        { course: "target", date: "2023-01-01", session: 2, attendance: 110, class_type: "Revision" },
-        { course: "other", date: "2023-01-01", session: 1, attendance: 110 }
+      // 2. sync status but no official record (implicit else of else if)
+      const tracking: TrackAttendance[] = [
+        { 
+          id: 't1', 
+          course: 'CS101', 
+          date: '2023-01-01', 
+          session: 1, 
+          attendance: 110, 
+          status: 'sync', // NOT extra, but no official record
+          created_at: '',
+          user_id: ''
+        } as any,
       ];
-      const stats = getReconciledStats("target", { present: 0, absent: 0, total: 0 }, sessions, []);
-      expect(stats.realTotal).toBe(1);
-    });
-
-    it("should track Duty Leave and Other Leave in real stats", () => {
-      const sessions = [
-        { course: "target", date: "2023-01-01", session: 1, attendance: 225 }, // DL
-        { course: "target", date: "2023-01-01", session: 2, attendance: 112 }  // Other
-      ];
-      const stats = getReconciledStats("target", { present: 0, absent: 0, total: 0 }, sessions, []);
-      expect(stats.realDL).toBe(1);
-      expect(stats.realOther).toBe(1);
-      expect(stats.realPresent).toBe(1); // DL is positive
-    });
-
-    it("should handle tracker corrections for absent official sessions", () => {
-        const sessions = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 111 } // Absent
-        ];
-        const tracks = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 110 } // Tracker Present
-        ];
-        const stats = getReconciledStats("target", { present: 0, absent: 1, total: 1 }, sessions, tracks as any);
-        expect(stats.correctionPresent).toBe(1);
-        expect(stats.savedAbsent).toBe(1);
-        expect(stats.finalPresent).toBe(1);
-    });
-
-    it("should handle tracker DL correction for absent official sessions", () => {
-        const sessions = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 111 } // Absent
-        ];
-        const tracks = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 225 } // Tracker DL
-        ];
-        const stats = getReconciledStats("target", { present: 0, absent: 1, total: 1 }, sessions, tracks as any);
-        expect(stats.correctionPresent).toBe(1);
-        expect(stats.correctionDL).toBe(1);
-    });
-
-    it("should identify Self-Marked legacy remarks", () => {
-        expect(isLegacyRemark("Self-Marked: Anything")).toBe(true);
-        expect(isLegacyRemark("Normal remark")).toBe(false);
-    });
-
-    it("should handle tracker ABSENT for official ABSENT sessions", () => {
-        const sessions = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 111 } // Absent
-        ];
-        const tracks = [
-            { course: "target", date: "2023-01-01", session: 1, attendance: 111 } // Tracker Absent
-        ];
-        const stats = getReconciledStats("target", { present: 0, absent: 1, total: 1 }, sessions, tracks as any);
-        expect(stats.correctionPresent).toBe(0);
-        expect(stats.finalPresent).toBe(0);
+      const stats2 = getReconciledStats(courseId, officialAggregate, [], tracking);
+      expect(stats2.correctionPresent).toBe(0);
+      expect(stats2.extraPresent).toBe(0);
     });
   });
 });

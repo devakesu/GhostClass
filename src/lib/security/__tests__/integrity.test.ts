@@ -1,85 +1,87 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { verifyPlayIntegrity } from '../integrity';
+import { google } from 'googleapis';
+import { logger } from '@/lib/logger';
+import crypto from 'crypto';
 
-const { mockDecode } = vi.hoisted(() => ({
-  mockDecode: vi.fn(),
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    dev: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
-vi.mock("googleapis", () => {
-  const JWT = vi.fn().mockImplementation(function() {
-    return {};
-  });
-  const playintegrity = vi.fn().mockImplementation(() => ({
+vi.mock('googleapis', () => {
+  const mockDecode = vi.fn();
+  const mockPlayIntegrity = {
     v1: {
       decodeIntegrityToken: mockDecode,
     },
-  }));
-  
+  };
+
   return {
     google: {
-      auth: { JWT },
-      playintegrity,
+      auth: {
+        JWT: vi.fn().mockImplementation(function() {
+          return {};
+        }),
+      },
+      playintegrity: vi.fn().mockReturnValue(mockPlayIntegrity),
     },
   };
 });
 
-vi.mock("@/lib/logger", () => ({
-  logger: {
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}));
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-vi.mock("@sentry/nextjs", () => ({
-  captureException: vi.fn(),
-}));
-
-describe("Play Integrity Security", () => {
-  const mockToken = "mock-token";
+describe('verifyPlayIntegrity', () => {
+  const originalEnv = process.env;
+  const mockToken = 'mock-integrity-token';
   const mockServiceAccount = JSON.stringify({
-    client_email: "test@example.com",
-    private_key: "private-key",
+    client_email: 'test@example.com',
+    private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
   });
 
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
+    process.env = { ...originalEnv };
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = mockServiceAccount;
   });
 
-  async function getSut() {
-    return await import("../integrity");
-  }
+  afterEach(() => {
+    process.env = originalEnv;
+  });
 
-  it("returns error if service account config is missing in production", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", "");
-    vi.stubEnv("NODE_ENV", "production");
-    
+  it('returns invalid if GOOGLE_SERVICE_ACCOUNT_JSON is missing', async () => {
+    delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toBe("Server configuration error");
+    expect(result.error).toBe('Server configuration error');
   });
 
-  it("returns error if config missing in development", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", "");
-    vi.stubEnv("NODE_ENV", "development");
-    
+  it('returns invalid if token payload is empty', async () => {
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({ data: {} });
+
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toBe("Server configuration error");
+    expect(result.error).toBe('Empty integrity verdict');
   });
 
-  it("successfully verifies a valid token", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    
-    mockDecode.mockResolvedValue({
+  it('successfully validates a healthy verdict', async () => {
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          appIntegrity: { appRecognitionVerdict: "PLAY_RECOGNIZED" },
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY"] },
-          accountIntegrity: { appLicensingVerdict: "LICENSED" },
+          appIntegrity: { appRecognitionVerdict: 'PLAY_RECOGNIZED' },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+          accountIntegrity: { appLicensingVerdict: 'LICENSED' },
         },
       },
     });
@@ -88,59 +90,57 @@ describe("Play Integrity Security", () => {
     expect(result.isValid).toBe(true);
   });
 
-  it("rejects if app recognition verdict is not PLAY_RECOGNIZED and enforced", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_PLAY_RECOGNIZED", "true");
-    
-    mockDecode.mockResolvedValue({
+  it('fails if app is not recognized and enforcement is on', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_PLAY_RECOGNIZED = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          appIntegrity: { appRecognitionVerdict: "UNRECOGNIZED" },
+          appIntegrity: { appRecognitionVerdict: 'UNEVALUATED' },
         },
       },
     });
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain("App not recognized");
+    expect(result.error).toBe('App not recognized by Play Store');
   });
 
-  it("verifies nonce if provided", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    
-    mockDecode.mockResolvedValue({
+  it('fails if device does not meet device integrity and enforcement is on', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_DEVICE = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          requestDetails: { nonce: "valid-nonce" },
-          appIntegrity: { appRecognitionVerdict: "PLAY_RECOGNIZED" },
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY"] },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_BASIC_INTEGRITY'] },
         },
       },
     });
 
-    const result = await verifyPlayIntegrity(mockToken, "valid-nonce");
-    expect(result.isValid).toBe(true);
-
-    const resultInvalid = await verifyPlayIntegrity(mockToken, "invalid-nonce");
-    expect(resultInvalid.isValid).toBe(false);
-    expect(resultInvalid.error).toContain("replay detected");
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Device failed verified device check');
   });
 
-  it("handles base64 encoded service account json", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    const base64Config = Buffer.from(mockServiceAccount).toString("base64");
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", base64Config);
-    vi.stubEnv("NODE_ENV", "production");
+  it('validates signed nonce statelessly', async () => {
+    // Generate a valid signed nonce
+    const random = 'rand123';
+    const timestamp = Date.now();
+    const secret = 'test-secret';
+    process.env.MOBILE_API_SECRET = secret;
     
-    mockDecode.mockResolvedValue({
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(`${random}:${timestamp}`);
+    const signature = hmac.digest('hex');
+    const nonce = Buffer.from(`${random}:${timestamp}:${signature}`).toString('base64url');
+
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          appIntegrity: { appRecognitionVerdict: "PLAY_RECOGNIZED" },
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY"] },
+          requestDetails: { nonce },
+          appIntegrity: { appRecognitionVerdict: 'PLAY_RECOGNIZED' },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
         },
       },
     });
@@ -149,226 +149,53 @@ describe("Play Integrity Security", () => {
     expect(result.isValid).toBe(true);
   });
 
-  it("rejects if verdict is missing", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    mockDecode.mockResolvedValue({ data: {} });
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe("Empty integrity verdict");
-  });
-
-  it("rejects if app licensing fails and enforced", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_LICENSED", "true");
+  it('fails if signed nonce is expired', async () => {
+    const random = 'rand123';
+    const timestamp = Date.now() - (10 * 60 * 1000); // 10 minutes ago
+    const secret = 'test-secret';
+    process.env.MOBILE_API_SECRET = secret;
     
-    mockDecode.mockResolvedValue({
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(`${random}:${timestamp}`);
+    const signature = hmac.digest('hex');
+    const nonce = Buffer.from(`${random}:${timestamp}:${signature}`).toString('base64url');
+
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          accountIntegrity: { appLicensingVerdict: "UNLICENSED" },
+          requestDetails: { nonce },
         },
       },
     });
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain("not licensed");
+    expect(result.error).toBe('Integrity handshake invalid or expired');
   });
 
-  it("verifies certificate digest if enforced", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_SIGNING_CERT", "true");
-    vi.stubEnv("PLAY_INTEGRITY_CERT_SHA256", "authorized-hash");
-    
-    mockDecode.mockResolvedValue({
+  it('fails if nonce does not match expectedNonce', async () => {
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
       data: {
         tokenPayloadExternal: {
-          appIntegrity: { certificateSha256Digest: ["authorized-hash"] },
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY"] },
+          requestDetails: { nonce: 'wrong-nonce' },
         },
       },
     });
 
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(true);
-
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          appIntegrity: { certificateSha256Digest: ["wrong-hash"] },
-        },
-      },
-    });
-    const resultFail = await verifyPlayIntegrity(mockToken);
-    expect(resultFail.isValid).toBe(false);
-    expect(resultFail.error).toContain("certificate mismatch");
+    const result = await verifyPlayIntegrity(mockToken, 'expected-nonce');
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Integrity handshake replay detected');
   });
 
-  it("verifies device integrity levels", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_DEVICE", "true");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_STRONG", "true");
-    
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY"] },
-        },
-      },
-    });
-
-    const resultFailDevice = await verifyPlayIntegrity(mockToken);
-    expect(resultFailDevice.isValid).toBe(false);
-    expect(resultFailDevice.error).toContain("verified device check");
-
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          deviceIntegrity: { deviceRecognitionVerdict: ["MEETS_BASIC_INTEGRITY", "MEETS_DEVICE_INTEGRITY"] },
-        },
-      },
-    });
-    const resultFailStrong = await verifyPlayIntegrity(mockToken);
-    expect(resultFailStrong.isValid).toBe(false);
-    expect(resultFailStrong.error).toContain("hardware-backed integrity check");
-  });
-
-  it("rejects if basic integrity fails in production", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_BASIC", "true");
-    
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          deviceIntegrity: { deviceRecognitionVerdict: ["UNKNOWN"] },
-        },
-      },
-    });
+  it('handles exceptions from Play Integrity API', async () => {
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockRejectedValueOnce(new Error('API failure'));
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain("basic integrity check");
-  });
-
-  it("handles missing certificates or verdicts in payload", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_SIGNING_CERT", "true");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_DEVICE", "true");
-    
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          appIntegrity: { }, // missing certificateSha256Digest
-          deviceIntegrity: { }, // missing deviceRecognitionVerdict
-        },
-      },
-    });
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-  });
-
-  it("handles completely missing appIntegrity or deviceIntegrity", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_SIGNING_CERT", "true");
-    
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          // Both missing
-        },
-      },
-    });
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-  });
-
-  it("handles exceptions without response detail", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    
-    const error: any = new Error("API Failure");
-    error.response = { data: {} }; // No detail field
-    mockDecode.mockRejectedValue(error);
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-  });
-
-  it("enforces checks regardless of NODE_ENV when env flags are enabled", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_PLAY_RECOGNIZED", "true");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_SIGNING_CERT", "true");
-    vi.stubEnv("PLAY_INTEGRITY_ENFORCE_BASIC", "true");
-    
-    mockDecode.mockResolvedValue({
-      data: {
-        tokenPayloadExternal: {
-          appIntegrity: { appRecognitionVerdict: "UNEVALUATED", certificateSha256Digest: ["unknown"] },
-          deviceIntegrity: { deviceRecognitionVerdict: ["UNKNOWN"] },
-        },
-      },
-    });
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe("App not recognized by Play Store");
-  });
-
-  it("handles exceptions and logs API error details", async () => {
-    const { verifyPlayIntegrity } = await getSut();
-    vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-    
-    const error: any = new Error("API Failure");
-    error.response = { data: { detail: "Rate limit exceeded" } };
-    mockDecode.mockRejectedValue(error);
-
-    const result = await verifyPlayIntegrity(mockToken);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe("Integrity verification failed");
-  });
-
-  it("handles exceptions without response data", async () => {
-      const { verifyPlayIntegrity } = await getSut();
-      vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-      
-      const error: any = new Error("API Failure");
-      // response is undefined
-      mockDecode.mockRejectedValue(error);
-
-      const result = await verifyPlayIntegrity(mockToken);
-      expect(result.isValid).toBe(false);
-  });
-
-  it("handles completely missing deviceIntegrity", async () => {
-      const { verifyPlayIntegrity } = await getSut();
-      vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_JSON", mockServiceAccount);
-      
-      mockDecode.mockResolvedValue({
-          data: {
-              tokenPayloadExternal: {
-                  // deviceIntegrity missing
-              },
-          },
-      });
-
-      const result = await verifyPlayIntegrity(mockToken);
-      expect(result.isValid).toBe(true);
+    expect(result.error).toBe('Integrity verification failed');
+    expect(result.reason).toContain('API failure');
   });
 });

@@ -22,6 +22,12 @@ import { NextRequest } from "next/server";
 // Must be declared before any module that transitively imports server-only.
 vi.mock("server-only", () => ({}));
 
+vi.mock("@/lib/utils.server", () => ({
+  egressFetch: vi.fn((path, options) => fetch(path, options)),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+  redact: vi.fn((_k, v) => v),
+}));
+
 // ---------------------------------------------------------------------------
 // Environment variables — must be set before any module imports
 // ---------------------------------------------------------------------------
@@ -761,6 +767,6 @@ describe("Cron sync — malformed authorization header (no Bearer prefix)", () =
     const res = await GET(req);
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toBe("Unauthorized");
+    expect(body.error).toBe('Unauthorized');
   });
 });

@@ -111,6 +111,7 @@ describe("POST /api/auth/save-token", () => {
     vi.mocked(cookies).mockResolvedValue(mockCookies as any);
     vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost:3000");
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_LOCK_TTL", "20");
   });
 
   it("returns 403 for invalid origin on web", async () => {
@@ -260,5 +261,179 @@ describe("POST /api/auth/save-token", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.userId).toBe("new-auth-id-after-cleanup");
+  });
+
+  it("returns 403 when origin or host is missing", async () => {
+    mockHeaders.get.mockImplementation((name) => {
+      if (name === "origin") return null;
+      if (name === "host") return "localhost:3000";
+      return null;
+    });
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 500 when NEXT_PUBLIC_APP_DOMAIN is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toContain("Server configuration error");
+  });
+
+  it("returns 500 when NEXT_PUBLIC_APP_DOMAIN contains protocol", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "https://localhost:3000");
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(500);
+  });
+
+  it("returns 400 when IP cannot be determined", async () => {
+    const { getClientIp } = await import("@/lib/utils.server");
+    vi.mocked(getClientIp).mockReturnValueOnce(null);
+    const req = { json: async () => ({ token: "test-token" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Unable to determine client IP" });
+  });
+
+  it("returns 401 when EzyGo returns 401", async () => {
+    vi.mocked(egressFetch).mockResolvedValueOnce({ status: 401 } as any);
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ message: "Invalid or expired token" });
+  });
+
+  it("returns 502 when EzyGo returns unexpected status", async () => {
+    vi.mocked(egressFetch).mockResolvedValueOnce({ status: 404 } as any);
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(502);
+  });
+
+  it("returns 504 when EzyGo request times out", async () => {
+    const timeoutError = new Error("AbortError");
+    timeoutError.name = "AbortError";
+    vi.mocked(egressFetch).mockRejectedValueOnce(timeoutError);
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(504);
+  });
+
+  it("returns 503 when Redis lock acquisition fails", async () => {
+    const { redis } = await import("@/lib/redis");
+    vi.mocked(redis.set).mockRejectedValueOnce(new Error("Redis down"));
+    vi.mocked(egressFetch).mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+    } as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(503);
+  });
+
+  it("returns 409 when login is already in progress (lock held)", async () => {
+    const { redis } = await import("@/lib/redis");
+    vi.mocked(redis.set).mockResolvedValueOnce(null); // Lock not acquired
+    vi.mocked(egressFetch).mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+    } as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(409);
+  });
+
+  it("returns 400 for invalid user identifier sanitization", async () => {
+    vi.mocked(egressFetch).mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ username: "testuser", id: "invalid#id", email: "test@example.com" }),
+    } as any);
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ message: "Invalid user identifier" });
+  });
+
+  it("bootstraps canonical password for legacy user", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "legacyuser", id: "77777", email: "legacy@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn().mockResolvedValue({ data: { user: null }, error: { message: "User already registered", status: 422 } }),
+          updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        },
+      },
+      from: vi.fn((table) => {
+        if (table === "users") {
+          const mockUsers = {
+            select: vi.fn().mockImplementation((_fields) => {
+              // The handler calls .select() in two ways:
+              // 1. Initial lookup: .from("users").select(...).eq(...).single()
+              // 2. Update bootstrap: .from("users").update(...).eq(...).is(...).select(...)
+              
+              // Case 1: Initial lookup or Case 2: Terminal select
+              const terminalResult = Promise.resolve({ 
+                data: [{ auth_password: "enc", auth_password_iv: "iv" }], 
+                error: null 
+              });
+              
+              return Object.assign(terminalResult, {
+                eq: vi.fn().mockReturnThis(),
+                single: vi.fn().mockResolvedValue({ 
+                  data: { auth_id: "legacy-uuid", auth_password: null, auth_password_iv: null }, 
+                  error: null 
+                }),
+                is: vi.fn().mockReturnThis(),
+                select: vi.fn().mockReturnThis(),
+              });
+            }),
+            update: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            is: vi.fn().mockReturnThis(),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          };
+          return mockUsers;
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+        };
+      }),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(200);
+  });
+
+  it("returns 500 when DB upsert fails", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: { admin: { createUser: vi.fn().mockResolvedValue({ data: { user: { id: "new-auth-id" } }, error: null }) } },
+      from: vi.fn(() => ({
+        upsert: vi.fn().mockResolvedValue({ error: { message: "Upsert failed" } }),
+      })),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+    expect(response.status).toBe(500);
   });
 });

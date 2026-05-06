@@ -90,11 +90,18 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Globals for tests
+// ---------------------------------------------------------------------------
+let localStorageMock: Record<string, string> = {};
+let sessionStorageMock: Record<string, string> = {};
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 import { UserSettingsProvider, useUserSettings, DEFAULT_TARGET_PERCENTAGE } from '../user-settings';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { logger } from '@/lib/logger';
 
 function TestConsumer() {
   const { settings, isLoading } = useUserSettings();
@@ -264,9 +271,6 @@ describe('UserSettingsProvider', () => {
 });
 
 describe('loadPrefetchedSettings via provider initial state', () => {
-  let localStorageMock: Record<string, string>;
-  let sessionStorageMock: Record<string, string>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     authStateCallback = null;
@@ -337,8 +341,6 @@ describe('loadPrefetchedSettings via provider initial state', () => {
 });
 
 describe('useUserSettingsState auth state changes', () => {
-  let localStorageMock: Record<string, string>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     authStateCallback = null;
@@ -447,8 +449,6 @@ describe('useUserSettingsState auth state changes', () => {
 });
 
 describe('DB → localStorage sync effect', () => {
-  let localStorageMock: Record<string, string>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     authStateCallback = null;
@@ -464,9 +464,9 @@ describe('DB → localStorage sync effect', () => {
       removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
     });
     vi.stubGlobal('sessionStorage', {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
+      getItem: vi.fn((key: string) => sessionStorageMock[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { sessionStorageMock[key] = value; }),
+      removeItem: vi.fn((key: string) => { delete sessionStorageMock[key]; }),
     });
   });
 
@@ -621,5 +621,44 @@ describe('DB → localStorage sync effect', () => {
     );
     expect(bunkEvents).toHaveLength(0);
     dispatchSpy.mockRestore();
+  });
+
+  it('handles errors in sync effect catch block', async () => {
+    
+    // Force localStorage.getItem to throw in the effect only for sync keys
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => {
+        if (key.startsWith('showBunkCalc_')) throw new Error('storage_fail');
+        return null;
+      }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+
+    // 1. Initial state (undefined settings)
+    vi.mocked(useQuery).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+    } as any);
+
+    const { rerender } = render(<WrappedConsumer />);
+
+    // 2. Auth change + settings loaded
+    vi.mocked(useQuery).mockReturnValue({
+      data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
+      isLoading: false,
+      isFetching: false,
+    } as any);
+
+    await act(async () => {
+      authStateCallback?.('INITIAL_SESSION', { user: { id: 'error-user-unique-2' } });
+    });
+
+    rerender(<WrappedConsumer />);
+
+    await waitFor(() => {
+      expect(logger.dev).toHaveBeenCalledWith("Error during storage sync:", expect.any(Error));
+    });
   });
 });
