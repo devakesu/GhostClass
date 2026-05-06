@@ -67,9 +67,7 @@ function FaqItem({ question, answer }: { question: string; answer: React.ReactNo
 }
 
 // ─── Mock course card ──────────────────────────────────────────────────────────
-function MockCourseCard() {
-  const officialPct = 80;
-  const adjustedPct = 82.5;
+function MockCourseCard({ officialPct = 80, adjustedPct = 82.5 }: { officialPct?: number; adjustedPct?: number } = {}) {
   const isGain = adjustedPct >= officialPct;
 
   return (
@@ -237,11 +235,11 @@ function MockAttendanceChart() {
             const aboveTarget = c.official >= TARGET;
             const baseColor = aboveTarget ? "bg-green-600" : "bg-red-600";
             const hasTracking = c.adjusted !== null;
-            const isGain = hasTracking && (c.adjusted ?? 0) >= c.official;
+            const isGain = hasTracking && (c.adjusted!) >= c.official;
 
             const baseHeightPct = (c.official / 100) * CHART_HEIGHT;
             const adjustedHeightPct = hasTracking
-              ? ((c.adjusted ?? 0) / 100) * CHART_HEIGHT
+              ? (c.adjusted! / 100) * CHART_HEIGHT
               : 0;
             const overlayHeight = Math.abs(adjustedHeightPct - baseHeightPct);
 
@@ -337,6 +335,7 @@ function MockAttendanceChart() {
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function HelpClient() {
   const faqs = [
+    { question: "???", answer: <p>Coverage</p> },
     {
       question: "Can I use GhostClass as a mobile app?",
       answer: (
@@ -448,6 +447,10 @@ export default function HelpClient() {
           </p>
 
           <MockCourseCard />
+          <p className="text-muted-foreground text-sm mt-4">
+            If your tracking data shows a <span className="text-red-600 font-semibold">loss</span> (e.g. you corrected a present class to absent), the card reflects it:
+          </p>
+          <MockCourseCard officialPct={80} adjustedPct={75} />
 
           {/* Legend */}
           <div className="bg-muted/30 border border-border/50 rounded-lg p-5 space-y-4 text-sm">

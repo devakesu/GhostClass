@@ -71,6 +71,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (e is AppException && e.details?['type'] == 'security') {
         final reason = e.details?['reason'] ?? e.message;
         final action = e.details?['action'] ?? 'Please restart the app.';
+        final criticalRisk = e.details?['criticalRisk'] == true;
+
+        if (criticalRisk) {
+          ref.read(apiServiceProvider).clearCaches();
+          await ref.read(authProvider.notifier).logout(force: true);
+        }
 
         SecurityUtils.showSecurityFailureDialog(
           context,

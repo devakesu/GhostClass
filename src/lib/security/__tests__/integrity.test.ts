@@ -67,7 +67,7 @@ describe('verifyPlayIntegrity', () => {
 
   it('returns invalid if token payload is empty', async () => {
     const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
-    mockDecode.mockResolvedValueOnce({ data: {} });
+    mockDecode.mockResolvedValueOnce({ data: {} } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
@@ -84,7 +84,7 @@ describe('verifyPlayIntegrity', () => {
           accountIntegrity: { appLicensingVerdict: 'LICENSED' },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(true);
@@ -99,7 +99,7 @@ describe('verifyPlayIntegrity', () => {
           appIntegrity: { appRecognitionVerdict: 'UNEVALUATED' },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
@@ -115,7 +115,7 @@ describe('verifyPlayIntegrity', () => {
           deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_BASIC_INTEGRITY'] },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
@@ -143,7 +143,7 @@ describe('verifyPlayIntegrity', () => {
           deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(true);
@@ -167,7 +167,7 @@ describe('verifyPlayIntegrity', () => {
           requestDetails: { nonce },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
@@ -182,20 +182,160 @@ describe('verifyPlayIntegrity', () => {
           requestDetails: { nonce: 'wrong-nonce' },
         },
       },
-    });
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken, 'expected-nonce');
     expect(result.isValid).toBe(false);
     expect(result.error).toBe('Integrity handshake replay detected');
   });
 
-  it('handles exceptions from Play Integrity API', async () => {
+  it('handles base64 encoded GOOGLE_SERVICE_ACCOUNT_JSON', async () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = Buffer.from(mockServiceAccount).toString('base64');
     const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
-    mockDecode.mockRejectedValueOnce(new Error('API failure'));
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          appIntegrity: { appRecognitionVerdict: 'PLAY_RECOGNIZED' },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(true);
+  });
+
+  it('fails if basic integrity is enforced and missing', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_BASIC = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          deviceIntegrity: { deviceRecognitionVerdict: ['NONE'] },
+        },
+      },
+    } as any);
 
     const result = await verifyPlayIntegrity(mockToken);
     expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Integrity verification failed');
-    expect(result.reason).toContain('API failure');
+    expect(result.error).toBe('Device failed basic integrity check');
+  });
+
+  it('fails if strong integrity is enforced and missing', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_STRONG = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Device failed hardware-backed integrity check');
+  });
+
+  it('fails if app licensing is enforced and missing', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_LICENSED = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          accountIntegrity: { appLicensingVerdict: 'UNLICENSED' },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('App not licensed for this user');
+  });
+
+  it('validates certificate digest when enforced', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_SIGNING_CERT = 'true';
+    process.env.PLAY_INTEGRITY_CERT_SHA256 = 'valid-cert';
+    
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          appIntegrity: { 
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['valid-cert'] 
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(true);
+  });
+
+  it('fails if certificate digest mismatch and enforced', async () => {
+    process.env.PLAY_INTEGRITY_ENFORCE_SIGNING_CERT = 'true';
+    process.env.PLAY_INTEGRITY_CERT_SHA256 = 'valid-cert';
+    
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          appIntegrity: { 
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['invalid-cert'] 
+          },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('App signing certificate mismatch');
+  });
+
+  it('fails if nonce is required but missing', async () => {
+    process.env.ENFORCE_PLAY_INTEGRITY_NONCE = 'true';
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          appIntegrity: { appRecognitionVerdict: 'PLAY_RECOGNIZED' },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe('Missing integrity nonce');
+  });
+
+  it('logs detailed API error response', async () => {
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    const apiError: any = new Error('API failure');
+    apiError.response = { data: { error: 'detailed error' } };
+    mockDecode.mockRejectedValueOnce(apiError);
+
+    await verifyPlayIntegrity(mockToken);
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('API Error Details:'), expect.stringContaining('detailed error'));
+  });
+
+  it('returns false for malformed nonce (catch block)', async () => {
+    // A nonce that is valid base64 and has a valid timestamp, but will cause timingSafeEqual to throw due to length mismatch
+    const timestamp = Date.now();
+    const nonce = Buffer.from(`rand:${timestamp}:short-sig`).toString('base64url');
+    const mockDecode = vi.mocked(google.playintegrity('v1').v1.decodeIntegrityToken);
+    mockDecode.mockResolvedValueOnce({
+      data: {
+        tokenPayloadExternal: {
+          requestDetails: { nonce },
+        },
+      },
+    } as any);
+
+    const result = await verifyPlayIntegrity(mockToken);
+    expect(result.isValid).toBe(false);
   });
 });

@@ -43,6 +43,7 @@ class ApiService {
   Future<Response<dynamic>>? _syncInFlight;
   DateTime? _lastSyncTime;
   static const _syncCooldown = Duration(seconds: 30);
+  final Duration _networkTimeout;
   DateTime? _last401Broadcast;
   bool _backendUnauthorized = false;
 
@@ -100,11 +101,29 @@ class ApiService {
     AppLogger.i('ApiService: All local caches cleared.');
   }
 
+  void _setSecurityFailure({
+    required String message,
+    bool criticalRisk = false,
+    String? reason,
+    String? action,
+    String source = 'backend',
+  }) {
+    _ref.read(securityFailureProvider.notifier).setFailure(
+          message,
+          criticalRisk: criticalRisk,
+          reason: reason,
+          action: action,
+          source: source,
+        );
+  }
+
   ApiService(this._ref) {
+    _networkTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
     _dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: _networkTimeout,
+        receiveTimeout: _networkTimeout,
+        sendTimeout: _networkTimeout,
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
@@ -115,8 +134,9 @@ class ApiService {
     // Create a clean Dio instance for internal security calls to avoid recursion
     _securityDio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: _networkTimeout,
+        receiveTimeout: _networkTimeout,
+        sendTimeout: _networkTimeout,
       ),
     );
 
@@ -172,16 +192,21 @@ class ApiService {
               if (isAppCheckFailure) {
                 _backendUnauthorized = true;
                 final data = response.data as Map<String, dynamic>?;
-                String friendlyMsg;
-                if (data != null && data['type'] == 'security') {
-                  friendlyMsg = "${data['reason']}\n\n ${data['action']}";
-                } else {
-                  friendlyMsg = errorMsg ?? 'Device verification failed';
-                }
+                final isSecurityPayload = data != null && data['type'] == 'security';
+                final reason = data?['reason']?.toString();
+                final action = data?['action']?.toString();
+                final criticalRisk = data?['criticalRisk'] == true;
+                final friendlyMsg = isSecurityPayload
+                    ? '${reason ?? errorMsg ?? 'Device verification failed'}\n\n${action ?? 'Please try again later.'}'
+                    : errorMsg ?? 'Device verification failed';
 
-                _ref
-                    .read(securityFailureProvider.notifier)
-                    .setFailure(friendlyMsg);
+                _setSecurityFailure(
+                  message: friendlyMsg,
+                  criticalRisk: criticalRisk,
+                  reason: reason,
+                  action: action,
+                  source: 'backend',
+                );
                 AppLogger.e(
                   'ApiService: SECURITY FAILURE (App Check) for ${response.requestOptions.path}',
                 );
@@ -195,7 +220,7 @@ class ApiService {
             // Success! Reset security lock
             if (_backendUnauthorized) {
               _backendUnauthorized = false;
-              _ref.read(securityFailureProvider.notifier).setFailure(null);
+              _ref.read(securityFailureProvider.notifier).clearFailure();
               AppLogger.i(
                 'ApiService: Security lock cleared via successful request.',
               );
@@ -241,16 +266,21 @@ class ApiService {
               if (isAppCheckFailure) {
                 _backendUnauthorized = true;
                 final data = responseData as Map<String, dynamic>?;
-                String friendlyMsg;
-                if (data != null && data['type'] == 'security') {
-                  friendlyMsg = "${data['reason']}\n\n ${data['action']}";
-                } else {
-                  friendlyMsg = errorMsg ?? 'Device verification failed';
-                }
+                final isSecurityPayload = data != null && data['type'] == 'security';
+                final reason = data?['reason']?.toString();
+                final action = data?['action']?.toString();
+                final criticalRisk = data?['criticalRisk'] == true;
+                final friendlyMsg = isSecurityPayload
+                    ? '${reason ?? errorMsg ?? 'Device verification failed'}\n\n${action ?? 'Please try again later.'}'
+                    : errorMsg ?? 'Device verification failed';
 
-                _ref
-                    .read(securityFailureProvider.notifier)
-                    .setFailure(friendlyMsg);
+                _setSecurityFailure(
+                  message: friendlyMsg,
+                  criticalRisk: criticalRisk,
+                  reason: reason,
+                  action: action,
+                  source: 'backend',
+                );
                 AppLogger.e(
                   'ApiService: SECURITY ERROR (App Check) for ${e.requestOptions.path}',
                 );
@@ -392,8 +422,8 @@ class ApiService {
           .requestIntegrityToken(
             cloudProjectNumber: _cloudProjectNumber,
             nonce: await _fetchServerNonce(),
-          )
-          .timeout(const Duration(seconds: 20));
+              )
+              .timeout(_networkTimeout);
 
       if (integrityToken != null) {
         _cachedIntegrityToken = integrityToken;
@@ -411,8 +441,8 @@ class ApiService {
     required String password,
   }) async {
     // 1. Login to EzyGo
-    final ezygoResponse = await loginEzygo(username, password).timeout(
-      const Duration(seconds: 30),
+      final ezygoResponse = await loginEzygo(username, password).timeout(
+      _networkTimeout,
       onTimeout: () => throw AppException(
         message: 'Login timeout to EzyGo portal',
         type: AppExceptionType.network,
@@ -434,7 +464,7 @@ class ApiService {
     try {
       final ghostResponse = await provisionGhostClassSession(
         ezygoToken,
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(_networkTimeout);
       return ghostResponse;
     } on TimeoutException {
       throw AppException(
@@ -645,13 +675,19 @@ class ApiService {
         final bool verified = data['verified'] ?? false;
 
         if (!verified) {
-          final String reason = data['reason'] ?? data['playIntegrityError'] ?? 'Device integrity check failed.';
+          final String reason = data['reason'] ?? data['playIntegrityError'] ?? data['appCheckError'] ?? 'Device integrity check failed.';
           final String action = data['action'] ?? 'Please ensure you are using a genuine version of GhostClass from the Play Store.';
+          final bool criticalRisk = data['criticalRisk'] == true;
 
           throw AppException(
             message: reason,
             type: AppExceptionType.unauthorized,
-            details: {'type': 'security', 'reason': reason, 'action': action},
+            details: {
+              'type': 'security',
+              'reason': reason,
+              'action': action,
+              'criticalRisk': criticalRisk,
+            },
           );
         }
       } else {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -34,6 +35,8 @@ class NavigationShell extends ConsumerStatefulWidget {
 }
 
 class _NavigationShellState extends ConsumerState<NavigationShell> {
+  bool _criticalSecurityLogoutStarted = false;
+
   AcademicState? _asyncValueOrNull(AsyncValue<AcademicState?> value) {
     return value.hasValue ? value.value : null;
   }
@@ -81,6 +84,18 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       // Keep calendar dependencies warm in the background whenever the
       // academic context changes, even if the calendar screen is not open.
       unawaited(_prewarmCalendarData());
+    });
+
+    ref.listenManual<SecurityFailureState?>(securityFailureProvider, (
+      previous,
+      next,
+    ) {
+      if (next?.criticalRisk == true &&
+          !_criticalSecurityLogoutStarted &&
+          previous?.criticalRisk != true) {
+        _criticalSecurityLogoutStarted = true;
+        unawaited(ref.read(authProvider.notifier).logout(force: true));
+      }
     });
   }
 
@@ -180,6 +195,8 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     // --- SECURITY BARRIER ---
     final securityFailure = ref.watch(securityFailureProvider);
     final showSecurityBarrier = securityFailure != null;
+    final securityMessage = securityFailure?.message ?? '';
+    final isCriticalSecurityFailure = securityFailure?.criticalRisk ?? false;
 
     Future<void> showAddAttendanceDialog() async {
       ref.read(uiModalOpenProvider.notifier).setOpen(true);
@@ -554,7 +571,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      securityFailure,
+                      securityMessage,
                       style: GoogleFonts.manrope(
                         fontSize: 15,
                         color: Colors.white.withValues(alpha: 0.7),
@@ -573,9 +590,14 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: () async {
+                           if (isCriticalSecurityFailure) {
+                             exit(0);
+                             return;
+                           }
+
                            // Clear lock and retry
                            ref.read(apiServiceProvider).clearCaches();
-                           ref.read(securityFailureProvider.notifier).setFailure(null);
+                           ref.read(securityFailureProvider.notifier).clearFailure();
                            try {
                              await ref.read(authProvider.notifier).refreshProfile(force: true);
                            } catch (e) {
@@ -583,22 +605,24 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                            }
                         },
                         child: Text(
-                          'Retry Verification',
+                          isCriticalSecurityFailure ? 'Exit App' : 'Retry Verification',
                           style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => ref.read(authProvider.notifier).logout(),
-                      child: Text(
-                        'Logout of GhostClass',
-                        style: GoogleFonts.manrope(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
+                    if (!isCriticalSecurityFailure) ...[
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => ref.read(authProvider.notifier).logout(),
+                        child: Text(
+                          'Logout of GhostClass',
+                          style: GoogleFonts.manrope(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

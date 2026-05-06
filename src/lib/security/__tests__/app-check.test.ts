@@ -134,63 +134,115 @@ describe('app-check logic', () => {
     });
   });
 
-  describe('withSecurity', () => {
-    const mockHandler = vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
-    
-    it('authenticates web request via CSRF', async () => {
-        process.env.DISABLE_SECURITY_BYPASS = 'true';
-        const req = new Request('https://test.com', {
-            headers: { 'x-csrf-token': 'valid-csrf' }
-        });
-        vi.mocked(validateCsrfToken).mockResolvedValue(true);
-        vi.mocked(headers).mockResolvedValue(new Headers({ 'x-csrf-token': 'valid-csrf' }));
-        
-        const wrapped = withSecurity(mockHandler);
-        const res = await wrapped(req, { params: {} });
-        
-        expect(res.status).toBe(200);
+  describe('verifyAppCheckToken iOS', () => {
+    const mockAppCheck = { verifyToken: vi.fn() };
+    beforeEach(() => {
+      vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
     });
 
-    it('handles JWE decryption for mobile requests', async () => {
-        const h = new Headers();
-        h.set('X-Firebase-AppCheck', 'valid-token');
-        h.set('Content-Type', 'application/jose');
-        
-        const req = new Request('https://test.com', {
-            method: 'POST',
-            headers: h,
-            body: 'part1.part2.part3.part4.part5'
-        });
+    it('verifies valid iOS token with DeviceCheck', async () => {
+      const h = new Headers();
+      h.set('X-Firebase-AppCheck', 'valid-token');
+      h.set('X-Device-Check', 'device-token');
+      h.set('X-Device-Check-Nonce', 'nonce');
+      vi.mocked(headers).mockResolvedValue(h as any);
+      
+      mockAppCheck.verifyToken.mockResolvedValue({ appId: 'ios-id' });
+      vi.mocked(verifyDeviceCheckToken).mockResolvedValue({ isValid: true, verdict: { ok: true } } as any);
 
+      const result = await verifyAppCheckToken();
+      expect(result.isValid).toBe(true);
+    });
+
+    it('fails if iOS DeviceCheck is enforced but missing', async () => {
+      process.env.ENFORCE_DEVICE_CHECK = 'true';
+      const h = new Headers();
+      h.set('X-Firebase-AppCheck', 'valid-token');
+      vi.mocked(headers).mockResolvedValue(h as any);
+      
+      mockAppCheck.verifyToken.mockResolvedValue({ appId: 'ios-id' });
+
+      const result = await verifyAppCheckToken();
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe('Missing mandatory device check');
+    });
+  });
+
+  describe('CSRF Session Binding', () => {
+    it('fails if CSRF is bound to a different session', async () => {
+        process.env.DISABLE_SECURITY_BYPASS = 'true';
+        const h = new Headers({ 'x-csrf-token': 'token123' });
+        vi.mocked(headers).mockResolvedValue(h);
+        vi.mocked(cookies).mockResolvedValue({
+            get: vi.fn().mockReturnValue({ value: 'session-actual' }),
+        } as any);
+        vi.mocked(validateCsrfToken).mockResolvedValue(true);
+        const { redis } = await import('@/lib/redis');
+        vi.mocked(redis.get).mockResolvedValue('session-expected');
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { headers: h });
+        const res = await wrapped(req, { params: {} });
+
+        expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Bypass and Cron', () => {
+    it('bypasses for Cron requests with valid secret', async () => {
+        process.env.CRON_SECRET = 'cron-secret';
+        const h = new Headers({ 'authorization': 'Bearer cron-secret' });
+        vi.mocked(headers).mockResolvedValue(h);
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { headers: h });
+        const res = await wrapped(req, { params: {} });
+
+        expect(res.status).toBe(200);
+    });
+  });
+
+  describe('JWE Response Encryption', () => {
+    it('encrypts response for mobile requests when rcek is present', async () => {
+        const h = new Headers({
+            'X-Firebase-AppCheck': 'valid-token',
+            'X-JWE-Key': 'cek-jwe'
+        });
+        vi.mocked(headers).mockResolvedValue(h);
         const mockAppCheck = { verifyToken: vi.fn().mockResolvedValue({ appId: 'android-id' }) };
         vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
-        vi.mocked(decryptRequest).mockResolvedValue({ payload: { data: 'secret' }, rcek: 'cek' });
-        vi.mocked(headers).mockResolvedValue(h as any);
-
-        const wrapped = withSecurity(mockHandler);
-        const res = await wrapped(req, { params: {} });
         
+        vi.mocked(decryptRequest).mockResolvedValue({ rcek: 'response-cek' });
+        vi.mocked(encryptResponse).mockResolvedValue('encrypted-blob');
+
+        const handler = vi.fn().mockResolvedValue(new Response('{"data":"secret"}'));
+        const wrapped = withSecurity(handler);
+        const req = new Request('https://test.com', { headers: h });
+        const res = await wrapped(req, { params: {} });
+
         expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toBe('application/jose');
+        expect(await res.text()).toBe('encrypted-blob');
     });
+  });
 
 /*
+  describe('Rate Limiting Enforcement', () => {
     it('enforces rate limiting for web requests', async () => {
-        // Trigger rate limit failure
         rateLimitMock.success = false;
-
-        const h = new Headers();
-        h.set('x-csrf-token', 'valid');
-        vi.mocked(validateCsrfToken).mockResolvedValue(true);
-        const req = new Request('https://test.com', { headers: h });
+        process.env.DISABLE_SECURITY_BYPASS = 'true';
         
-        vi.mocked(getClientIp).mockReturnValue('127.0.0.1');
-        vi.mocked(headers).mockResolvedValue(new Headers({ 'x-forwarded-for': '127.0.0.1' }));
+        const h = new Headers({ 'x-csrf-token': 'valid' });
+        vi.mocked(headers).mockResolvedValue(h);
+        vi.mocked(getClientIp).mockReturnValue('1.2.3.4');
+        vi.mocked(validateCsrfToken).mockResolvedValue(true);
 
-        const wrapped = withSecurity(mockHandler);
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { headers: h });
         const res = await wrapped(req, { params: {} });
         
         expect(res.status).toBe(429);
     });
-*/
   });
+*/
 });

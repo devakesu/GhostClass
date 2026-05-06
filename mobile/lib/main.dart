@@ -23,7 +23,7 @@ class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    client.connectionTimeout = const Duration(seconds: 10);
+    client.connectionTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
     client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
     return client;
   }

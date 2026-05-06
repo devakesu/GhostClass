@@ -30,7 +30,14 @@ class JweService {
     }
 
     try {
-      final dio = Dio();
+      final networkTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: networkTimeout,
+          receiveTimeout: networkTimeout,
+          sendTimeout: networkTimeout,
+        ),
+      );
 
       if (kDebugMode) {
         (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
