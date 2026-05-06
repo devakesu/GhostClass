@@ -158,6 +158,8 @@ export async function verifyDeviceCheckToken(
   }
 }
 
+import { SignJWT, importPKCS8 } from "jose";
+
 /**
  * Creates a JWT for authenticating with Apple's DeviceCheck API
  * Uses HMAC-based signing for simplicity (alternative: use full ES256 signing)
@@ -171,9 +173,6 @@ async function createDeviceCheckJWT(
   teamId: string,
   privateKeyB64: string,
 ): Promise<string> {
-  // Import jose for proper JWT creation
-  const { SignJWT, importPKCS8 } = await import("jose");
-
   try {
     const privateKeyPem = Buffer.from(privateKeyB64, "base64").toString("utf-8");
     const now = Math.floor(Date.now() / 1000);

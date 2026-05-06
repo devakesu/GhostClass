@@ -3,6 +3,9 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import React from 'react'
 
+// Mock server-only
+vi.mock('server-only', () => ({}))
+
 // Setup environment variables before each test
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co')

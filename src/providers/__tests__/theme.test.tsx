@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ThemeProvider, useTheme } from '../theme';
 import { THEME_STORAGE_KEY } from '@/lib/theme-storage-key';
 
@@ -244,14 +244,14 @@ describe('ThemeProvider', () => {
   });
 
   describe('localStorage persistence', () => {
-    it('persists theme to localStorage on mount', () => {
+    it('does not persist theme to localStorage on mount', () => {
       const setItemSpy = vi.spyOn(window.localStorage, 'setItem');
       render(
         <ThemeProvider>
           <ThemeDisplay />
         </ThemeProvider>
       );
-      expect(setItemSpy).toHaveBeenCalledWith(THEME_STORAGE_KEY, expect.any(String));
+      expect(setItemSpy).not.toHaveBeenCalled();
     });
 
     it('does not throw when localStorage.setItem throws', () => {
@@ -278,5 +278,131 @@ describe('useTheme', () => {
       'useTheme must be used within a ThemeProvider'
     );
     consoleError.mockRestore();
+  });
+});
+
+describe('ThemeProvider system preference', () => {
+  let localStorageMock: Record<string, string>;
+
+  beforeEach(() => {
+    localStorageMock = {};
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
+      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+    });
+    // Mock matchMedia
+    vi.stubGlobal('window', {
+      ...window,
+      matchMedia: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('listens for system preference changes and updates theme if no manual choice exists', async () => {
+    let changeHandler: (e: any) => void = () => {};
+    const addEventListenerMock = vi.fn((event, handler) => {
+      if (event === 'change') changeHandler = handler;
+    });
+    const removeEventListenerMock = vi.fn();
+
+    vi.stubGlobal('window', {
+      ...window,
+      matchMedia: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: addEventListenerMock,
+        removeEventListener: removeEventListenerMock,
+      }),
+    });
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <ThemeDisplay />
+      </ThemeProvider>
+    );
+
+    // Verify listener was added
+    expect(addEventListenerMock).toHaveBeenCalledWith('change', expect.any(Function));
+
+    // Simulate system change to dark
+    await act(async () => {
+      changeHandler({ matches: true } as any);
+    });
+    expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+
+    // Simulate system change to light
+    await act(async () => {
+      changeHandler({ matches: false } as any);
+    });
+    expect(screen.getByTestId('theme-value').textContent).toBe('light');
+    
+    // Verify cleanup
+    unmount();
+    expect(removeEventListenerMock).toHaveBeenCalledWith('change', expect.any(Function));
+  });
+
+  it('ignores system preference changes if manual choice exists', async () => {
+    localStorageMock[THEME_STORAGE_KEY] = 'dark';
+    let changeHandler: (e: any) => void = () => {};
+    
+    vi.stubGlobal('window', {
+      ...window,
+      matchMedia: vi.fn().mockReturnValue({
+        matches: false,
+      addEventListener: (_event: any, handler: any) => { changeHandler = handler; },
+        removeEventListener: vi.fn(),
+      }),
+    });
+
+    render(
+      <ThemeProvider>
+        <ThemeDisplay />
+      </ThemeProvider>
+    );
+
+    // Simulate system change to light — should stay dark due to localStorage
+    await act(async () => {
+      changeHandler({ matches: false } as any);
+    });
+    expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+  });
+  
+  it('handles localStorage errors in system change handler', async () => {
+    let changeHandler: (e: any) => void = () => {};
+    vi.stubGlobal('window', {
+      ...window,
+      matchMedia: vi.fn().mockReturnValue({
+        matches: false,
+      addEventListener: (_event: any, handler: any) => { changeHandler = handler; },
+        removeEventListener: vi.fn(),
+      }),
+    });
+    
+    render(
+      <ThemeProvider>
+        <ThemeDisplay />
+      </ThemeProvider>
+    );
+    
+    // Force localStorage.getItem to throw
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => { throw new Error('blocked'); }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+    
+    // Simulate system change to light
+    await act(async () => {
+      changeHandler({ matches: false } as any);
+    });
+    expect(screen.getByTestId('theme-value').textContent).toBe('light');
   });
 });

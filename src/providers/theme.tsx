@@ -53,12 +53,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Apply theme on mount & when it changes
   useEffect(() => {
     applyTheme(theme);
+  }, [theme]);
+
+  const saveTheme = useCallback((t: Theme) => {
     try {
-      localStorage.setItem(STORAGE_KEY, theme);
+      localStorage.setItem(STORAGE_KEY, t);
     } catch {
       // localStorage may be blocked
     }
-  }, [theme]);
+  }, []);
 
   // Listen for system preference changes
   useEffect(() => {
@@ -77,10 +80,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    saveTheme(t);
+  }, [saveTheme]);
   const toggleTheme = useCallback(
-    () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),
-    []
+    () => setThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      saveTheme(next);
+      return next;
+    }),
+    [saveTheme]
   );
 
   const value = useMemo(

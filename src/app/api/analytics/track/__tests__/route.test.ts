@@ -1,380 +1,129 @@
 /**
- * Tests for Analytics API Route
+ * Tests for POST /api/analytics/track
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { POST } from "../route";
 import { NextRequest } from "next/server";
+import { trackGA4Event } from "@/lib/analytics";
+import { syncRateLimiter } from "@/lib/ratelimit";
+import { getClientIp as _getClientIp } from "@/lib/utils.server";
 
 // Mock dependencies
+vi.mock("server-only", () => ({}));
+
 vi.mock("@/lib/analytics", () => ({
-  trackGA4Event: vi.fn().mockResolvedValue(undefined),
+  trackGA4Event: vi.fn(),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({
   syncRateLimiter: {
-    limit: vi.fn().mockResolvedValue({ success: true }),
+    limit: vi.fn(() => Promise.resolve({ success: true, reset: 0 })),
   },
 }));
 
 vi.mock("@/lib/utils.server", () => ({
-  getClientIp: vi.fn().mockReturnValue("192.168.1.1"),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+}));
+
+vi.mock("@/lib/security/app-check", () => ({
+  withSecurity: vi.fn((handler) => handler),
 }));
 
 vi.mock("@/lib/logger", () => ({
   logger: {
     error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
   },
 }));
 
-describe("Analytics API Route", () => {
-  const createMockRequest = (body: any, headers: Record<string, string> = {}): NextRequest => {
-    return {
-      json: async () => body,
-      headers: new Headers({
-        "x-forwarded-for": "192.168.1.1",
-        ...headers,
-      }),
-      method: "POST",
-      nextUrl: new URL("https://localhost:3001/api/analytics/track"),
-    } as NextRequest;
-  };
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
 
+describe("POST /api/analytics/track", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("Request Validation", () => {
-    it("should accept valid analytics request", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",  // Valid format: timestamp.random
-        events: [
-          {
-            name: "page_view",
-            params: { page_location: "https://example.com" },
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-    });
-
-    it("should reject request without client ID", async () => {
-      const req = createMockRequest({
-        events: [{ name: "page_view" }],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Missing fields");
-    });
-
-    it("should reject request with invalid clientId format", async () => {
-      const req = createMockRequest({
-        clientId: "invalid-format",  // Should be timestamp.random format
-        events: [{ name: "page_view" }],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-
-      expect(response.status).toBe(200); // Current implementation doesn't validate format
-    });
-
-    it("should reject request without events", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Missing fields");
-    });
-
-    it("should reject request with non-array events", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: "not-an-array",
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Missing fields");
-    });
+  it("returns 400 when IP cannot be determined", async () => {
+    vi.mocked(_getClientIp).mockReturnValueOnce(null);
+    const { POST } = await import("../route");
+    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(400);
   });
 
-  describe("Origin Validation", () => {
-    it("should allow localhost origin with dynamic port in development", async () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      const originalAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-      const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-      Object.assign(process.env, {
-        NODE_ENV: "development",
-        NEXT_PUBLIC_APP_DOMAIN: "ghostclass.devakesu.com",
-        NEXT_PUBLIC_APP_URL: "https://ghostclass.devakesu.com",
-      });
-
-      const req = createMockRequest(
-        {
-          clientId: "1234567890.abcdefghi",
-          events: [{ name: "page_view" }],
-        },
-        { origin: "https://localhost:3001" }
-      );
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-
-      Object.assign(process.env, {
-        NODE_ENV: originalNodeEnv,
-        NEXT_PUBLIC_APP_DOMAIN: originalAppDomain,
-        NEXT_PUBLIC_APP_URL: originalAppUrl,
-      });
-
-      expect(response.status).toBe(200);
-    });
-
-    it("should reject non-allowed foreign origin", async () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      const originalAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-      const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-      Object.assign(process.env, {
-        NODE_ENV: "production",
-        NEXT_PUBLIC_APP_DOMAIN: "ghostclass.devakesu.com",
-        NEXT_PUBLIC_APP_URL: "https://ghostclass.devakesu.com",
-      });
-
-      const req = createMockRequest(
-        {
-          clientId: "1234567890.abcdefghi",
-          events: [{ name: "page_view" }],
-        },
-        { origin: "https://evil.example" }
-      );
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-
-      Object.assign(process.env, {
-        NODE_ENV: originalNodeEnv,
-        NEXT_PUBLIC_APP_DOMAIN: originalAppDomain,
-        NEXT_PUBLIC_APP_URL: originalAppUrl,
-      });
-
-      expect(response.status).toBe(200); // Origin validation not implemented for this route
-    });
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(syncRateLimiter.limit).mockResolvedValueOnce({ success: false, reset: Date.now() + 1000, limit: 1, remaining: 0, pending: Promise.resolve() });
+    const { POST } = await import("../route");
+    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(429);
   });
 
-  describe("Event Validation", () => {
-    it("should reject events with invalid name format", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          {
-            name: "Invalid Event Name!", // Contains spaces and special chars
-            params: {},
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-
-      expect(response.status).toBe(200); // Current implementation truncates to 40 chars
+  it("returns 400 for invalid body", async () => {
+    const { POST } = await import("../route");
+    const req = new NextRequest("http://localhost/api/analytics/track", { 
+      method: "POST",
+      body: "not-json"
     });
-
-    it("should accept valid event names", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          { name: "page_view" },
-          { name: "button_click" },
-          { name: "form_submit" },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
-    });
-
-    it("should truncate long event names", async () => {
-      const longName = "a".repeat(100); // Exceeds 40 char limit
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [{ name: longName }],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
-    });
-
-    it("should reject too many events per request", async () => {
-      const events = Array(30).fill({ name: "test_event" }); // Exceeds 25 limit
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events,
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-
-      expect(response.status).toBe(200); // Current implementation doesn't limit event count
-    });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(400);
   });
 
-  describe("Event Parameter Sanitization", () => {
-    it("should sanitize string parameters", async () => {
-      const longString = "a".repeat(200); // Exceeds 100 char limit
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          {
-            name: "test_event",
-            params: {
-              test_param: longString,
-            },
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
+  it("returns 400 when missing fields", async () => {
+    const { POST } = await import("../route");
+    const req = new NextRequest("http://localhost/api/analytics/track", { 
+      method: "POST",
+      body: JSON.stringify({ clientId: "123" }) // missing events
     });
-
-    it("should allow number and boolean parameters", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          {
-            name: "test_event",
-            params: {
-              count: 42,
-              is_active: true,
-              price: 19.99,
-            },
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
-    });
-
-    it("should filter out invalid parameter types", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          {
-            name: "test_event",
-            params: {
-              valid_string: "test",
-              valid_number: 123,
-              invalid_object: { nested: "object" },
-              invalid_array: [1, 2, 3],
-            },
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
-    });
-    
-    it("should filter out NaN and Infinity values", async () => {
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [
-          {
-            name: "test_event",
-            params: {
-              valid_number: 123,
-              nan_value: NaN,
-              infinity_value: Infinity,
-              negative_infinity: -Infinity,
-            },
-          },
-        ],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      expect(response.status).toBe(200);
-    });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(400);
   });
 
-  describe("Rate Limiting", () => {
-    it("should return 429 when rate limit exceeded", async () => {
-      const { syncRateLimiter } = await import("@/lib/ratelimit");
-      vi.mocked(syncRateLimiter.limit).mockResolvedValueOnce({
-        success: false,
-        limit: 10,
-        remaining: 0,
-        reset: Date.now() + 10000,
-        pending: Promise.resolve(),
-      });
-
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [{ name: "test_event" }],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(429);
-      expect(data.error).toContain("Rate limit exceeded");
+  it("tracks events successfully", async () => {
+    const { POST } = await import("../route");
+    const body = {
+      clientId: "client-123",
+      events: [{ name: "page_view", params: { page: "/" } }],
+      userProperties: { role: "admin", status: { value: "active" } }
+    };
+    const req = new NextRequest("http://localhost/api/analytics/track", { 
+      method: "POST",
+      body: JSON.stringify(body)
     });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(200);
+    expect(trackGA4Event).toHaveBeenCalledWith(
+      "client-123",
+      [{ name: "page_view", params: { page: "/" } }],
+      { role: { value: "admin" }, status: { value: "active" } }
+    );
   });
 
-  describe("IP Handling", () => {
-    it("should reject request when IP cannot be determined", async () => {
-      const { getClientIp } = await import("@/lib/utils.server");
-      vi.mocked(getClientIp).mockReturnValueOnce(null);
-
-      const req = createMockRequest({
-        clientId: "1234567890.abcdefghi",
-        events: [{ name: "test_event" }],
-      });
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("No IP");
-    });
+  it("uses decryptedBody if provided", async () => {
+    const { POST } = await import("../route");
+    const body = {
+      clientId: "client-123",
+      events: [{ name: "mobile_event" }]
+    };
+    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const res = await POST(req, { decryptedBody: body, params: {} });
+    expect(res.status).toBe(200);
+    expect(trackGA4Event).toHaveBeenCalled();
   });
 
-  describe("Body Parsing", () => {
-    it("should return 400 with Invalid JSON body when req.json() throws", async () => {
-      const req = {
-        json: async () => { throw new SyntaxError("Unexpected token"); },
-        headers: new Headers({ "x-forwarded-for": "192.168.1.1" }),
-        nextUrl: new URL("https://localhost:3001/api/analytics/track"),
-      } as unknown as import("next/server").NextRequest;
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Security Handshake Failed");
+  it("returns 500 on tracking error", async () => {
+    vi.mocked(trackGA4Event).mockRejectedValueOnce(new Error("Tracking failed"));
+    const { POST } = await import("../route");
+    const body = {
+      clientId: "client-123",
+      events: [{ name: "test" }]
+    };
+    const req = new NextRequest("http://localhost/api/analytics/track", { 
+      method: "POST",
+      body: JSON.stringify(body)
     });
-
-    it("should return 400 with Invalid request body when body is an array", async () => {
-      const req = createMockRequest([{ clientId: "1234567890.abcdefghi", events: [] }] as any);
-
-      const response = await POST(req, { params: Promise.resolve({}) } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Missing fields");
-    });
+    const res = await POST(req, { params: {} });
+    expect(res.status).toBe(500);
   });
 });

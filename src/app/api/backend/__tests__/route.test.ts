@@ -29,6 +29,18 @@ vi.mock('@/lib/ratelimit', () => ({
   },
 }));
 
+vi.mock('@/lib/ezygo-batch-fetcher', () => ({
+  fetchEzygoData: vi.fn(),
+  invalidateEzygoCacheForUser: vi.fn(),
+}));
+
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+  })),
+}));
+
 // Mock fetch for upstream API calls
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
@@ -86,6 +98,10 @@ describe('Backend Proxy Route', () => {
   });
 
   describe('CSRF Protection', () => {
+    beforeEach(() => {
+      vi.stubEnv('DISABLE_SECURITY_BYPASS', 'true');
+    });
+
     it('should enforce CSRF validation for POST requests', async () => {
       const { validateCsrfToken } = await import('@/lib/security/csrf');
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
@@ -94,6 +110,7 @@ describe('Backend Proxy Route', () => {
         method: 'POST',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -119,6 +136,7 @@ describe('Backend Proxy Route', () => {
         headers: {
           origin: 'http://localhost',
           'content-type': 'application/json',
+          'x-csrf-token': 'any-token',
         },
         body: JSON.stringify({ name: 'Test' }),
       });
@@ -158,6 +176,7 @@ describe('Backend Proxy Route', () => {
         method: 'PUT',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -175,6 +194,7 @@ describe('Backend Proxy Route', () => {
         method: 'PATCH',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -192,6 +212,7 @@ describe('Backend Proxy Route', () => {
         method: 'DELETE',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -833,6 +854,78 @@ describe('Backend Proxy Route', () => {
       expect(fetchHeaders['x-forwarded-for']).toBe('9.10.11.12');
       expect(fetchHeaders['x-real-ip']).toBe('9.10.11.12');
       expect(fetchHeaders['user-agent']).toBe('TestAgent/1.0');
+    });
+  });
+
+  describe('Cache Invalidation and Edge Cases', () => {
+    it('should invalidate cache for default_semester setting', async () => {
+      const { invalidateEzygoCacheForUser } = await import('@/lib/ezygo-batch-fetcher');
+      const mockInvalidate = vi.mocked(invalidateEzygoCacheForUser);
+
+      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/user/setting/default_semester', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost',
+          'x-csrf-token': 'any',
+        },
+        body: JSON.stringify({ semester: 'odd' }),
+      });
+
+      const response = await forward(request, 'POST', ['user', 'setting', 'default_semester']);
+      expect(response.status).toBe(200);
+      expect(mockInvalidate).toHaveBeenCalled();
+    });
+
+    it('should handle fetch errors gracefully (exercises line 199)', async () => {
+      vi.mocked(mockFetch).mockRejectedValue(new Error('Network failure'));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: { origin: 'http://localhost' },
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(502);
+      const body = await response.json();
+      expect(body.message).toContain('Exception: EzyGo servers');
+    });
+
+    it('should handle binary bodies (exercises line 93)', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/upload', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost',
+          'content-type': 'application/octet-stream',
+          'x-csrf-token': 'any',
+        },
+        body: new Uint8Array([1, 2, 3]),
+      });
+
+      const response = await forward(request, 'POST', ['upload']);
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle missing path segments (exercises line 33)', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/', {
+        method: 'GET',
+      });
+      const response = await GET(request, { params: Promise.resolve({ path: [] }) } as any);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.message).toBe('Missing path');
+    });
+
+    it('should reject paths with fragments (exercises line 35)', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/users#fragment', {
+        method: 'GET',
+      });
+      const response = await GET(request, { params: Promise.resolve({ path: ['users#fragment'] }) } as any);
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe('Invalid path format');
     });
   });
 });

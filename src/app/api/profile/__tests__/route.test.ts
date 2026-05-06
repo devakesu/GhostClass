@@ -93,6 +93,12 @@ vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: { limit: mockRateLimiterLimit },
 }));
 
+// --- Mock sync logic ---
+const mockPerformProfileSync = vi.fn();
+vi.mock("@/lib/user/sync", () => ({
+  performProfileSync: mockPerformProfileSync,
+}));
+
 // ---------------------------------------------------------------------------
 // Helper builders
 // ---------------------------------------------------------------------------
@@ -129,13 +135,25 @@ function makeEzygoFetchFail() {
 // Tests
 // ---------------------------------------------------------------------------
 
+// Helper: build a NextRequest that passes Origin validation.
+// Tests run with NODE_ENV=test and NEXT_PUBLIC_APP_DOMAIN=localhost (vitest.setup.ts).
+const makeGetReq = (overrideHeaders?: Record<string, string>) =>
+  new NextRequest("http://localhost/api/profile", {
+    headers: { origin: "http://localhost", ...overrideHeaders },
+  });
+
+function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csrf") {
+  return new NextRequest("http://localhost:3000/api/profile", {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "x-csrf-token": csrfHeader,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("GET /api/profile", () => {
-  // Helper: build a NextRequest that passes Origin validation.
-  // Tests run with NODE_ENV=test and NEXT_PUBLIC_APP_DOMAIN=localhost (vitest.setup.ts).
-  const makeGetReq = (overrideHeaders?: Record<string, string>) =>
-    new NextRequest("http://localhost/api/profile", {
-      headers: { origin: "http://localhost", ...overrideHeaders },
-    });
 
   beforeEach(() => {
     vi.resetModules();
@@ -375,17 +393,6 @@ describe("PATCH /api/profile", () => {
     vi.restoreAllMocks();
   });
 
-  function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csrf") {
-    return new NextRequest("http://localhost:3000/api/profile", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        "x-csrf-token": csrfHeader,
-      },
-      body: JSON.stringify(body),
-    });
-  }
-
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { PATCH } = await import("../route");
@@ -536,3 +543,128 @@ describe("PATCH /api/profile", () => {
     });
   });
 });
+
+describe("Edge Case & Branch Coverage", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockAdminSelect.mockReset();
+    mockAdminUpsert.mockReset();
+    mockAdminUpdate.mockReset();
+    mockPerformProfileSync.mockReset();
+    mockGetAuthToken.mockReset();
+    mockRateLimiterLimit.mockReset();
+    mockGetUser.mockReset();
+    mockEgressFetch.mockReset();
+
+    process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
+    __resetCachedKey();
+    __resetAllowedHostsCache();
+
+    mockGetUser.mockResolvedValue({
+      data: { user: MOCK_USER },
+      error: null,
+    });
+    mockGetAuthToken.mockResolvedValue("ezygo-session-token");
+    mockAdminSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        }),
+      }),
+    });
+    mockAdminUpsert.mockResolvedValue({ error: null });
+    mockAdminUpdate.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
+  });
+
+  it("handles shouldSync=true when getAuthTokenServer returns null", async () => {
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: 1, first_name: "Alice", auth_id: MOCK_USER.id },
+          error: null,
+        }),
+      }),
+    }));
+    mockGetAuthToken.mockResolvedValue(null);
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    expect(mockPerformProfileSync).not.toHaveBeenCalled();
+  });
+
+  it("handles profile sync failure gracefully (logged but success response)", async () => {
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: 1, first_name: "Alice", auth_id: MOCK_USER.id },
+          error: null,
+        }),
+      }),
+    }));
+    mockPerformProfileSync.mockRejectedValue(new Error("Sync failed"));
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    // Even if sync fails, we return the existing DB data
+    const body = await res.json();
+    expect(body.first_name).toBe("Alice");
+  });
+
+  it("returns 502 when EzyGo returns error status", async () => {
+    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ error: "EzyGo error" }), { status: 500 }));
+    
+    const { GET } = await import("../route");
+    const res = await GET(makeGetReq(), { params: {} });
+    
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.error).toContain("Failed to reach EzyGo profile service");
+  });
+
+  it("handles EzyGo response without .data wrapper", async () => {
+    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ user_id: 123, username: "direct" }), { status: 200 }));
+    
+    const { GET } = await import("../route");
+    const res = await GET(makeGetReq(), { params: {} });
+    
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.username).toBe("direct");
+  });
+
+  it("returns 400 for malformed JSON body in PATCH", async () => {
+    const { PATCH } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile", {
+      method: "PATCH",
+      body: "not-json",
+      headers: { "content-type": "application/json" }
+    });
+    const res = await PATCH(req, { params: {} });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid or empty JSON body" });
+  });
+
+  it("returns 500 when database update fails in PATCH", async () => {
+    mockAdminUpdate.mockImplementation(() => ({
+      eq: vi.fn().mockResolvedValue({ error: { message: "DB Error" } }),
+    }));
+    
+    const { PATCH } = await import("../route");
+    const req = makePatchRequest({ first_name: "Alice" });
+    const res = await PATCH(req, { params: {} });
+    
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to update profile" });
+  });
+  });
