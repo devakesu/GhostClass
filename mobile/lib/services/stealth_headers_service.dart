@@ -3,6 +3,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class StealthHeadersService {
+  static const String _chromeVersion = '141';
+
   final SecureStorageService storage;
   String? _deviceUA;
   String? _secChUa;
@@ -19,8 +21,8 @@ class StealthHeadersService {
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
         // Generate a Chrome-on-Android style UA
-        _deviceUA = 'Mozilla/5.0 (Linux; Android ${androidInfo.version.release}; ${androidInfo.model} Build/${androidInfo.id}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36';
-        _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"';
+        _deviceUA = 'Mozilla/5.0 (Linux; Android ${androidInfo.version.release}; ${androidInfo.model} Build/${androidInfo.id}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
+        _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
         _secChUaPlatform = '"Android"';
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
@@ -30,14 +32,14 @@ class StealthHeadersService {
         _secChUa = ''; // iOS Safari doesn't typically send Sec-Ch-Ua
         _secChUaPlatform = '"iOS"';
       } else {
-        _deviceUA = 'Mozilla/5.0 (${Platform.operatingSystem} ${Platform.operatingSystemVersion}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
-        _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"';
+        _deviceUA = 'Mozilla/5.0 (${Platform.operatingSystem} ${Platform.operatingSystemVersion}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Safari/537.36';
+        _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
         _secChUaPlatform = '"${Platform.operatingSystem}"';
       }
     } catch (e) {
       // Fallback
-      _deviceUA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36';
-      _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"';
+      _deviceUA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
+      _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
       _secChUaPlatform = '"Android"';
     }
   }

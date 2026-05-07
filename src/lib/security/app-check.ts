@@ -6,7 +6,6 @@ import { verifyDeviceCheckToken } from "@/lib/security/device-check";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { decryptRequest, encryptResponse } from "@/lib/security/jwe";
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
 import * as Sentry from "@sentry/nextjs";
@@ -31,21 +30,6 @@ export interface AppCheckOptions {
   consume?: boolean; // If true, the token is invalidated after use (Replay Protection)
 }
 
-/**
- * Checks if the request is from an authorized mobile app using the mobile API key.
- */
-export function isMobileRequest(headers: Headers): boolean {
-  const mobileApiKey = headers.get("x-mobile-api-key");
-  const mobileSecret = process.env.MOBILE_API_SECRET;
-
-  if (!mobileApiKey || !mobileSecret) return false;
-
-  const keyBuffer = Buffer.from(mobileApiKey);
-  const secretBuffer = Buffer.from(mobileSecret);
-  if (keyBuffer.length !== secretBuffer.length) return false;
-
-  return crypto.timingSafeEqual(keyBuffer, secretBuffer);
-}
 
 /**
  * Authentication result - either CSRF (web) or App Check (mobile)
@@ -381,7 +365,11 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
 export function withSecurity(
   handler: (
     req: Request,
-    context: { params: any; decryptedBody?: any; authType?: string },
+    context: {
+      params: any;
+      decryptedBody?: any;
+      authType?: "csrf" | "app-check" | "none";
+    },
   ) => Promise<Response>,
 ) {
   return async (req: Request, context: any) => {

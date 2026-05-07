@@ -14,8 +14,6 @@ import 'package:ghostclass/config/app_secrets.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:ghostclass/services/security_guard.dart';
-import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/services/logger.dart';
 
@@ -88,11 +86,6 @@ void main() async {
     await _handleSecurityFailure(e);
     return;
   }
-
-  // Initialize Security Guard
-  final storage = SecureStorageService();
-  final securityGuard = SecurityGuard(storage);
-  await securityGuard.initialize();
 
   // Initialize Supabase
   await Supabase.initialize(

@@ -7,8 +7,11 @@ import { NextRequest } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { decrypt } from "@/lib/crypto";
-import { isMobileRequest } from "@/lib/security/app-check";
 import { authRateLimiter } from "@/lib/ratelimit";
+
+const { isMobileRequest } = vi.hoisted(() => ({
+  isMobileRequest: vi.fn(),
+}));
 
 // Mock dependencies
 vi.mock("server-only", () => ({}));
@@ -48,8 +51,11 @@ vi.mock("@/lib/utils.server", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", () => ({
-  withSecurity: vi.fn((handler) => handler),
-  isMobileRequest: vi.fn(),
+  withSecurity: vi.fn((handler) => (req: any, context: any) => handler(req, {
+    ...context,
+    authType: isMobileRequest() ? "app-check" : "csrf"
+  })),
+  isMobileRequest,
 }));
 
 vi.mock("@sentry/nextjs", () => ({

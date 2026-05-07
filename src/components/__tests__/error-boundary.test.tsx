@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
 import { ErrorBoundary } from '../error-boundary';
 import * as Sentry from '@sentry/nextjs';
 
@@ -59,7 +58,7 @@ describe('ErrorBoundary Component', () => {
   });
 
   it('resets error when Try Again is clicked', () => {
-    const { rerender } = render(
+    render(
       <ErrorBoundary>
         <ProblemChild />
       </ErrorBoundary>

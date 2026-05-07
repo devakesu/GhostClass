@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorFallback } from '../error-fallback';
 import { useRouter } from 'next/navigation';
 import { handleLogout } from '@/lib/security/auth';

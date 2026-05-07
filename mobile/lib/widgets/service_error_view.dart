@@ -13,7 +13,6 @@ class ServiceErrorView extends ConsumerWidget {
   final VoidCallback? onRetry;
   final bool showHome;
   final Object? error;
-  final bool isError;
 
   const ServiceErrorView({
     super.key,
@@ -23,7 +22,6 @@ class ServiceErrorView extends ConsumerWidget {
     this.onRetry,
     this.showHome = true,
     this.error,
-    this.isError = false,
   });
 
   @override

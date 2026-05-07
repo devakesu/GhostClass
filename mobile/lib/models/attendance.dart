@@ -1,3 +1,5 @@
+import 'package:ghostclass/logic/type_utils.dart';
+
 class AttendanceCourse {
   final int id;
   final String name;
@@ -7,7 +9,7 @@ class AttendanceCourse {
 
   factory AttendanceCourse.fromJson(Map<String, dynamic> json) {
     return AttendanceCourse(
-      id: _toInt(json['id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
       name: (json['name'] ?? 'Unknown Course').toString(),
       code: json['code'] as String?,
     );
@@ -159,7 +161,7 @@ class TrackingRecord {
 
   factory TrackingRecord.fromJson(Map<String, dynamic> json) {
     return TrackingRecord(
-      id: _toInt(json['id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
       course: (json['course'] ?? '').toString(),
       date: (json['date'] ?? '').toString(),
       session: (json['session'] ?? '').toString(),
@@ -198,11 +200,4 @@ class SuspiciousAbsence {
     required this.session,
     required this.presentIn,
   });
-}
-
-int? _toInt(dynamic value) {
-  if (value is int) return value;
-  if (value is double) return value.toInt();
-  if (value is String) return int.tryParse(value);
-  return null;
 }

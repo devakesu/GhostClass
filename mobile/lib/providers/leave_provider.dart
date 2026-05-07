@@ -39,12 +39,15 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
             l.userSubgroup?.academicYear == academic.year)
         .toList();
 
-    final sessions = rawSessions.map((key, value) => MapEntry(
-          int.parse(key.toString()),
-          (value as List)
-              .map((s) => LeaveSession.fromJson(s as Map<String, dynamic>))
-              .toList(),
-        ));
+    final sessions = <int, List<LeaveSession>>{};
+    rawSessions.forEach((key, value) {
+      final parsedKey = int.tryParse(key.toString());
+      if (parsedKey != null) {
+        sessions[parsedKey] = (value as List)
+            .map((s) => LeaveSession.fromJson(s as Map<String, dynamic>))
+            .toList();
+      }
+    });
 
     return LeaveState(leaves: leaves, sessions: sessions);
   }

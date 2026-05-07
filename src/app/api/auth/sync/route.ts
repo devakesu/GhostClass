@@ -4,7 +4,7 @@ import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { logger } from "@/lib/logger";
 import { getClientIp, redact } from "@/lib/utils.server";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto";
 import { UserResponse } from "@supabase/supabase-js";
@@ -32,10 +32,10 @@ export const dynamic = "force-dynamic";
  * - Web: Refreshes Supabase session and heals ezygo_access_token cookie.
  * - Mobile: Returns an encrypted bundle containing the healed EzyGo token and terms status.
  */
-const handler = async (req: Request) => {
+const handler = async (req: Request, { authType }: { authType: "app-check" | "csrf" }) => {
   try {
     const headerList = req.headers;
-    const isMobile = isMobileRequest(headerList);
+    const isMobile = authType === "app-check";
     
     // 0. Rate limiting by IP
     const ip = getClientIp(headerList);

@@ -130,25 +130,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
           Positioned(
             top: -120,
             right: -60,
-            child: _GlowBlob(
-              color: primaryColor.withValues(alpha: 0.1),
-              size: 320,
+            child: RepaintBoundary(
+              child: _GlowBlob(
+                color: primaryColor.withValues(alpha: 0.1),
+                size: 320,
+              ),
             ),
           ),
           Positioned(
             bottom: -60,
             left: -100,
-            child: _GlowBlob(
-              color: amber.withValues(alpha: 0.08),
-              size: 280,
+            child: RepaintBoundary(
+              child: _GlowBlob(
+                color: amber.withValues(alpha: 0.08),
+                size: 280,
+              ),
             ),
           ),
           Positioned(
             top: 200,
             left: -80,
-            child: _GlowBlob(
-              color: primaryColor.withValues(alpha: 0.04),
-              size: 200,
+            child: RepaintBoundary(
+              child: _GlowBlob(
+                color: primaryColor.withValues(alpha: 0.04),
+                size: 200,
+              ),
             ),
           ),
 
@@ -169,10 +175,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                           Center(
                             child: Hero(
                               tag: 'app_logo',
-                              child: Image.asset(
-                                'assets/logo.png',
-                                width: MediaQuery.of(context).size.width * 0.7,
-                                fit: BoxFit.contain,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 300),
+                                child: Image.asset(
+                                  'assets/logo.png',
+                                  width: MediaQuery.of(context).size.width * 0.7,
+                                  fit: BoxFit.contain,
+                                  semanticLabel: 'GhostClass Logo',
+                                ),
                               ),
                             ),
                           ).animate().fade().scale(
@@ -222,19 +232,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                           // Password Field
                           _FieldLabel(
                             label: 'Password',
-                            trailing: GestureDetector(
-                              onTap: () async {
-                                final url = Uri.parse(AppConfig.ezygoOrigin);
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                                }
-                              },
-                              child: Text(
-                                'Forgot password?',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: primaryColor,
+                            trailing: Semantics(
+                              button: true,
+                              label: 'Forgot password',
+                              hint: 'Opens EzyGo website to reset your password',
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final url = Uri.parse(AppConfig.ezygoOrigin);
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                child: Text(
+                                  'Forgot password?',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryColor,
+                                  ),
                                 ),
                               ),
                             ),
@@ -327,7 +342,8 @@ class _FieldLabel extends StatelessWidget {
   final List<IconData>? icons;
   final Widget? trailing;
 
-  const _FieldLabel({required this.label, this.icons, this.trailing});
+  const _FieldLabel({required this.label, this.icons, this.trailing})
+      : assert(icons == null || trailing == null);
 
   @override
   Widget build(BuildContext context) {

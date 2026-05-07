@@ -12,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/config/app_secrets.dart';
 import 'package:ghostclass/logic/app_exception.dart';
-import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
@@ -65,8 +64,6 @@ class ApiService {
   /// The EzyGo Base API root.
   static String get _ezygoApiRoot => AppConfig.ezygoApiRoot;
 
-  /// Used as the x-mobile-api-key header to the GhostClass auth bridge.
-  static final EncryptedValue _mobileApiKey = AppConfig.mobileApiSecret;
 
   /// Generates a secure random nonce of at least 16 bytes for Play Integrity.
   /// Note: This is a fallback if the server nonce fetch fails.
@@ -519,7 +516,6 @@ class ApiService {
       '$_ghostclassBaseUrl/auth/save-token',
       data: {'token': ezygoToken.trim()},
       options: Options(
-        headers: {'x-mobile-api-key': _mobileApiKey.value},
         extra: {'useLimitedToken': true}, // Enable Replay Protection (Nonce)
         validateStatus: (s) => s != null && s < 600,
       ),
@@ -536,8 +532,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,
@@ -551,8 +545,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,
@@ -570,8 +562,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         validateStatus: (s) => s != null && s < 600,
       ),
@@ -596,8 +586,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         validateStatus: (s) => s != null && s < 600,
       ),
@@ -614,8 +602,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         validateStatus: (s) => s != null && s < 600,
       ),
@@ -640,8 +626,6 @@ class ApiService {
       options: Options(
         headers: {
           if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         validateStatus: (s) => s != null && s < 600,
       ),
@@ -656,8 +640,6 @@ class ApiService {
       options: Options(
         headers: {
           if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,
@@ -960,8 +942,6 @@ class ApiService {
       options: Options(
         headers: {
           'Authorization': 'Bearer $supabaseToken',
-          if (_mobileApiKey.value.isNotEmpty)
-            'x-mobile-api-key': _mobileApiKey.value,
         },
         extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,

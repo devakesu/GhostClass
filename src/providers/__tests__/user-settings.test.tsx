@@ -646,7 +646,7 @@ describe('UserSettingsProvider', () => {
       const settings = { bunk_calculator_enabled: false, target_percentage: 88, disabled_courses: {} };
       window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({ userId, settings }));
 
-      vi.mocked(useQuery).mockImplementation((options: any) => ({
+      vi.mocked(useQuery).mockImplementation((_options: any) => ({
         data: null, 
         isLoading: false,
         isFetching: false,
@@ -668,7 +668,7 @@ describe('UserSettingsProvider', () => {
       window.localStorage.setItem('showBunkCalc', 'false');
       window.localStorage.setItem('targetPercentage', '92');
 
-      vi.mocked(useQuery).mockImplementation((options: any) => ({
+      vi.mocked(useQuery).mockImplementation((_options: any) => ({
         data: null,
         isLoading: false,
         isFetching: false,

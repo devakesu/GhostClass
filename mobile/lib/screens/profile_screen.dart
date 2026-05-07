@@ -8,6 +8,7 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -163,6 +164,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
         throw Exception('Unsupported file type. Use JPG, PNG or WebP.');
       }
 
+      // File size limit: reject if > 5MB
+      final fileSize = await file.length();
+      const maxSizeBytes = 5 * 1024 * 1024; // 5 MB
+      if (fileSize > maxSizeBytes) {
+        throw Exception('Avatar file too large. Maximum size is 5 MB (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB detected).');
+      }
+
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = '${user.supabaseUserId}/$fileName';
 
@@ -315,11 +323,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
           isFullScreen: false,
           showLogo: false,
         ),
-        error: (_, _) => Center(
-          child: Text(
-            'We encountered an error while loading your profile. Please try again later. If the issue persists, please contact us.',
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-          ),
+        error: (err, _) => ServiceErrorView(
+          title: 'Profile Error',
+          description: 'We encountered an error while loading your profile. Please try again later.',
+          error: err,
+          onRetry: () => ref.invalidate(authProvider),
         ),
       ),
     );

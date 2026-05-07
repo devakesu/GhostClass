@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { isMobileRequest, verifyAppCheckToken, withSecurity } from '../app-check';
+import { verifyAppCheckToken, withSecurity } from '../app-check';
 import { getAppCheck } from '@/lib/firebase/admin';
 import { verifyPlayIntegrity } from '@/lib/security/integrity';
 import { verifyDeviceCheckToken } from '@/lib/security/device-check';
 import { headers, cookies } from 'next/headers';
 import { validateCsrfToken } from '@/lib/security/csrf';
 import { decryptRequest, encryptResponse } from '@/lib/security/jwe';
-import { Ratelimit } from '@upstash/ratelimit';
-import { getClientIp } from '@/lib/utils.server';
 
 // Create a stable mock result that we can control
 const rateLimitMock = {
@@ -91,19 +89,6 @@ describe('app-check logic', () => {
     rateLimitMock.success = true;
   });
 
-  describe('isMobileRequest', () => {
-    it('returns true for matching secret', () => {
-      const h = new Headers();
-      h.set('x-mobile-api-key', 'test-secret');
-      expect(isMobileRequest(h)).toBe(true);
-    });
-
-    it('returns false for mismatched secret', () => {
-      const h = new Headers();
-      h.set('x-mobile-api-key', 'wrong');
-      expect(isMobileRequest(h)).toBe(false);
-    });
-  });
 
   describe('verifyAppCheckToken', () => {
     const mockAppCheck = {

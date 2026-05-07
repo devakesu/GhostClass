@@ -406,8 +406,12 @@ class _ScoreCard extends StatelessWidget {
                         style: GoogleFonts.manrope(fontSize: 32, fontWeight: FontWeight.w900, color: scoreColor),
                       ),
                       Text(
-                        ' / ${resolved!.maxMark.toStringAsFixed(0)}',
-                        style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+                        resolved!.isMaxUnresolvable ? ' (max unknown)' : ' / ${resolved!.maxMark.toStringAsFixed(0)}',
+                        style: GoogleFonts.manrope(
+                          fontSize: resolved!.isMaxUnresolvable ? 12 : 16, 
+                          fontWeight: FontWeight.w700, 
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                        ),
                       ),
                     ],
                   )
@@ -436,7 +440,7 @@ class _ScoreCard extends StatelessWidget {
                   ),
               ],
             ),
-            if (resolved != null && resolved!.isMarked) ...[
+            if (resolved != null && resolved!.isMarked && !resolved!.isMaxUnresolvable) ...[
               const SizedBox(height: 16),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -624,8 +628,12 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
                         style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.w900, color: widget.resolved!.color),
                       ),
                       Text(
-                        ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
-                        style: GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                        widget.resolved!.isMaxUnresolvable ? ' (max unknown)' : ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
+                        style: GoogleFonts.manrope(
+                          fontSize: widget.resolved!.isMaxUnresolvable ? 11 : 14, 
+                          fontWeight: FontWeight.w700, 
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                        ),
                       ),
                     ],
                   ),

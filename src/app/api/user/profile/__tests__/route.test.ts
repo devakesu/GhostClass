@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { decrypt } from "@/lib/crypto";
 import { performProfileSync } from "@/lib/user/sync";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -21,7 +21,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("@/lib/crypto", () => ({
-  decrypt: vi.fn((iv, content) => `decrypted-${content}`),
+  decrypt: vi.fn((_iv, content) => `decrypted-${content}`),
 }));
 
 vi.mock("@/lib/logic/academic", () => ({
@@ -178,7 +178,7 @@ describe("GET /api/user/profile", () => {
       birth_date_iv: "iv"
     };
     mockAdminMaybeSingle.mockResolvedValueOnce({ data: MOCK_DB_USER_WITH_PII, error: null });
-    (decrypt as any).mockImplementation((iv, content) => {
+    (decrypt as any).mockImplementation((_iv: string, content: string) => {
       if (content === "enc-phone") throw new Error("Decryption failed");
       return `decrypted-${content}`;
     });

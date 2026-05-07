@@ -60,6 +60,7 @@ dependencies:
   sentry_flutter: ^9.18.0
   sentry_dio: ^9.18.0
   flutter_markdown_plus: ^1.0.7
+  uuid: ^4.5.3
 
 
 dependency_overrides:

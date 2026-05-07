@@ -99,10 +99,16 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
 
 (int, int) _parseAcademicYear(String year) {
   final parts = year.split('-');
-  final start =
-      int.tryParse(parts.isNotEmpty ? parts.first : '') ?? DateTime.now().year;
+  
+  // Handle cases like "2025" -> (2025, 2026)
+  // This ensures reasonable defaults for single-year inputs.
+  String startPart = parts.isNotEmpty ? parts.first : '';
+  if (startPart.length == 2) startPart = '20$startPart';
+  final start = int.tryParse(startPart) ?? DateTime.now().year;
+  
   final end = parts.length > 1
       ? int.tryParse(parts[1].length == 2 ? '20${parts[1]}' : parts[1])
       : start + 1;
+      
   return (start, end ?? start + 1);
 }

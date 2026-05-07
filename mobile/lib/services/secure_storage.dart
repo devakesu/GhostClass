@@ -134,6 +134,36 @@ class SecureStorageService {
     }
   }
 
+  // ─── Generic TTL Cache ──────────────────────────────────────────────────
+
+  /// Persists any JSON-serializable data with a TTL.
+  Future<void> saveCachedData(String key, dynamic data, {Duration ttl = const Duration(hours: 24)}) async {
+    final expiry = DateTime.now().add(ttl).millisecondsSinceEpoch;
+    final payload = {
+      'data': data,
+      'expiry': expiry,
+    };
+    await _storage.write(key: 'cache_$key', value: jsonEncode(payload));
+  }
+
+  /// Returns cached data if it exists and has not expired.
+  Future<dynamic> getCachedData(String key) async {
+    final raw = await _storage.read(key: 'cache_$key');
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final expiry = decoded['expiry'] as int;
+      if (DateTime.now().millisecondsSinceEpoch > expiry) {
+        await _storage.delete(key: 'cache_$key');
+        return null;
+      }
+      return decoded['data'];
+    } catch (e) {
+      AppLogger.w('SecureStorage: Error decoding cache for $key');
+      return null;
+    }
+  }
+
   // ─── Full Clear ──────────────────────────────────────────────────────────
 
   /// Deletes every key managed by this service. Should be called on logout.

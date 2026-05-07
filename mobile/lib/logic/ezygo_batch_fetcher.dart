@@ -75,6 +75,9 @@ class EzygoBatchFetcher {
     // 0.5. Circuit Breaker: If an outage is active, block ALL network requests immediately.
     // This state is only cleared when the user manually presses 'Retry' (clearAll()).
     if (_getOutage()) {
+      // Ensure the UI state is definitely true if we are blocking
+      _setOutage(true);
+      
       // Throttle the warning log to once per minute to avoid console flooding
       const logThrottle = Duration(minutes: 1);
       final now = DateTime.now();
@@ -107,6 +110,13 @@ class EzygoBatchFetcher {
         // Purge expired entry
         _cache.remove(cacheKey);
       }
+    }
+
+    // 2. Check in-flight requests (Deduplication)
+    final inFlight = _inFlight[cacheKey];
+    if (inFlight != null) {
+      AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request for $path');
+      return inFlight;
     }
 
     // 3. Rate Limiting: Wait for an available slot

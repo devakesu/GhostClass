@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ghostclass/constants/content_cache.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -34,8 +33,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     // Proactively pre-warm security layers while logo is showing
     final jwePreWarm = JweService.instance.preWarm();
     final apiPreWarm = ref.read(apiServiceProvider).preWarm();
-
-    ContentCache.warmUp();
 
     // 2. Minimum animation duration and opportunistic cache warming
     try {
