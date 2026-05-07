@@ -276,7 +276,7 @@ function useUserSettingsState() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!userId || isLoading || mutation.isPending) return;
+    if (!userId || isLoading || mutation.isPending || dbSettings === undefined) return;
 
     try {
       // 1. If DB has no record for this user, create one using local preferences (migration)

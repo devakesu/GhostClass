@@ -17,7 +17,7 @@ import {
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 import { validateSignedRequest } from "@/lib/security/request-signing";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 
@@ -95,7 +95,7 @@ interface UserSyncData {
   auth_id: string;
 }
 
-export const GET = withSecurity(async (req) => {
+export const GET = withSecurity(async (req, { authType }) => {
   const supabaseAdmin = getAdminClient();
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -117,7 +117,7 @@ export const GET = withSecurity(async (req) => {
   // invalid requests without consuming rate-limit quota. Uses constant-time comparison
   // to prevent timing attacks.
   const authHeader = req.headers.get("authorization");
-  const isMobile = isMobileRequest(req.headers);
+  const isMobile = authType === "app-check";
   let isCron = false;
 
   if (authHeader !== null && !isMobile) {

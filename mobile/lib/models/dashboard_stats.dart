@@ -315,6 +315,11 @@ class DashboardStats {
     final finalTotal = officialTotal + manualTotalGain;
     final finalPresentCount = officialPresent + corrPresent + extraPresent;
     final finalAbsentCount = officialAbsent - savedAbsent + extraAbsent;
+    
+    // Invariant: savedAbsent and finalAbsentCount must never be negative.
+    // Divergence here indicates a tracking record without a matching official record.
+    assert(savedAbsent >= 0 && finalAbsentCount >= 0,
+        'Attendance Invariant Violation: Negative absent count (official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)');
 
     final double rawPercentage = finalTotal > 0
         ? (finalPresentCount / finalTotal) * 100

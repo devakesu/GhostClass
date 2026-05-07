@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
+// ignore: unnecessary_import
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
@@ -22,6 +24,68 @@ class JweService {
 
   final _ghostclassApiUrl = AppConfig.ghostclassApiUrl;
 
+  /// Extracts the hostname from the configured API URL
+  String _getExpectedHostname() {
+    try {
+      final uri = Uri.parse(_ghostclassApiUrl);
+      return uri.host;
+    } catch (e) {
+      AppLogger.e('JweService: Failed to extract hostname', e);
+      return 'ghostclass.devakesu.com'; // Safe fallback
+    }
+  }
+
+  /// Validates certificate CN/SANs match the expected hostname
+  /// Returns true if valid, false otherwise (to reject the cert)
+  ///
+  /// SECURITY: Even in debug mode, we validate the certificate CN to prevent
+  /// MITM attacks. This allows self-signed certs (for local dev) but still
+  /// ensures we're talking to the correct server.
+  bool _validateCertificateHostname(
+    X509Certificate cert,
+    String host,
+    int port,
+  ) {
+    final expectedHost = _getExpectedHostname();
+
+    // In production, reject any certificate issues
+    if (!kDebugMode) {
+      return false; // Let the normal verification happen
+    }
+
+    // Debug mode: Allow self-signed certs BUT validate the CN
+    try {
+      final subject = cert.subject;
+
+      // Extract CN from certificate subject
+      if (subject.contains('CN=')) {
+        final cnStart = subject.indexOf('CN=') + 3;
+        final cnEnd = subject.indexOf(',', cnStart);
+        final cn = cnEnd > cnStart
+            ? subject.substring(cnStart, cnEnd)
+            : subject.substring(cnStart);
+
+        // Check if CN matches expected hostname or is a wildcard
+        if (cn.trim() == expectedHost ||
+            cn.trim() == '*.$expectedHost' ||
+            (cn.trim().startsWith('*.') &&
+                expectedHost.endsWith(cn.trim().substring(1)))) {
+          AppLogger.i('JweService: Certificate CN validated for $expectedHost');
+          return true;
+        }
+      }
+
+      // If CN doesn't match, reject the certificate
+      AppLogger.w(
+        'JweService: Certificate CN mismatch. Expected: $expectedHost, Certificate: $subject',
+      );
+      return false;
+    } catch (e) {
+      AppLogger.e('JweService: Certificate validation error', e);
+      return false; // Fail closed on errors
+    }
+  }
+
   Future<void> _fetchJwks() async {
     if (_cachedJwks != null &&
         _lastFetch != null &&
@@ -30,7 +94,9 @@ class JweService {
     }
 
     try {
-      final networkTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
+      final networkTimeout = kDebugMode
+          ? const Duration(seconds: 40)
+          : const Duration(seconds: 20);
       final dio = Dio(
         BaseOptions(
           connectTimeout: networkTimeout,
@@ -42,8 +108,9 @@ class JweService {
       if (kDebugMode) {
         (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
           final client = HttpClient();
-          client.badCertificateCallback =
-              (X509Certificate cert, String host, int port) => true;
+          // SECURITY: Validate certificate CN even in debug mode
+          // This prevents MITM attacks while allowing self-signed certs
+          client.badCertificateCallback = _validateCertificateHostname;
           return client;
         };
       }
@@ -72,14 +139,30 @@ class JweService {
     }
   }
 
-  /// Forces the JsonWebKey to explicitly support wrapKey to bypass Dart jose library quirks
-  JsonWebKey _getSanitizedServerKey() {
-    final rawJson = _cachedJwks!.keys.first.toJson();
+  /// Selects a usable server key from JWKS.
+  ///
+  /// Prefer a key with a kid so the resulting JWE preserves key-rotation hints.
+  JsonWebKey _getPreferredServerKey() {
+    final keys = _cachedJwks?.keys ?? const <JsonWebKey>[];
+    if (keys.isEmpty) {
+      throw Exception('Server public key not available.');
+    }
+
+    return keys.firstWhere(
+      (key) => key.keyId != null && key.keyId!.isNotEmpty,
+      orElse: () => keys.first,
+    );
+  }
+
+  /// Forces the JsonWebKey to explicitly support wrapKey while preserving kid.
+  JsonWebKey _getSanitizedServerKey(JsonWebKey key) {
+    final rawJson = key.toJson();
 
     return JsonWebKey.fromJson({
       'kty': 'RSA',
       'n': rawJson['n'],
       'e': rawJson['e'],
+      if (rawJson['kid'] != null) 'kid': rawJson['kid'],
       // Notice: We completely omit 'alg', 'use', and 'key_ops'.
       // The library can no longer reject it for operation mismatches.
     });
@@ -102,8 +185,8 @@ class JweService {
 
     final enrichedData = {...data, 'rcek': rcekBase64};
 
-    // Use the sanitized key
-    final serverKey = _getSanitizedServerKey();
+    // Use the sanitized key while preserving kid for rotation-aware servers
+    final serverKey = _getSanitizedServerKey(_getPreferredServerKey());
 
     final builder = JsonWebEncryptionBuilder()
       ..jsonContent = enrichedData
@@ -128,8 +211,8 @@ class JweService {
     );
     final rcekBase64 = base64Url.encode(rcekBytes).replaceAll('=', '');
 
-    // Use the sanitized key
-    final serverKey = _getSanitizedServerKey();
+    // Use the sanitized key while preserving kid for rotation-aware servers
+    final serverKey = _getSanitizedServerKey(_getPreferredServerKey());
 
     final builder = JsonWebEncryptionBuilder()
       ..jsonContent = {'rcek': rcekBase64}

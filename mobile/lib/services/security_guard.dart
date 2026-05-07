@@ -10,7 +10,6 @@ class SecurityGuard {
 
   SecurityGuard(this.storage);
 
-  Future<void> initialize() async {}
 
   /// Toggles screenshot/screen recording protection on Android.
   Future<void> setSecureScreen(bool enabled) async {

@@ -461,7 +461,7 @@ export function validateEnvironment() {
 
   if (!process.env.MOBILE_API_SECRET) {
     warnings.push(
-      "⚠️  MOBILE_API_SECRET not set - mobile application login will be disabled",
+      "⚠️  MOBILE_API_SECRET not set - server-side nonce signing will use a fallback (less secure).",
     );
   }
 

@@ -222,13 +222,28 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     required Map<int, List<ExamAnswer>> answersMap,
     required Map<int, ResolvedScore> resolvedScores,
   }) async {
-    final results = await Future.wait([
-      api.fetchExamQuestions(exam.id, storage),
-      api.fetchExamAnswers(exam.id, storage),
-    ]);
+    final cacheKeyQs = 'exam_questions_${exam.id}';
+    final cacheKeyAns = 'exam_answers_${exam.id}';
 
-    final qsData = results[0].data;
-    final ansData = results[1].data;
+    dynamic qsData = await storage.getCachedData(cacheKeyQs);
+    dynamic ansData = await storage.getCachedData(cacheKeyAns);
+
+    if (qsData == null || ansData == null) {
+      final results = await Future.wait([
+        api.fetchExamQuestions(exam.id, storage),
+        api.fetchExamAnswers(exam.id, storage),
+      ]);
+
+      qsData = results[0].data;
+      ansData = results[1].data;
+
+      if (results[0].statusCode == 200 && qsData != null) {
+        await storage.saveCachedData(cacheKeyQs, qsData);
+      }
+      if (results[1].statusCode == 200 && ansData != null) {
+        await storage.saveCachedData(cacheKeyAns, ansData);
+      }
+    }
 
     final qs = (qsData is List ? qsData : [])
         .map((j) => ExamQuestion.fromJson(j as Map<String, dynamic>))
@@ -302,10 +317,13 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     }
 
     if (finalScore != null) {
+      final double? m = finalMax;
+      final bool isMaxUnresolvable = (m == null || m <= 0);
       resolvedScores[exam.id] = ResolvedScore(
         score: finalScore,
-        maxMark: (finalMax != null && finalMax > 0) ? finalMax : (finalScore > 0 ? finalScore : 0.0),
+        maxMark: isMaxUnresolvable ? 0.0 : m,
         isMarked: true,
+        isMaxUnresolvable: isMaxUnresolvable,
       );
     }
   }

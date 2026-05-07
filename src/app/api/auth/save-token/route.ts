@@ -15,7 +15,7 @@ import { TERMS_VERSION } from "@/app/config/legal";
 import { setTermsVersionCookie, clearTermsVersionCookie } from "@/app/actions/user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { performProfileSync } from "@/lib/user/sync";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 
 export const dynamic = 'force-dynamic';
 
@@ -127,12 +127,12 @@ async function releaseAuthLock(userId: string, lockValue: string): Promise<void>
   }
 }
 
-export const POST = withSecurity(async (req, { decryptedBody }) => {
+export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
   const supabaseAdmin = getAdminClient();
 
   // 1. Origin/Host Validation
   const headerList = await headers();
-  const isMobileApp = isMobileRequest(headerList);
+  const isMobileApp = authType === "app-check";
   // Note: Rate limiting is performed later in this handler after client IP extraction.
   // SKIP origin validation in development mode for easier local testing.
   // This is safe in dev because: (1) the CSRF token still validates the request,

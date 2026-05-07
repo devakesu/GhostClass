@@ -38,12 +38,6 @@ class AppConfig {
       ? AppSecrets.ghostclassApiUrlDev
       : AppSecrets.ghostclassApiUrlProd;
 
-  /// Secret key used in the x-mobile-api-key header for the GhostClass bridge.
-  static EncryptedValue get mobileApiSecret => EncryptedValue.fromPlaintext(
-    AppSecrets.isDev
-        ? AppSecrets.mobileApiSecretDev
-        : AppSecrets.mobileApiSecretProd,
-  );
 
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
@@ -137,17 +131,12 @@ class AppConfig {
 
   /// Simple base64 decoding for stealth strings.
   /// This prevents sensitive strings and variable names from appearing plainly in the binary.
+  /// ALL values must be base64-encoded uniformly to maintain consistent obfuscation.
   static String _d(String encoded) {
     if (encoded.isEmpty) return '';
     try {
       final trimmed = encoded.trim();
       if (trimmed.isEmpty) return '';
-
-      if (trimmed.startsWith('http') ||
-          trimmed.startsWith('sb_') ||
-          trimmed.contains('://')) {
-        return trimmed;
-      }
 
       return utf8.decode(base64.decode(trimmed));
     } catch (e) {

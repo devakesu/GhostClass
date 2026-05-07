@@ -29,6 +29,8 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   bool _isSubmitting = false;
 
   final List<String> _sessions = ['1', '2', '3', '4', '5', '6', '7'];
+  Map<int, Map<String, Map<String, int>>>? _precomputedFrequencies;
+  bool _isBlocked = false;
 
   String _canonicalTrackerCourseCode(CourseDetails course) {
     final code = course.code?.trim();
@@ -39,10 +41,59 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   @override
   void initState() {
     super.initState();
+    // Precompute frequencies once when dialog opens
+    _precomputeFrequencies();
+    
     // Initial prefill logic will be handled after build or via a post-frame callback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _prefillDefaults();
     });
+  }
+
+  void _precomputeFrequencies() {
+    final data = ref.read(dashboardProvider).value;
+    if (data == null) return;
+
+    final result = <int, Map<String, Map<String, int>>>{};
+
+    data.attendance.studentAttendanceData.forEach((dStr, sessions) {
+      try {
+        if (dStr.length != 8) return;
+        final y = int.parse(dStr.substring(0, 4));
+        final m = int.parse(dStr.substring(4, 6));
+        final d = int.parse(dStr.substring(6, 8));
+        final date = DateTime(y, m, d);
+        final weekday = date.weekday;
+
+        result.putIfAbsent(weekday, () => {});
+        final weekdayMap = result[weekday]!;
+
+        int idx = 0;
+        sessions.forEach((key, sessionObj) {
+          if (sessionObj.course != null &&
+              sessionObj.course != 0 &&
+              sessionObj.course.toString() != 'null') {
+            final sessionName = _getSessionName(
+              data.attendance.sessions,
+              key,
+              sessionObj,
+              idx,
+            );
+            final target = utils.normalizeSession(sessionName);
+
+            weekdayMap.putIfAbsent(target, () => {});
+            final sessionMap = weekdayMap[target]!;
+
+            final cid = sessionObj.course.toString();
+            sessionMap[cid] = (sessionMap[cid] ?? 0) + 1;
+          }
+          idx++;
+        });
+      } catch (e) {
+        // Silently skip malformed dates
+      }
+    });
+    _precomputedFrequencies = result;
   }
 
   String _getSessionName(
@@ -128,9 +179,19 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       orElse: () => '',
     );
 
+    if (firstFree.isEmpty) {
+      ServiceToast.show(
+        context,
+        'All sessions for today are already recorded.',
+        isError: true,
+      );
+    }
+
     setState(() {
       _selectedSession = firstFree.isNotEmpty ? firstFree : null;
     });
+
+    _updateBlockedState();
 
     if (firstFree.isNotEmpty) {
       _prefillCourse(firstFree);
@@ -143,54 +204,21 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
 
     final data = dashboardAsync.value!;
     final dayOfWeek = _selectedDate.weekday;
-    final frequencyMap = <String, int>{};
     final target = utils.normalizeSession(session);
 
-    data.attendance.studentAttendanceData.forEach((dStr, sessions) {
-      try {
-        if (dStr.length != 8) return;
-        final y = int.parse(dStr.substring(0, 4));
-        final m = int.parse(dStr.substring(4, 6));
-        final d = int.parse(dStr.substring(6, 8));
-        final date = DateTime(y, m, d);
-
-        if (date.weekday == dayOfWeek) {
-          int idx = 0;
-          sessions.forEach((key, sessionObj) {
-            if (sessionObj.course != null &&
-                sessionObj.course != 0 &&
-                sessionObj.course.toString() != 'null') {
-              final sessionName = _getSessionName(
-                data.attendance.sessions,
-                key,
-                sessionObj,
-                idx,
-              );
-
-              if (utils.normalizeSession(sessionName) == target) {
-                final cid = sessionObj.course.toString();
-                frequencyMap[cid] = (frequencyMap[cid] ?? 0) + 1;
-              }
-            }
-            idx++;
-          });
-        }
-      } catch (e) {
-        AppLogger.w(
-          'AddAttendanceDialog: Failed to prefill course from date key',
-          e,
-        );
-      }
-    });
+    // Use precomputed frequencies for O(1) course lookup (per session/weekday)
+    final frequencyMap = _precomputedFrequencies?[dayOfWeek]?[target];
 
     String? bestCourseId;
-    int maxCount = 0;
-    frequencyMap.forEach((cid, count) {
-      if (count > maxCount) {
-        maxCount = count;
-        bestCourseId = cid;
-      }
-    });
+    if (frequencyMap != null && frequencyMap.isNotEmpty) {
+      int maxCount = 0;
+      frequencyMap.forEach((cid, count) {
+        if (count > maxCount) {
+          maxCount = count;
+          bestCourseId = cid;
+        }
+      });
+    }
 
     if (bestCourseId != null) {
       final course = data.courses.firstWhere(
@@ -211,7 +239,16 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     }
   }
 
-  bool _isSessionBlocked() {
+  void _updateBlockedState() {
+    final isBlockedNow = _checkIfSessionBlocked();
+    if (_isBlocked != isBlockedNow) {
+      setState(() {
+        _isBlocked = isBlockedNow;
+      });
+    }
+  }
+
+  bool _checkIfSessionBlocked() {
     if (_selectedSession == null) return false;
 
     final dashboardAsync = ref.read(dashboardProvider).value;
@@ -262,7 +299,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       return;
     }
 
-    if (_isSessionBlocked()) {
+    if (_isBlocked) {
       ServiceToast.show(
         context,
         'This session is already marked!',
@@ -295,10 +332,6 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       final remarks = _status == 'Duty Leave'
           ? (sanitizedReason.isEmpty ? 'Duty Leave' : sanitizedReason)
           : sanitizedReason;
-
-      // Extract the actual ID (Safe ID for custom courses)
-      final data = ref.read(dashboardProvider).value;
-      if (data == null) return;
 
       final matchingCourse = data.courses.firstWhere(
         (c) => c.safeId == _selectedCourseId,
@@ -359,11 +392,13 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardProvider);
     final data = dashboardAsync.value;
-    final blocked = _isSessionBlocked();
+    final blocked = _isBlocked;
 
-    final primary =
-        Theme.of(context).extension<GhostColors>()?.brandPrimary ??
-        Theme.of(context).colorScheme.primary;
+    final ghostColors = Theme.of(context).extension<GhostColors>();
+    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final success = ghostColors?.successGreen ?? Colors.green;
+    final danger = ghostColors?.dangerRed ?? Theme.of(context).colorScheme.error;
+    final amber = ghostColors?.accentOrange ?? Colors.orange;
     final surface = Theme.of(context).colorScheme.surface;
 
     return Dialog(
@@ -543,6 +578,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedSession = val);
+                    _updateBlockedState();
                     _prefillCourse(val);
                   }
                 },
@@ -618,11 +654,11 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
               _buildLabel('Status'),
               Row(
                 children: [
-                  _statusButton('Present', Colors.greenAccent),
+                  _statusButton('Present', success),
                   const SizedBox(width: 10),
-                  _statusButton('Absent', Colors.redAccent),
+                  _statusButton('Absent', danger),
                   const SizedBox(width: 10),
-                  _statusButton('Duty Leave', Colors.amberAccent, label: 'DL'),
+                  _statusButton('Duty Leave', amber, label: 'DL'),
                 ],
               ),
               const SizedBox(height: 20),

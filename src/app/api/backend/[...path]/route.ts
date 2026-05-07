@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "buffer";
 import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
-import { withSecurity, isMobileRequest } from "@/lib/security/app-check";
+import { withSecurity } from "@/lib/security/app-check";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import { ezygoCircuitBreaker, UpstreamServerError } from "@/lib/circuit-breaker";
@@ -21,7 +21,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 // Runtime validation for proxy secrets (defense-in-depth)
 const MISCONFIGURED_EGRESS_TARGET = EGRESS_TARGETS.find(target => target.name !== "direct" && !target.secret);
 
-async function forward(req: NextRequest, method: string, path: string[], decryptedBody?: any) {
+async function forward(req: NextRequest, method: string, path: string[], decryptedBody?: any, authType?: "app-check" | "csrf" | "none") {
   let lastAttemptedEgressName = "direct"; // Declare at top to ensure visibility in catch block
   if (!BASE_API_URL) {
     logger.error("NEXT_PUBLIC_BACKEND_URL is not configured");
@@ -37,7 +37,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   }
 
   const isPublic = PUBLIC_PATHS.has(fullPath);
-  const isMobileApp = isMobileRequest(req.headers);
+  const isMobileApp = authType === "app-check";
   const isWrite = method !== "GET" && method !== "HEAD";
   const clientIp = getClientIp(req.headers);
 
@@ -230,14 +230,14 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   }
 }
 
-export const GET = withSecurity(async (req, { params }) => {
+export const GET = withSecurity(async (req, { params, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  return forward(req as NextRequest, "GET", path);
+  return forward(req as NextRequest, "GET", path, undefined, authType);
 });
 
-export const POST = withSecurity(async (req, { params, decryptedBody }) => {
+export const POST = withSecurity(async (req, { params, decryptedBody, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  const res = await forward(req as NextRequest, "POST", path, decryptedBody);
+  const res = await forward(req as NextRequest, "POST", path, decryptedBody, authType);
   const pathStr = path.join("/");
   if (res.ok && (pathStr.includes("user/setting/default_semester") || pathStr.includes("user/setting/default_academic_year"))) {
     const token = await getAuthTokenWithFallback();
@@ -246,22 +246,22 @@ export const POST = withSecurity(async (req, { params, decryptedBody }) => {
   return res;
 });
 
-export const PUT = withSecurity(async (req, { params, decryptedBody }) => {
+export const PUT = withSecurity(async (req, { params, decryptedBody, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  return forward(req as NextRequest, "PUT", path, decryptedBody);
+  return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
 });
 
-export const PATCH = withSecurity(async (req, { params, decryptedBody }) => {
+export const PATCH = withSecurity(async (req, { params, decryptedBody, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  return forward(req as NextRequest, "PATCH", path, decryptedBody);
+  return forward(req as NextRequest, "PATCH", path, decryptedBody, authType);
 });
 
-export const DELETE = withSecurity(async (req, { params }) => {
+export const DELETE = withSecurity(async (req, { params, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  return forward(req as NextRequest, "DELETE", path);
+  return forward(req as NextRequest, "DELETE", path, undefined, authType);
 });
 
-export const HEAD = withSecurity(async (req, { params }) => {
+export const HEAD = withSecurity(async (req, { params, authType }) => {
   const { path } = await (params as Promise<{ path: string[] }>);
-  return forward(req as NextRequest, "HEAD", path);
+  return forward(req as NextRequest, "HEAD", path, undefined, authType);
 });

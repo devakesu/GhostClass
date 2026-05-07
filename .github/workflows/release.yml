@@ -4,20 +4,20 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Version tag (e.g., v1.5.8) - takes precedence over bump_type'
+        description: "Version tag (e.g., v1.5.8) - takes precedence over bump_type"
         required: false
         type: string
       bump_type:
-        description: 'Version bump type'
+        description: "Version bump type"
         required: true
         type: choice
         options:
           - patch
           - minor
           - major
-        default: 'patch'
+        default: "patch"
       build_arm64:
-        description: 'Build ARM64 architecture (slower, ~5min extra)'
+        description: "Build ARM64 architecture (slower, ~5min extra)"
         required: false
         type: boolean
         default: false
@@ -25,7 +25,7 @@ on:
     types: [release_requested]
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 permissions:
   contents: read
@@ -303,7 +303,6 @@ jobs:
           secrets: |
             sentry_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           platforms: ${{ steps.prep.outputs.platforms }}
-
           # Enable layer caching for faster builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -428,7 +427,7 @@ jobs:
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
-          predicate-type: 'https://cyclonedx.org/bom'
+          predicate-type: "https://cyclonedx.org/bom"
           predicate-path: sbom.json
           push-to-registry: true
 
@@ -540,7 +539,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -609,13 +608,18 @@ jobs:
           APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
         run: |
           set -euo pipefail
-          
-          # Encode sensitive strings to Base64 for stealth as per the project's pattern
+
+          # Encode all sensitive strings to Base64 for uniform obfuscation
+          # This prevents secrets from appearing in plaintext in the compiled binary
+          ENCODED_SUPABASE_URL_DEV=$(echo -n "$SUPABASE_URL_DEV" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_ANON_KEY_DEV=$(echo -n "$SUPABASE_ANON_KEY_DEV" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$SUPABASE_ANON_KEY_PROD" | base64 | tr -d '\n')
           ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
           ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
           ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
           ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
-          
+
           GHOSTCLASS_API_URL="https://${APP_DOMAIN}/api"
 
           cat > lib/config/app_secrets.dart << EOF
@@ -626,27 +630,23 @@ jobs:
 
             static const bool isDev = kDebugMode;
 
-            static const String supabaseUrlDev = '${SUPABASE_URL_DEV}';
-            static const String supabasePublishableKeyDev = '${SUPABASE_ANON_KEY_DEV}';
+            static const String supabaseUrlDev = '${ENCODED_SUPABASE_URL_DEV}';
+            static const String supabasePublishableKeyDev = '${ENCODED_SUPABASE_ANON_KEY_DEV}';
 
-            static const String supabaseProxyUrlProd = '${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}';
-            static const String supabasePublishableKeyProd = '${SUPABASE_ANON_KEY_PROD}';
+            static const String supabaseProxyUrlProd = '${ENCODED_SUPABASE_PROXY_URL_PROD}';
+            static const String supabasePublishableKeyProd = '${ENCODED_SUPABASE_ANON_KEY_PROD}';
 
             static const String sentryDsn = '${ENCODED_SENTRY_DSN}';
 
             static const String ghostclassApiUrlDev = '';
-            static const String mobileApiSecretDev = '';
 
             static const String ghostclassApiUrlProd = '${GHOSTCLASS_API_URL}';
-            static const String mobileApiSecretProd = '${MOBILE_API_SECRET_PROD}';
 
             static const String ezygoAuthUrl = '${ENCODED_EZYGO_AUTH_URL}';
             static const String ezygoApiRoot = '${ENCODED_EZYGO_API_ROOT}';
             static const String ezygoOrigin = '${ENCODED_EZYGO_ORIGIN}';
 
             static const String supabaseSpoofedOrigin = 'https://${APP_DOMAIN}';
-
-            static const String diagnosticJwksUrl = '';
           }
           EOF
 
@@ -946,7 +946,13 @@ jobs:
   # This ensures deployment only happens after the full release completes successfully
   deploy-to-production:
     name: Deploy to Production
-    needs: [calculate-version, build-and-release, build-mobile, create-github-release]
+    needs:
+      [
+        calculate-version,
+        build-and-release,
+        build-mobile,
+        create-github-release,
+      ]
     runs-on: ubuntu-latest
     # Deploy on tag pushes, workflow_dispatch with version_tag, OR repository_dispatch
     # Manual workflow_dispatch without version_tag (bump_type only) does not auto-deploy

@@ -27,7 +27,7 @@ export function getAppCheck(): AppCheckVerifier | null {
     }
 
     return {
-      async verifyToken(token: string, options?: { consume?: boolean }) {
+      async verifyToken(token: string, _options?: { consume?: boolean }) {
         try {
           const appCheckService = admin.appCheck();
           const decodedToken = await appCheckService.verifyToken(token);

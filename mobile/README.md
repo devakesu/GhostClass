@@ -247,7 +247,6 @@ class AppSecrets {
   static const String supabasePublishableKeyProd = 'your-anon-key';
   static const String sentryDsn = 'aHR0cHM6Ly94eHh4QHNlbnRyeS5pby94eHh4'; // Base64 encoded
   static const String ghostclassApiUrlProd = 'https://your-ghostclass-instance.com/api';
-  static const String mobileApiSecretProd = 'your-mobile-api-secret';
   // ... other keys
 }
 ```

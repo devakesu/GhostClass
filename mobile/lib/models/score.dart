@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
-
-int? _toInt(dynamic value) {
-  if (value == null) return null;
-  if (value is int) return value;
-  if (value is double) return value.toInt();
-  if (value is String) return int.tryParse(value);
-  return null;
-}
+import 'package:ghostclass/logic/type_utils.dart';
 
 String? _firstNonEmptyString(Map<String, dynamic> json, List<String> keys) {
   for (final key in keys) {
@@ -61,7 +54,7 @@ class Exam {
         .toList();
 
     return Exam(
-      id: _toInt(json['id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
       name: json['name'] as String? ?? 'Untitled Exam',
       // Prefer historical EzyGo typo key first, fallback to corrected spelling.
       summary: _firstNonEmptyString(json, const ['summery', 'summary']),
@@ -94,7 +87,7 @@ class Course {
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
-      id: _toInt(json['id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
       name: json['name'] as String? ?? 'Unknown',
       code: json['code'] as String?,
       academicYear: json['academic_year'] as String?,
@@ -120,11 +113,11 @@ class ExamQuestion {
 
   factory ExamQuestion.fromJson(Map<String, dynamic> json) {
     return ExamQuestion(
-      id: _toInt(json['id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
       questionNo: json['question_no'] as String? ?? '?',
       maximumMark: _toDouble(json['maximum_mark']) ?? 0.0,
-      subquestionParentId: _toInt(json['subquestion_parent_id']),
-      orQuestionGroupId: _toInt(json['orquestion_group_id']),
+      subquestionParentId: toInt(json['subquestion_parent_id']),
+      orQuestionGroupId: toInt(json['orquestion_group_id']),
     );
   }
 }
@@ -142,8 +135,8 @@ class ExamAnswer {
 
   factory ExamAnswer.fromJson(Map<String, dynamic> json) {
     return ExamAnswer(
-      id: _toInt(json['id']) ?? 0,
-      examQuestionId: _toInt(json['examquestion_id']) ?? 0,
+      id: toInt(json['id']) ?? 0,
+      examQuestionId: toInt(json['examquestion_id']) ?? 0,
       score: _toDouble(json['score']),
     );
   }
@@ -153,17 +146,20 @@ class ResolvedScore {
   final double score;
   final double maxMark;
   final bool isMarked;
+  final bool isMaxUnresolvable;
 
   ResolvedScore({
     required this.score,
     required this.maxMark,
     required this.isMarked,
+    this.isMaxUnresolvable = false,
   });
 
-  double get percentage => maxMark > 0 ? (score / maxMark) * 100 : 0;
+  double get percentage => (isMaxUnresolvable || maxMark <= 0) ? 0 : (score / maxMark) * 100;
 
   Color get color {
     if (!isMarked) return Colors.grey;
+    if (isMaxUnresolvable) return Colors.blueGrey;
     if (percentage >= 75) return const Color(0xFF10B981); // emerald-500
     if (percentage >= 50) return const Color(0xFFF59E0B); // amber-500
     return const Color(0xFFEF4444); // red-500

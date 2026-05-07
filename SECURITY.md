@@ -39,7 +39,7 @@ GhostClass implements multiple layers of security:
 - **Circuit Breaker Pattern** - Graceful handling of upstream API failures
 - **Request Deduplication** - Prevents duplicate concurrent requests
 - **Bot Protection** - Cloudflare Turnstile on public endpoints
-- **CSRF Protection** - Custom token-based CSRF protection for web; `MOBILE_API_SECRET` validation for mobile requests
+- **CSRF Protection** - Custom token-based CSRF protection for web; App Check attestation for mobile requests. `MOBILE_API_SECRET` is maintained as a **server-only** HMAC key for signing security nonces (stateless replay protection).
 - **JWE Encryption (Web & Mobile)** - Bi-directional RSA-OAEP + AES-256-GCM encryption for all client-server traffic (Next.js ↔ Browser/App)
 - **Device Attestation (Mobile)** - Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS)
 - **Anti-Tapjacking (Mobile)** - Android `FLAG_SECURE` implementation to prevent screenshot/overlay attacks on sensitive screens
@@ -71,7 +71,7 @@ GhostClass implements multiple layers of security:
 
 - **EzyGo Server-Side Egress** - All server-to-EzyGo API requests route through a two-tier egress proxy chain: a Cloudflare Worker (`CF_PROXY_URL`, Tier 1) falling back to an AWS Lambda (`AWS_SECONDARY_URL`, Tier 2), then direct. This masks the origin server IP and bypasses ISP-level blocks. Implemented via `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`.
 - **Supabase Browser Proxy (ISP Bypass)** - Browser-to-Supabase requests auto-fail-over through the same pattern: CF Worker (`NEXT_PUBLIC_SUPABASE_CF_PROXY_URL`) → Lambda (`NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL`) → direct. Implemented in `src/lib/supabase/client.ts`.
-- **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret` header on every incoming request; requests without a valid secret are rejected with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET` and `AWS_SECONDARY_SECRET` are server-only runtime variables).
+- **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret` header on every incoming request; requests without a valid secret are rejected with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET`, `AWS_SECONDARY_SECRET`, and `MOBILE_API_SECRET` are server-only runtime variables).
 
 ## Dependency Security Overrides
 

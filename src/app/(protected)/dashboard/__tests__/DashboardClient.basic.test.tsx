@@ -1,10 +1,9 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock lucide-react at the very top
-vi.mock('lucide-react', () => {
-  const React = require('react');
-  const Icon = (props: any) => React.createElement('div', props);
+vi.mock('lucide-react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  const Icon = (props: any) => actual.createElement('div', props);
   return {
     __esModule: true,
     AlertCircle: Icon,

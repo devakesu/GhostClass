@@ -72,47 +72,40 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return NotificationsState.empty();
 
-    // 1. Fetch ALL Unread Conflicts (Action Required)
-    final actionResponse = await supabase
-        .from('notification')
-        .select()
-        .eq('auth_user_id', userId)
-        .ilike('topic', '%conflict%')
-        .eq('is_read', false)
-        .order('created_at', ascending: false);
+    // 1 & 2. Fetch ALL Unread Conflicts and First Page of General Feed in parallel
+    final results = await Future.wait([
+      supabase
+          .from('notification')
+          .select()
+          .eq('auth_user_id', userId)
+          .ilike('topic', '%conflict%')
+          .eq('is_read', false)
+          .order('created_at', ascending: false),
+      supabase
+          .from('notification')
+          .select()
+          .eq('auth_user_id', userId)
+          .order('created_at', ascending: false)
+          .range(0, _pageSize - 1),
+    ]);
 
-    final actionNotifications = (actionResponse as List)
+    final actionNotifications = (results[0] as List)
         .map((n) => AppNotification.fromJson(n))
         .toList();
 
-    // 2. Fetch First Page of General Feed
-    const from = 0;
-    const to = _pageSize - 1;
-
-    final feedResponse = await supabase
-        .from('notification')
-        .select()
-        .eq('auth_user_id', userId)
-        .order('created_at', ascending: false)
-        .range(from, to);
-
-    final feedNotifications = (feedResponse as List)
+    final feedNotifications = (results[1] as List)
         .map((n) => AppNotification.fromJson(n))
         .toList();
-
-    // 3. Fetch Total Unread Count
-    final countRes = await supabase
-        .from('notification')
-        .select('id')
-        .eq('auth_user_id', userId)
-        .eq('is_read', false);
-
-    final unreadCount = (countRes as List).length;
 
     // Deduplicate: Remove actions from the regular feed
     final actionIds = actionNotifications.map((n) => n.id).toSet();
     final regularNotifications =
         feedNotifications.where((n) => !actionIds.contains(n.id)).toList();
+
+    // 3. Calculate Unread Count in memory (Action items are always unread by filter)
+    final unreadInActions = actionNotifications.length;
+    final unreadInFeed = regularNotifications.where((n) => !n.isRead).length;
+    final unreadCount = unreadInActions + unreadInFeed;
 
     _currentPage = 0;
 
@@ -175,11 +168,11 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     state = AsyncValue.data(nextState);
   }
 
-  Future<void> toggleRead(int id, bool currentStatus) async {
+  Future<void> toggleRead(int id, bool wasRead) async {
     final previousState = state.value;
     if (previousState == null) return;
 
-    final newIsRead = !currentStatus;
+    final newIsRead = !wasRead;
 
     // 1. Update in actionNotifications
     final List<AppNotification> updatedActions = [];
@@ -228,7 +221,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
       updatedRegular.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
-    final unreadChange = currentStatus ? 1 : -1;
+    final unreadChange = wasRead ? 1 : -1;
     state = AsyncValue.data(NotificationsState(
       actionNotifications: updatedActions,
       regularNotifications: updatedRegular,

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:uuid/uuid.dart';
 
 /// Interceptor that handles JSON Web Encryption (JWE) for all GhostClass API requests.
 /// 
@@ -27,9 +28,10 @@ class JweInterceptor extends Interceptor {
         final jweService = JweService.instance;
         final result = await jweService.encryptRequest(options.data as Map<String, dynamic>);
         
-        // Store the RCEK for this request's response decryption
-        final requestId = options.hashCode.toString();
+        // Store the RCEK for this request's response decryption using a unique request ID
+        final requestId = const Uuid().v4();
         _rcekMap[requestId] = result.rcek;
+        options.headers['X-GhostClass-Request-ID'] = requestId;
         
         options.data = result.jwe;
         options.headers['x-jwe'] = 'true';
@@ -49,8 +51,9 @@ class JweInterceptor extends Interceptor {
         final jweService = JweService.instance;
         final keyResult = await jweService.encryptHeaderKey();
         
-        final requestId = options.hashCode.toString();
+        final requestId = const Uuid().v4();
         _rcekMap[requestId] = keyResult.rcek;
+        options.headers['X-GhostClass-Request-ID'] = requestId;
         
         options.headers['x-jwe-key'] = keyResult.jwe;
       } catch (e) {
@@ -65,7 +68,7 @@ class JweInterceptor extends Interceptor {
   Future<void> onResponse(Response response, ResponseInterceptorHandler handler) async {
     final contentType = response.headers.value('content-type') ?? '';
     final isEncrypted = contentType.contains('application/jose') || response.headers.value('x-jwe') == 'true';
-    final requestId = response.requestOptions.hashCode.toString();
+    final requestId = response.requestOptions.headers['X-GhostClass-Request-ID'];
     final rcek = _rcekMap.remove(requestId);
 
     if (isEncrypted && rcek != null) {
@@ -92,7 +95,8 @@ class JweInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // Clean up RCEK on error to prevent memory leaks
-    _rcekMap.remove(err.requestOptions.hashCode.toString());
+    final requestId = err.requestOptions.headers['X-GhostClass-Request-ID'];
+    _rcekMap.remove(requestId);
     return handler.next(err);
   }
 }

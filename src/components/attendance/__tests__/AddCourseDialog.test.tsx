@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AddCourseDialog } from '../AddCourseDialog';
 
 // Mock lucide-react with explicit icons
-vi.mock('lucide-react', () => {
-  const React = require('react');
-  const MockIcon = (props: any) => React.createElement('div', props);
+vi.mock('lucide-react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  const MockIcon = (props: any) => actual.createElement('div', props);
   return {
     BookPlus: MockIcon,
     Search: MockIcon,

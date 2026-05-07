@@ -168,7 +168,7 @@ describe('useNotifications', () => {
     it('fetches action notifications from supabase', async () => {
       renderHook(() => useNotifications());
       
-      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'actions')![0].queryFn as Function;
+      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'actions')![0].queryFn as (...args: any[]) => any;
       
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ data: [{ id: 1 }], error: null }).then(onFulfilled);
@@ -184,7 +184,7 @@ describe('useNotifications', () => {
     it('fetches infinite feed with pagination', async () => {
       renderHook(() => useNotifications());
       
-      const queryFn = vi.mocked(useInfiniteQuery).mock.calls[0][0].queryFn as Function;
+      const queryFn = vi.mocked(useInfiniteQuery).mock.calls[0][0].queryFn as (...args: any[]) => any;
       
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ data: Array(20).fill({ id: 1 }), error: null }).then(onFulfilled);
@@ -199,7 +199,7 @@ describe('useNotifications', () => {
     it('fetches unread count using head-only query', async () => {
       renderHook(() => useNotifications());
       
-      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'unreadCount')![0].queryFn as Function;
+      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'unreadCount')![0].queryFn as (...args: any[]) => any;
       
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ count: 5, error: null }).then(onFulfilled);
@@ -216,7 +216,7 @@ describe('useNotifications', () => {
     it('updates status in supabase', async () => {
       renderHook(() => useNotifications());
       
-      const mutationFn = vi.mocked(useMutation).mock.calls[0][0].mutationFn as Function;
+      const mutationFn = vi.mocked(useMutation).mock.calls[0][0].mutationFn as (...args: any[]) => any;
       
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ error: null }).then(onFulfilled);
@@ -231,7 +231,7 @@ describe('useNotifications', () => {
     it('handles query invalidation on settlement', () => {
       renderHook(() => useNotifications());
       
-      const onSettled = vi.mocked(useMutation).mock.calls[0][0].onSettled as Function;
+      const onSettled = vi.mocked(useMutation).mock.calls[0][0].onSettled as (...args: any[]) => any;
       onSettled();
       
       expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['notifications'] });

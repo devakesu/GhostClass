@@ -186,11 +186,8 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     final dashboardAsync = ref.watch(dashboardProvider);
     final trackingAsync = ref.watch(trackingProvider);
 
-    // Check if either is in error state AND reactive provider confirms an outage
-    final hasOutage = ref.watch(outageProvider);
-    final isDashboardOutage = dashboardAsync.hasError && hasOutage;
-    final isTrackingOutage = trackingAsync.hasError && hasOutage;
-    final showOutageBarrier = isDashboardOutage || isTrackingOutage;
+    // Reactive provider confirms an outage (Global Barrier)
+    final showOutageBarrier = ref.watch(outageProvider);
 
     // --- SECURITY BARRIER ---
     final securityFailure = ref.watch(securityFailureProvider);
@@ -235,152 +232,131 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Notifications Icon
-                    GestureDetector(
-                      onTap: showNotificationsOverlay,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surface.withValues(alpha: 0.8),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant
-                                    .withValues(alpha: 0.1),
+                    Semantics(
+                      button: true,
+                      label: 'Notifications',
+                      child: GestureDetector(
+                        onTap: showNotificationsOverlay,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                                ),
+                              ),
+                              child: Icon(
+                                LucideIcons.bell,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
                               ),
                             ),
-                            child: Icon(
-                              LucideIcons.bell,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.85),
-                            ),
-                          ),
-                          if (unreadCount > 0)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  unreadCount > 9
-                                      ? '9+'
-                                      : unreadCount.toString(),
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
+                            if (unreadCount > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: Theme.of(context).colorScheme.onPrimary,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     // Tracking Icon Overlay
-                    GestureDetector(
-                      onTap: showTrackingOverlay,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: surface.withValues(alpha: 0.8),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                    Semantics(
+                      button: true,
+                      label: 'Tracking',
+                      child: GestureDetector(
+                        onTap: showTrackingOverlay,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: surface.withValues(alpha: 0.8),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          LucideIcons.listTodo,
-                          size: 18,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.85),
+                          child: Icon(
+                            LucideIcons.listTodo,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     // Service Avatar with Gradient Border
-                    GestureDetector(
-                          onTap: () => context.go('/ghostclass'),
+                    Semantics(
+                      button: true,
+                      label: 'Profile',
+                      child: GestureDetector(
+                        onTap: () => context.go('/ghostclass'),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: SweepGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue,
+                                Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange,
+                                Theme.of(context).colorScheme.primary,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: SweepGradient(
-                                colors: [
-                                  Theme.of(context).colorScheme.primary,
-                                  Theme.of(
-                                        context,
-                                      ).extension<GhostColors>()?.accentBlue ??
-                                      Colors.blue,
-                                  Theme.of(context)
-                                          .extension<GhostColors>()
-                                          ?.accentOrange ??
-                                      Colors.orange,
-                                  Theme.of(context).colorScheme.primary,
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.15),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                ),
-                              ],
+                              color: Theme.of(context).scaffoldBackgroundColor,
                             ),
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Theme.of(
-                                  context,
-                                ).scaffoldBackgroundColor,
-                              ),
-                              child: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainer,
-                                backgroundImage:
-                                    user?.profile?.avatarUrl != null
-                                    ? NetworkImage(user!.profile!.avatarUrl!)
-                                    : null,
-                                child: user?.profile?.avatarUrl == null
-                                    ? Icon(
-                                        LucideIcons.user,
-                                        size: 20,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.65),
-                                      )
-                                    : null,
-                              ),
+                            child: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                              backgroundImage: user?.profile?.avatarUrl != null
+                                  ? NetworkImage(user!.profile!.avatarUrl!)
+                                  : null,
+                              child: user?.profile?.avatarUrl == null
+                                  ? Icon(
+                                      LucideIcons.user,
+                                      size: 20,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                                    )
+                                  : null,
                             ),
                           ),
-                        )
-                        .animate()
-                        .fadeIn(duration: 600.ms, delay: 200.ms)
-                        .scale(begin: const Offset(0.8, 0.8)),
+                        ),
+                      ).animate().fadeIn(duration: 600.ms, delay: 200.ms).scale(begin: const Offset(0.8, 0.8)),
+                    ),
                   ],
                 ).animate().fade().slideX(begin: 0.2),
               ],
