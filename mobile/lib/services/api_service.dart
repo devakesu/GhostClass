@@ -117,8 +117,8 @@ class ApiService {
         );
   }
 
-  ApiService(this._ref) {
-    _networkTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
+  ApiService(this._ref)
+      : _networkTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20) {
     _dio = Dio(
       BaseOptions(
         connectTimeout: _networkTimeout,

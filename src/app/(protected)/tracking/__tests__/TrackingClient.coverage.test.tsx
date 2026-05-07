@@ -242,5 +242,27 @@ describe('TrackingClient Coverage Hardening', () => {
       expect(screen.queryByText('Delete Record')).not.toBeInTheDocument();
     });
   });
-;
+  it('renders correction with Duty Leave status (isCorrection + orange)', async () => {
+    const item = {
+      id: '2', auth_user_id: '123', course: 'CS101', session: '1', date: '20240902',
+      attendance: 225, status: 'correction', semester: 'even', year: '2024-25'
+    };
+    vi.mocked(useTrackingData).mockReturnValue({ data: [item], isLoading: false } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({ data: 1, isLoading: false } as any);
+
+    render(<TrackingClient />);
+    expect(await screen.findByText(/Absent → Duty Leave/i)).toBeInTheDocument();
+  });
+
+  it('renders correction with Absent status (isCorrection + red)', async () => {
+    const item = {
+      id: '3', auth_user_id: '123', course: 'CS101', session: '1', date: '20240903',
+      attendance: 111, status: 'correction', semester: 'even', year: '2024-25'
+    };
+    vi.mocked(useTrackingData).mockReturnValue({ data: [item], isLoading: false } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({ data: 1, isLoading: false } as any);
+
+    render(<TrackingClient />);
+    expect(await screen.findByText(/Absent → Absent/i)).toBeInTheDocument();
+  });
 });

@@ -39,6 +39,7 @@ const createMockLeave = (id: number, actionType: string | null = null, overrides
     {
       id: id * 10,
       action_type: actionType,
+      action_by: 'user-123',
       action_by_user: { first_name: 'Test', last_name: 'User' },
       action_at: '2026-03-26T10:00:00Z',
       updated_at: '2026-03-26T10:00:00Z',
@@ -150,4 +151,76 @@ describe('LeaveClient', () => {
     expect(screen.getByText('medical_cert.pdf')).toBeInTheDocument()
     expect(screen.getByText(/\(1\.0 MB\)/)).toBeInTheDocument()
   })
-})
+
+  it('handles multiple approvers with sorting and duplicates', () => {
+    const initialData = {
+      studentLeaves: {
+        student_leaves: [
+          createMockLeave(1, null, {
+            approvers: [
+              {
+                id: 1, action_type: 'approve', action_by: 'user1',
+                action_by_user: { first_name: 'A', last_name: 'B' },
+                action_at: '2026-03-26T10:00:00Z', updated_at: '2026-03-26T10:00:00Z',
+              },
+              {
+                id: 2, action_type: 'approve', action_by: 'user1',
+                action_by_user: { first_name: 'A', last_name: 'B' },
+                action_at: '2026-03-26T10:00:00Z', updated_at: '2026-03-26T10:00:00Z',
+              }, // Duplicate
+              {
+                id: 3, action_type: 'recommend', action_by: 'user2',
+                action_by_user: { first_name: 'C', last_name: 'D' },
+                action_at: '2026-03-27T10:00:00Z', updated_at: '2026-03-27T10:00:00Z',
+              }
+            ]
+          })
+        ],
+        student_leave_sessions: {}
+      }
+    }
+    renderWithClient(<LeaveClient initialData={initialData} />)
+    // Should show C D as the latest
+    expect(screen.getByText('C D')).toBeInTheDocument()
+  })
+
+  it('renders impacted sessions', () => {
+    const initialData = {
+      studentLeaves: {
+        student_leaves: [createMockLeave(1)],
+        student_leave_sessions: {
+          '1': [
+            { id: 501, session: { name: '1st Hour' }, course: { name: 'CS101' }, date: '2026-03-25' }
+          ]
+        }
+      }
+    }
+    renderWithClient(<LeaveClient initialData={initialData} />)
+    expect(screen.getByText('CS101')).toBeInTheDocument()
+    expect(screen.getByText('S: 1st Hour')).toBeInTheDocument()
+  })
+
+  it('handles forwarded status and unknown fallback', async () => {
+    const initialData = {
+      studentLeaves: {
+        student_leaves: [
+          createMockLeave(1, 'forward'),
+          createMockLeave(2, 'unknown' as any, {
+            approvers: [{ 
+              id: 1, action_type: 'unknown', 
+              action_by: 'u1', action_by_user: { first_name: 'X', last_name: 'Y' }, 
+              action_at: '2026-03-26T10:00:00Z', updated_at: '2026-03-26T10:00:00Z' 
+            }]
+          })
+        ],
+        student_leave_sessions: {}
+      }
+    }
+    renderWithClient(<LeaveClient initialData={initialData} />)
+    
+    // Status badge and workflow history should both show Forwarded
+    expect(await screen.findAllByText('Forwarded')).toHaveLength(2)
+    expect(screen.getByText('In Progress')).toBeInTheDocument()
+  })
+});
+;

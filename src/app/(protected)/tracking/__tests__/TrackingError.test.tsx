@@ -1,8 +1,7 @@
-/** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import AcceptTermsError from '../error';
+import TrackingError from '../error';
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
@@ -25,25 +24,26 @@ vi.mock("@/components/error-fallback", () => ({
   ),
 }));
 
-describe('AcceptTermsError', () => {
+describe('TrackingError', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('logs error and captures exception on mount', () => {
-    const error = new Error('Terms error') as any;
-    error.digest = 'terms-digest';
+    const error = new Error('Test error') as any;
+    error.digest = 'test-digest';
     const reset = vi.fn();
 
-    render(<AcceptTermsError error={error} reset={reset} />);
+    render(<TrackingError error={error} reset={reset} />);
 
-    expect(logger.error).toHaveBeenCalledWith("[accept-terms] Render error:", "Terms error", "terms-digest");
+    expect(logger.error).toHaveBeenCalledWith("[tracking] Render error:", "Test error", "test-digest");
     expect(Sentry.captureException).toHaveBeenCalledWith(error, {
       tags: {
-        location: "accept-terms",
-        digest: "terms-digest",
+        location: "tracking",
+        digest: "test-digest",
       },
     });
     expect(screen.getByTestId('error-fallback')).toBeInTheDocument();
+    expect(screen.getByText('Test error')).toBeInTheDocument();
   });
 });

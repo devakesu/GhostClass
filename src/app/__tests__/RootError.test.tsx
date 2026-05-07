@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import AcceptTermsError from '../error';
+import RootError from '../error';
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
@@ -25,25 +25,35 @@ vi.mock("@/components/error-fallback", () => ({
   ),
 }));
 
-describe('AcceptTermsError', () => {
+vi.mock("@/components/layout/public-navbar", () => ({
+  PublicNavbar: () => <div data-testid="public-navbar">Navbar</div>,
+}));
+
+vi.mock("@/components/layout/footer", () => ({
+  Footer: () => <div data-testid="footer">Footer</div>,
+}));
+
+describe('RootError', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('logs error and captures exception on mount', () => {
-    const error = new Error('Terms error') as any;
-    error.digest = 'terms-digest';
+  it('renders error components and logs error', () => {
+    const error = new Error('Global error') as any;
+    error.digest = 'global-digest';
     const reset = vi.fn();
 
-    render(<AcceptTermsError error={error} reset={reset} />);
+    render(<RootError error={error} reset={reset} />);
 
-    expect(logger.error).toHaveBeenCalledWith("[accept-terms] Render error:", "Terms error", "terms-digest");
+    expect(logger.error).toHaveBeenCalledWith("[root] Render error:", "Global error", "global-digest");
     expect(Sentry.captureException).toHaveBeenCalledWith(error, {
       tags: {
-        location: "accept-terms",
-        digest: "terms-digest",
+        location: "error.tsx",
+        digest: "global-digest",
       },
     });
+    expect(screen.getByTestId('public-navbar')).toBeInTheDocument();
     expect(screen.getByTestId('error-fallback')).toBeInTheDocument();
+    expect(screen.getByTestId('footer')).toBeInTheDocument();
   });
 });

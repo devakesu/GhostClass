@@ -78,12 +78,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           await ref.read(authProvider.notifier).logout(force: true);
         }
 
+        if (!mounted) return;
+
+        String dialogMessage = '$reason';
+        if (!criticalRisk) {
+          dialogMessage +=
+              '\n\n$action\n\nPlease try again after some time if you think this is a temporary glitch. If the issue persists, contact support.';
+        } else {
+          dialogMessage += '\n\n$action';
+        }
+
         SecurityUtils.showSecurityFailureDialog(
           context,
           title: 'Security Verification Failed',
-          message: '$reason\n\n $action',
+          message: dialogMessage,
           technicalDetails: e.toString(),
-          retryLabel: 'Exit App',
+          retryLabel: criticalRisk ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
           isDismissible: false,
         );

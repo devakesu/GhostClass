@@ -143,7 +143,7 @@ describe('axios lib', () => {
       
       expect(encryptRequest).toHaveBeenCalledWith({ foo: 'bar' });
       expect(resultConfig.data).toBe('mocked-jwe-body');
-      expect(resultConfig._jweCek).toEqual(new Uint8Array([1, 2, 3]));
+      expect((resultConfig as any)._jweCek).toEqual(new Uint8Array([1, 2, 3]));
       expect(resultConfig.headers.get('Content-Type')).toBe('application/jose');
     });
 
@@ -160,7 +160,7 @@ describe('axios lib', () => {
       
       expect(encryptHeader).toHaveBeenCalled();
       expect(resultConfig.headers.get('X-JWE-Key')).toBe('mocked-jwe-header');
-      expect(resultConfig._jweCek).toEqual(new Uint8Array([4, 5, 6]));
+      expect((resultConfig as any)._jweCek).toEqual(new Uint8Array([4, 5, 6]));
     });
   });
 
@@ -198,7 +198,7 @@ describe('axios lib', () => {
       
       // @ts-ignore
       const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
-      await interceptor(error);
+      if (interceptor) await interceptor(error);
       
       expect(mockFetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
       expect(getCsrfToken()).toBe('b'.repeat(64));
@@ -219,10 +219,52 @@ describe('axios lib', () => {
 
       // @ts-ignore
       const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
-      await interceptor(error);
+      if (interceptor) await interceptor(error);
       
       expect(mockFetch).toHaveBeenCalledWith('/api/auth/sync', expect.any(Object));
       expect(requestSpy).toHaveBeenCalled();
+    });
+
+    it('handles 401 error and logs out if session sync fails', async () => {
+      const error = {
+        config: { url: '/api/test', _authRetried: false },
+        response: { status: 401 }
+      } as any;
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500
+      });
+      
+      const { handleLogout } = await import('@/lib/security/auth');
+
+      // @ts-ignore
+      const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
+      try {
+        if (interceptor) await interceptor(error);
+      } catch (_e) {
+        // Expected to reject with the error
+      }
+      
+      expect(handleLogout).toHaveBeenCalled();
+    });
+  });
+
+  describe('Encryption Errors', () => {
+    it('logs error if JWE encryption fails', async () => {
+      const config = { 
+        url: '/api/mutation', 
+        method: 'post', 
+        data: { foo: 'bar' },
+        headers: new Map() 
+      } as any;
+      
+      vi.mocked(encryptRequest).mockRejectedValueOnce(new Error('Cipher error'));
+
+      // @ts-ignore
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      await expect(interceptor(config)).rejects.toThrow('Cipher error');
+      expect(logger.error).toHaveBeenCalledWith('[axios] JWE request encryption failed', expect.any(Error));
     });
   });
 });

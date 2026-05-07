@@ -23,13 +23,22 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
       if (data != null && data['type'] == 'security') {
         final reason = data['reason'] ?? 'Device verification failed';
         final action = data['action'] ?? 'Please try again later';
+        final isCritical = data['criticalRisk'] == true;
+
+        String dialogMessage = '$reason';
+        if (!isCritical) {
+          dialogMessage +=
+              '\n\n$action\n\nPlease try again after some time if you think this is a temporary glitch. If the issue persists, contact support.';
+        } else {
+          dialogMessage += '\n\n$action';
+        }
 
         await SecurityUtils.showSecurityFailureDialog(
           context,
           title: 'Security Attestation Failed',
-          message: '$reason\n\n $action',
+          message: dialogMessage,
           technicalDetails: error.message,
-          retryLabel: 'Restart App',
+          retryLabel: isCritical ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
           isDismissible: false,
         );
@@ -46,11 +55,12 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
             error.message.contains('Handshake');
 
         if (isSecurityFailure) {
+          // Fallback errors are treated as non-critical (temp glitch)
           await SecurityUtils.showSecurityFailureDialog(
             context,
             title: 'Security Attestation Failed',
             message:
-                'GhostClass servers could not verify the integrity of this request. This can happen if your app version is outdated, or your device environment is restricted (Root/Jailbreak/Emulator).',
+                'GhostClass servers could not verify the integrity of this request. This can happen if your app version is outdated, or your device environment is restricted (Root/Jailbreak/Emulator).\n\nPlease try again after some time if you think this is a temp glitch. If the issue persists, contact support.',
             technicalDetails:
                 '${error.type.name.toUpperCase()}: ${error.message}',
             retryLabel: 'Restart App',

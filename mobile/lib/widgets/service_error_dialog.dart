@@ -223,9 +223,10 @@ class ServiceErrorDialog extends StatelessWidget {
                           onRetry!();
                         },
                         icon: Icon(
-                          // Use an 'x' icon for exit flows (label contains "Exit"),
+                          // Use an 'x' icon for exit/close flows (label contains "Exit" or "Close"),
                           // otherwise keep the restart/refresh icon.
-                          (retryLabel?.toLowerCase().contains('exit') ?? false)
+                          (retryLabel?.toLowerCase().contains('exit') ?? false) ||
+                                  (retryLabel?.toLowerCase().contains('close') ?? false)
                               ? LucideIcons.x
                               : LucideIcons.refreshCcw,
                           size: 18,
