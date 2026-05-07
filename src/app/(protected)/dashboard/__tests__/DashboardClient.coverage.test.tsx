@@ -79,29 +79,39 @@ vi.mock('@/providers/attendance-settings', () => ({
 
 // Mock components that are heavy or problematic
 vi.mock('@/components/attendance/course-card', () => ({
-  CourseCard: ({ course }: any) => <div data-testid="course-card">{course.name}</div>,
+  CourseCard: ({ course, onEditInstructor }: any) => (
+    <div data-testid="course-card">
+      {course.name}
+      <button data-testid="edit-instructor-btn" onClick={onEditInstructor}>Edit</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/pwa-install-banner', () => ({
-  PWAInstallBanner: () => null,
+  PWAInstallBanner: () => <div data-testid="pwa-banner" />,
 }));
 
 vi.mock('@/components/attendance/AddAttendanceDialog', () => ({
-  AddAttendanceDialog: () => null,
+  AddAttendanceDialog: ({ onSuccess }: any) => (
+    <div data-testid="add-attendance-dialog">
+      <button data-testid="trigger-success" onClick={onSuccess}>Success</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/attendance/AddCourseDialog', () => ({
-  AddCourseDialog: () => null,
+  AddCourseDialog: ({ open }: any) => (open ? <div data-testid="add-course-dialog" /> : null),
 }));
 
 vi.mock('@/components/attendance/EditInstructorDialog', () => ({
-  EditInstructorDialog: () => null,
+  EditInstructorDialog: ({ open }: any) => (open ? <div data-testid="edit-instructor-dialog" /> : null),
 }));
 
 vi.mock('next/dynamic', () => ({
-  default: (_fn: any) => {
-    const Component = () => <div data-testid="dynamic-component">Dynamic</div>;
-    return Component;
+  default: () => {
+    return function DynamicComponent() {
+      return <div data-testid="dynamic-component">Dynamic</div>;
+    };
   },
 }));
 
@@ -123,7 +133,7 @@ vi.mock('@/components/ui/select', () => ({
 }));
 
 vi.mock('@/components/ui/alert-dialog', () => ({
-  AlertDialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  AlertDialog: ({ children, open }: any) => (open ? <div data-testid="alert-dialog">{children}</div> : null),
   AlertDialogContent: ({ children }: any) => <div>{children}</div>,
   AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
   AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
@@ -134,7 +144,7 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 }));
 
 vi.mock('@/components/ui/card', () => ({
-  Card: ({ children }: any) => <div>{children}</div>,
+  Card: ({ children }: any) => <div data-testid="card">{children}</div>,
   CardHeader: ({ children }: any) => <div>{children}</div>,
   CardTitle: ({ children }: any) => <div>{children}</div>,
   CardDescription: ({ children }: any) => <div>{children}</div>,
@@ -157,17 +167,17 @@ describe('DashboardClient', () => {
     
     vi.mocked(useProfile).mockReturnValue({ data: mockProfile, isLoading: false, isFetching: false, refetch: vi.fn() } as any);
     vi.mocked(useFetchUserSettings).mockReturnValue({ data: { semester: 'odd', academicYear: '2024-25' }, isLoading: false } as any);
-    vi.mocked(useAttendanceReport).mockReturnValue({ data: { studentAttendanceData: {}, sessions: {} }, isLoading: false, isFetching: false, refetch: vi.fn() } as any);
-    vi.mocked(useFetchCourses).mockReturnValue({ data: { courses: {} }, isLoading: false, isFetching: false, refetch: vi.fn() } as any);
-    vi.mocked(useTrackingData).mockReturnValue({ data: [], isLoading: false, isFetching: false, refetch: vi.fn() } as any);
+    vi.mocked(useAttendanceReport).mockReturnValue({ data: { studentAttendanceData: {}, sessions: {} }, isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) } as any);
+    vi.mocked(useFetchCourses).mockReturnValue({ data: { courses: {} }, isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) } as any);
+    vi.mocked(useTrackingData).mockReturnValue({ data: [], isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue([]) } as any);
     vi.mocked(useFetchCourseInstructors).mockReturnValue({ data: [] } as any);
     vi.mocked(useFetchClassCourses).mockReturnValue({ data: [] } as any);
     vi.mocked(useDisabledCourses).mockReturnValue({ disabledCodes: new Set() } as any);
     vi.mocked(useCourseLookup).mockReturnValue({ getCourseCodeById: vi.fn((id) => id) } as any);
     vi.mocked(useAllCourseDetails).mockReturnValue({ data: [], isLoading: false, isFetching: false } as any);
     vi.mocked(useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false } as any);
-    vi.mocked(useSetSemester).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false } as any);
-    vi.mocked(useSetAcademicYear).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false } as any);
+    vi.mocked(useSetSemester).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
+    vi.mocked(useSetAcademicYear).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
   });
 
   it('renders correctly with default settings', async () => {
@@ -230,15 +240,87 @@ describe('DashboardClient', () => {
 
     render(<DashboardClient />);
     
-    // Wait for initial initialization effect (Promise.resolve().then())
     await waitFor(() => {
       expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument();
     }, { timeout: 2000 });
 
-    // Check if CourseCard is rendered
     await waitFor(() => {
       expect(screen.getByTestId('course-card')).toBeInTheDocument();
     });
     expect(screen.getByText('Computer Science 101')).toBeInTheDocument();
+  });
+
+  it('shows empty state when no courses are found', async () => {
+    vi.mocked(useFetchCourses).mockReturnValue({ data: { courses: {} }, isLoading: false } as any);
+    render(<DashboardClient />);
+    await waitFor(() => {
+      expect(screen.getByText(/No courses found/i)).toBeInTheDocument();
+    });
+    
+    const addBtn = screen.getByText('Add Your First Course');
+    fireEvent.click(addBtn);
+    expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
+  });
+
+  it('handles confirm and cancel in AlertDialog', async () => {
+    const mockMutate = vi.fn().mockResolvedValue({});
+    vi.mocked(useSetSemester).mockReturnValue({ mutateAsync: mockMutate, isPending: false } as any);
+    
+    render(<DashboardClient />);
+    await waitFor(() => expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument());
+
+    const selects = screen.getAllByTestId('select-component');
+    fireEvent.change(selects[0], { target: { value: 'even' } });
+    
+    // Cancel first
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
+
+    // Trigger again and confirm
+    fireEvent.change(selects[0], { target: { value: 'even' } });
+    fireEvent.click(screen.getByText('Confirm'));
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalled();
+    });
+  });
+
+  it('handles AddAttendanceDialog success callback', async () => {
+    const refetchAttendance = vi.fn().mockResolvedValue({});
+    vi.mocked(useAttendanceReport).mockReturnValue({ data: { studentAttendanceData: {}, sessions: {} }, isLoading: false, refetch: refetchAttendance } as any);
+    
+    render(<DashboardClient />);
+    await waitFor(() => expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument());
+    
+    const successBtn = screen.getByTestId('trigger-success');
+    fireEvent.click(successBtn);
+    expect(refetchAttendance).toHaveBeenCalled();
+  });
+
+  it('opens EditInstructorDialog from CourseCard', async () => {
+    vi.mocked(useFetchCourses).mockReturnValue({
+      data: { courses: { '101': { id: '101', name: 'CS', code: 'CS101' } } },
+      isLoading: false
+    } as any);
+
+    render(<DashboardClient />);
+    await waitFor(() => expect(screen.getByTestId('course-card')).toBeInTheDocument());
+    
+    const editBtn = screen.getByTestId('edit-instructor-btn');
+    fireEvent.click(editBtn);
+    expect(screen.getByTestId('edit-instructor-dialog')).toBeInTheDocument();
+  });
+
+  it('opens AddCourseDialog from add course card', async () => {
+    vi.mocked(useFetchCourses).mockReturnValue({
+      data: { courses: { '101': { id: '101', name: 'CS' } } },
+      isLoading: false
+    } as any);
+
+    render(<DashboardClient />);
+    await waitFor(() => expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument());
+    
+    const addCard = screen.getByText(/Can't find a course/i);
+    fireEvent.click(addCard);
+    expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
   });
 });

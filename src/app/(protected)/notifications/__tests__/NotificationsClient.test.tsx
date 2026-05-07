@@ -62,6 +62,8 @@ vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
@@ -448,7 +450,7 @@ describe('NotificationsClient', () => {
       expect(mockToggleRead).toHaveBeenCalledWith(9, false);
     });
 
-    it('does not call toggleRead when a read notification is clicked', async () => {
+    it('calls toggleRead when a read notification is clicked', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
       const mockToggleRead = vi.fn();
 
@@ -487,6 +489,82 @@ describe('NotificationsClient', () => {
       const card = notification.closest('div[role="button"]') as HTMLElement;
       if (card) fireEvent.click(card);
       expect(mockToggleRead).toHaveBeenCalledWith(10, true);
+    });
+  });
+
+  describe('Sync Callbacks', () => {
+    it('handles partial sync by showing a toast', async () => {
+      const { useSyncOnMount } = await import('@/hooks/use-sync-on-mount');
+      let partialSyncCallback: any;
+      vi.mocked(useSyncOnMount).mockImplementation(({ onPartialSync }: any) => {
+        partialSyncCallback = onPartialSync;
+        return { isSyncing: false, syncCompleted: true };
+      });
+
+      const { toast } = await import('sonner');
+      render(<NotificationsPage />);
+      await partialSyncCallback();
+      expect(toast.warning).toHaveBeenCalledWith("Partial Sync Completed", expect.any(Object));
+    });
+
+    it('handles successful sync with updates by showing a toast', async () => {
+      const { useSyncOnMount } = await import('@/hooks/use-sync-on-mount');
+      let successCallback: any;
+      vi.mocked(useSyncOnMount).mockImplementation(({ onSuccess }: any) => {
+        successCallback = onSuccess;
+        return { isSyncing: false, syncCompleted: true };
+      });
+
+      const { toast } = await import('sonner');
+      render(<NotificationsPage />);
+      await successCallback({ updates: 5 });
+      expect(toast.info).toHaveBeenCalledWith("Notifications Updated", expect.any(Object));
+    });
+  });
+
+  describe('Handle Toggle Read Error', () => {
+    it('logs error and shows toast on failure', async () => {
+      const { useNotifications } = await import('@/hooks/notifications/useNotifications');
+      const mockToggleRead = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      vi.mocked(useNotifications).mockReturnValue({
+        ...MOCK_NOTIFICATIONS_VAL,
+        regularNotifications: [
+          { id: 11, title: 'Error Notification', is_read: false, created_at: new Date().toISOString(), topic: 'sync' }
+        ],
+        toggleRead: mockToggleRead,
+      } as any);
+
+      const { toast } = await import('sonner');
+      const { logger } = await import('@/lib/logger');
+      
+      // Ensure NODE_ENV is development for line 213 coverage
+      vi.stubEnv('NODE_ENV', 'development');
+
+      render(<NotificationsPage />);
+      const notification = await screen.findByText('Error Notification');
+      fireEvent.click(notification);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Could not update notification");
+        expect(logger.error).toHaveBeenCalled();
+      });
+      
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe('Empty State', () => {
+    it('renders empty state when no notifications exist', async () => {
+      const { useNotifications } = await import('@/hooks/notifications/useNotifications');
+      vi.mocked(useNotifications).mockReturnValue({
+        ...MOCK_NOTIFICATIONS_VAL,
+        actionNotifications: [],
+        regularNotifications: [],
+      } as any);
+
+      render(<NotificationsPage />);
+      expect(screen.getByText('All caught up!')).toBeInTheDocument();
     });
   });
 });

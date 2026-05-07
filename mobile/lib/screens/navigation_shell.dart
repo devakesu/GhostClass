@@ -592,7 +592,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         onPressed: () async {
                            if (isCriticalSecurityFailure) {
                              exit(0);
-                             return;
                            }
 
                            // Clear lock and retry
@@ -605,7 +604,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                            }
                         },
                         child: Text(
-                          isCriticalSecurityFailure ? 'Exit App' : 'Retry Verification',
+                          isCriticalSecurityFailure ? 'Close App' : 'Restart App',
                           style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
                         ),
                       ),
