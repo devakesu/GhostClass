@@ -144,11 +144,12 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 }));
 
 vi.mock('@/components/ui/card', () => ({
-  Card: ({ children }: any) => <div data-testid="card">{children}</div>,
-  CardHeader: ({ children }: any) => <div>{children}</div>,
-  CardTitle: ({ children }: any) => <div>{children}</div>,
-  CardDescription: ({ children }: any) => <div>{children}</div>,
-  CardContent: ({ children }: any) => <div>{children}</div>,
+  Card: ({ children, ...props }: any) => <div data-testid="card" {...props}>{children}</div>,
+  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardFooter: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 
 vi.mock('@/components/ui/skeleton', () => ({

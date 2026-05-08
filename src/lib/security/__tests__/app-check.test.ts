@@ -6,6 +6,7 @@ import { verifyDeviceCheckToken } from '@/lib/security/device-check';
 import { headers, cookies } from 'next/headers';
 import { validateCsrfToken } from '@/lib/security/csrf';
 import { decryptRequest, encryptResponse } from '@/lib/security/jwe';
+import { getClientIp } from '@/lib/utils.server';
 
 // Create a stable mock result that we can control
 const rateLimitMock = {
@@ -61,12 +62,11 @@ vi.mock('@/lib/utils.server', () => ({
 }));
 
 vi.mock('@upstash/ratelimit', () => {
-    const RatelimitMock = vi.fn().mockImplementation(() => ({
-        limit: vi.fn().mockImplementation(() => Promise.resolve(rateLimitMock)),
-    }));
-    (RatelimitMock as any).slidingWindow = vi.fn();
     return {
-        Ratelimit: RatelimitMock,
+        Ratelimit: class {
+            static slidingWindow = vi.fn();
+            limit = vi.fn().mockImplementation(() => Promise.resolve(rateLimitMock));
+        }
     };
 });
 
@@ -167,7 +167,7 @@ describe('app-check logic', () => {
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
         const req = new Request('https://test.com', { headers: h });
-        const res = await wrapped(req, { params: {} });
+        const res = await wrapped(req as any, { params: {} });
 
         expect(res.status).toBe(403);
     });
@@ -181,7 +181,7 @@ describe('app-check logic', () => {
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
         const req = new Request('https://test.com', { headers: h });
-        const res = await wrapped(req, { params: {} });
+        const res = await wrapped(req as any, { params: {} });
 
         expect(res.status).toBe(200);
     });
@@ -203,7 +203,7 @@ describe('app-check logic', () => {
         const handler = vi.fn().mockResolvedValue(new Response('{"data":"secret"}'));
         const wrapped = withSecurity(handler);
         const req = new Request('https://test.com', { headers: h });
-        const res = await wrapped(req, { params: {} });
+        const res = await wrapped(req as any, { params: {} });
 
         expect(res.status).toBe(200);
         expect(res.headers.get('Content-Type')).toBe('application/jose');
@@ -211,23 +211,57 @@ describe('app-check logic', () => {
     });
   });
 
-/*
   describe('Rate Limiting Enforcement', () => {
-    it('enforces rate limiting for web requests', async () => {
-        rateLimitMock.success = false;
-        process.env.DISABLE_SECURITY_BYPASS = 'true';
-        
+    it('uses standard web limit (60) for non-proxy routes', async () => {
+        const { Ratelimit } = await import('@upstash/ratelimit');
         const h = new Headers({ 'x-csrf-token': 'valid' });
         vi.mocked(headers).mockResolvedValue(h);
-        vi.mocked(getClientIp).mockReturnValue('1.2.3.4');
         vi.mocked(validateCsrfToken).mockResolvedValue(true);
+        vi.mocked(getClientIp).mockReturnValue('1.2.3.4');
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
-        const req = new Request('https://test.com', { headers: h });
-        const res = await wrapped(req, { params: {} });
+        const req = new Request('https://test.com/api/some-api', { headers: h });
+        // @ts-ignore - mock request property for nextUrl
+        req.nextUrl = { pathname: '/api/some-api' };
         
+        await wrapped(req as any, { params: {} });
+        
+        expect(Ratelimit.slidingWindow).toHaveBeenCalledWith(60, '60 s');
+    });
+
+    it('uses higher proxy limit (300) for backend proxy routes', async () => {
+        const { Ratelimit } = await import('@upstash/ratelimit');
+        const h = new Headers({ 'x-csrf-token': 'valid' });
+        vi.mocked(headers).mockResolvedValue(h);
+        vi.mocked(validateCsrfToken).mockResolvedValue(true);
+        vi.mocked(getClientIp).mockReturnValue('1.2.3.4');
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com/api/backend/test', { headers: h });
+        // @ts-ignore - mock request property for nextUrl
+        req.nextUrl = { pathname: '/api/backend/test' };
+        
+        await wrapped(req as any, { params: {} });
+        
+        expect(Ratelimit.slidingWindow).toHaveBeenCalledWith(300, '60 s');
+    });
+
+    it('returns 429 when rate limit is exceeded', async () => {
+        rateLimitMock.success = false;
+        const h = new Headers({ 'x-csrf-token': 'valid' });
+        vi.mocked(headers).mockResolvedValue(h);
+        vi.mocked(validateCsrfToken).mockResolvedValue(true);
+        vi.mocked(getClientIp).mockReturnValue('1.2.3.4');
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com/api/test', { headers: h });
+        // @ts-ignore - mock request property for nextUrl
+        req.nextUrl = { pathname: '/api/test' };
+        
+        const res = await wrapped(req as any, { params: {} });
         expect(res.status).toBe(429);
+        const data = await res.json();
+        expect(data.error).toBe('Rate limit exceeded');
     });
   });
-*/
 });

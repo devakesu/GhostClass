@@ -14,6 +14,7 @@ import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { useCSRFToken } from "@/hooks/use-csrf-token";
+import { OutageProvider } from "@/providers/outage-provider";
 
 export default function ProtectedLayout({
   children,
@@ -163,9 +164,11 @@ export default function ProtectedLayout({
             </LazyMotion>
             
             <main className="flex-1 w-full bg-background pt-20">
+              <OutageProvider>
               <ErrorBoundary>
                 {children}
               </ErrorBoundary>
+              </OutageProvider>
             </main>
             
             <Footer />

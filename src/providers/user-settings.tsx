@@ -61,92 +61,55 @@ const normalizeTarget = (val: number): number => Math.min(Math.max(val, 1), 100)
  * 3. Validates the data shape and returns a clean UserSettings object or null.
  */
 const loadPrefetchedSettings = (currentUserId: string | null): UserSettings | null => {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined" || !currentUserId) return null;
 
-  const clearAndReturn = () => {
-    try {
-      sessionStorage.removeItem("prefetchedSettings");
-    } catch {
-      // Swallow storage errors to ensure we always return null
-    }
-    return null;
-  };
-  
   try {
-    const raw = sessionStorage.getItem("prefetchedSettings");
-
-    if (!raw) {
-      // Stage 2: sessionStorage is gone (cleared after the first successful DB fetch).
-      // Build placeholder from individual localStorage keys so returning users get their
-      // settings immediately without waiting for Supabase query completion.
-      if (!currentUserId) return null;
-
-      const storedBunk = localStorage.getItem(`showBunkCalc_${currentUserId}`);
-      const storedTarget = localStorage.getItem(`targetPercentage_${currentUserId}`);
-      const storedDisabled = localStorage.getItem(`disabledCourses_${currentUserId}`);
-
-      if (storedBunk === null && storedTarget === null) return null;
-
+    // 1. Check sessionStorage for Stage 1 hydration (pre-fetched by server)
+    //    This is used for the very first load to avoid any flash of default settings.
+    const prefetchedRaw = sessionStorage.getItem("prefetchedSettings");
+    if (prefetchedRaw) {
       try {
-        return {
-          bunk_calculator_enabled: storedBunk === "true",
-          target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
-          disabled_courses: storedDisabled ? JSON.parse(storedDisabled) : {},
-        };
+        const parsed = JSON.parse(prefetchedRaw);
+        // Ensure the prefetched data belongs to the currently logged-in user
+        if (parsed && typeof parsed === 'object' && parsed.userId === currentUserId && parsed.settings) {
+          const s = parsed.settings;
+          // Basic validation of required fields
+          if (typeof s.bunk_calculator_enabled === 'boolean' && 
+              typeof s.target_percentage === 'number' &&
+              s.disabled_courses) {
+            return s as UserSettings;
+          }
+        }
+        // If mismatched, invalid format, or missing fields, clear it
+        sessionStorage.removeItem("prefetchedSettings");
       } catch {
-        return null;
+        sessionStorage.removeItem("prefetchedSettings");
       }
     }
 
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return clearAndReturn();
+    // 2. Rely on individual user-scoped localStorage keys (Stage 2).
+    //    These are updated on every successful DB fetch and are safer than 
+    //    a single large sessionStorage object for subsequent loads.
+    const storedBunk = localStorage.getItem(`showBunkCalc_${currentUserId}`);
+    const storedTarget = localStorage.getItem(`targetPercentage_${currentUserId}`);
+    const storedDisabled = localStorage.getItem(`disabledCourses_${currentUserId}`);
 
-    const parsedRecord = parsed as Record<string, unknown>;
+    if (storedBunk === null && storedTarget === null) return null;
 
-    // Security check: if currentUserId is provided, the record MUST belong to them
-    if (currentUserId) {
-      if (!('userId' in parsedRecord)) {
-        // Legacy format without userId - clear it to avoid leaking cross-user data
-        return clearAndReturn();
-      }
-      // Then validate the userId is a string and matches the current user
-      if (typeof parsedRecord.userId !== "string" || parsedRecord.userId !== currentUserId) {
-        // Invalid type or belongs to a different user - clear and ignore
-        return clearAndReturn();
-      }
+    try {
+      return {
+        bunk_calculator_enabled: storedBunk === "true",
+        target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
+        disabled_courses: (storedDisabled && typeof storedDisabled === "string") 
+          ? JSON.parse(storedDisabled) 
+          : {},
+      };
+    } catch {
+      return null;
     }
-
-    let settingsData: Record<string, unknown>;
-    
-    if ('settings' in parsedRecord && parsedRecord.settings !== null && typeof parsedRecord.settings === "object") {
-      // New format: { userId?: string; settings: { bunk_calculator_enabled, target_percentage } }
-      settingsData = parsedRecord.settings as Record<string, unknown>;
-    } else if ('bunk_calculator_enabled' in parsedRecord || 'target_percentage' in parsedRecord) {
-      // Legacy format: { bunk_calculator_enabled, target_percentage }
-      settingsData = parsedRecord;
-    } else {
-      return clearAndReturn();
-    }
-
-    const { bunk_calculator_enabled, target_percentage, disabled_courses } = settingsData;
-
-    if (
-      typeof bunk_calculator_enabled !== "boolean" ||
-      typeof target_percentage !== "number"
-    ) {
-      return clearAndReturn();
-    }
-
-    return {
-      bunk_calculator_enabled,
-      target_percentage: normalizeTarget(target_percentage),
-      disabled_courses: (disabled_courses && typeof disabled_courses === "object") 
-        ? (disabled_courses as Record<string, Record<string, string>>) 
-        : {},
-    };
   } catch (err) {
     logger.error("Failed to load prefetched settings:", err);
-    return clearAndReturn();
+    return null;
   }
 };
 
@@ -170,6 +133,7 @@ function useUserSettingsState() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUserId = session?.user?.id ?? null;
+      const previousUserId = currentUserIdRef.current;
       currentUserIdRef.current = currentUserId;
 
       if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED" || event === "PASSWORD_RECOVERY") {
@@ -182,10 +146,10 @@ function useUserSettingsState() {
         queryClient.removeQueries({ queryKey: ["userSettings", null] });
       } else if (event === "SIGNED_OUT") {
         // Clear local storage keys for the user who just logged out
-        if (userId) {
-          localStorage.removeItem(`showBunkCalc_${userId}`);
-          localStorage.removeItem(`targetPercentage_${userId}`);
-          localStorage.removeItem(`disabledCourses_${userId}`);
+        if (previousUserId) {
+          localStorage.removeItem(`showBunkCalc_${previousUserId}`);
+          localStorage.removeItem(`targetPercentage_${previousUserId}`);
+          localStorage.removeItem(`disabledCourses_${previousUserId}`);
         }
         setUserId(null);
         queryClient.removeQueries({ queryKey: ["userSettings"] });
@@ -195,7 +159,7 @@ function useUserSettingsState() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, queryClient, userId]);
+  }, [supabase, queryClient]); // Removed userId from dependencies
 
   // Determine the placeholder data for the query (Stage 2 hydration)
   const prefetchedSettings = useMemo(
@@ -233,8 +197,11 @@ function useUserSettingsState() {
     gcTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    retry: (failureCount, error: any) => {
-      if (error?.code === 'PGRST116') return false; // Not found
+    retry: (failureCount: number, error: unknown) => {
+      // Type guard for Supabase/PostgREST errors
+      if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
+        return false; // Not found (no record yet)
+      }
       return failureCount < 3;
     },
     placeholderData: userId ? prefetchedSettings ?? undefined : undefined,

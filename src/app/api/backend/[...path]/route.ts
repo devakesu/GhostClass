@@ -231,12 +231,12 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
 }
 
 export const GET = withSecurity(async (req, { params, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   return forward(req as NextRequest, "GET", path, undefined, authType);
 });
 
 export const POST = withSecurity(async (req, { params, decryptedBody, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   const res = await forward(req as NextRequest, "POST", path, decryptedBody, authType);
   const pathStr = path.join("/");
   if (res.ok && (pathStr.includes("user/setting/default_semester") || pathStr.includes("user/setting/default_academic_year"))) {
@@ -247,21 +247,21 @@ export const POST = withSecurity(async (req, { params, decryptedBody, authType }
 });
 
 export const PUT = withSecurity(async (req, { params, decryptedBody, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
 });
 
 export const PATCH = withSecurity(async (req, { params, decryptedBody, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PATCH", path, decryptedBody, authType);
 });
 
 export const DELETE = withSecurity(async (req, { params, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   return forward(req as NextRequest, "DELETE", path, undefined, authType);
 });
 
 export const HEAD = withSecurity(async (req, { params, authType }) => {
-  const { path } = await (params as Promise<{ path: string[] }>);
+  const { path } = params as { path: string[] };
   return forward(req as NextRequest, "HEAD", path, undefined, authType);
 });

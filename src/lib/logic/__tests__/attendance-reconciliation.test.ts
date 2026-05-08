@@ -96,7 +96,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.realPresent).toBe(0);
       expect(stats.correctionPresent).toBe(1);
       expect(stats.savedAbsent).toBe(1);
@@ -118,7 +118,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.realPresent).toBe(10); // From fallback
       expect(stats.extraPresent).toBe(1);
       expect(stats.extrasCount).toBe(1);
@@ -141,7 +141,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.extraAbsent).toBe(1);
       expect(stats.extrasCount).toBe(1);
       expect(stats.finalTotal).toBe(13);
@@ -175,7 +175,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.realOther).toBe(1);
       expect(stats.extraDL).toBe(1);
       expect(stats.extraPresent).toBe(1); // DL is positive
@@ -198,7 +198,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.correctionDL).toBe(1);
       expect(stats.correctionPresent).toBe(1);
     });
@@ -231,7 +231,7 @@ describe('attendance-reconciliation logic', () => {
         } as any,
       ];
 
-      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking);
+      const stats = getReconciledStats(courseId, officialAggregate, sessions, tracking.filter(t => t.course === courseId));
       expect(stats.correctionPresent).toBe(0);
     });
 
@@ -259,7 +259,7 @@ describe('attendance-reconciliation logic', () => {
           user_id: ''
         } as any,
       ];
-      const stats2 = getReconciledStats(courseId, officialAggregate, [], tracking);
+      const stats2 = getReconciledStats(courseId, officialAggregate, [], tracking.filter(t => t.course === courseId));
       expect(stats2.correctionPresent).toBe(0);
       expect(stats2.extraPresent).toBe(0);
     });

@@ -15,7 +15,7 @@ const handler = async (_req: Request) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from("user_settings")
-      .select("bunk_calculator_enabled, target_percentage")
+      .select("bunk_calculator_enabled, target_percentage, disabled_courses")
       .eq("user_id", user.id)
       .maybeSingle();
 

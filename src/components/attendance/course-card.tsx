@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchUserSettings } from "@/hooks/users/settings";
+import { getReconciledStats } from "@/lib/logic/attendance-reconciliation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -227,74 +228,77 @@ export function CourseCard({
   }, [supabaseUserId]);
 
   const stats = useMemo(() => {
-    // 1. Official Data (From API)
-    // Fall back to officialPresent/officialTotal (official-only, no tracking extras)
-    // to avoid contaminating safeMetrics with tracking data when courseDetails is not yet loaded.
-    // Derive total from present+absent instead of courseDetails.total, because the EzyGo
-    // /summery endpoint may include revision or untracked slots in its total field, causing
-    // it to exceed present+absent and diverge from our per-day count.
-    const realPresent = activeCourseDetails?.present ?? course.officialPresent ?? 0;
-    const realAbsent = activeCourseDetails?.absent ?? Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0);
-    const realTotal = activeCourseDetails
-      ? activeCourseDetails.present + activeCourseDetails.absent
-      : (course.officialTotal ?? 0);
-    const officialPercentage = realTotal > 0 ? (realPresent / realTotal) * 100 : 0;
-    
-    // 2. Filter Tracking Data (Local Calculation Backup)
-     const { targetId, targetName, targetCode } = courseIdentifiers;
+    const { targetId, targetName, targetCode } = courseIdentifiers;
 
+    // Filter tracking data for this specific course
     const courseTracks = trackingData?.filter(t => {
-        if (String(t.course) === targetId) return true;
-        const tName = normalize(String(t.course));
-        return tName === targetName || (targetCode && tName === targetCode);
+      if (String(t.course) === targetId) return true;
+      const tName = normalize(String(t.course));
+      return tName === targetName || (targetCode && tName === targetCode);
     }) || [];
-    
-    // 3. Calculate Modifiers (For visual breakdown only)
-    let extraPresent = 0;
-    let extraAbsent = 0;
-    let correctionPresent = 0; 
 
-    courseTracks.forEach(t => {
-        const isPos = t.attendance === 110 || t.attendance === 225; // Present or DL
-        
-        if (t.status === 'extra') {
-            // Extra: Adds to Total AND (Present or Absent)
-            if (isPos) extraPresent++;
-            else extraAbsent++;
-        } else {
-            // Correction: Only swaps status. Does NOT add to total.
-            // Assumption: User corrects Absent -> Present
-            if (isPos) correctionPresent++;
-        }
-    });
+    // If the parent already provided reconciled stats, trust them.
+    // This avoids the 'Extra inflation' bug where CourseCard re-reconciles without the session map.
+    if (course.present !== undefined && course.total !== undefined) {
+      const reconciled = {
+        realPresent: course.officialPresent ?? 0,
+        realTotal: course.officialTotal ?? 0,
+        realAbsent: Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0),
+        finalPresent: course.present,
+        finalTotal: course.total,
+        correctionPresent: (course as any).correctionPresent ?? 0,
+        extraPresent: (course as any).extraPresent ?? 0,
+        extrasCount: (course as any).extrasCount ?? 0,
+        extraAbsent: (course as any).extraAbsent ?? 0,
+        officialPercentage: course.officialTotal ? (course.officialPresent! / course.officialTotal!) * 100 : 0,
+        finalPercentage: course.total ? (course.present / course.total) * 100 : 0,
+      };
 
-    const extras = extraPresent + extraAbsent;
+      const safeMetrics = calculateAttendance(reconciled.realPresent, reconciled.realTotal, targetPercentage ?? 75);
+      const extraMetrics = calculateAttendance(reconciled.finalPresent, reconciled.finalTotal, targetPercentage ?? 75);
 
-    // 4. Final Calculation
-    const finalPresent = course.present !== undefined ? course.present : realPresent;
-    const finalTotal = course.total !== undefined ? course.total : realTotal;
-    
-    const displayPercentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
+      return {
+        ...reconciled,
+        displayTotal: reconciled.finalTotal, // Explicitly set for UI
+        displayPercentage: parseFloat(reconciled.finalPercentage.toFixed(2)),
+        officialPercentage: parseFloat(reconciled.officialPercentage.toFixed(2)),
+        safeMetrics,
+        extraMetrics,
+        // Added missing keys for the UI
+        realAbsent: reconciled.realTotal - reconciled.realPresent,
+        extras: reconciled.extrasCount,
+      };
+    }
 
-    // 5. Metrics
-    const safeMetrics = calculateAttendance(realPresent, realTotal, targetPercentage ?? 75);
-    const extraMetrics = calculateAttendance(finalPresent, finalTotal, targetPercentage ?? 75);
+    const reconciled = getReconciledStats(
+      String(course.id),
+      {
+        present: activeCourseDetails?.present ?? course.officialPresent ?? 0,
+        absent: activeCourseDetails?.absent ?? Math.max((course.officialTotal ?? 0) - (course.officialPresent ?? 0), 0),
+        total: activeCourseDetails ? (activeCourseDetails.present + activeCourseDetails.absent) : (course.officialTotal ?? 0)
+      },
+      undefined, // No raw sessions in individual cards
+      courseTracks
+    );
+
+    const safeMetrics = calculateAttendance(reconciled.realPresent, reconciled.realTotal, targetPercentage ?? 75);
+    const extraMetrics = calculateAttendance(reconciled.finalPresent, reconciled.finalTotal, targetPercentage ?? 75);
 
     return {
-      realPresent,
-      realAbsent,
-      realTotal,
-      correctionPresent, 
-      extraPresent,           
-      extras,
-      extraAbsent,
-      displayTotal: finalTotal,
-      displayPercentage: parseFloat(displayPercentage.toFixed(2)),
-      officialPercentage: parseFloat(officialPercentage.toFixed(2)),
+      realPresent: reconciled.realPresent,
+      realAbsent: reconciled.realAbsent,
+      realTotal: reconciled.realTotal,
+      correctionPresent: reconciled.correctionPresent, 
+      extraPresent: reconciled.extraPresent,           
+      extras: reconciled.extrasCount,
+      extraAbsent: reconciled.extraAbsent,
+      displayTotal: reconciled.finalTotal,
+      displayPercentage: reconciled.finalPercentage,
+      officialPercentage: reconciled.officialPercentage,
       safeMetrics,
       extraMetrics
     };
-  }, [activeCourseDetails, course.officialPresent, course.officialTotal, course.present, course.total, courseIdentifiers, trackingData, targetPercentage, normalize]);
+  }, [activeCourseDetails, course, courseIdentifiers, trackingData, targetPercentage, normalize]);
 
   const hasAttendanceData = useMemo(() => 
     !isSummaryLoading && stats.displayTotal > 0,
@@ -312,20 +316,8 @@ export function CourseCard({
   );
 
   const statusColorClasses = useMemo(() => {
-    if (!hasAttendanceData) return {
-      card: "",
-      headerBg: "bg-muted/60",
-      headerBorder: "border-border/60",
-      badge: "bg-foreground/10 text-muted-foreground",
-    };
-    
     const metrics = stats.extraMetrics;
     const isAtRisk = metrics.requiredToAttend > 0;
-    
-    // Warning threshold: if user is within 10% of target (e.g. 65% when target is 75%)
-    const percentage = stats.displayPercentage;
-    const target = targetPercentage ?? 75;
-    const isWarning = isAtRisk && percentage >= (target - 10);
     
     if (!isAtRisk) return {
       card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
@@ -334,20 +326,13 @@ export function CourseCard({
       badge: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
     };
 
-    if (isWarning) return {
-      card: "border-t-[3px] border-t-amber-500/70 dark:border-t-transparent",
-      headerBg: "bg-amber-500/10 dark:bg-amber-500/20",
-      headerBorder: "border-amber-500/20 dark:border-amber-500/40",
-      badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
-    };
-
     return {
       card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
       headerBg: "bg-red-500/10 dark:bg-red-500/20",
       headerBorder: "border-red-500/20 dark:border-red-500/40",
       badge: "bg-red-500/15 text-red-500 border-red-500/30",
     };
-  }, [hasAttendanceData, stats.extraMetrics, stats.displayPercentage, targetPercentage]);
+  }, [stats.extraMetrics]);
 
 
   const capitalize = useCallback((str: string) => {
@@ -617,14 +602,14 @@ export function CourseCard({
                         <p className="text-sm text-muted-foreground text-center font-medium leading-tight">
                           {stats.safeMetrics.canBunk > 0 ? (
                             <>
-                              You can safely bunk <span className="font-bold text-green-500">{stats.safeMetrics.canBunk}</span> {stats.safeMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
+                              You can bunk <span className="font-bold text-green-500">{stats.safeMetrics.canBunk}</span> {stats.safeMetrics.canBunk === 1 ? "class" : "classes"} 🥳
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                              You need to attend <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
                             </span>
                           ) : (
-                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
                           )}
                         </p>
                       </div>
@@ -651,14 +636,14 @@ export function CourseCard({
                         <p className="text-sm text-muted-foreground text-center font-medium leading-tight">
                           {stats.extraMetrics.canBunk > 0 ? (
                             <>
-                              You can safely bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
+                              You can bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class" : "classes"} 🥳
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
                             </span>
                           ) : (
-                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
                           )}
                         </p>
                       </div>
@@ -672,14 +657,14 @@ export function CourseCard({
                         <p className="text-sm text-muted-foreground text-center font-medium leading-tight">
                           {stats.extraMetrics.canBunk > 0 ? (
                             <>
-                              You can safely bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class 🥳" : "classes 🥳🥳"}
+                              You can bunk <span className="font-bold text-green-500">{stats.extraMetrics.canBunk}</span> {stats.extraMetrics.canBunk === 1 ? "class" : "classes"} 🥳
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class 💀" : "classes 💀💀"}
+                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
                             </span>
                           ) : (
-                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge. Skipping now&apos;s risky 💀💀</span>
+                            <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
                           )}
                         </p>
                       </div>
@@ -704,7 +689,7 @@ export function CourseCard({
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend} 💀💀</span>
+                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> 💀
                             </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
@@ -727,7 +712,7 @@ export function CourseCard({
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend} 💀💀</span>
+                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> 💀
                             </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>

@@ -652,7 +652,8 @@ export function AttendanceCalendar({
 
         const override = normalizedTrackingData.find((t: any) => {
             const isDateMatch = t._isoDate === dbDateStr;
-            const isCourseMatch = String(t.course) === String(ev.courseId);
+            const tCourseCode = getCourseCodeById(String(t.course));
+            const isCourseMatch = tCourseCode === ev.courseId;
             const tSessionNorm = normalizeSession(t.session);
             const evSessionNorm = normalizeSession(ev.sessionName);
             const isKeyMatch = tSessionNorm === evSessionNorm;
@@ -687,7 +688,8 @@ export function AttendanceCalendar({
             }
 
             if (t._isoDate === dbDateStr) {
-                const key = generateSlotKey(t.course, t.date, t.session);
+                const tCourseCode = getCourseCodeById(String(t.course));
+                const key = generateSlotKey(tCourseCode, t.date, t.session);
                 
                 const alreadyMerged = processedEvents.some(ev => 
                     generateSlotKey(ev.courseId, ev.date, ev.sessionName) === key
@@ -698,8 +700,8 @@ export function AttendanceCalendar({
                     if (Number(t.attendance) === 111) label = "Absent";
                     else if (Number(t.attendance) === 225) label = "Duty Leave";
                     
-                    const cId = t.course.toString();
-                    const resolvedName = getCourseNameById(cId);
+                    const cId = tCourseCode;
+                    const resolvedName = getCourseNameById(String(t.course));
                     
                     processedEvents.push({
                         title: resolvedName, 
@@ -729,7 +731,7 @@ export function AttendanceCalendar({
     }
 
     return merged.sort((a, b) => getNormalizedSession(a.sessionName) - getNormalizedSession(b.sessionName));
-  }, [selectedDate, rawEvents, filter, normalizedTrackingData, semester, year, isSameDay, getCourseNameById]);
+  }, [selectedDate, rawEvents, filter, normalizedTrackingData, semester, year, isSameDay, getCourseNameById, getCourseCodeById]);
   
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const monthOptions = useMemo(() => {

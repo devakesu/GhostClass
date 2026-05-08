@@ -138,7 +138,9 @@ class AppConfig {
       final trimmed = encoded.trim();
       if (trimmed.isEmpty) return '';
 
-      return utf8.decode(base64.decode(trimmed));
+      // Normalize adds padding and handles URL-safe/standard base64 mixed alphabets.
+      // If normalization or decoding fails, it's likely not base64, so we return raw.
+      return utf8.decode(base64.decode(base64.normalize(trimmed)));
     } catch (e) {
       // Return the raw string as fallback if it's not actually base64
       // This allows migration and reduces breakage for unencoded dev strings

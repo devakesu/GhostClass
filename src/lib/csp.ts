@@ -59,6 +59,7 @@ export const getCspHeader = (nonce?: string) => {
   };
   const supabaseCfProxyOrigin  = parseProxyOrigin(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
   const supabaseAwsProxyOrigin = parseProxyOrigin(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
+  const supabaseDevProxyOrigin = parseProxyOrigin(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL);
   
   // Supabase WebSocket URL for Realtime features
   const supabaseWsUrl = (() => {
@@ -113,7 +114,7 @@ export const getCspHeader = (nonce?: string) => {
       style-src 'self' 'unsafe-inline';
       style-src-elem 'self' 'unsafe-inline';
       style-src-attr 'unsafe-inline';
-      img-src 'self' blob: data: ${supabaseOrigin} https://www.google-analytics.com https://stats.g.doubleclick.net;
+      img-src 'self' blob: data: ${supabaseOrigin} ${supabaseCfProxyOrigin} ${supabaseAwsProxyOrigin} ${supabaseDevProxyOrigin} https://www.google-analytics.com https://stats.g.doubleclick.net;
       font-src 'self' data:;
       object-src 'none';
       object-src 'none';
@@ -126,6 +127,7 @@ export const getCspHeader = (nonce?: string) => {
         ${supabaseOrigin}
         ${supabaseCfProxyOrigin}
         ${supabaseAwsProxyOrigin}
+        ${supabaseDevProxyOrigin}
         https://production.api.ezygo.app
         https://*.ingest.sentry.io 
         https://challenges.cloudflare.com
@@ -302,6 +304,7 @@ export const getCspHeader = (nonce?: string) => {
     supabaseWsUrl,
     supabaseCfProxyOrigin,
     supabaseAwsProxyOrigin,
+    supabaseDevProxyOrigin,
     "https://production.api.ezygo.app",
     "https://*.ingest.sentry.io",
     "https://challenges.cloudflare.com",
@@ -330,7 +333,7 @@ export const getCspHeader = (nonce?: string) => {
     `style-src ${styleSrcParts.join(" ")}`,
     `style-src-elem ${styleSrcElemParts.join(" ")}`,
     `style-src-attr ${styleSrcAttrParts.join(" ")}`,
-    `img-src ${["'self'", "blob:", "data:", supabaseOrigin, "https://www.google-analytics.com", "https://stats.g.doubleclick.net"].filter(Boolean).join(" ")}`,
+    `img-src ${["'self'", "blob:", "data:", supabaseOrigin, supabaseCfProxyOrigin, supabaseAwsProxyOrigin, supabaseDevProxyOrigin, "https://www.google-analytics.com", "https://stats.g.doubleclick.net"].filter(Boolean).join(" ")}`,
     `font-src 'self' data:`,
     `media-src 'none'`,
     `manifest-src 'self'`,

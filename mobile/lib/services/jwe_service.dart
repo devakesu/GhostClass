@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:jose/jose.dart';
+import 'package:pointycastle/asn1.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/logger.dart';
 
@@ -35,54 +36,125 @@ class JweService {
     }
   }
 
-  /// Validates certificate CN/SANs match the expected hostname
-  /// Returns true if valid, false otherwise (to reject the cert)
-  ///
-  /// SECURITY: Even in debug mode, we validate the certificate CN to prevent
-  /// MITM attacks. This allows self-signed certs (for local dev) but still
-  /// ensures we're talking to the correct server.
+  /// Extracts all valid hostnames and IP addresses from the certificate (CN and SAN)
+  List<String> _extractHostnamesFromCertificate(X509Certificate cert) {
+    final hostnames = <String>[];
+
+    // 1. Extract CN from Subject Distinguished Name
+    final subject = cert.subject;
+    // Handle both comma and slash separators, and optional spaces
+    final cnMatch = RegExp(r'(?:CN|cn)\s*=\s*([^,/]+)').firstMatch(subject);
+    if (cnMatch != null) {
+      hostnames.add(cnMatch.group(1)!.trim().replaceAll('"', ''));
+    }
+
+    // 2. Extract Subject Alternative Names (SAN) from DER encoding
+    try {
+      final parser = ASN1Parser(cert.der);
+      final root = parser.nextObject() as ASN1Sequence;
+      final tbs = root.elements![0] as ASN1Sequence;
+
+      // Extensions are the last element in TBSCertificate, tagged [3]
+      for (final element in tbs.elements!) {
+        // Tag [3] is Context-specific (0x80) | Constructed (0x20) | 3 = 0xA3
+        if (element.tag! == 0xA3) {
+          // Inside the tagged object is the Extensions sequence
+          // We need to skip the tag and length of the tagged object to get the sequence
+          final extensions = ASN1Sequence.fromBytes(element.valueBytes!);
+          for (final ext in extensions.elements!) {
+            final extSeq = ext as ASN1Sequence;
+            final oid = extSeq.elements![0] as ASN1ObjectIdentifier;
+
+            // OID 2.5.29.17 is Subject Alternative Name
+            if (listEquals(oid.objectIdentifier, [85, 29, 17])) {
+              // The extension value is an OctetString containing the actual SAN sequence
+              // It might be the second or third element depending on if 'critical' is present
+              final sanOctets = extSeq.elements!.last as ASN1OctetString;
+              final sanSeq = ASN1Sequence.fromBytes(sanOctets.valueBytes!);
+
+              for (final sanEntry in sanSeq.elements!) {
+                // SAN entries are tagged objects: dNSName [2], iPAddress [7]
+                final tagNum = sanEntry.tag! & 0x1F;
+                if (tagNum == 2) {
+                  // dNSName [2] IA5String
+                  hostnames.add(utf8.decode(sanEntry.valueBytes!));
+                } else if (tagNum == 7) {
+                  // iPAddress [7] OCTET STRING
+                  final ipBytes = sanEntry.valueBytes!;
+                  if (ipBytes.length == 4) {
+                    hostnames.add(ipBytes.join('.'));
+                  } else if (ipBytes.length == 16) {
+                    // IPv6 support
+                    final segments = <String>[];
+                    for (var i = 0; i < 16; i += 2) {
+                      segments.add(
+                        ((ipBytes[i] << 8) | ipBytes[i + 1]).toRadixString(16),
+                      );
+                    }
+                    hostnames.add(segments.join(':'));
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.w('JweService: Failed to parse SAN from certificate DER', e);
+    }
+
+    return hostnames.map((h) => h.toLowerCase()).toSet().toList();
+  }
+
+  /// Validates certificate hostnames match the expected hostname
   bool _validateCertificateHostname(
     X509Certificate cert,
     String host,
     int port,
   ) {
-    final expectedHost = _getExpectedHostname();
+    final expectedHost = _getExpectedHostname().toLowerCase();
 
-    // In production, reject any certificate issues
+    // In production, reject and let standard verification handle it
     if (!kDebugMode) {
-      return false; // Let the normal verification happen
+      return false;
     }
 
-    // Debug mode: Allow self-signed certs BUT validate the CN
     try {
-      final subject = cert.subject;
+      final hostnames = _extractHostnamesFromCertificate(cert);
 
-      // Extract CN from certificate subject
-      if (subject.contains('CN=')) {
-        final cnStart = subject.indexOf('CN=') + 3;
-        final cnEnd = subject.indexOf(',', cnStart);
-        final cn = cnEnd > cnStart
-            ? subject.substring(cnStart, cnEnd)
-            : subject.substring(cnStart);
-
-        // Check if CN matches expected hostname or is a wildcard
-        if (cn.trim() == expectedHost ||
-            cn.trim() == '*.$expectedHost' ||
-            (cn.trim().startsWith('*.') &&
-                expectedHost.endsWith(cn.trim().substring(1)))) {
-          AppLogger.i('JweService: Certificate CN validated for $expectedHost');
+      for (final hostname in hostnames) {
+        if (hostname == expectedHost) {
+          AppLogger.i('JweService: Certificate validated for $expectedHost');
           return true;
+        }
+
+        // Handle wildcards for DNS names
+        if (hostname.startsWith('*.')) {
+          final suffix = hostname.substring(1);
+          if (expectedHost.endsWith(suffix)) {
+            AppLogger.i(
+              'JweService: Certificate wildcard validated for $expectedHost',
+            );
+            return true;
+          }
         }
       }
 
-      // If CN doesn't match, reject the certificate
+      // Fallback for mkcert organization in debug mode
+      if (cert.subject.contains('mkcert development certificate')) {
+        AppLogger.i(
+          'JweService: Trusted mkcert development certificate by organization name',
+        );
+        return true;
+      }
+
       AppLogger.w(
-        'JweService: Certificate CN mismatch. Expected: $expectedHost, Certificate: $subject',
+        'JweService: Certificate mismatch. Expected: $expectedHost, Found: ${hostnames.join(", ")}',
       );
       return false;
     } catch (e) {
       AppLogger.e('JweService: Certificate validation error', e);
-      return false; // Fail closed on errors
+      return false;
     }
   }
 

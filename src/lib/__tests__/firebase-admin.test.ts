@@ -61,7 +61,7 @@ describe('firebase-admin', () => {
       expect(admin.initializeApp).toHaveBeenCalled();
       
       const mockVerifyToken = vi.mocked(admin.appCheck().verifyToken);
-      mockVerifyToken.mockResolvedValueOnce({ appId: 'test-app' });
+      mockVerifyToken.mockResolvedValueOnce({ appId: 'test-app', token: 'mock-token' } as any);
 
       const result = await verifier!.verifyToken('token');
       expect(result.appId).toBe('test-app');

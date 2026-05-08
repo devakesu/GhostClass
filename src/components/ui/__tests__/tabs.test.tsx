@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../tabs';
 
 describe('Tabs Component', () => {

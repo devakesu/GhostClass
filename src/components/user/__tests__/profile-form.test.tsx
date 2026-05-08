@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
 import { ProfileForm } from '../profile-form';
 import { useUpdateProfile } from '@/hooks/users/profile';
 import { toast } from 'sonner';

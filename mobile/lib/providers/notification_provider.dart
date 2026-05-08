@@ -102,10 +102,13 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final regularNotifications =
         feedNotifications.where((n) => !actionIds.contains(n.id)).toList();
 
-    // 3. Calculate Unread Count in memory (Action items are always unread by filter)
-    final unreadInActions = actionNotifications.length;
-    final unreadInFeed = regularNotifications.where((n) => !n.isRead).length;
-    final unreadCount = unreadInActions + unreadInFeed;
+    // 3. Fetch Total Unread Count (Web Parity: accurate total even beyond first page)
+    final unreadCountRes = await supabase
+        .from('notification')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .eq('is_read', false);
+    final unreadCount = (unreadCountRes as List).length;
 
     _currentPage = 0;
 
@@ -200,19 +203,33 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
     // 2. Update in regularNotifications
     final List<AppNotification> updatedRegular = [];
+    AppNotification? movedToAction;
+
     for (final n in previousState.regularNotifications) {
       if (n.id == id) {
-        updatedRegular.add(AppNotification(
+        final updated = AppNotification(
           id: n.id,
           title: n.title,
           description: n.description,
           createdAt: n.createdAt,
           topic: n.topic,
           isRead: newIsRead,
-        ));
+        );
+
+        // If a conflict is marked as UNREAD, it must move back to actionNotifications
+        if (!newIsRead && (n.topic?.toLowerCase().contains('conflict') ?? false)) {
+          movedToAction = updated;
+        } else {
+          updatedRegular.add(updated);
+        }
       } else {
         updatedRegular.add(n);
       }
+    }
+
+    if (movedToAction != null) {
+      updatedActions.insert(0, movedToAction);
+      updatedActions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
     if (movedToRegular != null) {

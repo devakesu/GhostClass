@@ -20,11 +20,11 @@ describe('Loading', () => {
     vi.useFakeTimers();
     // @ts-ignore
     delete window.location;
-    window.location = { ...originalLocation, reload: vi.fn() };
+     (window as any).location = { ...originalLocation, reload: vi.fn() };
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+     (window as any).location = originalLocation;
     vi.useRealTimers();
   });
 

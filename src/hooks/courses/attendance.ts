@@ -3,6 +3,7 @@
 
 import axios from "@/lib/axios";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
 
@@ -24,15 +25,34 @@ function normalizeCourseDetail(raw: unknown): CourseDetail {
   } satisfies CourseDetail;
 }
 
+/** 
+ * Cache the working endpoint typo variant to avoid redundant 404s/retries on load.
+ * EzyGo environments usually standardize on one variant across all courses.
+ */
+let workingSummaryEndpoint: "summery" | "summary" | null = null;
+
 async function fetchCourseSummaryWithFallback(ezygoId: number) {
-  try {
+  // If we already know which endpoint works, use it immediately.
+  if (workingSummaryEndpoint) {
     return await axios.get(
+      `/attendancereports/institutionuser/courses/${ezygoId}/${workingSummaryEndpoint}`
+    );
+  }
+
+  try {
+    // Try the common EzyGo typo first
+    const res = await axios.get(
       `/attendancereports/institutionuser/courses/${ezygoId}/summery`
     );
-  } catch {
-    return axios.get(
+    workingSummaryEndpoint = "summery";
+    return res;
+  } catch (_err) {
+    // If 'summery' failed, try 'summary' and cache the result if successful
+    const res = await axios.get(
       `/attendancereports/institutionuser/courses/${ezygoId}/summary`
     );
+    workingSummaryEndpoint = "summary";
+    return res;
   }
 }
 
@@ -121,11 +141,28 @@ export const useCourseDetails = (
  */
 export const useAllCourseDetails = (courses: { code: string; id: number; name: string }[]) => {
   const queryClient = useQueryClient();
-  const sortedCodes = courses.map(c => c.code).sort();
+  
+  // Explicitly deduplicate courses by code to prevent redundant batching.
+  // This ensures the queryKey remains stable and the API receives a clean list.
+  const uniqueCourses = useMemo(() => {
+    const seen = new Set<string>();
+    return courses.filter((c: { code: string; id: number; name: string }) => {
+      const code = c.code.toUpperCase().replace(/\s+/g, "");
+      if (!code || seen.has(code)) return false;
+      seen.add(code);
+      return true;
+    });
+  }, [courses]);
+
+  const sortedCodes = useMemo(() => 
+    uniqueCourses.map(c => c.code.toUpperCase().replace(/\s+/g, "")).sort(),
+    [uniqueCourses]
+  );
+
   return useQuery<Record<string, CourseDetail>>({
     queryKey: ["attendance-report-all", sortedCodes],
     queryFn: async () => {
-      const res = await axios.post("/api/attendance/summary-batch", { courses }, { baseURL: "" });
+      const res = await axios.post("/api/attendance/summary-batch", { courses: uniqueCourses }, { baseURL: "" });
       if (!res || !res.data) throw new Error("Failed to fetch batch course details");
       
       // Normalize each item and update the individual query cache
@@ -134,7 +171,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
         const detail = normalizeCourseDetail(rawDetail);
         data[code] = detail;
         
-        const course = courses.find(c => c.code === code);
+        const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
         if (course) {
           queryClient.setQueryData(
             ["attendance-report", code],
@@ -145,7 +182,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
 
       return data;
     },
-    enabled: courses.length > 0,
+    enabled: uniqueCourses.length > 0,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnReconnect: true,

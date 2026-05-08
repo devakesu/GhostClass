@@ -107,7 +107,7 @@ describe("POST /api/analytics/track", () => {
       events: [{ name: "mobile_event" }]
     };
     const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
-    const res = await POST(req, { decryptedBody: body, params: {} });
+    const res = await POST(req, { decryptedBody: body, params: {} } as any);
     expect(res.status).toBe(200);
     expect(trackGA4Event).toHaveBeenCalled();
   });

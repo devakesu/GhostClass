@@ -10,7 +10,7 @@ describe('SW Reload', () => {
     // Mock window.location.reload
     // @ts-ignore
     delete window.location;
-    window.location = { ...originalLocation, reload: vi.fn() } as any;
+     (window as any).location = { ...originalLocation, reload: vi.fn() } as any;
 
     // Mock navigator.serviceWorker
     Object.defineProperty(navigator, 'serviceWorker', {
@@ -25,7 +25,7 @@ describe('SW Reload', () => {
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+     (window as any).location = originalLocation;
     Object.defineProperty(navigator, 'serviceWorker', {
       value: originalServiceWorker,
       configurable: true,

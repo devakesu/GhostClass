@@ -159,7 +159,7 @@ describe("POST /api/contact", () => {
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/contact", { method: "POST" });
     // withSecurity passes decryptedBody as second argument
-    const res = await POST(req as any, { decryptedBody: MOCK_SUBMISSION, params: {} });
+    const res = await POST(req as any, { decryptedBody: MOCK_SUBMISSION, params: {} } as any);
     expect(res.status).toBe(200);
     expect(processContactSubmission).toHaveBeenCalledWith(
       expect.anything(),

@@ -366,15 +366,30 @@ class ApiService {
                       now.difference(_integrityTokenTimestamp!) < _tokenTTL) {
                     options.headers['X-Play-Integrity'] = _cachedIntegrityToken;
                   } else {
-                    final String? integrityToken = await _playIntegrity
-                        .requestIntegrityToken(
-                          cloudProjectNumber: _cloudProjectNumber,
-                          nonce: await _fetchServerNonce(),
-                        );
-                    if (integrityToken != null) {
-                      _cachedIntegrityToken = integrityToken;
-                      _integrityTokenTimestamp = now;
-                      options.headers['X-Play-Integrity'] = integrityToken;
+                    try {
+                      final String? integrityToken = await _playIntegrity
+                          .requestIntegrityToken(
+                            cloudProjectNumber: _cloudProjectNumber,
+                            nonce: await _fetchServerNonce(),
+                          );
+                      if (integrityToken != null) {
+                        _cachedIntegrityToken = integrityToken;
+                        _integrityTokenTimestamp = now;
+                        options.headers['X-Play-Integrity'] = integrityToken;
+                      }
+                    } catch (e) {
+                      // Graceful Fallback: If we hit Google's quota (-8: TOO_MANY_REQUESTS)
+                      // we fallback to the last cached token even if it's older than TTL.
+                      // This avoids blocking the request due to client-side throttling.
+                      if (e.toString().contains('-8') || e.toString().contains('INTEGRITY_ERROR_-8')) {
+                        AppLogger.w('ApiService: Play Integrity quota exceeded. Falling back to cached token.');
+                        if (_cachedIntegrityToken != null) {
+                          options.headers['X-Play-Integrity'] = _cachedIntegrityToken;
+                        }
+                        // Continue to handler.next(options)
+                      } else {
+                        rethrow;
+                      }
                     }
                   }
                 } catch (e) {
@@ -427,7 +442,12 @@ class ApiService {
         _integrityTokenTimestamp = DateTime.now();
       }
     } catch (e) {
-      // Background attestation failures on emulators are expected and handled gracefully
+      // Background attestation failures on emulators or quota issues are handled gracefully
+      if (e.toString().contains('-8')) {
+        AppLogger.w('ApiService: Play Integrity pre-warm quota exceeded.');
+      } else {
+        AppLogger.w('ApiService: Play Integrity pre-warm failed: $e');
+      }
     }
   }
 

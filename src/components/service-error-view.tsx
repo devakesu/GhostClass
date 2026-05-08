@@ -7,15 +7,19 @@ import { createBrowserClient } from "@supabase/ssr";
 
 interface ServiceErrorViewProps {
   title?: string;
+  messages?: string[];
   description?: string;
   onRetry?: () => void;
   showHome?: boolean;
-  error?: unknown;
+  error?: any;
 }
 
+import { motion } from "framer-motion";
+
 export function ServiceErrorView({
-  title = "Connection Error",
-  description = "Ezygo API is not responding properly, either it is down or has been modified. Please try again after some time.\n \n If the issue persists even after significant time, please contact us.",
+  title = "Service Unavailable",
+  messages = ["EzyGo servers are currently down. Please try again later."],
+  description,
   onRetry,
   showHome = true,
   error,
@@ -27,7 +31,7 @@ export function ServiceErrorView({
     const sanitizedError = errorStr.length > 300 ? `${errorStr.substring(0, 300)}...` : errorStr;
     const subject = encodeURIComponent("Connection Error");
     const message = encodeURIComponent(`I am experiencing a connection error with the Ezygo API.\n\nContext: ${sanitizedError}`);
-    router.push(`/contact?subject=${subject}&message=${message}`);
+    window.location.href = `mailto:support@ghostclass.app?subject=${subject}&message=${message}`;
   };
 
   const handleLogout = async () => {
@@ -41,35 +45,101 @@ export function ServiceErrorView({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-4 p-6 text-center">
-      <div className="rounded-full bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400">
-        <AlertTriangle className="h-6 w-6" />
-      </div>
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="max-w-xl whitespace-pre-wrap text-sm text-muted-foreground">{description}</p>
-      
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-        <Button onClick={onRetry ?? (() => window.location.reload())} className="rounded-full px-6">
-          <RefreshCcw className="mr-2 h-4 w-4" />
-          Retry
-        </Button>
-        {showHome && (
-          <Button onClick={() => router.push("/")} className="rounded-full bg-blue-500 px-6 hover:bg-blue-600 text-white">
-            <Home className="mr-2 h-4 w-4" />
-            Home
-          </Button>
-        )}
-        <Button onClick={handleContactUs} className="rounded-full bg-purple-600 px-6 hover:bg-purple-700 text-white">
-          <MessageSquare className="mr-2 h-4 w-4" />
-          Contact Us
-        </Button>
+    <div className="relative flex flex-1 flex-col items-center justify-center py-20 px-6 text-center animate-in fade-in duration-500">
+      {/* Background Decorative Blobs (Premium feel) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-red-500/5 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/5 blur-[120px]" />
       </div>
 
-      <div className="mt-4">
-        <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:bg-transparent hover:text-foreground">
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout & try again
-        </Button>
+      <div className="relative z-10 flex w-full max-w-lg flex-col items-center">
+        {/* Error Icon with Pulsed Glow */}
+        <div className="relative mb-8">
+          <motion.div
+            animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-full bg-red-500/20 blur-2xl"
+          />
+          <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-red-500/10 text-red-500 shadow-2xl shadow-red-500/20">
+            <AlertTriangle className="h-12 w-12" />
+          </div>
+        </div>
+
+        {/* Title */}
+        <h1 className="mb-4 text-3xl font-black tracking-tight text-foreground sm:text-4xl font-manrope">
+          {title}
+        </h1>
+
+        {/* Messages */}
+        <div className="mb-10 space-y-3">
+          {(messages || []).map((msg, i) => (
+            <p key={i} className="text-lg font-medium text-muted-foreground/80 leading-relaxed max-w-md mx-auto">
+              {msg}
+            </p>
+          ))}
+          {description && (
+            <p className="text-sm text-muted-foreground/60 max-w-sm mx-auto">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex w-full flex-col gap-6 sm:flex-row sm:justify-center mt-4 mb-8">
+          <Button 
+            onClick={onRetry ?? (() => window.location.reload())} 
+            className="h-16 w-full sm:w-80 rounded-2xl bg-primary px-10 text-lg font-extrabold text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <RefreshCcw className="mr-3 h-6 w-6" />
+            Try Again
+          </Button>
+
+          {showHome && (
+            <Button 
+              variant="outline"
+              onClick={() => router.push("/")} 
+              className="h-14 rounded-2xl border-white/10 bg-white/5 px-10 text-base font-bold text-foreground hover:bg-white/10 transition-all"
+            >
+              <Home className="mr-2 h-5 w-5" />
+              Home
+            </Button>
+          )}
+        </div>
+
+        {/* Tertiary Actions */}
+        <div className="mt-12 flex flex-wrap justify-center gap-6">
+          <button 
+            onClick={handleContactUs} 
+            className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Contact Support
+          </button>
+          
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
+
+        {/* Technical Details (Expandable) */}
+        {error && (
+          <div className="mt-12 w-full max-w-md overflow-hidden rounded-2xl border border-white/5 bg-white/2">
+            <details className="group">
+              <summary className="flex cursor-pointer items-center justify-center p-4 text-xs font-bold text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors uppercase tracking-widest">
+                Technical Details
+              </summary>
+              <div className="border-t border-white/5 p-4 text-left">
+                <pre className="overflow-x-auto font-dm-mono text-[10px] text-muted-foreground/50 leading-relaxed whitespace-pre-wrap break-all">
+                  {error ? String(error) : "No details available"}
+                </pre>
+              </div>
+            </details>
+          </div>
+        )}
       </div>
     </div>
   );

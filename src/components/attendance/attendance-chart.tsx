@@ -274,7 +274,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
              }
           }
 
-          const key = generateSlotKey(sessionData.course.toString(), dateStr, sessionName);
+          const key = generateSlotKey(courseId, dateStr, sessionName);
           officialSessionMap.set(key, status);
 
           if (
@@ -300,8 +300,10 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
         const targetCode = normalize(courseStats.code);
 
         const courseTracks = trackingData.filter(t => {
-            if (String(t.course) === targetId) return true;
-            const tName = normalize(String(t.course));
+            const tCodeRaw = String(t.course);
+            const tCodeResolved = idToCodeMap.get(tCodeRaw) || tCodeRaw;
+            if (tCodeResolved === targetId) return true;
+            const tName = normalize(tCodeRaw);
             return tName === targetName || (targetCode && tName === targetCode);
         });
         
@@ -310,7 +312,9 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
 
         courseTracks.forEach((t) => {
             const trackIsPresent = isPresent(Number(t.attendance));
-            const key = generateSlotKey(courseStats.id, t.date, t.session);
+            const tCourseRaw = String(t.course);
+            const tCourseCode = idToCodeMap.get(tCourseRaw) || tCourseRaw;
+            const key = generateSlotKey(tCourseCode, t.date, t.session);
             const officialStatus = officialSessionMap.get(key);
 
             if (t.status === 'extra') {

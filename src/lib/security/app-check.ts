@@ -5,7 +5,7 @@ import { verifyPlayIntegrity } from "@/lib/security/integrity";
 import { verifyDeviceCheckToken } from "@/lib/security/device-check";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { decryptRequest, encryptResponse } from "@/lib/security/jwe";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
 import * as Sentry from "@sentry/nextjs";
@@ -20,7 +20,7 @@ export interface AppCheckResult {
   action?: string;
   criticalRisk?: boolean;
   alreadyLogged?: boolean;
-  integrity?: any;
+  integrity?: unknown;
 }
 
 /**
@@ -41,7 +41,7 @@ export interface AuthResult {
   action?: string;
   criticalRisk?: boolean;
   alreadyLogged?: boolean;
-  integrity?: any;
+  integrity?: unknown;
   authType: "csrf" | "app-check" | "none"; // 'csrf' for web, 'app-check' for mobile
   isWebRequest?: boolean;
   isMobileRequest?: boolean;
@@ -231,7 +231,7 @@ export async function verifyAppCheckToken(
     }
 
     return { isValid: true, integrity };
-  } catch (error: any) {
+  } catch (error: unknown) {
     Sentry.captureException(error, {
       tags: { type: "app_check_error", location: "verifyAppCheckToken" },
     });
@@ -362,17 +362,21 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
  * 3. Bi-directional JWE Decryption & Encryption (mobile only)
  * 4. Rate limiting (more restrictive for web to compensate for lack of device attestation)
  */
-export function withSecurity(
+export function withSecurity<T = unknown>(
   handler: (
-    req: Request,
+    req: NextRequest,
     context: {
-      params: any;
-      decryptedBody?: any;
+      params: Record<string, string | string[]>;
+      decryptedBody?: T;
       authType?: "csrf" | "app-check" | "none";
     },
   ) => Promise<Response>,
 ) {
-  return async (req: Request, context: any) => {
+  return async (req: NextRequest, context: any) => {
+    // Next.js 15+ makes params a Promise. We handle both Promise and direct Record
+    // (for tests) using a failsafe any type to satisfy the Next.js RouteContext constraint.
+    const rawParams = context?.params;
+    const resolvedParams = rawParams instanceof Promise ? await rawParams : (rawParams ?? {});
     const headerList = req.headers;
 
     // Get client IP for rate limiting
@@ -389,22 +393,34 @@ export function withSecurity(
       const isWebRequest = !headerList.has("X-Firebase-AppCheck");
 
       if (isWebRequest && clientIp) {
-        // Web requests: stricter rate limiting (10 req/min per IP)
-        // This compensates for lack of device attestation by preventing
-        // automated attacks that use CSRF token bypass techniques
+        // Web requests: stricter rate limiting than mobile to compensate for
+        // lack of device attestation. However, we must allow enough for
+        // legitimate dashboard bursts.
+        const path = req.nextUrl?.pathname || new URL(req.url).pathname;
+        const isBackendProxy = path.startsWith("/api/backend/");
+
+        // Proxy routes get higher throughput (default 300/min) matching proxyRateLimiter
+        // Standard web API routes get 60/min (up from 10/min)
+        const limit = isBackendProxy
+          ? parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10)
+          : parseInt(process.env.WEB_RATE_LIMIT_REQUESTS || "60", 10);
+        const window = isBackendProxy
+          ? parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10)
+          : 60;
+
         const { Ratelimit } = await import("@upstash/ratelimit");
         const webLimiter = new Ratelimit({
           redis,
-          limiter: Ratelimit.slidingWindow(10, "60 s"),
-          prefix: "@ghostclass/web-api",
+          limiter: Ratelimit.slidingWindow(limit, `${window} s`),
+          prefix: isBackendProxy ? "@ghostclass/web-proxy" : "@ghostclass/web-api",
         });
 
         const rateLimitResult = await webLimiter.limit(`web:${clientIp}`);
         if (!rateLimitResult.success) {
-          logger.warn("Web request rate limit exceeded", { ip: clientIp });
+          logger.warn("Web request rate limit exceeded", { ip: clientIp, path, limit });
           return NextResponse.json(
             { error: "Rate limit exceeded" },
-            { status: 429, headers: { "Retry-After": "60" } },
+            { status: 429, headers: { "Retry-After": String(window) } },
           );
         }
       }
@@ -436,7 +452,7 @@ export function withSecurity(
       );
     }
 
-    let decryptedBody: any = null;
+    let decryptedBody: T | undefined = undefined;
     let responseCek: string | null = null;
     const contentType = (req.headers.get("content-type") || "").toLowerCase();
     const jweKeyHeader = req.headers.get("X-JWE-Key");
@@ -451,8 +467,7 @@ export function withSecurity(
 
       if (
         contentType.includes("application/jose") &&
-        isMutationMethod &&
-        authResult.isMobileRequest
+        isMutationMethod
       ) {
         const jwe = await req.text();
 
@@ -467,29 +482,32 @@ export function withSecurity(
           );
         }
 
-        const decrypted = (await decryptRequest(jwe)) as any;
+        const decrypted = (await decryptRequest(jwe)) as unknown;
 
         // Handle both nested {payload, rcek} and flat {token, ..., rcek} structures
-        if (decrypted && typeof decrypted === "object" && "payload" in decrypted) {
-          decryptedBody = decrypted.payload;
-          responseCek = decrypted.rcek || null;
-        } else {
-          decryptedBody = decrypted;
-          responseCek =
-            decrypted && typeof decrypted === "object" ? decrypted.rcek : null;
+        if (decrypted && typeof decrypted === "object") {
+          if ("payload" in decrypted) {
+            decryptedBody = (decrypted as { payload: T }).payload;
+            responseCek = (decrypted as { rcek?: string }).rcek || null;
+          } else {
+            decryptedBody = decrypted as T;
+            responseCek = (decrypted as { rcek?: string }).rcek || null;
+          }
         }
-      } else if (jweKeyHeader && authResult.isMobileRequest) {
+      } else if (jweKeyHeader) {
         // Support for GET requests or requests without bodies:
         // The client sends the JWE-wrapped CEK in a header.
-        const decrypted = (await decryptRequest(jweKeyHeader)) as any;
+        const decrypted = (await decryptRequest(jweKeyHeader)) as unknown;
         // For header-only JWE, rcek might be direct or in a payload property
-        if (decrypted && typeof decrypted === "object" && "payload" in decrypted) {
-          responseCek = decrypted.rcek || null;
-        } else {
-          responseCek =
-            decrypted && typeof decrypted === "object"
-              ? decrypted.rcek || decrypted.payload?.rcek || null
-              : null;
+        if (decrypted && typeof decrypted === "object") {
+          if ("payload" in decrypted) {
+            const payload = (decrypted as { payload: any }).payload;
+            responseCek = (decrypted as { rcek?: string }).rcek || 
+                          (payload && typeof payload === "object" ? (payload as any).rcek : null) || 
+                          null;
+          } else {
+            responseCek = (decrypted as { rcek?: string }).rcek || null;
+          }
         }
       }
     } catch (_error) {
@@ -505,6 +523,7 @@ export function withSecurity(
     // 4. Execute the handler
     const response = await handler(req, {
       ...context,
+      params: resolvedParams,
       decryptedBody,
       authType: authResult.authType,
     });
@@ -518,12 +537,12 @@ export function withSecurity(
       );
     }
 
-    // 5. Handle JWE Response Encryption (mobile only)
-    if (responseCek && response.ok && authResult.isMobileRequest) {
+    // 5. Handle JWE Response Encryption
+    if (responseCek && response.ok) {
       try {
         // Only attempt to encrypt if the client provided a response CEK
         // and the handler returned a successful response.
-        let responseData: any;
+        let responseData: unknown;
         const responseText = await response.text();
 
         try {
