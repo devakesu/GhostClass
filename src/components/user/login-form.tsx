@@ -13,6 +13,7 @@ import Image from "next/image";
 import axios from "@/lib/axios";
 import { AxiosError } from "axios"; 
 import { useCSRFToken } from "@/hooks/use-csrf-token"; 
+import { useQueryClient } from "@tanstack/react-query";
 
 import { PasswordResetForm } from "./password-reset-form";
 import { motion, HTMLMotionProps, Variants } from "framer-motion";
@@ -92,6 +93,7 @@ const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
 
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const manuallySelectedLoginMethodRef = useRef<"email" | "phone" | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -306,6 +308,13 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           // Also update localStorage for persistence across sessions
           localStorage.setItem(`showBunkCalc_${supabaseUserId}`, bunkValue);
           localStorage.setItem(`targetPercentage_${supabaseUserId}`, targetValue);
+
+          // Update React Query cache immediately to prevent default fallback on dashboard load
+          queryClient.setQueryData(["userSettings", supabaseUserId], {
+            bunk_calculator_enabled: bunkEnabled,
+            target_percentage: targetPercentage,
+            disabled_courses: settings.disabled_courses || []
+          });
         } catch (storageError) {
           // Storage errors are non-critical - log but continue
           // Storage can fail in private browsing mode or when storage is disabled
@@ -367,7 +376,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
            ? "These credentials do not match EzyGo records."
            : msg;
       } else if (err.code === "ERR_NETWORK") {
-         errorMsg = "Network error. Please check your connection.";
+         errorMsg = "Network error. Please check your connection. If this persists even after some time, kindly contact us using the link in the footer.";
+         Sentry.captureException(error, { tags: { type: "network_error", location: "LoginForm/handleSubmit" } });
       }
       setError(errorMsg);
 

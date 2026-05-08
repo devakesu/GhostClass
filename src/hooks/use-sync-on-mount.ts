@@ -20,7 +20,8 @@ import { useState, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
 import { captureSentryException, captureSentryMessage } from "@/lib/sentry-lazy";
-import { safeResponseJson } from "@/lib/json";
+import axios from "@/lib/axios";
+import { isAxiosError } from "axios";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -130,12 +131,13 @@ export function useSyncOnMount({
       setIsSyncing(true);
 
       try {
-        const res = await fetch(`/api/cron/sync`, {
+        const res = await axios.get(`/api/cron/sync`, {
           signal: abortController.signal,
+          baseURL: "", // Call internal API
         });
 
-        const data = await safeResponseJson<SyncResponse>(res);
-        if (!data) throw new Error("Sync response was empty or invalid JSON");
+        const data = res.data;
+        if (!data) throw new Error("Sync response was empty");
 
         if (isCleanedUp) return;
 
@@ -147,8 +149,6 @@ export function useSyncOnMount({
             extra: { userId: redact("id", String(userId)), response: data },
           });
           await onPartialSyncRef.current?.(data);
-        } else if (!res.ok) {
-          throw new Error(`Sync API responded with status: ${res.status}`);
         } else if (
           data.success &&
           ((data.deletions ?? 0) + (data.conflicts ?? 0) + (data.updates ?? 0)) > 0
@@ -157,10 +157,17 @@ export function useSyncOnMount({
         }
       } catch (error: unknown) {
         if (isCleanedUp) return;
-        const e = error as Error;
-        if (e.name === "AbortError") {
-          logger.dev(`[${sentryLocation}] Sync request aborted`);
-          return;
+        
+        if (isAxiosError(error)) {
+          if (error.name === "CanceledError") {
+            logger.dev(`[${sentryLocation}] Sync request aborted`);
+            return;
+          }
+          if (error.response?.status === 500 || error.response?.status === 503) {
+            // Interceptor handles the UI, we just stop syncing
+            setIsSyncing(false);
+            return;
+          }
         }
 
         logger.error(`${sentryLocation} background sync failed`, error);

@@ -326,6 +326,11 @@ export function setCsrfToken(token: string | null): void {
 // correct recovery path. A singleton flag prevents concurrent logout calls when multiple
 // in-flight requests all receive 401 simultaneously.
 let isLoggingOut401 = false;
+let isOutageDetected = false;
+
+export const isGlobalOutageDetected = () => isOutageDetected;
+export const resetOutageDetection = () => { isOutageDetected = false; };
+
 axiosInstance.interceptors.response.use(
   async (response) => {
     // Transparent JWE Decryption for GhostClass internal APIs
@@ -396,12 +401,28 @@ axiosInstance.interceptors.response.use(
         }
       }
     }
+    const isOutageStatus = error?.response?.status === 503 || error?.response?.status === 500;
+    if (isOutageStatus && typeof window !== "undefined" && !isOutageDetected) {
+      isOutageDetected = true;
+      logger.error(`[axios] ${error.response.status} Error — Backend is likely down`);
+      const outageEvent = new CustomEvent("gc:outage", {
+        detail: {
+          messages: ["EzyGo servers are currently down. Please try again later."],
+          details: `Error ${error.response.status}: ${error.response.statusText}\nURL: ${error.config?.url}`,
+        },
+      });
+      window.dispatchEvent(outageEvent);
+    }
+
     return Promise.reject(error);
   }
 );
 
 // Attach CSRF token and handle JWE encryption
 axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
+  if (isOutageDetected) {
+    return Promise.reject(new Error("Request blocked due to active service outage"));
+  }
   const isBrowser = typeof window !== "undefined";
   
   if (isBrowser) {

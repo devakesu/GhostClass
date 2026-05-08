@@ -82,7 +82,7 @@ describe("POST /api/attendance/summary-batch", () => {
   });
 
   it("returns 401 when token is missing", async () => {
-    vi.mocked(getAuthTokenServer).mockResolvedValueOnce(null);
+    vi.mocked(getAuthTokenServer).mockResolvedValueOnce(undefined);
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/attendance/summary-batch", { method: "POST" });
     const res = await POST(req, { params: {} });

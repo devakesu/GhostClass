@@ -17,7 +17,15 @@ export const dynamic = "force-dynamic";
  * which the backend then handles efficiently using the EzyGo batch fetcher
  * (which provides request deduplication and global rate limiting).
  */
-const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: any }) => {
+interface BatchRequest {
+  courses: {
+    code: string;
+    id: number;
+    name: string;
+  }[];
+}
+
+const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: BatchRequest }) => {
   // 1. Rate limiting — keyed per IP to prevent abuse
   const ip = getClientIp(req.headers);
   if (!ip) {
@@ -51,15 +59,22 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: an
     }
   }
 
-  const { courses } = body;
-  if (!Array.isArray(courses)) {
+  const { courses } = body || {};
+  if (!courses || !Array.isArray(courses)) {
     return NextResponse.json({ error: "Courses must be an array" }, { status: 400 });
   }
 
   // 5. Batch fetch summaries from EzyGo
   // We use Promise.all to fetch in parallel, but the ezygo-batch-fetcher
   // will ensure we don't exceed the global concurrency limit (max 3).
-  const results: Record<string, any> = {};
+  interface AttendanceSummary {
+    present: number;
+    absent: number;
+    total: number;
+    percentage: number;
+    course: { id: number; name: string; code: string };
+  }
+  const results: Record<string, AttendanceSummary> = {};
   const promises = courses.map(async (course: { code: string; id: number; name: string }) => {
     try {
       // Custom/Staging courses with ID 0 don't exist in EzyGo
@@ -85,7 +100,7 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: an
       }
       
       if (data) {
-        results[course.code] = data;
+        results[course.code] = data as AttendanceSummary;
       }
     } catch (_err) {
       logger.warn(`[attendance-batch] Failed to fetch summary for ${course.code} (ID: ${course.id}):`, _err);
@@ -100,4 +115,4 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: an
 };
 
 // Wrap with security HOF to handle App Check and JWE decryption for mobile clients
-export const POST = withSecurity(handler as any);
+export const POST = withSecurity<BatchRequest>(handler);

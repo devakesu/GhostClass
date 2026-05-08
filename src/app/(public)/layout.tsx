@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useScroll } from "framer-motion";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { cn } from "@/lib/utils";
+import { OutageProvider } from "@/providers/outage-provider";
 
 export default function PublicLayout({
   children,
@@ -88,9 +89,11 @@ export default function PublicLayout({
         </motion.div>
 
         <main className="flex-1 w-full pt-20">
+          <OutageProvider>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
+          </OutageProvider>
         </main>
         
         <Footer />

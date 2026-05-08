@@ -88,12 +88,6 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
 export function buildSupabaseTieredFetch(
   supabaseOrigin: string,
 ): typeof fetch | undefined {
-  // Disable proxy in development to avoid redundant network hops
-  // and simplify debugging of Supabase requests.
-  if (process.env.NODE_ENV === "development") {
-    return undefined;
-  }
-
   const parseProxyBase = (envVal: string | undefined): string | null => {
     const u = envVal?.trim().replace(/\/+$/, "");
     if (!u) return null;
@@ -106,6 +100,8 @@ export function buildSupabaseTieredFetch(
     }
   };
 
+  const isDev = process.env.NODE_ENV === "development";
+  const devBase = isDev ? parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL) : null;
   const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
   const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
 
@@ -115,7 +111,12 @@ export function buildSupabaseTieredFetch(
   if (isServer) {
     // Server NEVER uses proxy (as per security policy)
     tiers.push({ base: supabaseOrigin, name: "direct" });
+  } else if (isDev) {
+    // Development: Only use DevProxy if explicitly configured
+    if (devBase) tiers.push({ base: devBase, name: "DevProxy" });
+    tiers.push({ base: supabaseOrigin, name: "direct" });
   } else {
+    // Production: Use tiered failover (CF -> AWS -> direct)
     if (cfBase)  tiers.push({ base: cfBase, name: "CF" });
     if (awsBase) tiers.push({ base: awsBase, name: "AWS" });
     tiers.push({ base: supabaseOrigin, name: "direct" });
@@ -165,8 +166,17 @@ export function buildSupabaseTieredFetch(
       const tierTimeout    = setTimeout(() => tierController.abort(), SUPABASE_TIER_TIMEOUT_MS);
       const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
 
+      const headers = new Headers(init?.headers);
+      if (isDev && tier.name === "DevProxy") {
+        const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+        if (appDomain) {
+          headers.set("x-ghostclass-proxy-origin", `https://${appDomain}`);
+        }
+      }
+
       const effectiveInit: RequestInit = {
         ...init,
+        headers,
         signal: tierSignal,
         ...(bodyOverride !== null ? { body: bodyOverride } : {}),
       };

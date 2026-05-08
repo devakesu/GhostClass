@@ -9,8 +9,10 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -97,20 +99,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         return;
       }
 
-      List<String> messages = ['We encountered a problem during startup.'];
-
+      List<String> messages = [];
       if (e is DioException) {
         final appEx = api.mapDioError(e);
         messages = [appEx.message];
       } else {
-        messages.add(e.toString());
+        messages = ['We encountered a problem during startup.', e.toString()];
       }
+      
+      messages.add('Please contact us if the error persists even after some time.');
 
+      final technicalDetails = e.toString();
+      
       await ServiceErrorDialog.show(
         context,
         'Connectivity Issue',
         messages,
+        details: technicalDetails,
         isDismissible: false,
+        onContactSupport: () async {
+          final user = ref.read(authProvider).value;
+          final subject = Uri.encodeComponent('App Connectivity Issue [${AppConfig.supportEmail}]');
+          final body = Uri.encodeComponent(
+            'Hello Support Team,\n\n'
+            'I encountered a connectivity issue during app startup.\n\n'
+            '--- Diagnostic Information ---\n'
+            'User ID: ${user?.supabaseUserId ?? "Unauthenticated"}\n'
+            'Error: ${messages.first}\n'
+            'Details: $technicalDetails\n'
+            'App Version: ${AppConfig.appVersion}\n'
+            'Timestamp: ${DateTime.now().toIso8601String()}\n'
+          );
+          
+          final mailUrl = Uri.parse('mailto:${AppConfig.supportEmail}?subject=$subject&body=$body');
+          if (await canLaunchUrl(mailUrl)) {
+            await launchUrl(mailUrl);
+          }
+        },
         onRetry: () {
           // Trigger a fresh build of the Ref which will re-run _initializeApp
           ref.invalidate(authProvider);

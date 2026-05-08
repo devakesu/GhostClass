@@ -68,14 +68,14 @@ describe('ErrorFallback Component', () => {
   it('shows error details in development', () => {
     // Save original NODE_ENV
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
+    (process.env as any).NODE_ENV = 'development';
     
     render(<ErrorFallback error={mockError} />);
     expect(screen.getByText('Error Details (Dev Only)')).toBeDefined();
     expect(screen.getByText((content) => content.includes('Test error'))).toBeDefined();
     
     // Restore original NODE_ENV
-    process.env.NODE_ENV = originalEnv;
+    (process.env as any).NODE_ENV = originalEnv;
   });
 
   it('handles logout when logged in', async () => {

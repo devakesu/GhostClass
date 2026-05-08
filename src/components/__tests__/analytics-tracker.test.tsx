@@ -33,7 +33,7 @@ describe('AnalyticsTracker', () => {
     // Mock window.location
     // @ts-ignore
     delete window.location;
-    window.location = {
+     (window as any).location = {
       ...originalLocation,
       origin: 'http://localhost:3000',
       hostname: 'localhost',
@@ -43,7 +43,7 @@ describe('AnalyticsTracker', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    window.location = originalLocation;
+     (window as any).location = originalLocation;
   });
 
   it('tracks page view on mount', async () => {

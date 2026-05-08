@@ -531,7 +531,7 @@ export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
             try {
               const { data } = await supabaseAdmin
                 .from("user_settings")
-                .select("bunk_calculator_enabled, target_percentage")
+                .select("bunk_calculator_enabled, target_percentage, disabled_courses")
                 .eq("user_id", userId!)
                 .maybeSingle();
               return data ?? null;
@@ -850,7 +850,7 @@ export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
         try {
           const { data: settings } = await supabaseAdmin
             .from("user_settings")
-            .select("bunk_calculator_enabled, target_percentage")
+            .select("bunk_calculator_enabled, target_percentage, disabled_courses")
             .eq("user_id", userId!)
             .maybeSingle();
           return settings;

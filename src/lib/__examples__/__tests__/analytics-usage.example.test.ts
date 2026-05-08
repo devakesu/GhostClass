@@ -43,7 +43,7 @@ describe('analytics-usage.example', () => {
     // Mock window.location.href
     const originalLocation = window.location;
     delete (window as any).location;
-    window.location = { href: "http://localhost/test" } as any;
+     (window as any).location = { href: "http://localhost/test" } as any;
 
     await handleError(error);
     expect(trackEvent).toHaveBeenCalledWith("error_occurred", {
@@ -52,6 +52,6 @@ describe('analytics-usage.example', () => {
       page_url: "http://localhost/test",
     });
 
-    window.location = originalLocation;
+     (window as any).location = originalLocation;
   });
 });

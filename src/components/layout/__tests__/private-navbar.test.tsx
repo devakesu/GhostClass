@@ -249,7 +249,7 @@ describe("Navbar", () => {
   });
 
   it("calls handleInstitutionChange and handles success/error", () => {
-    const mutate = vi.fn((val, options) => {
+    const mutate = vi.fn((_val, options) => {
       if (options.onSuccess) options.onSuccess();
       if (options.onError) options.onError();
     });

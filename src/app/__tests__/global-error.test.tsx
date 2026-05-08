@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
 import GlobalError from '../global-error';
 import * as Sentry from '@sentry/nextjs';
 import { reloadWithUpdate, tryAutoUpdate } from '@/lib/sw-reload';
@@ -21,11 +20,11 @@ describe('GlobalError', () => {
     vi.clearAllMocks();
     // @ts-ignore
     delete window.location;
-    window.location = { ...originalLocation, href: '' };
+     (window as any).location = { ...originalLocation, href: '' };
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+     (window as any).location = originalLocation;
   });
 
   it('reports error to Sentry and tries auto update on mount', () => {

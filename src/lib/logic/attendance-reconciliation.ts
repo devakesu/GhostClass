@@ -8,23 +8,12 @@ interface RawSessionData {
   session?: string | number | null;
 }
 
-export const ATTENDANCE_STATUS = {
-  PRESENT: 110,
-  ABSENT: 111,
-  DUTY_LEAVE: 225,
-  OTHER_LEAVE: 112,
-};
-
-/**
- * Default/placeholder remarks stored when a DL reason is not provided.
- * These should not be surfaced in the UI as user-entered reasons.
- */
-export const DUTY_LEAVE_PLACEHOLDER_REMARKS = new Set<string>([
-  "Duty Leave",
-  "Self-Marked: Duty Leave",
-  "Self-Marked: Present",
-  "Self-Marked: Absent",
-]);
+import { 
+  ATTENDANCE_STATUS, 
+  isPositiveStatus as isPositive, 
+  isAbsentStatus as isAbsent,
+  DUTY_LEAVE_PLACEHOLDER_REMARKS 
+} from "../constants/ezygo";
 
 /** Returns true if a remark string is a legacy/placeholder value that should be hidden. */
 export const isLegacyRemark = (remark: string | null | undefined): boolean => {
@@ -35,11 +24,8 @@ export const isLegacyRemark = (remark: string | null | undefined): boolean => {
   return false;
 };
 
-export const isPositive = (code: number) => code === ATTENDANCE_STATUS.PRESENT || code === ATTENDANCE_STATUS.DUTY_LEAVE;
-// code === 0 is NOT treated as Absent: 0 is either an uninitialised value or an unknown
-// API response, not a documented EzyGo attendance state. Treating it as Absent would
-// incorrectly inflate the savedAbsents counter for null-coerced DB records.
-export const isAbsent = (code: number) => code === ATTENDANCE_STATUS.ABSENT;
+export { isPositive, isAbsent, ATTENDANCE_STATUS };
+
 
 export const getOfficialSessionRaw = (
   session: RawSessionData | null | undefined, 
@@ -89,7 +75,7 @@ export function getReconciledStats(
   courseId: string,
   officialAggregate: { present: number; absent: number; total: number },
   officialSessions: OfficialSession[] | undefined,
-  trackingData: TrackAttendance[] | undefined
+  courseTracks: TrackAttendance[] | undefined
 ): ReconciledStats {
   
   const stats = {
@@ -127,9 +113,7 @@ export function getReconciledStats(
   }
 
   // 2. Process Tracker
-  if (trackingData) {
-    const courseTracks = trackingData.filter(t => String(t.course) === String(courseId));
-
+  if (courseTracks) {
     courseTracks.forEach(item => {
       const key = generateSlotKey(courseId, item.date, item.session);
       const officialStatus = officialMap.get(key);
@@ -149,27 +133,30 @@ export function getReconciledStats(
       const isTrulyExtra = item.status === "extra" && officialStatus === undefined;
 
       if (isTrulyExtra) {
-          stats.extrasCount++;
-          // finalTotal and finalPresent are computed from component counters in step 3.
-          // Do NOT mutate them here to keep that step's formula unambiguous.
-
-          if (trackPos) {
-             stats.extraPresent++;
-          } else {
-             stats.extraAbsent++;
-          }
-          if (trackDL) stats.extraDL++;
-
+        stats.extrasCount++;
+        if (trackPos) stats.extraPresent++;
+        else stats.extraAbsent++;
+        if (trackDL) stats.extraDL++;
       } else if (officialStatus !== undefined) {
-          
-          if (offPos) return; // Official Present -> Ignore Tracker
+        // If official is not positive, but tracker is positive -> Gain
+        if (!offPos && trackPos) {
+          stats.correctionPresent++;
+          stats.savedAbsent++;
+        }
+        // If official is positive, but tracker is NOT positive -> Loss
+        else if (offPos && !trackPos) {
+          stats.correctionPresent--;
+          stats.savedAbsent--; // Technically "losing" a saved absence or increasing net absences
+        }
 
-          if (!offPos && trackPos) {
-             stats.correctionPresent++;
-             stats.savedAbsent++;
-             // finalPresent is computed from component counters in step 3 — do NOT mutate here.
-          }
-          if (!offDL && trackDL) stats.correctionDL++;
+        // If official is not DL, but tracker is DL -> DL Correction (even if already present)
+        if (!offDL && trackDL) {
+          stats.correctionDL++;
+        }
+        // If official is DL, but tracker is NOT DL -> DL Loss
+        else if (offDL && !trackDL) {
+          stats.correctionDL--;
+        }
       }
     });
   }

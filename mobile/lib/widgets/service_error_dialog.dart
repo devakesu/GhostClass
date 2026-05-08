@@ -219,7 +219,7 @@ class ServiceErrorDialog extends StatelessWidget {
                       height: 56,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          if (isDismissible) Navigator.of(context).pop();
+                          Navigator.of(context).pop();
                           onRetry!();
                         },
                         icon: Icon(

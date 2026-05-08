@@ -30,7 +30,7 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 vi.mock('@/lib/utils.server', () => ({
-  redact: vi.fn((type, val) => val),
+  redact: vi.fn((_type, val) => val),
 }));
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ describe('processContactSubmission', () => {
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
 
-    vi.mocked(sendEmail).mockResolvedValue({ success: true });
+    vi.mocked(sendEmail).mockResolvedValue({ success: true, provider: 'Brevo' });
   });
 
   it('successfully processes a contact submission', async () => {
@@ -93,7 +93,7 @@ describe('processContactSubmission', () => {
   });
 
   it('rolls back (deletes from DB) if admin email fails', async () => {
-    vi.mocked(sendEmail).mockResolvedValueOnce({ success: false, error: 'Email Provider Down' });
+    vi.mocked(sendEmail).mockResolvedValueOnce({ success: false, error: 'Email Provider Down', provider: 'Brevo' });
 
     const result = await processContactSubmission(mockSupabase, mockSupabaseAdmin, mockPayload);
     
@@ -105,7 +105,7 @@ describe('processContactSubmission', () => {
 
   it('continues if user confirmation email fails (non-fatal)', async () => {
     vi.mocked(sendEmail)
-      .mockResolvedValueOnce({ success: true }) // Admin email
+      .mockResolvedValueOnce({ success: true, provider: 'Brevo' }) // Admin email
       .mockRejectedValueOnce(new Error('SMTP Error')); // User email
 
     const result = await processContactSubmission(mockSupabase, mockSupabaseAdmin, mockPayload);
@@ -115,7 +115,7 @@ describe('processContactSubmission', () => {
   });
 
   it('handles rollback failure gracefully', async () => {
-    vi.mocked(sendEmail).mockResolvedValueOnce({ success: false, error: 'Email Failed' });
+    vi.mocked(sendEmail).mockResolvedValueOnce({ success: false, error: 'Email Failed', provider: 'Brevo' });
     mockSupabaseAdmin.eq.mockResolvedValueOnce({ error: { message: 'Delete Failed' } });
 
     const result = await processContactSubmission(mockSupabase, mockSupabaseAdmin, mockPayload);

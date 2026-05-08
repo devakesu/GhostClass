@@ -26,8 +26,8 @@ describe('instrumentation-server', () => {
     const options = vi.mocked(Sentry.init).mock.calls[0][0];
     
     const breadcrumb: any = { data: { url: 'https://www.google-analytics.com/collect?api_secret=secret123&v=1' } };
-    const processed = options.beforeBreadcrumb!(breadcrumb);
-    expect(processed.data.url).toContain('api_secret=%5BFiltered%5D');
+    const processed: any = options.beforeBreadcrumb!(breadcrumb);
+    expect(processed?.data?.url).toContain('api_secret=%5BFiltered%5D');
   });
 
   it('ignores non-GA4 URLs in breadcrumbs', async () => {
@@ -36,8 +36,8 @@ describe('instrumentation-server', () => {
     
     const url = 'https://example.com/api?api_secret=keep-me';
     const breadcrumb: any = { data: { url } };
-    const processed = options.beforeBreadcrumb!(breadcrumb);
-    expect(processed.data.url).toBe(url);
+    const processed: any = options.beforeBreadcrumb!(breadcrumb);
+    expect(processed?.data?.url).toBe(url);
   });
 
   it('handles malformed URLs in scrubbing', async () => {
@@ -46,8 +46,8 @@ describe('instrumentation-server', () => {
     
     const url = 'not-a-url';
     const breadcrumb: any = { data: { url } };
-    const processed = options.beforeBreadcrumb!(breadcrumb);
-    expect(processed.data.url).toBe(url);
+    const processed: any = options.beforeBreadcrumb!(breadcrumb);
+    expect(processed?.data?.url).toBe(url);
   });
 
   it('filters out network error types in beforeSend', async () => {
@@ -55,11 +55,11 @@ describe('instrumentation-server', () => {
     const options = vi.mocked(Sentry.init).mock.calls[0][0];
     
     const abortError = { message: 'The request was aborted' };
-    const result = options.beforeSend!({}, { originalException: abortError });
+    const result = options.beforeSend!({} as any, { originalException: abortError } as any);
     expect(result).toBeNull();
 
     const realError = { message: 'Database crash' };
-    const result2 = options.beforeSend!({}, { originalException: realError });
+    const result2 = options.beforeSend!({} as any, { originalException: realError } as any);
     expect(result2).not.toBeNull();
   });
 
@@ -76,10 +76,10 @@ describe('instrumentation-server', () => {
         }
       }
     };
-    const result = options.beforeSend!(event, {});
-    expect(result.request.headers.authorization).toBeUndefined();
-    expect(result.request.headers.cookie).toBeUndefined();
-    expect(result.request.headers['user-agent']).toBe('browser');
+    const result: any = options.beforeSend!(event, {} as any);
+    expect(result?.request?.headers?.authorization).toBeUndefined();
+    expect(result?.request?.headers?.cookie).toBeUndefined();
+    expect(result?.request?.headers?.['user-agent']).toBe('browser');
   });
 
   it('scrubs transactions', async () => {
@@ -93,8 +93,8 @@ describe('instrumentation-server', () => {
         { data: { 'other': 'no-change' } }
       ]
     };
-    const result = options.beforeSendTransaction!(event);
-    expect(result.spans[0].data['http.url']).toContain('%5BFiltered%5D');
-    expect(result.spans[1].data['url']).toContain('%5BFiltered%5D');
+    const result: any = options.beforeSendTransaction!(event as any, {} as any);
+    expect(result?.spans?.[0]?.data?.['http.url']).toContain('%5BFiltered%5D');
+    expect(result?.spans?.[1]?.data?.['url']).toContain('%5BFiltered%5D');
   });
 });
