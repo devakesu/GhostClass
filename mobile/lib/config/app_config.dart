@@ -66,7 +66,7 @@ class AppConfig {
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
   /// Current application version.
-  static String appVersion = '3.0.8';
+  static String get appVersion => '3.0.8';
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
