@@ -1,0 +1,136 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/services/dio_service.dart';
+import 'package:ghostclass/services/secure_storage.dart';
+
+class AuthService {
+  final Ref _ref;
+  static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
+  static final String _ezygoAuthUrl = AppConfig.ezygoAuthUrl;
+
+  AuthService(this._ref);
+
+  Dio get _dio => _ref.read(dioServiceProvider).dio;
+
+  Future<Response<dynamic>> loginAndProvision({
+    required String username,
+    required String password,
+  }) async {
+    final ezygoResponse = await loginEzygo(username, password);
+    if (ezygoResponse.statusCode != 200) return ezygoResponse;
+
+    final ezygoToken = ezygoResponse.data['token'] ?? ezygoResponse.data['access_token'];
+    if (ezygoToken?.toString().isEmpty ?? true) {
+      throw AppException(
+        message: 'Portal returned no token.',
+        type: AppExceptionType.unauthorized,
+      );
+    }
+
+    return provisionGhostClassSession(ezygoToken.toString());
+  }
+
+  Future<Response<dynamic>> loginEzygo(String username, String password) async {
+    return _dio.post(
+      _ezygoAuthUrl,
+      data: {
+        'username': username.trim(),
+        'password': password.trim(),
+        'stay_logged_in': true,
+      },
+      options: Options(validateStatus: (s) => s != null && s < 600),
+    );
+  }
+
+  Future<Response<dynamic>> provisionGhostClassSession(String ezygoToken) async {
+    return _dio.post(
+      '$_ghostclassBaseUrl/auth/save-token',
+      data: {'token': ezygoToken.trim()},
+      options: Options(
+        extra: {'useLimitedToken': true},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> refreshProfile(String supabaseToken, {bool sync = false}) async {
+    return _dio.get(
+      '$_ghostclassBaseUrl/user/profile',
+      queryParameters: sync ? {'sync': 'true'} : null,
+      options: Options(
+        headers: {'Authorization': 'Bearer $supabaseToken'},
+        extra: {'useLimitedToken': true},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> syncMobileAuth(String supabaseToken) async {
+    return _dio.post(
+      '$_ghostclassBaseUrl/auth/sync',
+      options: Options(
+        headers: {'Authorization': 'Bearer $supabaseToken'},
+        extra: {'useLimitedToken': true},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> updateProfile(String supabaseToken, Map<String, dynamic> data) async {
+    return _dio.patch(
+      '$_ghostclassBaseUrl/profile',
+      data: data,
+      options: Options(
+        headers: {'Authorization': 'Bearer $supabaseToken'},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> acceptTerms(String supabaseToken, String version) async {
+    return _dio.post(
+      '$_ghostclassBaseUrl/user/accept-terms',
+      data: {'version': version},
+      options: Options(
+        headers: {'Authorization': 'Bearer $supabaseToken'},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> submitContact({
+    required String name,
+    required String email,
+    required String subject,
+    required String message,
+    String? supabaseToken,
+  }) async {
+    return _dio.post(
+      '$_ghostclassBaseUrl/contact',
+      data: {
+        'name': name,
+        'email': email,
+        'subject': subject,
+        'message': message,
+      },
+      options: Options(
+        headers: {if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken'},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> getUser(SecureStorageService storage) async {
+    final token = await storage.getEzygoToken();
+    final path = '${AppConfig.ezygoApiRoot}/user';
+    if (token == null) return _dio.get(path);
+    return _dio.get(
+      path,
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+}
+
+final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref));

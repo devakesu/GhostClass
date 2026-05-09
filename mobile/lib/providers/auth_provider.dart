@@ -44,8 +44,8 @@ final authProvider = AsyncNotifierProvider<AuthNotifier, AuthenticatedUser?>(
 );
 
 final institutionsProvider = FutureProvider<List<Institution>>((ref) async {
-  final authState = ref.watch(authProvider);
-  if (authState.value == null) return [];
+  final userId = ref.watch(authProvider.select((v) => v.value?.supabaseUserId));
+  if (userId == null) return [];
   return ref.read(authProvider.notifier).fetchInstitutions();
 });
 
@@ -236,13 +236,33 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         AppLogger.w('AuthNotifier: Self-healing did not produce a new token. Failures: $_consecutiveHealFailures');
         
         if (_consecutiveHealFailures >= 3) {
-          AppLogger.e('AuthNotifier: Terminal 401 loop detected. Logging out to protect state.');
-          await logout();
+          final lastError = state.error;
+          final isSecurityError = lastError is AppException && lastError.details?['type'] == 'security';
+          
+          if (isSecurityError) {
+             AppLogger.w('AuthNotifier: Terminal security block. Not logging out.');
+             _consecutiveHealFailures = 0; // Reset to allow more attempts later
+          } else {
+            AppLogger.e('AuthNotifier: Terminal 401 loop detected. Logging out to protect state.');
+            await logout();
+          }
         }
       }
     } catch (e) {
       AppLogger.e('AuthNotifier: Self-healing error', e);
-      if (e is AppException && e.isAuthError) await logout();
+      if (e is AppException && e.isAuthError) {
+        final isSecurityError = e.details?['type'] == 'security';
+        final isCritical = e.details?['criticalRisk'] == true;
+
+        if (isSecurityError && !isCritical) {
+          AppLogger.w('AuthNotifier: Non-critical security block. Skipping logout.');
+        } else {
+          if (isCritical) {
+            AppLogger.e('AuthNotifier: CRITICAL SECURITY RISK. Logging out.');
+          }
+          await logout();
+        }
+      }
     } finally {
       // Cooldown before allowing next 401 triggers to prevent tight cascades
       await Future.delayed(const Duration(milliseconds: 1000));
@@ -276,7 +296,19 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
       await _fetchAndApplyServerProfile(currentUser, supabaseToken: token, sync: sync);
     } catch (e) {
-      if (e is AppException && e.isAuthError) await logout();
+      if (e is AppException && e.isAuthError) {
+        final isSecurityError = e.details?['type'] == 'security';
+        final isCritical = e.details?['criticalRisk'] == true;
+
+        if (isSecurityError && !isCritical) {
+          AppLogger.w('AuthNotifier: Non-critical security block. Skipping logout.');
+        } else {
+          if (isCritical) {
+            AppLogger.e('AuthNotifier: CRITICAL SECURITY RISK. Logging out.');
+          }
+          await logout();
+        }
+      }
     }
   }
 
@@ -332,6 +364,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         updateState: false,
       );
       _lastRefresh = DateTime.now();
+
+      // Proactively pre-warm institutions data in the background
+      unawaited(ref.read(institutionsProvider.future));
+
       return updatedUser;
     } catch (e) {
       if (e is AppException && e.isAuthError) {
@@ -638,10 +674,12 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     final response = await api.refreshProfile(token, sync: sync);
 
     if (response.statusCode == 401) {
-      throw const AppException(
-        message: 'Security verification failed. Please try again or re-login.',
+      final data = response.data as Map<String, dynamic>?;
+      throw AppException(
+        message: formatApiError(data, 'Security Verification'),
         type: AppExceptionType.unauthorized,
         statusCode: 401,
+        details: data,
       );
     }
 
@@ -697,8 +735,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ezygoToken: EncryptedValue.fromPlaintext(
         data['ezygo_token'] ?? currentUser.ezygoToken.value,
       ),
-      ezygoId:
-          (data['id'] ?? data['user_id'])?.toString() ?? currentUser.ezygoId,
+      ezygoId: (data['id'] ?? data['user_id'] ?? data['ezygo_user_id'] ?? data['ezygo_id'])?.toString() ?? currentUser.ezygoId,
       termsVersion: _extractTermsVersion(data) ?? currentUser.termsVersion,
       username: data['username'] as String? ?? currentUser.username,
     );

@@ -270,7 +270,13 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
   }
 
   // 2. Allow bypass for Vitest test environment
-  if (process.env.VITEST && !process.env.DISABLE_SECURITY_BYPASS && !hasAppCheckToken && !csrfToken) {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.VITEST &&
+    !process.env.DISABLE_SECURITY_BYPASS &&
+    !hasAppCheckToken &&
+    !csrfToken
+  ) {
     logger.dev("Authentication bypassed for Vitest test environment");
     return { isValid: true, authType: "none" };
   }

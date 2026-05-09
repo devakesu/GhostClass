@@ -3,7 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 
 String formatApiError(dynamic response, String context) {
-  if (response == null) return 'Failed to complete $context';
+  if (response == null) {
+    if (context == 'ApiService.Dio') {
+      return "Connectivity problem: The server is taking too long to respond.";
+    }
+    if (context == 'Tracking.OfficialReport') {
+      return "The attendance report is currently unavailable. Please check your connection and try again.";
+    }
+    return 'Failed to complete $context';
+  }
 
   // Handle String response
   if (response is String && response.trim().isNotEmpty) {
@@ -86,4 +94,26 @@ String formatApiError(dynamic response, String context) {
   }
 
   return message.isNotEmpty ? message : 'Failed to complete $context';
+}
+
+/// Redacts sensitive information like IP addresses, ports, and file paths from error logs.
+String sanitizeTechnicalDetails(String error) {
+  // Remove IP addresses (v4)
+  String sanitized = error.replaceAll(
+      RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'), '[REDACTED_IP]');
+
+  // Remove Port numbers in common formats
+  sanitized = sanitized.replaceAll(RegExp(r'port\s*[:=]\s*\d+'), 'port = [REDACTED]');
+  sanitized = sanitized.replaceAll(RegExp(r':\d{4,5}'), ':[REDACTED_PORT]');
+
+  // Remove absolute Unix-like paths (keeping it safe for common startup logs)
+  sanitized = sanitized.replaceAll(
+      RegExp(r'\/[a-zA-Z0-9._\-\/]+\/[a-zA-Z0-9._\-]+'), '[REDACTED_PATH]');
+
+  // Remove potential auth tokens in URLs or headers
+  sanitized = sanitized.replaceAll(
+      RegExp(r'(Bearer|token|key|secret)[^, \n]+', caseSensitive: false),
+      r'$1 [REDACTED]');
+
+  return sanitized;
 }

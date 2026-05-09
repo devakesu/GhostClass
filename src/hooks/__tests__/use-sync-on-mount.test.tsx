@@ -3,12 +3,20 @@ vi.unmock("../use-sync-on-mount");
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useSyncOnMount } from "../use-sync-on-mount";
 import { logger } from "@/lib/logger";
+import axios from "@/lib/axios";
 
 vi.mock("@/lib/logger", () => ({
   logger: {
     dev: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/axios", () => ({
+  default: {
+    get: vi.fn(),
+  },
+  isAxiosError: vi.fn((err) => err?.isAxiosError === true),
 }));
 
 vi.mock("@/lib/utils", () => ({
@@ -30,14 +38,13 @@ describe("useSyncOnMount", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
     vi.useRealTimers();
   });
 
   it("should start syncing on mount when enabled", async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true }),
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      status: 200,
+      data: { success: true },
     });
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
@@ -46,7 +53,7 @@ describe("useSyncOnMount", () => {
       expect(result.current.syncCompleted).toBe(true);
     }, { timeout: 10000 });
 
-    expect(global.fetch).toHaveBeenCalledWith("/api/cron/sync", expect.any(Object));
+    expect(axios.get).toHaveBeenCalledWith("/api/cron/sync", expect.any(Object));
   });
 
   it("should not sync if disabled", () => {
@@ -54,7 +61,7 @@ describe("useSyncOnMount", () => {
 
     expect(result.current.isSyncing).toBe(false);
     expect(result.current.syncCompleted).toBe(false);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(axios.get).not.toHaveBeenCalled();
   });
 
   it("should not sync if username is missing but userId is present (short-circuit)", () => {
@@ -62,15 +69,14 @@ describe("useSyncOnMount", () => {
 
     expect(result.current.isSyncing).toBe(false);
     expect(result.current.syncCompleted).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(axios.get).not.toHaveBeenCalled();
   });
 
   it("should handle 207 Partial Content", async () => {
     const onPartialSync = vi.fn();
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
+    vi.mocked(axios.get).mockResolvedValueOnce({
       status: 207,
-      json: async () => ({ success: true, errors: 1 }),
+      data: { success: true, errors: 1 },
     });
 
     renderHook(() => useSyncOnMount({ ...defaultOptions, onPartialSync }));
@@ -82,9 +88,9 @@ describe("useSyncOnMount", () => {
 
   it("should handle successful sync with updates", async () => {
     const onSuccess = vi.fn();
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, updates: 1 }),
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      status: 200,
+      data: { success: true, updates: 1 },
     });
 
     renderHook(() => useSyncOnMount({ ...defaultOptions, onSuccess }));
@@ -94,8 +100,8 @@ describe("useSyncOnMount", () => {
     }, { timeout: 10000 });
   });
 
-  it("should handle fetch error", async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error("Network Error"));
+  it("should handle axios error", async () => {
+    vi.mocked(axios.get).mockRejectedValueOnce(new Error("Network Error"));
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
@@ -107,11 +113,10 @@ describe("useSyncOnMount", () => {
   });
 
   it("should handle non-ok response", async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: async () => ({}),
-    });
+    const axiosError = new Error("Bad Request");
+    (axiosError as any).isAxiosError = true;
+    (axiosError as any).response = { status: 400, data: {} };
+    vi.mocked(axios.get).mockRejectedValueOnce(axiosError);
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
@@ -123,9 +128,9 @@ describe("useSyncOnMount", () => {
   });
 
   it("should deduplicate multiple effect runs (Strict Mode simulation)", async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true }),
+    vi.mocked(axios.get).mockResolvedValue({
+      status: 200,
+      data: { success: true },
     });
 
     const { rerender } = renderHook(() => useSyncOnMount(defaultOptions));
@@ -134,14 +139,15 @@ describe("useSyncOnMount", () => {
     rerender();
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalledTimes(1);
     }, { timeout: 10000 });
   });
 
   it("should handle AbortError and log it", async () => {
     const abortError = new Error("Aborted");
-    abortError.name = "AbortError";
-    (global.fetch as any).mockRejectedValueOnce(abortError);
+    abortError.name = "CanceledError"; // Axios uses CanceledError for aborts
+    (abortError as any).isAxiosError = true;
+    vi.mocked(axios.get).mockRejectedValueOnce(abortError);
 
     renderHook(() => useSyncOnMount(defaultOptions));
 
@@ -159,7 +165,7 @@ describe("useSyncOnMount", () => {
     }
     vi.stubGlobal("AbortController", MockAbortController);
 
-    (global.fetch as any).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(axios.get).mockImplementation(() => new Promise(() => {}));
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
@@ -167,41 +173,41 @@ describe("useSyncOnMount", () => {
     expect(abortSpy).toHaveBeenCalled();
   });
 
-  it('should skip state updates if unmounted after fetch', async () => {
-    let resolveFetch: (v: any) => void;
-    (global.fetch as any).mockImplementation(() => new Promise(resolve => {
-      resolveFetch = resolve;
+  it('should skip state updates if unmounted after request', async () => {
+    let resolveAxios: (v: any) => void;
+    vi.mocked(axios.get).mockImplementation(() => new Promise(resolve => {
+      resolveAxios = resolve;
     }));
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
     unmount();
     
-    // Complete fetch after unmount
-    // @ts-expect-error - resolveFetch is assigned
-    resolveFetch({
-      ok: true,
-      json: async () => ({ success: true }),
+    // Complete axios after unmount
+    // @ts-expect-error - resolveAxios is assigned
+    resolveAxios({
+      status: 200,
+      data: { success: true },
     });
 
     await new Promise(resolve => setTimeout(resolve, 50));
-    // Should not have logged "Sync completed" for this mount because it was cleaned up
-    expect(logger.dev).not.toHaveBeenCalledWith(expect.stringContaining('Sync completed for mount'));
+    // Should not have logged "Sync result processed" for this mount because it was cleaned up
+    expect(logger.dev).not.toHaveBeenCalledWith(expect.stringContaining('Sync result processed for mount'));
   });
 
-  it('should skip state updates if unmounted after fetch error', async () => {
-    let rejectFetch: (v: any) => void;
-    (global.fetch as any).mockImplementation(() => new Promise((_, reject) => {
-      rejectFetch = reject;
+  it('should skip state updates if unmounted after request error', async () => {
+    let rejectAxios: (v: any) => void;
+    vi.mocked(axios.get).mockImplementation(() => new Promise((_, reject) => {
+      rejectAxios = reject;
     }));
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
     unmount();
     
-    // Fail fetch after unmount
-    // @ts-expect-error - rejectFetch is assigned
-    rejectFetch(new Error('Post-unmount fail'));
+    // Fail axios after unmount
+    // @ts-expect-error - rejectAxios is assigned
+    rejectAxios(new Error('Post-unmount fail'));
 
     await new Promise(resolve => setTimeout(resolve, 50));
     // Should not have logged error because it was cleaned up

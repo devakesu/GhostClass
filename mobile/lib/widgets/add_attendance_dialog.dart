@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
-import 'package:ghostclass/models/course_details.dart';
+import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
-import 'package:ghostclass/widgets/service_toast.dart';
+import 'package:ghostclass/widgets/attendance/attendance_dialog_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -16,15 +16,14 @@ class AddAttendanceDialog extends ConsumerStatefulWidget {
   const AddAttendanceDialog({super.key});
 
   @override
-  ConsumerState<AddAttendanceDialog> createState() =>
-      _AddAttendanceDialogState();
+  ConsumerState<AddAttendanceDialog> createState() => _AddAttendanceDialogState();
 }
 
 class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedSession;
   String? _selectedCourseId;
-  String _status = 'Present'; // Present, Absent, Duty Leave
+  AttendanceStatus _status = AttendanceStatus.present;
   final TextEditingController _reasonController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -32,685 +31,152 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   Map<int, Map<String, Map<String, int>>>? _precomputedFrequencies;
   bool _isBlocked = false;
 
-  String _canonicalTrackerCourseCode(CourseDetails course) {
-    final code = course.code?.trim();
-    final source = (code != null && code.isNotEmpty) ? code : course.safeId;
-    return source.replaceAll(RegExp(r'\s+'), '').toUpperCase();
-  }
-
   @override
   void initState() {
     super.initState();
-    // Precompute frequencies once when dialog opens
     _precomputeFrequencies();
-    
-    // Initial prefill logic will be handled after build or via a post-frame callback
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _prefillDefaults();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDefaults());
   }
 
   void _precomputeFrequencies() {
     final data = ref.read(dashboardProvider).value;
     if (data == null) return;
-
     final result = <int, Map<String, Map<String, int>>>{};
-
     data.attendance.studentAttendanceData.forEach((dStr, sessions) {
       try {
         if (dStr.length != 8) return;
-        final y = int.parse(dStr.substring(0, 4));
-        final m = int.parse(dStr.substring(4, 6));
-        final d = int.parse(dStr.substring(6, 8));
-        final date = DateTime(y, m, d);
-        final weekday = date.weekday;
-
-        result.putIfAbsent(weekday, () => {});
-        final weekdayMap = result[weekday]!;
-
+        final date = DateTime(int.parse(dStr.substring(0, 4)), int.parse(dStr.substring(4, 6)), int.parse(dStr.substring(6, 8)));
+        result.putIfAbsent(date.weekday, () => {});
+        final weekdayMap = result[date.weekday]!;
         int idx = 0;
         sessions.forEach((key, sessionObj) {
-          if (sessionObj.course != null &&
-              sessionObj.course != 0 &&
-              sessionObj.course.toString() != 'null') {
-            final sessionName = _getSessionName(
-              data.attendance.sessions,
-              key,
-              sessionObj,
-              idx,
-            );
-            final target = utils.normalizeSession(sessionName);
-
+          if (sessionObj.course != null && sessionObj.course != 0) {
+            final target = utils.normalizeSession(_getSessionName(data.attendance.sessions, key, sessionObj, idx));
             weekdayMap.putIfAbsent(target, () => {});
-            final sessionMap = weekdayMap[target]!;
-
             final cid = sessionObj.course.toString();
-            sessionMap[cid] = (sessionMap[cid] ?? 0) + 1;
+            weekdayMap[target]![cid] = (weekdayMap[target]![cid] ?? 0) + 1;
           }
           idx++;
         });
-      } catch (e) {
-        // Silently skip malformed dates
-      }
+      } catch (_) {}
     });
     _precomputedFrequencies = result;
   }
 
-  String _getSessionName(
-    Map<String, dynamic> sessionMetadata,
-    String key,
-    dynamic sessionObj,
-    int index,
-  ) {
-    // 1. Try metadata
-    final metadata = sessionMetadata[key];
-    if (metadata != null && metadata['name'] != null) {
-      return metadata['name'].toString();
-    }
-
-    // 2. Try session object's internal session field
-    if (sessionObj.session != null &&
-        sessionObj.session.toString() != 'null' &&
-        sessionObj.session.toString() != '0') {
-      return sessionObj.session.toString();
-    }
-
-    // 3. Fallback to key or index-based numbering (matching web app)
-    final keyInt = int.tryParse(key);
-    if (keyInt != null && keyInt < 20) {
-      return key;
-    }
-    return (index + 1).toString();
+  String _getSessionName(Map<String, dynamic> meta, String key, dynamic obj, int idx) {
+    if (meta[key]?['name'] != null) return meta[key]['name'].toString();
+    if (obj.session != null && obj.session != 0) return obj.session.toString();
+    final kInt = int.tryParse(key);
+    return (kInt != null && kInt < 20) ? key : (idx + 1).toString();
   }
 
   void _prefillDefaults() {
-    final dashboardAsync = ref.read(dashboardProvider);
-    if (dashboardAsync.value == null) return;
-    final data = dashboardAsync.value!;
-
-    // Academic Range Clamping (Single-Semester Enforcement)
-    final academicAsync = ref.read(academicProvider);
-    final academic = academicAsync.value;
-    final startDate = academic?.startDate ?? DateTime(2020);
-    final endDate = academic?.endDate ?? DateTime(2030);
-
-    if (_selectedDate.isBefore(startDate)) {
-      _selectedDate = startDate;
-    } else if (_selectedDate.isAfter(endDate)) {
-      _selectedDate = endDate;
-    }
+    final data = ref.read(dashboardProvider).value;
+    if (data == null) return;
+    final academic = ref.read(academicProvider).value;
+    final start = academic?.startDate ?? DateTime(2020);
+    final end = academic?.endDate ?? DateTime(2030);
+    if (_selectedDate.isBefore(start)) _selectedDate = start;
+    if (_selectedDate.isAfter(end)) _selectedDate = end;
 
     final dateKey = DateFormat('yyyyMMdd').format(_selectedDate);
-
-    // 1. Find occupied sessions
-    final occupiedSessions = <String>{};
-
-    // Official data
-    final officialDay = data.attendance.studentAttendanceData[dateKey];
-    if (officialDay != null) {
+    final occupied = <String>{};
+    final official = data.attendance.studentAttendanceData[dateKey];
+    if (official != null) {
       int idx = 0;
-      officialDay.forEach((key, sessionObj) {
-        if (sessionObj.course != null &&
-            sessionObj.course != 0 &&
-            sessionObj.course.toString() != 'null') {
-          final sessionName = _getSessionName(
-            data.attendance.sessions,
-            key,
-            sessionObj,
-            idx,
-          );
-          occupiedSessions.add(utils.normalizeSession(sessionName));
-        }
+      official.forEach((key, obj) {
+        if (obj.course != null && obj.course != 0) occupied.add(utils.normalizeSession(_getSessionName(data.attendance.sessions, key, obj, idx)));
         idx++;
       });
     }
-
-    // Tracking data
     final dbDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    for (final record in data.tracking) {
-      if (record.date == dbDate) {
-        occupiedSessions.add(utils.normalizeSession(record.session));
-      }
+    for (final r in data.tracking) {
+      if (r.date == dbDate) occupied.add(utils.normalizeSession(r.session));
     }
 
-    // 2. Set first free session
-    final firstFree = _sessions.firstWhere(
-      (s) => !occupiedSessions.contains(utils.normalizeSession(s)),
-      orElse: () => '',
-    );
-
-    if (firstFree.isEmpty) {
-      ServiceToast.show(
-        context,
-        'All sessions for today are already recorded.',
-        isError: true,
-      );
-    }
-
-    setState(() {
-      _selectedSession = firstFree.isNotEmpty ? firstFree : null;
-    });
-
+    final firstFree = _sessions.firstWhere((s) => !occupied.contains(utils.normalizeSession(s)), orElse: () => '');
+    setState(() => _selectedSession = firstFree.isNotEmpty ? firstFree : null);
     _updateBlockedState();
-
-    if (firstFree.isNotEmpty) {
-      _prefillCourse(firstFree);
-    }
+    if (firstFree.isNotEmpty) _prefillCourse(firstFree);
   }
 
   void _prefillCourse(String session) {
-    final dashboardAsync = ref.read(dashboardProvider);
-    if (dashboardAsync.value == null) return;
-
-    final data = dashboardAsync.value!;
-    final dayOfWeek = _selectedDate.weekday;
-    final target = utils.normalizeSession(session);
-
-    // Use precomputed frequencies for O(1) course lookup (per session/weekday)
-    final frequencyMap = _precomputedFrequencies?[dayOfWeek]?[target];
-
-    String? bestCourseId;
-    if (frequencyMap != null && frequencyMap.isNotEmpty) {
-      int maxCount = 0;
-      frequencyMap.forEach((cid, count) {
-        if (count > maxCount) {
-          maxCount = count;
-          bestCourseId = cid;
-        }
-      });
+    final data = ref.read(dashboardProvider).value;
+    if (data == null) return;
+    final freq = _precomputedFrequencies?[_selectedDate.weekday]?[utils.normalizeSession(session)];
+    String? best;
+    if (freq != null) {
+      int max = 0;
+      freq.forEach((cid, count) { if (count > max) { max = count; best = cid; } });
     }
-
-    if (bestCourseId != null) {
-      final course = data.courses.firstWhere(
-        (c) =>
-            c.id.toString() == bestCourseId ||
-            c.code?.toUpperCase() == bestCourseId?.toUpperCase() ||
-            c.safeId == bestCourseId,
-        orElse: () => data.courses.first,
-      );
-
-      setState(() {
-        _selectedCourseId = course.safeId;
-      });
+    if (best != null) {
+      final c = data.courses.firstWhere((c) => c.id.toString() == best || c.code == best || c.safeId == best, orElse: () => data.courses.first);
+      setState(() => _selectedCourseId = c.safeId);
     } else if (data.courses.isNotEmpty) {
-      setState(() {
-        _selectedCourseId = data.courses.first.safeId;
-      });
+      setState(() => _selectedCourseId = data.courses.first.safeId);
     }
   }
 
   void _updateBlockedState() {
-    final isBlockedNow = _checkIfSessionBlocked();
-    if (_isBlocked != isBlockedNow) {
-      setState(() {
-        _isBlocked = isBlockedNow;
-      });
-    }
-  }
-
-  bool _checkIfSessionBlocked() {
-    if (_selectedSession == null) return false;
-
-    final dashboardAsync = ref.read(dashboardProvider).value;
-    if (dashboardAsync == null) return false;
-
+    if (_selectedSession == null) { setState(() => _isBlocked = false); return; }
+    final data = ref.read(dashboardProvider).value;
+    if (data == null) return;
     final target = utils.normalizeSession(_selectedSession!);
     final dateKey = DateFormat('yyyyMMdd').format(_selectedDate);
-    final dbDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-    // Official Check
-    final officialDay =
-        dashboardAsync.attendance.studentAttendanceData[dateKey];
-    if (officialDay != null) {
+    final official = data.attendance.studentAttendanceData[dateKey];
+    bool blocked = false;
+    if (official != null) {
       int idx = 0;
-      for (var entry in officialDay.entries) {
-        final sessionObj = entry.value;
-        if (sessionObj.course != null &&
-            sessionObj.course != 0 &&
-            sessionObj.course.toString() != 'null') {
-          final sessionName = _getSessionName(
-            dashboardAsync.attendance.sessions,
-            entry.key,
-            sessionObj,
-            idx,
-          );
-          if (utils.normalizeSession(sessionName) == target) return true;
+      for (var e in official.entries) {
+        if (e.value.course != null && e.value.course != 0) {
+          if (utils.normalizeSession(_getSessionName(data.attendance.sessions, e.key, e.value, idx)) == target) { blocked = true; break; }
         }
         idx++;
       }
     }
-
-    // Tracking Check
-    for (final record in dashboardAsync.tracking) {
-      if (record.date == dbDate &&
-          utils.normalizeSession(record.session) == target) {
-        return true;
-      }
+    if (!blocked) {
+      final dbDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      blocked = data.tracking.any((r) => r.date == dbDate && utils.normalizeSession(r.session) == target);
     }
-
-    return false;
-  }
-
-  Future<void> _handleSubmit() async {
-    if (_selectedCourseId == null || _selectedSession == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
-      return;
-    }
-
-    if (_isBlocked) {
-      ServiceToast.show(
-        context,
-        'This session is already marked!',
-        isError: true,
-      );
-      return;
-    }
-
-    final data = ref.read(dashboardProvider).value;
-    if (data == null) return;
-
-    setState(() => _isSubmitting = true);
-
-    int loggedAttendanceCode = 110;
-    String loggedTrackerCourseCode = '';
-
-    try {
-      int attCode = 110; // Present
-      if (_status == 'Absent') attCode = 111;
-      if (_status == 'Duty Leave') attCode = 225;
-      loggedAttendanceCode = attCode;
-
-      final sanitizedReason = _reasonController.text.trim().substring(
-        0,
-        _reasonController.text.trim().length > 255
-            ? 255
-            : _reasonController.text.trim().length,
-      );
-
-      final remarks = _status == 'Duty Leave'
-          ? (sanitizedReason.isEmpty ? 'Duty Leave' : sanitizedReason)
-          : sanitizedReason;
-
-      final matchingCourse = data.courses.firstWhere(
-        (c) => c.safeId == _selectedCourseId,
-        orElse: () => data.courses.first,
-      );
-
-      final String trackerCourseCode = _canonicalTrackerCourseCode(
-        matchingCourse,
-      );
-      loggedTrackerCourseCode = trackerCourseCode;
-
-      await ref
-          .read(trackingProvider.notifier)
-          .insertRecord(
-            date: DateFormat('yyyy-MM-dd').format(_selectedDate),
-            session: utils.toRoman(_selectedSession!),
-            status: 'extra',
-            attendance: attCode,
-            courseId: trackerCourseCode,
-            remarks: remarks,
-          );
-
-      // The dashboard automatically refreshes because it watches trackingProvider
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        ServiceToast.show(context, 'Record added successfully');
-      }
-    } catch (e, st) {
-      AppLogger.eWithContext(
-        'AddAttendanceDialog: Failed to insert record',
-        error: e,
-        stackTrace: st,
-        tags: {
-          'feature': 'attendance_tracking',
-          'action': 'insert_extra_record',
-        },
-        extras: {
-          'attendance.date': DateFormat('yyyy-MM-dd').format(_selectedDate),
-          'attendance.session': utils.toRoman(_selectedSession!),
-          'attendance.course_id': loggedTrackerCourseCode,
-          'attendance.status': loggedAttendanceCode,
-        },
-      );
-      if (mounted) {
-        ServiceToast.show(
-          context,
-          'We encountered an error while adding this record. Please try again later. If the issue persists, please contact us.',
-          isError: true,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+    setState(() => _isBlocked = blocked);
   }
 
   @override
   Widget build(BuildContext context) {
-    final dashboardAsync = ref.watch(dashboardProvider);
-    final data = dashboardAsync.value;
-    final blocked = _isBlocked;
-
+    final data = ref.watch(dashboardProvider).value;
     final ghostColors = Theme.of(context).extension<GhostColors>();
     final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
-    final success = ghostColors?.successGreen ?? Colors.green;
-    final danger = ghostColors?.dangerRed ?? Theme.of(context).colorScheme.error;
-    final amber = ghostColors?.accentOrange ?? Colors.orange;
-    final surface = Theme.of(context).colorScheme.surface;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark
-                    ? 0.5
-                    : 0.05,
-              ),
-              blurRadius: 40,
-              offset: const Offset(0, 20),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(28)),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(LucideIcons.plus, color: primary, size: 20),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Add Extra Class',
-                        style: GoogleFonts.manrope(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      Text(
-                        'Record a custom class session',
-                        style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => Navigator.pop(context),
-                    icon: Icon(
-                      LucideIcons.x,
-                      color: _isSubmitting
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.1)
-                          : Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.4),
-                      size: 20,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    splashRadius: 20,
-                  ),
-                ],
-              ),
+              _buildHeader(primary),
               const SizedBox(height: 32),
-
-              // Date Picker
-              _buildLabel('Date'),
-              GestureDetector(
-                onTap: () async {
-                  final academicAsync = ref.read(academicProvider);
-                  final academic = academicAsync.value;
-                  final startDate = academic?.startDate ?? DateTime(2020);
-                  final endDate = academic?.endDate ?? DateTime(2030);
-
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate.isBefore(startDate)
-                        ? startDate
-                        : (_selectedDate.isAfter(endDate)
-                              ? endDate
-                              : _selectedDate),
-                    firstDate: startDate,
-                    lastDate: endDate,
-                    builder: (context, child) {
-                      return Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: Theme.of(context).colorScheme.copyWith(
-                            primary: primary,
-                            surface: Theme.of(context).colorScheme.surface,
-                            onSurface: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                        child: child!,
-                      );
-                    },
-                  );
-                  if (picked != null) {
-                    setState(() => _selectedDate = picked);
-                    _prefillDefaults();
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: surface.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        LucideIcons.calendar,
-                        size: 18,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        DateFormat('MMMM d, yyyy').format(_selectedDate),
-                        style: GoogleFonts.manrope(
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const AttendanceDialogLabel(text: 'Date'),
+              _buildDatePicker(primary),
               const SizedBox(height: 20),
-
-              // Session Picker
-              _buildLabel('Session'),
-              DropdownButtonFormField<String>(
-                key: ValueKey('session_$_selectedSession'),
-                initialValue: _selectedSession,
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                decoration: _inputDecoration(LucideIcons.clock),
-                style: GoogleFonts.manrope(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                items: _sessions.map((s) {
-                  return DropdownMenuItem(
-                    value: s,
-                    child: Text(utils.formatSessionName(s)),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _selectedSession = val);
-                    _updateBlockedState();
-                    _prefillCourse(val);
-                  }
-                },
-              ),
-              if (blocked)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, left: 4),
-                  child: Text(
-                    'Session occupied',
-                    style: GoogleFonts.manrope(
-                      color: Colors.redAccent,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
+              const AttendanceDialogLabel(text: 'Session'),
+              _buildSessionDropdown(),
+              if (_isBlocked) Padding(padding: const EdgeInsets.only(top: 6, left: 4), child: const Text('Session occupied', style: TextStyle(color: Colors.redAccent, fontSize: 11))),
               const SizedBox(height: 20),
-
-              // Subject Picker
-              _buildLabel('Subject'),
-              DropdownButtonFormField<String>(
-                key: ValueKey('course_$_selectedCourseId'),
-                initialValue: _selectedCourseId,
-                isExpanded: true,
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                decoration: _inputDecoration(LucideIcons.bookOpen),
-                style: GoogleFonts.manrope(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 13,
-                ),
-                items: (() {
-                  final courses = List<CourseDetails>.from(data?.courses ?? []);
-                  courses.sort((a, b) {
-                    final stdA = utils.standardizeCourseCode(a.code ?? a.id.toString());
-                    final stdB = utils.standardizeCourseCode(b.code ?? b.id.toString());
-                    final disabledA = data?.disabledCodes.contains(stdA) ?? false;
-                    final disabledB = data?.disabledCodes.contains(stdB) ?? false;
-                    
-                    if (disabledA && !disabledB) return 1;
-                    if (!disabledA && disabledB) return -1;
-                    return a.name.compareTo(b.name);
-                  });
-
-                  return courses.map((c) {
-                    final stdCode = utils.standardizeCourseCode(
-                      c.code ?? c.id.toString(),
-                    );
-                    final isDisabled = data?.disabledCodes.contains(stdCode) ?? false;
-
-                    return DropdownMenuItem(
-                      value: c.safeId,
-                      child: Text(
-                        '${c.name}${isDisabled ? ' (Disabled)' : ''}',
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          color: isDisabled
-                              ? Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.4)
-                              : Theme.of(context).colorScheme.onSurface,
-                          fontStyle: isDisabled
-                              ? FontStyle.italic
-                              : FontStyle.normal,
-                        ),
-                      ),
-                    );
-                  }).toList();
-                })(),
-                onChanged: (val) => setState(() => _selectedCourseId = val),
-              ),
+              const AttendanceDialogLabel(text: 'Subject'),
+              _buildSubjectDropdown(data),
               const SizedBox(height: 24),
-
-              // Status (Radio Group)
-              _buildLabel('Status'),
-              Row(
-                children: [
-                  _statusButton('Present', success),
-                  const SizedBox(width: 10),
-                  _statusButton('Absent', danger),
-                  const SizedBox(width: 10),
-                  _statusButton('Duty Leave', amber, label: 'DL'),
-                ],
-              ),
+              const AttendanceDialogLabel(text: 'Status'),
+              _buildStatusButtons(ghostColors),
               const SizedBox(height: 20),
-
-              _buildLabel(_status == 'Duty Leave' ? 'Reason (Optional)' : 'Remarks (Optional)'),
-              TextField(
-                controller: _reasonController,
-                style: GoogleFonts.manrope(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                maxLength: 255,
-                decoration: _inputDecoration(LucideIcons.textCursor),
-              ),
+              AttendanceDialogLabel(text: _status == AttendanceStatus.dutyLeave ? 'Reason (Optional)' : 'Remarks (Optional)'),
+              _buildRemarksField(primary),
               const SizedBox(height: 24),
-
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed:
-                      (_isSubmitting ||
-                          blocked ||
-                          _selectedSession == null ||
-                          _selectedCourseId == null)
-                      ? null
-                      : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Add Record',
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                ),
-              ),
+              _buildSubmitButton(primary),
             ],
           ),
         ),
@@ -718,91 +184,109 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(
-        text.toUpperCase(),
-        style: GoogleFonts.manrope(
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-          letterSpacing: 1.5,
-        ),
+  Widget _buildHeader(Color primary) {
+    return Row(
+      children: [
+        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(LucideIcons.plus, color: primary, size: 20)),
+        const SizedBox(width: 16),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Add Extra Class', style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.w800)),
+          Text('Record a custom class session', style: GoogleFonts.manrope(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4))),
+        ])),
+        IconButton(onPressed: _isSubmitting ? null : () => Navigator.pop(context), icon: const Icon(LucideIcons.x, size: 20)),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker(Color primary) {
+    return InkWell(
+      onTap: () async {
+        final academic = ref.read(academicProvider).value;
+        final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: academic?.startDate ?? DateTime(2020), lastDate: academic?.endDate ?? DateTime(2030));
+        if (picked != null) { setState(() => _selectedDate = picked); _prefillDefaults(); }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1))),
+        child: Row(children: [const Icon(LucideIcons.calendar, size: 18, color: Colors.grey), const SizedBox(width: 12), Text(DateFormat('MMMM d, yyyy').format(_selectedDate))]),
+      ),
+    );
+  }
+
+  Widget _buildSessionDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedSession,
+      items: _sessions.map((s) => DropdownMenuItem(value: s, child: Text(utils.formatSessionName(s)))).toList(),
+      onChanged: (val) { if (val != null) { setState(() => _selectedSession = val); _updateBlockedState(); _prefillCourse(val); } },
+      decoration: _inputDecoration(LucideIcons.clock),
+    );
+  }
+
+  Widget _buildSubjectDropdown(DashboardData? data) {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedCourseId,
+      isExpanded: true,
+      items: (data?.courses ?? []).map((c) => DropdownMenuItem(value: c.safeId, child: Text(c.name, overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: (val) => setState(() => _selectedCourseId = val),
+      decoration: _inputDecoration(LucideIcons.bookOpen),
+    );
+  }
+
+  Widget _buildStatusButtons(GhostColors? colors) {
+    return Row(children: [
+      AttendanceStatusToggleButton(value: 'Present', isSelected: _status == AttendanceStatus.present, color: colors?.successGreen ?? Colors.green, onTap: () => setState(() => _status = AttendanceStatus.present)),
+      const SizedBox(width: 10),
+      AttendanceStatusToggleButton(value: 'Absent', isSelected: _status == AttendanceStatus.absent, color: colors?.dangerRed ?? Colors.red, onTap: () => setState(() => _status = AttendanceStatus.absent)),
+      const SizedBox(width: 10),
+      AttendanceStatusToggleButton(value: 'Duty Leave', label: 'DL', isSelected: _status == AttendanceStatus.dutyLeave, color: colors?.accentOrange ?? Colors.orange, onTap: () => setState(() => _status = AttendanceStatus.dutyLeave)),
+    ]);
+  }
+
+  Widget _buildRemarksField(Color primary) {
+    return TextField(
+      controller: _reasonController,
+      maxLength: 255,
+      decoration: _inputDecoration(LucideIcons.textCursor),
+    );
+  }
+
+  Widget _buildSubmitButton(Color primary) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: (_isSubmitting || _isBlocked || _selectedSession == null || _selectedCourseId == null) ? null : _handleSubmit,
+        style: ElevatedButton.styleFrom(backgroundColor: primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+        child: _isSubmitting ? const CircularProgressIndicator(color: Colors.white) : const Text('Add Record', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   InputDecoration _inputDecoration(IconData icon) {
     return InputDecoration(
-      prefixIcon: Icon(
-        icon,
-        size: 18,
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-      ),
-      filled: true,
-      fillColor: Theme.of(context).colorScheme.surface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-        ),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color:
-              Theme.of(context).extension<GhostColors>()?.brandPrimary ??
-              Theme.of(context).colorScheme.primary,
-        ),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      prefixIcon: Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
-  Widget _statusButton(String value, Color color, {String? label}) {
-    final isSelected = _status == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _status = value),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? color.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? color
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.1),
-              width: 1.5,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label ?? value,
-              style: GoogleFonts.manrope(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isSelected
-                    ? color
-                    : Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _handleSubmit() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final matchingCourse = ref.read(dashboardProvider).value!.courses.firstWhere((c) => c.safeId == _selectedCourseId);
+      final trackerCourseCode = matchingCourse.code?.replaceAll(RegExp(r'\s+'), '').toUpperCase() ?? matchingCourse.safeId;
+      await ref.read(trackingProvider.notifier).insertRecord(
+        date: DateFormat('yyyy-MM-dd').format(_selectedDate),
+        session: utils.toRoman(_selectedSession!),
+        status: 'extra',
+        attendance: _status.code,
+        courseId: trackerCourseCode,
+        remarks: _reasonController.text.trim(),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e, st) {
+      AppLogger.e('AddAttendanceDialog: Insert failed', e, st);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }

@@ -335,7 +335,6 @@ function MockAttendanceChart() {
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function HelpClient() {
   const faqs = [
-    { question: "???", answer: <p>Coverage</p> },
     {
       question: "Can I use GhostClass as a mobile app?",
       answer: (

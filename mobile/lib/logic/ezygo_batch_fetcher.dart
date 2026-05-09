@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -56,7 +57,9 @@ class EzygoBatchFetcher {
     dynamic data,
   }) async {
     // Generate a unique cache key based on the request identity
-    final cacheKey = '$method|$path|$token';
+    // We include method, path, token, and a hash of the body data to avoid collisions.
+    final dataKey = data != null ? json.encode(data) : '';
+    final cacheKey = '$method|$path|$token|$dataKey';
 
     // 0. Security Barrier: If the backend connection is compromised, block immediately.
     if (_isBackendUnauthorized()) {

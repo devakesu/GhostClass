@@ -74,6 +74,16 @@ export interface UseSyncOnMountReturn {
 }
 
 // ---------------------------------------------------------------------------
+// Module state
+// ---------------------------------------------------------------------------
+
+/**
+ * Tracks the mountId of the last successfully completed sync to prevent
+ * double-syncing when React Strict Mode remounts a component.
+ */
+let lastSyncMountId: string | null = null;
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -86,8 +96,8 @@ export function useSyncOnMount({
   sentryLocation,
   sentryTag,
 }: UseSyncOnMountOptions): UseSyncOnMountReturn {
-  const [mountId, setMountId] = useState(() => Math.random().toString(36));
-  const [lastSyncMountId, setLastSyncMountId] = useState<string | null>(null);
+  const [mountId] = useState(() => Math.random().toString(36));
+  const syncFinishedRef = useRef(false);
 
   // Keep callbacks in refs so the sync effect never needs to re-run when the
   // caller re-creates the callback functions.
@@ -101,27 +111,11 @@ export function useSyncOnMount({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncCompleted, setSyncCompleted] = useState(false);
 
-  // Regenerate the mountId on every real navigation so that navigating back to
-  // the same page triggers a fresh sync. This runs after the sync effect so the
-  // stable initial ID is used for the first sync and the new ID is ready for the
-  // next real mount.
-  useEffect(() => {
-    // Regenerate the mountId on every real navigation.
-    // We defer this to avoid the "setState in effect" synchronous warning.
-    const timer = setTimeout(() => {
-        setMountId(Math.random().toString(36));
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
-
   useEffect(() => {
     // Wait until the caller signals all prerequisite queries have loaded.
-    if (!enabled) return;
-
-    if (!username) return;
-
-    // Dedup: this mount already ran a sync – skip.
-    if (lastSyncMountId === mountId) return;
+    // De-duplication: if this mount ID has already synced, skip.
+    const isAlreadySynced = typeof window !== "undefined" && lastSyncMountId === mountId;
+    if (!enabled || !username || syncFinishedRef.current || isAlreadySynced) return;
 
     const abortController = new AbortController();
     let isCleanedUp = false;
@@ -140,6 +134,13 @@ export function useSyncOnMount({
         if (!data) throw new Error("Sync response was empty");
 
         if (isCleanedUp) return;
+
+        // Mark as finished successfully BEFORE calling callbacks to prevent any
+        // potential re-triggering if callbacks cause a re-render.
+        syncFinishedRef.current = true;
+        if (typeof window !== "undefined") {
+          lastSyncMountId = mountId;
+        }
 
         if (res.status === 207) {
           // Partial failure – call the page-specific handler.
@@ -177,8 +178,7 @@ export function useSyncOnMount({
         });
       } finally {
         if (!isCleanedUp) {
-          logger.dev(`[${sentryLocation}] Sync completed for mount: ${mountId}`);
-          setLastSyncMountId(mountId);
+          logger.dev(`[${sentryLocation}] Sync result processed for mount: ${mountId}`);
           setIsSyncing(false);
           setSyncCompleted(true);
         }
@@ -191,10 +191,10 @@ export function useSyncOnMount({
       isCleanedUp = true;
       abortController.abort();
     };
-  }, [enabled, username, userId, sentryLocation, sentryTag, mountId, lastSyncMountId, syncCompleted]);
+  }, [enabled, username, userId, sentryLocation, sentryTag, mountId]);
 
   const isShortCircuited = !username && !!userId;
-  const isAlreadySynced = lastSyncMountId === mountId;
+  const isAlreadySynced = typeof window !== "undefined" && lastSyncMountId === mountId;
   const effectiveSyncCompleted = syncCompleted || isShortCircuited || isAlreadySynced;
 
   return { isSyncing, syncCompleted: effectiveSyncCompleted };

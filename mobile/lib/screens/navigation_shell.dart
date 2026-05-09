@@ -495,7 +495,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       await Future.wait([
                         ref.read(dashboardProvider.future),
                         ref.read(trackingProvider.future),
-                      ]).timeout(const Duration(seconds: 10));
+                      ]);
                       AppLogger.i(
                         'NavigationShell: Outage recovery wait completed (or partial success).',
                       );

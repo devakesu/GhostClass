@@ -231,7 +231,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-
 class _Correction {
   final int value;
   final Color color;

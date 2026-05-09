@@ -22,30 +22,27 @@ class HeaderSection extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Welcome Message
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.manrope(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    children: [
-                      const TextSpan(text: 'Welcome back,\n'),
-                      TextSpan(
-                        text: '${profile?.firstName ?? 'Ghost'}!',
-                        style: GoogleFonts.manrope(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
+            RichText(
+              text: TextSpan(
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
-                const SizedBox(height: 12),
+                children: [
+                  const TextSpan(text: 'Welcome back,\n'),
+                  TextSpan(
+                    text: '${profile?.firstName ?? 'Ghost'}!',
+                    style: GoogleFonts.manrope(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
                 // 2. Class Badge
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -88,31 +85,37 @@ class HeaderSection extends ConsumerWidget {
                     fontStyle: FontStyle.italic,
                   ),
                 ),
-              ],
-            ),
             const SizedBox(height: 20),
 
             // 3. Selectors
             Row(
               children: [
                 Expanded(
-                  child: _SelectorButton(
-                    label: data.selectedSemester.toUpperCase(),
-                    icon: LucideIcons.calendar,
-                    onTap: () => _showSemesterPicker(
-                      context,
-                      ref,
-                      data.selectedSemester,
+                  child: Semantics(
+                    label: 'Current semester: ${data.selectedSemester}. Tap to change.',
+                    button: true,
+                    child: _SelectorButton(
+                      label: data.selectedSemester.toUpperCase(),
+                      icon: LucideIcons.calendar,
+                      onTap: () => _showSemesterPicker(
+                        context,
+                        ref,
+                        data.selectedSemester,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _SelectorButton(
-                    label: data.selectedYear,
-                    icon: LucideIcons.calendarDays,
-                    onTap: () =>
-                        _showYearPicker(context, ref, data.selectedYear),
+                  child: Semantics(
+                    label: 'Current academic year: ${data.selectedYear}. Tap to change.',
+                    button: true,
+                    child: _SelectorButton(
+                      label: data.selectedYear,
+                      icon: LucideIcons.calendarDays,
+                      onTap: () =>
+                          _showYearPicker(context, ref, data.selectedYear),
+                    ),
                   ),
                 ),
               ],

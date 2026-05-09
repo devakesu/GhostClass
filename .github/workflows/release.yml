@@ -645,8 +645,6 @@ jobs:
             static const String ezygoAuthUrl = '${ENCODED_EZYGO_AUTH_URL}';
             static const String ezygoApiRoot = '${ENCODED_EZYGO_API_ROOT}';
             static const String ezygoOrigin = '${ENCODED_EZYGO_ORIGIN}';
-
-            static const String supabaseSpoofedOrigin = 'https://${APP_DOMAIN}';
           }
           EOF
 

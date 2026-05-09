@@ -27,7 +27,8 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
-    final data = await api.fetchLeaveData(storage);
+    final res = await api.fetchLeaveData(storage);
+    final data = res.data;
     final rawLeaves = data['studentLeaves']?['student_leaves'] as List? ?? [];
     final rawSessions =
         data['studentLeaves']?['student_leave_sessions'] as Map? ?? {};

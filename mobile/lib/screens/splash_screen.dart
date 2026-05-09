@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -91,7 +92,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           context,
           title: 'Security Verification Failed',
           message: dialogMessage,
-          technicalDetails: e.toString(),
+          technicalDetails: sanitizeTechnicalDetails(e.toString()),
           retryLabel: criticalRisk ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
           isDismissible: false,
@@ -109,7 +110,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       
       messages.add('Please contact us if the error persists even after some time.');
 
-      final technicalDetails = e.toString();
+      final technicalDetails = sanitizeTechnicalDetails(e.toString());
       
       await ServiceErrorDialog.show(
         context,

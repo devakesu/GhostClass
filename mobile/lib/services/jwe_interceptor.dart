@@ -19,8 +19,12 @@ class JweInterceptor extends Interceptor {
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final baseUrl = AppConfig.ghostclassApiUrl;
-    // Every request to our backend must use JWE (except EzyGo)
-    final isGhostClassApi = options.path.startsWith(baseUrl) || options.baseUrl.startsWith(baseUrl);
+    // Ensure we only encrypt requests targeting our own backend.
+    // Check both absolute paths and relative paths combined with baseUrl.
+    final String fullUrl = options.path.startsWith('http') 
+        ? options.path 
+        : '${options.baseUrl}${options.path}';
+    final isGhostClassApi = fullUrl.startsWith(baseUrl);
     final isWrite = options.method == 'POST' || options.method == 'PUT' || options.method == 'PATCH';
 
     if (isGhostClassApi && isWrite && options.data is Map<String, dynamic>) {
