@@ -16,7 +16,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -80,13 +79,6 @@ Future<void> _handleSecurityFailure(Object error) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Package Info & App Config
-  try {
-    final packageInfo = await PackageInfo.fromPlatform();
-    AppConfig.appVersion = packageInfo.version;
-  } catch (e) {
-    AppLogger.e('Failed to load package info', e);
-  }
 
   HttpOverrides.global = MyHttpOverrides();
   
