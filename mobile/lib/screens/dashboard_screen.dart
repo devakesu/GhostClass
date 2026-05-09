@@ -42,6 +42,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onRetry: () async {
             ref.read(apiServiceProvider).clearCaches();
             ref.invalidate(dashboardProvider);
+            ref.invalidate(institutionsProvider);
             try {
               await ref.read(dashboardProvider.future);
             } catch (e, st) {
@@ -102,7 +103,11 @@ class _DashboardContent extends ConsumerWidget {
             instructors: data.instructors,
             className: data.className,
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).padding.bottom + 90,
+            ),
+          ),
         ],
       ),
     );

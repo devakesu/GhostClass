@@ -71,35 +71,63 @@ Map<String, String> calculateCurrentAcademicInfo({
 String normalizeDate(dynamic date) {
   if (date == null) return '';
 
+  if (date is DateTime) {
+    final y = date.year.toString();
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return "$y$m$d";
+  }
+
   String s = date.toString().trim();
   if (s.isEmpty) return '';
 
   // Handle ISO datetime strings (2024-01-15T10:30:00Z)
-  if (s.contains('T')) s = s.split('T')[0];
+  final String base = s.contains('T') ? s.split('T')[0] : s;
 
   // 1. YYYYMMDD (no separator)
-  if (RegExp(r'^\d{8}$').hasMatch(s)) return s;
+  if (RegExp(r'^\d{8}$').hasMatch(base)) return base;
 
   // 2. Dash-separated (YYYY-MM-DD or DD-MM-YYYY)
-  if (s.contains('-')) {
-    final parts = s.split('-');
+  if (base.contains('-')) {
+    final parts = base.split('-');
     if (parts.length == 3) {
-      if (parts[0].length == 4) {
-        // YYYY-MM-DD
-        return "${parts[0]}${parts[1].padLeft(2, '0')}${parts[2].padLeft(2, '0')}";
-      } else if (parts[2].length == 4) {
-        // DD-MM-YYYY
-        return "${parts[2]}${parts[1].padLeft(2, '0')}${parts[0].padLeft(2, '0')}";
+      final a = parts[0].trim();
+      final b = parts[1].trim();
+      final c = parts[2].trim();
+      
+      if (RegExp(r'^\d+$').hasMatch(a) && 
+          RegExp(r'^\d+$').hasMatch(b) && 
+          RegExp(r'^\d+$').hasMatch(c)) {
+        if (a.length == 4) {
+          // YYYY-MM-DD
+          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+        } else if (c.length == 4) {
+          // DD-MM-YYYY
+          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+        }
       }
     }
   }
 
-  // 3. Slash-separated (DD/MM/YYYY)
-  if (s.contains('/')) {
-    final parts = s.split('/');
+  // 3. Slash-separated (DD/MM/YYYY or YYYY/MM/DD)
+  if (base.contains('/')) {
+    final parts = base.split('/');
     if (parts.length == 3) {
-      // Assuming DD/MM/YYYY
-      return "${parts[2]}${parts[1].padLeft(2, '0')}${parts[0].padLeft(2, '0')}";
+      final a = parts[0].trim();
+      final b = parts[1].trim();
+      final c = parts[2].trim();
+
+      if (RegExp(r'^\d+$').hasMatch(a) && 
+          RegExp(r'^\d+$').hasMatch(b) && 
+          RegExp(r'^\d+$').hasMatch(c)) {
+        if (a.length == 4) {
+          // YYYY/MM/DD
+          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+        } else {
+          // DD/MM/YYYY
+          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+        }
+      }
     }
   }
 

@@ -425,8 +425,9 @@ class _ProfileDumpContent extends ConsumerWidget {
                 shrinkWrap: true,
                 itemCount: settings.disabledCourses.entries.length,
                 separatorBuilder: (context, index) => Divider(
-                  height: 24,
-                  color: Theme.of(context).dividerColor,
+                  height: 32,
+                  thickness: 1,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
                 ),
                 itemBuilder: (context, index) {
                   final semesterEntry =
@@ -564,7 +565,7 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 24, thickness: 1, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
           ...rows.map((row) => row._buildRow(context)),
           const SizedBox(height: 4),
         ],

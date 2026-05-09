@@ -241,12 +241,25 @@ export async function performProfileSync(
 
         // Automated Migration: Update this user's tracker records from numeric IDs to codes
         // using the fresh mappings we just received.
+        // We fetch current trackers first to avoid redundant sequential update calls.
+        const { data: currentTrackers } = await supabaseAdmin
+          .from("tracker")
+          .select("course")
+          .eq("auth_user_id", authId);
+
+        const coursesWithTrackers = new Set(currentTrackers?.map(t => String(t.course)) || []);
+
         for (const m of mappings) {
-          await supabaseAdmin
-            .from("tracker")
-            .update({ course: m.university_code })
-            .eq("auth_user_id", authId)
-            .eq("course", String(m.ezygo_id));
+          const ezygoIdStr = String(m.ezygo_id);
+          // Only fire the update if we actually have tracker records using the numeric ID
+          if (coursesWithTrackers.has(ezygoIdStr)) {
+            logger.dev(`Sync: Migrating tracker record for ${m.university_code} (from ID: ${ezygoIdStr})`);
+            await supabaseAdmin
+              .from("tracker")
+              .update({ course: m.university_code })
+              .eq("auth_user_id", authId)
+              .eq("course", ezygoIdStr);
+          }
         }
       }
     }

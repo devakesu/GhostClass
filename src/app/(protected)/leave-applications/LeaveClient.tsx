@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, FileText, CheckCircle2, XCircle, ArrowRight, User } from "lucide-react";
@@ -45,12 +46,16 @@ export default function LeaveClient({ initialData }: { initialData: any }) {
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
 
-  const leaves = (initialData?.studentLeaves?.student_leaves || []).filter((leave: any) => {
-      // If semester/year data isn't loaded yet from the client context, don't filter out yet
-      // Or filter explicitly once they are available.
-      if (!semesterData || !academicYearData) return true;
-      return leave.usersubgroup?.academic_semester === semesterData && leave.usersubgroup?.academic_year === academicYearData;
-  });
+  const leaves = useMemo(() => {
+    const rawLeaves = initialData?.studentLeaves?.student_leaves || [];
+    // If semester/year data isn't loaded yet from the client context, don't filter out yet
+    if (!semesterData || !academicYearData) return rawLeaves;
+    
+    return rawLeaves.filter((leave: any) => 
+      leave.usersubgroup?.academic_semester === semesterData && 
+      leave.usersubgroup?.academic_year === academicYearData
+    );
+  }, [initialData, semesterData, academicYearData]);
 
   const allSessions = initialData?.studentLeaves?.student_leave_sessions || {};
   const approvedCount = leaves.filter((leave: any) => getLeaveStatus(leave.approvers).label === "Approved").length;

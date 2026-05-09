@@ -116,18 +116,20 @@ const getHandler = async (req: Request) => {
       }
     }
 
-    after(async () => {
-      // Reuse token already fetched in shouldSync block; only fetch fresh for background-only path
-      const syncToken = resolvedToken ?? await getAuthTokenServer();
-      if (!syncToken) return;
-      try {
-        // Trigger a full background sync (Profile, Class, Courses)
-        // This ensures class label updates correctly after semester/year changes.
-        await performProfileSync(syncToken, existingUser.id, user.id);
-      } catch (err) { 
-        logger.warn("Profile background sync failed", err); 
-      }
-    });
+    if (!shouldSync) {
+      after(async () => {
+        // Reuse token already fetched in shouldSync block; only fetch fresh for background-only path
+        const syncToken = resolvedToken ?? await getAuthTokenServer();
+        if (!syncToken) return;
+        try {
+          // Trigger a full background sync (Profile, Class, Courses)
+          // This ensures class label updates correctly after semester/year changes.
+          await performProfileSync(syncToken, existingUser.id, user.id);
+        } catch (err) { 
+          logger.warn("Profile background sync failed", err); 
+        }
+      });
+    }
     return NextResponse.json({ 
       id: existingUser.id, 
       username: existingUser.username, 

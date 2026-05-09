@@ -38,8 +38,6 @@ class DashboardStats {
 
   final Map<String, CourseStat> courseStats;
 
-  final List<SuspiciousAbsence> suspiciousAbsences;
-
   DashboardStats({
     required this.percentage,
     required this.rawPercentage,
@@ -64,7 +62,6 @@ class DashboardStats {
     required this.activeCourses,
     required this.totalCoursesCount,
     required this.courseStats,
-    this.suspiciousAbsences = const [],
   });
 
   factory DashboardStats.calculate({
@@ -91,9 +88,6 @@ class DashboardStats {
     final Map<String, CourseStat> courseStats = {};
 
     // --- 1. Robust Identity Resolution System (Web Parity) ---
-    // Standardizes ID/Code/Name into a consistent Match Key.
-    // Replicates Web's formatCourseCode: splits at hyphens and removes all spaces.
-
     final Map<String, String> lookupMap = {}; // StandardizedCode -> SafeId
     final Map<String, String> idToSafeId = {}; // NumericID -> SafeId
     final Set<String> catalogCodesSet = {}; // For denominator filtering
@@ -128,12 +122,8 @@ class DashboardStats {
 
     // --- 2. Process Official Data ---
     final Map<String, int> officialMap = {};
-    final List<SuspiciousAbsence> suspiciousAbsences = [];
 
     attendanceData.studentAttendanceData.forEach((date, dailySessions) {
-      final List<String> presentCourses = [];
-      final List<Map<String, dynamic>> absentSessions = [];
-
       dailySessions.forEach((sessionKey, session) {
         if (session.course != null && session.classType != 'Revision') {
           final String rawCid = session.course.toString();
@@ -148,12 +138,12 @@ class DashboardStats {
           );
 
           // Web Parity: Only specific codes count toward official stats
-          final bool isPos = [110, 225, 112].contains(status);
-          final bool isNeg = status == 111;
+          final attStatus = AttendanceStatus.fromCode(status);
+          final bool isPos = attStatus.isPositive;
+          final bool isNeg = attStatus.isNegative;
           final bool isValid = isPos || isNeg;
 
           if (isValid) {
-            // Standardize Slot Key Format: {StandardizedCode}_{YYYYMMDD}_{SESSION_ROMAN}
             final String normalizedDate = utils.normalizeDate(date);
             final String normalizedSessionNum = utils.normalizeSession(
               session.session ?? sessionKey,
@@ -172,52 +162,24 @@ class DashboardStats {
 
             course.officialTotal++;
             course.finalTotal++;
-              // Note: For per-course stats, we use the stricter _isPositive (110, 225)
-              if (_isPositive(status, includeOtherLeave: false)) {
-                course.officialPresent++;
-                course.finalPresent++;
-              }
+            if (_isPositive(status, includeOtherLeave: false)) {
+              course.officialPresent++;
+              course.finalPresent++;
+            }
 
-              if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
+            if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
               officialTotal++;
-              // Dashboard Overview Parity: Present counter includes 112 (Other Leave)
               if (_isPositive(status, includeOtherLeave: true)) {
                 officialPresent++;
               } else {
                 officialAbsent++;
               }
-              if (status == 225) officialDL++;
-              if (status == 112) officialOther++;
-
-              // For Suspicious Absence Detection
-              if (_isPositive(status, includeOtherLeave: false)) {
-                presentCourses.add(
-                  attendanceData.courses[rawCid]?.name ?? rawCid,
-                );
-              } else if (status == 111) {
-                absentSessions.add({
-                  'courseId': rawCid,
-                  'courseName': attendanceData.courses[rawCid]?.name ?? rawCid,
-                  'session': session.session ?? sessionKey,
-                });
-              }
+              if (status == AttendanceStatus.dutyLeave.code) officialDL++;
+              if (status == AttendanceStatus.late.code) officialOther++;
             }
           }
         }
       });
-
-      // If marked absent in something but present in something else on the SAME day
-      if (absentSessions.isNotEmpty && presentCourses.isNotEmpty) {
-        for (var abs in absentSessions) {
-          suspiciousAbsences.add(SuspiciousAbsence(
-            date: date,
-            courseId: abs['courseId'] as String,
-            courseName: abs['courseName'] as String,
-            session: abs['session'].toString(),
-            presentIn: List.from(presentCourses),
-          ));
-        }
-      }
     });
 
     // --- 3. Process Tracking Data ---
@@ -234,9 +196,6 @@ class DashboardStats {
 
       final String normalizedDate = utils.normalizeDate(item.date);
       final String normalizedSessionNum = utils.normalizeSession(item.session);
-
-      // Use the course entity to get the standardized code for the key
-      // Web Parity: Slot keys use Course ID, not Code
       final String key =
           "${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}";
 
@@ -247,22 +206,20 @@ class DashboardStats {
       );
       final bool courseDisabled = disabledCourseCodes.contains(courseCode);
 
-      // The Web Dashboard's strict "True Extra" rule
       final bool isTrulyExtra =
           item.status == 'extra' && officialStatus == null;
       final bool trackerPositive = _isPositive(
         trackerStatus,
         includeOtherLeave: false,
       );
-      final bool trackerDL = trackerStatus == 225;
+      final bool trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
       final bool officialPositive = officialStatus != null
           ? _isPositive(officialStatus, includeOtherLeave: false)
           : false;
-      final bool officialDL = officialStatus == 225;
+      final bool officialDLStatus = officialStatus == AttendanceStatus.dutyLeave.code;
 
       final course = courseStats[cid];
       if (course != null) {
-        // A. Mathematical Update (matches web's updateCourse in DashboardClient.tsx)
         if (isTrulyExtra) {
           course.finalTotal++;
           if (trackerPositive) course.finalPresent++;
@@ -274,7 +231,6 @@ class DashboardStats {
           }
         }
 
-        // B. Visual Layout Update (matches web's loop in CourseCard.tsx)
         if (item.status == 'extra') {
           if (trackerPositive) {
             course.extraPresent++;
@@ -288,7 +244,6 @@ class DashboardStats {
         }
       }
 
-      // C. Dashboard Global Aggregation
       if (catalogCodesSet.contains(courseCode) && !courseDisabled) {
         if (isTrulyExtra) {
           if (trackerPositive) {
@@ -304,7 +259,7 @@ class DashboardStats {
           if (!officialPositive && (trackerPositive || trackerDL)) {
             savedAbsent++;
           }
-          if (!officialDL && trackerDL) {
+          if (!officialDLStatus && trackerDL) {
             corrDL++;
           }
         }
@@ -316,8 +271,6 @@ class DashboardStats {
     final finalPresentCount = officialPresent + corrPresent + extraPresent;
     final finalAbsentCount = officialAbsent - savedAbsent + extraAbsent;
     
-    // Invariant: savedAbsent and finalAbsentCount must never be negative.
-    // Divergence here indicates a tracking record without a matching official record.
     assert(savedAbsent >= 0 && finalAbsentCount >= 0,
         'Attendance Invariant Violation: Negative absent count (official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)');
 
@@ -360,7 +313,6 @@ class DashboardStats {
       activeCourses: activeCourses,
       totalCoursesCount: catalogCodesSet.length,
       courseStats: courseStats,
-      suspiciousAbsences: suspiciousAbsences,
     );
   }
 
@@ -370,12 +322,11 @@ class DashboardStats {
     return int.tryParse(val.toString()) ?? 0;
   }
   static bool _isPositive(int status, {bool includeOtherLeave = false}) {
-    if (includeOtherLeave && status == 112) return true;
-    return [110, 225].contains(status);
+    final attStatus = AttendanceStatus.fromCode(status);
+    if (includeOtherLeave && attStatus == AttendanceStatus.late) return true;
+    return attStatus == AttendanceStatus.present || attStatus == AttendanceStatus.dutyLeave;
   }
 
-  /// Standardizes ID/Code/Name into a consistent Match Key.
-  /// Replicates Web's formatCourseCode: splits at hyphens and removes all spaces.
   static String standardize(String input) {
     return input.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
   }

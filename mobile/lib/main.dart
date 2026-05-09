@@ -9,21 +9,62 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/config/app_config.dart';
-import 'package:ghostclass/config/app_secrets.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/logic/network_utils.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
     client.connectionTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    
+    // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.
+    // In release mode, standard certificate validation is enforced.
+    if (kDebugMode) {
+      client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
+    }
+    
     return client;
+  }
+}
+
+class _SecurityFailureApp extends StatelessWidget {
+  final String friendlyMessage;
+  final String technicalDetails;
+
+  const _SecurityFailureApp({
+    required this.friendlyMessage,
+    required this.technicalDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(),
+      home: Builder(
+        builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SecurityUtils.showSecurityFailureDialog(
+              context,
+              title: 'Security Handshake Failed',
+              message: friendlyMessage,
+              technicalDetails: technicalDetails,
+              retryLabel: 'Close App',
+              onRetry: () => exit(0),
+              isDismissible: false,
+            );
+          });
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        },
+      ),
+    );
   }
 }
 
@@ -33,33 +74,20 @@ Future<void> _handleSecurityFailure(Object error) async {
       ? 'GhostClass encountered a network security issue while verifying your device. This often happens on restricted WiFi or with custom DNS settings.'
       : 'We couldn\'t verify the integrity of this app. To protect your data, GhostClass requires a secure, unmodified environment.';
 
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
-      home: Builder(
-        builder: (context) {
-          // Use a post frame callback to show the dialog
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            SecurityUtils.showSecurityFailureDialog(
-              context,
-              title: 'Security Handshake Failed',
-              message: friendlyMessage,
-              technicalDetails: errorMessage,
-              retryLabel: 'Close App',
-              onRetry: () => exit(0),
-              isDismissible: false,
-            );
-          });
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        },
-      ),
-    ),
-  );
+  runApp(_SecurityFailureApp(friendlyMessage: friendlyMessage, technicalDetails: errorMessage));
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Package Info & App Config
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    AppConfig.appVersion = packageInfo.version;
+  } catch (e) {
+    AppLogger.e('Failed to load package info', e);
+  }
+
   HttpOverrides.global = MyHttpOverrides();
   
   // Initialize Firebase & App Check
@@ -91,7 +119,9 @@ void main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabasePublishableKey.value,
-    headers: {'origin': AppSecrets.supabaseSpoofedOrigin},
+    headers: {
+      'Origin': AppConfig.supabaseOrigin,
+    },
   );
 
   await GoogleFonts.pendingFonts([GoogleFonts.manrope()]);

@@ -35,13 +35,8 @@ import {
   useSetAcademicYear,
   useSetSemester,
 } from "@/hooks/users/settings";
-import { 
-  getOfficialSessionRaw,
-  ATTENDANCE_STATUS,
-  isPositive,
-} from "@/lib/logic/attendance-reconciliation";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { calculateAttendance } from "@/lib/logic/bunk";
-import { generateSlotKey } from "@/lib/utils";
 import { Loading as CompLoading } from "@/components/loading";
 import {
   AlertDialog,
@@ -339,6 +334,18 @@ export default function DashboardClient(
     setIsTransitioning(true);
     setShowConfirmDialog(false);
 
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ["attendance-report"] }),
+      queryClient.cancelQueries({ queryKey: ["courses"] }),
+      queryClient.cancelQueries({ queryKey: ["track_data"] }),
+      queryClient.cancelQueries({ queryKey: ["attendance-report-all"] }),
+      queryClient.cancelQueries({ queryKey: ["class_courses"] }),
+      queryClient.cancelQueries({ queryKey: ["course_instructors"] }),
+      queryClient.cancelQueries({ queryKey: ["exams"] }),
+      queryClient.cancelQueries({ queryKey: ["exam-questions"] }),
+      queryClient.cancelQueries({ queryKey: ["exam-answers"] }),
+    ]);
+
     queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
     queryClient.invalidateQueries({ queryKey: ["courses"] });
     queryClient.invalidateQueries({ queryKey: ["track_data"] });
@@ -579,266 +586,15 @@ export default function DashboardClient(
 
 
   // --- STATS CALCULATION ---
-  const stats = useMemo(() => {
-    const officialStats = { present: 0, absent: 0, dl: 0, total: 0, other: 0 };
-    const modifierStats = {
-      correctionPresent: 0,
-      savedAbsent: 0,
-      correctionDL: 0,
-      extraPresent: 0,
-      extraAbsent: 0,
-      extraDL: 0,
-    };
-
-    const courseStats: Record<
-      string,
-      {
-        present: number;
-        total: number;
-        officialPresent: number;
-        officialTotal: number;
-        bunkable: number;
-        required: number;
-        correctionPresent: number;
-        extraPresent: number;
-        extrasCount: number;
-        extraAbsent: number;
-      }
-    > = {};
-    if (coursesData?.courses) {
-      Object.keys(coursesData.courses).forEach((id) => {
-        const key = getCourseCode(id).toUpperCase().replace(/\s+/g, "") || id;
-        courseStats[key] = {
-          present: 0,
-          total: 0,
-          officialPresent: 0,
-          officialTotal: 0,
-          bunkable: 0,
-          required: 0,
-          correctionPresent: 0,
-          extraPresent: 0,
-          extrasCount: 0,
-          extraAbsent: 0,
-        };
-      });
-    }
-    // Also seed entries for class-specific custom courses
-    if (classCourses) {
-      classCourses.forEach((cc: any) => {
-        const key = cc.course_code.replace(/\s+/g, "").toUpperCase();
-        if (!courseStats[key]) {
-          courseStats[key] = {
-            present: 0,
-            total: 0,
-            officialPresent: 0,
-            officialTotal: 0,
-            bunkable: 0,
-            required: 0,
-            correctionPresent: 0,
-            extraPresent: 0,
-            extrasCount: 0,
-            extraAbsent: 0,
-          };
-        }
-      });
-    }
-
-    /** Resolve a raw course ID (may be numeric EzyGo ID) to its course code */
-    const resolveCode = (cid: string): string => {
-      if (disabledCodes.has(cid.toUpperCase())) return cid.toUpperCase();
-      // Try ID→code lookup (numeric IDs from EzyGo attendance data)
-      const mapped = getCourseCode(cid);
-      return mapped || cid.toUpperCase();
-    };
-
-    /** Check if a course code is disabled — resolves numeric IDs first */
-    const isCourseDisabled = (cid: string): boolean => {
-      return disabledCodes.has(resolveCode(cid));
-    };
-
-    const officialMap = new Map<string, number>();
-    if (attendanceData?.studentAttendanceData) {
-      Object.entries(attendanceData.studentAttendanceData).forEach(
-        ([dateStr, dateData]) => {
-          Object.entries(dateData).forEach(([sessionKey, session]) => {
-            if (session.course && session.class_type !== "Revision") {
-              const cid = String(session.course);
-              const status = Number(session.attendance);
-              const rawSession = getOfficialSessionRaw(session, sessionKey);
-
-              const courseDisabled = isCourseDisabled(cid);
-              const statsKey = resolveCode(cid);
-
-              const key = generateSlotKey(statsKey, dateStr, rawSession);
-              officialMap.set(key, status);
-
-              // Always update per-course stats (course cards still show)
-              if (courseStats[statsKey]) {
-                const isValidCode = [110, 111, 225, 112].includes(status);
-                if (isValidCode) {
-                  courseStats[statsKey].total++;
-                  courseStats[statsKey].officialTotal++;
-                  if (
-                    status === ATTENDANCE_STATUS.PRESENT ||
-                    status === ATTENDANCE_STATUS.DUTY_LEAVE ||
-                    status === ATTENDANCE_STATUS.OTHER_LEAVE ||
-                    status === 225
-                  ) {
-                    courseStats[statsKey].present++;
-                    courseStats[statsKey].officialPresent++;
-                  }
-                }
-              }
-
-              // Only aggregate into dashboard totals if the course is in the current term's catalog AND not disabled
-              if (courseStats[statsKey] && !courseDisabled) {
-                if (
-                  status === ATTENDANCE_STATUS.PRESENT ||
-                  status === ATTENDANCE_STATUS.DUTY_LEAVE ||
-                  status === ATTENDANCE_STATUS.OTHER_LEAVE
-                ) {
-                  officialStats.present++;
-                  officialStats.total++;
-                } else if (status === ATTENDANCE_STATUS.ABSENT) {
-                  officialStats.absent++;
-                  officialStats.total++;
-                }
-
-                if (status === ATTENDANCE_STATUS.DUTY_LEAVE) officialStats.dl++;
-              }
-            }
-          });
-        },
-      );
-    }
-
-    if (trackingData) {
-      trackingData.forEach((item) => {
-        if (item.semester !== selectedSemester || item.year !== selectedYear) {
-          return;
-        }
-
-        if (!item.course) return;
-        const cid = String(item.course);
-        const statsKey = resolveCode(cid);
-        const key = generateSlotKey(statsKey, item.date, item.session);
-
-        let trackerStatus: number = ATTENDANCE_STATUS.PRESENT;
-        if (typeof item.attendance === "number") {
-          trackerStatus = item.attendance;
-        }
-
-        const officialStatus = officialMap.get(key);
-        const isTrulyExtra = item.status === "extra" &&
-          officialStatus === undefined;
-
-        const trackerPositive = isPositive(trackerStatus);
-        const trackerDL = trackerStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
-
-        const officialPositive = officialStatus !== undefined
-          ? isPositive(officialStatus)
-          : false;
-        const officialDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
-
-        const courseDisabled = isCourseDisabled(cid);
-
-        const updateCourse = (
-          isExtraClass: boolean,
-          offPos: boolean,
-          trackPos: boolean,
-          isExtraAbsent: boolean = false
-        ) => {
-          if (courseStats[statsKey]) {
-            if (isExtraClass) {
-              courseStats[statsKey].total++;
-              courseStats[statsKey].extrasCount++;
-              if (trackPos) {
-                courseStats[statsKey].present++;
-                courseStats[statsKey].extraPresent++;
-              } else if (isExtraAbsent) {
-                courseStats[statsKey].extraAbsent++;
-              }
-            } else {
-              if (!offPos && trackPos) {
-                courseStats[statsKey].present++;
-                courseStats[statsKey].correctionPresent++;
-              } else if (offPos && !trackPos) {
-                courseStats[statsKey].present--;
-                courseStats[statsKey].correctionPresent--;
-              }
-            }
-          }
-        };
-
-        if (isTrulyExtra) {
-          // Always update per-course stats
-          updateCourse(true, false, trackerPositive, !trackerPositive);
-          // Only aggregate into dashboard totals when course is NOT disabled
-          if (!courseDisabled) {
-            if (trackerPositive) modifierStats.extraPresent++;
-            else modifierStats.extraAbsent++;
-            if (trackerDL) modifierStats.extraDL++;
-          }
-        } else {
-          // Always update per-course stats
-          updateCourse(false, officialPositive, trackerPositive);
-          // Only aggregate into dashboard totals when course is NOT disabled
-          if (!courseDisabled) {
-            if (!officialPositive && trackerPositive) {
-              modifierStats.correctionPresent++;
-            }
-            if (!officialPositive && (trackerPositive || trackerDL)) {
-              modifierStats.savedAbsent++;
-            }
-            if (!officialDL && trackerDL) modifierStats.correctionDL++;
-          }
-        }
-      });
-    }
-
-    const finalTotal = officialStats.total + modifierStats.extraPresent +
-      modifierStats.extraAbsent;
-    const finalPresent = officialStats.present +
-      modifierStats.correctionPresent + modifierStats.extraPresent;
-
-    const percentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
-    const officialPercentage = officialStats.total > 0
-      ? (officialStats.present / officialStats.total) * 100
-      : 0;
-    const formatPct = (
-      val: number,
-    ) => (val % 1 === 0 ? Math.round(val) : parseFloat(val.toFixed(2)));
-
-    return {
-      percentage: formatPct(percentage),
-      rawPercentage: percentage,
-      officialPercentage: formatPct(officialPercentage),
-      rawOfficialPercentage: officialPercentage,
-      realPresent: officialStats.present,
-      correctionPresent: modifierStats.correctionPresent,
-      extraPresent: modifierStats.extraPresent,
-      realAbsent: officialStats.absent,
-      savedAbsent: modifierStats.savedAbsent,
-      extraAbsent: modifierStats.extraAbsent,
-      realDL: officialStats.dl,
-      correctionDL: modifierStats.correctionDL,
-      extraDL: modifierStats.extraDL,
-      otherLeave: officialStats.other,
-      realTotal: officialStats.total,
-      finalTotal: finalTotal,
-      finalPresent: finalPresent,
-      courseStats,
-    };
-  }, [
+  const stats = useDashboardStats({
     coursesData,
     attendanceData,
     trackingData,
     classCourses,
     disabledCodes,
-    getCourseCode,
     selectedSemester,
     selectedYear,
-  ]);
+  });
 
 
   const courseRegistry = useMemo(() => {

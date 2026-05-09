@@ -186,18 +186,28 @@ class TrackingRecord {
   };
 }
 
-class SuspiciousAbsence {
-  final String date;
-  final String courseId;
-  final String courseName;
-  final String session;
-  final List<String> presentIn; // List of courses present in on same day
+enum AttendanceStatus {
+  present(110),
+  absent(111),
+  late(112), // Also used for "Other Leave" in some contexts
+  dutyLeave(225);
 
-  const SuspiciousAbsence({
-    required this.date,
-    required this.courseId,
-    required this.courseName,
-    required this.session,
-    required this.presentIn,
-  });
+  final int code;
+  const AttendanceStatus(this.code);
+
+  static AttendanceStatus fromCode(dynamic code) {
+    final intCode = toInt(code) ?? 110;
+    return AttendanceStatus.values.firstWhere(
+      (e) => e.code == intCode,
+      orElse: () => AttendanceStatus.present,
+    );
+  }
+
+  bool get isPositive =>
+      this == AttendanceStatus.present ||
+      this == AttendanceStatus.dutyLeave ||
+      this == AttendanceStatus.late;
+  bool get isNegative => this == AttendanceStatus.absent;
 }
+
+

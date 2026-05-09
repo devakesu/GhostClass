@@ -100,6 +100,7 @@ export function useNotifications(enabled = true, countOnly = false) {
         .from("notification")
         .select("*")
         .eq("auth_user_id", session.user.id)
+        .not("topic", "ilike", "%conflict%") // Exclude conflicts handled by priority query
         .order("created_at", { ascending: false })
         .range(from, to);
 

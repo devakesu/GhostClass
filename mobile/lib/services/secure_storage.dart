@@ -307,7 +307,11 @@ class UserProfile {
       currentYear: json['current_year'] as String?,
       createdAt: createdAt,
       ezygoCreatedAt: ezygoCreatedAt,
-      classField: json['class'] != null ? UserClass.fromJson(json['class'] as Map<String, dynamic>) : null,
+      classField: json['class'] != null
+          ? (json['class'] is Map
+              ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
+              : UserClass(id: '', name: json['class'].toString()))
+          : null,
     );
   }
 

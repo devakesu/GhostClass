@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -123,7 +124,14 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         res.data as Map<String, dynamic>,
       );
     } else {
-      throw Exception(formatApiError(res.data, 'Tracking.OfficialReport'));
+      final message = formatApiError(res.data, 'Tracking.OfficialReport');
+      throw AppException(
+        message: message,
+        type: res.statusCode == 401
+            ? AppExceptionType.unauthorized
+            : AppExceptionType.server,
+        statusCode: res.statusCode,
+      );
     }
 
     final records = <TrackingRecord>[];

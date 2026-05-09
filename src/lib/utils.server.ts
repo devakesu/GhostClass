@@ -8,7 +8,6 @@
  */
 import "server-only";
 import crypto from "crypto";
-import axios from "axios";
 
 // ---------------------------------------------------------------------------
 // redact — HMAC-SHA256 implementation (server only)
@@ -145,53 +144,6 @@ export function getClientIp(headerList: Headers): string | null {
     "Request will be rejected if IP is required for security checks."
   );
   return null;
-}
-
-// ---------------------------------------------------------------------------
-// getEgressConfig — resolve the best available EzyGo egress tier at runtime
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the base URL and proxy secret header for the highest-priority configured
- * egress tier:
- *   Tier 1 — CF_PROXY_URL       (Cloudflare Worker)       + CF_PROXY_SECRET
- *   Tier 2 — AWS_SECONDARY_URL  (AWS Lambda + API GW)     + AWS_SECONDARY_SECRET
- *   Tier 3 — NEXT_PUBLIC_BACKEND_URL (direct EzyGo)       (no secret header)
- *
- * Use this in server-side API routes that call EzyGo directly (save-token,
- * profile sync, cron sync) so they benefit from the same egress diversity as
- * the client-facing backend proxy route.
- */
-export function getEgressConfig(): {
-  baseUrl: string;
-  proxyHeaders: Record<string, string>;
-} {
-  const cfProxyUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
-  if (cfProxyUrl) {
-    const cfProxySecret = process.env.CF_PROXY_SECRET?.trim();
-    return {
-      baseUrl: cfProxyUrl,
-      proxyHeaders: cfProxySecret
-        ? { "x-proxy-secret": cfProxySecret }
-        : {},
-    };
-  }
-
-  const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
-  if (awsUrl) {
-    const awsSecondarySecret = process.env.AWS_SECONDARY_SECRET?.trim();
-    return {
-      baseUrl: awsUrl,
-      proxyHeaders: awsSecondarySecret
-        ? { "x-proxy-secret": awsSecondarySecret }
-        : {},
-    };
-  }
-
-  return {
-    baseUrl: process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "") ?? "",
-    proxyHeaders: {},
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -380,45 +332,3 @@ export async function egressFetch(
   // This line is unreachable: the last iteration always returns or throws.
   throw new Error("[egress-failover] unreachable: exhausted all egress tiers without returning");
 }
-
-// ---------------------------------------------------------------------------
-// egressAxios — server-only Axios instance pre-wired for EzyGo egress
-// ---------------------------------------------------------------------------
-
-/**
- * Server-only Axios instance for EzyGo calls. A request interceptor resolves
- * the highest-priority egress tier and injects the baseURL and proxy secret
- * header before each request. Callers supply only the endpoint path (no base
- * URL, no proxy headers) and their own Authorization header.
- */
-const _egressAxios = axios.create({ timeout: 15000 });
-_egressAxios.interceptors.request.use((config) => {
-  const { baseUrl, proxyHeaders } = getEgressConfig();
-  config.baseURL = baseUrl;
-  
-  // Add Stealth Headers
-  if (!config.headers.has("origin")) {
-    config.headers.set("origin", "https://edu.ezygo.app");
-  }
-  if (!config.headers.has("referer")) {
-    config.headers.set("referer", "https://edu.ezygo.app/");
-  }
-  if (!config.headers.has("user-agent")) {
-    config.headers.set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
-  }
-  if (!config.headers.has("sec-fetch-site")) {
-    config.headers.set("sec-fetch-site", "same-site");
-  }
-  if (!config.headers.has("sec-fetch-mode")) {
-    config.headers.set("sec-fetch-mode", "cors");
-  }
-  if (!config.headers.has("sec-fetch-dest")) {
-    config.headers.set("sec-fetch-dest", "empty");
-  }
-
-  for (const [key, value] of Object.entries(proxyHeaders)) {
-    config.headers.set(key, value);
-  }
-  return config;
-});
-export { _egressAxios as egressAxios };

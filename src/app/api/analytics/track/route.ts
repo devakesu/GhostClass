@@ -42,8 +42,18 @@ const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any })
     const { clientId, events, userProperties } = body as any;
     if (!clientId || !Array.isArray(events)) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
+    const sanitizeGA4Name = (name: string) => {
+      // GA4 event names and property keys must start with a letter, 
+      // contain only alphanumeric characters and underscores, 
+      // and be between 1-40 characters.
+      return name
+        .replace(/[^a-zA-Z0-9_]/g, "_")
+        .replace(/^[^a-zA-Z]/, "a_") // Must start with a letter
+        .slice(0, 40);
+    };
+
     const sanitizedEvents: GA4Event[] = events.map((event: any) => ({
-      name: String(event.name || "event").slice(0, 40),
+      name: sanitizeGA4Name(String(event.name || "event")),
       params: event.params || {},
     }));
 
@@ -51,8 +61,12 @@ const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any })
     if (userProperties) {
       sanitizedUserProperties = {};
       for (const [key, value] of Object.entries(userProperties)) {
-        if (typeof value === 'string') sanitizedUserProperties[key] = { value };
-        else if (isGA4UserProperty(value)) sanitizedUserProperties[key] = value;
+        const safeKey = sanitizeGA4Name(key);
+        if (typeof value === "string") {
+          sanitizedUserProperties[safeKey] = { value };
+        } else if (isGA4UserProperty(value)) {
+          sanitizedUserProperties[safeKey] = value;
+        }
       }
     }
 

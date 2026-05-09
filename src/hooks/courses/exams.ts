@@ -108,7 +108,7 @@ export const useExamAnswers = (examId: number | null) => {
       return res.data;
     },
     enabled: examId !== null,
-    staleTime: 0,
+    staleTime: 10 * 60 * 1000, // 10 minutes - scores are stable
     gcTime: 15 * 60 * 1000,
     retry: retryOnce,
   });
@@ -171,5 +171,24 @@ export const useAllExamQuestions = (examIds: number[]) => {
       gcTime: 15 * 60 * 1000,
       retry: retryOnce,
     })),
+  });
+};
+
+/**
+ * Batch fetches details (questions + answers) for multiple exams via the custom batch API.
+ * This is the preferred way to pre-fetch data for the Scores page.
+ */
+export const useBatchExamDetails = (examIds: number[], options?: { enabled?: boolean }) => {
+  return useQuery<Record<number, { questions: ExamQuestion[]; answers: ExamAnswer[] }>>({
+    queryKey: ["exam-details-batch", examIds],
+    queryFn: async () => {
+      if (!examIds.length) return {};
+      const res = await axios.post("/scores/batch", { examIds });
+      return res.data;
+    },
+    enabled: (options?.enabled !== false) && examIds.length > 0,
+    staleTime: 15 * 60 * 1000, // Cache batch heavily (15 mins)
+    gcTime: 20 * 60 * 1000,
+    retry: retryOnce,
   });
 };

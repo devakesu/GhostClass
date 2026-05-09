@@ -61,6 +61,8 @@ dependencies:
   sentry_dio: ^9.18.0
   flutter_markdown_plus: ^1.0.7
   uuid: ^4.5.3
+  table_calendar: ^3.1.2
+  package_info_plus: ^9.0.1
 
 
 dependency_overrides:

@@ -31,6 +31,13 @@ class AppConfig {
         ),
       );
 
+  /// The official GhostClass web application URL.
+  static String get webUrl => 'https://ghostclass.devakesu.com';
+
+  /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
+  /// Spoofed to match the official app domain.
+  static String get supabaseOrigin => webUrl;
+
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
   /// The GhostClass web app's API origin (Auth Bridge).
@@ -59,7 +66,7 @@ class AppConfig {
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
   /// Current application version.
-  static String get appVersion => '3.0.8';
+  static String appVersion = '3.0.8';
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>

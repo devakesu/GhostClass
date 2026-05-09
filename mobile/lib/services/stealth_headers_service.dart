@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class StealthHeadersService {
@@ -82,3 +83,8 @@ class StealthHeadersService {
     return headers;
   }
 }
+
+final stealthHeadersServiceProvider = Provider<StealthHeadersService>((ref) {
+  final storage = ref.watch(secureStorageProvider);
+  return StealthHeadersService(storage);
+});

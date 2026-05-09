@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loading } from "@/components/loading";
-import { useExams, useExamAnswers, useExamQuestions, useAllExamAnswers, useAllExamQuestions } from "@/hooks/courses/exams";
+import { useExams, useExamAnswers, useExamQuestions, useBatchExamDetails } from "@/hooks/courses/exams";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import type { Exam, ExamAnswer, ExamQuestion } from "@/types";
@@ -718,14 +718,11 @@ export default function ScoresClient() {
         .map((e) => e.id) ?? [],
     [exams]
   );
-  const allAnswersQueries = useAllExamAnswers(examIds);
-  const allQuestionsQueries = useAllExamQuestions(examIds);
+  // Pre-fetch all exam answers in parallel on load via a single batch request.
+  const batchQuery = useBatchExamDetails(examIds);
 
-  // Block render until exams list + every answers + every questions request has settled.
-  const isLoading =
-    examsLoading ||
-    allAnswersQueries.some((q) => q.isPending) ||
-    allQuestionsQueries.some((q) => q.isPending);
+  // Block render until exams list + batch details have settled.
+  const isLoading = examsLoading || batchQuery.isPending;
 
   /**
    * Map of examId → computed total score from examanswers.
@@ -733,11 +730,13 @@ export default function ScoresClient() {
    */
   const resolvedScores = useMemo(() => {
     const map: Record<number, number> = {};
-    allAnswersQueries.forEach((q, i) => {
-      const id = examIds[i];
-      if (id !== undefined && q.data && q.data.length > 0) {
-        // Deduplicate answers for this exam before summing
-        const uniqueAnswers = Array.from(new Map(q.data.map((a) => [a.id, a])).values());
+    if (!batchQuery.data) return map;
+
+    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+      const id = parseInt(idStr, 10);
+      const answers = details.answers;
+      if (answers && answers.length > 0) {
+        const uniqueAnswers = Array.from(new Map(answers.map((a) => [a.id, a])).values());
         const hasAnyScore = uniqueAnswers.some((a) => a.score != null);
         if (hasAnyScore) {
           map[id] = uniqueAnswers.reduce(
@@ -748,7 +747,7 @@ export default function ScoresClient() {
       }
     });
     return map;
-  }, [allAnswersQueries, examIds]);
+  }, [batchQuery.data]);
 
   /**
    * Map of examId → total possible marks, summed from examquestions.
@@ -757,18 +756,19 @@ export default function ScoresClient() {
    */
   const resolvedMaxMarks = useMemo(() => {
     const map: Record<number, number> = {};
-    allQuestionsQueries.forEach((q, i) => {
-      const id = examIds[i];
+    if (!batchQuery.data) return map;
+
+    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+      const id = parseInt(idStr, 10);
       const exam = exams?.find((e) => e.id === id);
+      const qData = details.questions;
+
       if (id !== undefined) {
-        // Priority 1: Use exam-level total if available (handles optional questions)
         const apiMaxMark = exam ? getMaxMark(exam) : null;
         if (apiMaxMark) {
           map[id] = safeParseFloat(apiMaxMark);
-        } 
-        // Priority 2: Fallback to sum of attempted leaf questions
-        else if (q.data && q.data.length > 0) {
-          const uniqueQuestions = Array.from(new Map(q.data.map((question) => [question.id, question])).values());
+        } else if (qData && qData.length > 0) {
+          const uniqueQuestions = Array.from(new Map(qData.map((question) => [question.id, question])).values());
           const parentIds = new Set(
             uniqueQuestions
               .map((question) => question.subquestion_parent_id)
@@ -776,13 +776,11 @@ export default function ScoresClient() {
           );
           const leaves = uniqueQuestions.filter((question) => !parentIds.has(question.id));
           
-          // Use graded questions if answers are available
-          const answers = allAnswersQueries[i]?.data || [];
+          const answers = details.answers || [];
           const gradedQuestionIds = new Set(
             answers.filter((a) => a.score !== null).map((a) => a.examquestion_id)
           );
           const gradedLeaves = leaves.filter((q) => gradedQuestionIds.has(q.id));
-          
           const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
           
           const orGroups = new Map<number, number>();
@@ -801,13 +799,12 @@ export default function ScoresClient() {
           for (const groupMark of orGroups.values()) {
             total += groupMark;
           }
-          
           map[id] = total;
         }
       }
     });
     return map;
-  }, [allQuestionsQueries, examIds, exams, allAnswersQueries]);
+  }, [batchQuery.data, exams]);
 
   // Open the drawer and push a history entry so the back button can close it.
   const openDrawer = useCallback(
@@ -848,14 +845,12 @@ export default function ScoresClient() {
     return exams.filter((e) => {
       if (!e.participants || e.participants.length === 0) return false;
       if (e.activity_type === "assignment") {
-        const idx = examIds.indexOf(e.id);
-        if (idx === -1) return false;
-        const q = allAnswersQueries[idx];
-        return q?.data !== undefined && q.data.length > 0;
+        const details = batchQuery.data?.[e.id];
+        return details?.answers !== undefined && details.answers.length > 0;
       }
       return true;
     });
-  }, [exams, examIds, allAnswersQueries]);
+  }, [exams, batchQuery.data]);
 
   const filtered = useMemo(() => {
     const base =

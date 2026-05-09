@@ -16,6 +16,7 @@ import { setTermsVersionCookie, clearTermsVersionCookie } from "@/app/actions/us
 import { getAdminClient } from "@/lib/supabase/admin";
 import { performProfileSync } from "@/lib/user/sync";
 import { withSecurity } from "@/lib/security/app-check";
+import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 
 export const dynamic = 'force-dynamic';
 
@@ -872,8 +873,9 @@ export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
     if (dbError) throw dbError;
 
     // Use derived academic info for the response
-    const currentSem = syncResult?.academic?.current_semester ?? "odd";
-    const currentYear = syncResult?.academic?.current_year ?? "2024-25";
+    const defaultInfo = calculateCurrentAcademicInfo();
+    const currentSem = syncResult?.academic?.current_semester ?? defaultInfo.current_semester;
+    const currentYear = syncResult?.academic?.current_year ?? defaultInfo.current_year;
 
     if (!isMobileApp) {
       await setAuthCookie(token);
