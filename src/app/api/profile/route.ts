@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
@@ -13,6 +13,7 @@ import { withSecurity } from "@/lib/security/app-check";
 import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
 import { safeResponseJson } from "@/lib/json";
+import { getProfileBundle } from "@/lib/user/profile-bundle";
 
 export const dynamic = "force-dynamic";
 
@@ -69,48 +70,45 @@ const getHandler = async (req: Request) => {
     }
   }
 
-  const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const authHeader = req.headers.get("authorization");
+  let user: any;
 
-  const { data: existingUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    user = authUser;
+  } else {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    user = authUser;
+  }
+
+  const { data: existingUserRaw } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
   const searchParams = new URL(req.url).searchParams;
   const shouldSync = searchParams.get("sync") === "true";
 
-  const decryptedGender = existingUser?.gender && existingUser?.gender_iv ? decrypt(existingUser.gender_iv, existingUser.gender) : null;
-  const decryptedBirthDate = existingUser?.birth_date && existingUser?.birth_date_iv ? decrypt(existingUser.birth_date_iv, existingUser.birth_date) : null;
-  const decryptedPhone = existingUser?.phone && existingUser?.phone_iv ? decrypt(existingUser.phone_iv, existingUser.phone) : null;
+  let existingUser = existingUserRaw;
 
   if (existingUser && existingUser.first_name) {
     // Cache the token so it's reused in the after() background sync (avoids a second
     // getAuthTokenServer() call when shouldSync=true).
     let resolvedToken: string | null = null;
 
+    let syncResult: any = null;
     if (shouldSync) {
       resolvedToken = (await getAuthTokenServer()) ?? null;
       if (resolvedToken) {
         try {
           // Block until EzyGo sync completes
-          await performProfileSync(resolvedToken, existingUser.id, user.id);
+          syncResult = await performProfileSync(resolvedToken, existingUser.id, user.id);
 
           // Refetch from DB to return fresh data (e.g. updated class name)
           const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).single();
           if (updatedUser) {
-             return NextResponse.json({ 
-                id: updatedUser.id, 
-                username: updatedUser.username, 
-                email: updatedUser.email, 
-                first_name: updatedUser.first_name, 
-                last_name: updatedUser.last_name, 
-                phone: updatedUser.phone && updatedUser.phone_iv ? decrypt(updatedUser.phone_iv, updatedUser.phone) : null,
-                gender: updatedUser.gender && updatedUser.gender_iv ? decrypt(updatedUser.gender_iv, updatedUser.gender) : null,
-                birth_date: updatedUser.birth_date && updatedUser.birth_date_iv ? decrypt(updatedUser.birth_date_iv, updatedUser.birth_date) : null,
-                avatar_url: updatedUser.avatar_url,
-                created_at: updatedUser.created_at,
-                ezygo_created_at: updatedUser.ezygo_created_at,
-                class: Array.isArray(updatedUser.class) ? updatedUser.class[0] : updatedUser.class
-              });
+            existingUser = updatedUser;
           }
         } catch (err) { logger.warn("Synchronous profile sync failed", err); }
       }
@@ -123,29 +121,19 @@ const getHandler = async (req: Request) => {
         if (!syncToken) return;
         try {
           // Trigger a full background sync (Profile, Class, Courses)
-          // This ensures class label updates correctly after semester/year changes.
           await performProfileSync(syncToken, existingUser.id, user.id);
         } catch (err) { 
           logger.warn("Profile background sync failed", err); 
         }
       });
     }
-    return NextResponse.json({ 
-      id: existingUser.id, 
-      username: existingUser.username, 
-      email: existingUser.email, 
-      first_name: existingUser.first_name, 
-      last_name: existingUser.last_name, 
-      phone: decryptedPhone, 
-      gender: decryptedGender, 
-      birth_date: decryptedBirthDate, 
-      avatar_url: existingUser.avatar_url,
-      created_at: existingUser.created_at,
-      ezygo_created_at: existingUser.ezygo_created_at,
-      class: Array.isArray(existingUser.class) ? existingUser.class[0] : existingUser.class
-    });
+    const bundle = await getProfileBundle(user.id, syncResult?.academic);
+    if (!bundle) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+    return NextResponse.json(bundle);
   }
 
+  // Path for new users (not in DB yet)
   const token = await getAuthTokenServer();
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   let ezygoRes: Response;
@@ -186,7 +174,9 @@ const getHandler = async (req: Request) => {
     gender_iv: encGender?.iv,
     birth_date: encBirthDate?.content,
     birth_date_iv: encBirthDate?.iv,
-    ezygo_created_at: d.created_at || null
+    ezygo_created_at: d.created_at || null,
+    current_semester: d.current_semester || d.current_term || null,
+    current_year: d.current_year || d.academic_year || null,
   };
   await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
   
@@ -241,9 +231,21 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
     );
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const supabaseAdmin = getAdminClient();
+  const authHeader = req.headers.get("authorization");
+  let user: any;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    user = authUser;
+  } else {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    user = authUser;
+  }
 
   let body = decryptedBody;
   if (!body) { 
@@ -282,7 +284,6 @@ const patchHandler = async (req: Request, { decryptedBody }: { decryptedBody?: a
     }
   }
 
-  const supabaseAdmin = getAdminClient();
   const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
   if (updateError) {
     logger.error("[profile PATCH] Database update failed:", updateError);

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppNotification {
@@ -64,23 +66,28 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
   @override
   Future<NotificationsState> build() async {
-    return _fetchInitialData();
+    final user = ref.watch(authProvider).value;
+    if (user == null) return NotificationsState.empty();
+    
+    // BLOCKER: Do not fire queries until Cron Sync is finished
+    if (user.isSyncing) return NotificationsState.empty();
+
+    return _fetchInitialData(user.supabaseUserId);
   }
 
-  Future<NotificationsState> _fetchInitialData() async {
+  Future<NotificationsState> _fetchInitialData(String userId) async {
     final supabase = Supabase.instance.client;
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return NotificationsState.empty();
 
-    // 1 & 2. Fetch ALL Unread Conflicts and First Page of General Feed in parallel
+    // 1. Fetch ALL Unread Notifications (both conflicts and regular)
+    // This ensures the unread count matches the visible unread items.
     final results = await Future.wait([
       supabase
           .from('notification')
           .select()
           .eq('auth_user_id', userId)
-          .ilike('topic', '%conflict%')
           .eq('is_read', false)
           .order('created_at', ascending: false),
+      // 2. Fetch first page of General Feed for "EARLIER" section
       supabase
           .from('notification')
           .select()
@@ -89,34 +96,36 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .range(0, _pageSize - 1),
     ]);
 
-    final actionNotifications = (results[0] as List)
+    final allUnread = (results[0] as List)
         .map((n) => AppNotification.fromJson(n))
         .toList();
 
-    final feedNotifications = (results[1] as List)
+    final feedItems = (results[1] as List)
         .map((n) => AppNotification.fromJson(n))
         .toList();
 
-    // Deduplicate: Remove actions from the regular feed
-    final actionIds = actionNotifications.map((n) => n.id).toSet();
-    final regularNotifications =
-        feedNotifications.where((n) => !actionIds.contains(n.id)).toList();
+    // Separate unread into Actions (Conflicts) and Regular
+    final actionNotifications = allUnread
+        .where((n) => n.topic?.toLowerCase().contains('conflict') ?? false)
+        .toList();
+    
+    final unreadRegular = allUnread
+        .where((n) => !(n.topic?.toLowerCase().contains('conflict') ?? false))
+        .toList();
 
-    // 3. Fetch Total Unread Count (Web Parity: accurate total even beyond first page)
-    final unreadCountRes = await supabase
-        .from('notification')
-        .select('id')
-        .eq('auth_user_id', userId)
-        .eq('is_read', false);
-    final unreadCount = (unreadCountRes as List).length;
+    // Deduplicate: regularNotifications = unreadRegular + (read notifications from feed)
+    final unreadIds = allUnread.map((n) => n.id).toSet();
+    final readFromFeed = feedItems.where((n) => !unreadIds.contains(n.id)).toList();
+    
+    final regularNotifications = [...unreadRegular, ...readFromFeed];
 
     _currentPage = 0;
 
     return NotificationsState(
       actionNotifications: actionNotifications,
       regularNotifications: regularNotifications,
-      unreadCount: unreadCount,
-      hasNextPage: feedNotifications.length == _pageSize,
+      unreadCount: allUnread.length,
+      hasNextPage: feedItems.length == _pageSize,
     );
   }
 
@@ -161,14 +170,20 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     );
   }
 
+  bool _isFetchingNextPage = false;
   Future<void> fetchNextPage() async {
     final current = state.value;
-    if (current == null || !current.hasNextPage) return;
+    if (current == null || !current.hasNextPage || _isFetchingNextPage) return;
 
-    _currentPage++;
-    // We don't set state to loading to avoid full-screen spinner.
-    final nextState = await _fetchNextPage(page: _currentPage);
-    state = AsyncValue.data(nextState);
+    _isFetchingNextPage = true;
+    try {
+      _currentPage++;
+      // We don't set state to loading to avoid full-screen spinner.
+      final nextState = await _fetchNextPage(page: _currentPage);
+      state = AsyncValue.data(nextState);
+    } finally {
+      _isFetchingNextPage = false;
+    }
   }
 
   Future<void> toggleRead(int id, bool wasRead) async {

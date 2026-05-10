@@ -234,7 +234,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
 
     // 1. Initialize Courses (Deduplicated by Code)
     Object.entries(coursesData.courses).forEach(([key, course]) => {
-      const codeKey = (course.code || key).replace(/\s+/g, "").toUpperCase();
+      const codeKey = (course.code || key).toUpperCase().replace(/[\s\u00A0-]/g, "");
       
       // Map this ID (key) to the codeKey for later lookup
       idToCodeMap.set(key, codeKey);

@@ -16,6 +16,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
+import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -122,6 +123,11 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = AppConfig.sentryDsn;
+      options.tracesSampleRate = 1.0; // Capturing 100% of transactions for debugging
+      options.release = 'ghostclass@${AppConfig.appVersion}';
+      options.environment = kDebugMode ? 'development' : 'production';
+      options.attachStacktrace = true;
+      options.enableAutoPerformanceTracing = true;
     },
     appRunner: () {
       return runApp(const ProviderScope(child: MyApp()));
@@ -147,13 +153,18 @@ class MyApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeProvider);
 
-    return MaterialApp.router(
-      title: AppConfig.appName,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeMode,
-      routerConfig: router,
-      debugShowCheckedModeBanner: false,
+    return SecurityLockdownListener(
+      child: MaterialApp.router(
+        title: AppConfig.appName,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeMode,
+        routerConfig: router,
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) {
+          return child!;
+        },
+      ),
     );
   }
 }

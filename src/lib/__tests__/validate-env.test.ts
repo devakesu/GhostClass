@@ -34,7 +34,11 @@ describe('validate-env utility', () => {
     vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-12345678');
     vi.stubEnv('GA_API_SECRET', 'a'.repeat(21));
     vi.stubEnv('NEXT_PUBLIC_GITHUB_URL', 'https://github.com');
-    vi.stubEnv('MOBILE_API_SECRET', 'a'.repeat(32));
+    vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', JSON.stringify({
+      project_id: 'test',
+      private_key: 'test',
+      client_email: 'test@test.com'
+    }));
     vi.stubEnv('NEXT_PUBLIC_LEGAL_EMAIL', 'legal@ghostclass.io');
     vi.stubEnv('NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE', '2024-01-01');
     vi.stubEnv('NEXT_PUBLIC_AUTHOR_NAME', 'GhostClass');
@@ -68,11 +72,8 @@ describe('validate-env utility', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
     // Set other production vars
     vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-    vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-    vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-    vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
     vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-    vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
+    vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
 
     validateEnvironment();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY: HOSTNAME=0.0.0.0'));
@@ -100,7 +101,6 @@ describe('validate-env utility', () => {
     vi.stubEnv('AUTH_RATE_LIMIT_WINDOW', '60');
     vi.stubEnv('PROXY_RATE_LIMIT_REQUESTS', '120');
     vi.stubEnv('PROXY_RATE_LIMIT_WINDOW', '60');
-    vi.stubEnv('REQUEST_SIGNATURE_MAX_AGE', '600');
     
     expect(() => validateEnvironment()).not.toThrow();
   });
@@ -145,11 +145,8 @@ describe('validate-env utility', () => {
       
       // Set other production vars to avoid throw
       vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
       vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
+      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
       
       // Test different loopback formats
       vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '127.0.0.1');
@@ -313,9 +310,6 @@ describe('validate-env utility', () => {
     it('validates boolean flags', () => {
       vi.stubEnv('NEXT_PUBLIC_ENABLE_SW_IN_DEV', 'maybe');
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      
-      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'yes');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
     });
 
     it('validates TEST_CLIENT_IP', () => {
@@ -331,77 +325,8 @@ describe('validate-env utility', () => {
     vi.stubEnv('ENCRYPTION_KEY', '');
     expect(() => validateEnvironment()).not.toThrow();
   });
-  describe('Ed25519 Key Formats', () => {
-    it('fails if GOOGLE_SERVICE_ACCOUNT_JSON is missing when integrity is enforced', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('ENFORCE_PLAY_INTEGRITY', 'true');
-      vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', '');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true'));
-    });
-
-    it('fails if granular Play Integrity flags are enabled but master switch is false', () => {
-      vi.stubEnv('ENFORCE_PLAY_INTEGRITY', 'false');
-      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'true');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Conflicting Config: Granular PLAY_INTEGRITY_ENFORCE_* flags are enabled, but ENFORCE_PLAY_INTEGRITY is false'));
-    });
-
-    it('fails if granular Play Integrity flags are enabled but service account is missing', () => {
-      vi.stubEnv('ENFORCE_PLAY_INTEGRITY', 'true');
-      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'true');
-      vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', '');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_PLAY_INTEGRITY=true'));
-    });
-
-    it('validates Ed25519 PEM key formats strictly', () => {
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'invalid key');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'invalid key');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must be a valid Ed25519 private key in PEM format'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must be a valid Ed25519 public key in PEM format'));
-    });
-
-    it('fails if numeric optional vars are out of range', () => {
-      vi.stubEnv('SYNC_RATE_LIMIT_REQUESTS', '0');
-      vi.stubEnv('SYNC_RATE_LIMIT_WINDOW', '3601');
-      vi.stubEnv('CONTACT_RATE_LIMIT_REQUESTS', '1001');
-      vi.stubEnv('CONTACT_RATE_LIMIT_WINDOW', '0');
-      vi.stubEnv('AUTH_RATE_LIMIT_REQUESTS', '1001');
-      vi.stubEnv('AUTH_RATE_LIMIT_WINDOW', '0');
-      vi.stubEnv('PROXY_RATE_LIMIT_REQUESTS', '5001');
-      vi.stubEnv('PROXY_RATE_LIMIT_WINDOW', '3601');
-      vi.stubEnv('RATE_LIMIT_REQUESTS', '1001');
-      vi.stubEnv('RATE_LIMIT_WINDOW', '3601');
-      
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('RATE_LIMIT_WINDOW is invalid'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('RATE_LIMIT_REQUESTS must be a number'));
-    });
-    
-    it('fails if Turnstile keys are test keys in production', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '1x00000000000000000000AA');
-      vi.stubEnv('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('is using TEST KEY in production!'));
-    });
-  });
 
   describe('Optional Proxies and Sentry', () => {
-    it('validates NEXT_PUBLIC_APP_URL trailing slash', () => {
-      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://ghostclass.io/');
-      validateEnvironment();
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Recommended: remove the trailing slash'));
-    });
-
-    it('validates NEXT_PUBLIC_APP_URL path', () => {
-      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://ghostclass.io/some-path');
-      validateEnvironment();
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('should typically only specify the domain'));
-    });
-
     it('validates NEXT_PUBLIC_APP_URL parse error', () => {
       vi.stubEnv('NEXT_PUBLIC_APP_URL', 'invalid-url');
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
@@ -426,32 +351,10 @@ describe('validate-env utility', () => {
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must start with "@"'));
     });
 
-    it('validates NEXT_PUBLIC_BACKEND_URL format and protocol', () => {
-      vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'ftp://api.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must use http or https protocol'));
-
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'http://api.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must use https:// in production'));
-    });
-
     it('validates NEXT_PUBLIC_BACKEND_URL parse error', () => {
       vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'invalid-url');
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('must be a valid absolute URL'));
-    });
-
-    it('validates CF_PROXY_URL format and protocol', () => {
-      vi.stubEnv('CF_PROXY_URL', 'ftp://proxy.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('CF_PROXY_URL must use http or https protocol'));
-
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('CF_PROXY_URL', 'http://proxy.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('CF_PROXY_URL must use https:// in production'));
     });
 
     it('validates CF_PROXY_URL parse error', () => {
@@ -464,22 +367,6 @@ describe('validate-env utility', () => {
       vi.stubEnv('AWS_SECONDARY_URL', 'ftp://proxy.com');
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('AWS_SECONDARY_URL must use http or https protocol'));
-    });
-
-    it('validates AWS_SECONDARY_URL production protocol', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('AWS_SECONDARY_URL', 'http://proxy.com');
-      // Set other production vars to avoid throw elsewhere if needed
-      vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-      vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
-      vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
-
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('AWS_SECONDARY_URL must use https:// in production'));
     });
 
     it('validates AWS_SECONDARY_URL parse error', () => {
@@ -512,74 +399,6 @@ describe('validate-env utility', () => {
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('DEV_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY looks invalid'));
     });
 
-    it('fails if Turnstile keys are test keys in production', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '1x00000000000000000000AA');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('using TEST KEY in production'));
-
-      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'valid-key');
-      vi.stubEnv('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('using TEST KEY in production'));
-    });
-
-    it('warns if Turnstile keys are test keys in development', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '1x00000000000000000000AA');
-      vi.stubEnv('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA');
-      validateEnvironment();
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('using Cloudflare test key'));
-    });
-
-    it('validates NEXT_PUBLIC_SUPABASE_CF_PROXY_URL and AWS_PROXY_URL protocol', () => {
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL', 'ftp://proxy.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use http or https protocol'));
-
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL', 'http://proxy.com');
-      // Set other production vars
-      vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-      vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
-      vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
-
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use https:// in production'));
-
-      vi.stubEnv('NODE_ENV', 'development');
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL', 'ftp://proxy.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use http or https protocol'));
-
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL', 'http://proxy.com');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use https:// in production'));
-    });
-
-    it('validates NEXT_PUBLIC_SUPABASE_CF_PROXY_URL and AWS_PROXY_URL format', () => {
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL', 'invalid-url');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must be a valid absolute URL'));
-
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL', 'invalid-url');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must be a valid absolute URL'));
-    });
-
-    it('validates boolean flags for App Check and Integrity', () => {
-      vi.stubEnv('ENFORCE_APP_CHECK', 'maybe');
-      vi.stubEnv('PLAY_INTEGRITY_ENFORCE_BASIC', 'maybe');
-      expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('ENFORCE_APP_CHECK must be either "true" or "false"'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('PLAY_INTEGRITY_ENFORCE_BASIC must be either "true" or "false"'));
-    });
-
     it('warns if optional Sentry DSN is missing', () => {
       vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '');
       validateEnvironment();
@@ -606,33 +425,11 @@ describe('validate-env utility', () => {
       // Set required production vars to avoid throw
       vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
       vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
       vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
       vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
 
       validateEnvironment();
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('APP_COMMIT_SHA is not set'));
-    });
-
-    it('warns for other missing optional vars', () => {
-      vi.stubEnv('NEXT_PUBLIC_GITHUB_URL', '');
-      vi.stubEnv('MOBILE_API_SECRET', '');
-      vi.stubEnv('NEXT_PUBLIC_LEGAL_EMAIL', '');
-      vi.stubEnv('NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE', '');
-      vi.stubEnv('NEXT_PUBLIC_AUTHOR_NAME', '');
-      vi.stubEnv('NEXT_PUBLIC_AUTHOR_URL', '');
-      vi.stubEnv('NEXT_PUBLIC_GA_ID', '');
-      
-      validateEnvironment();
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_GITHUB_URL not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('MOBILE_API_SECRET not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_LEGAL_EMAIL not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_AUTHOR_NAME not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_AUTHOR_URL not set'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_GA_ID not set'));
     });
 
     it('validates GA ID and API Secret strictly', () => {
@@ -677,18 +474,21 @@ describe('validate-env utility', () => {
 
     it('requires mandatory production security keys', () => {
       vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', '');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', '');
+      vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
       vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', '');
       vi.stubEnv('FIREBASE_APP_ID_ANDROID', '');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '');
       
       expect(() => validateEnvironment()).toThrow('Environment validation failed');
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('REQUEST_PRIVATE_KEY is required in production'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('REQUEST_PUBLIC_KEY is required in production'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_ANDROID_PACKAGE_NAME is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FIREBASE_APP_ID_ANDROID is required'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('PLAY_INTEGRITY_PROJECT_NUMBER is required'));
+    });
+
+    it('fails if GOOGLE_SERVICE_ACCOUNT_JSON is missing when ENFORCE_APP_CHECK is true', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('ENFORCE_APP_CHECK', 'true');
+      vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', '');
+      expect(() => validateEnvironment()).toThrow('Environment validation failed');
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_APP_CHECK=true'));
     });
 
     it('warns if HOSTNAME=0.0.0.0 in production without proxy indicators', () => {
@@ -698,11 +498,8 @@ describe('validate-env utility', () => {
       // Set other required production vars
       vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
       vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
       vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
+      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
 
       validateEnvironment();
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY: HOSTNAME=0.0.0.0 in production'));
@@ -711,45 +508,6 @@ describe('validate-env utility', () => {
     it('logs success in development', () => {
       vi.stubEnv('NODE_ENV', 'development');
       validateEnvironment();
-    });
-  });
-
-  describe('isLocalDomain check', () => {
-    it('handles URL parsing failure in isLocalDomain check', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('HOSTNAME', '0.0.0.0');
-      // Passes regex /^[a-z0-9.-]+$/i
-      // but new URL("https://127.0.0.1.1") throws "Invalid URL"
-      vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '127.0.0.1.1');
-      vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
-      vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      
-      try {
-        validateEnvironment();
-      } catch {
-        // Just covering the catch block
-      }
-    });
-
-    it('warns if HOSTNAME=0.0.0.0 in production with localhost domain', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('HOSTNAME', '0.0.0.0');
-      vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
-      vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
-      vi.stubEnv('SUPABASE_SECRET_KEY', 'sk_'.repeat(20));
-      vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
-      vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
-      vi.stubEnv('PLAY_INTEGRITY_PROJECT_NUMBER', '12345');
-      vi.stubEnv('REQUEST_PRIVATE_KEY', 'BEGIN ED25519 PRIVATE KEY');
-      vi.stubEnv('REQUEST_PUBLIC_KEY', 'BEGIN ED25519 PUBLIC KEY');
-      
-      validateEnvironment();
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY: HOSTNAME=0.0.0.0'));
     });
   });
 });

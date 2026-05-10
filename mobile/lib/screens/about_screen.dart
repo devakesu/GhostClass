@@ -254,8 +254,8 @@ class AboutScreen extends ConsumerWidget {
                         LinkRow(
                           icon: LucideIcons.globe,
                           title: 'Web app',
-                          value: AppConfig.ghostclassWebUrl,
-                          onTap: () => _launchUrl(AppConfig.ghostclassWebUrl),
+                          value: AppConfig.webUrl,
+                          onTap: () => _launchUrl(AppConfig.webUrl),
                         ),
                         LinkRow(
                           icon: LucideIcons.mail,

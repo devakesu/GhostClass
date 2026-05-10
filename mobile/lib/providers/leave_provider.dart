@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
@@ -21,8 +23,16 @@ final leaveProvider = AsyncNotifierProvider<LeaveNotifier, LeaveState>(
 class LeaveNotifier extends AsyncNotifier<LeaveState> {
   @override
   FutureOr<LeaveState> build() async {
+    final authState = ref.watch(authProvider);
     final academic = ref.watch(academicProvider).value;
-    if (academic == null) return LeaveState.empty();
+
+    if (authState.value == null || academic == null) return LeaveState.empty();
+
+    // BLOCKER: Do not fire queries until Cron Sync is finished
+    if (authState.value?.isSyncing == true) {
+      // Return a future that will be replaced once isSyncing changes
+      return Completer<LeaveState>().future;
+    }
 
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
@@ -54,6 +64,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
   }
 
   Future<void> refresh() async {
+    ref.invalidate(notificationsProvider);
     state = const AsyncValue.loading();
     ref.invalidateSelf();
   }

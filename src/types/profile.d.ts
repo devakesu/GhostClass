@@ -35,6 +35,16 @@ export interface UserProfile {
   created_at?: string | null;
   /** Account creation timestamp in EzyGo */
   ezygo_created_at?: string | null;
+  /** Terms acceptance info */
+  terms_accepted_at?: string | null;
+  /** Encrypted EzyGo token for auth bridging */
+  ezygo_token?: string | null;
+  /** User preference settings */
+  settings?: {
+    bunk_calculator_enabled: boolean;
+    target_percentage: number;
+    disabled_courses: Record<string, Record<string, string>>;
+  } | null;
   /** Optional class relation included by some profile responses */
   class?: {
     id?: string | number | null;

@@ -22,7 +22,7 @@ class SecurityService {
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         if (data['verified'] != true) {
-          final String reason = data['reason'] ?? data['playIntegrityError'] ?? data['appCheckError'] ?? 'Device integrity check failed.';
+          final String reason = data['reason'] ?? data['appCheckError'] ?? 'Device integrity check failed.';
           final String action = data['action'] ?? 'Please ensure you are using a genuine version of GhostClass from the Play Store.';
           final bool criticalRisk = data['criticalRisk'] == true;
 

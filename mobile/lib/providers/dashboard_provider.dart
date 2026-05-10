@@ -10,6 +10,7 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -52,8 +53,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   @override
   FutureOr<DashboardData> build() async {
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
-    final user = await ref.watch(authProvider.future);
-    final academic = await ref.watch(academicProvider.future);
+    final userAsync = ref.watch(authProvider);
+    final academicAsync = ref.watch(academicProvider);
+
+    final user = userAsync.value;
+    final academic = academicAsync.value;
 
     if (user == null || academic == null) {
       _cachedCourses = null;
@@ -61,6 +65,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedInstructors = null;
       _lastAcademic = null;
       throw Exception('Not authenticated');
+    }
+
+    // BLOCKER: Do not fire queries until Cron Sync is finished
+    if (user.isSyncing) {
+      if (_cachedCourses != null && _cachedAttendance != null) {
+         return _processData(_cachedCourses!, _cachedAttendance!, [], academic, _cachedInstructors ?? []);
+      }
+      // Return a future that will be replaced once isSyncing changes
+      return Completer<DashboardData>().future;
     }
 
     // Invalidate caches when account switches.
@@ -194,9 +207,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       AttendanceReportDetailed attendance, List<CourseDetails> shared) {
     final Map<String, AttendanceCourse> mergedMap = Map.from(attendance.courses);
     for (var c in shared) {
-      final code = (c.code ?? '').toUpperCase();
-      if (code.isNotEmpty && !mergedMap.containsKey(code)) {
-        mergedMap[code] = AttendanceCourse(
+      final stdCode = utils.standardizeCourseCode(c.code ?? '');
+      if (stdCode.isNotEmpty && !mergedMap.containsKey(stdCode)) {
+        mergedMap[stdCode] = AttendanceCourse(
           id: 0,
           name: c.name,
           code: c.code,
@@ -269,67 +282,56 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
 
     // --- SORTING LOGIC (WEBSITE PARITY) ---
+    // Pre-calculate sorting criteria to avoid redundant math during sort
+    final target = (auth?.settings.targetPercentage ?? 75).toDouble();
+    
+    int getTier(CourseStat? s, bool disabled) {
+      if (disabled) return 2; // Absolute bottom
+      if (s == null || s.finalTotal == 0) return 1;
+      return 0;
+    }
+
+    final Map<String, ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})> metaMap = {
+      for (var c in courses)
+        c.safeId: (() {
+          final s = stats.courseStats[c.safeId];
+          final disabled = disabledCodes.contains(utils.standardizeCourseCode(c.code ?? ''));
+          final tier = getTier(s, disabled);
+          
+          if (s == null) {
+            return (tier: tier, canBunk: 0, safeCanBunk: 0, requiredToAttend: 0);
+          }
+
+          final bunkRes = utils.calculateAttendance(s.finalPresent, s.finalTotal, targetPercentage: target);
+          final safeRes = utils.calculateAttendance(s.officialPresent, s.officialTotal, targetPercentage: target);
+
+          return (
+            tier: tier,
+            canBunk: bunkRes.canBunk,
+            safeCanBunk: safeRes.canBunk,
+            requiredToAttend: bunkRes.requiredToAttend,
+          );
+        })()
+    };
+
     final sortedCourses = List<CourseDetails>.from(courses);
     sortedCourses.sort((a, b) {
-      final String cidA = a.safeId;
-      final String cidB = b.safeId;
-      
-      final statA = stats.courseStats[cidA];
-      final statB = stats.courseStats[cidB];
+      final metaA = metaMap[a.safeId]!;
+      final metaB = metaMap[b.safeId]!;
 
-      // Sorting Tiers:
-      // 0: Active (finalTotal > 0, Not Disabled)
-      // 1: No Data (finalTotal == 0, Not Disabled)
-      // 2: Disabled (Always bottom)
-      
-      final bool isDisabledA = disabledCodes.contains((a.code ?? '').toUpperCase());
-      final bool isDisabledB = disabledCodes.contains((b.code ?? '').toUpperCase());
-      
-      int getTier(CourseStat? s, bool disabled) {
-        if (disabled) return 2; // Absolute bottom
-        if (s == null || s.finalTotal == 0) return 1;
-        return 0;
-      }
+      if (metaA.tier != metaB.tier) return metaA.tier.compareTo(metaB.tier);
 
-      final int tierA = getTier(statA, isDisabledA);
-      final int tierB = getTier(statB, isDisabledB);
-
-      if (tierA != tierB) return tierA.compareTo(tierB);
-
-      if (tierA == 0 && statA != null && statB != null) {
-        final target = (auth?.settings.targetPercentage ?? 75).toDouble();
-        
-        final resA = utils.calculateAttendance(
-          statA.finalPresent,
-          statA.finalTotal,
-          targetPercentage: target,
-        );
-        final resB = utils.calculateAttendance(
-          statB.finalPresent,
-          statB.finalTotal,
-          targetPercentage: target,
-        );
-        
+      if (metaA.tier == 0) {
         // 1. Safety Sort: Bunkable (Descending)
-        int cmp = resB.canBunk.compareTo(resA.canBunk);
+        int cmp = metaB.canBunk.compareTo(metaA.canBunk);
         if (cmp != 0) return cmp;
 
         // 2. Tie-breaker: Safe Bunkable (Official Only)
-        final safeResA = utils.calculateAttendance(
-          statA.officialPresent,
-          statA.officialTotal,
-          targetPercentage: target,
-        );
-        final safeResB = utils.calculateAttendance(
-          statB.officialPresent,
-          statB.officialTotal,
-          targetPercentage: target,
-        );
-        cmp = safeResB.canBunk.compareTo(safeResA.canBunk);
+        cmp = metaB.safeCanBunk.compareTo(metaA.safeCanBunk);
         if (cmp != 0) return cmp;
         
         // 3. Safety Sort: Required to Attend (Ascending)
-        cmp = resA.requiredToAttend.compareTo(resB.requiredToAttend);
+        cmp = metaA.requiredToAttend.compareTo(metaB.requiredToAttend);
         if (cmp != 0) return cmp;
       }
       
@@ -350,28 +352,33 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     );
   }
   Future<void> refresh() async {
+    ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
     final api = ref.read(apiServiceProvider);
     final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
     
-    // 0. HARD CLEAR: Ensure no stale data survives the refresh request
-    api.clearCaches();
-    ref.invalidate(institutionsProvider);
+    // 0. Set local loading state
     state = const AsyncValue.loading();
+
+    if (user != null && supabaseToken != null) {
+      // 1. Trigger the server-side sync (this updates the database)
+      // We await this to ensure the server has latest data before we fetch it back
+      await api.triggerSync(supabaseToken, force: true);
+      
+      // 2. Fetch the fresh profile from the server
+      await ref.read(authProvider.notifier).refreshProfile(force: true, sync: true);
+    }
+
+    // 3. Refresh Tracking (Official Report + Tracker Records)
+    // We don't need forceSync: true here because we already triggered it above
+    await ref.read(trackingProvider.notifier).refresh(forceSync: false);
+
+    // 4. Force a rebuild of the dashboard with fresh data
+    // We clear local caches to ensure we don't return stale combined data
     _cachedCourses = null;
     _cachedAttendance = null;
     _cachedInstructors = null;
     _lastAcademic = null;
-
-    if (user != null && supabaseToken != null) {
-      // 1. Trigger the server-side sync (this updates the database)
-      // Manual refresh IS blocking to ensure the UI waits for fresh data
-      await api.triggerSync(supabaseToken);
-      
-      // 2. Fetch the fresh profile from the server (this updates class_id, label etc)
-      // We MUST await this so that the subsequent _fetchAndProcess uses the updated classId!
-      await ref.read(authProvider.notifier).refreshProfile(force: true, sync: true);
-    }
     
     state = await AsyncValue.guard(() async {
       final academicAsync = ref.read(academicProvider);

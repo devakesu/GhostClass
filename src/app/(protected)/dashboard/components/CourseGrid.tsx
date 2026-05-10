@@ -49,7 +49,7 @@ export function CourseGrid({
               {sortedCourses.map((course: any) => {
                 const courseCodeNormalized =
                   (course.code || String(course.id))
-                    .toUpperCase().replace(/\s+/g, "");
+                    .toUpperCase().replace(/[\s\u00A0-]/g, "");
                 const customInstructor = customInstructors
                   ?.find(
                     (ci) => ci.course_code === courseCodeNormalized,

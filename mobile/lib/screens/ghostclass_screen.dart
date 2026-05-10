@@ -70,30 +70,27 @@ class GhostClassScreen extends ConsumerWidget {
                       label: 'Target',
                       value: '${user.settings.targetPercentage}%',
                       color: primary,
+                      isDisabled: user.isUpdatingSettings,
                       onTap: () => _showTargetPicker(context, ref, user),
                     ),
                     // Bunk Calculator Switch
-                    StatefulBuilder(
-                      builder: (context, setState) {
-                        bool localVal = user.settings.bunkCalculatorEnabled;
-                        return GhostClassSettingsCard(
-                          icon: LucideIcons.calculator,
-                          label: 'Bunk',
-                          value: localVal ? 'ON' : 'OFF',
-                          color: ghostColors?.accentBlue ?? const Color(0xFF6366F1),
-                          isActive: localVal,
-                          showToggle: true,
-                          toggleValue: localVal,
-                          onToggle: (val) {
-                            setState(() => localVal = val);
-                            ref.read(authProvider.notifier).updateSettings(bunkEnabled: val);
-                          },
-                          onTap: () {
-                            setState(() => localVal = !localVal);
-                            ref.read(authProvider.notifier).updateSettings(bunkEnabled: localVal);
-                          },
+                    GhostClassSettingsCard(
+                      icon: LucideIcons.calculator,
+                      label: 'Bunk',
+                      value: user.settings.bunkCalculatorEnabled ? 'ON' : 'OFF',
+                      color: ghostColors?.accentBlue ?? const Color(0xFF6366F1),
+                      isActive: user.settings.bunkCalculatorEnabled,
+                      showToggle: true,
+                      toggleValue: user.settings.bunkCalculatorEnabled,
+                      isDisabled: user.isUpdatingSettings,
+                      onToggle: (val) {
+                        ref.read(authProvider.notifier).updateSettings(bunkEnabled: val);
+                      },
+                      onTap: () {
+                        ref.read(authProvider.notifier).updateSettings(
+                          bunkEnabled: !user.settings.bunkCalculatorEnabled,
                         );
-                      }
+                      },
                     ),
                     // Theme Switcher
                     GhostClassSettingsCard(
@@ -106,6 +103,7 @@ class GhostClassScreen extends ConsumerWidget {
                       isActive: themeMode == ThemeMode.dark,
                       showToggle: true,
                       toggleValue: themeMode == ThemeMode.dark,
+                      isDisabled: user.isUpdatingSettings,
                       onToggle: (_) =>
                           ref.read(themeProvider.notifier).toggleTheme(),
                       onTap: () =>
@@ -125,6 +123,7 @@ class GhostClassScreen extends ConsumerWidget {
                     icon: LucideIcons.building,
                     label: 'Institution',
                     isFullWidth: true,
+                    isDisabled: user.isUpdatingSettings,
                     value: ref.watch(institutionsProvider).when(
                           data: (insts) {
                             if (insts.isEmpty) return 'SWITCH';
@@ -506,9 +505,9 @@ class GhostClassScreen extends ConsumerWidget {
                       return Text(
                         '$val%',
                         style: GoogleFonts.manrope(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                          color: isSelected ? primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                          color: isSelected ? primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           letterSpacing: 1,
                         ),
                       );
@@ -517,7 +516,7 @@ class GhostClassScreen extends ConsumerWidget {
                 ),
                 SliderTheme(
                   data: SliderThemeData(
-                    showValueIndicator: ShowValueIndicator.always,
+                    showValueIndicator: ShowValueIndicator.onDrag,
                     tickMarkShape: _CustomSliderTickMarkShape(tickMarkRadius: 2.5),
                     activeTickMarkColor: Colors.white.withValues(alpha: 0.4),
                     inactiveTickMarkColor: primary.withValues(alpha: 0.4),

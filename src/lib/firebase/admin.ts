@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 
 export interface DecodedAppCheckToken {
   appId: string;
+  token?: Record<string, any>;
 }
 
 export interface AppCheckVerifier {
@@ -31,7 +32,10 @@ export function getAppCheck(): AppCheckVerifier | null {
         try {
           const appCheckService = admin.appCheck();
           const decodedToken = await appCheckService.verifyToken(token);
-          return { appId: decodedToken.appId };
+          return { 
+            appId: decodedToken.appId,
+            token: decodedToken.token
+          };
         } catch (error) {
 
           logger.error("Firebase App Check token verification failed:", error);

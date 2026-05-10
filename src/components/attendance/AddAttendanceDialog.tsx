@@ -176,8 +176,8 @@ export function AddAttendanceDialog({
     // 2. Custom (Class) Courses - Add if not already present
     if (classCourses) {
       classCourses.forEach(cc => {
-        const code = cc.course_code.toUpperCase().replace(/\s+/g, "");
-        if (!courses.some(c => c.key.toUpperCase().replace(/\s+/g, "") === code)) {
+        const code = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+        if (!courses.some(c => c.key.toUpperCase().replace(/[\s\u00A0-]/g, "") === code)) {
           courses.push({ key: cc.course_code, name: cc.course_name });
         }
       });
@@ -432,10 +432,10 @@ export function AddAttendanceDialog({
         return;
       }
 
-      let courseIdToSave = courseId.trim().toUpperCase().replace(/\s+/g, "");
+      let courseIdToSave = courseId.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
       const selectedCourse = coursesData?.courses?.[courseId];
       if (selectedCourse?.code) {
-        courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/\s+/g, "");
+        courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
       }
 
       const finalRemarks = (remarks.trim() || "").substring(0, 255) || null;

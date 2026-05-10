@@ -102,7 +102,7 @@ export default function DashboardClient(
     isLoading: isLoadingProfile,
     isFetching: isFetchingProfile,
     refetch: refetchProfile,
-  } = useProfile();
+  } = useProfile({ sync: true });
   const queryClient = useQueryClient();
 
   const setSemesterMutation = useSetSemester();
@@ -207,6 +207,14 @@ export default function DashboardClient(
   const currentSem = selectedSemester ?? undefined;
   const currentYear = selectedYear ?? undefined;
 
+  const { syncCompleted } = useSyncOnMount({
+    username: profile?.username,
+    userId: profile?.id,
+    enabled: !!profile?.username,
+    sentryLocation: "DashboardClient",
+    sentryTag: "background_sync",
+  });
+
   const {
     data: attendanceData,
     isLoading: isLoadingAttendance,
@@ -217,12 +225,14 @@ export default function DashboardClient(
     currentSem,
     currentYear,
     {
+      enabled: syncCompleted,
       // Only use initialData if active semester/year matches initialData defaults
       initialData: (selectedSemester === null && selectedYear === null)
         ? (initialData?.attendance ?? undefined)
         : undefined,
     },
   );
+
 
   const {
     data: coursesData,
@@ -237,7 +247,7 @@ export default function DashboardClient(
     initialData: (selectedSemester === null && selectedYear === null)
       ? initialCoursesData
       : undefined,
-    enabled: !!currentSem && !!currentYear,
+    enabled: syncCompleted && !!currentSem && !!currentYear,
   });
 
   const {
@@ -249,17 +259,19 @@ export default function DashboardClient(
   } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
+    enabled: syncCompleted,
   });
 
   const { data: customInstructors } = useFetchCourseInstructors({
     semester: currentSem,
     year: currentYear,
+    enabled: syncCompleted,
   });
 
   const { data: classCourses } = useFetchClassCourses({
     semester: currentSem,
     year: currentYear,
-    enabled: !!currentSem && !!currentYear && !!profile?.class?.id,
+    enabled: syncCompleted && !!profile?.class?.id,
   });
 
   const { getCourseCodeById: getCourseCode } = useCourseLookup({
@@ -272,13 +284,13 @@ export default function DashboardClient(
     const registry: Record<string, { code: string; id: number; name: string }> = {};
     if (coursesData?.courses) {
       Object.entries(coursesData.courses).forEach(([code, c]: [string, any]) => {
-        const key = (c.code ?? code).replace(/\s+/g, "").toUpperCase();
+        const key = (c.code ?? code).toUpperCase().replace(/[\s\u00A0-]/g, "");
         registry[key] = { code: c.code ?? code, id: Number(c.id), name: c.name };
       });
     }
     if (classCourses) {
       classCourses.forEach((cc: any) => {
-        const key = cc.course_code.replace(/\s+/g, "").toUpperCase();
+        const key = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
         if (!registry[key]) {
           registry[key] = { code: cc.course_code, id: 0, name: cc.course_name || cc.course_code };
         }
@@ -292,7 +304,7 @@ export default function DashboardClient(
     isError: isAllCourseSummariesError,
     isLoading: isLoadingAllCourseSummaries,
     isFetching: isFetchingAllCourseSummaries,
-  } = useAllCourseDetails(courseList);
+  } = useAllCourseDetails(syncCompleted ? courseList : []);
 
   useEffect(() => {
     if (!isTransitioning) return;
@@ -406,41 +418,6 @@ export default function DashboardClient(
     }
   }, [selectedSemester, selectedYear, ezygoSemester, ezygoYear, profile, setSemesterMutation, setAcademicYearMutation]);
 
-  const { syncCompleted } = useSyncOnMount({
-    username: profile?.username,
-    userId: profile?.id,
-    enabled: true,
-    sentryLocation: "DashboardClient",
-    sentryTag: "background_sync",
-    onPartialSync: async () => {
-      toast.warning("Partial Sync Completed", {
-        description:
-          "Some attendance data couldn't be synced. Your dashboard may be incomplete.",
-      });
-      await Promise.all([
-        refetchTracking(),
-        refetchAttendance(),
-        refetchCourses(),
-        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
-      ]);
-    },
-    onSuccess: async (data) => {
-      const changed = (data.deletions ?? 0) + (data.updates ?? 0);
-      if (changed > 0) {
-        toast.info("Attendance Synced", {
-          description: `Dashboard updated. ${changed} record${
-            changed === 1 ? "" : "s"
-          } synced.`,
-        });
-      }
-      await Promise.all([
-        refetchTracking(),
-        refetchAttendance(),
-        refetchCourses(),
-        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
-      ]);
-    },
-  });
 
   useEffect(() => {
     if (syncCompleted && !profile?.first_name) {
@@ -489,11 +466,11 @@ export default function DashboardClient(
         ...(coursesData?.courses
           ? Object.values(coursesData.courses).map(
               (c: any) =>
-                (c.code ? c.code.replace(/\s+/g, "").toUpperCase() : String(c.id).toUpperCase()),
+                (c.code ? c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") : String(c.id).toUpperCase()),
             )
           : []),
         ...(classCourses
-          ? classCourses.map((cc: any) => cc.course_code.replace(/\s+/g, "").toUpperCase())
+          ? classCourses.map((cc: any) => cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, ""))
           : []),
       ]
     );
@@ -502,7 +479,7 @@ export default function DashboardClient(
     const disabledWithDataCodes = new Set<string>();
 
     activeIds.forEach((id) => {
-      const code = (getCourseCode(id) || id).toUpperCase().replace(/\s+/g, "");
+      const code = (getCourseCode(id) || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
       if (code !== "" && catalogCodes.has(code)) {
         if (disabledCodes.has(code)) {
           disabledWithDataCodes.add(code);
@@ -602,7 +579,7 @@ export default function DashboardClient(
     if (coursesData?.courses) {
       Object.entries(coursesData.courses).forEach(([id, course]: [string, any]) => {
         registry[id] = { ...course, key: id };
-        const codeKey = (course.code || "").replace(/\s+/g, "").toUpperCase();
+        const codeKey = (course.code || "").toUpperCase().replace(/[\s\u00A0-]/g, "");
         if (codeKey && !registry[codeKey]) {
           registry[codeKey] = { ...course, key: id };
         }
@@ -610,7 +587,7 @@ export default function DashboardClient(
     }
     if (classCourses) {
       classCourses.forEach((cc: any) => {
-        const codeKey = cc.course_code.replace(/\s+/g, "").toUpperCase();
+        const codeKey = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
         if (!registry[codeKey]) {
           registry[codeKey] = {
             id: 0,
@@ -632,7 +609,7 @@ export default function DashboardClient(
     const uniqueCourses: any[] = [];
 
     Object.values(courseRegistry).forEach((course: any) => {
-      const codeKey = (course.code || course.key).replace(/\s+/g, "").toUpperCase();
+      const codeKey = (course.code || course.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
       if (!seenCodes.has(codeKey)) {
         seenCodes.add(codeKey);
         uniqueCourses.push({ ...course, codeKey });
@@ -667,7 +644,7 @@ export default function DashboardClient(
         safeBunkable = safeResult.canBunk;
       }
       const isDisabled = !!course.code &&
-        disabledCodes.has(course.code.replace(/\s+/g, "").toUpperCase());
+        disabledCodes.has(course.code.toUpperCase().replace(/[\s\u00A0-]/g, ""));
       return {
         ...course,
         key: codeKey,
@@ -711,11 +688,11 @@ export default function DashboardClient(
   ]);
 
 
-  const isInitialLoading = (!profile && !isLoadingProfile) || !currentSem || !currentYear || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating;
+  const isInitialLoading = (!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating;
 
   if (isInitialLoading && !isAttendanceError && !isCoursesError && !isTrackingError && !isAllCourseSummariesError) return <CompLoading />;
 
-  const isGlobalLoading = isLoadingProfile || isUpdating || isTransitioning || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending;
+  const isGlobalLoading = isLoadingProfile || isUpdating || isTransitioning || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
 
   return (
     <LazyMotion features={domAnimation}>
@@ -794,7 +771,7 @@ export default function DashboardClient(
             allCourseSummaries={allCourseSummaries}
             profile={profile}
             onEditInstructor={(course, _name, hasCustomName, customInstructor) => {
-              const code = (course.code || String(course.id)).toUpperCase().replace(/\s+/g, "");
+              const code = (course.code || String(course.id)).toUpperCase().replace(/[\s\u00A0-]/g, "");
               setSelectedInstructorCourse({
                 code,
                 name: course.name,

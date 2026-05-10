@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
@@ -17,7 +18,7 @@ class AcceptTermsScreen extends ConsumerStatefulWidget {
 class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
   bool _accepted = false;
   bool _isLoading = false;
-  static const String _termsVersion = '2.5';
+  static String get _termsVersion => AppConfig.termsVersion;
 
   @override
   void initState() {

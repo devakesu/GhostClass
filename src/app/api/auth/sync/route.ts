@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { getClientIp, redact } from "@/lib/utils.server";
 import { withSecurity } from "@/lib/security/app-check";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { decrypt } from "@/lib/crypto";
+import { getProfileBundle } from "@/lib/user/profile-bundle";
 import { UserResponse } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 
@@ -83,39 +83,22 @@ const handler = async (req: Request, { authType }: { authType: "app-check" | "cs
       authUser = user;
     }
 
-    // 2. Heal EzyGo Token & Fetch Compliance Status
-    const { data: dbUser, error: dbError } = await supabaseAdmin
-      .from("users")
-      .select("id, ezygo_token, ezygo_iv, terms_version, terms_accepted_at")
-      .eq("auth_id", authUser.id)
-      .maybeSingle();
-
-    if (dbError || !dbUser) {
+    // 2. Heal EzyGo Token & Return Full Bundle
+    const bundle = await getProfileBundle(authUser.id);
+    if (!bundle) {
       logger.warn("[sync] Profile not found for healing", { userId: redact("id", authUser.id) });
       return NextResponse.json({ success: false, message: "Profile sync failed" }, { status: 404 });
     }
 
-    let decryptedEzygoToken: string | null = null;
-    if (dbUser.ezygo_token && dbUser.ezygo_iv) {
-      try {
-        decryptedEzygoToken = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
-      } catch (e) {
-        logger.error("[sync] Token decryption failed during heal", e);
-      }
-    }
-
-    // 3. Response Construction
     if (isMobile) {
-      // Mobile expects the full encrypted payload
+      // Mobile expects the full encrypted payload (now unified with /api/profile)
       return NextResponse.json({
         success: true,
-        id: dbUser.id ? String(dbUser.id) : null,
-        ezygo_token: decryptedEzygoToken,
-        terms_version: dbUser.terms_version ?? null,
-        terms_accepted_at: dbUser.terms_accepted_at ?? null,
+        ...bundle
       });
     } else {
       // Web uses cookies; check if they are already present
+      // getAuthTokenWithFallback() performs the actual healing if cookie is missing
       const webToken = await getAuthTokenWithFallback();
       if (!webToken) {
         logger.warn("[sync] Web session blip detected during heal", { userId: redact("id", authUser.id) });

@@ -1,8 +1,6 @@
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
-import { verifyPlayIntegrity } from "@/lib/security/integrity";
-import { verifyDeviceCheckToken } from "@/lib/security/device-check";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { decryptRequest, encryptResponse } from "@/lib/security/jwe";
 import { NextRequest, NextResponse } from "next/server";
@@ -129,6 +127,16 @@ export async function verifyAppCheckToken(
       "App Check verification skipped: Firebase Admin not initialized",
     );
 
+    if (process.env.ENFORCE_APP_CHECK === "true") {
+      return {
+        isValid: false,
+        error: "Security Infrastructure Offline",
+        reason: "The server's security verifier is currently unavailable.",
+        action: "Please try again later. If the issue persists, contact support.",
+        criticalRisk: false,
+      };
+    }
+
     return { isValid: true, alreadyLogged: true };
   }
 
@@ -150,87 +158,17 @@ export async function verifyAppCheckToken(
       );
       return { 
         isValid: false, 
-        error: "Unauthorized App ID",
-        reason: "The application signature does not match our security records.",
-        action: "Please reinstall the official GhostClass app from the Google Play Store or Apple App Store.",
+        error: "Unauthorized Application",
+        reason: "This app version is unrecognized or has been modified.",
+        action: "Please reinstall the official GhostClass app from the Play Store or Apple App Store.",
         criticalRisk: true,
       };
     }
 
-    // Determine which platform (Android or iOS) based on App ID
-    const isAndroid = decodedToken.appId.includes("android");
-    const isIOS = decodedToken.appId.includes("ios");
+    // Android/iOS: We rely on Firebase App Check which already uses Play Integrity/DeviceCheck
+    // under the hood. The manual X-Play-Integrity header is no longer required for standard API access.
 
-    let integrity: any = null;
-
-    // Android: Verify with Play Integrity
-    if (isAndroid) {
-      const playIntegrityToken = headerList.get("X-Play-Integrity");
-      const shouldEnforceIntegrity = process.env.ENFORCE_PLAY_INTEGRITY === "true";
-
-      if (playIntegrityToken) {
-        const integrityResult = await verifyPlayIntegrity(playIntegrityToken);
-        integrity = integrityResult.verdict;
-
-        if (!integrityResult.isValid) {
-          return {
-            isValid: false,
-            error: integrityResult.error || "Device integrity check failed",
-            reason: integrityResult.reason || "Android Play Integrity check failed (Device may be compromised or uncertified).",
-            action: integrityResult.action || "Please ensure your device is not rooted and you are using the official version of the app.",
-            criticalRisk: integrityResult.criticalRisk ?? false,
-            integrity,
-          };
-        }
-      } else if (shouldEnforceIntegrity) {
-        logger.warn(
-          "App Check: Android client missing mandatory Play Integrity token (ENFORCE_PLAY_INTEGRITY=true)",
-        );
-        return {
-          isValid: false,
-          error: "Missing mandatory integrity attestation",
-          reason: "Play Integrity token was not provided by the Android system.",
-          action: "Please ensure your device is not rooted and is running a certified version of Android.",
-          criticalRisk: false,
-        };
-      }
-    }
-
-    // iOS: Verify with DeviceCheck
-    if (isIOS) {
-      const deviceCheckToken = headerList.get("X-Device-Check");
-      const shouldEnforceDeviceCheck = process.env.ENFORCE_DEVICE_CHECK === "true";
-
-      if (deviceCheckToken) {
-        const nonce = headerList.get("X-Device-Check-Nonce");
-        const deviceCheckResult = await verifyDeviceCheckToken(deviceCheckToken, nonce || undefined);
-        integrity = deviceCheckResult.verdict;
-
-        if (!deviceCheckResult.isValid) {
-          return {
-            isValid: false,
-            error: deviceCheckResult.error || "Device integrity check failed",
-            reason: "iOS DeviceCheck verification failed (Device integrity cannot be guaranteed).",
-            action: "Please ensure your device is not jailbroken and is using an official iOS release.",
-            criticalRisk: false,
-            integrity,
-          };
-        }
-      } else if (shouldEnforceDeviceCheck) {
-        logger.warn(
-          "App Check: iOS client missing mandatory DeviceCheck token (ENFORCE_DEVICE_CHECK=true)",
-        );
-        return {
-          isValid: false,
-          error: "Missing mandatory device check",
-          reason: "DeviceCheck token was not provided by the iOS system.",
-          action: "Please ensure your device is not jailbroken and is using an official iOS release.",
-          criticalRisk: false,
-        };
-      }
-    }
-
-    return { isValid: true, integrity };
+    return { isValid: true };
   } catch (error: unknown) {
     Sentry.captureException(error, {
       tags: { type: "app_check_error", location: "verifyAppCheckToken" },
@@ -238,10 +176,10 @@ export async function verifyAppCheckToken(
 
     return { 
       isValid: false, 
-      error: "Invalid App Check token",
-      reason: "The security token provided by your device has expired or is invalid.",
-      action: "Please restart the app. If the issue persists after repeated attempts, please contact support.",
-      criticalRisk: false,
+      error: "Security Verification Failed",
+      reason: "Your device failed the automated security handshake.",
+      action: "Please ensure your device is not rooted/jailbroken and you have a stable internet connection.",
+      criticalRisk: true, // App Check failure is usually a device integrity issue
     };
   }
 }
@@ -251,7 +189,10 @@ export async function verifyAppCheckToken(
  * Checks for EITHER CSRF token (web) OR App Check token (mobile)
  * Both must be valid for the request to proceed
  */
-async function verifyAuthentication(req: Request): Promise<AuthResult> {
+async function verifyAuthentication(
+  req: Request,
+  options: AppCheckOptions = {},
+): Promise<AuthResult> {
   const headerList = req.headers;
 
   // Check for App Check token (mobile)
@@ -295,7 +236,7 @@ async function verifyAuthentication(req: Request): Promise<AuthResult> {
 
   // Prioritize App Check (mobile) if both present (defensive)
   if (hasAppCheckToken) {
-    const appCheckResult = await verifyAppCheckToken(req);
+    const appCheckResult = await verifyAppCheckToken(req, options);
 
     if (!appCheckResult.isValid) {
       logger.warn("App Check verification failed", { error: appCheckResult.error });
@@ -377,6 +318,7 @@ export function withSecurity<T = unknown>(
       authType?: "csrf" | "app-check" | "none";
     },
   ) => Promise<Response>,
+  options: AppCheckOptions = {},
 ) {
   return async (req: NextRequest, context: any) => {
     // Next.js 15+ makes params a Promise. We handle both Promise and direct Record
@@ -435,7 +377,7 @@ export function withSecurity<T = unknown>(
     }
 
     // 2. Enforce unified authentication (CSRF or App Check)
-    const authResult = await verifyAuthentication(req);
+    const authResult = await verifyAuthentication(req, options);
 
     if (!authResult.isValid) {
       logger.warn("Authentication failed", {

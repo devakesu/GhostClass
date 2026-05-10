@@ -162,20 +162,21 @@ class DashboardStats {
 
             course.officialTotal++;
             course.finalTotal++;
-            if (_isPositive(status, includeOtherLeave: false)) {
+            if (_isPositive(status)) {
               course.officialPresent++;
               course.finalPresent++;
             }
 
             if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
               officialTotal++;
-              if (_isPositive(status, includeOtherLeave: true)) {
+              final statusObj = AttendanceStatus.fromCode(status);
+              if (statusObj.isPositive) {
                 officialPresent++;
               } else {
                 officialAbsent++;
               }
               if (status == AttendanceStatus.dutyLeave.code) officialDL++;
-              if (status == AttendanceStatus.late.code) officialOther++;
+              if (status == AttendanceStatus.otherLeave.code) officialOther++;
             }
           }
         }
@@ -208,13 +209,10 @@ class DashboardStats {
 
       final bool isTrulyExtra =
           item.status == 'extra' && officialStatus == null;
-      final bool trackerPositive = _isPositive(
-        trackerStatus,
-        includeOtherLeave: false,
-      );
+      final bool trackerPositive = _isPositive(trackerStatus);
       final bool trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
       final bool officialPositive = officialStatus != null
-          ? _isPositive(officialStatus, includeOtherLeave: false)
+          ? _isPositive(officialStatus)
           : false;
       final bool officialDLStatus = officialStatus == AttendanceStatus.dutyLeave.code;
 
@@ -321,14 +319,12 @@ class DashboardStats {
     if (val is int) return val;
     return int.tryParse(val.toString()) ?? 0;
   }
-  static bool _isPositive(int status, {bool includeOtherLeave = false}) {
-    final attStatus = AttendanceStatus.fromCode(status);
-    if (includeOtherLeave && attStatus == AttendanceStatus.late) return true;
-    return attStatus == AttendanceStatus.present || attStatus == AttendanceStatus.dutyLeave;
+  static bool _isPositive(int status) {
+    return AttendanceStatus.fromCode(status).isPositive;
   }
 
   static String standardize(String input) {
-    return input.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+    return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
   }
 }
 

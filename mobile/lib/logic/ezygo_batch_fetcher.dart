@@ -125,6 +125,16 @@ class EzygoBatchFetcher {
     // 3. Rate Limiting: Wait for an available slot
     await _waitForSlot();
 
+    // 3.5. Final Deduplication Check
+    // Between checking inFlight (step 2) and acquiring a slot (step 3), 
+    // another request with the same key might have already started.
+    final postSlotInFlight = _inFlight[cacheKey];
+    if (postSlotInFlight != null) {
+      AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request (POST-SLOT) for $path');
+      _releaseSlot(); // Immediate release as we will await the existing future
+      return postSlotInFlight;
+    }
+
     try {
       // 4. Execute the network request
       final requestFuture = _executeRequest(

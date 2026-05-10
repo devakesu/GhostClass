@@ -189,7 +189,7 @@ class TrackingRecord {
 enum AttendanceStatus {
   present(110),
   absent(111),
-  late(112), // Also used for "Other Leave" in some contexts
+  otherLeave(112),
   dutyLeave(225);
 
   final int code;
@@ -206,7 +206,7 @@ enum AttendanceStatus {
   bool get isPositive =>
       this == AttendanceStatus.present ||
       this == AttendanceStatus.dutyLeave ||
-      this == AttendanceStatus.late;
+      this == AttendanceStatus.otherLeave;
   bool get isNegative => this == AttendanceStatus.absent;
 }
 

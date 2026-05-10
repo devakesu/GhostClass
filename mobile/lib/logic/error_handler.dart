@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +39,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
           message: dialogMessage,
           technicalDetails: error.message,
           retryLabel: isCritical ? 'Close App' : 'Restart App',
-          onRetry: () => exit(0),
+          onRetry: () => SystemNavigator.pop(),
           isDismissible: false,
         );
         return;
@@ -64,7 +64,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
             technicalDetails:
                 '${error.type.name.toUpperCase()}: ${error.message}',
             retryLabel: 'Restart App',
-            onRetry: () => exit(0),
+            onRetry: () => SystemNavigator.pop(),
             isDismissible: false,
           );
           return;

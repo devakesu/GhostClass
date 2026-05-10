@@ -6,9 +6,11 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 // ─── Tracking State ──────────────────────────────────────────────────────────
@@ -52,7 +54,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   static bool _isSyncingExternal = false;
 
   String _canonicalTrackerCourseCode(String courseId) {
-    return courseId.trim().replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    return utils.standardizeCourseCode(courseId);
   }
 
   @override
@@ -71,7 +73,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    // Background Sync trigger moved to NavigationShell.
+    // BLOCKER: Do not fire queries until Cron Sync is finished
+    if (authState.value?.isSyncing == true) {
+      // Return a future that will be replaced once isSyncing changes
+      return Completer<TrackingState>().future;
+    }
 
     // 2. Initial Load
     return _fetchAndProcess(academic: academic, isInitial: true);
@@ -102,12 +108,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       } else {
         _isSyncingExternal = true;
         try {
-          final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
-          if (supabaseToken != null) {
-            await api.triggerSync(supabaseToken);
-          }
-        } catch (e) {
-          AppLogger.e('TrackingNotifier: Background sync failed during fetch.', e);
+          // Sync is now primarily triggered by DashboardNotifier.refresh
+          // or NavigationShell. Individual triggers here are redundant.
         } finally {
           _isSyncingExternal = false;
           syncCompleted = true;
@@ -181,11 +183,17 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     AcademicState academic,
   ) {
     if (report == null) return input;
-    final s = input.trim().toUpperCase();
+    final stdInput = utils.standardizeCourseCode(input);
     if (report.courses.containsKey(input)) return input;
+    
+    // Search courses by standardized code
     for (final c in report.courses.values) {
-      if (c.code?.trim().toUpperCase() == s) return c.id.toString();
+      if (c.code != null && utils.standardizeCourseCode(c.code!) == stdInput) {
+        return c.id.toString();
+      }
     }
+    
+    // Fallback: Check if input is a numeric ID
     final n = int.tryParse(input);
     if (n != null) {
       for (final it in report.courses.entries) {
@@ -197,6 +205,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
   /// Manually trigger a refresh of the data.
   Future<void> refresh({bool forceSync = false}) async {
+    ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
     final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
@@ -360,15 +369,15 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         // ID-CODE Mismatch Safety: 
         // We aggregate both the numeric ID and the Alphanumeric Code to ensure
         // all variants stored in the DB (via Web vs Mobile) are cleared.
-        final Set<String> keys = {courseId};
+        final Set<String> keys = {courseId, utils.standardizeCourseCode(courseId)};
         if (officialReport != null) {
           // Find the course in the report
           for (final c in officialReport.courses.values) {
             final String cId = c.id.toString();
             final String? cCode = c.code;
-            if (cId == courseId || cCode?.toUpperCase() == courseId.toUpperCase()) {
+            if (cId == courseId || (cCode != null && utils.standardizeCourseCode(cCode) == utils.standardizeCourseCode(courseId))) {
               keys.add(cId);
-              if (cCode != null) keys.add(cCode);
+              if (cCode != null) keys.add(utils.standardizeCourseCode(cCode));
               break;
             }
           }

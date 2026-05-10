@@ -237,8 +237,6 @@ function main() {
     'NEXT_PUBLIC_ANDROID_PACKAGE_NAME',
     'FIREBASE_APP_ID_ANDROID',
     'FIREBASE_APP_ID_IOS',
-    'PLAY_INTEGRITY_PROJECT_NUMBER',
-    'PLAY_INTEGRITY_CERT_SHA256',
   ];
 
   // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────
@@ -255,10 +253,6 @@ function main() {
     'CLOUDFLARE_ACCOUNT_ID',
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
-    'MOBILE_API_SECRET',
-    'REQUEST_PRIVATE_KEY',
-    'REQUEST_PUBLIC_KEY',
-    'GOOGLE_SERVICE_ACCOUNT_JSON',
     'SENTRY_HASH_SALT',
     'CRON_SECRET',
     'GA_API_SECRET',

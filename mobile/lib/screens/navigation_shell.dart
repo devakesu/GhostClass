@@ -5,6 +5,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
@@ -23,7 +25,6 @@ import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NavigationShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -59,15 +60,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   void initState() {
     super.initState();
 
-    // CENTRALIZED BACKGROUND SYNC: Trigger a single unified sync on app startup.
-    // This replaces multiple individual triggers in providers to prevent network blasts.
-    Future.microtask(() {
-      final supabaseToken =
-          Supabase.instance.client.auth.currentSession?.accessToken;
-      if (supabaseToken != null) {
-        unawaited(ref.read(apiServiceProvider).triggerSync(supabaseToken));
-      }
-    });
 
     ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
       previous,
@@ -585,6 +577,31 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () => SupportHelper.contactViaEmail(
+                          subject: 'Security Failure Report [v${AppConfig.appVersion}]',
+                          customBody: 'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+                              '-- SUMMARY --\n'
+                              'Message: $securityMessage\n\n'
+                              '-- PERSISTENCE --\n'
+                              '${SupportHelper.persistenceMessage}\n',
+                        ),
+                        icon: const Icon(LucideIcons.mail, size: 18),
+                        label: Text(
+                          'Contact Support',
+                          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
                     if (!isCriticalSecurityFailure) ...[
                       const SizedBox(height: 16),
                       TextButton(
@@ -603,6 +620,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
               ),
             ),
           ).animate().fadeIn(duration: 400.ms),
+
       ],
     );
   }
@@ -625,44 +643,49 @@ class _NavButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? primary.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-                  icon,
-                  size: 22,
-                  color: isSelected
-                      ? primary
-                      : Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.45),
-                )
-                .animate(target: isSelected ? 1 : 0)
-                .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1)),
-            const SizedBox(height: 2),
-            if (isSelected)
-              Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: primary,
-                ),
-              ).animate().fade(duration: 200.ms),
-          ],
+    return Semantics(
+      button: true,
+      label: '$label tab',
+      selected: isSelected,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                    icon,
+                    size: 22,
+                    color: isSelected
+                        ? primary
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.45),
+                  )
+                  .animate(target: isSelected ? 1 : 0)
+                  .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1)),
+              const SizedBox(height: 2),
+              if (isSelected)
+                Text(
+                  label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: primary,
+                  ),
+                ).animate().fade(duration: 200.ms),
+            ],
+          ),
         ),
       ),
     );

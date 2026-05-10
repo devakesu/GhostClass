@@ -251,10 +251,7 @@ class _CalendarContent extends ConsumerWidget {
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
-        final trackingNotifier = ref.read(trackingProvider.notifier);
-        final dashboardNotifier = ref.read(dashboardProvider.notifier);
-        await trackingNotifier.refresh(forceSync: true);
-        await dashboardNotifier.refresh();
+        await ref.read(dashboardProvider.notifier).refresh();
       },
       child: CustomScrollView(
         controller: scrollController,
@@ -891,7 +888,7 @@ class _CalendarContent extends ConsumerWidget {
         return 'Absent';
       case AttendanceStatus.dutyLeave:
         return 'Duty Leave';
-      case AttendanceStatus.late:
+      case AttendanceStatus.otherLeave:
         return 'Other Leave';
       case AttendanceStatus.present:
         return 'Present';
@@ -905,7 +902,7 @@ class _CalendarContent extends ConsumerWidget {
         return ghostColors?.dangerRed ?? const Color(0xFFEF4444);
       case AttendanceStatus.dutyLeave:
         return ghostColors?.accentOrange ?? const Color(0xFFF59E0B);
-      case AttendanceStatus.late:
+      case AttendanceStatus.otherLeave:
         return ghostColors?.accentBlue ?? const Color(0xFF3B82F6);
       case AttendanceStatus.present:
         return ghostColors?.successGreen ?? const Color(0xFF10B981);

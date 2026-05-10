@@ -847,10 +847,12 @@ paths:
         with EzyGo. PII fields (`phone`, `gender`, `birth_date`) are AES-256-GCM
         encrypted at rest; the server decrypts them before responding.
         
-        **Fast path:** If a seeded local row exists the response is immediate, with a
-        background job quietly refreshing EzyGo fields for the next call.
-        
-        **Slow path:** First-time after login — EzyGo is called inline to seed the row.
+        **Full Bundle:** This endpoint returns an "uber-bundle" containing:
+        - Basic profile info
+        - Academic context (current_semester, current_year)
+        - User settings (bunk calculator, target percentage, disabled courses)
+        - Terms compliance status
+        - Auth bridge token (decrypted ezygo_token)
         
         **Origin validation:** In production, requests must include a matching `Origin`
         header (or `Sec-Fetch-Site: same-origin`). Cross-site requests are rejected
@@ -1238,38 +1240,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/user/profile:
-    get:
-      tags:
-        - Mobile
-        - Profile
-      summary: Get mobile profile bundle
-      description: |
-        Returns mobile-optimized profile payload including settings, academic context,
-        class info, and decrypted EzyGo token when available.
-      operationId: getMobileProfile
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Mobile profile data
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '401':
-          description: Unauthorized or invalid session
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /api/user/accept-terms:
     post:
@@ -1479,6 +1449,28 @@ components:
           type: string
           format: date-time
           nullable: true
+        current_semester:
+          type: string
+          nullable: true
+        current_year:
+          type: string
+          nullable: true
+        ezygo_token:
+          type: string
+          nullable: true
+        settings:
+          type: object
+          properties:
+            bunk_calculator_enabled:
+              type: boolean
+            target_percentage:
+              type: integer
+            disabled_courses:
+              type: object
+              additionalProperties:
+                type: object
+                additionalProperties:
+                  type: string
     
     Error:
       type: object

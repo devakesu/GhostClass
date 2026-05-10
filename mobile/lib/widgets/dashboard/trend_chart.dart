@@ -90,14 +90,30 @@ class _TrendChartSectionState extends State<TrendChartSection> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _updateCourses();
+  }
+
+  @override
+  void didUpdateWidget(TrendChartSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.stats != widget.stats || oldWidget.disabledCodes != widget.disabledCodes) {
+      _updateCourses();
+    }
+  }
+
+  void _updateCourses() {
+    _courses = widget.stats.courseStats.values.where((s) {
+      final isTracked = s.finalTotal > 0;
+      final isDisabled = widget.disabledCodes.contains(s.code);
+      return isTracked && !isDisabled;
+    }).toList()
+      ..sort((a, b) => a.percentage.compareTo(b.percentage));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    _courses =
-        widget.stats.courseStats.values.where((s) {
-          final isTracked = s.finalTotal > 0;
-          final isDisabled = widget.disabledCodes.contains(s.code);
-          return isTracked && !isDisabled;
-        }).toList()
-          ..sort((a, b) => a.percentage.compareTo(b.percentage));
 
     if (_courses.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -204,7 +220,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface
-                                        .withValues(alpha: 0.6),
+                                        .withValues(alpha: 0.75),
                                   ),
                                 ),
                               ),
@@ -227,7 +243,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(
                                   context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                                ).colorScheme.onSurface.withValues(alpha: 0.8),
                               ),
                             ),
                           ),
@@ -304,24 +320,16 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                       final Color brightLine = extraColor.withValues(alpha: 0.75);
                       final Color faintGap = extraColor.withValues(alpha: 0.15);
                       
-                      final List<Color> hatchColors = [];
-                      final List<double> hatchStops = [];
-                      
-                      const int n = 32; // Higher frequency for thinner look
+                      // Pre-calculate stops to avoid recreating them in the loop
+                      final hatchColors = <Color>[];
+                      final hatchStops = <double>[];
+                      const int n = 16; // Optimized frequency
                       for (int j = 0; j < n; j++) {
                         final double s0 = j / n;
-                        final double mid = (j + 0.25) / n; // 25% line, 75% gap for better visibility
+                        final double mid = (j + 0.25) / n;
                         final double s1 = (j + 1) / n;
-                        
-                        hatchColors.add(brightLine);
-                        hatchStops.add(s0);
-                        hatchColors.add(brightLine);
-                        hatchStops.add(mid);
-                        
-                        hatchColors.add(faintGap);
-                        hatchStops.add(mid);
-                        hatchColors.add(faintGap);
-                        hatchStops.add(s1);
+                        hatchColors.addAll([brightLine, brightLine, faintGap, faintGap]);
+                        hatchStops.addAll([s0, mid, mid, s1]);
                       }
 
                       return BarChartGroupData(

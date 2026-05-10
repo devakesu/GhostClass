@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
+import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
@@ -13,7 +14,6 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -30,25 +30,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // 1. Start background tasks immediately (Concurrent with animation)
-    final authTask = ref.read(authProvider.future);
-
-    // Proactively pre-warm security layers while logo is showing
+    // 1. Proactively pre-warm security layers while logo is showing
     final jwePreWarm = JweService.instance.preWarm();
     final apiPreWarm = ref.read(apiServiceProvider).preWarm();
 
-    // 2. Minimum animation duration and opportunistic cache warming
+    // 2. Critical Security Check First
     try {
       final api = ref.read(apiServiceProvider);
 
-      // Perform full server-side integrity check on app opening
-      final integrityCheck = api.verifyIntegrity();
+      // Perform full server-side integrity check before anything else
+      // This satisfies the requirement: "all other reqs must be only if app check success"
+      await api.verifyIntegrity();
 
-      await Future.wait([
-        Future.delayed(const Duration(milliseconds: 1800)),
+      // 3. Start hydration only after security is verified
+      // CLEAR ALL previous app-open caches for a truly fresh start
+      api.clearCaches();
+
+      final authTask = ref.read(authProvider.future);
+
+      await Future.wait<dynamic>([
+        Future.delayed(
+          const Duration(milliseconds: 1000),
+        ), // Shorter delay since we already waited for integrity
         jwePreWarm,
         apiPreWarm,
-        integrityCheck,
         authTask.then((user) {
           if (!mounted || user == null || user.profile?.avatarUrl == null) {
             return;
@@ -107,36 +112,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       } else {
         messages = ['We encountered a problem during startup.', e.toString()];
       }
-      
-      messages.add('Please contact us if the error persists even after some time.');
+
+      messages.add(
+        'Please contact us if the error persists even after some time.',
+      );
 
       final technicalDetails = sanitizeTechnicalDetails(e.toString());
-      
+
       await ServiceErrorDialog.show(
         context,
         'Connectivity Issue',
         messages,
         details: technicalDetails,
         isDismissible: false,
-        onContactSupport: () async {
-          final user = ref.read(authProvider).value;
-          final subject = Uri.encodeComponent('App Connectivity Issue [${AppConfig.supportEmail}]');
-          final body = Uri.encodeComponent(
-            'Hello Support Team,\n\n'
-            'I encountered a connectivity issue during app startup.\n\n'
-            '--- Diagnostic Information ---\n'
-            'User ID: ${user?.supabaseUserId ?? "Unauthenticated"}\n'
-            'Error: ${messages.first}\n'
-            'Details: $technicalDetails\n'
-            'App Version: ${AppConfig.appVersion}\n'
-            'Timestamp: ${DateTime.now().toIso8601String()}\n'
-          );
-          
-          final mailUrl = Uri.parse('mailto:${AppConfig.supportEmail}?subject=$subject&body=$body');
-          if (await canLaunchUrl(mailUrl)) {
-            await launchUrl(mailUrl);
-          }
-        },
+        onContactSupport: () => SupportHelper.contactViaEmail(
+          subject: 'App Connectivity Issue [v${AppConfig.appVersion}]',
+          customBody: 'Hello GhostClass Support Team,\n\n'
+              'I encountered a connectivity issue during app startup.\n\n'
+              '-- SUMMARY --\n'
+              'Error: ${messages.first}\n'
+              'Technical Details: $technicalDetails\n',
+        ),
         onRetry: () {
           // Trigger a fresh build of the Ref which will re-run _initializeApp
           ref.invalidate(authProvider);
@@ -148,9 +144,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // 3. Check final state
     // We already awaited authTask inside the Future.wait, so this is instant now.
-    // However, the value of 'user' may have changed due to the unawaited refreshProfile
-    // call inside AUTH provider (though in the latest fix I made it awaited).
-    // Let's use ref.read(authProvider).value to get the absolute current state.
     if (!mounted) return;
     final finalUser = ref.read(authProvider).value;
 

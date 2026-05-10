@@ -627,11 +627,7 @@ Optional Variables (omit to use defaults):
 | Secret | Description |
 | --- | --- |
 | `JWE_PRIVATE_KEY` | RSA Private Key for request/response encryption (required for mobile) |
-| `MOBILE_API_SECRET` | Pre-shared secret to identify mobile requests |
 | `ENFORCE_APP_CHECK` | Set to `"true"` to enforce Firebase App Check |
-| `ENFORCE_PLAY_INTEGRITY` | Set to `"true"` to enforce Play Integrity (Android) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Credentials for Play Integrity API |
-| `PLAY_INTEGRITY_CERT_SHA256` | Developer certificate fingerprint (optional) |
 
 > **Why Variables and not Secrets?** All values above are non-sensitive and already embedded in the browser JavaScript bundle or HTML. Storing them as Secrets causes GitHub Actions log masking to redact their values from build output, making logs unreadable (e.g. the package name becomes `***@1.9.5`).
 
@@ -1059,7 +1055,7 @@ See [mobile/README.md](../mobile/README.md#secrets-setup) for the full file sche
 
 GhostClass uses local vendored packages for security-critical plugins to ensure trust and allow for local patches. Ensure the `mobile/packages/` directory is present:
 
-- `flutter_play_integrity_wrapper`: Vendored for stable Play Integrity attestation.
+- `firebase_app_check`: Standardized Firebase App Check for cross-platform integrity.
 
 These are already linked via `path` in `pubspec.yaml`. No separate setup is required other than ensuring the files exist in the `packages/` directory.
 
@@ -1125,10 +1121,7 @@ All traffic between the mobile app and the GhostClass API is encrypted bi-direct
 
 #### 3. Device Integrity (App Check)
 
-We enforce Firebase App Check with:
-
-- **Android**: Play Integrity (verifies app binary, signing cert, and device hardware).
-- **iOS**: DeviceCheck / App Attest.
+We enforce Firebase App Check to verify app binary genuineness and device integrity.
 
 #### 4. Stealth Headers
 
@@ -1185,7 +1178,7 @@ flutter build ios --release
 - **State**: Riverpod 3 with code-generated providers. Each feature domain has its own provider file under `lib/providers/`.
 - **Networking**: All requests go through `ApiService` (Dio + `JweInterceptor`). The interceptor fetches the JWE public key from the backend on first use, then wraps every request body in JWE before sending and decrypts every response body on receipt.
 - **Secrets storage**: `SecureStorageService` wraps `flutter_secure_storage`. The EzyGo bearer token, Supabase session, and any sensitive keys are stored here — never in `shared_preferences`.
-- **Security guard**: `SecurityGuard.check()` is called at app startup. It requests an App Check token (Play Integrity on Android, DeviceCheck on iOS). In debug mode a Firebase Debug provider token is used automatically.
+- **Security guard**: `SecurityGuard.check()` is called at app startup to verify device integrity via Firebase App Check.
 
 ---
 

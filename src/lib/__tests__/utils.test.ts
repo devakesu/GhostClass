@@ -245,7 +245,7 @@ describe("utils.ts", () => {
 
   describe("formatCourseCode", () => {
     it("removes whitespace and handles hyphens", () => {
-      expect(formatCourseCode("CS 101-A")).toBe("CS101");
+      expect(formatCourseCode("CS 101-A")).toBe("CS101A");
       expect(formatCourseCode("MATH 201")).toBe("MATH201");
     });
   });

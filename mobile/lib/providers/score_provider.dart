@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/logic/error_utils.dart';
@@ -67,8 +69,16 @@ class CourseGroup {
 class ScoreNotifier extends AsyncNotifier<ScoreState> {
   @override
   Future<ScoreState> build() async {
+    final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
     final academic = academicAsync.value;
+
+    // BLOCKER: Do not fire queries until Cron Sync is finished
+    if (authState.value?.isSyncing == true) {
+      // Return a future that will be replaced once isSyncing changes
+      return Completer<ScoreState>().future;
+    }
+
     return _initialFetch(academic: academic);
   }
 
@@ -196,6 +206,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   }
 
   Future<void> refresh() async {
+    ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final academic = academicAsync.value;
     state = const AsyncValue.loading();

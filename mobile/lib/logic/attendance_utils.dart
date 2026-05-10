@@ -100,10 +100,14 @@ String normalizeDate(dynamic date) {
           RegExp(r'^\d+$').hasMatch(c)) {
         if (a.length == 4) {
           // YYYY-MM-DD
-          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+          final res = "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+          if (DateTime.tryParse("$a-$b-$c") == null) return '';
+          return res;
         } else if (c.length == 4) {
           // DD-MM-YYYY
-          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+          final res = "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+          if (DateTime.tryParse("$c-$b-$a") == null) return '';
+          return res;
         }
       }
     }
@@ -122,10 +126,14 @@ String normalizeDate(dynamic date) {
           RegExp(r'^\d+$').hasMatch(c)) {
         if (a.length == 4) {
           // YYYY/MM/DD
-          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+          final res = "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
+          if (DateTime.tryParse("$a-$b-$c") == null) return '';
+          return res;
         } else {
           // DD/MM/YYYY
-          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+          final res = "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
+          if (DateTime.tryParse("$c-$b-$a") == null) return '';
+          return res;
         }
       }
     }
@@ -334,11 +342,7 @@ String toTitleCase(String text) {
 }
 
 String standardizeCourseCode(String input) {
-  String s = input.trim().toUpperCase();
-  if (s.contains('-')) {
-    s = s.split('-')[0].trim();
-  }
-  return s.replaceAll(RegExp(r'\s+'), '');
+  return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
 }
 
 const Set<String> remarkPlaceholders = {
