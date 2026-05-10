@@ -45,7 +45,6 @@ class AppConfig {
       ? AppSecrets.ghostclassApiUrlDev
       : AppSecrets.ghostclassApiUrlProd;
 
-
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
 
@@ -111,9 +110,6 @@ class AppConfig {
   /// The Play Store URL for the application.
   static String get playStoreUrl =>
       'https://play.google.com/store/apps/details?id=com.devakesu.ghostclass';
-
-  /// The GhostClass public web app URL.
-  static String get ghostclassWebUrl => 'https://ghostclass.devakesu.com';
 
   /// Official legal contact email.
   static String get legalEmail => 'legal@ghostclass.devakesu.com';

@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -131,33 +132,12 @@ class ServiceErrorView extends ConsumerWidget {
                         ),
                       ),
                     FilledButton(
-                      onPressed: () {
-                        final errorStr = error?.toString() ?? 'Unknown Error';
-                        final sanitizedError = errorStr.length > 300
-                            ? '${errorStr.substring(0, 300)}...'
-                            : errorStr;
-
-                        final subject = 'Connection Error';
-                        final message =
-                            'I am experiencing a connection error with the Ezygo API.\n\n'
-                            'Context: $sanitizedError';
-
-                        final uri = Uri(
-                          path: '/contact',
-                          queryParameters: {
-                            'subject': subject,
-                            'message': message,
-                          },
-                        );
-
-                        context.push(
-                          uri.toString(),
-                          extra: {
-                            'subject': subject,
-                            'message': message,
-                          },
-                        );
-                      },
+                      onPressed: () => SupportHelper.openContactPage(
+                        context,
+                        subject: title,
+                        message: 'I am experiencing an issue with the Ezygo API.\n\n'
+                            'Context: ${error?.toString() ?? "Unknown Error"}',
+                      ),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,

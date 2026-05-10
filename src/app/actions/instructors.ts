@@ -10,7 +10,7 @@ export async function upsertInstructorAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
-  const courseCode = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  const courseCode = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
   const instructorName = toTitleCase(String(formData.get("instructorName") ?? ""));
   const semester = String(formData.get("semester") ?? "").trim();
   const academicYear = String(formData.get("academicYear") ?? "").trim();
@@ -72,7 +72,7 @@ export async function upsertInstructorAction(
       .from("course_instructors")
       .upsert({
         class_id: profile.class_id,
-        course_code: courseCode.toUpperCase().replace(/\s+/g, ""),
+        course_code: courseCode.toUpperCase().replace(/[\s\u00A0-]/g, ""),
         instructor_name: instructorName,
         semester,
         academic_year: academicYear,

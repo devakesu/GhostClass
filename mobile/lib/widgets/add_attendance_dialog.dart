@@ -273,7 +273,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     setState(() => _isSubmitting = true);
     try {
       final matchingCourse = ref.read(dashboardProvider).value!.courses.firstWhere((c) => c.safeId == _selectedCourseId);
-      final trackerCourseCode = matchingCourse.code?.replaceAll(RegExp(r'\s+'), '').toUpperCase() ?? matchingCourse.safeId;
+      final trackerCourseCode = utils.standardizeCourseCode(matchingCourse.code ?? matchingCourse.safeId);
       await ref.read(trackingProvider.notifier).insertRecord(
         date: DateFormat('yyyy-MM-dd').format(_selectedDate),
         session: utils.toRoman(_selectedSession!),

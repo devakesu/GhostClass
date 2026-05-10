@@ -30,9 +30,9 @@ export function useDashboardStats({
   return useMemo(() => {
     // 0. Pre-normalize course codes for O(1) lookup in loops
     const normalizedCourseMap = new Map<string, string>();
-    const normalizedDisabledCodes = new Set(Array.from(disabledCodes).map(c => c.toUpperCase().replace(/\s+/g, "")));
+    const normalizedDisabledCodes = new Set(Array.from(disabledCodes).map(c => c.toUpperCase().replace(/[\s\u00A0-]/g, "")));
 
-    const getNormalizedKey = (raw: string) => raw.toUpperCase().replace(/\s+/g, "");
+    const getNormalizedKey = (raw: string) => raw.toUpperCase().replace(/[\s\u00A0-]/g, "");
 
     const getCourseCode = (id: string) => {
       if (normalizedCourseMap.has(id)) return normalizedCourseMap.get(id)!;

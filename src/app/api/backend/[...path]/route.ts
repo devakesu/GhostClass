@@ -244,22 +244,22 @@ export const POST = withSecurity(async (req, { params, decryptedBody, authType }
     if (token) invalidateEzygoCacheForUser(token);
   }
   return res;
-});
+}, { consume: true });
 
 export const PUT = withSecurity(async (req, { params, decryptedBody, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
-});
+}, { consume: true });
 
 export const PATCH = withSecurity(async (req, { params, decryptedBody, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PATCH", path, decryptedBody, authType);
-});
+}, { consume: true });
 
 export const DELETE = withSecurity(async (req, { params, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "DELETE", path, undefined, authType);
-});
+}, { consume: true });
 
 export const HEAD = withSecurity(async (req, { params, authType }) => {
   const { path } = params as { path: string[] };

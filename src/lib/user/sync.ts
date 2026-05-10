@@ -127,8 +127,7 @@ export async function performProfileSync(
           coursesData.forEach((c) => {
             if (c.id) coursesMap[String(c.id)] = c;
             if (c.code) {
-              const normalized = String(c.code).replace(/\s+/g, "")
-                .toUpperCase();
+              const normalized = String(c.code).toUpperCase().replace(/[\s\u00A0-]/g, "");
               coursesMap[normalized] = c;
             }
           });
@@ -143,30 +142,80 @@ export async function performProfileSync(
       }
 
     // 2. Resolve Academic Info (with robust parsing and derivation)
-    let ezygoAcademicSemester: string | null = null;
-    if (semRaw) {
-      const semVal = typeof semRaw === "object"
-        ? (semRaw as any).default_semester
-        : semRaw;
-      const semStr = String(semVal).toLowerCase();
+    // Robust extraction of semester/year from EzyGo settings responses
+    const extractValue = (raw: any, key: string, fallbackKeys: string[] = []): string | null => {
+      if (!raw) return null;
+      if (typeof raw !== "object") return String(raw);
+      
+      // 1. Try common top-level keys
+      const keysToTry = [key, "data", "value", ...fallbackKeys];
+      for (const k of keysToTry) {
+        const val = raw[k];
+        if (val === undefined || val === null) continue;
+        
+        // If primitive, use it
+        if (typeof val !== "object") return String(val);
+        
+        // If object, check for the primary key inside it
+        if (val[key] !== undefined && val[key] !== null) return String(val[key]);
+      }
+      return null;
+    };
+
+    const semVal = extractValue(semRaw, "default_semester", ["current_semester", "current_term", "semester"]);
+    const yearVal = extractValue(yearRaw, "default_academic_year", ["current_year", "academic_year", "year"]);
+
+    if (!semVal || !yearVal) {
+      logger.dev(`[sync] Academic resolution incomplete. Raw sem=${JSON.stringify(semRaw)}, Raw year=${JSON.stringify(yearRaw)}`);
+    }
+
+    let ezygoAcademicSemester: "even" | "odd" | null = null;
+    if (semVal) {
+      const semStr = semVal.toLowerCase();
       if (semStr.includes("odd") || semStr === "1") {
         ezygoAcademicSemester = "odd";
       } else if (semStr.includes("even") || semStr === "2") {
         ezygoAcademicSemester = "even";
       }
     }
-    const ezygoAcademicYear = yearRaw
-      ? String(
-        typeof yearRaw === "object"
-          ? (yearRaw as any).default_academic_year
-          : yearRaw,
-      )
-      : null;
+
+    const ezygoAcademicYear = yearVal;
+    logger.dev(`[sync] Resolved Academic from EzyGo: sem=${ezygoAcademicSemester}, year=${ezygoAcademicYear}`);
 
     const currentAcademic = calculateCurrentAcademicInfo({
       year: ezygoAcademicYear,
       semester: ezygoAcademicSemester,
     });
+
+    // 2a. Self-Healing: If EzyGo was missing data, push our derivation back to anchor it
+    if (!ezygoAcademicSemester || !ezygoAcademicYear) {
+      logger.info(`[sync] Self-healing academic context for ${authId}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year}`);
+      
+      const pushPromises: Promise<any>[] = [];
+      if (!ezygoAcademicSemester) {
+        pushPromises.push(egressFetch("user/setting/default_semester", {
+          method: "POST",
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ default_semester: currentAcademic.current_semester }),
+        }));
+      }
+      if (!ezygoAcademicYear) {
+        pushPromises.push(egressFetch("user/setting/default_academic_year", {
+          method: "POST",
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ default_academic_year: currentAcademic.current_year }),
+        }));
+      }
+      
+      // Fire and forget (or await if we want to be certain, but let's not block the whole sync)
+      Promise.all(pushPromises).catch(err => logger.warn("[sync] Academic self-heal push failed", err));
+    }
 
     // 2b. Class Detection & Catalog Population
     let classId: string | null = null;
@@ -229,7 +278,7 @@ export async function performProfileSync(
         .filter((c) => c.id && c.code)
         .map((c) => ({
           ezygo_id: c.id,
-          university_code: String(c.code).replace(/\s+/g, "").toUpperCase(),
+          university_code: String(c.code).toUpperCase().replace(/[\s\u00A0-]/g, ""),
           course_name: c.name,
           last_seen_at: new Date().toISOString(),
         }));

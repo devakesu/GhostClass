@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
-import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/dashboard/course_list_section.dart';
@@ -26,8 +25,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(dashboardProvider);
     final data = dashboardState.value;
+    final isSyncing = ref.watch(authProvider.select((v) => v.value?.isSyncing ?? false));
 
-    if (dashboardState.isLoading) {
+    if (dashboardState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -72,12 +72,7 @@ class _DashboardContent extends ConsumerWidget {
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
-        final trackingNotifier = ref.read(trackingProvider.notifier);
-        final dashboardNotifier = ref.read(dashboardProvider.notifier);
-        // Refresh profile, tracking (EzyGo sync), and dashboard
-        await ref.read(authProvider.notifier).refreshProfile();
-        await trackingNotifier.refresh(forceSync: true);
-        await dashboardNotifier.refresh();
+        await ref.read(dashboardProvider.notifier).refresh();
       },
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(

@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:dio/dio.dart';
 
 class AcademicState {
   final String semester;
@@ -53,35 +56,95 @@ final academicProvider =
 class AcademicNotifier extends AsyncNotifier<AcademicState?> {
   @override
   FutureOr<AcademicState?> build() async {
-    final auth = ref.watch(authProvider).value;
-    if (auth == null) return null;
+    // Academic state is pre-populated by AuthNotifier during startup
+    // (via _fetchAndSaveAcademicContext) before authProvider.future resolves.
+    // We gate on auth being available to avoid building while logged out.
+    final authAsync = ref.watch(authProvider);
+    if (!authAsync.hasValue || authAsync.value == null) return null;
 
-    final semester = auth.settings.semester ?? auth.profile?.currentSemester;
-    final year = auth.settings.academicYear ?? auth.profile?.currentYear;
+    final storage = ref.read(secureStorageProvider);
+
+    // 1. Primary source: secure storage (written by auth startup flow)
+    final cached = await storage.getAcademicState();
+    if (cached != null) return cached;
+
+    // 2. Fallback: User settings from profile sync
+    final auth = authAsync.value!;
+    final semester = auth.settings.semester;
+    final year = auth.settings.academicYear;
 
     if (semester != null && year != null) {
-      return AcademicState(semester: semester, year: year);
+      final state = AcademicState(semester: semester, year: year);
+      unawaited(storage.saveAcademicState(state));
+      return state;
     }
 
-    final fallback = calculateCurrentAcademicInfo(
-      semester: semester,
-      year: year,
-    );
+    // 3. Last resort: Calculate from current date
+    final fallback = calculateCurrentAcademicInfo();
     return AcademicState(
       semester: fallback['current_semester']!,
       year: fallback['current_year']!,
     );
   }
 
+  Future<void> refreshFromEzygo() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final api = ref.read(apiServiceProvider);
+      final storage = ref.read(secureStorageProvider);
+      
+      final results = await Future.wait<Response<dynamic>>([
+        api.fetchSemester(storage),
+        api.fetchAcademicYear(storage),
+      ]);
+      
+      final semRes = results[0];
+      final yearRes = results[1];
+      
+      String? extract(dynamic raw, String key) {
+        if (raw == null) return null;
+        if (raw is! Map) return raw.toString();
+        
+        final map = raw;
+        if (map[key] != null) return map[key].toString();
+        
+        final keysToTry = ['data', 'value'];
+        for (final k in keysToTry) {
+          final val = map[k];
+          if (val != null) {
+            if (val is! Map) return val.toString();
+            if (val[key] != null) return val[key].toString();
+          }
+        }
+        return null;
+      }
+      
+      final semester = extract(semRes.data, 'default_semester');
+      final year = extract(yearRes.data, 'default_academic_year');
+      
+      if (semester != null && year != null) {
+        final next = AcademicState(semester: semester, year: year);
+        await storage.saveAcademicState(next);
+        return next;
+      }
+      
+      final cached = await storage.getAcademicState();
+      return cached ?? state.value;
+    });
+  }
+
   Future<void> setSemester(String semester) async {
     final current = state.value;
     final nextYear =
         current?.year ?? calculateCurrentAcademicInfo()['current_year']!;
-    final nextState = AcademicState(semester: semester, year: nextYear);
-    state = AsyncValue.data(nextState);
+    
+    // 1. Show loading immediately in the state
+    state = const AsyncValue.loading();
+    
+    // 2. Perform the heavy lifting on the server
     await ref
         .read(authProvider.notifier)
-        .updateAcademicContext(nextState.semester, nextState.year);
+        .updateAcademicContext(semester, nextYear);
   }
 
   Future<void> setYear(String year) async {
@@ -89,11 +152,14 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final nextSemester =
         current?.semester ??
         calculateCurrentAcademicInfo()['current_semester']!;
-    final nextState = AcademicState(semester: nextSemester, year: year);
-    state = AsyncValue.data(nextState);
+    
+    // 1. Show loading immediately
+    state = const AsyncValue.loading();
+    
+    // 2. Update server
     await ref
         .read(authProvider.notifier)
-        .updateAcademicContext(nextState.semester, nextState.year);
+        .updateAcademicContext(nextSemester, year);
   }
 }
 

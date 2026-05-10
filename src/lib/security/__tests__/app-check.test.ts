@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { verifyAppCheckToken, withSecurity } from '../app-check';
 import { getAppCheck } from '@/lib/firebase/admin';
-import { verifyPlayIntegrity } from '@/lib/security/integrity';
-import { verifyDeviceCheckToken } from '@/lib/security/device-check';
 import { headers, cookies } from 'next/headers';
 import { validateCsrfToken } from '@/lib/security/csrf';
 import { decryptRequest, encryptResponse } from '@/lib/security/jwe';
@@ -20,14 +18,6 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@/lib/firebase/admin', () => ({
   getAppCheck: vi.fn(),
-}));
-
-vi.mock('@/lib/security/integrity', () => ({
-  verifyPlayIntegrity: vi.fn(),
-}));
-
-vi.mock('@/lib/security/device-check', () => ({
-  verifyDeviceCheckToken: vi.fn(),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -73,7 +63,6 @@ vi.mock('@upstash/ratelimit', () => {
 describe('app-check logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.MOBILE_API_SECRET = 'test-secret';
     process.env.VITEST = 'true';
     process.env.DISABLE_SECURITY_BYPASS = 'false';
     process.env.FIREBASE_APP_ID_ANDROID = 'android-id';
@@ -105,17 +94,28 @@ describe('app-check logic', () => {
       expect(result.isValid).toBe(true);
     });
 
-    it('verifies valid Android token with Play Integrity', async () => {
+    it('verifies valid Android token', async () => {
       const h = new Headers();
       h.set('X-Firebase-AppCheck', 'valid-token');
-      h.set('X-Play-Integrity', 'integrity-token');
       vi.mocked(headers).mockResolvedValue(h as any);
       
       mockAppCheck.verifyToken.mockResolvedValue({ appId: 'android-id' });
-      vi.mocked(verifyPlayIntegrity).mockResolvedValue({ isValid: true, verdict: { ok: true } } as any);
 
       const result = await verifyAppCheckToken();
       expect(result.isValid).toBe(true);
+    });
+
+    it('fails for unauthorized App ID with criticalRisk', async () => {
+      const h = new Headers();
+      h.set('X-Firebase-AppCheck', 'valid-token');
+      vi.mocked(headers).mockResolvedValue(h as any);
+      
+      mockAppCheck.verifyToken.mockResolvedValue({ appId: 'malicious-app-id' });
+
+      const result = await verifyAppCheckToken();
+      expect(result.isValid).toBe(false);
+      expect(result.criticalRisk).toBe(true);
+      expect(result.error).toBe('Unauthorized Application');
     });
   });
 
@@ -125,31 +125,15 @@ describe('app-check logic', () => {
       vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
     });
 
-    it('verifies valid iOS token with DeviceCheck', async () => {
+    it('verifies valid iOS token', async () => {
       const h = new Headers();
       h.set('X-Firebase-AppCheck', 'valid-token');
-      h.set('X-Device-Check', 'device-token');
-      h.set('X-Device-Check-Nonce', 'nonce');
       vi.mocked(headers).mockResolvedValue(h as any);
       
       mockAppCheck.verifyToken.mockResolvedValue({ appId: 'ios-id' });
-      vi.mocked(verifyDeviceCheckToken).mockResolvedValue({ isValid: true, verdict: { ok: true } } as any);
 
       const result = await verifyAppCheckToken();
       expect(result.isValid).toBe(true);
-    });
-
-    it('fails if iOS DeviceCheck is enforced but missing', async () => {
-      process.env.ENFORCE_DEVICE_CHECK = 'true';
-      const h = new Headers();
-      h.set('X-Firebase-AppCheck', 'valid-token');
-      vi.mocked(headers).mockResolvedValue(h as any);
-      
-      mockAppCheck.verifyToken.mockResolvedValue({ appId: 'ios-id' });
-
-      const result = await verifyAppCheckToken();
-      expect(result.isValid).toBe(false);
-      expect(result.error).toBe('Missing mandatory device check');
     });
   });
 

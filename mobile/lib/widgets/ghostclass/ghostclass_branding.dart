@@ -111,7 +111,7 @@ class GhostClassBranding extends StatelessWidget {
             children: [
               _SecondaryLink(
                 label: 'GHOSTCLASS WEB',
-                onTap: () => _launchUrl(AppConfig.ghostclassWebUrl),
+                onTap: () => _launchUrl(AppConfig.webUrl),
               ),
               const SizedBox(width: 16),
               _SecondaryLink(

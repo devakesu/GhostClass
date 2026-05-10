@@ -80,6 +80,19 @@ class EzygoService {
     );
   }
 
+  Future<Response<dynamic>> updateAcademicYear(String year, SecureStorageService storage) async {
+    final token = await storage.getEzygoToken();
+    return _ref.read(dioServiceProvider).dio.post(
+      '$_ezygoApiRoot/user/setting/default_academic_year',
+      data: {'default_academic_year': year},
+      options: Options(
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+        extra: {'useLimitedToken': true},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
+  }
+
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
     final token = await storage.getEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_semester';

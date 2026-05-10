@@ -18,7 +18,6 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { withSecurity } from "@/lib/security/app-check";
-import { validateSignedRequest } from "@/lib/security/request-signing";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 
 // Insert shape for the `notification` table (server-generated fields omitted).
@@ -138,13 +137,10 @@ export const GET = withSecurity(async (req, { authType }) => {
         providedBuf.length === cronBuf.length &&
         crypto.timingSafeEqual(providedBuf, cronBuf);
 
-      // 1b. Signature-based Auth (Ed25519) — The new "Maximum Security" path
-      const isSignatureValid = await validateSignedRequest(req);
-      
-      if (isCronValid || isSignatureValid) {
+      if (isCronValid) {
         isCron = true;
       } else {
-        // Auth present but all methods failed — reject immediately before rate limiting
+        // Auth present but secret mismatch — reject immediately before rate limiting
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       }
     } catch (error) {
@@ -442,7 +438,7 @@ export const GET = withSecurity(async (req, { authType }) => {
           // to canonical alphanumeric course codes (uppercase, no whitespace).
           const legacyCourseIdToCode = new Map<string, string>();
           validatedCourses.forEach((course) => {
-            const normalizedCode = course.code?.replace(/\s+/g, "").toUpperCase();
+            const normalizedCode = course.code?.toUpperCase().replace(/[\s\u00A0-]/g, "");
             if (normalizedCode) {
               legacyCourseIdToCode.set(String(course.id), normalizedCode);
             }

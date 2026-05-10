@@ -188,60 +188,10 @@ class HeaderSection extends ConsumerWidget {
     Navigator.pop(context);
     if (value == current) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Change'),
-        content: Text(
-          'You are about to change the ${type == 'semester' ? 'semester' : 'academic year'}. Are you sure you want to continue?',
-          style: GoogleFonts.manrope(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'CANCEL',
-              style: GoogleFonts.manrope(
-                fontWeight: FontWeight.w700,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'CONFIRM',
-              style: GoogleFonts.manrope(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      if (type == 'semester') {
-        await ref.read(academicProvider.notifier).setSemester(value);
-      } else {
-        await ref.read(academicProvider.notifier).setYear(value);
-      }
-      // Force refresh dashboard
-      ref.invalidate(dashboardProvider);
+    if (type == 'semester') {
+      await ref.read(academicProvider.notifier).setSemester(value);
+    } else {
+      await ref.read(academicProvider.notifier).setYear(value);
     }
   }
 }

@@ -147,7 +147,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   const uniqueCourses = useMemo(() => {
     const seen = new Set<string>();
     return courses.filter((c: { code: string; id: number; name: string }) => {
-      const code = c.code.toUpperCase().replace(/\s+/g, "");
+      const code = c.code.toUpperCase().replace(/[\s\u00A0-]/g, "");
       if (!code || seen.has(code)) return false;
       seen.add(code);
       return true;
@@ -155,7 +155,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   }, [courses]);
 
   const sortedCodes = useMemo(() => 
-    uniqueCourses.map(c => c.code.toUpperCase().replace(/\s+/g, "")).sort(),
+    uniqueCourses.map(c => c.code.toUpperCase().replace(/[\s\u00A0-]/g, "")).sort(),
     [uniqueCourses]
   );
 

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/models/user.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';

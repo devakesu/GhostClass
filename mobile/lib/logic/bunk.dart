@@ -49,9 +49,18 @@ AttendanceResult calculateAttendance(
   }
 
   if (currentPercentage < safeTarget) {
-    final required = safeTarget >= 100
-        ? total - present
-        : ((safeTarget * total - 100 * present) / (100 - safeTarget)).ceil();
+    if (safeTarget >= 100) {
+      // Impossible to reach 100% if missed any class
+      return AttendanceResult(
+        canBunk: 0,
+        requiredToAttend: 999,
+        targetPercentage: safeTarget,
+        isExact: false,
+        isBorderline: false,
+      );
+    }
+    final required =
+        ((safeTarget * total - 100 * present) / (100 - safeTarget)).ceil();
     return AttendanceResult(
       canBunk: 0,
       requiredToAttend: required < 0 ? 0 : required,

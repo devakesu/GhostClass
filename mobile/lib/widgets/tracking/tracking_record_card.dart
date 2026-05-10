@@ -44,7 +44,7 @@ class TrackingRecordCard extends StatelessWidget {
           officialLabel = 'Absent';
         } else if (offStatus == AttendanceStatus.dutyLeave) {
           officialLabel = 'Duty Leave';
-        } else if (offStatus == AttendanceStatus.late) {
+        } else if (offStatus == AttendanceStatus.otherLeave) {
           officialLabel = 'Other Leave';
         }
       }
@@ -205,7 +205,7 @@ class TrackingRecordCard extends StatelessWidget {
     final status = AttendanceStatus.fromCode(attendance);
     if (status == AttendanceStatus.dutyLeave) return 'Duty Leave';
     if (status == AttendanceStatus.absent) return 'Absent';
-    if (status == AttendanceStatus.late) return 'Other Leave';
+    if (status == AttendanceStatus.otherLeave) return 'Other Leave';
     return 'Present';
   }
 
@@ -214,7 +214,7 @@ class TrackingRecordCard extends StatelessWidget {
     final ghostColors = Theme.of(context).extension<GhostColors>();
     if (status == AttendanceStatus.dutyLeave) return ghostColors?.accentOrange ?? Colors.orange;
     if (status == AttendanceStatus.absent) return ghostColors?.dangerRed ?? Colors.red;
-    if (status == AttendanceStatus.late) return ghostColors?.accentBlue ?? Colors.blue;
+    if (status == AttendanceStatus.otherLeave) return ghostColors?.accentBlue ?? Colors.blue;
     return ghostColors?.successGreen ?? Colors.green;
   }
 

@@ -23,6 +23,7 @@ import 'package:ghostclass/screens/splash_screen.dart';
 import 'package:ghostclass/screens/static_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -30,8 +31,6 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(de
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {
     notifyListeners();
-    // Supabase.instance.client.auth.onAuthStateChange is already a broadcast stream,
-    // so we can listen directly without wrapping in asBroadcastStream()
     _subscription = stream.listen((_) => notifyListeners());
   }
 
@@ -45,35 +44,47 @@ class GoRouterRefreshStream extends ChangeNotifier {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final authRefreshNotifier = ValueNotifier<bool>(false);
+  
+  // Create a listener that triggers router refresh when terms acceptance status changes
+  ref.listen(authProvider, (previous, next) {
+    if (previous?.value?.termsAccepted != next.value?.termsAccepted) {
+      authRefreshNotifier.value = !authRefreshNotifier.value;
+    }
+  });
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
-    refreshListenable: GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+    refreshListenable: Listenable.merge([
+      GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+      authRefreshNotifier,
+    ]),
+    observers: [SentryNavigatorObserver()],
     redirect: (context, state) {
+      final path = state.uri.path;
+      final isSplash = path == '/splash';
+      final isRoot = path == '/';
+      
+      // 1. Always allow Splash and Root to load without triggering auth hydration.
+      // This ensures SplashScreen can perform its security handshake first.
+      if (isSplash || isRoot) return null;
+
       final session = Supabase.instance.client.auth.currentSession;
       final isAuth = session != null;
       final authAsync = ref.read(authProvider);
       final authResolved = !authAsync.isLoading;
       final hydratedUser = authAsync.value;
       
-      final path = state.uri.path;
-      final isSplash = path == '/splash';
       final isLogin = path == '/login';
-      final isRoot = path == '/';
       final isLegal = path == '/legal';
       final isPublic = isLegal || path == '/help' || path == '/contact' || path == '/about';
       final isAcceptTerms = path == '/accept-terms';
       
-      // Always allow Splash
-      if (isSplash) return null;
-      
-      // Handle Root - let it hit the route or redirect to splash if we want a clean start
-      if (isRoot) return null;
-
-      // Handle Public pages
+      // Handle Public pages - always accessible
       if (isPublic) return null;
 
-      // Auth protection
+      // Auth protection - force login if no session
       if (!isAuth && !isLogin) {
         return '/login';
       }
@@ -97,6 +108,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // ─── Terms Acceptance Redirection ───
+      // If user is logged in but hasn't accepted current terms, force them to accept-terms page
       if (isAuth && !isAcceptTerms && !isPublic) {
         if (hydratedUser != null && !hydratedUser.termsAccepted) {
           return '/accept-terms';
@@ -188,7 +200,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileScreen(),
       ),
 
-      // Static Pages (outside shell if they shouldn't have nav bar)
+      // Static Pages
       GoRoute(
         path: '/legal',
         pageBuilder: (context, state) => CustomTransitionPage(

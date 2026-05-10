@@ -58,7 +58,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 | :--- | :--- | :--- |
 | `firebase_core` | ^4.7.0 | Firebase SDK |
 | `firebase_app_check` | ^0.4.3 | Device integrity attestation |
-| `flutter_play_integrity_wrapper` | local | Vendored Play Integrity plugin |
+| `firebase_app_check` | pub | Firebase App Check for API protection |
 | `flutter_secure_storage` | ^10.0.0 | Hardware-backed credential storage |
 | `jose` + `pointycastle` | ^0.3.5 / ^3.9.1 | JWE key parsing + RSA operations |
 | `encrypt` | ^5.0.3 | AES-256 symmetric encryption |
@@ -100,7 +100,6 @@ mobile/
 │   └── Runner/
 │       └── AppDelegate.swift
 ├── packages/
-│   └── flutter_play_integrity_wrapper/  # Vendored Play Integrity plugin
 ├── assets/
 │   ├── icon.png              # App icon
 │   └── logo.png              # GhostClass logo

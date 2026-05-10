@@ -7,8 +7,11 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/models/institution.dart';
+import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
 import 'package:ghostclass/providers/security_provider.dart';
@@ -59,6 +62,8 @@ class AuthenticatedUser {
   final String? termsVersion;
   final UserSettings settings;
   final UserProfile? profile;
+  final bool isSyncing;
+  final bool isUpdatingSettings;
 
   const AuthenticatedUser({
     required this.supabaseUserId,
@@ -68,6 +73,8 @@ class AuthenticatedUser {
     this.username,
     this.termsVersion,
     this.profile,
+    this.isSyncing = false,
+    this.isUpdatingSettings = false,
   });
 
   bool get termsAccepted => termsVersion == AppConfig.termsVersion;
@@ -86,6 +93,8 @@ class AuthenticatedUser {
     String? termsVersion,
     UserSettings? settings,
     UserProfile? profile,
+    bool? isSyncing,
+    bool? isUpdatingSettings,
   }) {
     return AuthenticatedUser(
       supabaseUserId: supabaseUserId ?? this.supabaseUserId,
@@ -95,6 +104,8 @@ class AuthenticatedUser {
       username: username ?? this.username,
       termsVersion: termsVersion ?? this.termsVersion,
       profile: profile ?? this.profile,
+      isSyncing: isSyncing ?? this.isSyncing,
+      isUpdatingSettings: isUpdatingSettings ?? this.isUpdatingSettings,
     );
   }
 
@@ -109,7 +120,9 @@ class AuthenticatedUser {
           username == other.username &&
           termsVersion == other.termsVersion &&
           settings == other.settings &&
-          profile == other.profile;
+          profile == other.profile &&
+          isSyncing == other.isSyncing &&
+          isUpdatingSettings == other.isUpdatingSettings;
 
   @override
   int get hashCode =>
@@ -119,7 +132,9 @@ class AuthenticatedUser {
       username.hashCode ^
       termsVersion.hashCode ^
       settings.hashCode ^
-      profile.hashCode;
+      profile.hashCode ^
+      isSyncing.hashCode ^
+      isUpdatingSettings.hashCode;
 }
 
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
@@ -138,14 +153,19 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     WidgetsBinding.instance.addObserver(this);
 
     final apiService = ref.read(apiServiceProvider);
-    final subscription = apiService.onUnauthorized.listen((_) {
+    final unauthorizedSub = apiService.onUnauthorized.listen((_) {
       _handleUnauthorized();
+    });
+
+    final lockdownSub = apiService.onSecurityLockdown.listen((data) {
+      _handleSecurityLockdown(data);
     });
 
     ref.onDispose(() {
       WidgetsBinding.instance.removeObserver(this);
       _refreshTimer?.cancel();
-      subscription.cancel();
+      unauthorizedSub.cancel();
+      lockdownSub.cancel();
     });
 
     _startPeriodicRefresh();
@@ -170,7 +190,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         final backgroundDuration = now.difference(_lastBackgroundedAt!);
         if (backgroundDuration < const Duration(minutes: 15)) return;
       }
-      refreshProfile(force: true);
+      refreshProfile(force: true, sync: true);
     }
   }
 
@@ -271,6 +291,22 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
   }
 
+  Future<void> _handleSecurityLockdown(Map<String, String> data) async {
+    AppLogger.e('AuthNotifier: SECURITY LOCKDOWN TRIGGERED');
+    
+    // 1. Set failure state immediately to block UI
+    ref.read(securityFailureProvider.notifier).setFailure(
+      data['title'],
+      criticalRisk: true,
+      reason: data['reason'],
+      action: data['action'],
+      source: data['technicalDetails'],
+    );
+
+    // 2. Perform forced logout and data wipe
+    await logout(force: true);
+  }
+
   Future<void> refreshProfile({bool force = false, bool sync = false}) async {
     final currentUser = state.value;
     if (currentUser == null) return;
@@ -358,29 +394,125 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
       }
 
+      // Step 3: Profile Fetch (blocking)
       final updatedUser = await _fetchAndApplyServerProfile(
         user,
         supabaseToken: token,
         updateState: false,
+        sync: false,
       );
       _lastRefresh = DateTime.now();
 
-      // Proactively pre-warm institutions data in the background
-      unawaited(ref.read(institutionsProvider.future));
+      // Step 4: Fetch sem/year from EzyGo (blocking — splash waits for this)
+      await _fetchAndSaveAcademicContext(token);
 
-      return updatedUser;
+      // Step 5: Mark as syncing and kick off cron sync in background
+      final syncingUser = updatedUser.copyWith(isSyncing: true);
+      unawaited(Future.microtask(() async {
+        try {
+          // Pre-fetch institutions so they are ready in settings
+          unawaited(ref.read(institutionsProvider.future));
+          
+          await api.triggerSync(token, force: true);
+          // Refresh profile after cron so class name, etc. are accurate
+          await refreshProfile(force: true);
+        } catch (e) {
+          AppLogger.w('AuthNotifier: Background startup tasks failed', e);
+        } finally {
+          final finalUser = state.value;
+          if (finalUser != null) {
+            state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+          }
+        }
+      }));
+
+      return syncingUser;
     } catch (e) {
       if (e is AppException && e.isAuthError) {
         await logout();
         return null;
       }
       
-      // If it's a network error or other non-auth issue, return the cached user 
-      // instead of rethrowing, so the app remains usable in offline mode.
-      AppLogger.w('AuthNotifier: Background sync failed during startup. Using cached data.', e);
+      // Network / server errors: return cached user so app is usable offline.
+      AppLogger.w('AuthNotifier: Startup sync failed. Using cached data.', e);
       return user;
     } finally {
       api.suppress401 = false;
+    }
+  }
+
+  /// Fetches sem/year from EzyGo and persists to secure storage.
+  /// If EzyGo returns null/empty, calculates from the current date and
+  /// POSTs the calculated values back to EzyGo so it stays in sync.
+  /// This is called synchronously during startup — it blocks the splash screen.
+  Future<void> _fetchAndSaveAcademicContext(String supabaseToken) async {
+    final api = ref.read(apiServiceProvider);
+    final storage = ref.read(secureStorageProvider);
+
+    // Clear any previously cached academic state so we always get a fresh value
+    // (avoids showing last term's data after semester rollover)
+    try {
+      final results = await Future.wait<dynamic>([
+        api.fetchSemester(storage),
+        api.fetchAcademicYear(storage),
+      ]);
+
+      final semRes = results[0];
+      final yearRes = results[1];
+
+      String? extract(dynamic raw, String key) {
+        if (raw == null) return null;
+        if (raw is! Map) {
+          final s = raw.toString().trim();
+          return s.isEmpty ? null : s;
+        }
+        final map = raw;
+        if (map[key] != null) return map[key].toString().trim().isEmpty ? null : map[key].toString().trim();
+        for (final k in ['data', 'value']) {
+          final val = map[k];
+          if (val == null) continue;
+          if (val is! Map) return val.toString().trim().isEmpty ? null : val.toString().trim();
+          if (val[key] != null) return val[key].toString().trim().isEmpty ? null : val[key].toString().trim();
+        }
+        return null;
+      }
+
+      var semester = extract(semRes.data, 'default_semester');
+      var year = extract(yearRes.data, 'default_academic_year');
+
+      AppLogger.i('AuthNotifier: EzyGo academic context — semester=$semester year=$year');
+
+      // If EzyGo returned null/empty, calculate from date and POST back
+      if (semester == null || year == null) {
+        final fallback = calculateCurrentAcademicInfo();
+        semester ??= fallback['current_semester']!;
+        year ??= fallback['current_year']!;
+
+        AppLogger.i('AuthNotifier: EzyGo academic context missing — using fallback ($semester, $year) and posting back');
+
+        // Best-effort POST — do not throw if this fails
+        try {
+          await Future.wait([
+            api.updateSemester(semester, storage),
+            api.updateAcademicYear(year, storage),
+          ]);
+        } catch (e) {
+          AppLogger.w('AuthNotifier: Could not POST fallback academic context to EzyGo', e);
+        }
+      }
+
+      final academicState = AcademicState(semester: semester, year: year);
+      await storage.saveAcademicState(academicState);
+      AppLogger.i('AuthNotifier: Academic context saved — $semester / $year');
+    } catch (e) {
+      // EzyGo is down: calculate fallback and persist it so the app still works
+      AppLogger.w('AuthNotifier: Failed to fetch academic context from EzyGo. Using date-based fallback.', e);
+      final fallback = calculateCurrentAcademicInfo();
+      final academicState = AcademicState(
+        semester: fallback['current_semester']!,
+        year: fallback['current_year']!,
+      );
+      await storage.saveAcademicState(academicState);
     }
   }
 
@@ -446,11 +578,20 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final termsVersion = _extractTermsVersion(bridgeResponse.data);
       final ezygoToken = (bridgeResponse.data['ezygo_token'] as String?) ?? '';
 
+      // Extract initial academic context from bridge response
+      final initialSem = bridgeResponse.data['current_semester'] ?? bridgeResponse.data['semester'];
+      final initialYear = bridgeResponse.data['current_year'] ?? bridgeResponse.data['academic_year'];
+
+      final settingsWithAcademic = settingsFallback.copyWith(
+        semester: initialSem?.toString(),
+        academicYear: initialYear?.toString(),
+      );
+
       await Future.wait([
         storage.saveEzygoToken(ezygoToken),
         storage.saveSupabaseUserId(supabaseUser.id),
         storage.saveUsername(username),
-        storage.saveSettings(settingsFallback),
+        storage.saveSettings(settingsWithAcademic),
         if (ezygoId != null) storage.saveEzygoUserId(ezygoId),
         if (termsVersion != null) storage.saveTermsVersion(termsVersion),
       ]);
@@ -461,7 +602,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         usernameOverride: username,
         ezygoIdOverride: ezygoId,
         termsVersionOverride: termsVersion,
-        settingsFallback: settingsFallback,
+        settingsFallback: settingsWithAcademic,
       );
 
       final profileService = ref.read(profileServiceProvider);
@@ -471,7 +612,38 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         return;
       }
 
-      await _fetchAndApplyServerProfile(cachedUser);
+      final token = await _getFreshSupabaseToken();
+      if (token != null) {
+        // Fetch sem/year from EzyGo (blocking — user waits on login screen)
+        await _fetchAndSaveAcademicContext(token);
+
+        // Mark as syncing and kick off cron sync in background
+        final profiledUser = await _fetchAndApplyServerProfile(
+          cachedUser,
+          supabaseToken: token,
+          updateState: false,
+        );
+        final syncingUser = profiledUser.copyWith(isSyncing: true);
+        state = AsyncValue.data(syncingUser);
+        unawaited(Future.microtask(() async {
+          try {
+            // Pre-fetch institutions so they are ready in settings
+            unawaited(ref.read(institutionsProvider.future));
+            
+            await ref.read(apiServiceProvider).triggerSync(token, force: true);
+            await refreshProfile(force: true);
+          } catch (e) {
+            AppLogger.w('AuthNotifier: Post-login cron sync failed', e);
+          } finally {
+            final finalUser = state.value;
+            if (finalUser != null) {
+              state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+            }
+          }
+        }));
+      } else {
+        await _fetchAndApplyServerProfile(cachedUser);
+      }
     } catch (e, st) {
       AppLogger.e('AuthNotifier: LOGIN ERROR', e);
       state = AsyncValue.error(e, st);
@@ -540,45 +712,93 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   }) async {
     final user = state.value;
     if (user == null) return;
-    final service = ref.read(settingsServiceProvider);
-    await service.updateSettings(
-      user.supabaseUserId,
-      bunkEnabled: bunkEnabled,
-      targetPercentage: targetPercentage,
-      disabledCourses: disabledCourses,
-    );
 
+    final previousSettings = user.settings;
+
+    // 1. Optimistic UI Update + Visual Feedback (isUpdatingSettings = true)
     final updatedSettings = user.settings.copyWith(
-      bunkCalculatorEnabled: bunkEnabled,
-      targetPercentage: targetPercentage,
-      disabledCourses: disabledCourses,
+      bunkCalculatorEnabled: bunkEnabled ?? user.settings.bunkCalculatorEnabled,
+      targetPercentage: targetPercentage ?? user.settings.targetPercentage,
+      disabledCourses: disabledCourses ?? user.settings.disabledCourses,
     );
-    await service.saveSettingsLocally(updatedSettings);
-    state = AsyncValue.data(user.copyWith(settings: updatedSettings));
+    
+    state = AsyncValue.data(user.copyWith(
+      settings: updatedSettings,
+      isUpdatingSettings: true,
+    ));
+
+    // 2. Persist
+    final service = ref.read(settingsServiceProvider);
+    try {
+      await service.saveSettingsLocally(updatedSettings);
+      await service.updateSettings(
+        user.supabaseUserId,
+        bunkEnabled: bunkEnabled,
+        targetPercentage: targetPercentage,
+        disabledCourses: disabledCourses,
+      );
+    } catch (e) {
+      AppLogger.w('AuthNotifier: Settings persistence failed, rolling back.', e);
+      // Rollback to previous settings
+      state = AsyncValue.data(user.copyWith(
+        settings: previousSettings,
+        isUpdatingSettings: false,
+      ));
+      rethrow;
+    } finally {
+      // Clear updating flag if not already cleared by rollback
+      final currentUser = state.value;
+      if (currentUser != null && currentUser.isUpdatingSettings) {
+        state = AsyncValue.data(currentUser.copyWith(isUpdatingSettings: false));
+      }
+    }
   }
 
   Future<void> updateAcademicContext(String? sem, String? year) async {
     final user = state.value;
     if (user == null) return;
 
-    final updatedSettings = user.settings.copyWith(
-      semester: sem,
-      academicYear: year,
-    );
-    final updatedProfile = user.profile?.copyWith(
-      currentSemester: sem,
-      currentYear: year,
-    );
-
+    final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
-    await Future.wait([
-      storage.saveSettings(updatedSettings),
-      if (updatedProfile != null) storage.saveUserProfile(updatedProfile),
-    ]);
 
-    state = AsyncValue.data(
-      user.copyWith(settings: updatedSettings, profile: updatedProfile),
-    );
+    try {
+      // 1. Inform Ezygo of the change first (matches web parity)
+      final List<Future> updates = [];
+      if (sem != null) updates.add(api.updateSemester(sem, storage));
+      if (year != null) updates.add(api.updateAcademicYear(year, storage));
+
+      if (updates.isNotEmpty) {
+        final results = await Future.wait(updates);
+        for (var res in results) {
+          if (res.statusCode != 200 && res.statusCode != 201) {
+            throw Exception(formatApiError(res.data, 'Auth.AcademicUpdate'));
+          }
+        }
+      }
+
+      // 2. Update the dedicated academic state in storage immediately so providers see it
+      if (sem != null || year != null) {
+        final currentAcademic = await storage.getAcademicState();
+        final nextAcademic = AcademicState(
+          semester: sem ?? currentAcademic?.semester ?? calculateCurrentAcademicInfo()['current_semester']!,
+          year: year ?? currentAcademic?.year ?? calculateCurrentAcademicInfo()['current_year']!,
+        );
+        await storage.saveAcademicState(nextAcademic);
+      }
+
+      // 3. Trigger server-side profile sync to align database with new Ezygo state
+      // This also updates our local profile and settings via _applyProfileResponseData
+      // We set isSyncing=true here because refreshProfile(sync: true) kicks off cron sync.
+      // Changing the state here will also trigger academicProvider to rebuild because it watches authProvider.
+      state = AsyncValue.data(user.copyWith(isSyncing: true));
+      
+      await refreshProfile(force: true, sync: true);
+      
+      AppLogger.i('AuthNotifier: Academic context updated successfully ($sem, $year)');
+    } catch (e) {
+      AppLogger.e('AuthNotifier: Failed to update academic context', e);
+      rethrow;
+    }
   }
 
   Future<void> updateDefaultInstitution(int institutionId) async {
@@ -696,11 +916,34 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       );
     }
 
-    return _applyProfileResponseData(
+    final updatedUser = await _applyProfileResponseData(
       currentUser: user,
       data: response.data as Map<String, dynamic>,
-      updateState: updateState,
+      updateState: false, 
     );
+
+    if (updateState) {
+      state = AsyncValue.data(updatedUser);
+    }
+
+    if (sync) {
+      unawaited(Future.microtask(() async {
+        try {
+          api.clearCaches();
+          await api.triggerSync(token, force: true);
+          await refreshProfile(force: true);
+        } catch (e) {
+          AppLogger.w('AuthNotifier: Profile-triggered cron sync failed', e);
+        } finally {
+          final finalUser = state.value;
+          if (finalUser != null) {
+            state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+          }
+        }
+      }));
+    }
+
+    return updatedUser;
   }
 
   Future<AuthenticatedUser> _applyProfileResponseData({
@@ -714,10 +957,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         ? UserSettings.fromJson(rawSettings)
         : currentUser.settings;
 
-    final settings = baseSettings.copyWith(
-      semester: data['current_semester'] ?? baseSettings.semester,
-      academicYear: data['current_year'] ?? baseSettings.academicYear,
-    );
+    final settings = baseSettings;
 
     final rawProfile = data.containsKey('profile') 
         ? Map<String, dynamic>.from(data['profile'] as Map) 

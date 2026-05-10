@@ -232,11 +232,8 @@ class CourseCard extends StatelessWidget {
                     final instructor = instructors
                         .where(
                           (i) =>
-                              i.courseCode.toUpperCase().replaceAll(' ', '') ==
-                              (course.code ?? '').toUpperCase().replaceAll(
-                                ' ',
-                                '',
-                              ),
+                              utils.standardizeCourseCode(i.courseCode) ==
+                              utils.standardizeCourseCode(course.code ?? ''),
                         )
                         .lastOrNull;
 
@@ -786,6 +783,8 @@ class SimpleBunkPanel extends StatelessWidget {
           Text(
             result.canBunk > 0
                 ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class 🥳' : 'classes 🥳🥳'}'
+                : result.requiredToAttend >= 999
+                ? 'Impossible to reach target 💀'
                 : result.requiredToAttend > 0
                 ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
                 : 'You are on the edge. Skipping now\'s risky 💀💀',

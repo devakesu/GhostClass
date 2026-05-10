@@ -8,6 +8,20 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 class AppLogger {
   AppLogger._();
 
+  static final List<String> _logBuffer = [];
+  static const int _maxBufferSize = 50;
+
+  static void _addToBuffer(String level, String message) {
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    _logBuffer.add('[$timestamp] [$level] $message');
+    if (_logBuffer.length > _maxBufferSize) {
+      _logBuffer.removeAt(0);
+    }
+  }
+
+  /// Returns the current log buffer as a single string.
+  static String getLogBuffer() => _logBuffer.join('\n');
+
   static final RegExp _safeTagChars = RegExp(r'[^a-z0-9._-]');
 
   static String _toSafeTagValue(String value) {
@@ -29,6 +43,7 @@ class AppLogger {
 
   /// Logs a debug message.
   static void d(String message, [Object? error, StackTrace? stackTrace]) {
+    _addToBuffer('DEBUG', message);
     if (kDebugMode) {
       debugPrint('[DEBUG] $message');
       if (error != null) {
@@ -42,6 +57,7 @@ class AppLogger {
 
   /// Logs an information message.
   static void i(String message) {
+    _addToBuffer('INFO', message);
     if (kDebugMode) {
       debugPrint('[INFO] $message');
     }
@@ -50,6 +66,7 @@ class AppLogger {
 
   /// Logs a warning message.
   static void w(String message, [Object? error]) {
+    _addToBuffer('WARN', message);
     if (kDebugMode) {
       debugPrint('[WARNING] $message');
       if (error != null) {
@@ -76,6 +93,7 @@ class AppLogger {
     Map<String, String>? tags,
     Map<String, dynamic>? extras,
   }) {
+    _addToBuffer('ERROR', message);
     if (kDebugMode) {
       debugPrint('[ERROR] $message');
       if (error != null) {

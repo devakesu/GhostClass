@@ -108,7 +108,7 @@ export function CourseCard({
   onEditInstructor,
   supabaseUserId
 }: CourseCardProps) {
-  const courseCodeNormalized = (course.code || String(course.id)).toUpperCase().replace(/\s+/g, "");
+  const courseCodeNormalized = (course.code || String(course.id)).toUpperCase().replace(/[\s\u00A0-]/g, "");
   const { data: courseDetails, isLoading } = useCourseDetails(
     courseCodeNormalized,
     Number(course.id),

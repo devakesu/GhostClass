@@ -195,28 +195,28 @@ export function AttendanceCalendar({
 
   /** Resolve course code from courseId using available registries */
   const getCourseCodeById = useCallback((id: string): string => {
-    const normalizedInput = id.trim().toUpperCase().replace(/\s+/g, "");
+    const normalizedInput = id.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
 
     // 1. Check if ID exists in coursesData and has a code
     if (coursesData?.courses?.[id]) {
-      return (coursesData.courses[id].code || id).toUpperCase().replace(/\s+/g, "");
+      return (coursesData.courses[id].code || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
     }
 
     // 2. Otherwise, find match by numeric code or code
     const course = Object.values(coursesData?.courses || {}).find(c => 
-      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/\s+/g, "") === normalizedInput)
+      String(c.id) === id || (c.code && c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput)
     );
-    if (course?.code) return course.code.toUpperCase().replace(/\s+/g, "");
+    if (course?.code) return course.code.toUpperCase().replace(/[\s\u00A0-]/g, "");
     
     // 3. Check Custom (Class) Courses
     const custom = classCourses?.find(cc => 
-      cc.course_code.toUpperCase().replace(/\s+/g, "") === normalizedInput
+      cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput
     );
-    if (custom) return custom.course_code.toUpperCase().replace(/\s+/g, "");
+    if (custom) return custom.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
 
     // 4. Fallback to attendanceData courses
     const altCourse = attendanceData?.courses?.[id];
-    return (altCourse?.code ?? id).toUpperCase().replace(/\s+/g, "");
+    return (altCourse?.code ?? id).toUpperCase().replace(/[\s\u00A0-]/g, "");
   }, [attendanceData, coursesData, classCourses]);
 
   /** Resolve course name from courseId using available registries */
@@ -225,9 +225,9 @@ export function AttendanceCalendar({
     const course = Object.values(coursesData?.courses || {}).find(c => String(c.id) === id);
     if (course?.name) return course.name;
 
-    const normalizedId = id.replace(/\s+/g, "").toUpperCase();
+    const normalizedId = id.toUpperCase().replace(/[\s\u00A0-]/g, "");
     const custom = classCourses?.find(cc => 
-      cc.course_code.replace(/\s+/g, "").toUpperCase() === normalizedId
+      cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedId
     );
     if (custom) return custom.course_name || custom.course_code;
 

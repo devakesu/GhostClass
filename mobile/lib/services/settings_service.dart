@@ -1,3 +1,4 @@
+import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

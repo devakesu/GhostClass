@@ -57,7 +57,7 @@ class AuthService {
 
   Future<Response<dynamic>> refreshProfile(String supabaseToken, {bool sync = false}) async {
     return _dio.get(
-      '$_ghostclassBaseUrl/user/profile',
+      '$_ghostclassBaseUrl/profile',
       queryParameters: sync ? {'sync': 'true'} : null,
       options: Options(
         headers: {'Authorization': 'Bearer $supabaseToken'},

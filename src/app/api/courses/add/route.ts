@@ -13,7 +13,7 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: any })
   try {
     const body = decryptedBody || await req.json();
     
-    const code = String(body.courseCode ?? "").trim().toUpperCase().replace(/\s+/g, "");
+    const code = String(body.courseCode ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
     const name = toTitleCase(String(body.courseName ?? ""));
     const semester = String(body.semester ?? "").trim();
     const academicYear = String(body.academicYear ?? "").trim();

@@ -398,38 +398,6 @@ export function validateEnvironment() {
     errors.push('❌ ENFORCE_APP_CHECK must be either "true" or "false"');
   }
 
-  // Play Integrity Granular Enforcement
-  const integrityFlags = [
-    "PLAY_INTEGRITY_ENFORCE_BASIC",
-    "PLAY_INTEGRITY_ENFORCE_DEVICE",
-    "PLAY_INTEGRITY_ENFORCE_STRONG",
-    "PLAY_INTEGRITY_ENFORCE_LICENSED",
-    "PLAY_INTEGRITY_ENFORCE_PLAY_RECOGNIZED",
-    "PLAY_INTEGRITY_ENFORCE_SIGNING_CERT",
-  ];
-
-  const anyGranularEnforcement = integrityFlags.some((flag) => process.env[flag] === "true");
-  const enforcePlayIntegrityMaster = process.env.ENFORCE_PLAY_INTEGRITY === "true";
-
-  integrityFlags.forEach((flag) => {
-    const value = process.env[flag];
-    if (value && !["true", "false"].includes(value.toLowerCase())) {
-      errors.push(`❌ ${flag} must be either "true" or "false"`);
-    }
-  });
-
-  if (anyGranularEnforcement && !enforcePlayIntegrityMaster) {
-    errors.push(
-      "❌ Conflicting Config: Granular PLAY_INTEGRITY_ENFORCE_* flags are enabled, but ENFORCE_PLAY_INTEGRITY is false.\n" +
-        "   Either set ENFORCE_PLAY_INTEGRITY=true to enable integrity enforcement, or disable all granular flags.",
-    );
-  }
-
-  if ((enforcePlayIntegrityMaster || anyGranularEnforcement) && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    const cause = enforcePlayIntegrityMaster ? "ENFORCE_PLAY_INTEGRITY=true" : "granular PLAY_INTEGRITY_ENFORCE_* flags are enabled";
-    errors.push(`❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ${cause}`);
-  }
-
   // Application Identity
   if (process.env.NODE_ENV === "production") {
     if (!process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME) {
@@ -438,10 +406,11 @@ export function validateEnvironment() {
     if (!process.env.FIREBASE_APP_ID_ANDROID) {
       errors.push("❌ FIREBASE_APP_ID_ANDROID is required");
     }
-    if (!process.env.PLAY_INTEGRITY_PROJECT_NUMBER) {
-      errors.push("❌ PLAY_INTEGRITY_PROJECT_NUMBER is required");
+    if (process.env.ENFORCE_APP_CHECK === "true" && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_APP_CHECK=true");
     }
   }
+
 
   // ============================================================================
   // OPTIONAL - App works but features may be limited
@@ -459,11 +428,7 @@ export function validateEnvironment() {
     warnings.push("⚠️  NEXT_PUBLIC_GITHUB_URL not set");
   }
 
-  if (!process.env.MOBILE_API_SECRET) {
-    warnings.push(
-      "⚠️  MOBILE_API_SECRET not set - server-side nonce signing will use a fallback (less secure).",
-    );
-  }
+
 
   if (!process.env.NEXT_PUBLIC_LEGAL_EMAIL) {
     warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EMAIL not set");
@@ -661,25 +626,7 @@ export function validateEnvironment() {
     }
   }
 
-  // Request Signature Keys (Ed25519)
-  const requestPrivateKey = process.env.REQUEST_PRIVATE_KEY;
-  const requestPublicKey = process.env.REQUEST_PUBLIC_KEY;
 
-  if (process.env.NODE_ENV === "production") {
-    if (!requestPrivateKey) {
-      errors.push("❌ REQUEST_PRIVATE_KEY is required in production");
-    }
-    if (!requestPublicKey) {
-      errors.push("❌ REQUEST_PUBLIC_KEY is required in production");
-    }
-  }
-
-  if (requestPrivateKey && !requestPrivateKey.includes("PRIVATE KEY")) {
-    errors.push("❌ REQUEST_PRIVATE_KEY must be a valid Ed25519 private key in PEM format");
-  }
-  if (requestPublicKey && !requestPublicKey.includes("PUBLIC KEY")) {
-    errors.push("❌ REQUEST_PUBLIC_KEY must be a valid Ed25519 public key in PEM format");
-  }
 
 
 

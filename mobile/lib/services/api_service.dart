@@ -25,6 +25,7 @@ class ApiService {
   DioService get _dioService => _ref.read(dioServiceProvider);
 
   Stream<void> get onUnauthorized => _dioService.onUnauthorized;
+  Stream<Map<String, String>> get onSecurityLockdown => _dioService.onSecurityLockdown;
   bool get suppress401 => _dioService.suppress401;
   set suppress401(bool v) => _dioService.suppress401 = v;
 
@@ -83,6 +84,8 @@ class ApiService {
       _ezygo.updateDefaultInstitution(institutionUserId, storage);
   Future<Response<dynamic>> updateSemester(String semester, SecureStorageService storage) =>
       _ezygo.updateSemester(semester, storage);
+  Future<Response<dynamic>> updateAcademicYear(String year, SecureStorageService storage) =>
+      _ezygo.updateAcademicYear(year, storage);
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) => _ezygo.fetchSemester(storage);
   Future<Response<dynamic>> fetchAcademicYear(SecureStorageService storage) => _ezygo.fetchAcademicYear(storage);
   Future<Response<dynamic>> fetchLeaveData(SecureStorageService storage) => _ezygo.fetchLeaveData(storage);
@@ -95,7 +98,7 @@ class ApiService {
   Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) => _security.fetchAttestationDetails(supabaseToken);
 
   // --- GhostClass Sync ---
-  Future<Response<dynamic>> triggerSync(String supabaseToken) async {
+  Future<Response<dynamic>> triggerSync(String supabaseToken, {bool force = false}) async {
     // 1. Deduplication
     if (_syncInFlight != null) return _syncInFlight!;
 
@@ -112,7 +115,7 @@ class ApiService {
 
     // 3. Throttling
     final now = DateTime.now();
-    if (_lastSyncTime != null && now.difference(_lastSyncTime!) < _syncCooldown) {
+    if (!force && _lastSyncTime != null && now.difference(_lastSyncTime!) < _syncCooldown) {
       AppLogger.d('ApiService: Sync throttled.');
       return Response(
         requestOptions: RequestOptions(path: 'sync'),

@@ -121,51 +121,68 @@ class ServiceErrorDialog extends StatelessWidget {
             // Message Area
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.3,
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
               ),
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 child: Column(
-                  children: messages.where((m) => m.trim().isNotEmpty).map((msg) {
-                    final bool isList = messages.length > 1;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: isList 
-                            ? MainAxisAlignment.start 
-                            : MainAxisAlignment.center,
-                        children: [
-                          if (isList) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(top: 7),
-                              child: Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
+                  children: [
+                    ...messages.where((m) => m.trim().isNotEmpty).map((msg) {
+                      final bool isList = messages.length > 1;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: isList 
+                              ? MainAxisAlignment.start 
+                              : MainAxisAlignment.center,
+                          children: [
+                            if (isList) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(top: 7),
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                            ],
+                            Flexible(
+                              child: Text(
+                                msg,
+                                textAlign: isList ? TextAlign.left : TextAlign.center,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 14),
                           ],
-                          Flexible(
-                            child: Text(
-                              msg,
-                              textAlign: isList ? TextAlign.left : TextAlign.center,
-                              style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                height: 1.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
+                      );
+                    }),
+                    
+                    // Unified persistence message
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Text(
+                        'If this issue persists even after some time and repeated attempts, please contact us.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.manrope(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -187,7 +187,7 @@ class AttendanceCalendarWidget extends StatelessWidget {
         final status = AttendanceStatus.fromCode(s.attendance);
         if (status == AttendanceStatus.absent) hasAbsent = true;
         if (status == AttendanceStatus.dutyLeave) hasDutyLeave = true;
-        if (status == AttendanceStatus.late) hasOtherLeave = true;
+        if (status == AttendanceStatus.otherLeave) hasOtherLeave = true;
         if (status == AttendanceStatus.present) hasPresent = true;
       });
     }
@@ -196,7 +196,7 @@ class AttendanceCalendarWidget extends StatelessWidget {
       final status = AttendanceStatus.fromCode(t.attendance);
       if (status == AttendanceStatus.absent) hasAbsent = true;
       if (status == AttendanceStatus.dutyLeave) hasDutyLeave = true;
-      if (status == AttendanceStatus.late) hasOtherLeave = true;
+      if (status == AttendanceStatus.otherLeave) hasOtherLeave = true;
       if (status == AttendanceStatus.present) hasPresent = true;
     }
 

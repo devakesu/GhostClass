@@ -8,7 +8,7 @@ import * as Sentry from "@sentry/nextjs";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
-  const code = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  const code = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
   const name = toTitleCase(String(formData.get("courseName") ?? ""));
   const semester = String(formData.get("semester") ?? "").trim();
   const academicYear = String(formData.get("academicYear") ?? "").trim();
@@ -70,7 +70,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
       .from("class_courses")
       .insert({
         class_id: profile.class_id,
-        course_code: code.toUpperCase().replace(/\s+/g, ""),
+        course_code: code.toUpperCase().replace(/[\s\u00A0-]/g, ""),
         course_name: name,
         semester,
         academic_year: academicYear,

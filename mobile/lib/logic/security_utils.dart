@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/widgets/security_error_dialog.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SecurityUtils {
   static Future<void> showSecurityFailureDialog(BuildContext context, {
@@ -48,16 +48,16 @@ class SecurityUtils {
             retryLabel: retryLabel,
             onRetry: onRetry,
             isDismissible: isDismissible,
-            onContactSupport: () async {
-              final Uri emailLaunchUri = Uri(
-                scheme: 'mailto',
-                path: AppConfig.supportEmail,
-                query: 'subject=Security Failure Report [v${AppConfig.appVersion}]&body=Hi Support,\n\nI encountered a security failure while using the app.\n\n-- SUMMARY --\nTitle: $title\nMessage: $message\n\n-- TECHNICAL DETAILS --\nDevice: $deviceDetails\nError Context: $technicalDetails\nApp Version: ${AppConfig.appVersion}\nTimestamp: ${DateTime.now().toIso8601String()}\n\n-- PLEASE DESCRIBE WHAT HAPPENED --\n',
-              );
-              if (await canLaunchUrl(emailLaunchUri)) {
-                await launchUrl(emailLaunchUri);
-              }
-            },
+            onContactSupport: () => SupportHelper.contactViaEmail(
+              subject: 'Security Failure Report [v${AppConfig.appVersion}]',
+              customBody: 'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+                  '-- SUMMARY --\n'
+                  'Title: $title\n'
+                  'Message: $message\n\n'
+                  '-- TECHNICAL DETAILS --\n'
+                  'Device: $deviceDetails\n'
+                  'Error Context: $technicalDetails\n',
+            ),
           ),
         ),
       ),

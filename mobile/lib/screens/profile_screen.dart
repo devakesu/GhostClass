@@ -163,8 +163,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       ),
       body: authAsync.when(
         data: (user) {
-          if (user == null)
+          if (user == null) {
             return const LoadingOverlay(isFullScreen: false, showLogo: false);
+          }
           return Column(
             children: [
               ProfileHeader(
@@ -428,8 +429,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       );
                     },
                   );
-                  if (picked != null)
+                  if (picked != null) {
                     setState(() => _selectedBirthDate = picked);
+                  }
                 }
               : null,
           child: Container(

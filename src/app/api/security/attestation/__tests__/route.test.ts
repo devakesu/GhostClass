@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from '../route';
 import { getAppCheck } from '@/lib/firebase/admin';
-import { verifyPlayIntegrity } from '@/lib/security/integrity';
 
 vi.mock('next/server', () => ({
   NextResponse: {
@@ -16,16 +15,12 @@ vi.mock('@/lib/firebase/admin', () => ({
   getAppCheck: vi.fn(),
 }));
 
-vi.mock('@/lib/security/integrity', () => ({
-  verifyPlayIntegrity: vi.fn(),
-}));
-
 describe('GET /api/security/attestation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns verification details when both tokens are missing', async () => {
+  it('returns failure when App Check token is missing', async () => {
     const req = {
       headers: {
         get: vi.fn().mockReturnValue(null),
@@ -36,16 +31,14 @@ describe('GET /api/security/attestation', () => {
 
     expect(response.data.verified).toBe(false);
     expect(response.data.appCheckError).toBe('Missing App Check token');
-    expect(response.data.playIntegrityError).toBe('Missing Play Integrity token');
   });
 
-  it('verifies App Check and Play Integrity tokens when provided', async () => {
+  it('verifies App Check token when provided', async () => {
     const authorizedAppId = "1:424804867878:android:015bb34927f1dd8e21abe7";
     const req = {
       headers: {
         get: vi.fn().mockImplementation((name) => {
           if (name === 'X-Firebase-AppCheck') return 'ac-token';
-          if (name === 'X-Play-Integrity') return 'pi-token';
           return null;
         }),
       },
@@ -56,17 +49,11 @@ describe('GET /api/security/attestation', () => {
     };
     vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
 
-    vi.mocked(verifyPlayIntegrity).mockResolvedValue({
-      isValid: true,
-      verdict: { healthy: true },
-    });
-
     const response = await GET(req) as any;
 
     expect(response.data.verified).toBe(true);
     expect(response.data.appId).toBe(authorizedAppId);
-    expect(response.data.playIntegrityVerified).toBe(true);
-    expect(response.data.details).toEqual({ healthy: true });
+    expect(response.data.appCheck).toBe(true);
   });
 
   it('handles App Check verification failure', async () => {
@@ -90,53 +77,27 @@ describe('GET /api/security/attestation', () => {
     expect(response.data.appCheckError).toBe('AC Token Invalid');
   });
 
-  it('handles Play Integrity verification failure', async () => {
-    const authorizedAppId = "1:424804867878:android:015bb34927f1dd8e21abe7";
+  it('handles unauthorized App ID', async () => {
+    const unauthorizedAppId = "1:wrong:android:id";
     const req = {
       headers: {
         get: vi.fn().mockImplementation((name) => {
           if (name === 'X-Firebase-AppCheck') return 'ac-token';
-          if (name === 'X-Play-Integrity') return 'invalid-pi-token';
           return null;
         }),
       },
     } as any;
 
     const mockAppCheck = {
-      verifyToken: vi.fn().mockResolvedValue({ appId: authorizedAppId }),
+      verifyToken: vi.fn().mockResolvedValue({ appId: unauthorizedAppId }),
     };
     vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
 
-    vi.mocked(verifyPlayIntegrity).mockResolvedValue({
-      isValid: false,
-      error: 'PI Token Invalid',
-      reason: 'Compromised device',
-      action: 'Reinstall app',
-    });
-
     const response = await GET(req) as any;
 
-    expect(response.data.playIntegrityVerified).toBe(false);
-    expect(response.data.playIntegrityError).toBe('PI Token Invalid');
-    expect(response.data.reason).toBe('Compromised device');
-  });
-
-  it('handles Play Integrity internal exception', async () => {
-    const req = {
-      headers: {
-        get: vi.fn().mockImplementation((name) => {
-          if (name === 'X-Play-Integrity') return 'pi-token';
-          return null;
-        }),
-      },
-    } as any;
-
-    vi.mocked(verifyPlayIntegrity).mockRejectedValue(new Error('Internal Crash'));
-
-    const response = await GET(req) as any;
-
-    expect(response.data.playIntegrityVerified).toBe(false);
-    expect(response.data.playIntegrityError).toBe('Internal Crash');
+    expect(response.data.verified).toBe(false);
+    expect(response.data.criticalRisk).toBe(true);
+    expect(response.data.appCheckError).toBe('Unauthorized App ID');
   });
 
   it('handles case where App Check verifier is unavailable', async () => {
