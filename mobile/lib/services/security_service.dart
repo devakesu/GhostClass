@@ -47,13 +47,28 @@ class SecurityService {
         );
       }
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
+      final appCheckError = e.requestOptions.extra['appCheckError'];
+
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
         final data = e.response?.data as Map<String, dynamic>?;
-        if (data != null && data['type'] == 'security') {
+        final isSecurityType = data != null && data['type'] == 'security';
+        final backendReason = data?['reason'] ?? data?['error'] ?? data?['appCheckError'];
+
+        if (isSecurityType || appCheckError != null) {
+          final action = data?['action'] ?? 'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';
+
           throw AppException(
-            message: data['error'] ?? 'Security handshake failed',
+            message: appCheckError != null 
+                ? 'Device verification failed: $appCheckError'
+                : (backendReason ?? 'Security verification failed'),
             type: AppExceptionType.unauthorized,
-            details: data,
+            details: {
+              ...?data,
+              'type': 'security',
+              'reason': appCheckError ?? backendReason ?? 'App attestation failed',
+              'appCheckError': appCheckError,
+              'action': action,
+            },
           );
         }
       }

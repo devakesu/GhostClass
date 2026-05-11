@@ -1,6 +1,7 @@
 // src/lib/validate-env.ts
 
 import { logger } from "./logger";
+import { ENCRYPTION_KEY_PATTERN } from "@/lib/constants/crypto";
 
 /** Parses a string as a non-negative integer. Returns NaN for values with non-numeric suffixes (e.g. "10abc"), decimals, or unsafe integers. */
 function parseStrictInt(value: string): number {
@@ -29,7 +30,7 @@ export function validateEnvironment() {
   // Security
   if (!process.env.ENCRYPTION_KEY) {
     errors.push("❌ ENCRYPTION_KEY is required");
-  } else if (!/^[a-f0-9]{64}$/i.test(process.env.ENCRYPTION_KEY)) {
+  } else if (!ENCRYPTION_KEY_PATTERN.test(process.env.ENCRYPTION_KEY)) {
     errors.push("❌ ENCRYPTION_KEY must be 64 hex characters (32 bytes)");
   }
 

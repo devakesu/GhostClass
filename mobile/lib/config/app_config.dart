@@ -87,7 +87,7 @@ class AppConfig {
   static bool get isReleaseBuild => kReleaseMode;
 
   /// Effective date for legal terms.
-  static String get legalEffectiveDate => 'March 6, 2026';
+  static String get legalEffectiveDate => 'May 11, 2026';
 
   /// Author branding.
   static String get authorName => '@deva.kesu';
@@ -124,7 +124,7 @@ class AppConfig {
   static String get governingLawSpecific => 'Kochi, Kerala, India';
 
   /// Required Terms of Service version.
-  static String get termsVersion => '2.5';
+  static String get termsVersion => '2.8';
 
   /// Message displayed during background synchronization.
   static String get syncLoadingMessage =>

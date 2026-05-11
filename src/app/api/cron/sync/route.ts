@@ -939,7 +939,8 @@ export const GET = withSecurity(async (req, { authType }) => {
                 .map((r) => r.value)
               : [];
 
-            await Promise.all([
+            // Execute all DB operations in parallel and check for errors
+            const dbOperations = await Promise.allSettled([
               toDelete.size > 0
                 ? supabaseAdmin.from("tracker").delete().in("id", [...toDelete])
                 : null,
@@ -950,10 +951,35 @@ export const GET = withSecurity(async (req, { authType }) => {
               notifications.length > 0
                 ? supabaseAdmin.from("notification").insert(notifications)
                 : null,
-              renderedEmails.length > 0
-                ? Promise.allSettled(renderedEmails.map((e) => sendEmail(e)))
-                : null,
-            ].filter((p) => p !== null) as Promise<unknown>[]);
+            ].filter((p) => p !== null));
+
+            // Check for Supabase errors — do not silently ignore DB failures
+            for (const result of dbOperations) {
+              if (result.status === "rejected") {
+                logger.error(
+                  `[sync] DB operation failed for user ${redact("id", user.username)}:`,
+                  result.reason
+                );
+                Sentry.captureException(result.reason, {
+                  tags: { type: "sync_db_operation_error", location: "cron/sync" },
+                  extra: { user_id: redact("id", user.auth_id) },
+                });
+              } else if (result.value?.error) {
+                logger.error(
+                  `[sync] Supabase returned error for user ${redact("id", user.username)}:`,
+                  result.value.error
+                );
+                Sentry.captureException(result.value.error, {
+                  tags: { type: "sync_supabase_error", location: "cron/sync" },
+                  extra: { user_id: redact("id", user.auth_id) },
+                });
+              }
+            }
+
+            // Send emails after successful DB operations
+            if (renderedEmails.length > 0) {
+              await Promise.allSettled(renderedEmails.map((e) => sendEmail(e)));
+            }
           }
 
           userStats.processed++;

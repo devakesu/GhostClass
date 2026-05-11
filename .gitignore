@@ -94,6 +94,7 @@ certificates/
 /mobile/android/**/*.jks
 /mobile/android/**/*.keystore
 /mobile/android/**/*.p12
+/mobile/android/app/google-services.json
 /mobile/google-services.json
 
 # iOS Additional
@@ -102,6 +103,7 @@ certificates/
 /mobile/ios/Flutter/Flutter.framework
 /mobile/ios/Flutter/Flutter.podspec
 /mobile/ios/Flutter/App.framework
+/mobile/ios/Runner/GoogleService-Info.plist
 
 # App Secrets
 /mobile/lib/config/app_secrets.dart

@@ -20,7 +20,7 @@ import 'package:ghostclass/screens/profile_dump_screen.dart';
 import 'package:ghostclass/screens/profile_screen.dart';
 import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
-import 'package:ghostclass/screens/static_screen.dart';
+import 'package:ghostclass/screens/legal_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -205,7 +205,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/legal',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: StaticPageScreen(
+          child: LegalScreen(
             title: 'Legal',
             body: getLegalPageContent(
               AppConfig.legalEffectiveDate,

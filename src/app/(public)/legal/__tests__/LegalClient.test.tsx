@@ -42,7 +42,6 @@ vi.mock('@/app/config/legal', () => ({
 describe('LegalClient', () => {
   it('renders all sections and handles components', () => {
     render(<LegalClient />);
-    screen.debug(undefined, 20000);
     expect(screen.getByText('Legal Policies')).toBeInTheDocument();
     
     // Check if our mocked components were triggered

@@ -59,7 +59,19 @@ export default function GlobalError({
             --ge-shadow: rgba(0, 0, 0, 0.1);
             --ge-error-code: #b91c1c;
           }
-          .dark {
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --ge-bg: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+              --ge-text: #fafafa;
+              --ge-card-bg: #18181b;
+              --ge-card-border: #27272a;
+              --ge-muted: #a1a1aa;
+              --ge-outline-border: #3f3f46;
+              --ge-shadow: rgba(0, 0, 0, 0.3);
+              --ge-error-code: #fca5a5;
+            }
+          }
+          html.dark {
             --ge-bg: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
             --ge-text: #fafafa;
             --ge-card-bg: #18181b;
@@ -69,14 +81,6 @@ export default function GlobalError({
             --ge-shadow: rgba(0, 0, 0, 0.3);
             --ge-error-code: #fca5a5;
           }
-        ` }} />
-        <script dangerouslySetInnerHTML={{ __html: `
-          try {
-            var t = localStorage.getItem('ghostclass-theme');
-            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-              document.documentElement.classList.add('dark');
-            }
-          } catch(e) {}
         ` }} />
       </head>
       <body style={{

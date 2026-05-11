@@ -204,11 +204,17 @@ class ApiService {
       }
     }
 
+    final appCheckError = e.requestOptions.extra['appCheckError'];
+
     return AppException(
       message: message,
       type: type,
       originalError: e,
       statusCode: status,
+      details: {
+        'appCheckError': appCheckError,
+        if (e.requestOptions.path.contains('/security/')) 'type': 'security',
+      },
     );
   }
 }

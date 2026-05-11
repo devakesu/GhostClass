@@ -85,19 +85,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         if (!mounted) return;
 
-        String dialogMessage = '$reason';
-        if (!criticalRisk) {
-          dialogMessage +=
-              '\n\n$action\n\nPlease try again after some time if you think this is a temporary glitch. If the issue persists, contact support.';
-        } else {
-          dialogMessage += '\n\n$action';
-        }
+        final appCheckError = e.details?['appCheckError'];
+        
+        // Use backend-provided strings directly for the main message
+        final dialogMessage = '$reason\n\n$action';
 
         SecurityUtils.showSecurityFailureDialog(
           context,
-          title: 'Security Verification Failed',
+          title: criticalRisk
+              ? 'Security Verification Failed'
+              : 'Security Handshake Failed',
           message: dialogMessage,
-          technicalDetails: sanitizeTechnicalDetails(e.toString()),
+          technicalDetails: sanitizeTechnicalDetails(
+            '${e.toString()}\n\n'
+            '${appCheckError != null ? "Local Error: $appCheckError" : ""}'
+          ),
           retryLabel: criticalRisk ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
           isDismissible: false,
@@ -112,10 +114,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       } else {
         messages = ['We encountered a problem during startup.', e.toString()];
       }
-
-      messages.add(
-        'Please contact us if the error persists even after some time.',
-      );
 
       final technicalDetails = sanitizeTechnicalDetails(e.toString());
 
