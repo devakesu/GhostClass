@@ -36,9 +36,9 @@ class SupportHelper {
     String? subject,
     String? customBody,
   }) async {
-    final logs = AppLogger.getLogBuffer();
+    final logs = AppLogger.getSanitizedLogBuffer();
     final body =
-        '${customBody ?? 'Describe the issue here...'}$_persistanceMessage\n\n--- DIAGNOSTIC LOGS ---\n$logs\n\nApp Version: ${AppConfig.appVersion}\nOS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+      '${customBody ?? 'Describe the issue here...'}$_persistanceMessage\n\n--- DIAGNOSTIC LOGS (SANITIZED) ---\n$logs\n\nApp Version: ${AppConfig.appVersion}\nOS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
 
     final emailUri = Uri(
       scheme: 'mailto',

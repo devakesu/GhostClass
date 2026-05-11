@@ -144,11 +144,16 @@ class DioService {
               : FirebaseAppCheck.instance.getToken())
           .timeout(const Duration(seconds: 10));
 
-      if (appCheckToken != null) {
+      if (appCheckToken != null && appCheckToken.isNotEmpty) {
         options.headers['X-Firebase-AppCheck'] = appCheckToken;
+        AppLogger.d('DioService: App Check token attached successfully');
+      } else {
+        AppLogger.w('DioService: App Check token is empty or null');
+        options.extra['appCheckError'] = 'App Check token is empty - verify Firebase activation';
       }
     } catch (e) {
       AppLogger.w('DioService: Security headers failed: $e');
+      options.extra['appCheckError'] = e.toString();
     }
   }
 }

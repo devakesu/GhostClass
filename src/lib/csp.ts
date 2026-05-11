@@ -87,58 +87,38 @@ export const getCspHeader = (nonce?: string) => {
   })();
 
   // In production, nonce is mandatory for strict CSP enforcement
+  // FAIL CLOSED: Do not serve degraded CSP — this is a critical security failure
   if (!isDev && !nonce) {
-    // Consolidate logging: explain the problem, troubleshooting steps, and fallback behavior
     logger.error(
-      '[CSP] Nonce is required in production for secure CSP enforcement. ' +
-      'Falling back to less secure CSP with unsafe-inline. This should not happen in production - investigate immediately. ' +
-      'Troubleshooting: ' +
+      '[CSP] CRITICAL: Nonce is required in production for secure CSP enforcement. ' +
+      'Refusing to serve page without nonce (fail-closed security posture). ' +
+      'Investigate and fix immediately: ' +
       '1. Verify middleware is generating nonce (check src/proxy.ts nonce generation) ' +
       '2. Ensure middleware is passing nonce via x-nonce header to downstream components ' +
       '3. Check that getCspHeader is called with the nonce parameter from headers ' +
-      '4. Confirm middleware matcher includes the current route (see matcher config in src/proxy.ts)'
+      '4. Confirm middleware matcher includes the current route (see matcher config in src/proxy.ts) ' +
+      '5. Verify environment variable NODE_ENV is set to "production" for this deployment'
     );
 
-    // Alert Sentry so operators are paged — a plain logger.error is invisible
-    // outside the server log stream.
+    // Alert Sentry with fatal severity to page operators immediately
     Sentry.captureException(
-      new Error('[CSP] Nonce missing in production — degraded to unsafe-inline'),
-      { level: 'fatal', tags: { type: 'csp_degraded', location: 'getCspHeader' } }
+      new Error('[CSP] FATAL: Nonce missing in production — refusing to serve degraded CSP'),
+      { level: 'fatal', tags: { type: 'csp_missing_nonce', location: 'getCspHeader', severity: 'fail_closed' } }
     );
     
-    // Fallback CSP for production when nonce is missing (not recommended, but better than crashing)
-    // This uses 'unsafe-inline' which is less secure than nonce-based CSP
+    // Return hardened error CSP that blocks everything except basic structure
+    // This ensures the page cannot execute any scripts and displays an error
     return `
-      default-src 'self';
-      script-src 'self' 'unsafe-inline' blob: https://challenges.cloudflare.com https://static.cloudflareinsights.com;
-      style-src 'self' 'unsafe-inline';
-      style-src-elem 'self' 'unsafe-inline';
-      style-src-attr 'unsafe-inline';
-      img-src 'self' blob: data: ${supabaseOrigin} ${supabaseCfProxyOrigin} ${supabaseAwsProxyOrigin} ${supabaseDevProxyOrigin} https://www.google-analytics.com https://stats.g.doubleclick.net;
-      font-src 'self' data:;
-      object-src 'none';
-      object-src 'none';
-      base-uri 'self';
-      form-action 'self';
-      frame-src 'self' https://challenges.cloudflare.com;
+      default-src 'none';
+      script-src 'none';
+      style-src 'self';
+      img-src 'self';
+      font-src 'self';
+      base-uri 'none';
+      form-action 'none';
       frame-ancestors 'none';
-      worker-src 'self' blob:;
-      connect-src 'self' 
-        ${supabaseOrigin}
-        ${supabaseCfProxyOrigin}
-        ${supabaseAwsProxyOrigin}
-        ${supabaseDevProxyOrigin}
-        https://production.api.ezygo.app
-        https://*.ingest.sentry.io 
-        https://challenges.cloudflare.com
-        https://cloudflareinsights.com
-        https://static.cloudflareinsights.com
-        https://stats.g.doubleclick.net
-        https://www.google-analytics.com
-        https://analytics.google.com;
       report-to csp-endpoint;
       report-uri /api/csp-report;
-      upgrade-insecure-requests;
     `.replace(/\s{2,}/g, ' ').trim();
   }
 

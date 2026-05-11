@@ -28,6 +28,28 @@ export interface AppCheckOptions {
   consume?: boolean; // If true, the token is invalidated after use (Replay Protection)
 }
 
+/**
+ * Common security error messages
+ */
+export const SECURITY_ERRORS = {
+  MISSING_TOKEN: {
+    reason: "Your device is missing the security attestation required to access this service.",
+    action: "Please ensure you have a stable internet connection and are not using an uncertified device. This can also happen if the app was not installed from the official app store.",
+  },
+  UNAUTHORIZED_APP: {
+    reason: "This app version is unrecognized or has been modified.",
+    action: "Please reinstall the official GhostClass app from the Play Store or Apple App Store.",
+  },
+  VERIFICATION_FAILED: {
+    reason: "Your device failed the automated security handshake (Attestation Error).",
+    action: "Please ensure your device is certified, you are using the official app, and your system clock is accurate.",
+  },
+  DEFAULT: {
+    reason: "The security handshake failed or timed out.",
+    action: "Please try again in a few moments.",
+  }
+} as const;
+
 
 /**
  * Authentication result - either CSRF (web) or App Check (mobile)
@@ -112,8 +134,8 @@ export async function verifyAppCheckToken(
     return { 
       isValid: false, 
       error: "Missing mandatory App Check token",
-      reason: "Device verification was skipped or blocked by a firewall.",
-      action: "Please ensure your internet connection is stable and you are not using a VPN or custom DNS.",
+      reason: SECURITY_ERRORS.MISSING_TOKEN.reason,
+      action: SECURITY_ERRORS.MISSING_TOKEN.action,
       criticalRisk: false,
     };
   }
@@ -146,6 +168,11 @@ export async function verifyAppCheckToken(
       consume: options.consume,
     });
 
+    const integrityDetails = {
+      appId: decodedToken.appId,
+      ...(decodedToken.token || {}),
+    };
+
     const authorizedAppIds = [
       process.env.FIREBASE_APP_ID_ANDROID || "1:424804867878:android:015bb34927f1dd8e21abe7",
       process.env.FIREBASE_APP_ID_IOS || "1:424804867878:ios:43e6f61b15e0954321abe7",
@@ -159,8 +186,8 @@ export async function verifyAppCheckToken(
       return { 
         isValid: false, 
         error: "Unauthorized Application",
-        reason: "This app version is unrecognized or has been modified.",
-        action: "Please reinstall the official GhostClass app from the Play Store or Apple App Store.",
+        reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
+        action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
         criticalRisk: true,
       };
     }
@@ -168,7 +195,7 @@ export async function verifyAppCheckToken(
     // Android/iOS: We rely on Firebase App Check which already uses Play Integrity/DeviceCheck
     // under the hood. The manual X-Play-Integrity header is no longer required for standard API access.
 
-    return { isValid: true };
+    return { isValid: true, integrity: integrityDetails };
   } catch (error: unknown) {
     Sentry.captureException(error, {
       tags: { type: "app_check_error", location: "verifyAppCheckToken" },
@@ -177,9 +204,10 @@ export async function verifyAppCheckToken(
     return { 
       isValid: false, 
       error: "Security Verification Failed",
-      reason: "Your device failed the automated security handshake.",
-      action: "Please ensure your device is not rooted/jailbroken and you have a stable internet connection.",
-      criticalRisk: true, // App Check failure is usually a device integrity issue
+      reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
+      action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
+      criticalRisk: true,
+      integrity: { error: error instanceof Error ? error.message : String(error) },
     };
   }
 }
@@ -227,8 +255,8 @@ async function verifyAuthentication(
     return {
       isValid: false,
       error: "Unauthenticated request",
-      reason: "Missing device verification token.",
-      action: "Please restart the app and ensure you are using a secure internet connection. If this persists, please contact support.",
+      reason: "Device verification token is missing or expired.",
+      action: "Please restart the app and ensure your device has a stable internet connection",
       authType: "none",
     };
   }
@@ -390,8 +418,8 @@ export function withSecurity<T = unknown>(
         { 
           error: authResult.error || "Unauthenticated",
           message: authResult.error || "Unauthenticated",
-          reason: authResult.reason || "The security handshake failed or timed out.",
-          action: authResult.action || "Please try again in a few moments.",
+          reason: authResult.reason || SECURITY_ERRORS.DEFAULT.reason,
+          action: authResult.action || SECURITY_ERRORS.DEFAULT.action,
           criticalRisk: authResult.criticalRisk ?? false,
           type: "security",
         },
@@ -477,7 +505,11 @@ export function withSecurity<T = unknown>(
 
     // SAFETY CHECK: Ensure we actually have a response object
     if (!response) {
-      console.error("SECURITY HOF DEBUG: Crash - Handler returned no response");
+      logger.error("[withSecurity] Handler returned no response — this indicates a critical bug in the security middleware");
+      Sentry.captureException(
+        new Error("[withSecurity] Handler returned no response"),
+        { level: 'fatal', tags: { type: 'security_middleware_error', location: 'withSecurity' } }
+      );
       return NextResponse.json(
         { error: "Internal security error" },
         { status: 500 },

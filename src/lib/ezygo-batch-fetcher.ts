@@ -128,8 +128,13 @@ function waitForSlot(): Promise<number> {
     const itemId = ++queueItemId;
     const timeoutId = setTimeout(() => {
       // Remove from queue if still present
+      // CRITICAL: Guard splice to prevent removing wrong item when index is -1
+      // If item is not found (index === -1), splice(-1, 1) would remove the last queue item,
+      // corrupting fairness for another user and causing their request to never execute.
       const index = requestQueue.findIndex(item => item.id === itemId);
-      requestQueue.splice(index, 1);
+      if (index >= 0) {
+        requestQueue.splice(index, 1);
+      }
       reject(new QueueTimeoutError(QUEUE_TIMEOUT_MS));
     }, QUEUE_TIMEOUT_MS);
     

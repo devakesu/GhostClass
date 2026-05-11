@@ -41,7 +41,6 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Privacy-First Security:** end-to-end JWE bridge for mobile, AES-256-GCM for sensitive storage, and device attestation to block fakery.
 - **Visual Receipts & History:** calendar, charts, and downloadable attendance snapshots for verifications or appeals.
 
-
 ## 🎯 Core Features
 
 ### 💻 Web & 📱 Mobile Parity

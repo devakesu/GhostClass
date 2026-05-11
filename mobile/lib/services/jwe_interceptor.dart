@@ -31,12 +31,12 @@ class JweInterceptor extends Interceptor {
       try {
         final jweService = JweService.instance;
         final result = await jweService.encryptRequest(options.data as Map<String, dynamic>);
-        
+
         // Store the RCEK for this request's response decryption using a unique request ID
         final requestId = const Uuid().v4();
         _rcekMap[requestId] = result.rcek;
         options.headers['X-GhostClass-Request-ID'] = requestId;
-        
+
         options.data = result.jwe;
         options.headers['x-jwe'] = 'true';
         options.headers['Content-Type'] = 'application/jose';
@@ -44,24 +44,37 @@ class JweInterceptor extends Interceptor {
         // In the GhostClass protocol, we send the RCEK encrypted with the server's public key
         final keyResult = await jweService.encryptHeaderKey();
         options.headers['X-JWE-Key'] = keyResult.jwe;
-        
+
         AppLogger.d('JweInterceptor: Request encrypted for ${options.path}');
       } catch (e) {
         AppLogger.e('JweInterceptor: Encryption failed', e);
+        // Fail the request if encryption for our backend fails to avoid sending
+        // sensitive payloads unencrypted.
+        return handler.reject(DioException(
+          requestOptions: options,
+          error: 'JWE encryption failed',
+          type: DioExceptionType.unknown,
+        ));
       }
     } else if (isGhostClassApi && options.method == 'GET') {
       // For GET requests, we still need to send a JWE key if we want the response to be encrypted
       try {
         final jweService = JweService.instance;
         final keyResult = await jweService.encryptHeaderKey();
-        
+
         final requestId = const Uuid().v4();
         _rcekMap[requestId] = keyResult.rcek;
         options.headers['X-GhostClass-Request-ID'] = requestId;
-        
+
         options.headers['x-jwe-key'] = keyResult.jwe;
       } catch (e) {
         AppLogger.e('JweInterceptor: GET Key setup failed', e);
+        // Fail GET if we cannot establish a header key for our backend.
+        return handler.reject(DioException(
+          requestOptions: options,
+          error: 'JWE header key setup failed',
+          type: DioExceptionType.unknown,
+        ));
       }
     }
     
@@ -89,6 +102,13 @@ class JweInterceptor extends Interceptor {
           AppLogger.d('JweInterceptor: Response decrypted for ${response.requestOptions.path}');
         } catch (e) {
           AppLogger.e('JweInterceptor: Decryption failed', e);
+          // If decryption fails, reject the response so callers don't process
+          // potentially tampered or unreadable data.
+          return handler.reject(DioException(
+            requestOptions: response.requestOptions,
+            error: 'JWE response decryption failed',
+            type: DioExceptionType.badResponse,
+          ));
         }
       }
     }
