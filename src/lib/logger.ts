@@ -20,7 +20,7 @@
 const isDevelopment = process.env.NODE_ENV === 'development';
 // Detect test environment via the VITEST env var (set automatically by Vitest runner).
 // NOTE: vitest.config.ts sets NODE_ENV='development' (not 'test') so we use VITEST instead.
-const isTest = !!process.env.VITEST;
+const isTest = process.env.VITEST === "true";
 
 export const logger = {
   /**

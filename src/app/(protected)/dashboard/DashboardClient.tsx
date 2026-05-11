@@ -239,7 +239,6 @@ export default function DashboardClient(
     isLoading: isLoadingCourses,
     isFetching: isFetchingCourses,
     isError: isCoursesError,
-    refetch: refetchCourses,
   } = useFetchCourses({
     semester: currentSem,
     year: currentYear,

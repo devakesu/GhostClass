@@ -122,20 +122,25 @@ class EzygoBatchFetcher {
       return inFlight;
     }
 
-    // 3. Rate Limiting: Wait for an available slot
-    await _waitForSlot();
-
-    // 3.5. Final Deduplication Check
-    // Between checking inFlight (step 2) and acquiring a slot (step 3), 
-    // another request with the same key might have already started.
-    final postSlotInFlight = _inFlight[cacheKey];
-    if (postSlotInFlight != null) {
-      AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request (POST-SLOT) for $path');
-      _releaseSlot(); // Immediate release as we will await the existing future
-      return postSlotInFlight;
-    }
-
+    // 3. Rate Limiting: Wait for an available slot.
+    // Track acquisition so _releaseSlot() is only called if we actually got one,
+    // preventing the active-request counter from going below zero on early throws.
+    bool slotAcquired = false;
     try {
+      await _waitForSlot();
+      slotAcquired = true;
+
+      // 3.5. Final Deduplication Check
+      // Between checking inFlight (step 2) and acquiring a slot (step 3),
+      // another request with the same key might have already started.
+      final postSlotInFlight = _inFlight[cacheKey];
+      if (postSlotInFlight != null) {
+        AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request (POST-SLOT) for $path');
+        _releaseSlot(); // Immediate release as we will await the existing future
+        slotAcquired = false;
+        return postSlotInFlight;
+      }
+
       // 4. Execute the network request
       final requestFuture = _executeRequest(
         path: path,
@@ -184,12 +189,13 @@ class EzygoBatchFetcher {
         }
         rethrow;
       } finally {
-        // 6. Clean up in-flight map REGARDLESS of outcome
-        unawaited(_inFlight.remove(cacheKey));
+        // 6. Clean up in-flight map REGARDLESS of outcome.
+        // Map.remove() is synchronous — do NOT wrap in unawaited().
+        _inFlight.remove(cacheKey);
       }
     } finally {
-      // Always release the slot, even if executeRequest fails or throws
-      _releaseSlot();
+      // Only release the slot if we successfully acquired one.
+      if (slotAcquired) _releaseSlot();
     }
   }
 

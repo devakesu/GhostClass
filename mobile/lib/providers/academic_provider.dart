@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -37,17 +38,35 @@ class AcademicState {
 
   DateTime get startDate {
     final parsed = _parseAcademicYear(year);
-    if (semester.toLowerCase().contains('odd')) {
+    final semLower = semester.toLowerCase();
+    if (semLower.contains('odd')) {
       return DateTime(parsed.$1, 7, 1);
     }
+    if (semLower.contains('even') || semLower.contains('spring')) {
+      return DateTime(parsed.$2, 1, 1);
+    }
+    // Unrecognised semester name — default to even-semester dates and warn.
+    AppLogger.w(
+      'AcademicState.startDate: Unrecognised semester "$semester" for year "$year". '
+      'Defaulting to even-semester start (Jan 1). Consider mapping this name.',
+    );
     return DateTime(parsed.$2, 1, 1);
   }
 
   DateTime get endDate {
     final parsed = _parseAcademicYear(year);
-    if (semester.toLowerCase().contains('odd')) {
+    final semLower = semester.toLowerCase();
+    if (semLower.contains('odd')) {
       return DateTime(parsed.$1, 12, 31, 23, 59, 59);
     }
+    if (semLower.contains('even') || semLower.contains('spring')) {
+      return DateTime(parsed.$2, 6, 30, 23, 59, 59);
+    }
+    // Unrecognised semester name — default to even-semester dates and warn.
+    AppLogger.w(
+      'AcademicState.endDate: Unrecognised semester "$semester" for year "$year". '
+      'Defaulting to even-semester end (Jun 30). Consider mapping this name.',
+    );
     return DateTime(parsed.$2, 6, 30, 23, 59, 59);
   }
 }
@@ -173,16 +192,23 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
 
 (int, int) _parseAcademicYear(String year) {
   final parts = year.split('-');
-  
-  // Handle cases like "2025" -> (2025, 2026)
-  // This ensures reasonable defaults for single-year inputs.
+
+  // Expand short-form start year: "25-26" → "2025-2026".
   String startPart = parts.isNotEmpty ? parts.first : '';
   if (startPart.length == 2) startPart = '20$startPart';
   final start = int.tryParse(startPart) ?? DateTime.now().year;
-  
-  final end = parts.length > 1
-      ? int.tryParse(parts[1].length == 2 ? '20${parts[1]}' : parts[1])
-      : start + 1;
-      
+
+  int? end;
+  if (parts.length > 1) {
+    final endPart = parts[1];
+    // Expand 1- or 2-digit suffixes: "5" → "2005", "26" → "2026".
+    // A full 4-digit year is used as-is.
+    if (endPart.length <= 2) {
+      end = int.tryParse('20$endPart');
+    } else {
+      end = int.tryParse(endPart);
+    }
+  }
+
   return (start, end ?? start + 1);
 }

@@ -37,6 +37,10 @@ export function validateEnvironment() {
     errors.push("❌ CRON_SECRET is required");
   }
 
+  if (!process.env.JWE_PRIVATE_KEY) {
+    errors.push("❌ JWE_PRIVATE_KEY is required for mobile communication");
+  }
+
   // Supabase
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_URL is required");

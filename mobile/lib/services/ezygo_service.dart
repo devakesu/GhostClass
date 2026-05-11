@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
@@ -136,6 +137,19 @@ class EzygoService {
         token: token,
       ),
     ]);
+
+    // If any sub-request failed, abort the entire fetch to guarantee data integrity.
+    final failedRequests = results.where((r) => r.statusCode != 200);
+    if (failedRequests.isNotEmpty) {
+      final summary = failedRequests
+          .map((r) => '${r.requestOptions.path} -> ${r.statusCode}')
+          .join(', ');
+      AppLogger.e('EzygoService.fetchLeaveData: Partial failure — [$summary]. Aborting.');
+      throw AppException(
+        message: 'Failed to fetch complete leave data. Please try again.',
+        type: AppExceptionType.network,
+      );
+    }
 
     // Construct a merged response data map matching the original structure
     final mergedData = {

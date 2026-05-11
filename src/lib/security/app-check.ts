@@ -213,8 +213,7 @@ async function verifyAuthentication(
   // 2. Allow bypass for Vitest test environment
   if (
     process.env.NODE_ENV !== "production" &&
-    process.env.VITEST &&
-    !process.env.DISABLE_SECURITY_BYPASS &&
+    process.env.VITEST === "true" &&
     !hasAppCheckToken &&
     !csrfToken
   ) {

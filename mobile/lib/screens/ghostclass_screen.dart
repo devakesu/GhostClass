@@ -587,143 +587,155 @@ class GhostClassScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (context) {
-        final insts = ref.read(institutionsProvider).value ?? [];
-        return Container(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
+      // Use Consumer so that institutionsProvider is watched reactively inside
+      // the sheet. ref.read() would snapshot state at open-time, causing an
+      // empty list if the provider resolves asynchronously after the tap.
+      builder: (context) => Consumer(
+        builder: (context, sheetRef, _) {
+          final instsAsync = sheetRef.watch(institutionsProvider);
+          final insts = instsAsync.value ?? [];
+          return Container(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(LucideIcons.building, color: primary, size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Select Institution',
-                    style: GoogleFonts.manrope(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.4,
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: insts.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final inst = insts[index];
-                    final isSelected = inst.id.toString() == user.ezygoId;
-                    return InkWell(
-                      onTap:
-                          isSelected
-                              ? null
-                              : () async {
-                                await ref
-                                    .read(authProvider.notifier)
-                                    .updateDefaultInstitution(inst.id);
-                                if (context.mounted) Navigator.pop(context);
-                              },
-                      borderRadius: BorderRadius.circular(16),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color:
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(LucideIcons.building, color: primary, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Select Institution',
+                      style: GoogleFonts.manrope(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                if (instsAsync.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: insts.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final inst = insts[index];
+                        final isSelected = inst.id.toString() == user.ezygoId;
+                        return InkWell(
+                          onTap:
                               isSelected
-                                  ? primary.withValues(alpha: 0.1)
-                                  : Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(
-                                    alpha: 0.05,
-                                  ),
+                                  ? null
+                                  : () async {
+                                    await ref
+                                        .read(authProvider.notifier)
+                                        .updateDefaultInstitution(inst.id);
+                                    if (context.mounted) Navigator.pop(context);
+                                  },
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? primary.withValues(alpha: 0.3)
-                                    : Theme.of(
-                                      context,
-                                    ).colorScheme.outlineVariant.withValues(
-                                      alpha: 0.1,
-                                    ),
-                            width: isSelected ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    inst.name,
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    inst.role.toUpperCase(),
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color:
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.4),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? primary.withValues(alpha: 0.1)
+                                      : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.05,
+                                      ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color:
+                                    isSelected
+                                        ? primary.withValues(alpha: 0.3)
+                                        : Theme.of(
+                                          context,
+                                        ).colorScheme.outlineVariant.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                width: isSelected ? 2 : 1,
                               ),
                             ),
-                            if (isSelected)
-                              Icon(LucideIcons.checkCircle2, color: primary),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        inst.name,
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                          color:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        inst.role.toUpperCase(),
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color:
+                                              Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.4),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(LucideIcons.checkCircle2, color: primary),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
     ).then((_) => ref.read(uiModalOpenProvider.notifier).setOpen(false));
   }
 }

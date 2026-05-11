@@ -52,12 +52,11 @@ export function useNotifications(enabled = true, countOnly = false) {
   const queryClient = useQueryClient();
   const PAGE_SIZE = 20;
 
-  // 1. PRIORITY QUERY: Fetch ALL Unread Conflicts (Action Required)
-  const { data: actionData, isLoading: isActionLoading } = useQuery({
-    queryKey: ["notifications", "actions"],
+  // 1. PRIORITY QUERY: Fetch ALL Unread Notifications (Actions + Regular Unread)
+  // This ensures all unread items are immediately visible regardless of their date.
+  const { data: allUnreadData, isLoading: isUnreadLoading } = useQuery({
+    queryKey: ["notifications", "unread"],
     queryFn: async () => {
-      // getSession() reads the JWT from local storage — no network call.
-      // The Supabase query is RLS-protected; an invalid JWT is rejected by Postgres.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return [];
 
@@ -65,12 +64,11 @@ export function useNotifications(enabled = true, countOnly = false) {
         .from("notification")
         .select("*")
         .eq("auth_user_id", session.user.id)
-        .ilike("topic", "%conflict%") // Only conflicts
-        .eq("is_read", false)        // Only unread
+        .eq("is_read", false)        // ALL unread
         .order("created_at", { ascending: false });
 
       if (error) {
-         Sentry.captureException(error, { tags: { type: "notification_fetch_actions" } });
+         Sentry.captureException(error, { tags: { type: "notification_fetch_unread" } });
          throw error;
       }
       return data as Notification[];
@@ -100,7 +98,7 @@ export function useNotifications(enabled = true, countOnly = false) {
         .from("notification")
         .select("*")
         .eq("auth_user_id", session.user.id)
-        .not("topic", "ilike", "%conflict%") // Exclude conflicts handled by priority query
+        // Removed conflict exclusion to ensure read conflicts show in earlier section
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -122,26 +120,33 @@ export function useNotifications(enabled = true, countOnly = false) {
 
   // 3. COMBINE & DEDUPLICATE (Memoized)
   const { actionNotifications, regularNotifications } = useMemo(() => {
-      const actions = actionData || [];
+      const allUnread = allUnreadData || [];
       const rawFeed = feedData?.pages.flatMap((page) => page.data) || [];
       
-      // Deduplicate feed within itself (handles overlap during shifting)
+      // Separate unread into Actions (Conflicts) and Regular
+      const actions = allUnread.filter(n => n.topic?.toLowerCase().includes("conflict"));
+      const unreadRegular = allUnread.filter(n => !n.topic?.toLowerCase().includes("conflict"));
+
+      // Deduplicate feed: items in feed might also be in allUnread
+      const unreadIds = new Set(allUnread.map(n => String(n.id)));
+      
+      // Find read items from the feed to show in "EARLIER" section
+      const readFromFeed: Notification[] = [];
       const seenIds = new Set<string>();
-      const uniqueFeed: Notification[] = [];
+      
       for (const n of rawFeed) {
           const sid = String(n.id);
-          if (!seenIds.has(sid)) {
+          if (!seenIds.has(sid) && !unreadIds.has(sid)) {
               seenIds.add(sid);
-              uniqueFeed.push(n);
+              readFromFeed.push(n);
           }
       }
 
-      // Filter out items that are already in actions
-      const actionIds = new Set(actions.map(n => String(n.id)));
-      const regular = uniqueFeed.filter(n => !actionIds.has(String(n.id)));
+      // regularNotifications contains all unread regular + read items from feed
+      const regular = [...unreadRegular, ...readFromFeed];
 
       return { actionNotifications: actions, regularNotifications: regular };
-  }, [actionData, feedData]);
+  }, [allUnreadData, feedData]);
 
   // 3b. TOTAL UNREAD COUNT — head-only query (no refetchInterval; refreshed on
   //     explicit cache invalidation triggered by markAsRead / markAllAsRead).
@@ -188,18 +193,78 @@ export function useNotifications(enabled = true, countOnly = false) {
       const { error } = await query;
       if (error) throw error;
     },
-    // Cancel in-flight queries to avoid stale overwrites once the mutation settles.
-    // A full optimistic cache update is not implemented; the UI reflects the
-    // latest server state after onSettled triggers a cache invalidation.
-    onMutate: async () => {
-        await queryClient.cancelQueries({ queryKey: ["notifications"] });
-    },
-    onError: (err, targetId) => {
-        Sentry.captureException(err, { 
-            tags: { type: "notification_mark_read_failure", location: "useNotifications/markReadMutation" },
-            extra: { notificationId: targetId }
+    onMutate: async ({ id, isRead }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+
+      // Snapshot the previous values
+      const previousUnread = queryClient.getQueryData<Notification[]>(["notifications", "unread"]);
+      const previousFeed = queryClient.getQueryData<{ pages: FetchResponse[]; pageParams: any[] }>(["notifications", "feed"]);
+      const previousUnreadCount = queryClient.getQueryData<number>(["notifications", "unreadCount"]);
+
+      // 1. Optimistically update unread count
+      if (id) {
+        // Individual item toggle
+        queryClient.setQueryData<number>(["notifications", "unreadCount"], (old = 0) => {
+          return isRead ? Math.max(0, old - 1) : old + 1;
         });
-        // Revert on error could be implemented here if using full optimistic state
+      } else {
+        // Mark all as read
+        if (isRead) queryClient.setQueryData(["notifications", "unreadCount"], 0);
+      }
+
+      // 2. Optimistically update feed (all notifications)
+      if (previousFeed) {
+        queryClient.setQueryData(["notifications", "feed"], {
+          ...previousFeed,
+          pages: previousFeed.pages.map(page => ({
+            ...page,
+            data: page.data.map(n => {
+              if (id) {
+                return n.id === id ? { ...n, is_read: isRead } : n;
+              } else {
+                return n.is_read !== isRead ? { ...n, is_read: isRead } : n;
+              }
+            })
+          }))
+        });
+      }
+
+      // 3. Optimistically update unread query (Actions + Regular Unread)
+      if (id) {
+        const itemInUnread = previousUnread?.find(n => n.id === id);
+        const itemInFeed = previousFeed?.pages.flatMap(p => p.data).find(n => n.id === id);
+        const notification = itemInUnread || itemInFeed;
+
+        if (isRead) {
+          // Marking as read -> remove from unread list
+          queryClient.setQueryData<Notification[]>(["notifications", "unread"], (old = []) => 
+            old.filter(n => n.id !== id)
+          );
+        } else if (notification) {
+          // Marking as unread -> add to unread list
+          queryClient.setQueryData<Notification[]>(["notifications", "unread"], (old = []) => {
+            const updated = [{ ...notification, is_read: false }, ...old.filter(n => n.id !== id)];
+            return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          });
+        }
+      } else if (isRead) {
+        // Mark all as read -> clear unread
+        queryClient.setQueryData(["notifications", "unread"], []);
+      }
+
+      return { previousUnread, previousFeed, previousUnreadCount };
+    },
+    onError: (err, variables, context: any) => {
+      // Rollback on error
+      if (context?.previousUnread) queryClient.setQueryData(["notifications", "unread"], context.previousUnread);
+      if (context?.previousFeed) queryClient.setQueryData(["notifications", "feed"], context.previousFeed);
+      if (context?.previousUnreadCount !== undefined) queryClient.setQueryData(["notifications", "unreadCount"], context.previousUnreadCount);
+
+      Sentry.captureException(err, { 
+        tags: { type: "notification_mark_read_failure", location: "useNotifications/markReadMutation" },
+        extra: { notificationId: variables.id, isRead: variables.isRead }
+      });
     },
     onSettled: () => {
       // Always refetch to ensure server sync
@@ -211,7 +276,7 @@ export function useNotifications(enabled = true, countOnly = false) {
     actionNotifications,   // Always Unread Conflicts
     regularNotifications,  // Everything else
     unreadCount,
-    isLoading: isActionLoading || isFeedLoading,
+    isLoading: isUnreadLoading || isFeedLoading,
     error,
     fetchNextPage,
     hasNextPage,

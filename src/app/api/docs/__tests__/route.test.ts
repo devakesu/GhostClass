@@ -38,7 +38,7 @@ describe("GET /api/docs", () => {
     GET();
     expect(ApiReference).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: "/api-docs/openapi.yaml",
+        content: expect.any(String),
         theme: "purple",
         darkMode: true,
       })

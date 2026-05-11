@@ -118,7 +118,7 @@ describe('Backend Proxy Route', () => {
 
   describe('CSRF Protection', () => {
     beforeEach(() => {
-      vi.stubEnv('DISABLE_SECURITY_BYPASS', 'true');
+      vi.stubEnv('VITEST', 'false');
     });
 
     it('should enforce CSRF validation for POST requests', async () => {

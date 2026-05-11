@@ -64,7 +64,6 @@ describe('app-check logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.VITEST = 'true';
-    process.env.DISABLE_SECURITY_BYPASS = 'false';
     process.env.FIREBASE_APP_ID_ANDROID = 'android-id';
     process.env.FIREBASE_APP_ID_IOS = 'ios-id';
     process.env.ENFORCE_APP_CHECK = 'false';
@@ -139,7 +138,7 @@ describe('app-check logic', () => {
 
   describe('CSRF Session Binding', () => {
     it('fails if CSRF is bound to a different session', async () => {
-        process.env.DISABLE_SECURITY_BYPASS = 'true';
+      process.env.VITEST = 'false';
         const h = new Headers({ 'x-csrf-token': 'token123' });
         vi.mocked(headers).mockResolvedValue(h);
         vi.mocked(cookies).mockResolvedValue({

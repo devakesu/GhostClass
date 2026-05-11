@@ -69,9 +69,12 @@ const STRIP_REQUEST_HEADERS = new Set([
   "x-amz-security-token", // Should never be present; strip defensively
   "via",                   // Hop-by-hop proxy trail
   "connection",            // HTTP/1.1 connection management
+  // Request framing/encoding can become stale when API Gateway delivers
+  // base64-decoded payloads to Lambda. Let undici compute these correctly.
+  "content-length",
+  "content-encoding",
 ]);
 
-// Hop-by-hop headers that must not be forwarded in the response.
 const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -81,6 +84,13 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "trailers",
   "transfer-encoding",
   "upgrade",
+  // Node.js fetch auto-decompresses the response body before response.text()
+  // is called, so the body Lambda returns to API Gateway is already plain text.
+  // Forwarding content-encoding: gzip would cause the client to try to
+  // decompress again -> garbled JSON.
+  // content-length is also stale after decompression, so strip it too.
+  "content-encoding",
+  "content-length",
 ]);
 
 export const handler = async (event) => {

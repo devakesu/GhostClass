@@ -52,6 +52,14 @@ class _ProfileDumpContent extends ConsumerWidget {
     return s[0].toUpperCase() + s.substring(1).toLowerCase();
   }
 
+  /// Normalises a date string to DD-MM-YYYY display order.
+  ///
+  /// Handles two formats from the API:
+  ///   - ISO 8601 `YYYY-MM-DD` (or `YYYY-MM-DDTHH:mm:ssZ`) → converts to `DD-MM-YYYY`.
+  ///   - `DD-MM-YYYY` → returned unchanged (the "no-op" branch is intentional,
+  ///     not a bug — the data is already in the desired display format).
+  ///
+  /// Dates that match neither known format are returned verbatim.
   String _formatDate(String s) {
     try {
       final datePart = s.split('T')[0];
@@ -59,10 +67,12 @@ class _ProfileDumpContent extends ConsumerWidget {
         final parts = datePart.split('-');
         if (parts.length == 3) {
           if (parts[0].length == 4) {
+            // YYYY-MM-DD → DD-MM-YYYY
             return '${parts[2]}-${parts[1]}-${parts[0]}';
           }
           if (parts[2].length == 4) {
-             return '${parts[0]}-${parts[1]}-${parts[2]}';
+            // DD-MM-YYYY → already in display order; return as-is.
+            return '${parts[0]}-${parts[1]}-${parts[2]}';
           }
         }
       }

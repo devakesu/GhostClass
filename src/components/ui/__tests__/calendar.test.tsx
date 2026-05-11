@@ -15,7 +15,7 @@ describe('Calendar Component', () => {
   it('renders navigation buttons', () => {
     render(<Calendar mode="single" />);
     
-    expect(screen.getByLabelText('Previous month')).toBeDefined();
-    expect(screen.getByLabelText('Next month')).toBeDefined();
+    expect(screen.getByLabelText(/previous month/i)).toBeDefined();
+    expect(screen.getByLabelText(/next month/i)).toBeDefined();
   });
 });

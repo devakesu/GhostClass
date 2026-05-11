@@ -36,6 +36,13 @@ class NavigationShell extends ConsumerStatefulWidget {
 }
 
 class _NavigationShellState extends ConsumerState<NavigationShell> {
+  // Guards against duplicate forced-logout calls on rapid critical-security events.
+  //
+  // Design note: This flag is intentionally NOT reset after a failed logout attempt.
+  // If `logout(force: true)` fails (e.g., a Supabase timeout), the security barrier
+  // UI is still rendered by the securityFailureProvider, and pressing "Close App"
+  // is the only correct escape path — matching the threat model for critical failures.
+  // A fresh NavigationShell instance created on the next login resets it to false.
   bool _criticalSecurityLogoutStarted = false;
 
   AcademicState? _asyncValueOrNull(AsyncValue<AcademicState?> value) {

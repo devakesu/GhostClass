@@ -49,7 +49,6 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.example.env
-DEPLOYMENT_CHECKLIST.md
 
 # vercel
 .vercel

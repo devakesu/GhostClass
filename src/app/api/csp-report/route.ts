@@ -76,6 +76,21 @@ function extractLogFields(text: string): Record<string, unknown> {
   }
 }
 
+/**
+ * Handle GET requests gracefully.
+ * Browsers only POST to this endpoint; GETs are usually manual visits or crawlers.
+ */
+export async function GET() {
+  return NextResponse.json(
+    {
+      status: "operational",
+      message: "This endpoint is for CSP violation reports via POST only.",
+      docs: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri",
+    },
+    { status: 200 }
+  );
+}
+
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") ?? "";
   const isAccepted = ACCEPTED_CONTENT_TYPES.some((t) => contentType.includes(t));
