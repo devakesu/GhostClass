@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as profileHooks from '@/hooks/users/profile';
 import * as coursesHooks from '@/hooks/courses/courses';
 import * as syncHooks from '@/hooks/use-sync-on-mount';
-import * as attendanceHooks from '@/hooks/courses/attendance';
 
 // Mock all hooks
 vi.mock('@/hooks/users/profile', () => ({

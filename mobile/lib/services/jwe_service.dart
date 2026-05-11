@@ -19,7 +19,30 @@ import 'package:ghostclass/logic/network_utils.dart';
 class JweService {
   static final JweService _instance = JweService._internal();
   static JweService get instance => _instance;
-  JweService._internal();
+
+  late final Dio _dio;
+
+  JweService._internal() {
+    final networkTimeout = kDebugMode
+        ? const Duration(seconds: 40)
+        : const Duration(seconds: 20);
+    
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: networkTimeout,
+        receiveTimeout: networkTimeout,
+        sendTimeout: networkTimeout,
+      ),
+    );
+
+    if (kDebugMode) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
+        return client;
+      };
+    }
+  }
 
   JsonWebKeySet? _cachedJwks;
   DateTime? _lastFetch;
@@ -75,27 +98,8 @@ class JweService {
       }
 
       // 4. Network fetch
-      final networkTimeout = kDebugMode
-          ? const Duration(seconds: 40)
-          : const Duration(seconds: 20);
-      final dio = Dio(
-        BaseOptions(
-          connectTimeout: networkTimeout,
-          receiveTimeout: networkTimeout,
-          sendTimeout: networkTimeout,
-        ),
-      );
-
-      if (kDebugMode) {
-        (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-          final client = HttpClient();
-          client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
-          return client;
-        };
-      }
-
       final url = '$_ghostclassApiUrl/.well-known/jwks.json';
-      final response = await dio.get(url);
+      final response = await _dio.get(url);
 
       if (response.statusCode == 200) {
         final data = response.data;

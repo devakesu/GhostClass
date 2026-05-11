@@ -12,6 +12,7 @@
 
 import { ApiReference } from "@scalar/nextjs-api-reference";
 import { NextResponse } from "next/server";
+import { resolveOpenApiSpec } from "@/lib/openapi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export function GET() {
   }
 
   const handler = ApiReference({
-    url: "/api-docs/openapi.yaml",
+    content: resolveOpenApiSpec(),
     theme: "purple",
     layout: "modern",
     darkMode: true,

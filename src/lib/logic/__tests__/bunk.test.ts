@@ -45,7 +45,7 @@ describe("calculateAttendance", () => {
 
   it("handles 100% target separately", () => {
     const result = calculateAttendance(90, 100, 100);
-    expect(result.requiredToAttend).toBe(10);
+    expect(result.requiredToAttend).toBe(Infinity);
   });
 
   it("calculates classes able to bunk when above target", () => {
@@ -81,7 +81,7 @@ describe("calculateAttendance", () => {
 
   it("should handle 100% target percentage", () => {
     const result = calculateAttendance(8, 10, 100);
-    expect(result.requiredToAttend).toBe(2);
+    expect(result.requiredToAttend).toBe(Infinity);
   });
 
   it("should identify borderline attendance", () => {

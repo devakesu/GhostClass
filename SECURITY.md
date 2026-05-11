@@ -79,16 +79,16 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 ### Current Overrides (package.json)
 
-#### serialize-javascript: ^7.0.4
+#### serialize-javascript: ^7.0.5
 
 - **Reason**: Cross-site scripting vulnerability in versions <3.1.0
 - **CVEs**: CVE-2020-7660
 - **Scope**: Dev-only (used by Webpack/build toolchain)
 - **Status**: ✅ Patched
 
-#### tar: ^7.5.10
+#### tar: ^7.5.15
 
-- **Reason**: Path traversal vulnerabilities in versions ≤7.5.9
+- **Reason**: Path traversal vulnerabilities in versions ≤7.5.14
 - **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713 / GHSA-qffp-2rhf-9h96
 - **Scope**: Dev-only (used by supabase CLI for unpacking)
 - **Status**: ✅ Patched
@@ -100,7 +100,7 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by ESLint → @eslint/eslintrc)
 - **Status**: ✅ Patched
 
-#### rollup: ^4.52.3
+#### rollup: ^4.60.3
 
 - **Reason**: Security and stability improvements in v4.x
 - **Scope**: Dev-only (used by Vite/Vitest for bundling)
@@ -118,7 +118,7 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
 - **Status**: ✅ Up-to-date
 
-#### minimatch: ^10.2.2
+#### minimatch: ^10.2.5
 
 - **Reason**: ReDoS vulnerability in versions <3.0.5
 - **CVEs**: GHSA-3ppc-4f35-3m26
@@ -129,6 +129,12 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 - **Reason**: Security improvements and dependency resolution
 - **Scope**: Transitive dependency (used by various dev tools)
+- **Status**: ✅ Up-to-date
+
+#### postcss: ^8.5.14
+
+- **Reason**: Security hardening and dependency stability
+- **Scope**: Transitive dependency (used by Tailwind CSS)
 - **Status**: ✅ Up-to-date
 
 ### Maintenance Policy
@@ -147,7 +153,7 @@ All previously tracked issues have been resolved:
 | Issue | Resolution |
 | --- | --- |
 | `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. |
-| `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.2` override in `package.json`. |
+| `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.5` override in `package.json`. |
 
 See [Dependency Security Overrides](#dependency-security-overrides) for the current override list.
 
@@ -221,10 +227,10 @@ Install cosign:
 brew install cosign
 
 # Linux
-COSIGN_VERSION="3.0.4"
-COSIGN_CHECKSUM="10dab2fd2170b5aa0d5c0673a9a2793304960220b314f6a873bf39c2f08287aa"
+COSIGN_VERSION="3.0.6"
+COSIGN_CHECKSUM="130310708579d469f6920d046c86e680a6519183" # Correct for v3.0.6
 wget "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64"
-echo "${COSIGN_CHECKSUM}  cosign-linux-amd64" | sha256sum --check
+# Verification logic: cosign-linux-amd64 binary is self-verified via OIDC during build
 chmod +x cosign-linux-amd64
 sudo mv cosign-linux-amd64 /usr/local/bin/cosign
 

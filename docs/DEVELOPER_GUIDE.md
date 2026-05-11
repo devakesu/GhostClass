@@ -16,6 +16,7 @@ Complete guide for development, contribution, and release workflows for GhostCla
 - [Mobile Development](#mobile-development)
 - [Known Issues](#known-issues)
 - [Cron Job Setup](#cron-job-setup)
+- [Feature Implementation Details](#feature-implementation-details)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -621,6 +622,8 @@ Optional Variables (omit to use defaults):
 | `PROXY_RATE_LIMIT_REQUESTS` | `120` | Optional backend proxy limiter request budget for `/api/backend/*` |
 | `PROXY_RATE_LIMIT_WINDOW` | `60` | Optional backend proxy limiter window in seconds for `/api/backend/*` |
 | `ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK` | `false` | Optional release workflow fallback toggle for non-tag/manual dispatches when `NEXT_PUBLIC_APP_DOMAIN` is unset |
+| `GPG_COMMITTER_NAME` | `GhostClass Bot` | Name used for GPG-signed commits in automated workflows |
+| `GPG_COMMITTER_EMAIL` | `bot@ghostclass.dev` | Email used for GPG-signed commits (must match GPG key) |
 
 #### Mobile Security (Runtime Secrets)
 
@@ -1199,3 +1202,17 @@ flutter build ios --release
 - Check existing documentation
 - Review workflow runs in Actions tab
 - Join community discussions (if available)
+
+---
+
+## Feature Implementation Details
+
+### Disable Courses
+
+Courses can be disabled on a per-semester basis so they no longer affect aggregate attendance statistics. This is useful when a student has passed a challenge exam or otherwise no longer needs to attend a course.
+
+#### How It Works
+
+1. **Toggle** — Each course card shows a status indicator (green dot **Enabled** / red dot **Disabled**) next to the course code.
+2. **Persistence** — The disabled state is stored in the `disabled_courses` JSONB column on the `user_settings` table, keyed by `year-semester`.
+3. **Parity** — Both Web (TanStack Query) and Mobile (Riverpod) synchronize this state from Supabase and apply it during the attendance aggregation phase.

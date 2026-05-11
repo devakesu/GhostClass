@@ -4,6 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class StealthHeadersService {
+  // Chrome major version used in spoofed User-Agent and Sec-Ch-Ua headers.
+  //
+  // MAINTENANCE: Update this when Chrome ships a new major version to keep
+  // the UA string realistic. Chrome typically releases a new major every 4 weeks.
+  // Check: https://chromiumdash.appspot.com/releases?platform=Android
+  //
+  // Ideally this should be moved to AppConfig (or fetched from a remote config)
+  // so it can be updated without requiring a full app release.
   static const String _chromeVersion = '141';
 
   final SecureStorageService storage;

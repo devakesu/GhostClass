@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
-![Flutter](https://img.shields.io/badge/Flutter-3.41+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.11.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-^3.11.4-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -18,6 +18,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 - **Manual Tracker** 👻 — Track wrongly marked absences until they're corrected
 - **Scores** 📋 — Exam and assignment results grouped by course, with per-question breakdown
 - **Leave Applications** 📝 — View EzyGo leave application status
+ - **Leave Applications** 📝 — View leave application status (sourced from EzyGo)
 - **Notifications** 🔔 — In-app notification center
 - **Help & Contact** 📚 — Built-in help docs (rendered Markdown) and contact form
 - **Dark / Light Theme** 🌓 — System-aware theme with manual override
@@ -29,8 +30,8 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 
 | Package | Version | Purpose |
 | :--- | :--- | :--- |
-| **Flutter** | 3.41+ | Cross-platform UI framework |
-| **Dart** | 3.11.5+ | Language |
+| **Flutter** | 3.27+ | Cross-platform UI framework |
+| **Dart** | ^3.11.4 | Language |
 
 ### State Management
 
@@ -57,8 +58,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 | Package | Version | Purpose |
 | :--- | :--- | :--- |
 | `firebase_core` | ^4.7.0 | Firebase SDK |
-| `firebase_app_check` | ^0.4.3 | Device integrity attestation |
-| `firebase_app_check` | pub | Firebase App Check for API protection |
+| `firebase_app_check` | ^0.4.3 | Device integrity & API protection |
 | `flutter_secure_storage` | ^10.0.0 | Hardware-backed credential storage |
 | `jose` + `pointycastle` | ^0.3.5 / ^3.9.1 | JWE key parsing + RSA operations |
 | `encrypt` | ^5.0.3 | AES-256 symmetric encryption |
@@ -119,7 +119,7 @@ mobile/
 │   │   ├── error_handler.dart   # Centralized error handler mixin
 │   │   ├── error_utils.dart     # Error formatting utilities
 │   │   ├── encrypted_value.dart # AES-256 value wrapper
-│   │   └── ezygo_batch_fetcher.dart # Rate-limited EzyGo API batch client
+│   │   └── ezygo_batch_fetcher.dart # Rate-limited EzyGo API batch client (EzyGo data source)
 │   ├── models/
 │   │   ├── attendance.dart      # Attendance report types
 │   │   ├── course_details.dart  # Course model
@@ -130,7 +130,7 @@ mobile/
 │   │   ├── score.dart           # Exam/score model
 │   │   └── tracking.dart        # Manual tracking record model
 │   ├── providers/              # Riverpod providers
-│   │   ├── auth_provider.dart   # Auth state + EzyGo token lifecycle
+│   │   ├── auth_provider.dart   # Auth state + upstream token lifecycle (EzyGo)
 │   │   ├── academic_provider.dart # Academic year/semester info
 │   │   ├── dashboard_provider.dart # Dashboard data aggregation
 │   │   ├── tracking_provider.dart  # Manual tracking state
@@ -145,7 +145,7 @@ mobile/
 │   │   └── app_router.dart      # GoRouter configuration + guards
 │   ├── screens/
 │   │   ├── splash_screen.dart          # Launch + auth redirect
-│   │   ├── login_screen.dart           # EzyGo credential login
+│   │   ├── login_screen.dart           # Credential login (EzyGo)
 │   │   ├── accept_terms_screen.dart    # T&C acceptance gate
 │   │   ├── navigation_shell.dart       # Bottom nav shell
 │   │   ├── dashboard_screen.dart       # Main attendance dashboard
@@ -296,9 +296,9 @@ GhostClass Mobile implements a zero-trust security model:
 | **Network Encryption** | Every API request/response wrapped in JWE (RSA-OAEP + AES-256-GCM) |
 | **Credential Storage** | `flutter_secure_storage` (Android Keystore / iOS Keychain) |
 | **Anti-Tapjacking** | `FLAG_SECURE` on Android `MainActivity` |
-| **Stealth Headers** | Custom header injection to avoid EzyGo fingerprinting |
-| **Token Lifecycle** | EzyGo bearer token encrypted at rest; auto-refreshed on expiry |
-| **CSRF Bypass** | `MOBILE_API_SECRET` header used in place of cookie-based CSRF |
+| **Stealth Headers** | Custom header injection to reduce fingerprinting during upstream data fetches |
+| **Token Lifecycle** | Upstream bearer token (EzyGo) encrypted at rest; auto-refreshed on expiry |
+| **Unified Auth** | Firebase App Check used in place of cookie-based CSRF for API requests |
 
 ## 📱 Platform Requirements
 

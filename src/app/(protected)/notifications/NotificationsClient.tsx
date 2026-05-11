@@ -129,11 +129,11 @@ export default function NotificationsPage() {
 
   const [readingId, setReadingId] = useState<number | null>(null);
 
-  // BUILD VIRTUAL LIST WITH HEADERS
+  // BUILD VIRTUAL LIST WITH HEADERS (Matches Mobile: Action Required -> Unread -> Earlier)
   const virtualItems = useMemo<VirtualItem[]>(() => {
     const items: VirtualItem[] = [];
 
-    // Add Action Required section
+    // 1. ACTION REQUIRED (Unread Conflicts)
     const unreadActions = actionNotifications.filter(n => !n.is_read);
     if (unreadActions.length > 0) {
       items.push({ type: 'header', id: 'action-header', label: 'ACTION REQUIRED' });
@@ -142,10 +142,20 @@ export default function NotificationsPage() {
       });
     }
 
-    // Add Recent Activity section
-    if (regularNotifications.length > 0) {
-      items.push({ type: 'header', id: 'recent-header', label: 'RECENT ACTIVITY' });
-      regularNotifications.forEach(n => {
+    // 2. UNREAD (Unread Regular)
+    const unreadRegular = regularNotifications.filter(n => !n.is_read);
+    if (unreadRegular.length > 0) {
+      items.push({ type: 'header', id: 'unread-header', label: 'UNREAD' });
+      unreadRegular.forEach(n => {
+        items.push({ type: 'notification', id: n.id, data: n });
+      });
+    }
+
+    // 3. EARLIER (All Read Notifications)
+    const readNotifications = regularNotifications.filter(n => n.is_read);
+    if (readNotifications.length > 0) {
+      items.push({ type: 'header', id: 'earlier-header', label: 'EARLIER' });
+      readNotifications.forEach(n => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
@@ -316,13 +326,15 @@ export default function NotificationsPage() {
                   className="px-4"
                 >
                   {item.type === 'header' ? (
-                  // SECTION HEADER
+                  // SECTION HEADER (Colors match mobile)
                   <div className={cn(
-                    "flex items-center gap-2 px-1",
-                    item.label === 'ACTION REQUIRED' ? "text-amber-500 pt-6 pb-3" : "text-muted-foreground pt-6 pb-3"
+                    "flex items-center gap-2 px-1 pt-6 pb-3",
+                    item.label === 'ACTION REQUIRED' ? "text-amber-500" : 
+                    item.label === 'UNREAD' ? "text-blue-500" : 
+                    "text-muted-foreground"
                   )}>
-                    {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-4 w-4" aria-hidden="true" />}
-                    <h3 className="text-xs font-bold uppercase tracking-wider">{item.label}</h3>
+                    {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                    <h3 className="text-[11px] font-black uppercase tracking-widest">{item.label}</h3>
                   </div>
                 ) : (
                   // NOTIFICATION CARD

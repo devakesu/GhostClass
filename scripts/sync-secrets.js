@@ -237,6 +237,11 @@ function main() {
     'NEXT_PUBLIC_ANDROID_PACKAGE_NAME',
     'FIREBASE_APP_ID_ANDROID',
     'FIREBASE_APP_ID_IOS',
+    // GPG signing configuration (non-sensitive identity)
+    'GPG_COMMITTER_NAME',
+    'GPG_COMMITTER_EMAIL',
+    // Workflow behavior
+    'ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK',
   ];
 
   // ── GitHub Actions SECRETS (sensitive; masked in logs) ───────────────────────
@@ -264,6 +269,15 @@ function main() {
     'SUPABASE_PROJECT_ID',
     'SUPABASE_SECRET_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    // CI/CD and release automation
+    'BOT_PAT',
+    'GPG_PRIVATE_KEY',
+    'GPG_PASSPHRASE',
+    'CODECOV_TOKEN',
+    // Runtime secrets (synced as fallback for manual deployments)
+    'ENCRYPTION_KEY',
+    'JWE_PRIVATE_KEY',
+    'GOOGLE_SERVICE_ACCOUNT_JSON',
   ];
 
   let successCount = 0;

@@ -1,6 +1,7 @@
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/services/logger.dart';
 
 class DashboardStats {
   final int percentage;
@@ -267,10 +268,18 @@ class DashboardStats {
     final manualTotalGain = extraPresent + extraAbsent;
     final finalTotal = officialTotal + manualTotalGain;
     final finalPresentCount = officialPresent + corrPresent + extraPresent;
-    final finalAbsentCount = officialAbsent - savedAbsent + extraAbsent;
-    
-    assert(savedAbsent >= 0 && finalAbsentCount >= 0,
-        'Attendance Invariant Violation: Negative absent count (official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)');
+    // Clamp to 0 to guard against data drift between sync cycles where a
+    // tracker correction targets a session already positive in the official
+    // report, causing savedAbsent to exceed officialAbsent in production.
+    final rawFinalAbsent = officialAbsent - savedAbsent + extraAbsent;
+    final finalAbsentCount = rawFinalAbsent.clamp(0, double.maxFinite).toInt();
+    if (rawFinalAbsent < 0) {
+      AppLogger.w(
+        'DashboardStats: Attendance invariant violation – finalAbsent was '
+        '$rawFinalAbsent, clamped to 0 '
+        '(official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)',
+      );
+    }
 
     final double rawPercentage = finalTotal > 0
         ? (finalPresentCount / finalTotal) * 100
@@ -324,7 +333,9 @@ class DashboardStats {
   }
 
   static String standardize(String input) {
-    return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
+    // Note: the '-' is placed last in the character class to avoid forming an
+    // ambiguous or reversed range (\u00A0 > '-' in code-point order).
+    return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0\-]'), '');
   }
 }
 

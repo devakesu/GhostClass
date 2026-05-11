@@ -102,8 +102,8 @@ jobs:
           git_config_global: true
           # IMPORTANT: Use the same name and email as in your GPG key
           # This email MUST be verified in your GitHub account for commits to show as "Verified"
-          git_committer_name: ${{ secrets.GPG_COMMITTER_NAME || 'GhostClass Bot' }}
-          git_committer_email: ${{ secrets.GPG_COMMITTER_EMAIL || '61821107+devakesu@users.noreply.github.com' }}
+          git_committer_name: ${{ vars.GPG_COMMITTER_NAME || secrets.GPG_COMMITTER_NAME || 'GhostClass Bot' }}
+          git_committer_email: ${{ vars.GPG_COMMITTER_EMAIL || secrets.GPG_COMMITTER_EMAIL || '61821107+devakesu@users.noreply.github.com' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0

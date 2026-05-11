@@ -23,10 +23,6 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
-      # Sentry v10 introduced breaking changes with Next.js 16 App Router + edge runtime
-      # Pinned to v9 until the integration is stable; see Known Issues in DEVELOPER_GUIDE.md
-      - dependency-name: "@sentry/nextjs"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -38,4 +34,10 @@ updates:
     directory: "/"
     patterns:
       - "*"
+    multi-ecosystem-group: "all-dependencies"
+
+  - package-ecosystem: "pub"
+    directory: "/mobile"
+    schedule:
+      interval: "daily"
     multi-ecosystem-group: "all-dependencies"

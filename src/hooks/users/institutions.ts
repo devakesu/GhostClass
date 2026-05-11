@@ -67,6 +67,7 @@ export function useDefaultInstitute() {
 
       return res.data;
     },
+    staleTime: 1000 * 60 * 5,
     retry: retryOnce,
   });
 }
@@ -108,6 +109,7 @@ export function useDefaultInstitutionUser() {
       return defaultInstitutionUser;
     },
     enabled: !!institutions,
+    staleTime: 1000 * 60 * 5,
     retry: retryOnce,
   });
 }

@@ -106,7 +106,7 @@ async function forward(req: NextRequest, method: string, path: string[], decrypt
   try {
     // 4. Batch Fetcher Shortcut (GETs or Empty POSTs)
     const isBatchablePost = method === "POST" && (!body || body === "{}");
-    const isTest = !!process.env.VITEST;
+    const isTest = process.env.VITEST === "true";
     if ((method === "GET" || isBatchablePost) && !isPublic && token && !isTest) {
       try {
         const pathSuffix = `${fullPath}${req.nextUrl.search}`;

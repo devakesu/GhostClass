@@ -204,13 +204,17 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   }
 
   /// Manually trigger a refresh of the data.
+  /// [forceSync] — if true, triggers a server-side data sync before fetching.
+  /// DashboardNotifier.refresh() already handles the primary sync, so pass
+  /// forceSync: false when calling from that context to avoid redundant requests.
   Future<void> refresh({bool forceSync = false}) async {
     ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
     final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
-    if (user != null && supabaseToken != null) {
-      // Manual refresh IS blocking
+    // Only trigger a sync when the caller explicitly requests it.
+    // DashboardNotifier.refresh() already fires triggerSync before calling us.
+    if (forceSync && user != null && supabaseToken != null) {
       await ref.read(apiServiceProvider).triggerSync(supabaseToken);
     }
 

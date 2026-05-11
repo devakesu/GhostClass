@@ -51,13 +51,20 @@ describe('ServiceErrorView', () => {
     render(<ServiceErrorView error="Test Error" />);
     // Mock window.location.href
     const originalLocation = window.location;
-    delete (window as any).location;
-    window.location = { ...originalLocation, href: '' } as any;
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, href: '' },
+      configurable: true,
+      writable: true,
+    });
     
     fireEvent.click(screen.getByText('Contact Support'));
     expect(window.location.href).toContain('mailto:support@ghostclass.app?subject=Connection%20Error');
     
-    window.location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('handles logout correctly', async () => {

@@ -114,8 +114,13 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         .toList();
 
     // Deduplicate: regularNotifications = unreadRegular + (read notifications from feed)
+    // Exclude conflict-topic items from the regular feed even if they've been read,
+    // to prevent them reappearing in the wrong section after a data refresh.
     final unreadIds = allUnread.map((n) => n.id).toSet();
-    final readFromFeed = feedItems.where((n) => !unreadIds.contains(n.id)).toList();
+    final readFromFeed = feedItems.where((n) =>
+      !unreadIds.contains(n.id) &&
+      !(n.topic?.toLowerCase().contains('conflict') ?? false)
+    ).toList();
     
     final regularNotifications = [...unreadRegular, ...readFromFeed];
 
@@ -147,7 +152,11 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final List<AppNotification> newFeedItems =
         (response as List).map((n) => AppNotification.fromJson(n)).toList();
 
-    final current = state.value!;
+    // Use null-safe access instead of force-unwrap: although fetchNextPage()
+    // guards on current != null, state is async and could theoretically
+    // transition to null between the guard and this private call.
+    final current = state.value;
+    if (current == null) return NotificationsState.empty();
     final actionIds = current.actionNotifications.map((n) => n.id).toSet();
 
     // Filter out actions and existing regular items

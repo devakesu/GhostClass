@@ -382,8 +382,9 @@ export function CourseCard({
                 onClick={onEditInstructor}
                 className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-primary ml-0.5"
                 title="Edit Instructor"
+                aria-label="Edit Instructor"
               >
-                <Edit2 className="w-2.5 h-2.5" />
+                <Edit2 className="w-2.5 h-2.5" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -606,7 +607,11 @@ export function CourseCard({
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
+                              {!isFinite(stats.safeMetrics.requiredToAttend) ? (
+                                <span className="font-bold">Impossible 💀</span>
+                              ) : (
+                                <>You need to attend <span className="font-bold">{stats.safeMetrics.requiredToAttend}</span> more {stats.safeMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀</>
+                              )}
                             </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
@@ -640,7 +645,11 @@ export function CourseCard({
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
+                              {!isFinite(stats.extraMetrics.requiredToAttend) ? (
+                                <span className="font-bold">Impossible 💀</span>
+                              ) : (
+                                <>You need to attend <span className="font-bold">{stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀</>
+                              )}
                             </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
@@ -661,7 +670,11 @@ export function CourseCard({
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <span className="text-red-500 dark:text-red-400">
-                              You need to attend <span className="font-bold">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀
+                              {!isFinite(stats.extraMetrics.requiredToAttend) ? (
+                                <span className="font-bold">Impossible 💀</span>
+                              ) : (
+                                <>You need to attend <span className="font-bold">{stats.extraMetrics.requiredToAttend}</span> more {stats.extraMetrics.requiredToAttend === 1 ? "class" : "classes"} 💀</>
+                              )}
                             </span>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">You are on the edge 💀</span>
@@ -689,7 +702,11 @@ export function CourseCard({
                             </>
                           ) : stats.safeMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.safeMetrics.requiredToAttend) ? "all" : stats.safeMetrics.requiredToAttend}</span> 💀
+                              {!isFinite(stats.safeMetrics.requiredToAttend) ? (
+                                <span className="font-bold text-red-500 dark:text-red-400">Impossible 💀</span>
+                              ) : (
+                                <>Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{stats.safeMetrics.requiredToAttend}</span> 💀</>
+                              )}
                             </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>
@@ -712,7 +729,11 @@ export function CourseCard({
                             </>
                           ) : stats.extraMetrics.requiredToAttend > 0 ? (
                             <>
-                              Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{!isFinite(stats.extraMetrics.requiredToAttend) ? "all" : stats.extraMetrics.requiredToAttend}</span> 💀
+                              {!isFinite(stats.extraMetrics.requiredToAttend) ? (
+                                <span className="font-bold text-red-500 dark:text-red-400">Impossible 💀</span>
+                              ) : (
+                                <>Must Attend: <span className="font-bold text-red-500 dark:text-red-400">{stats.extraMetrics.requiredToAttend}</span> 💀</>
+                              )}
                             </>
                           ) : (
                             <span className="text-red-500 dark:text-red-400 font-bold">Edge 💀</span>

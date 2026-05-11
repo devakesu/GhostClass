@@ -41,6 +41,7 @@ vi.mock('framer-motion', () => {
 });
 
 vi.mock('next/image', () => ({
+  // eslint-disable-next-line @next/next/no-img-element
   default: (props: any) => <img {...props} data-testid="mock-image" src={props.src || ""} />,
 }));
 
@@ -50,8 +51,10 @@ vi.mock('@/components/loading', () => ({
 
 // Mock dynamic import correctly to capture the options
 vi.mock('next/dynamic', () => ({
-  default: vi.fn((_fn: any, options: any) => {
-    return () => <div data-testid="attendance-chart" />;
+  default: vi.fn((_fn: any, _options: any) => {
+    const MockChart = () => <div data-testid="attendance-chart" />;
+    MockChart.displayName = 'AttendanceChart';
+    return MockChart;
   }),
 }));
 

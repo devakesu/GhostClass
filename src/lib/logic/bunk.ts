@@ -42,7 +42,7 @@ export function calculateAttendance(
 
   if (currentPercentage < safeTarget - PERCENTAGE_EPSILON) {
     if (safeTarget >= 100) {
-      result.requiredToAttend = total - present;
+      result.requiredToAttend = Infinity;
     } else {
       const required = Math.ceil(
         (safeTarget * total - 100 * present) / (100 - safeTarget)
