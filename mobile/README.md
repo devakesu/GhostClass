@@ -94,7 +94,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 mobile/
 ├── android/                  # Android host app (Kotlin, Gradle)
 │   └── app/
-│       └── src/main/kotlin/com/devakesu/ghostclass/
+│       └── src/main/kotlin/com.devakesu.apps.ghostclass/
 │           └── MainActivity.kt   # Anti-tapjacking + FLAG_SECURE
 ├── ios/                      # iOS host app (Swift, Xcode)
 │   └── Runner/

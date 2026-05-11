@@ -109,7 +109,7 @@ class AppConfig {
 
   /// The Play Store URL for the application.
   static String get playStoreUrl =>
-      'https://play.google.com/store/apps/details?id=com.devakesu.ghostclass';
+      'https://play.google.com/store/apps/details?id=com.devakesu.apps.ghostclass';
 
   /// Official legal contact email.
   static String get legalEmail => 'legal@ghostclass.devakesu.com';
