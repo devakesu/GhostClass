@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SecurityGuard {
   final SecureStorageService storage;
-  static const _channel = MethodChannel('com.devakesu.ghostclass/security');
+  static const _channel = MethodChannel('com.devakesu.apps.ghostclass/security');
 
   SecurityGuard(this.storage);
 

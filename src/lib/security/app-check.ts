@@ -174,8 +174,8 @@ export async function verifyAppCheckToken(
     };
 
     const authorizedAppIds = [
-      process.env.FIREBASE_APP_ID_ANDROID || "1:424804867878:android:015bb34927f1dd8e21abe7",
-      process.env.FIREBASE_APP_ID_IOS || "1:424804867878:ios:43e6f61b15e0954321abe7",
+      process.env.FIREBASE_APP_ID_ANDROID,
+      process.env.FIREBASE_APP_ID_IOS,
     ];
 
     // Validate that the token belongs to our authorized mobile apps

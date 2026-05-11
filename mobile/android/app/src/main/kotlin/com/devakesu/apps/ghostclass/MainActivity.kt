@@ -1,4 +1,4 @@
-package com.devakesu.ghostclass
+package com.devakesu.apps.ghostclass
 
 import android.os.Debug
 import android.view.WindowManager
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.devakesu.ghostclass/security"
+    private val CHANNEL = "com.devakesu.apps.ghostclass/security"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

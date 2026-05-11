@@ -55,7 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
     FocusScope.of(context).unfocus();
     
     if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
-       const channel = MethodChannel('com.devakesu.ghostclass/security');
+       const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
        try {
          final bool isDebuggerAttached = await channel.invokeMethod('isDebuggerAttached') ?? false;
         if (isDebuggerAttached) {
