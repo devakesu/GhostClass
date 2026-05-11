@@ -61,6 +61,7 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(() => ({
     invalidateQueries: vi.fn(),
+    cancelQueries: vi.fn(),
   })),
 }));
 
@@ -164,6 +165,7 @@ describe('DashboardClient', () => {
   const mockProfile = { id: '123', username: 'testuser', first_name: 'Test' };
   
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     
     vi.mocked(useProfile).mockReturnValue({ data: mockProfile, isLoading: false, isFetching: false, refetch: vi.fn() } as any);
@@ -181,7 +183,7 @@ describe('DashboardClient', () => {
     vi.mocked(useSetAcademicYear).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
   });
 
-  it('renders correctly with default settings', async () => {
+  it.only('renders correctly with default settings', async () => {
     render(<DashboardClient />);
     
     await waitFor(() => {

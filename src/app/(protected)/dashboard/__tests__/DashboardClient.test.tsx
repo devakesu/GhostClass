@@ -1,0 +1,230 @@
+/** @vitest-environment jsdom */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import DashboardClient from '../DashboardClient';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as profileHooks from '@/hooks/users/profile';
+import * as coursesHooks from '@/hooks/courses/courses';
+import * as syncHooks from '@/hooks/use-sync-on-mount';
+import * as attendanceHooks from '@/hooks/courses/attendance';
+
+// Mock all hooks
+vi.mock('@/hooks/users/profile', () => ({
+  useProfile: vi.fn(() => ({ data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1 }, isLoading: false, isFetching: false, refetch: vi.fn() })),
+}));
+
+vi.mock('@/hooks/courses/attendance', () => ({
+  useAttendanceReport: vi.fn(() => ({ data: null, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() })),
+  useAllCourseDetails: vi.fn(() => ({ data: {}, isLoading: false, isFetching: false, isError: false })),
+  useAllCourseSummaries: vi.fn(() => ({ data: {}, isLoading: false })),
+}));
+
+vi.mock('@/hooks/courses/courses', () => ({
+  useFetchCourses: vi.fn(() => ({ data: { courses: {} }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() })),
+}));
+
+vi.mock('@/hooks/users/settings', () => ({
+  useFetchUserSettings: vi.fn(() => ({ data: { semester: 'odd', academicYear: '2024-25' }, isLoading: false })),
+  useSetSemester: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false, mutate: vi.fn() })),
+  useSetAcademicYear: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false, mutate: vi.fn() })),
+}));
+
+vi.mock('@/hooks/tracker/useTrackingData', () => ({
+  useTrackingData: vi.fn(() => ({ data: [], isLoading: false, isFetching: false, isError: false, refetch: vi.fn() })),
+}));
+
+vi.mock('@/hooks/courses/instructors', () => ({
+  useFetchCourseInstructors: vi.fn(() => ({ data: [], isLoading: false })),
+}));
+
+vi.mock('@/hooks/courses/useFetchClassCourses', () => ({
+  useFetchClassCourses: vi.fn(() => ({ data: [], isLoading: false })),
+}));
+
+vi.mock('@/hooks/use-dashboard-stats', () => ({
+  useDashboardStats: vi.fn(() => ({
+    realPresent: 0,
+    realTotal: 0,
+    percentage: 0,
+    courseStats: {},
+  })),
+}));
+
+vi.mock('@/hooks/use-sync-on-mount', () => ({
+  useSyncOnMount: vi.fn(() => ({ syncCompleted: true })),
+}));
+
+vi.mock('../components/CourseGrid', () => ({
+  CourseGrid: ({ sortedCourses, onEditInstructor, onAddCourse }: any) => (
+    <div data-testid="course-grid">
+      <button onClick={onAddCourse}>Add Course</button>
+      {sortedCourses.map((c: any) => (
+        <button key={c.id} onClick={() => onEditInstructor(c, 'Instructor', false, null)}>
+          Edit {c.code}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('../components/StatsPanel', () => ({
+  StatsPanel: () => <div data-testid="stats-panel" />,
+}));
+
+vi.mock('../components/DashboardCharts', () => ({
+  DashboardCharts: () => <div data-testid="dashboard-charts" />,
+}));
+
+vi.mock('@/providers/attendance-settings', () => ({
+  useAttendanceSettings: vi.fn(() => ({ targetPercentage: 75 })),
+}));
+
+vi.mock('@/hooks/courses/useDisabledCourses', () => ({
+  useDisabledCourses: vi.fn(() => ({ 
+    disabledCodes: new Set(),
+    isDisabled: vi.fn(() => false)
+  })),
+}));
+
+vi.mock('@/hooks/courses/useCourseLookup', () => ({
+  useCourseLookup: vi.fn(() => ({ getCourseCodeById: vi.fn() })),
+}));
+
+vi.mock('framer-motion', () => {
+  const mockComponent = ({ children, ...props }: any) => {
+    const { initial: _i, animate: _a, transition: _t, whileHover: _wh, whileTap: _wt, exit: _e, ...rest } = props;
+    return <div {...rest}>{children}</div>;
+  };
+  return {
+    motion: {
+      div: mockComponent,
+      h1: mockComponent,
+      p: mockComponent,
+      span: mockComponent,
+    },
+    m: {
+      div: mockComponent,
+      h1: mockComponent,
+      p: mockComponent,
+      span: mockComponent,
+    },
+    AnimatePresence: ({ children }: any) => <>{children}</>,
+    LazyMotion: ({ children }: any) => <>{children}</>,
+    domAnimation: {},
+  };
+});
+
+vi.mock('@/components/loading', () => ({
+  Loading: () => <div data-testid="loading">Full Loading...</div>,
+}));
+
+vi.mock('next/dynamic', () => ({
+  default: () => () => <div data-testid="dynamic-component" />,
+}));
+
+// Mock Select to trigger onValueChange
+vi.mock('@/components/ui/select', () => ({
+  Select: ({ children, onValueChange, value, disabled }: any) => (
+    <div data-testid="mock-select" data-value={value} data-disabled={disabled}>
+      <button onClick={() => !disabled && onValueChange('even')}>Change to EVEN</button>
+      {children}
+    </div>
+  ),
+  SelectTrigger: ({ children }: any) => <button>{children}</button>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+}));
+
+// Mock AlertDialog
+vi.mock('@/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children, open }: any) => open ? <div data-testid="alert-dialog">{children}</div> : null,
+  AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/attendance/AddAttendanceDialog', () => ({
+  AddAttendanceDialog: ({ onSuccess, open }: any) => (
+    open ? <div data-testid="add-attendance-dialog">
+      <button onClick={onSuccess}>Trigger Success</button>
+    </div> : null
+  ),
+}));
+
+vi.mock('@/components/attendance/AddCourseDialog', () => ({
+  AddCourseDialog: ({ open }: any) => open ? <div data-testid="add-course-dialog" /> : null,
+}));
+
+vi.mock('@/components/attendance/EditInstructorDialog', () => ({
+  EditInstructorDialog: ({ open }: any) => open ? <div data-testid="edit-instructor-dialog" /> : null,
+}));
+
+// Mock axios
+vi.mock('@/lib/axios', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: {} }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+});
+
+describe('DashboardClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(syncHooks.useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false } as any);
+    vi.mocked(profileHooks.useProfile).mockReturnValue({ 
+      data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1, class: { name: 'Test Class' } }, 
+      isLoading: false, 
+      isFetching: false, 
+      refetch: vi.fn() 
+    } as any);
+  });
+
+  it('handles semester change and confirm', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DashboardClient />
+      </QueryClientProvider>
+    );
+
+    const changeButtons = await screen.findAllByText('Change to EVEN');
+    fireEvent.click(changeButtons[0]);
+
+    expect(screen.getByTestId('alert-dialog')).toBeInTheDocument();
+    
+    const confirmButton = screen.getByText('Confirm');
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument());
+  });
+
+  it('triggers onEditInstructor from CourseGrid', async () => {
+    vi.mocked(coursesHooks.useFetchCourses).mockReturnValue({ 
+      data: { courses: { '1': { id: 1, code: 'CS101', name: 'Computer Science', key: '1' } } }, 
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn()
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DashboardClient />
+      </QueryClientProvider>
+    );
+
+    const editButton = await screen.findByText('Edit CS101');
+    fireEvent.click(editButton);
+
+    expect(screen.getByTestId('edit-instructor-dialog')).toBeInTheDocument();
+  });
+});

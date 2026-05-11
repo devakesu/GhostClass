@@ -138,24 +138,14 @@ export function getReconciledStats(
         else stats.extraAbsent++;
         if (trackDL) stats.extraDL++;
       } else if (officialStatus !== undefined) {
-        // If official is not positive, but tracker is positive -> Gain
         if (!offPos && trackPos) {
           stats.correctionPresent++;
           stats.savedAbsent++;
         }
-        // If official is positive, but tracker is NOT positive -> Loss
-        else if (offPos && !trackPos) {
-          stats.correctionPresent--;
-          stats.savedAbsent--; // Technically "losing" a saved absence or increasing net absences
-        }
 
-        // If official is not DL, but tracker is DL -> DL Correction (even if already present)
+        // If official is not DL, but tracker is DL -> DL Correction
         if (!offDL && trackDL) {
           stats.correctionDL++;
-        }
-        // If official is DL, but tracker is NOT DL -> DL Loss
-        else if (offDL && !trackDL) {
-          stats.correctionDL--;
         }
       }
     });

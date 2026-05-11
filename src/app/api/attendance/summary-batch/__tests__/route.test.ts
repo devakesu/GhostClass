@@ -48,8 +48,9 @@ vi.mock("@/lib/logger", () => ({
 describe("POST /api/attendance/summary-batch", () => {
   const mockAuthGetUser = vi.fn();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    vi.resetModules();
     (createClient as any).mockResolvedValue({
       auth: { getUser: mockAuthGetUser },
     });
@@ -66,24 +67,24 @@ describe("POST /api/attendance/summary-batch", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    vi.mocked(proxyRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
     const { POST } = await import("../route");
+    vi.mocked(proxyRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
     const req = new NextRequest("http://localhost/api/attendance/summary-batch", { method: "POST" });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(429);
   });
 
   it("returns 401 when unauthorized", async () => {
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error("Unauthorized") });
     const { POST } = await import("../route");
+    mockAuthGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error("Unauthorized") });
     const req = new NextRequest("http://localhost/api/attendance/summary-batch", { method: "POST" });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(401);
   });
 
   it("returns 401 when token is missing", async () => {
-    vi.mocked(getAuthTokenServer).mockResolvedValueOnce(undefined);
     const { POST } = await import("../route");
+    vi.mocked(getAuthTokenServer).mockResolvedValueOnce(undefined);
     const req = new NextRequest("http://localhost/api/attendance/summary-batch", { method: "POST" });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(401);
@@ -132,9 +133,10 @@ describe("POST /api/attendance/summary-batch", () => {
 
   it("handles fetch failure for individual courses", async () => {
     const { POST } = await import("../route");
-    vi.mocked(fetchEzygoData)
-      .mockResolvedValueOnce({ present: 10 })
-      .mockRejectedValueOnce(new Error("Fail"));
+    vi.mocked(fetchEzygoData).mockImplementation(async (url) => {
+      if (url.includes("/2/")) throw new Error("Fail");
+      return { present: 10 };
+    });
     
     const body = {
       courses: [
@@ -150,7 +152,8 @@ describe("POST /api/attendance/summary-batch", () => {
     expect(res.status).toBe(200);
     const results = await res.json();
     expect(results["OK"]).toBeDefined();
-    expect(results["FAIL"]).toBeUndefined();
+    expect(results["FAIL"]).toBeDefined();
+    expect(results["FAIL"].error).toBe("Fail");
   });
 
   it("uses fallback summary path if summery fails", async () => {

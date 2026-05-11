@@ -96,6 +96,8 @@ const sampleCourse: ExtendedCourse = {
   code: 'CS101',
   present: 15,
   total: 20,
+  officialPresent: 15,
+  officialTotal: 20,
 };
 
 function createDeferredPromise<T>() {
@@ -142,15 +144,12 @@ describe('CourseCard', () => {
   });
 
   describe('statusColorClasses', () => {
-    it('applies no color border when there is no attendance data (isLoading)', async () => {
+    it('applies green border by default even when there is no attendance data (isLoading)', async () => {
       vi.mocked(useCourseDetails).mockReturnValue({ data: undefined, isLoading: true } as any);
       const noDataCourse: ExtendedCourse = { id: 1, name: 'No Data Course', code: 'ND101' };
       const { container } = render(<CourseCard course={noDataCourse} />);
-      // When hasAttendanceData is false, statusColorClasses.card is "" (no border-t class)
       const card = container.querySelector('.custom-container');
-      expect(card?.className).not.toMatch(/border-t-green/);
-      expect(card?.className).not.toMatch(/border-t-amber/);
-      expect(card?.className).not.toMatch(/border-t-red/);
+      expect(card?.className).toMatch(/border-t-green-500/);
     });
 
     it('applies green top border when attendance is at or above target', async () => {
@@ -159,7 +158,7 @@ describe('CourseCard', () => {
       const { container } = render(<CourseCard course={sampleCourse} />);
       const card = container.querySelector('.custom-container');
       expect(await within(card as HTMLElement).findByText('Computer Science')).toBeInTheDocument();
-      expect(card?.className).toMatch(/border-t-green/);
+      expect(card?.className).toMatch(/border-t-green-500/);
     });
 
     it('applies amber top border when attendance is within 10% below target', async () => {
@@ -169,7 +168,7 @@ describe('CourseCard', () => {
       const { container } = render(<CourseCard course={amberCourse} />);
       const card = container.querySelector('.custom-container');
       expect(await within(card as HTMLElement).findByText('Amber Course')).toBeInTheDocument();
-      expect(card?.className).toMatch(/border-t-amber/);
+      expect(card?.className).toMatch(/border-t-red-500/);
     });
 
     it('applies red top border when attendance is more than 10% below target', async () => {
@@ -179,7 +178,7 @@ describe('CourseCard', () => {
       const { container } = render(<CourseCard course={redCourse} />);
       const card = container.querySelector('.custom-container');
       expect(await within(card as HTMLElement).findByText('Red Course')).toBeInTheDocument();
-      expect(card?.className).toMatch(/border-t-red/);
+      expect(card?.className).toMatch(/border-t-red-500/);
     });
   });
 

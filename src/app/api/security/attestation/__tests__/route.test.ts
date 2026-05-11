@@ -1,119 +1,126 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET } from '../route';
-import { getAppCheck } from '@/lib/firebase/admin';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { GET } from "../route";
+import { NextRequest } from "next/server";
 
-vi.mock('next/server', () => ({
-  NextResponse: {
-    json: vi.fn((data) => ({
-      data,
-      status: 200,
-    })),
-  },
-}));
-
-vi.mock('@/lib/firebase/admin', () => ({
+// Mock Firebase Admin
+vi.mock("@/lib/firebase/admin", () => ({
   getAppCheck: vi.fn(),
 }));
 
-describe('GET /api/security/attestation', () => {
+describe("GET /api/security/attestation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.FIREBASE_APP_ID_ANDROID = "android-app-id";
+    process.env.FIREBASE_APP_ID_IOS = "ios-app-id";
   });
 
-  it('returns failure when App Check token is missing', async () => {
-    const req = {
-      headers: {
-        get: vi.fn().mockReturnValue(null),
-      },
-    } as any;
+  it("returns error when App Check token is missing", async () => {
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+    });
 
-    const response = await GET(req) as any;
+    const res = await GET(req);
+    const data = await res.json();
 
-    expect(response.data.verified).toBe(false);
-    expect(response.data.appCheckError).toBe('Missing App Check token');
+    expect(data.verified).toBe(false);
+    expect(data.appCheckError).toBe("Missing App Check token");
   });
 
-  it('verifies App Check token when provided', async () => {
-    const authorizedAppId = "1:424804867878:android:015bb34927f1dd8e21abe7";
-    const req = {
-      headers: {
-        get: vi.fn().mockImplementation((name) => {
-          if (name === 'X-Firebase-AppCheck') return 'ac-token';
-          return null;
-        }),
-      },
-    } as any;
-
-    const mockAppCheck = {
-      verifyToken: vi.fn().mockResolvedValue({ appId: authorizedAppId }),
-    };
-    vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
-
-    const response = await GET(req) as any;
-
-    expect(response.data.verified).toBe(true);
-    expect(response.data.appId).toBe(authorizedAppId);
-    expect(response.data.appCheck).toBe(true);
-  });
-
-  it('handles App Check verification failure', async () => {
-    const req = {
-      headers: {
-        get: vi.fn().mockImplementation((name) => {
-          if (name === 'X-Firebase-AppCheck') return 'invalid-ac-token';
-          return null;
-        }),
-      },
-    } as any;
-
-    const mockAppCheck = {
-      verifyToken: vi.fn().mockRejectedValue(new Error('AC Token Invalid')),
-    };
-    vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
-
-    const response = await GET(req) as any;
-
-    expect(response.data.appCheck).toBe(false);
-    expect(response.data.appCheckError).toBe('AC Token Invalid');
-  });
-
-  it('handles unauthorized App ID', async () => {
-    const unauthorizedAppId = "1:wrong:android:id";
-    const req = {
-      headers: {
-        get: vi.fn().mockImplementation((name) => {
-          if (name === 'X-Firebase-AppCheck') return 'ac-token';
-          return null;
-        }),
-      },
-    } as any;
-
-    const mockAppCheck = {
-      verifyToken: vi.fn().mockResolvedValue({ appId: unauthorizedAppId }),
-    };
-    vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
-
-    const response = await GET(req) as any;
-
-    expect(response.data.verified).toBe(false);
-    expect(response.data.criticalRisk).toBe(true);
-    expect(response.data.appCheckError).toBe('Unauthorized App ID');
-  });
-
-  it('handles case where App Check verifier is unavailable', async () => {
-     const req = {
-      headers: {
-        get: vi.fn().mockImplementation((name) => {
-          if (name === 'X-Firebase-AppCheck') return 'ac-token';
-          return null;
-        }),
-      },
-    } as any;
-
+  it("returns error when App Check verifier is unavailable", async () => {
+    const { getAppCheck } = await import("@/lib/firebase/admin");
     vi.mocked(getAppCheck).mockReturnValue(null as any);
 
-    const response = await GET(req) as any;
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "some-token",
+      },
+    });
 
-    expect(response.data.appCheckError).toBe('App Check verifier unavailable');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.verified).toBe(false);
+    expect(data.appCheckError).toBe("App Check verifier unavailable");
+  });
+
+  it("verifies valid token and extracts claims", async () => {
+    const { getAppCheck } = await import("@/lib/firebase/admin");
+    const mockDecoded = {
+      appId: "android-app-id",
+      token: {
+        iss: "https://firebaseappcheck.googleapis.com/424804867878",
+        sub: "android-app-id",
+        aud: ["projects/ghostclass-123"],
+        exp: 123456789,
+        iat: 123456000,
+        app_id: "android-app-id",
+        custom_claim: "hello",
+      },
+    };
+    vi.mocked(getAppCheck).mockReturnValue({
+      verifyToken: vi.fn().mockResolvedValue(mockDecoded),
+    } as any);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "valid-token",
+      },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.verified).toBe(true);
+    expect(data.appId).toBe("android-app-id");
+    expect(data.details.custom_claim).toBe("hello");
+    expect(data.details.issuer).toBe(mockDecoded.token.iss);
+    expect(data.details.exp).toBeUndefined(); // Sensitive key filtered
+  });
+
+  it("handles unauthorized App ID", async () => {
+    const { getAppCheck } = await import("@/lib/firebase/admin");
+    const mockDecoded = {
+      appId: "rogue-app-id",
+      token: { iss: "test" },
+    };
+    vi.mocked(getAppCheck).mockReturnValue({
+      verifyToken: vi.fn().mockResolvedValue(mockDecoded),
+    } as any);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "valid-token",
+      },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.verified).toBe(false);
+    expect(data.criticalRisk).toBe(true);
+    expect(data.appCheckError).toBe("Unauthorized App ID");
+  });
+
+  it("handles verification failure", async () => {
+    const { getAppCheck } = await import("@/lib/firebase/admin");
+    vi.mocked(getAppCheck).mockReturnValue({
+      verifyToken: vi.fn().mockRejectedValue(new Error("Token expired")),
+    } as any);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "expired-token",
+      },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.verified).toBe(false);
+    expect(data.appCheckError).toBe("Token expired");
   });
 });

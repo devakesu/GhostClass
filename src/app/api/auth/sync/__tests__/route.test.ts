@@ -70,11 +70,24 @@ describe("POST /api/auth/sync", () => {
     vi.clearAllMocks();
     (getAdminClient as any).mockReturnValue({
       auth: { getUser: mockAuthGetUser },
-      from: vi.fn(() => ({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        maybeSingle: mockAdminMaybeSingle,
-      })),
+      from: vi.fn((table) => {
+        const mockMethods = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn(),
+        };
+
+        if (table === "users") {
+          mockMethods.maybeSingle = mockAdminMaybeSingle;
+        } else if (table === "user_settings") {
+          mockMethods.maybeSingle.mockResolvedValue({ 
+            data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} }, 
+            error: null 
+          });
+        }
+
+        return mockMethods;
+      }),
     });
     (createClient as any).mockResolvedValue({
       auth: { getUser: mockAuthGetUser },

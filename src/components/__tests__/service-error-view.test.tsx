@@ -26,14 +26,14 @@ describe('ServiceErrorView', () => {
 
   it('renders with default props', () => {
     render(<ServiceErrorView />);
-    expect(screen.getByText('Connection Error')).toBeDefined();
-    expect(screen.getByText(/Ezygo API is not responding properly/)).toBeDefined();
+    expect(screen.getByText('Service Unavailable')).toBeDefined();
+    expect(screen.getByText(/EzyGo servers are currently down/)).toBeDefined();
   });
 
-  it('calls onRetry when Retry button is clicked', () => {
+  it('calls onRetry when Try Again button is clicked', () => {
     const onRetry = vi.fn();
     render(<ServiceErrorView onRetry={onRetry} />);
-    fireEvent.click(screen.getByText('Retry'));
+    fireEvent.click(screen.getByText('Try Again'));
     expect(onRetry).toHaveBeenCalled();
   });
 
@@ -45,12 +45,19 @@ describe('ServiceErrorView', () => {
     expect(push).toHaveBeenCalledWith('/');
   });
 
-  it('navigates to contact page when Contact Us is clicked', () => {
+  it('navigates to contact page when Contact Support is clicked', () => {
     const push = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push, refresh: vi.fn() } as any);
     render(<ServiceErrorView error="Test Error" />);
-    fireEvent.click(screen.getByText('Contact Us'));
-    expect(push).toHaveBeenCalledWith(expect.stringContaining('/contact?subject=Connection%20Error'));
+    // Mock window.location.href
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = { ...originalLocation, href: '' } as any;
+    
+    fireEvent.click(screen.getByText('Contact Support'));
+    expect(window.location.href).toContain('mailto:support@ghostclass.app?subject=Connection%20Error');
+    
+    window.location = originalLocation;
   });
 
   it('handles logout correctly', async () => {
@@ -61,7 +68,7 @@ describe('ServiceErrorView', () => {
     vi.mocked(createBrowserClient).mockReturnValue({ auth: { signOut } } as any);
 
     render(<ServiceErrorView />);
-    fireEvent.click(screen.getByText('Logout & try again'));
+    fireEvent.click(screen.getByText('Sign Out'));
 
     await vi.waitFor(() => {
       expect(signOut).toHaveBeenCalled();

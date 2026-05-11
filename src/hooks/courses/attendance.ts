@@ -190,3 +190,8 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
     retry: retryTwice,
   });
 };
+
+/** TEST ONLY: Reset module-level singleton state. */
+export function _resetModuleState() {
+  workingSummaryEndpoint = null;
+}
