@@ -34,16 +34,15 @@ describe("query-utils.ts", () => {
       expect(retry(0, error)).toBe(false);
     });
 
-    it("returns true for 5xx axios errors (except 503) within retry limit", () => {
+    it("returns false for 500/503 (circuit breaker) and true for 502 (transient)", () => {
       const retry = makeRetryFn(3);
-      const error = { 
-        isAxiosError: true, 
-        response: { status: 500 } 
-      } as unknown as AxiosError;
+      const error500 = { isAxiosError: true, response: { status: 500 } } as any;
+      const error502 = { isAxiosError: true, response: { status: 502 } } as any;
       
-      expect(retry(0, error)).toBe(true);
-      expect(retry(2, error)).toBe(true);
-      expect(retry(3, error)).toBe(false);
+      expect(retry(0, error500)).toBe(false);
+      expect(retry(0, error502)).toBe(true);
+      expect(retry(2, error502)).toBe(true);
+      expect(retry(3, error502)).toBe(false);
     });
 
     it("returns false for 4xx fetch-based errors (with manual .status)", () => {

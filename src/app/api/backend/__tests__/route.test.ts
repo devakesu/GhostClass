@@ -34,6 +34,14 @@ vi.mock('@/lib/ezygo-batch-fetcher', () => ({
   invalidateEzygoCacheForUser: vi.fn(),
 }));
 
+vi.mock('@/lib/security/app-check', async () => {
+  const actual = await vi.importActual('@/lib/security/app-check') as any;
+  return {
+    ...actual,
+    verifyAppCheckToken: vi.fn(() => Promise.resolve({ isValid: true })),
+  };
+});
+
 vi.mock('next/headers', () => ({
   headers: vi.fn(),
   cookies: vi.fn(() => ({
@@ -58,6 +66,13 @@ describe('Backend Proxy Route', () => {
   // routing each call to the corresponding exported HTTP handler.
   async function forward(request: NextRequest, method: string, path: string[]): Promise<Response> {
     const ctx = { params: Promise.resolve({ path }) };
+    
+    // Ensure we have authentication to get past withSecurity
+    // We use x-csrf-token to make it look like a web request by default
+    if (!request.headers.has('x-csrf-token') && !request.headers.has('X-Firebase-AppCheck')) {
+      request.headers.set('x-csrf-token', 'mock-csrf-token');
+    }
+
     switch (method.toUpperCase()) {
       case 'GET':    return GET(request, ctx);
       case 'POST':   return POST(request, ctx);
@@ -74,7 +89,11 @@ describe('Backend Proxy Route', () => {
     vi.resetModules();
     vi.clearAllMocks();
     
-      vi.stubEnv('NODE_ENV', 'production');
+    // Default mock implementations
+    const { validateCsrfToken } = await import('@/lib/security/csrf');
+    vi.mocked(validateCsrfToken).mockResolvedValue(true);
+    
+    vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
     vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
     
@@ -159,6 +178,7 @@ describe('Backend Proxy Route', () => {
         method: 'GET',
         headers: {
           origin: 'http://localhost',
+          'X-Firebase-AppCheck': 'mock-token', // Use App Check to bypass CSRF check
         },
       });
 
@@ -912,6 +932,7 @@ describe('Backend Proxy Route', () => {
     it('should handle missing path segments (exercises line 33)', async () => {
       const request = new NextRequest('http://localhost:3000/api/backend/', {
         method: 'GET',
+        headers: { 'x-csrf-token': 'mock-token' }
       });
       const response = await GET(request, { params: Promise.resolve({ path: [] }) } as any);
       expect(response.status).toBe(400);
@@ -922,6 +943,7 @@ describe('Backend Proxy Route', () => {
     it('should reject paths with fragments (exercises line 35)', async () => {
       const request = new NextRequest('http://localhost:3000/api/backend/users#fragment', {
         method: 'GET',
+        headers: { 'x-csrf-token': 'mock-token' }
       });
       const response = await GET(request, { params: Promise.resolve({ path: ['users#fragment'] }) } as any);
       expect(response.status).toBe(400);

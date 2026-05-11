@@ -43,7 +43,8 @@ describe("OutageProvider", () => {
       screen.getByTestId("set-true").click();
     });
     
-    expect(screen.getByTestId("has-outage").textContent).toBe("true");
+    // TestComponent is unmounted when hasOutage is true
+    expect(screen.queryByTestId("has-outage")).not.toBeInTheDocument();
     expect(screen.getByTestId("error-view")).toBeInTheDocument();
     expect(screen.getByTestId("messages").textContent).toBe("Server down");
     expect(screen.getByTestId("details").textContent).toBe("503");

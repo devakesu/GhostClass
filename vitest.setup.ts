@@ -332,6 +332,39 @@ vi.mock('framer-motion', () => {
   };
 });
 
+// Mock lucide-react icons globally
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  const mockIcon = (name: string) => {
+    const Icon = (props: any) => React.createElement('div', { ...props, 'data-testid': `icon-${name.toLowerCase()}` });
+    Icon.displayName = name;
+    return Icon;
+  };
+
+  const mocks: any = {};
+  Object.keys(actual).forEach(key => {
+    if (typeof actual[key] === 'function' || (actual[key] && actual[key].$$typeof)) {
+      mocks[key] = mockIcon(key);
+    }
+  });
+
+  // Ensure common ones are there even if not in keys
+  const commonIcons = [
+    'AlertTriangle', 'AlertCircle', 'Bell', 'Check', 'CheckCircle2', 
+    'ChevronLeft', 'ChevronRight', 'Clock', 'FileText', 'Filter', 
+    'GraduationCap', 'HelpCircle', 'Info', 'Loader2', 'LogOut', 
+    'MoreVertical', 'Plus', 'RefreshCcw', 'RefreshCw', 'Search', 
+    'Settings', 'Trash2', 'User', 'X', 'BookOpen', 'CalendarClock'
+  ];
+  
+  commonIcons.forEach(icon => {
+    if (!mocks[icon]) mocks[icon] = mockIcon(icon);
+  });
+
+  return mocks;
+});
+
+
 
 
 

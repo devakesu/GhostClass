@@ -45,6 +45,18 @@ vi.mock('@/lib/ratelimit', () => ({
   },
 }));
 
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn((name: string) => {
+      if (name === 'x-csrf-token') return { value: 'mock-csrf-token' };
+      return null;
+    }),
+  })),
+  headers: vi.fn(() => ({
+    get: vi.fn(() => null),
+  })),
+}));
+
 // Provide a lightweight pass-through circuit breaker so that:
 // (a) the real @sentry/nextjs initialization is never triggered in this file
 //     (Sentry registers setInterval timers; if a sibling test left fake timers
@@ -104,7 +116,10 @@ describe('Backend Proxy Route – Egress Failover Chain', () => {
   function makeGetRequest() {
     return new NextRequest('http://localhost:3000/api/backend/users', {
       method: 'GET',
-      headers: { origin: 'http://localhost' },
+      headers: { 
+        origin: 'http://localhost',
+        'x-csrf-token': 'mock-csrf-token'
+      },
     });
   }
 

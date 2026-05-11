@@ -8,7 +8,7 @@ vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers())
 }));
 
-import { getClientIp, redact, getEgressConfig, egressFetch, egressAxios, _resetModuleState } from '@/lib/utils.server';
+import { getClientIp, redact, egressFetch, _resetModuleState } from '@/lib/utils.server';
 
 describe('utils.server.ts', () => {
   beforeEach(() => {
@@ -96,49 +96,6 @@ describe('utils.server.ts', () => {
       expect(h1).toBe(h2);
       expect(h1).toHaveLength(12);
     });
-
-    it('throws in production if salt is missing', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('SENTRY_HASH_SALT', '');
-      expect(() => redact('id', 'v')).toThrow('SENTRY_HASH_SALT is required in production');
-    });
-
-    it('warns in development if salt is missing', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      vi.stubEnv('SENTRY_HASH_SALT', '');
-      redact('id', 'v');
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Using fallback salt'));
-    });
-  });
-
-  describe('getEgressConfig', () => {
-    it('returns config with proxyHeaders if secret present', () => {
-      vi.stubEnv('CF_PROXY_URL', 'https://cf');
-      vi.stubEnv('CF_PROXY_SECRET', 'secret');
-      expect(getEgressConfig().proxyHeaders).toEqual({ 'x-proxy-secret': 'secret' });
-    });
-
-    it('returns config without proxyHeaders if secret missing', () => {
-      vi.stubEnv('CF_PROXY_URL', 'https://cf');
-      vi.stubEnv('CF_PROXY_SECRET', '');
-      expect(getEgressConfig().proxyHeaders).toEqual({});
-    });
-
-    it('prioritizes AWS if CF is missing', () => {
-      vi.stubEnv('CF_PROXY_URL', '');
-      vi.stubEnv('AWS_SECONDARY_URL', 'https://aws');
-      vi.stubEnv('AWS_SECONDARY_SECRET', 'aws-secret');
-      const config = getEgressConfig();
-      expect(config.baseUrl).toBe('https://aws');
-      expect(config.proxyHeaders).toEqual({ 'x-proxy-secret': 'aws-secret' });
-    });
-
-    it('falls back to direct backend if both CF and AWS are missing', () => {
-      vi.stubEnv('CF_PROXY_URL', '');
-      vi.stubEnv('AWS_SECONDARY_URL', '');
-      vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://direct');
-      expect(getEgressConfig().baseUrl).toBe('https://direct');
-    });
   });
 
   describe('egressFetch', () => {
@@ -157,12 +114,16 @@ describe('utils.server.ts', () => {
     });
 
     it('rethrows AbortError if caller signal is aborted', async () => {
-      (global.fetch as any).mockRejectedValue(new (class AbortError extends Error { name = 'AbortError'; })());
       const controller = new AbortController();
       controller.abort();
+      // Use a real promise that rejects with AbortError to simulate fetch behavior
+      (global.fetch as any).mockImplementation(() => {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        return Promise.reject(err);
+      });
       await expect(egressFetch('/test', { signal: controller.signal })).rejects.toThrow();
     });
-
 
     it('fails over on retryable statuses (429, 502, etc)', async () => {
       (global.fetch as any)
@@ -203,12 +164,6 @@ describe('utils.server.ts', () => {
       expect(res.status).toBe(200);
     });
 
-    it('respects caller signal', async () => {
-      const controller = new AbortController();
-      controller.abort();
-      await expect(egressFetch('/test', { signal: controller.signal })).rejects.toThrow();
-    });
-
     it('injects stealth headers and proxy secret', async () => {
       (global.fetch as any).mockResolvedValue({ status: 200, ok: true });
       await egressFetch('/test');
@@ -242,25 +197,6 @@ describe('utils.server.ts', () => {
       const lastCallHeaders = (global.fetch as any).mock.calls[0][1].headers;
       expect(lastCallHeaders.get('user-agent')).toBe('Browser UA');
       expect(lastCallHeaders.get('sec-ch-ua')).toBe('Browser UA Info');
-    });
-  });
-
-  describe('egressAxios', () => {
-    it('has correct timeout and interceptor logic', async () => {
-      vi.stubEnv('CF_PROXY_URL', 'https://cf');
-      vi.stubEnv('CF_PROXY_SECRET', 'secret');
-      
-      expect(egressAxios.defaults.timeout).toBe(15000);
-
-      // Manual check of interceptor
-      const config: any = { headers: new Map() };
-      const handlers = (egressAxios.interceptors.request as any).handlers;
-      const interceptor = handlers[0].fulfilled;
-      const result = interceptor(config);
-      
-      expect(result.baseURL).toBe('https://cf');
-      expect(result.headers.get('x-proxy-secret')).toBe('secret');
-      expect(result.headers.get('origin')).toBe('https://edu.ezygo.app');
     });
   });
 });

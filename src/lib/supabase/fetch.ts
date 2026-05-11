@@ -166,7 +166,11 @@ export function buildSupabaseTieredFetch(
       const tierTimeout    = setTimeout(() => tierController.abort(), SUPABASE_TIER_TIMEOUT_MS);
       const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
 
-      const headers = new Headers(init?.headers);
+      const headers = new Headers(input instanceof Request ? input.headers : undefined);
+      if (init?.headers) {
+        new Headers(init.headers).forEach((v, k) => headers.set(k, v));
+      }
+
       if (isDev && tier.name === "DevProxy") {
         const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
         if (appDomain) {

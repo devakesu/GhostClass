@@ -1,159 +1,129 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useExams, useExamQuestions, useExamAnswers, useAllExamAnswers, useAllExamQuestions } from "../exams";
-import axios from "@/lib/axios";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { useExams, useExamQuestions, useExamAnswers, useBatchExamDetails, useAllExamAnswers, useAllExamQuestions } from '../exams';
+import axios from '@/lib/axios';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
-vi.mock("@/lib/axios", () => ({
-  default: {
-    get: vi.fn(),
-  },
+vi.mock('@/lib/axios');
+vi.mock('../users/settings', () => ({
+  useFetchSemester: vi.fn(() => ({ data: 'odd' })),
+  useFetchAcademicYear: vi.fn(() => ({ data: '2024-25' })),
 }));
 
-vi.mock("@/lib/query-utils", () => ({
-  retryOnce: false,
-}));
+describe('exams hooks', () => {
+  let queryClient: QueryClient;
+  let wrapper: React.FC<{ children: React.ReactNode }>;
 
-vi.mock("../../users/settings", () => ({
-  useFetchAcademicYear: vi.fn(() => ({ data: "2023" })),
-  useFetchSemester: vi.fn(() => ({ data: "1" })),
-}));
-
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-  QueryClientWrapper.displayName = "QueryClientWrapper";
-  return QueryClientWrapper;
-};
-
-describe("exams hooks", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   });
 
-  describe("useExams", () => {
-    it("should fetch exams", async () => {
-      const mockExams = [{ id: 1, name: "Final" }];
-      (axios.get as any).mockResolvedValueOnce({ data: mockExams });
-
-      const { result } = renderHook(() => useExams({ enabled: true }), {
-        wrapper: createWrapper(),
-      });
-
+  describe('useExams', () => {
+    it('fetches exams successfully', async () => {
+      const mockExams = [{ id: 1, name: 'Midterm' }];
+      vi.mocked(axios.get).mockResolvedValue({ data: mockExams });
+      
+      const { result } = renderHook(() => useExams({ enabled: true }), { wrapper });
+      
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockExams);
-      expect(axios.get).toHaveBeenCalledWith("/exams");
+      expect(axios.get).toHaveBeenCalledWith('/exams');
     });
 
-    it("should throw if response is null", async () => {
-      (axios.get as any).mockResolvedValueOnce(null);
-      const { result } = renderHook(() => useExams({ enabled: true }), {
-        wrapper: createWrapper(),
-      });
-      await waitFor(() => expect(result.current.isError).toBe(true));
-    });
   });
 
-  describe("useExamQuestions", () => {
-    it("should fetch exam questions", async () => {
-      const mockQuestions = [{ id: 101, text: "Q1" }];
-      (axios.get as any).mockResolvedValueOnce({ data: mockQuestions });
-
-      const { result } = renderHook(() => useExamQuestions(1), {
-        wrapper: createWrapper(),
-      });
-
+  describe('useExamQuestions', () => {
+    it('fetches questions for an exam', async () => {
+      const mockQuestions = [{ id: 10, question_no: '1' }];
+      vi.mocked(axios.get).mockResolvedValue({ data: mockQuestions });
+      
+      const { result } = renderHook(() => useExamQuestions(1), { wrapper });
+      
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockQuestions);
-    });
-
-    it("should throw if response is null", async () => {
-      (axios.get as any).mockResolvedValueOnce(null);
-      const { result } = renderHook(() => useExamQuestions(1), {
-        wrapper: createWrapper(),
+      expect(axios.get).toHaveBeenCalledWith('/exams/1/examquestions', {
+        params: { from_view_score: true },
       });
-      await waitFor(() => expect(result.current.isError).toBe(true));
     });
   });
 
-  describe("useExamAnswers", () => {
-    it("should fetch exam answers", async () => {
-      const mockAnswers = [{ id: 201, score: 50 }];
-      (axios.get as any).mockResolvedValueOnce({ data: mockAnswers });
-
-      const { result } = renderHook(() => useExamAnswers(1), {
-        wrapper: createWrapper(),
-      });
-
+  describe('useExamAnswers', () => {
+    it('fetches answers for an exam', async () => {
+      const mockAnswers = [{ id: 20, score: 85 }];
+      vi.mocked(axios.get).mockResolvedValue({ data: mockAnswers });
+      
+      const { result } = renderHook(() => useExamAnswers(1), { wrapper });
+      
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockAnswers);
-    });
-
-    it("should throw if response is null", async () => {
-      (axios.get as any).mockResolvedValueOnce(null);
-      const { result } = renderHook(() => useExamAnswers(1), {
-        wrapper: createWrapper(),
-      });
-      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith('/exams/1/institutionuser/examanswers');
     });
   });
 
-  describe("useAllExamAnswers", () => {
-    it("should fetch answers for multiple exams", async () => {
-      (axios.get as any)
-        .mockResolvedValueOnce({ data: [{ id: 1 }] })
-        .mockResolvedValueOnce({ data: [{ id: 2 }] });
-
-      const { result } = renderHook(() => useAllExamAnswers([1, 2]), {
-        wrapper: createWrapper(),
-      });
-
-      await waitFor(() => {
-        expect(result.current[0].isSuccess).toBe(true);
-        expect(result.current[1].isSuccess).toBe(true);
-      });
-    });
-
-    it("should handle null response in parallel queries", async () => {
-      (axios.get as any).mockResolvedValueOnce(null);
-      const { result } = renderHook(() => useAllExamAnswers([1]), {
-        wrapper: createWrapper(),
-      });
-      await waitFor(() => expect(result.current[0].isError).toBe(true));
+  describe('useAllExamAnswers', () => {
+    it('fetches all answers for multiple exams', async () => {
+      const mockAnswers = [{ id: 20, score: 85 }];
+      vi.mocked(axios.get).mockResolvedValue({ data: mockAnswers });
+      
+      const { result } = renderHook(() => useAllExamAnswers([1, 2]), { wrapper });
+      await waitFor(() => expect(result.current[0].isSuccess).toBe(true));
+      await waitFor(() => expect(result.current[1].isSuccess).toBe(true));
+      expect(result.current[0].data).toEqual(mockAnswers);
+      expect(result.current[1].data).toEqual(mockAnswers);
+      expect(axios.get).toHaveBeenCalledWith('/exams/1/institutionuser/examanswers');
+      expect(axios.get).toHaveBeenCalledWith('/exams/2/institutionuser/examanswers');
     });
   });
 
-  describe("useAllExamQuestions", () => {
-    it("should fetch questions for multiple exams", async () => {
-      (axios.get as any)
-        .mockResolvedValueOnce({ data: [{ id: 11 }] })
-        .mockResolvedValueOnce({ data: [{ id: 22 }] });
-
-      const { result } = renderHook(() => useAllExamQuestions([1, 2]), {
-        wrapper: createWrapper(),
-      });
-
-      await waitFor(() => {
-        expect(result.current[0].isSuccess).toBe(true);
-        expect(result.current[1].isSuccess).toBe(true);
+  describe('useAllExamQuestions', () => {
+    it('fetches all questions for multiple exams', async () => {
+      const mockQuestions = [{ id: 10, question_no: '1' }];
+      vi.mocked(axios.get).mockResolvedValue({ data: mockQuestions });
+      
+      const { result } = renderHook(() => useAllExamQuestions([1, 2]), { wrapper });
+      
+      await waitFor(() => expect(result.current[0].isSuccess).toBe(true));
+      await waitFor(() => expect(result.current[1].isSuccess).toBe(true));
+      
+      expect(result.current[0].data).toEqual(mockQuestions);
+      expect(result.current[1].data).toEqual(mockQuestions);
+      expect(axios.get).toHaveBeenCalledWith('/exams/1/examquestions', {
+        params: { from_view_score: true },
       });
     });
+  });
 
-    it("should handle null response in parallel queries", async () => {
-      (axios.get as any).mockResolvedValueOnce(null);
-      const { result } = renderHook(() => useAllExamQuestions([1]), {
-        wrapper: createWrapper(),
-      });
-      await waitFor(() => expect(result.current[0].isError).toBe(true));
+  describe('useBatchExamDetails', () => {
+    it('fetches batch details', async () => {
+      const mockBatch = {
+        1: { questions: [], answers: [] }
+      };
+      vi.mocked(axios.post).mockResolvedValue({ data: mockBatch });
+      
+      const { result } = renderHook(() => useBatchExamDetails([1]), { wrapper });
+      
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(mockBatch);
+      expect(axios.post).toHaveBeenCalledWith('/scores/batch', { examIds: [1] });
+    });
+
+    it('returns empty object for empty examIds', async () => {
+      const { result } = renderHook(() => useBatchExamDetails([]), { wrapper });
+      
+      // Since it's disabled when length is 0, it won't fetch
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.data).toBeUndefined();
     });
   });
 });

@@ -42,14 +42,15 @@ describe('useNotifications', () => {
       auth: {
         getSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'user-123' } } } }),
       },
-      from: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      ilike: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      single: vi.fn().mockReturnThis(),
+      from: vi.fn().mockImplementation(() => mockSupabase),
+      select: vi.fn().mockImplementation(() => mockSupabase),
+      eq: vi.fn().mockImplementation(() => mockSupabase),
+      ilike: vi.fn().mockImplementation(() => mockSupabase),
+      order: vi.fn().mockImplementation(() => mockSupabase),
+      range: vi.fn().mockImplementation(() => mockSupabase),
+      update: vi.fn().mockImplementation(() => mockSupabase),
+      single: vi.fn().mockImplementation(() => mockSupabase),
+      not: vi.fn().mockImplementation(() => mockSupabase),
       // Make it thenable to simulate Promise
       then: vi.fn().mockImplementation((onFulfilled) => {
         return Promise.resolve({ data: [], error: null, count: 0 }).then(onFulfilled);

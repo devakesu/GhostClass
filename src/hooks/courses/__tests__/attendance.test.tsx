@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 vi.unmock('@/hooks/courses/attendance')
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useAttendanceReport, useCourseDetails, useAllCourseDetails } from "../attendance";
+import { useAttendanceReport, useCourseDetails, useAllCourseDetails, _resetModuleState } from "../attendance";
 import axios from "@/lib/axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -36,6 +36,7 @@ const createWrapper = () => {
 describe("attendance hooks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetModuleState();
   });
 
   describe("useAttendanceReport", () => {
