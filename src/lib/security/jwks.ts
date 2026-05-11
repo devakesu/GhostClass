@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger";
 
 let cachedJwks: { keys: any[] } | null = null;
 let cachedPrivateKey: any | null = null;
+let jwksPromise: Promise<{ keys: any[] }> | null = null;
 
 /**
  * FOR TESTING ONLY: Resets the cached JWKS and private key.
@@ -17,6 +18,7 @@ let cachedPrivateKey: any | null = null;
 export function __resetJwksCache() {
   cachedJwks = null;
   cachedPrivateKey = null;
+  jwksPromise = null;
 }
 
 const ALG = "RSA-OAEP-256";
@@ -50,42 +52,48 @@ export async function getJwePrivateKey() {
  */
 export async function getJwks() {
   if (cachedJwks) return cachedJwks;
+  if (jwksPromise) return jwksPromise;
 
-  const pem = process.env.JWE_PRIVATE_KEY;
-  if (!pem) {
-    throw new Error("JWE: Missing JWE_PRIVATE_KEY.");
-  }
+  jwksPromise = (async () => {
+    const pem = process.env.JWE_PRIVATE_KEY;
+    if (!pem) {
+      throw new Error("JWE: Missing JWE_PRIVATE_KEY.");
+    }
 
-  try {
-    const formattedPem = pem.replace(/\\n/g, "\n");
+    try {
+      const formattedPem = pem.replace(/\\n/g, "\n");
 
-    // Import as extractable
-    const privateKey = await importPKCS8(formattedPem, ALG, {
-      extractable: true,
-    });
+      // Import as extractable
+      const privateKey = await importPKCS8(formattedPem, ALG, {
+        extractable: true,
+      });
 
-    // Export the full JWK
-    const fullJwk = await exportJWK(privateKey);
+      // Export the full JWK
+      const fullJwk = await exportJWK(privateKey);
 
-    // SECURITY: Manually map ONLY the public components (n, e)
-    // COMPATIBILITY: Include both 'wrapKey' and 'encrypt' for Flutter
-    cachedJwks = {
-      keys: [
-        {
-          kty: fullJwk.kty,
-          n: fullJwk.n,
-          e: fullJwk.e,
-          kid: KID,
-          alg: ALG,
-          use: "enc",
-          key_ops: ["wrapKey", "encrypt"],
-        },
-      ],
-    };
+      // SECURITY: Manually map ONLY the public components (n, e)
+      // COMPATIBILITY: Include both 'wrapKey' and 'encrypt' for Flutter
+      cachedJwks = {
+        keys: [
+          {
+            kty: fullJwk.kty,
+            n: fullJwk.n,
+            e: fullJwk.e,
+            kid: KID,
+            alg: ALG,
+            use: "enc",
+            key_ops: ["wrapKey", "encrypt"],
+          },
+        ],
+      };
 
-    return cachedJwks;
-  } catch (error) {
-    logger.error("JWE: Failed to generate JWKS:", error);
-    throw new Error("Internal Server Error: JWKS generation failed.");
-  }
+      return cachedJwks;
+    } catch (error) {
+      logger.error("JWE: Failed to generate JWKS:", error);
+      jwksPromise = null; // Allow retry
+      throw new Error("Internal Server Error: JWKS generation failed.");
+    }
+  })();
+
+  return jwksPromise;
 }

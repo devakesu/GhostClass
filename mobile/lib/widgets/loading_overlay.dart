@@ -41,7 +41,7 @@ class LoadingOverlay extends StatelessWidget {
                       ),
                       child: showLogo 
                         ? Image.asset(
-                            'assets/logo.png',
+                            'assets/images/logo.png',
                             height: 60,
                           )
                         : Icon(

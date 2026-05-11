@@ -4,7 +4,6 @@
  * This script ensures the service worker is generated even in standalone mode
  */
 
-const { Serwist } = require('serwist');
 const { build } = require('esbuild');
 const fs = require('fs');
 const path = require('path');

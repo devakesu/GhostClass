@@ -3,6 +3,7 @@ import '../models/course_details.dart';
 import '../services/logger.dart';
 import 'bunk.dart' as bunk;
 
+/// Converts a numeric value (1, 2, 3...) to Roman numerals (I, II, III...).
 String toRoman(dynamic value) {
   final int n = (value is String)
       ? int.tryParse(value) ?? 0
@@ -28,6 +29,8 @@ String toRoman(dynamic value) {
   return n.toString();
 }
 
+/// Calculates the current academic semester and year based on the current date
+/// or provided overrides. Used as a fallback when server data is unavailable.
 Map<String, String> calculateCurrentAcademicInfo({
   String? semester,
   String? year,
@@ -68,6 +71,7 @@ Map<String, String> calculateCurrentAcademicInfo({
   return {'current_semester': currentSemester, 'current_year': currentYearStr};
 }
 
+/// Normalizes various date formats into a standard YYYYMMDD string.
 String normalizeDate(dynamic date) {
   if (date == null) return '';
 
@@ -146,6 +150,7 @@ String normalizeDate(dynamic date) {
   return '';
 }
 
+/// Normalizes session identifiers (e.g., "1st Hour", "Session I") to a numeric string.
 String normalizeSession(dynamic session) {
   if (session == null) return '';
   String s = session.toString().toLowerCase().trim();
@@ -188,6 +193,7 @@ String normalizeSession(dynamic session) {
   return s.toUpperCase();
 }
 
+/// Formats a session identifier for display (e.g., "1" -> "1st Hour").
 String formatSessionName(String sessionName) {
   if (sessionName.isEmpty) return '';
   final clean = sessionName
@@ -227,6 +233,7 @@ String formatSessionName(String sessionName) {
       : 'Session $sessionName';
 }
 
+/// Extracts the numeric value from a session name for sorting.
 int getSessionNumber(String name) {
   if (name.isEmpty) return 999;
   final clean = name

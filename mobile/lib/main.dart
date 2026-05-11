@@ -18,6 +18,10 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 
+/// MyHttpOverrides
+/// ---------------
+/// Configures global HTTP behavior, including timeouts and custom certificate
+/// validation logic for development environments.
 class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
@@ -33,6 +37,7 @@ class MyHttpOverrides extends HttpOverrides {
     return client;
   }
 }
+
 
 class _SecurityFailureApp extends StatelessWidget {
   final String friendlyMessage;
@@ -89,7 +94,7 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    debugPrint('🛡️ [FIREBASE SHIELD] Initializing App Check...');
+    AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
 
     if (kDebugMode) {
       await FirebaseAppCheck.instance.activate(
@@ -103,7 +108,7 @@ void main() async {
       );
     }
   } catch (e) {
-    debugPrint('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE: $e');
+    AppLogger.e('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE', e);
     await _handleSecurityFailure(e);
     return;
   }
@@ -123,7 +128,7 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = AppConfig.sentryDsn;
-      options.tracesSampleRate = 1.0; // Capturing 100% of transactions for debugging
+      options.tracesSampleRate = kDebugMode ? 1.0 : 0.1;
       options.release = 'ghostclass@${AppConfig.appVersion}';
       options.environment = kDebugMode ? 'development' : 'production';
       options.attachStacktrace = true;
@@ -145,6 +150,10 @@ void main() async {
   };
 }
 
+/// MyApp
+/// -----
+/// The root widget of the GhostClass mobile application.
+/// Sets up the primary theme, router, and security listeners.
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 

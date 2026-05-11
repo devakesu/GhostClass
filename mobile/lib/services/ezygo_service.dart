@@ -7,6 +7,10 @@ import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
 
+/// EzygoService
+/// ------------
+/// Orchestrates data fetching from the EzyGo portal, utilizing batching
+/// and deduplication to optimize performance and reduce backend load.
 class EzygoService {
   final Ref _ref;
   late final EzygoBatchFetcher _fetcher;

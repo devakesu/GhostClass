@@ -4,6 +4,10 @@ import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'dart:io';
 
+/// SecurityLockdownListener
+/// ------------------------
+/// A widget that listens for critical security failure states and
+/// displays a non-dismissible lockdown dialog to protect user data.
 class SecurityLockdownListener extends ConsumerWidget {
   final Widget child;
 

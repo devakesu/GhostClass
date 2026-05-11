@@ -211,7 +211,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                 SizedBox(
                   width: MediaQuery.of(context).size.width * 0.42,
                   child: Image.asset(
-                    'assets/logo.png',
+                    'assets/images/logo.png',
                     alignment: Alignment.centerLeft,
                     fit: BoxFit.fitWidth,
                   ),

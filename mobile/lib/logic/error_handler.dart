@@ -7,6 +7,10 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 
+/// ErrorHandlerMixin
+/// ----------------
+/// A mixin for State classes that provides a centralized method for
+/// handling and displaying errors to the user.
 mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
   Future<void> handleError(
     dynamic error, {

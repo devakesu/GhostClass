@@ -1,6 +1,10 @@
 const _borderlineThreshold = 0.9;
 const _percentageEpsilon = 1e-9;
 
+/// AttendanceResult
+/// ----------------
+/// Encapsulates the results of a "bunk calculator" operation, indicating
+/// how many classes can be missed or need to be attended to reach a target.
 class AttendanceResult {
   final int canBunk;
   final int requiredToAttend;
@@ -17,6 +21,8 @@ class AttendanceResult {
   });
 }
 
+/// Calculates the number of classes a user can miss (bunk) or needs to attend
+/// to reach a specific target attendance percentage.
 AttendanceResult calculateAttendance(
   int present,
   int total, {

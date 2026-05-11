@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:jose/jose.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
@@ -27,14 +28,53 @@ class JweService {
 
   /// No longer needed internally, delegated to NetworkUtils.
 
+  Future<void>? _inFlightFetch;
+  static const String _jwksCacheKey = 'ghostclass_jwks_cache';
+  static const String _jwksTimeKey = 'ghostclass_jwks_time';
+
   Future<void> _fetchJwks() async {
+    // 1. In-memory cache check (1 hour)
     if (_cachedJwks != null &&
         _lastFetch != null &&
         DateTime.now().difference(_lastFetch!).inHours < 1) {
       return;
     }
 
+    // 2. Return in-flight fetch if exists to deduplicate concurrent calls
+    if (_inFlightFetch != null) {
+      return _inFlightFetch!;
+    }
+
+    _inFlightFetch = _performFetch();
     try {
+      await _inFlightFetch;
+    } finally {
+      _inFlightFetch = null;
+    }
+  }
+
+  Future<void> _performFetch() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // 3. Persistent cache check
+      final cachedJson = prefs.getString(_jwksCacheKey);
+      final cachedTimeStr = prefs.getString(_jwksTimeKey);
+      if (cachedJson != null && cachedTimeStr != null) {
+        try {
+          final cachedTime = DateTime.parse(cachedTimeStr);
+          if (DateTime.now().difference(cachedTime).inHours < 1) {
+            _cachedJwks = JsonWebKeySet.fromJson(json.decode(cachedJson));
+            _lastFetch = cachedTime;
+            AppLogger.d('JweService: Loaded JWKS from persistent cache.');
+            return;
+          }
+        } catch (e) {
+          AppLogger.w('JweService: Failed to parse cached JWKS time', e);
+        }
+      }
+
+      // 4. Network fetch
       final networkTimeout = kDebugMode
           ? const Duration(seconds: 40)
           : const Duration(seconds: 20);
@@ -49,8 +89,6 @@ class JweService {
       if (kDebugMode) {
         (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
           final client = HttpClient();
-          // SECURITY: Validate certificate CN even in debug mode
-          // This prevents MITM attacks while allowing self-signed certs
           client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
           return client;
         };
@@ -60,8 +98,14 @@ class JweService {
       final response = await dio.get(url);
 
       if (response.statusCode == 200) {
-        _cachedJwks = JsonWebKeySet.fromJson(response.data);
+        final data = response.data;
+        _cachedJwks = JsonWebKeySet.fromJson(data);
         _lastFetch = DateTime.now();
+        
+        // Update persistent cache
+        await prefs.setString(_jwksCacheKey, json.encode(data));
+        await prefs.setString(_jwksTimeKey, _lastFetch!.toIso8601String());
+        
         AppLogger.i('JweService: Fetched server JWKS successfully.');
       } else {
         throw Exception('Failed to fetch JWKS: ${response.statusCode}');
