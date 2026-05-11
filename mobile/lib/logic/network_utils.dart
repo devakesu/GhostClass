@@ -6,6 +6,10 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:pointycastle/asn1.dart';
 
+/// NetworkUtils
+/// ------------
+/// Provides utility functions for network operations, specifically focused
+/// on certificate validation and hostname extraction for secure communication.
 class NetworkUtils {
   NetworkUtils._();
 

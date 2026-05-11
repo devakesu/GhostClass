@@ -5,6 +5,10 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// SupportHelper
+/// -------------
+/// Provides utility functions for contacting support via the app or email,
+/// including pre-filling diagnostic logs for troubleshooting.
 class SupportHelper {
   SupportHelper._();
 

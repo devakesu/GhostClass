@@ -614,7 +614,7 @@ class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Image.asset(
-              'assets/logo.png',
+              'assets/images/logo.png',
               height: 60,
               fit: BoxFit.contain,
             ),

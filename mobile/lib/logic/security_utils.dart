@@ -6,6 +6,10 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/widgets/security_error_dialog.dart';
 
+/// SecurityUtils
+/// -------------
+/// Provides UI utilities for displaying security-related failures and
+/// gathering device information for support reports.
 class SecurityUtils {
   static Future<void> showSecurityFailureDialog(BuildContext context, {
     required String title,

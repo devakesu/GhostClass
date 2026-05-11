@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ghostclass/services/logger.dart';
 
 final themeProvider = NotifierProvider<ThemeNotifier, ThemeMode>(
   ThemeNotifier.new,
 );
 
+/// ThemeNotifier
+/// -------------
+/// Manages the persistence and state of the application's theme mode.
 class ThemeNotifier extends Notifier<ThemeMode> {
   static const _key = 'theme_mode';
 
@@ -23,7 +27,7 @@ class ThemeNotifier extends Notifier<ThemeMode> {
         state = ThemeMode.values[index];
       }
     } catch (e) {
-      debugPrint('Error loading theme: $e');
+      AppLogger.e('ThemeNotifier: Error loading theme', e);
     }
   }
 
@@ -33,7 +37,7 @@ class ThemeNotifier extends Notifier<ThemeMode> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_key, mode.index);
     } catch (e) {
-      debugPrint('Error saving theme: $e');
+      AppLogger.e('ThemeNotifier: Error saving theme', e);
     }
   }
 

@@ -7,6 +7,10 @@ import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:dio/dio.dart';
 
+/// AcademicState
+/// -------------
+/// Represents the current academic context (semester and year) for the user.
+/// Provides utility methods to derive start and end dates for filtering logs.
 class AcademicState {
   final String semester;
   final String year;
@@ -53,6 +57,10 @@ final academicProvider =
       AcademicNotifier.new,
     );
 
+/// AcademicNotifier
+/// ----------------
+/// Manages the current academic context state, synchronizing with
+/// secure storage, user settings, and the EzyGo portal.
 class AcademicNotifier extends AsyncNotifier<AcademicState?> {
   @override
   FutureOr<AcademicState?> build() async {

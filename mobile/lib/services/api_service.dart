@@ -12,8 +12,10 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
-/// Legacy Facade for specialized API services.
-/// Refactored to reduce monolithic bloat.
+/// ApiService
+/// ----------
+/// A centralized facade for accessing specialized API services (Auth, EzyGo, Security).
+/// This service acts as the primary entry point for network-related logic in the app.
 class ApiService {
   final Ref _ref;
 
@@ -42,7 +44,7 @@ class ApiService {
     // Basic pre-warm handled by individual services on demand
   }
 
-  // --- Auth Methods ---
+  // --- Authentication ---
   Future<Response<dynamic>> loginAndProvision({required String username, required String password}) =>
       _auth.loginAndProvision(username: username, password: password);
 
@@ -75,7 +77,7 @@ class ApiService {
 
   Future<Response<dynamic>> getUser(SecureStorageService storage) => _auth.getUser(storage);
 
-  // --- EzyGo Methods ---
+  // --- Academic Data (EzyGo) ---
   Future<Response<dynamic>> fetchCourses(SecureStorageService storage) => _ezygo.fetchCourses(storage);
   Future<Response<dynamic>> fetchAttendanceReportDetailed(SecureStorageService storage) =>
       _ezygo.fetchAttendanceReportDetailed(storage);
@@ -93,11 +95,11 @@ class ApiService {
   Future<Response<dynamic>> fetchExamQuestions(int examId, SecureStorageService storage) => _ezygo.fetchExamQuestions(examId, storage);
   Future<Response<dynamic>> fetchExamAnswers(int examId, SecureStorageService storage) => _ezygo.fetchExamAnswers(examId, storage);
 
-  // --- Security Methods ---
+  // --- Device & Network Security ---
   Future<void> verifyIntegrity() => _security.verifyIntegrity();
   Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) => _security.fetchAttestationDetails(supabaseToken);
 
-  // --- GhostClass Sync ---
+  // --- Data Synchronization ---
   Future<Response<dynamic>> triggerSync(String supabaseToken, {bool force = false}) async {
     // 1. Deduplication
     if (_syncInFlight != null) return _syncInFlight!;

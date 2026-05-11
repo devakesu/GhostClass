@@ -163,7 +163,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
-        child: Image.asset('assets/logo.png', height: 120)
+        child: Image.asset('assets/images/logo.png', height: 120)
             .animate()
             .fade(duration: 400.ms)
             .scale(

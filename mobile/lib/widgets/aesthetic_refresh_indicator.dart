@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/services/logger.dart';
 
+/// AestheticRefreshIndicator
+/// -------------------------
+/// A custom, high-fidelity refresh indicator that provides smooth visual feedback
+/// and ensures reliable sync state across different platforms.
 class AestheticRefreshIndicator extends StatefulWidget {
   final Widget child;
   final RefreshCallback onRefresh;
@@ -73,7 +78,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
         );
       }
     } catch (e) {
-      debugPrint('AestheticRefreshIndicator: Refresh failed: $e');
+      AppLogger.w('AestheticRefreshIndicator: Refresh failed', e);
     } finally {
       if (widget.useOverlay) {
         try {
@@ -81,7 +86,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
             rootNavigator.pop();
           }
         } catch (e) {
-          debugPrint('AestheticRefreshIndicator: Failed to hide overlay: $e');
+          AppLogger.w('AestheticRefreshIndicator: Failed to hide overlay', e);
         }
       }
       _safeSetState(() => _isRefreshing = false);
@@ -159,6 +164,9 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
   }
 }
 
+/// RefreshGlowIcon
+/// ---------------
+/// Visual representation of the refresh pull action.
 class RefreshGlowIcon extends StatelessWidget {
   final double pullDistance;
 

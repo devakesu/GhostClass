@@ -178,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(maxWidth: 300),
                                 child: Image.asset(
-                                  'assets/logo.png',
+                                  'assets/images/logo.png',
                                   width: MediaQuery.of(context).size.width * 0.7,
                                   fit: BoxFit.contain,
                                   semanticLabel: 'GhostClass Logo',

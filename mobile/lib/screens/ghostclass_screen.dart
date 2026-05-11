@@ -15,6 +15,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+/// GhostClassScreen
+/// ----------------
+/// The main settings and account management screen for GhostClass.
+/// Allows users to configure target attendance, toggle the bunk calculator,
+/// switch themes, and manage their institution profile.
 class GhostClassScreen extends ConsumerWidget {
   const GhostClassScreen({super.key});
 
@@ -746,9 +751,6 @@ class _CustomSliderTickMarkShape extends SliderTickMarkShape {
   }) {
     final Canvas canvas = context.canvas;
     
-    // Debug: Print thumb and dot coordinates
-    // print('Dot at ${center.dx}, Thumb at ${thumbCenter.dx}');
-
     final bool isBeforeThumb = center.dx < thumbCenter.dx;
     
     final Paint paint = Paint()

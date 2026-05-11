@@ -5,6 +5,10 @@ import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
+/// AuthService
+/// -----------
+/// Handles authentication logic, including EzyGo login, session provisioning
+/// with the GhostClass backend, and user profile management.
 class AuthService {
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;

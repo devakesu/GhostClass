@@ -13,6 +13,10 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:sentry_dio/sentry_dio.dart';
 
+/// DioService
+/// ----------
+/// Manages Dio instances for standard and security-sensitive requests.
+/// Configures interceptors for JWE, Sentry, and authentication headers.
 class DioService {
   final Ref _ref;
   late final Dio dio;

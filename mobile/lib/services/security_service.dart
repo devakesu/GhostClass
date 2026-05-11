@@ -4,6 +4,9 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
 
+/// SecurityService
+/// ---------------
+/// Manages device integrity checks and security attestation with the GhostClass backend.
 class SecurityService {
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;

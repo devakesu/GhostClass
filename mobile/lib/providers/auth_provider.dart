@@ -139,6 +139,11 @@ class AuthenticatedUser {
 
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
 
+/// AuthNotifier
+/// ------------
+/// A complex notifier that manages the authenticated user session,
+/// self-healing token logic, periodic background refreshes, and
+/// security lockdown procedures.
 class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     with WidgetsBindingObserver {
   Timer? _refreshTimer;

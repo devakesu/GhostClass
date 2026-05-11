@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
+import 'package:ghostclass/services/logger.dart';
 
 /// Wraps a sensitive string value with in-memory encryption.
 ///
@@ -72,7 +73,7 @@ class EncryptedValue {
 
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
-      if (kDebugMode) print('EncryptedValue: Decryption failed: $e');
+      AppLogger.e('EncryptedValue: Decryption failed', e);
       return '';
     }
   }
