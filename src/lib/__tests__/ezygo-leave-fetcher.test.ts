@@ -48,16 +48,9 @@ describe('ezygo-leave-fetcher', () => {
     it('handles total failures and logs all errors', async () => {
       vi.mocked(fetchEzygoData).mockRejectedValue(new Error('Failed'));
 
-      const result = await fetchLeaveData(token);
+      await expect(fetchLeaveData(token)).rejects.toThrow('Failed to fetch leave data: Failed');
 
-      expect(result.studentLeaves).toEqual({ student_leaves: [], student_leave_sessions: [], admin: [], hod: [], advisor: [], counts: [] });
-      expect(result.userSubgroups).toEqual([]);
-      expect(result.attendanceTypes).toEqual([]);
-      expect(result.sessions).toEqual([]);
-      expect(result.events).toEqual([]);
-      expect(result.mandatoryEventCoordinator).toEqual([]);
-      expect(result.leaveApprovalLevel).toBe(2); // Fallback value
-      expect(logger.error).toHaveBeenCalledTimes(7);
+      expect(logger.error).toHaveBeenCalled();
     });
   });
 
@@ -84,9 +77,8 @@ describe('ezygo-leave-fetcher', () => {
     it('handles fetch failure and logs error', async () => {
       vi.mocked(fetchEzygoData).mockRejectedValue(new Error('Network Error'));
 
-      const result = await fetchLeaveAttendanceDetails(token, '2023-01-01', '2023-01-31');
-
-      expect(result).toBeNull();
+      await expect(fetchLeaveAttendanceDetails(token, '2023-01-01', '2023-01-31')).rejects.toThrow('Failed to fetch leave attendance details: Network Error');
+      
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to fetch leave attendance details'),
         expect.objectContaining({ error: 'Error: Network Error' })

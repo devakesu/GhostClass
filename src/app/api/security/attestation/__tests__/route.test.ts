@@ -15,6 +15,7 @@ describe("GET /api/security/attestation", () => {
   });
 
   it("returns error when App Check token is missing", async () => {
+    process.env.ENFORCE_APP_CHECK = "true";
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",
     });
@@ -23,10 +24,11 @@ describe("GET /api/security/attestation", () => {
     const data = await res.json();
 
     expect(data.verified).toBe(false);
-    expect(data.appCheckError).toBe("Missing App Check token");
+    expect(data.appCheckError).toBe("Missing mandatory App Check token");
   });
 
   it("returns error when App Check verifier is unavailable", async () => {
+    process.env.ENFORCE_APP_CHECK = "true";
     const { getAppCheck } = await import("@/lib/firebase/admin");
     vi.mocked(getAppCheck).mockReturnValue(null as any);
 
@@ -41,7 +43,7 @@ describe("GET /api/security/attestation", () => {
     const data = await res.json();
 
     expect(data.verified).toBe(false);
-    expect(data.appCheckError).toBe("App Check verifier unavailable");
+    expect(data.appCheckError).toBe("Security Infrastructure Offline");
   });
 
   it("verifies valid token and extracts claims", async () => {
@@ -101,7 +103,7 @@ describe("GET /api/security/attestation", () => {
 
     expect(data.verified).toBe(false);
     expect(data.criticalRisk).toBe(true);
-    expect(data.appCheckError).toBe("Unauthorized App ID");
+    expect(data.appCheckError).toBe("Unauthorized Application");
   });
 
   it("handles verification failure", async () => {
@@ -121,6 +123,6 @@ describe("GET /api/security/attestation", () => {
     const data = await res.json();
 
     expect(data.verified).toBe(false);
-    expect(data.appCheckError).toBe("Token expired");
+    expect(data.appCheckError).toBe("Security Verification Failed");
   });
 });

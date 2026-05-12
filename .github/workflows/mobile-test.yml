@@ -1,0 +1,73 @@
+name: Mobile Tests
+
+on:
+  push:
+    branches: [main, 'release/*']
+  pull_request:
+    branches: [main, 'release/*']
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run unit tests with coverage
+        run: flutter test --coverage
+
+      - name: Enforce minimum code coverage threshold
+        env:
+          MIN_COVERAGE: "80.0"
+        run: |
+          set -euo pipefail
+
+          if [ ! -f coverage/lcov.info ]; then
+            echo "::error::Coverage file coverage/lcov.info not found."
+            exit 1
+          fi
+
+          # Compute overall coverage percentage using awk from lcov DA records
+          COVERAGE=$(awk -F',' '/^DA:/ { total++; if($2>0) covered++ } END { if(total>0) printf "%.2f", (covered/total)*100; else print "0.00" }' coverage/lcov.info)
+
+          echo "Calculated Mobile Code Coverage: ${COVERAGE}%"
+          echo "Required Minimum Coverage: ${MIN_COVERAGE}%"
+
+          # Compare floating point numbers using awk
+          PASS=$(awk -v cov="$COVERAGE" -v min="$MIN_COVERAGE" 'BEGIN { if (cov >= min) print "1"; else print "0" }')
+
+          if [ "$PASS" = "0" ]; then
+            echo "::error::Code coverage ${COVERAGE}% is below the required minimum threshold of ${MIN_COVERAGE}%."
+            exit 1
+          else
+            echo "✓ Code coverage check passed successfully."
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5.5.2
+        with:
+          files: ./mobile/coverage/lcov.info
+          flags: mobile
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

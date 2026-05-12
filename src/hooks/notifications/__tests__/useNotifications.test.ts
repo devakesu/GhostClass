@@ -89,7 +89,7 @@ describe('useNotifications', () => {
     const regularNotif = { id: 2, topic: 'general', is_read: false };
 
     vi.mocked(useQuery).mockImplementation(({ queryKey }) => {
-      if (queryKey?.[1] === 'actions') {
+      if (queryKey?.[1] === 'unread') {
         return { data: [actionNotif], isLoading: false } as any;
       }
       return { data: 1, isLoading: false } as any; // unreadCount
@@ -135,7 +135,7 @@ describe('useNotifications', () => {
 
     const useQueryCalls = vi.mocked(useQuery).mock.calls;
     
-    const actionsQuery = useQueryCalls.find(call => call[0].queryKey?.[1] === 'actions');
+    const actionsQuery = useQueryCalls.find(call => call[0].queryKey?.[1] === 'unread');
     expect(actionsQuery?.[0].enabled).toBe(false);
 
     const unreadCountQuery = useQueryCalls.find(call => call[0].queryKey?.[1] === 'unreadCount');
@@ -169,7 +169,7 @@ describe('useNotifications', () => {
     it('fetches action notifications from supabase', async () => {
       renderHook(() => useNotifications());
       
-      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'actions')![0].queryFn as (...args: any[]) => any;
+      const queryFn = vi.mocked(useQuery).mock.calls.find(call => call[0].queryKey?.[1] === 'unread')![0].queryFn as (...args: any[]) => any;
       
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ data: [{ id: 1 }], error: null }).then(onFulfilled);
@@ -178,7 +178,7 @@ describe('useNotifications', () => {
       const data = await queryFn();
       
       expect(mockSupabase.from).toHaveBeenCalledWith('notification');
-      expect(mockSupabase.ilike).toHaveBeenCalledWith('topic', '%conflict%');
+      expect(mockSupabase.eq).toHaveBeenCalledWith('is_read', false);
       expect(data).toEqual([{ id: 1 }]);
     });
 
@@ -236,6 +236,61 @@ describe('useNotifications', () => {
       onSettled();
       
       expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['notifications'] });
+    });
+
+    it('handles optimistic updates in onMutate', async () => {
+      const setQueryData = vi.fn();
+      vi.mocked(useQueryClient).mockReturnValue({
+        ...mockQueryClient,
+        setQueryData,
+        getQueryData: vi.fn().mockImplementation((key) => {
+          if (key[1] === 'unread') return [{ id: 1, is_read: false }];
+          if (key[1] === 'feed') return { pages: [{ data: [{ id: 1, is_read: false }], nextPage: null }] };
+          if (key[1] === 'unreadCount') return 1;
+          return null;
+        }),
+      } as any);
+
+      renderHook(() => useNotifications());
+      
+      const onMutate = vi.mocked(useMutation).mock.calls[0][0].onMutate as (...args: any[]) => any;
+      
+      // Test individual item mark as read
+      await onMutate({ id: 1, isRead: true });
+      expect(mockQueryClient.cancelQueries).toHaveBeenCalledWith({ queryKey: ['notifications'] });
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unreadCount'], expect.any(Function));
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'feed'], expect.any(Object));
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unread'], expect.any(Function));
+
+      // Test mark all as read
+      setQueryData.mockClear();
+      await onMutate({ isRead: true });
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unreadCount'], 0);
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unread'], []);
+    });
+
+    it('handles rollback in onError', () => {
+      const setQueryData = vi.fn();
+      vi.mocked(useQueryClient).mockReturnValue({
+        ...mockQueryClient,
+        setQueryData,
+      } as any);
+
+      renderHook(() => useNotifications());
+      
+      const onError = vi.mocked(useMutation).mock.calls[0][0].onError as (...args: any[]) => any;
+      
+      const context = {
+        previousUnread: [{ id: 1 }],
+        previousFeed: { pages: [] },
+        previousUnreadCount: 1,
+      };
+
+      onError(new Error('test'), { id: 1, isRead: true }, context);
+      
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unread'], context.previousUnread);
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'feed'], context.previousFeed);
+      expect(setQueryData).toHaveBeenCalledWith(['notifications', 'unreadCount'], context.previousUnreadCount);
     });
   });
 });

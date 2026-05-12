@@ -8,7 +8,7 @@ String toRoman(dynamic value) {
   final int n = (value is String)
       ? int.tryParse(value) ?? 0
       : (value is num ? value.toInt() : 0);
-  if (n < 1) return value.toString();
+  if (n < 1) return n.toString();
   const romans = [
     'I',
     'II',
@@ -102,16 +102,21 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) && 
           RegExp(r'^\d+$').hasMatch(b) && 
           RegExp(r'^\d+$').hasMatch(c)) {
+        final int year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        final int month = int.parse(b);
+        final int day = (a.length == 4) ? int.parse(c) : int.parse(a);
+        
+        if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+
+        final parsed = DateTime.tryParse("${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}");
+        if (parsed == null || parsed.year != year || parsed.month != month || parsed.day != day) return '';
+
         if (a.length == 4) {
           // YYYY-MM-DD
-          final res = "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
-          if (DateTime.tryParse("$a-$b-$c") == null) return '';
-          return res;
+          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
         } else if (c.length == 4) {
           // DD-MM-YYYY
-          final res = "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
-          if (DateTime.tryParse("$c-$b-$a") == null) return '';
-          return res;
+          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
         }
       }
     }
@@ -128,16 +133,21 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) && 
           RegExp(r'^\d+$').hasMatch(b) && 
           RegExp(r'^\d+$').hasMatch(c)) {
+        final int year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        final int month = int.parse(b);
+        final int day = (a.length == 4) ? int.parse(c) : int.parse(a);
+
+        if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+
+        final parsed = DateTime.tryParse("${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}");
+        if (parsed == null || parsed.year != year || parsed.month != month || parsed.day != day) return '';
+
         if (a.length == 4) {
           // YYYY/MM/DD
-          final res = "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
-          if (DateTime.tryParse("$a-$b-$c") == null) return '';
-          return res;
+          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
         } else {
           // DD/MM/YYYY
-          final res = "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
-          if (DateTime.tryParse("$c-$b-$a") == null) return '';
-          return res;
+          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
         }
       }
     }

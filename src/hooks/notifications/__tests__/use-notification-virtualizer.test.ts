@@ -44,4 +44,17 @@ describe('useNotificationVirtualizer', () => {
     
     expect(estimateSize(2)).toBeGreaterThan(estimateSize(1));
   });
+
+  it('provides a measureElement function that returns height', () => {
+    const parentRef = { current: null };
+    renderHook(() => useNotificationVirtualizer({ virtualItems: mockItems, parentRef }));
+    
+    const { measureElement } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
+    
+    const mockElement = {
+      getBoundingClientRect: () => ({ height: 100 }),
+    };
+    
+    expect(measureElement(mockElement)).toBe(100);
+  });
 });
