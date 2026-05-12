@@ -728,7 +728,7 @@ export default function DashboardClient(
                     {profile?.class?.name || "Unassigned"}
                   </span>
                   <p className="text-muted-foreground font-normal italic text-sm">
-                    {"Track your classes, manage attendance, and stay ahead!"}
+                    {"For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚"}
                   </p>
                 </div>
               </div>

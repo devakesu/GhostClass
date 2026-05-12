@@ -119,11 +119,9 @@ export const Navbar = () => {
     : "Notifications: No unread messages";
 
   const handleAddSuccess = async () => {
-    // 1. Invalidate 'attendance-report' so the Dashboard charts update
-    await queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
-
-    // 2. Invalidate 'track_data' so the Tracking list updates
-    await queryClient.invalidateQueries({ queryKey: ["track_data"] });
+    // AddRecordTrigger handles full query invalidation and refetching
+    // for 'attendance-report', 'attendance-report-all', and 'track_data'.
+    // Avoiding redundant queryClient.invalidateQueries calls here.
   };
 
   const onLogoutClick = async () => {

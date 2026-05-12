@@ -47,7 +47,7 @@ final authProvider = AsyncNotifierProvider<AuthNotifier, AuthenticatedUser?>(
 );
 
 final institutionsProvider = FutureProvider<List<Institution>>((ref) async {
-  final userId = ref.watch(authProvider.select((v) => v.value?.supabaseUserId));
+  final userId = ref.read(authProvider).value?.supabaseUserId;
   if (userId == null) return [];
   return ref.read(authProvider.notifier).fetchInstitutions();
 });
@@ -522,6 +522,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   }
 
   Future<void> login(String username, String password) async {
+    ref.invalidate(institutionsProvider);
     state = const AsyncValue.loading();
     try {
       final api = ref.read(apiServiceProvider);
@@ -663,6 +664,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ref.read(securityFailureProvider.notifier).clearFailure();
     }
     ref.read(apiServiceProvider).clearCaches();
+    ref.invalidate(institutionsProvider);
     
     state = const AsyncValue.data(null);
     try {

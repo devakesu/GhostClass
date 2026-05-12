@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ProfileForm } from '../profile-form';
 import { useUpdateProfile } from '@/hooks/users/profile';
 import { toast } from 'sonner';
@@ -95,7 +95,9 @@ describe('ProfileForm Component', () => {
     
     // Simulate success
     const successCallback = mockMutate.mock.calls[0][1].onSuccess;
-    successCallback();
+    act(() => {
+      successCallback();
+    });
     
     expect(toast.success).toHaveBeenCalledWith('Profile updated');
   });
@@ -112,7 +114,9 @@ describe('ProfileForm Component', () => {
     
     // Simulate error
     const errorCallback = mockMutate.mock.calls[0][1].onError;
-    errorCallback(new Error('Update failed'));
+    act(() => {
+      errorCallback(new Error('Update failed'));
+    });
     
     expect(toast.error).toHaveBeenCalledWith('Failed to update profile');
   });
