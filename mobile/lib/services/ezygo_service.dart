@@ -159,7 +159,7 @@ class EzygoService {
       'sessions': results[3].data,
       'events': results[4].data,
       'mandatoryEventCoordinator': results[5].data,
-      'studentLeaveApprovalLevel': results[6].data,
+      'leaveApprovalLevel': results[6].data,
     };
 
     return Response(

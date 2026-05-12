@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { useProfile } from "@/hooks/users/profile";
 import { useUserSettings } from "@/providers/user-settings";
 import { useInstitutions, useUpdateDefaultInstitutionUser, useDefaultInstitutionUser } from "@/hooks/users/institutions";
@@ -268,14 +268,12 @@ describe("Navbar", () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it("triggers handleAddSuccess when AddRecordTrigger succeeds", async () => {
+  it("triggers handleAddSuccess when AddRecordTrigger succeeds without redundant query invalidations", async () => {
     render(<Navbar />);
     const addBtn = screen.getByTestId("add-record-trigger");
     fireEvent.click(addBtn);
-    await waitFor(() => {
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["attendance-report"] });
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["track_data"] });
-    });
+    // AddRecordTrigger handles invalidations internally; Navbar delegates this cleanly.
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
   });
 
   it("renders standalone nav buttons on other pages", () => {

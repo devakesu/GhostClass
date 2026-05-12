@@ -146,12 +146,43 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          'Educational Tool Only: GhostClass is an independent attendance calculation tool designed to help students manage their time.\n\nNo Liability: You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• EzyGo may impose rate limits, security checks, suspensions, or account restrictions at its sole discretion; GhostClass is not responsible for those actions.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\nUse at Your Own Risk: The creators are not affiliated with, endorsed by, or connected to EzyGo. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions or access loss imposed by EzyGo.',
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
-                            height: 1.6,
+                        Text.rich(
+                          TextSpan(
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                              height: 1.6,
+                            ),
+                            children: const [
+                              TextSpan(
+                                text: 'Educational Tool Only: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                text: 'GhostClass is an independent attendance calculation tool designed to help students manage their time.\n\n',
+                              ),
+                              TextSpan(
+                                text: 'No Liability: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                text: 'You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• EzyGo may impose rate limits, security checks, suspensions, or account restrictions at its sole discretion; GhostClass is not responsible for those actions.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\n',
+                              ),
+                              TextSpan(
+                                text: 'Use at Your Own Risk: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                text: 'The creators are ',
+                              ),
+                              TextSpan(
+                                text: 'not affiliated with, endorsed by, or connected to EzyGo',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(
+                                text: '. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions or access loss imposed by EzyGo.',
+                              ),
+                            ],
                           ),
                         ),
                       ],

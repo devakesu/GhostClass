@@ -9,7 +9,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
-class LegalScreen extends StatelessWidget {
+class LegalScreen extends StatefulWidget {
   final String title;
   final String body;
 
@@ -18,6 +18,23 @@ class LegalScreen extends StatelessWidget {
     required this.title,
     required this.body,
   });
+
+  @override
+  State<LegalScreen> createState() => _LegalScreenState();
+}
+
+class _LegalScreenState extends State<LegalScreen> {
+  bool _renderMarkdown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        setState(() => _renderMarkdown = true);
+      }
+    });
+  }
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -120,7 +137,7 @@ class LegalScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title,
+                          widget.title,
                           style: GoogleFonts.manrope(
                             fontSize: 40,
                             height: 1.0,
@@ -169,66 +186,74 @@ class LegalScreen extends StatelessWidget {
                         ),
                       ),
                       padding: const EdgeInsets.all(24),
-                      child: MarkdownBody(
-                        data: body,
-                        onTapLink: (text, href, title) {
-                          if (href != null) _launchUrl(href);
-                        },
-                        styleSheet: MarkdownStyleSheet(
-                          p: GoogleFonts.manrope(
-                            fontSize: 15,
-                            height: 1.75,
-                            color: onSurface.withValues(alpha: 0.8),
-                          ),
-                          h2: GoogleFonts.manrope(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: onSurface,
-                            height: 2.5,
-                          ),
-                          h3: GoogleFonts.manrope(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: onSurface,
-                            height: 2.0,
-                          ),
-                          listBullet: GoogleFonts.manrope(
-                            color: primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          strong: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w800,
-                            color: onSurface,
-                          ),
-                          em: GoogleFonts.manrope(
-                            fontStyle: FontStyle.italic,
-                          ),
-                          code: GoogleFonts.firaCode(
-                            backgroundColor: onSurface.withValues(alpha: 0.08),
-                            fontSize: 13,
-                            color: primary,
-                          ),
-                          blockquote: GoogleFonts.manrope(
-                            fontStyle: FontStyle.italic,
-                            color: onSurface.withValues(alpha: 0.7),
-                          ),
-                          blockquoteDecoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border(
-                              left: BorderSide(color: primary, width: 4),
-                            ),
-                          ),
-                          horizontalRuleDecoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                color: onSurface.withValues(alpha: 0.1),
-                                width: 1,
+                      child: _renderMarkdown
+                          ? MarkdownBody(
+                              data: widget.body,
+                              onTapLink: (text, href, title) {
+                                if (href != null) _launchUrl(href);
+                              },
+                              styleSheet: MarkdownStyleSheet(
+                                p: GoogleFonts.manrope(
+                                  fontSize: 15,
+                                  height: 1.75,
+                                  color: onSurface.withValues(alpha: 0.8),
+                                ),
+                                h2: GoogleFonts.manrope(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: onSurface,
+                                  height: 2.5,
+                                ),
+                                h3: GoogleFonts.manrope(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: onSurface,
+                                  height: 2.0,
+                                ),
+                                listBullet: GoogleFonts.manrope(
+                                  color: primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                strong: GoogleFonts.manrope(
+                                  fontWeight: FontWeight.w800,
+                                  color: onSurface,
+                                ),
+                                em: GoogleFonts.manrope(
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                code: GoogleFonts.firaCode(
+                                  backgroundColor:
+                                      onSurface.withValues(alpha: 0.08),
+                                  fontSize: 13,
+                                  color: primary,
+                                ),
+                                blockquote: GoogleFonts.manrope(
+                                  fontStyle: FontStyle.italic,
+                                  color: onSurface.withValues(alpha: 0.7),
+                                ),
+                                blockquoteDecoration: BoxDecoration(
+                                  color: primary.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border(
+                                    left: BorderSide(color: primary, width: 4),
+                                  ),
+                                ),
+                                horizontalRuleDecoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: onSurface.withValues(alpha: 0.1),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 40),
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.05),
                   ),
                 ),

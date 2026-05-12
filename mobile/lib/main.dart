@@ -83,7 +83,7 @@ Future<void> _handleSecurityFailure(Object error) async {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  SentryWidgetsFlutterBinding.ensureInitialized();
   
 
   HttpOverrides.global = MyHttpOverrides();
@@ -122,7 +122,7 @@ void main() async {
     },
   );
 
-  await GoogleFonts.pendingFonts([GoogleFonts.manrope()]);
+  await GoogleFonts.pendingFonts([GoogleFonts.manrope(), GoogleFonts.firaCode()]);
 
   // Initialize Sentry
   await SentryFlutter.init(

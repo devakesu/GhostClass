@@ -43,48 +43,43 @@ class HeaderSection extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-                // 2. Class Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.15),
-                    ),
-                  ),
-                  child: Text(
-                    (profile?.classField?.name ??
-                            data.className ??
-                            'Unassigned')
-                        .toUpperCase(),
-                    style: GoogleFonts.manrope(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.0,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
+            // 2. Class Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.15),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Track your classes, manage attendance, and stay ahead!',
-                  style: GoogleFonts.manrope(
-                    fontSize: 12,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    fontWeight: FontWeight.w500,
-                    fontStyle: FontStyle.italic,
-                  ),
+              ),
+              child: Text(
+                (profile?.classField?.name ?? data.className ?? 'Unassigned')
+                    .toUpperCase(),
+                style: GoogleFonts.manrope(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚',
+              style: GoogleFonts.manrope(
+                fontSize: 12,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
             const SizedBox(height: 20),
 
             // 3. Selectors
@@ -92,7 +87,8 @@ class HeaderSection extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Semantics(
-                    label: 'Current semester: ${data.selectedSemester}. Tap to change.',
+                    label:
+                        'Current semester: ${data.selectedSemester}. Tap to change.',
                     button: true,
                     child: _SelectorButton(
                       label: data.selectedSemester.toUpperCase(),
@@ -108,7 +104,8 @@ class HeaderSection extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Semantics(
-                    label: 'Current academic year: ${data.selectedYear}. Tap to change.',
+                    label:
+                        'Current academic year: ${data.selectedYear}. Tap to change.',
                     button: true,
                     child: _SelectorButton(
                       label: data.selectedYear,

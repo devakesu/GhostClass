@@ -19,7 +19,7 @@ const getLeaveStatus = (approvers: any[]) => {
   if (!approvers || approvers.length === 0) return { label: "Pending", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20", icon: Clock };
   
   const actedApprovers = approvers
-    .filter(a => a.action_by !== null || a.action_at !== null)
+    .filter(a => a.action_type !== null || a.action_at !== null)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
   if (actedApprovers.length === 0) return { label: "Pending", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border-yellow-500/20", icon: Clock };

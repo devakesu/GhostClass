@@ -5,6 +5,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { ga4Collect } from "../ga4-collect";
 
+const loggerSpy = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock("@/lib/logger", () => ({
+  logger: loggerSpy,
+}));
+
 describe("ga4-collect", () => {
   const measurementId = "G-TEST123";
   const payload = { test: "data" };
@@ -50,18 +58,7 @@ describe("ga4-collect", () => {
       statusText: "Internal Server Error",
     }));
 
-    // Mock logger
-    const loggerSpy = vi.hoisted(() => ({
-      error: vi.fn(),
-      warn: vi.fn(),
-    }));
-    vi.mock("@/lib/logger", () => ({
-      logger: loggerSpy,
-    }));
-
-    // Re-import to use mock
-    const { ga4Collect: ga4CollectMock } = await import("../ga4-collect");
-    await ga4CollectMock(measurementId, payload);
+    await ga4Collect(measurementId, payload);
 
     expect(loggerSpy.error).toHaveBeenCalledWith(
         expect.stringContaining("Failed to send event"),

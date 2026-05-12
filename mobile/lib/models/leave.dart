@@ -108,7 +108,7 @@ class LeaveApprover {
 
   factory LeaveApprover.fromJson(Map<String, dynamic> json) {
     return LeaveApprover(
-      id: json['id'] as int,
+      id: int.parse(json['id'].toString()),
       actionType: json['action_type'] as String?,
       actionAt: json['action_at'] as String?,
       updatedAt: json['updated_at'] as String? ?? '',

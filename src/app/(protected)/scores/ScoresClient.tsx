@@ -846,11 +846,13 @@ export default function ScoresClient() {
       if (!e.participants || e.participants.length === 0) return false;
       if (e.activity_type === "assignment") {
         const details = batchQuery.data?.[e.id];
-        return details?.answers !== undefined && details.answers.length > 0;
+        const hasAnswers = details?.answers !== undefined && details.answers.length > 0;
+        const hasScore = resolvedScores[e.id] !== undefined || getScore(e) !== null;
+        return hasAnswers || hasScore;
       }
       return true;
     });
-  }, [exams, batchQuery.data]);
+  }, [exams, batchQuery.data, resolvedScores]);
 
   const filtered = useMemo(() => {
     const base =
