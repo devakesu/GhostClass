@@ -19,6 +19,9 @@ class EncryptedValue {
 
   EncryptedValue._(this._encryptedBase64);
 
+  @visibleForTesting
+  factory EncryptedValue.forTesting(String base64) => EncryptedValue._(base64);
+
   static Uint8List _generateRandomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(List.generate(length, (_) => random.nextInt(256)));

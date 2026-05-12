@@ -111,9 +111,9 @@ String sanitizeTechnicalDetails(String error) {
       RegExp(r'\/[a-zA-Z0-9._\-\/]+\/[a-zA-Z0-9._\-]+'), '[REDACTED_PATH]');
 
   // Remove potential auth tokens in URLs or headers
-  sanitized = sanitized.replaceAll(
+  sanitized = sanitized.replaceAllMapped(
       RegExp(r'(Bearer|token|key|secret)[^, \n]+', caseSensitive: false),
-      r'$1 [REDACTED]');
+      (match) => '${match.group(1)} [REDACTED]');
 
   return sanitized;
 }

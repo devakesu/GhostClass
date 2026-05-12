@@ -7,7 +7,7 @@ describe('Logic Barrel Index', () => {
     expect(logic.calculateAttendance).toBeDefined();
     expect(logic.calculateCurrentAcademicInfo).toBeDefined();
     expect(logic.getReconciledStats).toBeDefined();
-    expect(logic.isPositive).toBeDefined();
-    expect(logic.isAbsent).toBeDefined();
+    expect(logic.isPositive(110)).toBe(true);
+    expect(logic.isAbsent(111)).toBe(true);
   });
 });

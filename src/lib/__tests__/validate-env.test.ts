@@ -26,6 +26,7 @@ describe('validate-env utility', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'ghostclass.app');
     vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', '@ghostclass.app');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.ghostclass.app');
+    vi.stubEnv('JWE_PRIVATE_KEY', 'a'.repeat(64));
 
     // Optional vars - set to valid defaults to avoid warnings
     vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', 'https://dsn@sentry.io/123');
@@ -500,6 +501,7 @@ describe('validate-env utility', () => {
       vi.stubEnv('SENTRY_HASH_SALT', 'some-salt');
       vi.stubEnv('FIREBASE_APP_ID_ANDROID', '1:bin:android');
       vi.stubEnv('NEXT_PUBLIC_ANDROID_PACKAGE_NAME', 'com.test');
+      vi.stubEnv('JWE_PRIVATE_KEY', 'a'.repeat(64));
 
       validateEnvironment();
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY: HOSTNAME=0.0.0.0 in production'));
