@@ -32,28 +32,22 @@
 
 GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek web dashboard and a native Flutter mobile application with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in "bunk calculator" to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built to integrate with existing attendance providers, GhostClass can fetch attendance and leave data from EzyGo and related sources and presents it with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!
 
-## 🎈 Vibe — Features
-
-- **What makes GhostClass fun:** a friendly, student-first dashboard with quick insights and a cheeky tone that still gets serious about accuracy.
-- **The Bunk Calculator:** precise, actionable bunk counts presented with both "official" and "what-you-see" metrics so you can plan confidently.
-- **Quiet Control:** per-semester course disable toggle (for challenge-passed / dropped courses) to keep your dashboard uncluttered.
-- **Offline-First PWA + Native Parity:** use the web PWA or Flutter mobile app; data and calculations stay consistent across both.
-- **Privacy-First Security:** end-to-end JWE bridge for mobile, AES-256-GCM for sensitive storage, and device attestation to block fakery.
-- **Visual Receipts & History:** calendar, charts, and downloadable attendance snapshots for verifications or appeals.
-
 ## 🎯 Core Features
 
-### 💻 Web & 📱 Mobile Parity
+### Key Vibes
 
-- **The Bunk Calc** 🧮: Know exactly how many classes you can miss before the threshold comes for your neck.
-- **Visual Receipts** 📊: Performance charts and detailed calendar history for an attendance glow-up.
+- **Student-First Dashboard** 🎈: A friendly dashboard with quick insights and a cheeky tone that still gets serious about accuracy.
+- **The Bunk Calc** 🧮: Precise, actionable bunk counts presented with both "official" and "what-you-see" metrics so you know exactly how many classes you can miss before the threshold comes for your neck.
+- **Visual Receipts** 📊: Performance charts, detailed calendar history, and downloadable attendance snapshots for an attendance glow-up, verifications, or appeals.
 - **Manual Tracking** ✍️: Mark custom attendance; GhostClass reconciles them once official records arrive.
-- **Course Toggle** 🔕: Disable specific courses on a per-semester basis to clean up your aggregate statistics.
+- **Anti-Ghosting Tracker** 👻: A personalized list to watch wrongly marked absences like a hawk until they get updated.
+- **Course Toggle** 🔕: Per-semester course disable toggle (for challenge-passed / dropped courses) to clean up your aggregate statistics and keep your dashboard uncluttered.
 - **Academic Documents** 📂: Unified viewer for Leave Applications and Exam Scores with detailed breakdowns.
+- **Offline-First PWA + Native Parity** 📱: Use the web PWA or native Flutter mobile app; data and calculations stay perfectly consistent across both.
 
 ### 🔐 Security & Reliability
 
-- **Zero-Trust Bridge**: Every mobile-to-server request is encrypted with **JWE** (RSA-OAEP + AES-GCM).
+- **Zero-Trust Bridge**: Every mobile-to-server and server-to-server request is encrypted with **JWE** (RSA-OAEP + AES-GCM).
 - **Device Attestation**: App Check with Play Integrity (Android) and DeviceCheck (iOS) prevents bot abuse.
 - **Multi-Device Support**: Stay logged in on multiple devices simultaneously without session conflicts.
 - **Build Transparency**: Full SLSA Level 3 provenance and mobile binary verification.
@@ -98,7 +92,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 ### Security & Monitoring
 
 - **AES-256-GCM Encryption** - Secure token storage at rest
-- **JWE (JSON Web Encryption)** - Secure cross-platform payload encryption for mobile-to-server bridge
+- **JWE (JSON Web Encryption)** - Secure cross-platform payload encryption for mobile-to-server and server-to-server communication
 - **CSRF Protection** - Custom token-based protection for web
 - **App Check / Play Integrity** - Device attestation to prevent bot abuse and tampering on mobile
 - **Upstash Redis** - Rate limiting with `@upstash/ratelimit`
@@ -121,13 +115,19 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 ```text
 mobile/                # Native Flutter application (Riverpod, JWE, SecureStorage)
+├── lib/
+│   ├── logic/         # Core business logic and bunk algorithm parity
+│   ├── providers/     # Riverpod reactive state management handlers
+│   ├── screens/       # Application views and dashboard UI
+│   ├── services/      # Encrypted storage, JWE client, and direct API egress
+│   └── widgets/       # Native UI components (FL Chart, custom layout items)
 src/                   # Next.js web application (React 19, Tailwind 4, TanStack Query)
 ├── app/               # Pages, layouts, and API route handlers
 ├── components/        # Reusable UI components (Attendance cards, Charts, Calendars)
 ├── lib/               # Core logic (Bunk algorithm, Encryption, CSRF, Supabase)
 └── proxy.ts           # Middleware security guard (Auth, CSP, Origin validation)
 supabase/              # Database schema, migrations, and RLS policies
-workers/               # Cloudflare/AWS egress proxies for EzyGo ISP bypass
+workers/               # Cloudflare/AWS egress proxies for Supabase ISP bypass
 ```
 
 ## 🧮 Attendance Calculation Algorithm
@@ -189,8 +189,8 @@ GhostClass maintains a comprehensive test suite with over **250+ test files** ac
 
 ### 📱 Mobile Testing (Flutter)
 
-- **Unit & Widget**: `flutter test`
-- **Coverage**: `flutter test --coverage`
+- ✅ **Unit & Widget**: `flutter test` (Core logic, Riverpod providers, async exceptions)
+- ✅ **CI/CD Enforcement**: Mandatory 80% global coverage gate on PRs via `flutter test --coverage`
 
 ### 🛡️ Coverage Highlights
 
@@ -205,7 +205,7 @@ GhostClass implements multiple layers of security:
 
 - **AES-256-GCM Encryption** - All sensitive tokens and credentials encrypted at rest.
 - **Multi-Device Session Security** - Concurrent logins without session invalidation.
-- **Mobile Bridge Security** - **JWE (JSON Web Encryption)** for mobile-to-server communication.
+- **Zero-Trust Bridge Security** - **JWE (JSON Web Encryption)** for mobile-to-server and server-to-server communication.
 - **Device Attestation** - Play Integrity / App Check to ensure genuine device requests.
 - **Secure Storage** - Hardware-backed **SecureStorage** (Android Keystore / iOS Keychain) for mobile.
 
@@ -240,10 +240,10 @@ We welcome contributions! GhostClass uses an **automatic version bumping system*
 ## 👥 Maintained by
 
 - [Devanarayanan](https://github.com/devakesu/)
-- Credits: [Bunkr](https://github.com/ABHAY-100/Bunkr/)
+- Credits: [Bunkr](https://github.com/ABHAY-100/Bunkr/) (Initial codebase foundation)
 
 ## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0**.
+This project is licensed under the **[GNU General Public License v3.0](LICENSE)**.
 
 ***Thank you for your interest in GhostClass! Bunk classes & enjoy, but don't forget to study!! 😝🤝***

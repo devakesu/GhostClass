@@ -19,6 +19,7 @@ abstract final class _Keys {
   static const termsVersion = 'terms_version';
   static const stealthInfo = 'browser_stealth_info';
   static const academicState = 'academic_state';
+  static const fcmToken = 'fcm_token';
 }
 
 /// Wraps [FlutterSecureStorage] with typed helpers.
@@ -53,6 +54,14 @@ class SecureStorageService {
 
   Future<void> clearEzygoToken() =>
       _storage.delete(key: _Keys.ezygoToken);
+
+  // ─── FCM Token ───────────────────────────────────────────────────────────
+
+  Future<void> saveFcmToken(String token) =>
+      _storage.write(key: _Keys.fcmToken, value: token);
+
+  Future<String?> getFcmToken() =>
+      _storage.read(key: _Keys.fcmToken);
 
   // ─── Supabase User ID ────────────────────────────────────────────────────
 

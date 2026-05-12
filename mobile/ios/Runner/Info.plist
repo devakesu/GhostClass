@@ -70,5 +70,13 @@
     <!-- Privacy Usage Descriptions for Image Picker -->
     <key>NSPhotoLibraryUsageDescription</key>
     <string>GhostClass needs photo library access to let you choose a profile photo.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>GhostClass needs camera access to let you take a profile photo.</string>
+
+    <!-- Background Processing Modes for Firebase Messaging -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+    </array>
 </dict>
 </plist>

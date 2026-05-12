@@ -26,6 +26,7 @@ const SaveTokenRequestSchema = z.object({
     .min(18, "Token too short")
     .max(2048, "Token too long")
     .trim(),
+  fcm_token: z.string().trim().optional(),
 });
 
 const EzygoUserSchema = z.object({
@@ -249,7 +250,7 @@ export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
       );
     }
 
-    const { token } = validation.data;
+    const { token, fcm_token } = validation.data;
 
     // 2. Verify Token with EzyGo
     let verifiedUsername = "";
@@ -845,6 +846,8 @@ export const POST = withSecurity(async (req, { decryptedBody, authType }) => {
             auth_password: encryptedPassword.content,
             auth_password_iv: encryptedPassword.iv,
           }),
+          ...(isMobileApp && { has_mobile_app: true }),
+          ...(fcm_token ? { fcm_token } : {}),
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" }),
       earlySettingsFetch ?? (async () => {
