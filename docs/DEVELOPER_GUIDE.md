@@ -657,6 +657,15 @@ Navigate to the **Secrets** tab and create the following:
 | `SUPABASE_ACCESS_TOKEN` | Supabase CLI access token used by `deploy-supabase.yaml` |
 | `SUPABASE_DB_PASSWORD` | Database password used during `supabase db push` |
 | `SUPABASE_PROJECT_ID` | Supabase project reference for `supabase link` |
+| `FIREBASE_GOOGLE_SERVICES_JSON_BASE64` | Base64-encoded `google-services.json` injected during CI builds |
+| `FIREBASE_GOOGLE_SERVICE_INFO_PLIST_BASE64` | Base64-encoded `GoogleService-Info.plist` injected during CI builds |
+| `MOBILE_APP_SECRETS_BASE64` | Base64-encoded `app_secrets.dart` injected during CI builds |
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded release keystore binary for mobile artifact signing |
+| `ANDROID_KEYSTORE_PASSWORD` | Password for the release keystore |
+| `ANDROID_KEY_ALIAS` | Key alias within the release keystore |
+| `ANDROID_KEY_PASSWORD` | Password for the specific release key alias |
+
+**🔒 Gitignored Production Artifacts Guidance Note**: To maintain secure boundaries and prevent repository leaks, critical files such as backend `.env.production` definitions, Firebase configurations (`google-services.json`, `GoogleService-Info.plist`), and native mobile signing assets (`app_secrets.dart`, release keystores, `key.properties`) are strictly ignored via `.gitignore`. The CI/CD pipeline dynamically materializes these files at compilation time by decoding base64-encoded versions supplied through the secure repository secrets above.
 
 > **`NEXT_PUBLIC_APP_VERSION` is not a Variable** — the pipeline derives it automatically from the git tag via the `calculate-version` job. Setting it manually would cause it to go stale after every auto-bump.
 > **`SOURCE_DATE_EPOCH` is not a Variable** — the pipeline derives it from the git commit timestamp (`git log -1 --format=%ct`) in the `prep` step. This guarantees the same tag always produces the same image digest (reproducible builds) without any manual sync needed.
@@ -1156,6 +1165,12 @@ flutter test
 # With coverage
 flutter test --coverage
 ```
+
+#### 🛡️ Mobile Testing Strategy & CI/CD Gates
+
+- **Unit & Logic Parity**: Verifies cross-platform implementation of attendance calculations, JWE wrapping interceptors, and SecureStorage integrations.
+- **Coverage Gates**: Mandatory GitHub Actions workflows enforce an **80% global code coverage threshold** on all pull requests and commits. Mission-critical security/math libraries enforce **100% module-level coverage**.
+- **Exception Simulation**: Integrates `mocktail` to inject extreme API edge cases and simulated App Check attestation failures during testing.
 
 **Before submitting a PR with mobile changes**, run `flutter analyze` to ensure there are no analysis issues.
 

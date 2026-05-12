@@ -38,6 +38,7 @@ dependencies:
   dio: ^5.9.2
   firebase_core: ^4.7.0
   firebase_app_check: ^0.4.3
+  firebase_messaging: ^16.2.0
   flutter_secure_storage: ^10.0.0
   supabase_flutter: ^2.12.2
   go_router: ^17.1.0
@@ -128,4 +129,4 @@ flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   image_path: "assets/images/icon.png"
-  min_sdk_android: 21 # android min sdk min:16, default:21
+  min_sdk_android: 29 # android min sdk min:16, default:21

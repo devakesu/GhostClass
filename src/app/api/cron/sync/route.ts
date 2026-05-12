@@ -8,6 +8,7 @@ import { normalizeSession, toRoman } from "@/lib/utils";
 import { egressFetch, getClientIp, redact } from "@/lib/utils.server";
 import { Course } from "@/types";
 import { sendEmail } from "@/lib/email";
+import { sendPushNotification } from "@/lib/notifications/push";
 import type { SendEmailProps } from "@/lib/email";
 import {
   renderAttendanceConflictEmail,
@@ -92,6 +93,7 @@ interface UserSyncData {
   ezygo_token: string;
   ezygo_iv: string;
   auth_id: string;
+  fcm_token?: string | null;
 }
 
 export const GET = withSecurity(async (req, { authType }) => {
@@ -249,7 +251,7 @@ export const GET = withSecurity(async (req, { authType }) => {
         });
       }
       let query = supabaseAdmin.from("users").select(
-        "username, email, ezygo_token, ezygo_iv, auth_id",
+        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token",
       ).not("ezygo_token", "is", null);
       if (targetUsername) query = query.eq("username", targetUsername);
       else {query = query.order("last_synced_at", {
@@ -288,7 +290,7 @@ export const GET = withSecurity(async (req, { authType }) => {
         return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
       }
       const { data, error } = await supabaseAdmin.from("users").select(
-        "username, email, ezygo_token, ezygo_iv, auth_id",
+        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token",
       ).eq("auth_id", user.id).not("ezygo_token", "is", null);
       if (error) {
         logger.error("Failed to fetch users for sync:", error);
@@ -940,25 +942,32 @@ export const GET = withSecurity(async (req, { authType }) => {
               : [];
 
             // Execute all DB operations in parallel and check for errors
-            const dbOperations = await Promise.allSettled([
-              toDelete.size > 0
-                ? supabaseAdmin.from("tracker").delete().in("id", [...toDelete])
-                : null,
-              toUpdateStatus.length > 0
-                ? supabaseAdmin.from("tracker").update({ status: "correction" })
-                  .in("id", toUpdateStatus)
-                : null,
-              notifications.length > 0
-                ? supabaseAdmin.from("notification").insert(notifications)
-                : null,
-            ].filter((p) => p !== null));
+            const promises: any[] = [];
+            if (toDelete.size > 0) {
+              promises.push(supabaseAdmin.from("tracker").delete().in("id", [...toDelete]));
+            }
+            if (toUpdateStatus.length > 0) {
+              promises.push(
+                supabaseAdmin.from("tracker").update({ status: "correction" }).in("id", toUpdateStatus),
+              );
+            }
+            let notificationPromiseIndex = -1;
+            if (notifications.length > 0) {
+              notificationPromiseIndex = promises.length;
+              promises.push(supabaseAdmin.from("notification").insert(notifications));
+            }
+
+            const dbOperations = await Promise.allSettled(promises);
+
+            let notificationsInserted = false;
 
             // Check for Supabase errors — do not silently ignore DB failures
-            for (const result of dbOperations) {
+            for (let idx = 0; idx < dbOperations.length; idx++) {
+              const result = dbOperations[idx];
               if (result.status === "rejected") {
                 logger.error(
                   `[sync] DB operation failed for user ${redact("id", user.username)}:`,
-                  result.reason
+                  result.reason,
                 );
                 Sentry.captureException(result.reason, {
                   tags: { type: "sync_db_operation_error", location: "cron/sync" },
@@ -967,18 +976,35 @@ export const GET = withSecurity(async (req, { authType }) => {
               } else if (result.value?.error) {
                 logger.error(
                   `[sync] Supabase returned error for user ${redact("id", user.username)}:`,
-                  result.value.error
+                  result.value.error,
                 );
                 Sentry.captureException(result.value.error, {
                   tags: { type: "sync_supabase_error", location: "cron/sync" },
                   extra: { user_id: redact("id", user.auth_id) },
                 });
+              } else {
+                if (idx === notificationPromiseIndex) {
+                  notificationsInserted = true;
+                }
               }
             }
 
             // Send emails after successful DB operations
             if (renderedEmails.length > 0) {
               await Promise.allSettled(renderedEmails.map((e) => sendEmail(e)));
+            }
+
+            // Dispatch mobile push notifications following successful DB insertion
+            if (notificationsInserted && user.fcm_token) {
+              const pushPromises = notifications.map((n) =>
+                sendPushNotification({
+                  token: user.fcm_token!,
+                  title: n.title,
+                  body: n.description,
+                  data: { topic: n.topic },
+                }),
+              );
+              await Promise.allSettled(pushPromises);
             }
           }
 

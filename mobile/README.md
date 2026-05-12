@@ -17,8 +17,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 - **Attendance Calendar** 📅 — Day-by-day attendance history calendar
 - **Manual Tracker** 👻 — Track wrongly marked absences until they're corrected
 - **Scores** 📋 — Exam and assignment results grouped by course, with per-question breakdown
-- **Leave Applications** 📝 — View EzyGo leave application status
- - **Leave Applications** 📝 — View leave application status (sourced from EzyGo)
+- **Leave Applications** 📝 — View leave application status (sourced from EzyGo)
 - **Notifications** 🔔 — In-app notification center
 - **Help & Contact** 📚 — Built-in help docs (rendered Markdown) and contact form
 - **Dark / Light Theme** 🌓 — System-aware theme with manual override
@@ -242,10 +241,10 @@ Then fill in your actual values in the `AppSecrets` class:
 class AppSecrets {
   AppSecrets._();
 
-  static const String supabaseProxyUrlProd = 'https://xxxx.supabase.co';
-  static const String supabasePublishableKeyProd = 'your-anon-key';
-  static const String sentryDsn = 'aHR0cHM6Ly94eHh4QHNlbnRyeS5pby94eHh4'; // Base64 encoded
-  static const String ghostclassApiUrlProd = 'https://your-ghostclass-instance.com/api';
+  static const String supabaseProxyUrlProd = 'aHR0cHM6Ly9...'; // Base64 encoded
+  static const String supabasePublishableKeyProd = 'c2JfcHVi...'; // Base64 encoded
+  static const String sentryDsn = 'aHR0cHM6Ly9...'; // Base64 encoded
+  static const String ghostclassApiUrlProd = 'https://ghostclass.devakesu.com/api';
   // ... other keys
 }
 ```
@@ -263,15 +262,25 @@ class AppSecrets {
    - `ios/Runner/GoogleService-Info.plist` ← gitignored
 4. Run `flutterfire configure` if regenerating `firebase_options.dart`
 
+> **🔒 Production CI/CD Injection Note**: Because `google-services.json` and `GoogleService-Info.plist` contain project identifiers and configurations, they are strictly excluded from version control to protect production infrastructure. For automated builds, store these files as Base64 repository secrets and dynamically decode/inject them during the CI/CD pipeline initialization phase.
+
 ### Running Tests
 
+GhostClass Mobile maintains a comprehensive automated testing suite covering logic parity, cryptographic operations, state management providers, and UI interactions.
+
 ```bash
-# All tests
+# Execute unit and widget tests
 flutter test
 
-# With coverage
+# Generate LCOV coverage report
 flutter test --coverage
 ```
+
+#### 🛡️ Testing & CI/CD Strategy
+
+- **Minimum Module Coverage**: All core logic and data model files enforce a minimum **50% test coverage threshold**, with mission-critical modules (such as the bunk calculation algorithm and encryption services) maintained at **100% coverage**.
+- **Automated CI/CD Quality Gates**: Mandatory GitHub Actions workflows validate coverage metrics on all pull requests and pushes, requiring an aggregate **80% total code coverage** before code can be merged.
+- **Resilient Exception Simulations**: Tests actively simulate extreme network dropouts, plugin failures, and asynchronous edge cases using `mocktail` to verify robustness.
 
 ### Building
 
@@ -285,6 +294,8 @@ flutter build appbundle --release
 # iOS (release, requires macOS + Xcode)
 flutter build ios --release
 ```
+
+> **🔑 Production Signing Note**: Release builds require valid cryptographically secure production keys. Ensure `android/key.properties` and your associated keystore (`.jks` / `.keystore`) file—both of which are **gitignored**—are placed in the `android/` directory before assembling production artifacts. For automated builds, these credentials must be injected dynamically via secure CI/CD environment secrets.
 
 ## 🔒 Security Architecture
 

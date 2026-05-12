@@ -16,6 +16,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
+import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 
 /// MyHttpOverrides
@@ -154,11 +155,25 @@ void main() async {
 /// -----
 /// The root widget of the GhostClass mobile application.
 /// Sets up the primary theme, router, and security listeners.
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize push notification listeners and tokens after layout mounts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(pushNotificationServiceProvider).initialize();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeProvider);
 

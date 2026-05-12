@@ -50,6 +50,26 @@ export function getAppCheck(): AppCheckVerifier | null {
 }
 
 /**
+ * Initialize and return Firebase Admin Messaging service
+ * Returns null if Firebase Admin is not properly configured
+ */
+export function getMessaging(): admin.messaging.Messaging | null {
+  try {
+    const firebaseApp = admin.apps.length > 0 ? admin.app() : initializeFirebaseAdmin();
+    
+    if (!firebaseApp) {
+      logger.warn("Firebase Admin Messaging: Failed to initialize Firebase Admin");
+      return null;
+    }
+
+    return admin.messaging();
+  } catch (error) {
+    logger.error("Firebase Admin Messaging initialization failed:", error);
+    return null;
+  }
+}
+
+/**
  * Initialize Firebase Admin SDK with service account credentials
  */
 function initializeFirebaseAdmin() {
