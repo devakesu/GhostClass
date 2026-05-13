@@ -54,7 +54,16 @@ describe('performProfileSync', () => {
   const mockEzygoId = '12345';
   const mockAuthId = 'auth-67890';
 
-  let mockSupabase: any;
+  let mockSupabase: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    or: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,26 +79,26 @@ describe('performProfileSync', () => {
       update: vi.fn().mockReturnThis(),
     };
 
-    vi.mocked(getAdminClient).mockReturnValue(mockSupabase);
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabase as unknown as ReturnType<typeof getAdminClient>);
     vi.mocked(calculateCurrentAcademicInfo).mockReturnValue({
       current_year: '2024-25',
       current_semester: 'odd',
     });
   });
 
-  function createMockResponse(content: string, ok = true, status = 200) {
+  function createMockResponse(content: string, ok = true, status = 200): Response {
     return {
       ok,
       status,
       text: async () => content,
       json: async () => JSON.parse(content),
       clone: function() { return this; }
-    } as any;
+    } as unknown as Response;
   }
 
   it('performs a full profile sync successfully', async () => {
     // 1. Mock EzyGo Responses
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') {
         return createMockResponse('{"data": {"user_id": "12345", "username": "testuser", "full_name": "Test User"}}');
       }
@@ -108,9 +117,9 @@ describe('performProfileSync', () => {
       return createMockResponse('', false, 404);
     });
 
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
       try {
-        const text = await res.text();
+        const text = await (res as Response).text();
         return JSON.parse(text);
       } catch {
         return null;
@@ -138,7 +147,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles missing EzyGo User ID', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') {
         return createMockResponse('{"data": {}}');
       }
@@ -150,7 +159,7 @@ describe('performProfileSync', () => {
   });
 
   it('falls back to existing local data for phone, gender, and birth date', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') {
         return createMockResponse('{"user_id": "12345"}');
       }
@@ -181,7 +190,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles course parsing errors gracefully', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') {
         return createMockResponse('{"user_id": "12345"}');
       }
@@ -191,8 +200,8 @@ describe('performProfileSync', () => {
       return createMockResponse('{}');
     });
     
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text === 'INVALID_JSON') return null;
       try { return JSON.parse(text); } catch { return { user_id: '12345' }; }
     });
@@ -202,7 +211,7 @@ describe('performProfileSync', () => {
   });
 
   it('performs a sync for the Even semester', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       if (url === 'user/setting/default_semester') return createMockResponse('Even');
       return createMockResponse('{}');
@@ -214,7 +223,7 @@ describe('performProfileSync', () => {
   });
 
   it('falls back to subgroupRoles for class detection', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       if (url === 'institutionuser/courses/withusers') return createMockResponse('[]'); // No courses
       if (url === 'institutionuser/myroles') {
@@ -222,8 +231,8 @@ describe('performProfileSync', () => {
       }
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('subgroupRoles')) return { data: { subgroupRoles: [{ id: 999, name: 'Fallback Class' }] } };
       if (text === '[]') return [];
       return { user_id: '12345' };
@@ -236,15 +245,16 @@ describe('performProfileSync', () => {
   });
 
   it('handles upsert error', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       return createMockResponse('{}');
     });
     vi.mocked(safeResponseJson).mockResolvedValue({ user_id: '12345' });
 
     // Mock the second upsert (to 'users' table) to fail
-    mockSupabase.upsert.mockImplementation((data: any) => {
-      if (data && data.id === '12345') { // This is the users upsert
+    mockSupabase.upsert.mockImplementation((data: unknown) => {
+      const record = data as Record<string, unknown> | undefined;
+      if (record && record.id === '12345') { // This is the users upsert
         return { error: new Error('Database Error') };
       }
       return mockSupabase; // For other upserts (classes, course_mappings)
@@ -255,13 +265,13 @@ describe('performProfileSync', () => {
 
   it('handles safeEzygoJson read failure', async () => {
     const warnSpy = vi.spyOn(logger, 'warn');
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'user/setting/default_semester') {
         return {
           ok: true,
           status: 200,
           text: () => { throw new Error('Body Read Error'); }
-        } as any;
+        } as unknown as Response;
       }
       return createMockResponse('{}');
     });
@@ -272,12 +282,12 @@ describe('performProfileSync', () => {
   });
 
   it('handles empty EzyGo Profile JSON', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('');
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      if ((await res.text()) === '') return null;
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      if ((await (res as Response).text()) === '') return null;
       return {};
     });
 
@@ -285,14 +295,14 @@ describe('performProfileSync', () => {
   });
 
   it('handles coursesRes read failure in catch block', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       if (url === 'institutionuser/courses/withusers') {
         return {
           ok: true,
           status: 200,
           clone: () => ({ text: () => Promise.reject(new Error('Clone Read Error')) })
-        } as any;
+        } as unknown as Response;
       }
       return createMockResponse('{}');
     });
@@ -303,7 +313,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles naked strings in safeEzygoJson', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'user/setting/default_semester') return createMockResponse('Odd');
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       return createMockResponse('{}');
@@ -315,7 +325,7 @@ describe('performProfileSync', () => {
   });
 
   it('resolves ezygoId from remote data if local is missing', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "remote-123"}');
       return createMockResponse('{}');
     });
@@ -326,7 +336,7 @@ describe('performProfileSync', () => {
   });
 
   it('resolves ezygoId from user.id if user_id is missing', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user": {"id": "nested-123"}}');
       return createMockResponse('{}');
     });
@@ -337,7 +347,7 @@ describe('performProfileSync', () => {
   });
 
   it('derives first and last name from full_name', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123", "full_name": "John Quincy Adams"}');
       return createMockResponse('{}');
     });
@@ -349,7 +359,7 @@ describe('performProfileSync', () => {
   });
 
   it('uses sex and dob as fallbacks for gender and birthDate', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123", "sex": "Female", "dob": "1995-05-05"}');
       return createMockResponse('{}');
     });
@@ -364,7 +374,7 @@ describe('performProfileSync', () => {
     const { decrypt } = await import('@/lib/crypto');
     vi.mocked(decrypt).mockImplementation(() => { throw new Error('Decryption failed'); });
 
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       return createMockResponse('{}');
     });
@@ -383,12 +393,12 @@ describe('performProfileSync', () => {
   });
 
   it('falls back to existing class_id if no new class detected', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('subgroupRoles')) return { data: { subgroupRoles: [] } };
       return { user_id: '12345' };
     });
@@ -403,7 +413,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles blank strings in safeEzygoJson', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'user/setting/default_semester') return createMockResponse('   ');
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       return createMockResponse('{}');
@@ -415,13 +425,13 @@ describe('performProfileSync', () => {
   });
 
   it('skips course mapping if code is missing', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') return createMockResponse('[{"id": 101, "name": "No Code"}]');
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('No Code')) return [{ id: 101, name: 'No Code' }];
       return { user_id: '123' };
     });
@@ -432,7 +442,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles null yearRaw', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'user/setting/default_academic_year') return createMockResponse('', false, 500);
       return createMockResponse('{}');
@@ -444,15 +454,15 @@ describe('performProfileSync', () => {
   });
 
   it('handles class upsert error (priority 1)', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') {
         return createMockResponse('[{"id": 101, "code": "C1", "usersubgroup": {"id": 1, "name": "G1", "usergroup": {"id": 1}}}]');
       }
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('G1')) return [{ id: 101, code: 'C1', usersubgroup: { id: 1, name: 'G1', usergroup: { id: 1 } } }];
       return { user_id: '123' };
     });
@@ -464,13 +474,13 @@ describe('performProfileSync', () => {
   });
 
   it('handles class upsert error (priority 2 fallback)', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/myroles') return createMockResponse('{"data": {"subgroupRoles": [{"id": 1, "name": "R1"}]}}');
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('R1')) return { data: { subgroupRoles: [{ id: 1, name: 'R1' }] } };
       return { user_id: '123' };
     });
@@ -482,7 +492,7 @@ describe('performProfileSync', () => {
   });
 
   it('handles coursesRes not ok', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') return createMockResponse('', false, 403);
       return createMockResponse('{}');
@@ -494,13 +504,13 @@ describe('performProfileSync', () => {
   });
 
   it('skips course mapping if id is missing', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: any) => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') return createMockResponse('[{"code": "C1", "name": "No ID"}]');
       return createMockResponse('{}');
     });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: any) => {
-      const text = await res.text();
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
       if (text.includes('No ID')) return [{ code: 'C1', name: 'No ID' }];
       return { user_id: '123' };
     });

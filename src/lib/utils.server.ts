@@ -13,19 +13,12 @@ import crypto from "crypto";
 // redact — HMAC-SHA256 implementation (server only)
 // ---------------------------------------------------------------------------
 
-// SECRET and secretWarningShown are module-level mutable state. The only
-// legitimate writers are getSecret() (single initialisation). TypeScript does not
-// prevent other code in this module from assigning to them directly; a future
-// refactor to a closure module would eliminate that risk.
-// DO NOT write to these variables outside getSecret().
 let SECRET: string | null = null;
 let secretWarningShown = false;
 let hasLoggedDevIpWarning = false;
 
 /**
  * TEST ONLY — Resets module-level state.
- * Allows tests to verify environment-dependent initialization logic
- * without requiring full Vitest module resets which break coverage tracking.
  */
 export function _resetModuleState() {
   SECRET = null;
@@ -34,6 +27,7 @@ export function _resetModuleState() {
 }
 
 function getSecret(): string {
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- Checking module variable initialization, not comparing secret values
   if (SECRET !== null) return SECRET;
 
   if (process.env.SENTRY_HASH_SALT) {
@@ -45,11 +39,8 @@ function getSecret(): string {
     throw new Error("SENTRY_HASH_SALT is required in production");
   }
 
-  // NODE_ENV === "test" included so Vitest runs without SENTRY_HASH_SALT don't throw.
   if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
     if (process.env.NODE_ENV === "development" && !secretWarningShown) {
-      // console.warn used deliberately — importing logger here would create a
-      // circular-dependency risk (logger → utils hypothetically possible in future).
       console.warn(
         "[SECURITY WARNING] Using fallback salt for redaction. " +
         "Set SENTRY_HASH_SALT environment variable for production-like hashing. " +
@@ -66,14 +57,6 @@ function getSecret(): string {
 
 /**
  * Redacts sensitive data (email, ID) for safe server-side logging using HMAC-SHA256.
- * Produces a 12-character deterministic hash keyed on SENTRY_HASH_SALT.
- *
- * Use this in API routes and server actions. Client components should use the
- * `redact` export from @/lib/utils, which uses a crypto-import-free implementation.
- *
- * @param type  - Type of data being redacted ('email' or 'id')
- * @param value - The sensitive value to redact
- * @returns A 12-character deterministic hex string safe for logging
  */
 export const redact = (type: "email" | "id", value: string): string =>
   crypto
@@ -88,17 +71,6 @@ export const redact = (type: "email" | "id", value: string): string =>
 
 /**
  * Extracts the client IP address from request headers.
- *
- * Header priority (assumes Cloudflare as primary CDN):
- *   1. cf-connecting-ip — Most trusted when behind Cloudflare
- *   2. x-real-ip — Common for nginx/Apache reverse proxies
- *   3. x-forwarded-for — First IP in chain (various load-balancers)
- *
- * In development, falls back to TEST_CLIENT_IP env var or "127.0.0.1".
- * In production, returns null when no valid header is present (caller must reject).
- *
- * @param headerList - The Headers object from the request
- * @returns The client IP address or null if it cannot be determined
  */
 export function getClientIp(headerList: Headers): string | null {
   const cf = headerList.get("cf-connecting-ip")?.trim();
@@ -116,7 +88,6 @@ export function getClientIp(headerList: Headers): string | null {
 
     if (!hasLoggedDevIpWarning) {
       hasLoggedDevIpWarning = true;
-      // console.warn used deliberately — see logger import note at top of utils.ts.
       console.warn(
         "\n" +
         "═══════════════════════════════════════════════════════════════════════\n" +
@@ -135,9 +106,6 @@ export function getClientIp(headerList: Headers): string | null {
     return testIp || "127.0.0.1";
   }
 
-  // In production, return null to signal that IP extraction failed.
-  // Callers must handle this null case (e.g. reject the request).
-  // console.warn used deliberately — see logger import note at top of utils.ts.
   console.warn(
     "[getClientIp] No IP forwarding headers found in production. " +
     "Ensure reverse proxy is configured to set x-forwarded-for, x-real-ip, or cf-connecting-ip headers. " +
@@ -150,13 +118,7 @@ export function getClientIp(headerList: Headers): string | null {
 // egressFetch — multi-tier fetch wrapper with automatic failover
 // ---------------------------------------------------------------------------
 
-// Retryable upstream statuses — mirrors the backend proxy route.
-// On these statuses the next configured egress tier is tried transparently.
 const RETRYABLE_EGRESS_STATUSES = new Set([429, 502, 503, 504]);
-
-// Per-tier fetch timeout: if a tier does not respond within this window we fail
-// over to the next tier. Chosen to be shorter than typical caller budgets (8–15 s)
-// so failover can occur within the overall request budget.
 const PER_TIER_TIMEOUT_MS = 10_000;
 
 interface EgressTarget {
@@ -165,29 +127,31 @@ interface EgressTarget {
   readonly name: string;
 }
 
-/**
- * Returns the ordered list of configured egress targets:
- *   Tier 1 — CF_PROXY_URL      (Cloudflare Worker, optional)
- *   Tier 2 — AWS_SECONDARY_URL (AWS Lambda, optional)
- *   Tier 3 — NEXT_PUBLIC_BACKEND_URL (direct EzyGo, always present when set)
- * Each tier is included only when its URL env var is non-empty.
- */
+function stripTrailingSlashes(str: string | undefined): string | undefined {
+  if (!str) return str;
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
 function buildEgressTargets(): EgressTarget[] {
   const targets: EgressTarget[] = [];
 
-  const cfUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
+  const cfUrl = stripTrailingSlashes(process.env.CF_PROXY_URL);
   if (cfUrl) {
     const secret = process.env.CF_PROXY_SECRET?.trim();
     targets.push({ baseUrl: cfUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "primary (CF Worker)" });
   }
 
-  const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
+  const awsUrl = stripTrailingSlashes(process.env.AWS_SECONDARY_URL);
   if (awsUrl) {
     const secret = process.env.AWS_SECONDARY_SECRET?.trim();
     targets.push({ baseUrl: awsUrl, proxyHeaders: secret ? { "x-proxy-secret": secret } : {}, name: "secondary (AWS)" });
   }
 
-  const directUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+  const directUrl = stripTrailingSlashes(process.env.NEXT_PUBLIC_BACKEND_URL);
   if (directUrl) {
     targets.push({ baseUrl: directUrl, proxyHeaders: {}, name: "direct" });
   }
@@ -195,20 +159,89 @@ function buildEgressTargets(): EgressTarget[] {
   return targets;
 }
 
+async function populateStealthHeaders(headers: Headers, targetHeaders: Record<string, string>): Promise<void> {
+  if (!headers.has("origin")) headers.set("origin", "https://edu.ezygo.app");
+  if (!headers.has("referer")) headers.set("referer", "https://edu.ezygo.app/");
+
+  let originalUserAgent: string | null = null;
+  let originalSecChUa: string | null = null;
+  try {
+    const { headers: nextHeaders } = await import("next/headers");
+    const activeHeaders = await nextHeaders();
+    originalUserAgent = activeHeaders.get("user-agent");
+    originalSecChUa = activeHeaders.get("sec-ch-ua");
+  } catch {
+    // Not in a request context
+  }
+
+  if (!headers.has("user-agent")) {
+    headers.set("user-agent", originalUserAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
+  }
+  if (!headers.has("sec-ch-ua") && originalSecChUa) {
+    headers.set("sec-ch-ua", originalSecChUa);
+  }
+  
+  if (!headers.has("accept")) headers.set("accept", "application/json, text/plain, */*");
+  if (!headers.has("accept-language")) headers.set("accept-language", "en-GB,en;q=0.9,en;q=0.8");
+  if (!headers.has("sec-fetch-site")) headers.set("sec-fetch-site", "same-site");
+  if (!headers.has("sec-fetch-mode")) headers.set("sec-fetch-mode", "cors");
+  if (!headers.has("sec-fetch-dest")) headers.set("sec-fetch-dest", "empty");
+  if (!headers.has("priority")) headers.set("priority", "u=1, i");
+
+  for (const [key, value] of Object.entries(targetHeaders)) {
+    headers.set(key, value);
+  }
+}
+
+async function attemptEgressTier(
+  target: EgressTarget,
+  cleanEndpoint: string,
+  init: RequestInit | undefined,
+  callerSignal: AbortSignal | null,
+  isLast: boolean
+): Promise<{ success: true; res: Response } | { success: false; shouldThrow: boolean; error?: unknown }> {
+  const url = `${target.baseUrl}/${cleanEndpoint}`;
+  const headers = new Headers(init?.headers);
+  await populateStealthHeaders(headers, target.proxyHeaders);
+
+  const tierController = new AbortController();
+  const tierTimeout = setTimeout(() => tierController.abort(), PER_TIER_TIMEOUT_MS);
+  const tierSignal: AbortSignal =
+    callerSignal !== null
+      ? (AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }).any([callerSignal, tierController.signal])
+      : tierController.signal;
+
+  try {
+    const res = await fetch(url, { ...init, headers, signal: tierSignal });
+    clearTimeout(tierTimeout);
+
+    if (RETRYABLE_EGRESS_STATUSES.has(res.status) && !isLast) {
+      console.warn(
+        `[egress-failover] ${target.name} returned ${res.status} for ${cleanEndpoint} — failing over to next tier`
+      );
+      await res.body?.cancel?.();
+      return { success: false, shouldThrow: false };
+    }
+
+    return { success: true, res };
+  } catch (err) {
+    clearTimeout(tierTimeout);
+    if (callerSignal?.aborted && err instanceof Error && err.name === "AbortError") {
+      return { success: false, shouldThrow: true, error: err };
+    }
+    if (isLast) {
+      return { success: false, shouldThrow: true, error: err };
+    }
+    console.warn(
+      `[egress-failover] ${target.name} failed for ${cleanEndpoint} — failing over to next tier:`,
+      err instanceof Error ? err.message : String(err)
+    );
+    return { success: false, shouldThrow: false };
+  }
+}
+
 /**
  * Fetch wrapper for server-side EzyGo calls with multi-tier egress failover.
- *
- * Loops through the configured tiers (CF Worker → AWS Lambda → direct EzyGo)
- * and transparently fails over on 429 / 502 / 503 / 504 responses or network
- * errors. Non-retryable statuses (most 4xx) are returned immediately without
- * retrying on other tiers. Callers supply only the endpoint path and their own
- * headers (e.g. Authorization); proxy secrets are injected automatically per tier.
- *
- * Each tier is given its own PER_TIER_TIMEOUT_MS budget via a fresh AbortController
- * combined with the caller's signal (AbortSignal.any). This prevents a slow tier
- * from consuming the entire caller budget, and prevents an already-aborted caller
- * signal from being shared across retries (which would make every retry fail
- * immediately). When the caller's own signal fires, failover is halted immediately.
  */
 export async function egressFetch(
   endpoint: string,
@@ -219,116 +252,22 @@ export async function egressFetch(
     throw new Error("No egress targets configured — set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL");
   }
 
-  const cleanEndpoint = endpoint.replace(/^\/+/, "");
-  // Preserve the caller's signal to distinguish deliberate cancellation from
-  // per-tier timeouts when deciding whether to fail over.
+  let cleanEndpoint = endpoint.trim();
+  while (cleanEndpoint.startsWith("/")) {
+    cleanEndpoint = cleanEndpoint.slice(1);
+  }
   const callerSignal = init?.signal ?? null;
 
-  for (let i = 0; i < targets.length; i++) {
-    const target = targets[i];
+  for (const [i, target] of targets.entries()) {
     const isLast = i === targets.length - 1;
-    const url = `${target.baseUrl}/${cleanEndpoint}`;
-
-    // Merge caller headers then apply per-tier proxy headers (proxy secret takes precedence).
-    const headers = new Headers(init?.headers);
-    
-    // 1. Add Default Stealth Headers (if not already set by caller)
-    // These help server-side calls (sync, cron) match the browser proxy logic
-    if (!headers.has("origin")) {
-      headers.set("origin", "https://edu.ezygo.app");
+    const attempt = await attemptEgressTier(target, cleanEndpoint, init, callerSignal, isLast);
+    if (attempt.success) {
+      return attempt.res;
     }
-    if (!headers.has("referer")) {
-      headers.set("referer", "https://edu.ezygo.app/");
-    }
-
-    // Try to get original user agent from request headers if available
-    let originalUserAgent: string | null = null;
-    let originalSecChUa: string | null = null;
-    try {
-      // Use dynamic import to avoid issues in non-Next.js environments (like tests)
-      // and to satisfy ESLint.
-      const { headers: nextHeaders } = await import("next/headers");
-      const activeHeaders = await nextHeaders();
-      originalUserAgent = activeHeaders.get("user-agent");
-      originalSecChUa = activeHeaders.get("sec-ch-ua");
-    } catch {
-      // Not in a request context (e.g. background job, or non-Next.js env)
-    }
-
-    if (!headers.has("user-agent")) {
-      headers.set("user-agent", originalUserAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
-    }
-    if (!headers.has("sec-ch-ua") && originalSecChUa) {
-      headers.set("sec-ch-ua", originalSecChUa);
-    }
-    
-    if (!headers.has("accept")) {
-      headers.set("accept", "application/json, text/plain, */*");
-    }
-    if (!headers.has("accept-language")) {
-      headers.set("accept-language", "en-GB,en;q=0.9,en;q=0.8");
-    }
-    if (!headers.has("sec-fetch-site")) {
-      headers.set("sec-fetch-site", "same-site");
-    }
-    if (!headers.has("sec-fetch-mode")) {
-      headers.set("sec-fetch-mode", "cors");
-    }
-    if (!headers.has("sec-fetch-dest")) {
-      headers.set("sec-fetch-dest", "empty");
-    }
-    if (!headers.has("priority")) {
-      headers.set("priority", "u=1, i");
-    }
-
-    for (const [key, value] of Object.entries(target.proxyHeaders)) {
-      headers.set(key, value);
-    }
-
-    // Create a per-tier AbortController + timeout so that:
-    //   a) A slow/hung tier is abandoned after PER_TIER_TIMEOUT_MS and we fail over.
-    //   b) The caller's signal is combined into this tier's signal so deliberate
-    //      cancellation (e.g. overall request budget exhausted) is still honoured.
-    // AbortSignal.any() is available in Node.js ≥ 20.3 (required env: ≥ 20.19).
-    const tierController = new AbortController();
-    const tierTimeout = setTimeout(() => tierController.abort(), PER_TIER_TIMEOUT_MS);
-    const tierSignal: AbortSignal =
-      callerSignal !== null
-        ? (AbortSignal as any).any([callerSignal, tierController.signal])
-        : tierController.signal;
-
-    try {
-      const res = await fetch(url, { ...init, headers, signal: tierSignal });
-      clearTimeout(tierTimeout);
-
-      if (RETRYABLE_EGRESS_STATUSES.has(res.status) && !isLast) {
-        // console.warn used deliberately — see logger import note at top of utils.server.ts.
-        console.warn(
-          `[egress-failover] ${target.name} returned ${res.status} for ${cleanEndpoint} — failing over to next tier`
-        );
-        // Drain the body to release the connection before trying the next tier.
-        await res.body?.cancel?.();
-        continue;
-      }
-
-      return res;
-    } catch (err) {
-      clearTimeout(tierTimeout);
-      // If the caller's own signal was aborted (not the per-tier timeout), propagate
-      // immediately — the overall request budget is exhausted and failover won't help.
-      if (callerSignal?.aborted && err instanceof Error && err.name === "AbortError") {
-        throw err;
-      }
-      if (isLast) throw err;
-      // console.warn used deliberately — see logger import note at top of utils.server.ts.
-      console.warn(
-        `[egress-failover] ${target.name} failed for ${cleanEndpoint} — failing over to next tier:`,
-        err instanceof Error ? err.message : String(err)
-      );
-      continue;
+    if (attempt.shouldThrow) {
+      throw attempt.error;
     }
   }
 
-  // This line is unreachable: the last iteration always returns or throws.
   throw new Error("[egress-failover] unreachable: exhausted all egress tiers without returning");
 }

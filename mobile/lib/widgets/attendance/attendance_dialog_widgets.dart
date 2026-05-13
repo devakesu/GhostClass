@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AttendanceDialogLabel extends StatelessWidget {
-  final String text;
 
-  const AttendanceDialogLabel({super.key, required this.text});
+  const AttendanceDialogLabel({required this.text, super.key});
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -24,20 +24,16 @@ class AttendanceDialogLabel extends StatelessWidget {
 }
 
 class AttendanceStatusToggleButton extends StatelessWidget {
+
+  const AttendanceStatusToggleButton({
+    required this.value, required this.isSelected, required this.color, required this.onTap, super.key,
+    this.label,
+  });
   final String value;
   final String? label;
   final bool isSelected;
   final Color color;
   final VoidCallback onTap;
-
-  const AttendanceStatusToggleButton({
-    super.key,
-    required this.value,
-    this.label,
-    required this.isSelected,
-    required this.color,
-    required this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {

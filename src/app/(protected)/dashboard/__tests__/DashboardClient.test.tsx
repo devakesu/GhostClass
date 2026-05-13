@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import DashboardClient from '../DashboardClient';
@@ -6,6 +7,27 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as profileHooks from '@/hooks/users/profile';
 import * as coursesHooks from '@/hooks/courses/courses';
 import * as syncHooks from '@/hooks/use-sync-on-mount';
+
+type MockCourse = {
+  id: number;
+  code: string;
+  name?: string;
+  key?: string;
+};
+
+type MockComponentProps = {
+  children?: ReactNode;
+  [key: string]: unknown;
+};
+
+type MotionProps = MockComponentProps & {
+  initial?: unknown;
+  animate?: unknown;
+  transition?: unknown;
+  whileHover?: unknown;
+  whileTap?: unknown;
+  exit?: unknown;
+};
 
 // Mock all hooks
 vi.mock('@/hooks/users/profile', () => ({
@@ -54,11 +76,11 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
 }));
 
 vi.mock('../components/CourseGrid', () => ({
-  CourseGrid: ({ sortedCourses, onEditInstructor, onAddCourse }: any) => (
+  CourseGrid: ({ sortedCourses = [], onEditInstructor, onAddCourse }: { sortedCourses?: MockCourse[]; onEditInstructor?: (course: MockCourse, instructor: string, open: boolean, value: unknown) => void; onAddCourse?: () => void }) => (
     <div data-testid="course-grid">
       <button onClick={onAddCourse}>Add Course</button>
-      {sortedCourses.map((c: any) => (
-        <button key={c.id} onClick={() => onEditInstructor(c, 'Instructor', false, null)}>
+      {sortedCourses.map((c) => (
+        <button key={c.id} onClick={() => onEditInstructor?.(c, 'Instructor', false, null)}>
           Edit {c.code}
         </button>
       ))}
@@ -90,8 +112,7 @@ vi.mock('@/hooks/courses/useCourseLookup', () => ({
 }));
 
 vi.mock('framer-motion', () => {
-  const mockComponent = ({ children, ...props }: any) => {
-    const { initial: _i, animate: _a, transition: _t, whileHover: _wh, whileTap: _wt, exit: _e, ...rest } = props;
+  const mockComponent = ({ children, ...rest }: MotionProps) => {
     return <div {...rest}>{children}</div>;
   };
   return {
@@ -107,8 +128,8 @@ vi.mock('framer-motion', () => {
       p: mockComponent,
       span: mockComponent,
     },
-    AnimatePresence: ({ children }: any) => <>{children}</>,
-    LazyMotion: ({ children }: any) => <>{children}</>,
+    AnimatePresence: ({ children }: MockComponentProps) => <>{children}</>,
+    LazyMotion: ({ children }: MockComponentProps) => <>{children}</>,
     domAnimation: {},
   };
 });
@@ -123,31 +144,31 @@ vi.mock('next/dynamic', () => ({
 
 // Mock Select to trigger onValueChange
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children, onValueChange, value, disabled }: any) => (
+  Select: ({ children, onValueChange, value, disabled }: { children?: ReactNode; onValueChange?: (value: string) => void; value?: string; disabled?: boolean }) => (
     <div data-testid="mock-select" data-value={value} data-disabled={disabled}>
-      <button onClick={() => !disabled && onValueChange('even')}>Change to EVEN</button>
+      <button onClick={() => !disabled && onValueChange?.('even')}>Change to EVEN</button>
       {children}
     </div>
   ),
-  SelectTrigger: ({ children }: any) => <button>{children}</button>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+  SelectTrigger: ({ children }: MockComponentProps) => <button>{children}</button>,
+  SelectContent: ({ children }: MockComponentProps) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children?: ReactNode; value?: string }) => <div data-value={value}>{children}</div>,
 }));
 
 // Mock AlertDialog
 vi.mock('@/components/ui/alert-dialog', () => ({
-  AlertDialog: ({ children, open }: any) => open ? <div data-testid="alert-dialog">{children}</div> : null,
-  AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
+  AlertDialog: ({ children, open }: { children?: ReactNode; open?: boolean }) => open ? <div data-testid="alert-dialog">{children}</div> : null,
+  AlertDialogAction: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+  AlertDialogContent: ({ children }: MockComponentProps) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: MockComponentProps) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: MockComponentProps) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: MockComponentProps) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: MockComponentProps) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/attendance/AddAttendanceDialog', () => ({
-  AddAttendanceDialog: ({ onSuccess, open }: any) => (
+  AddAttendanceDialog: ({ onSuccess, open }: { onSuccess?: () => void; open?: boolean }) => (
     open ? <div data-testid="add-attendance-dialog">
       <button onClick={onSuccess}>Trigger Success</button>
     </div> : null
@@ -155,11 +176,11 @@ vi.mock('@/components/attendance/AddAttendanceDialog', () => ({
 }));
 
 vi.mock('@/components/attendance/AddCourseDialog', () => ({
-  AddCourseDialog: ({ open }: any) => open ? <div data-testid="add-course-dialog" /> : null,
+  AddCourseDialog: ({ open }: { open?: boolean }) => open ? <div data-testid="add-course-dialog" /> : null,
 }));
 
 vi.mock('@/components/attendance/EditInstructorDialog', () => ({
-  EditInstructorDialog: ({ open }: any) => open ? <div data-testid="edit-instructor-dialog" /> : null,
+  EditInstructorDialog: ({ open }: { open?: boolean }) => open ? <div data-testid="edit-instructor-dialog" /> : null,
 }));
 
 // Mock axios
@@ -179,7 +200,7 @@ const queryClient = new QueryClient({
 describe('DashboardClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(syncHooks.useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false } as any);
+    vi.mocked(syncHooks.useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false });
     vi.mocked(profileHooks.useProfile).mockReturnValue({ 
       data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1, class: { name: 'Test Class' } }, 
       isLoading: false, 
@@ -208,7 +229,7 @@ describe('DashboardClient', () => {
 
   it('triggers onEditInstructor from CourseGrid', async () => {
     vi.mocked(coursesHooks.useFetchCourses).mockReturnValue({ 
-      data: { courses: { '1': { id: 1, code: 'CS101', name: 'Computer Science', key: '1' } } }, 
+      data: { courses: { '1': { id: 1, code: 'CS101', name: 'Computer Science' } } }, 
       isLoading: false,
       isFetching: false,
       isError: false,

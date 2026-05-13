@@ -20,15 +20,6 @@ double? _toDouble(dynamic value) {
 }
 
 class Exam {
-  final int id;
-  final String name;
-  final String? summary;
-  final String activityType; // 'assessment' or 'assignment'
-  final DateTime? startsAt;
-  final DateTime? endsAt;
-  final double? maximumMark;
-  final double? apiScore;
-  final List<Course> courses;
 
   Exam({
     required this.id,
@@ -45,13 +36,16 @@ class Exam {
     final participants = json['participants'] as List? ?? [];
     double? pivotScore;
     if (participants.isNotEmpty) {
-      final pivot = participants.first['pivot'] as Map<String, dynamic>?;
+      final firstParticipant = participants.first as Map<String, dynamic>? ?? {};
+      final pivot = firstParticipant['pivot'] as Map<String, dynamic>?;
       pivotScore = _toDouble(pivot?['score']);
     }
 
     final coursesList = (json['course'] as List? ?? [])
         .map((c) => Course.fromJson(c as Map<String, dynamic>))
         .toList();
+
+    final settingsMap = json['settings'] as Map<String, dynamic>? ?? {};
 
     return Exam(
       id: toInt(json['id']) ?? 0,
@@ -61,11 +55,20 @@ class Exam {
       activityType: json['activity_type'] as String? ?? 'assessment',
       startsAt: json['starts_at'] != null ? DateTime.tryParse(json['starts_at'] as String) : null,
       endsAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'] as String) : null,
-      maximumMark: _toDouble(json['maximum_mark']) ?? _toDouble(json['settings']?['questionPaperMaximumMark']),
+      maximumMark: _toDouble(json['maximum_mark']) ?? _toDouble(settingsMap['questionPaperMaximumMark']),
       apiScore: pivotScore,
       courses: coursesList,
     );
   }
+  final int id;
+  final String name;
+  final String? summary;
+  final String activityType; // 'assessment' or 'assignment'
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+  final double? maximumMark;
+  final double? apiScore;
+  final List<Course> courses;
 
   String get courseName {
     if (courses.isEmpty) return 'Unknown Course';
@@ -77,11 +80,6 @@ class Exam {
 }
 
 class Course {
-  final int id;
-  final String name;
-  final String? code;
-  final String? academicYear;
-  final String? academicSemester;
 
   Course({required this.id, required this.name, this.code, this.academicYear, this.academicSemester});
 
@@ -94,14 +92,14 @@ class Course {
       academicSemester: json['academic_semester'] as String?,
     );
   }
+  final int id;
+  final String name;
+  final String? code;
+  final String? academicYear;
+  final String? academicSemester;
 }
 
 class ExamQuestion {
-  final int id;
-  final String questionNo;
-  final double maximumMark;
-  final int? subquestionParentId;
-  final int? orQuestionGroupId;
 
   ExamQuestion({
     required this.id,
@@ -120,12 +118,14 @@ class ExamQuestion {
       orQuestionGroupId: toInt(json['orquestion_group_id']),
     );
   }
+  final int id;
+  final String questionNo;
+  final double maximumMark;
+  final int? subquestionParentId;
+  final int? orQuestionGroupId;
 }
 
 class ExamAnswer {
-  final int id;
-  final int examQuestionId;
-  final double? score;
 
   ExamAnswer({
     required this.id,
@@ -140,13 +140,12 @@ class ExamAnswer {
       score: _toDouble(json['score']),
     );
   }
+  final int id;
+  final int examQuestionId;
+  final double? score;
 }
 
 class ResolvedScore {
-  final double score;
-  final double maxMark;
-  final bool isMarked;
-  final bool isMaxUnresolvable;
 
   ResolvedScore({
     required this.score,
@@ -154,6 +153,10 @@ class ResolvedScore {
     required this.isMarked,
     this.isMaxUnresolvable = false,
   });
+  final double score;
+  final double maxMark;
+  final bool isMarked;
+  final bool isMaxUnresolvable;
 
   double get percentage => (isMaxUnresolvable || maxMark <= 0) ? 0 : (score / maxMark) * 100;
 

@@ -6,9 +6,10 @@ const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockSingle = vi.fn();
+const mockCreateServerClient = vi.fn();
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn((_url, _key, options) => {
+  createServerClient: mockCreateServerClient.mockImplementation((_url, _key, options) => {
     // Call getAll to cover the branch in proxy.ts
     options.cookies.getAll();
     // Call setAll to cover the branch in proxy.ts
@@ -22,7 +23,7 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 vi.mock("../lib/crypto", () => ({
-  decrypt: vi.fn((_iv, _token) => "decrypted-token"),
+  decrypt: vi.fn(() => "decrypted-token"),
 }));
 
 vi.mock("../lib/logger", () => ({
@@ -68,7 +69,7 @@ describe("proxy.ts coverage hardening", () => {
   });
 
   it("covers isApiDocs CSP branch", async () => {
-    const request = new NextRequest("http://localhost/api-docs");
+    const request = new NextRequest("https://localhost/api-docs");
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
     
     const response = await proxy(request);
@@ -77,14 +78,14 @@ describe("proxy.ts coverage hardening", () => {
 
   it("covers development Supabase URL/Key branches", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_DEV_URL", "http://dev-url");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_DEV_URL", "https://dev-url");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY", "dev-key");
     
-    const request = new NextRequest("http://localhost/");
+    const request = new NextRequest("https://localhost/");
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
     
     await proxy(request);
-    // Success means it didn't throw on undefined envs
+    expect(mockGetUser).toHaveBeenCalled();
   });
 
   it("covers getUserWithRetry transient error and successful retry", async () => {
@@ -93,7 +94,7 @@ describe("proxy.ts coverage hardening", () => {
       .mockRejectedValueOnce(new Error("fetch failure"))
       .mockResolvedValueOnce({ data: { user: { id: "user-1" } }, error: null });
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: { cookie: "terms_version=2.5" }
     });
     const proxyPromise = proxy(request);
@@ -113,7 +114,7 @@ describe("proxy.ts coverage hardening", () => {
       .mockRejectedValueOnce(new Error("Network Error"))
       .mockRejectedValueOnce(new Error("Persistent failure"));
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: { cookie: "terms_version=2.5" }
     });
     const proxyPromise = proxy(request);
@@ -129,7 +130,7 @@ describe("proxy.ts coverage hardening", () => {
   it("covers clearSessionCookies line 21 (sb- auth cookies)", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: {
         cookie: "sb-example-auth-token=value"
       }
@@ -146,12 +147,12 @@ describe("proxy.ts coverage hardening", () => {
     // This is tricky because createServerClient is called inside proxy()
     // I'll mock createServerClient to return an object where auth is a getter that throws
     const { createServerClient } = await import("@supabase/ssr");
-    (createServerClient as any).mockReturnValueOnce({
+    vi.mocked(createServerClient).mockReturnValueOnce({
       get auth() { throw new Error("Unexpected auth failure"); },
       from: mockFrom
     });
 
-    const request = new NextRequest("http://localhost/dashboard");
+    const request = new NextRequest("https://localhost/dashboard");
     const response = await proxy(request);
     
     expect(response.status).toBe(307);
@@ -161,7 +162,7 @@ describe("proxy.ts coverage hardening", () => {
   it("covers getUserWithRetry non-transient error", async () => {
     mockGetUser.mockRejectedValueOnce(new Error("Fatal error"));
     
-    const request = new NextRequest("http://localhost/dashboard");
+    const request = new NextRequest("https://localhost/dashboard");
     const response = await proxy(request);
     
     expect(mockGetUser).toHaveBeenCalledTimes(1);
@@ -172,7 +173,7 @@ describe("proxy.ts coverage hardening", () => {
     // We need to trigger a redirect for an unauthenticated user to hit clearSessionCookies
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
     
-    const request = new NextRequest("http://localhost/dashboard");
+    const request = new NextRequest("https://localhost/dashboard");
     
     // Mock getAll to throw after the first call (which happens in createServerClient)
     let callCount = 0;
@@ -194,7 +195,7 @@ describe("proxy.ts coverage hardening", () => {
       error: null 
     });
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: { cookie: "terms_version=2.5" }
     });
     // No ezygo_access_token cookie in request
@@ -209,7 +210,7 @@ describe("proxy.ts coverage hardening", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-healing-fail" } }, error: null });
     mockMaybeSingle.mockRejectedValue(new Error("DB error"));
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: { cookie: "terms_version=2.5" }
     });
     const response = await proxy(request);
@@ -221,7 +222,7 @@ describe("proxy.ts coverage hardening", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-loop" } }, error: null });
     mockSingle.mockResolvedValue({ data: { terms_version: "1.0" }, error: null });
     
-    const request = new NextRequest("http://localhost/dashboard", {
+    const request = new NextRequest("https://localhost/dashboard", {
       headers: {
         cookie: "terms_redirect_count=3"
       }
@@ -238,7 +239,7 @@ describe("proxy.ts coverage hardening", () => {
       message: "Invalid Refresh Token"
     });
     
-    const request = new NextRequest("http://localhost/dashboard");
+    const request = new NextRequest("https://localhost/dashboard");
     const response = await proxy(request);
     expect(response.status).toBe(307);
   });
@@ -251,7 +252,7 @@ describe("proxy.ts coverage hardening", () => {
         .mockRejectedValueOnce({ status, message: "Gateway error" })
         .mockResolvedValueOnce({ data: { user: { id: "user-retry" } }, error: null });
       
-      const request = new NextRequest("http://localhost/dashboard");
+      const request = new NextRequest("https://localhost/dashboard");
       const proxyPromise = proxy(request);
       await vi.runAllTimersAsync();
       await proxyPromise;

@@ -64,7 +64,7 @@ function slot(
   attendance: number | null,
   course: number | null,
   class_type = "Regular",
-): Record<string, unknown> {
+): Record<string, number | string | null> {
   return { session, attendance, course, class_type };
 }
 
@@ -72,6 +72,9 @@ function slot(
 function k(n: number): string {
   return String(n);
 }
+
+/** Type for attendance data structure: {date -> {sessionNum -> slot}} */
+type AttendanceData = Record<string, Record<string, Record<string, number | string | null>>>;
 
 // ---------------------------------------------------------------------------
 // SCENARIO DATA
@@ -86,7 +89,7 @@ function k(n: number): string {
  *   • All 18 tracker entries deleted
  *   • 0 notifications (official positive + tracker positive → no "Attendance Updated" notification)
  */
-const CONFIRMED: Record<string, Record<string, any>> = {
+const CONFIRMED: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 72327), // 332 — correction, att=110 → official=110 → delete
     [k(4)]: slot(4, 225, 72327), // 333 — correction, att=225 → official=225 → delete
@@ -126,7 +129,7 @@ const CONFIRMED: Record<string, Record<string, any>> = {
  *   • 14 corrections stay (official absent + correction status → no action)
  *   • 4 extras conflict (334, 352, 354, 355) → 4 updates, 4 "Attendance Conflict 💀" notifications
  */
-const ALL_ABSENT: Record<string, Record<string, any>> = {
+const ALL_ABSENT: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 111, 72327), // 332 — correction → stays
     [k(4)]: slot(4, 111, 72327), // 333 — correction → stays
@@ -166,7 +169,7 @@ const ALL_ABSENT: Record<string, Record<string, any>> = {
  *   • 14 corrections deleted (no notifications)
  *   • 4 extras conflict → 4 updates, 4 "Attendance Conflict 💀" notifications
  */
-const EXTRA_CONFLICTS: Record<string, Record<string, any>> = {
+const EXTRA_CONFLICTS: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 72327), // 332 — correction → delete
     [k(4)]: slot(4, 225, 72327), // 333 — correction → delete
@@ -209,7 +212,7 @@ const EXTRA_CONFLICTS: Record<string, Record<string, any>> = {
  *   • 4 extras: course mismatch (official=99001 vs tracker=72323/72329/72327)
  *       → deleted + "Course Mismatch 💀" notification for each extra
  */
-const COURSE_MISMATCH: Record<string, Record<string, any>> = {
+const COURSE_MISMATCH: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 72327), // 332 — correction → delete
     [k(4)]: slot(4, 225, 72327), // 333 — correction → delete
@@ -249,7 +252,7 @@ const COURSE_MISMATCH: Record<string, Record<string, any>> = {
  *   • 14 corrections: course mismatch → deleted, NO notifications (status=correction, not extra)
  *   • 4 extras: course mismatch → deleted + "Course Mismatch 💀" notifications
  */
-const COURSE_MISMATCH_ALL: Record<string, Record<string, any>> = {
+const COURSE_MISMATCH_ALL: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 99001), // 332 — correction + mismatch → delete (no notif)
     [k(4)]: slot(4, 225, 99001), // 333 — correction + mismatch → delete (no notif)
@@ -290,7 +293,7 @@ const COURSE_MISMATCH_ALL: Record<string, Record<string, any>> = {
  *   • 14 corrections deleted (confirmed for all non-Dec-31 dates)
  *   • 334, 352, 354, 355 stay (Dec 31 is null → key skipped → no officialMap entry)
  */
-const NULL_SLOTS: Record<string, Record<string, any>> = {
+const NULL_SLOTS: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 72327),
     [k(4)]: slot(4, 225, 72327),
@@ -332,7 +335,7 @@ const NULL_SLOTS: Record<string, Record<string, any>> = {
  *   • 14 corrections deleted (confirmed for non-Dec-31 dates)
  *   • 334, 352, 354, 355 stay (Revision slots skipped → no officialMap key)
  */
-const REVISION: Record<string, Record<string, any>> = {
+const REVISION: AttendanceData = {
   ...NULL_SLOTS, // reuse non-Dec-31 confirmed data
   "2025-12-31": {
     [k(1)]: slot(1, 110, 72323, "Revision"), // 334 — Revision → skipped
@@ -349,7 +352,7 @@ const REVISION: Record<string, Record<string, any>> = {
  * Expected outcome:
  *   • 0 deletions, 0 updates, 0 notifications
  */
-const NO_RECORD: Record<string, Record<string, any>> = {};
+const NO_RECORD: AttendanceData = {};
 
 /**
  * `mixed` — Realistic combination of all outcomes in a single sync.
@@ -381,7 +384,7 @@ const NO_RECORD: Record<string, Record<string, any>> = {};
  *   • 3 notifications: 1 "Attendance Conflict 💀" (334), 2 "Course Mismatch 💀" (352, 354)
  *   • 1 item stays: 351 (null slot)
  */
-const MIXED: Record<string, Record<string, any>> = {
+const MIXED: AttendanceData = {
   "2025-10-24": {
     [k(3)]: slot(3, 110, 72327), // 332 confirmed → delete
     [k(4)]: slot(4, 225, 72327), // 333 confirmed → delete
@@ -419,20 +422,20 @@ const MIXED: Record<string, Record<string, any>> = {
 // Registry
 // ---------------------------------------------------------------------------
 
-const SCENARIOS: Record<string, Record<string, Record<string, any>>> = {
-  confirmed: CONFIRMED,
-  all_absent: ALL_ABSENT,
-  extra_conflicts: EXTRA_CONFLICTS,
-  course_mismatch: COURSE_MISMATCH,
-  course_mismatch_all: COURSE_MISMATCH_ALL,
-  null_slots: NULL_SLOTS,
-  revision: REVISION,
-  no_record: NO_RECORD,
-  mixed: MIXED,
-};
+const SCENARIOS = new Map<string, AttendanceData>([
+  ["confirmed", CONFIRMED],
+  ["all_absent", ALL_ABSENT],
+  ["extra_conflicts", EXTRA_CONFLICTS],
+  ["course_mismatch", COURSE_MISMATCH],
+  ["course_mismatch_all", COURSE_MISMATCH_ALL],
+  ["null_slots", NULL_SLOTS],
+  ["revision", REVISION],
+  ["no_record", NO_RECORD],
+  ["mixed", MIXED],
+]);
 
 /** Available scenario names (for logging / error messages). */
-export const AVAILABLE_SCENARIOS = Object.keys(SCENARIOS);
+export const AVAILABLE_SCENARIOS = Array.from(SCENARIOS.keys());
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -448,7 +451,7 @@ export interface EzygoMockResponses {
  * if the scenario name is not recognised.
  */
 export function getMockResponses(scenario: string): EzygoMockResponses | null {
-  const data = SCENARIOS[scenario];
+  const data = SCENARIOS.get(scenario);
   if (!data) return null;
 
   const coursesResponse = new Response(JSON.stringify(MOCK_COURSES), {

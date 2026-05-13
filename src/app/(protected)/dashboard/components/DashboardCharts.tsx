@@ -27,14 +27,26 @@ const AttendanceChart = dynamic(
 );
 
 interface DashboardChartsProps {
-  stats: any;
+  stats: {
+    realPresent: number;
+    correctionPresent: number;
+    extraPresent: number;
+    realAbsent: number;
+    savedAbsent: number;
+    extraAbsent: number;
+    realDL: number;
+    correctionDL: number;
+    extraDL: number;
+    otherLeave: number;
+    [key: string]: unknown;
+  };
   isLoadingAttendance: boolean;
-  attendanceData: any;
-  filteredChartData: any;
-  trackingData: any;
-  courseRegistry: any;
+  attendanceData: unknown;
+  filteredChartData: unknown;
+  trackingData: unknown;
+  courseRegistry: unknown;
   disabledCodes: Set<string>;
-  activeCourseCount: any;
+  activeCourseCount: { active: number; total: number; [key: string]: unknown };
   isLoadingCourses: boolean;
 }
 
@@ -49,6 +61,56 @@ export function DashboardCharts({
   activeCourseCount,
   isLoadingCourses,
 }: DashboardChartsProps) {
+  const renderChartContent = () => {
+    if (isLoadingAttendance) {
+      return (
+        <div className="flex flex-col gap-4 items-center justify-center h-full w-full">
+          <Skeleton className="h-full w-full rounded-xl" />
+        </div>
+      );
+    }
+
+    if (attendanceData) {
+      return (
+        <ErrorBoundary
+          fallback={
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">
+                Unable to load chart. Please try refreshing.
+              </p>
+            </div>
+          }
+        >
+          <AttendanceChart
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            attendanceData={filteredChartData as any}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            trackingData={trackingData as any}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            coursesData={{ courses: courseRegistry as any }}
+            disabledCodes={disabledCodes}
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground text-center">
+          <Image
+            src="/placeholder-chart.svg"
+            width={192}
+            height={192}
+            className="mx-auto opacity-20 mb-4 invert dark:invert-0"
+            alt=""
+            aria-hidden="true"
+          />
+          No attendance data available
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6 mb-6">
       <motion.div
@@ -68,46 +130,7 @@ export function DashboardCharts({
           </CardHeader>
           <CardContent className="flex-1 px-4 pt-2 pb-2">
             <div className="h-85 w-full">
-              {isLoadingAttendance
-                ? (
-                  <div className="flex flex-col gap-4 items-center justify-center h-full w-full">
-                    <Skeleton className="h-full w-full rounded-xl" />
-                  </div>
-                )
-                : attendanceData
-                ? (
-                  <ErrorBoundary
-                    fallback={
-                      <div className="flex items-center justify-center h-full">
-                        <p className="text-muted-foreground">
-                          Unable to load chart. Please try refreshing.
-                        </p>
-                      </div>
-                    }
-                  >
-                    <AttendanceChart
-                      attendanceData={filteredChartData}
-                      trackingData={trackingData}
-                      coursesData={{ courses: courseRegistry }}
-                      disabledCodes={disabledCodes}
-                    />
-                  </ErrorBoundary>
-                )
-                : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground text-center">
-                      <Image
-                        src="/placeholder-chart.svg"
-                        width={192}
-                        height={192}
-                        className="mx-auto opacity-20 mb-4 invert dark:invert-0"
-                        alt=""
-                        aria-hidden="true"
-                      />
-                      No attendance data available
-                    </p>
-                  </div>
-                )}
+              {renderChartContent()}
             </div>
           </CardContent>
         </Card>

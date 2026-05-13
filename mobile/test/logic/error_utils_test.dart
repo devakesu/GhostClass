@@ -1,8 +1,8 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:ghostclass/logic/error_utils.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/error_utils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   group('Error Utils - formatApiError', () {
@@ -23,24 +23,24 @@ void main() {
     });
 
     test('handles PostgrestException', () {
-      final peRls = PostgrestException(message: 'RLS violation', code: '42501');
+      const peRls = PostgrestException(message: 'RLS violation', code: '42501');
       expect(
         formatApiError(peRls, 'adding course'),
         "You don't have permission to add courses to this class. Ensure your profile sync is complete.",
       );
       expect(
         formatApiError(peRls, 'attendance'),
-        "Permission denied. You can only modify your own attendance records.",
+        'Permission denied. You can only modify your own attendance records.',
       );
       expect(
         formatApiError(peRls, 'other'),
         "You don't have permission to perform this action.",
       );
 
-      final peUnique = PostgrestException(message: 'Duplicate key', code: '23505');
+      const peUnique = PostgrestException(message: 'Duplicate key', code: '23505');
       expect(
         formatApiError(peUnique, 'attendance'),
-        "A record already exists for this date and session.",
+        'A record already exists for this date and session.',
       );
     });
 
@@ -55,7 +55,7 @@ void main() {
       );
       expect(
         formatApiError(dioErr, 'fetching'),
-        "EzyGo servers are currently down. Please try again later.",
+        'EzyGo servers are currently down. Please try again later.',
       );
 
       final dioStringErr = DioException(
@@ -69,7 +69,7 @@ void main() {
       );
       expect(
         formatApiError(dioStringErr, 'fetching'),
-        "Plain error message",
+        'Plain error message',
       );
     });
 
@@ -77,7 +77,7 @@ void main() {
       final mapErr = {'code': '429', 'message': 'Too many requests'};
       expect(
         formatApiError(mapErr, 'login'),
-        "Too many requests. Please wait a few moments and try again.",
+        'Too many requests. Please wait a few moments and try again.',
       );
     });
 
@@ -93,15 +93,15 @@ void main() {
     test('handles various specific error codes and messages', () {
       expect(
         formatApiError({'code': '23503'}, 'action'),
-        "The related record was not found or has been deleted.",
+        'The related record was not found or has been deleted.',
       );
       expect(
         formatApiError({'code': '22P02'}, 'action'),
-        "Invalid data format. Please check your input and try again.",
+        'Invalid data format. Please check your input and try again.',
       );
       expect(
         formatApiError({'message': 'Network error occurred'}, 'action'),
-        "Connection failed. Please check your internet and try again.",
+        'Connection failed. Please check your internet and try again.',
       );
     });
   });

@@ -8,16 +8,16 @@ import 'package:ghostclass/services/dio_service.dart';
 /// ---------------
 /// Manages device integrity checks and security attestation with the GhostClass backend.
 class SecurityService {
-  final Ref _ref;
-  static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
 
   SecurityService(this._ref);
+  final Ref _ref;
+  static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
   Future<void> verifyIntegrity() async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         '$_ghostclassBaseUrl/security/attestation',
         options: Options(extra: {'useLimitedToken': true}),
       );
@@ -25,9 +25,9 @@ class SecurityService {
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         if (data['verified'] != true) {
-          final String reason = data['reason'] ?? data['appCheckError'] ?? 'Device integrity check failed.';
-          final String action = data['action'] ?? 'Please ensure you are using a genuine version of GhostClass from the Play Store.';
-          final bool criticalRisk = data['criticalRisk'] == true;
+          final reason = (data['reason'] as String?) ?? (data['appCheckError'] as String?) ?? 'Device integrity check failed.';
+          final action = (data['action'] as String?) ?? 'Please ensure you are using a genuine version of GhostClass from the Play Store.';
+          final criticalRisk = data['criticalRisk'] == true;
 
           throw AppException(
             message: reason,
@@ -41,18 +41,18 @@ class SecurityService {
           );
         }
       } else {
-        throw AppException(
+        throw const AppException(
           message: 'Security verification unavailable',
           type: AppExceptionType.server,
         );
       }
     } on DioException catch (e) {
-      final appCheckError = e.requestOptions.extra['appCheckError'];
+      final appCheckError = e.requestOptions.extra['appCheckError'] as String?;
 
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
         final data = e.response?.data as Map<String, dynamic>?;
         final isSecurityType = data != null && data['type'] == 'security';
-        final backendReason = data?['reason'] ?? data?['error'] ?? data?['appCheckError'];
+        final backendReason = (data?['reason'] as String?) ?? (data?['error'] as String?) ?? (data?['appCheckError'] as String?);
 
         if (isSecurityType || appCheckError != null) {
           final action = data?['action'] ?? 'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';
@@ -77,7 +77,7 @@ class SecurityService {
   }
 
   Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) async {
-    return _dio.get(
+    return _dio.get<dynamic>(
       '$_ghostclassBaseUrl/security/attestation',
       options: Options(
         headers: {if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken'},
@@ -88,4 +88,4 @@ class SecurityService {
   }
 }
 
-final securityServiceProvider = Provider<SecurityService>((ref) => SecurityService(ref));
+final securityServiceProvider = Provider<SecurityService>(SecurityService.new);

@@ -78,12 +78,8 @@ export default function PublicLayout({
           // Browser support: Chrome 102+, Safari 15.5+, Firefox 112+ (March 2023+)
           // Graceful degradation: on older browsers the navbar is visually off-screen via
           // the CSS transform but remains keyboard-reachable (acceptable fallback).
-          {...((isHidden &&
-            typeof HTMLElement !== "undefined" &&
-            HTMLElement?.prototype &&
-            "inert" in HTMLElement.prototype
-              ? { inert: true }
-              : {}) as any)}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          {...((isHidden ? { inert: true } : {}) as any)}
         >
           <PublicNavbar />
         </motion.div>

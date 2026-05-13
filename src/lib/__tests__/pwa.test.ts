@@ -12,14 +12,12 @@ describe("isStandalonePWA", () => {
 
   afterEach(() => {
     global.window = originalWindow;
-    // @ts-ignore
     global.navigator = originalNavigator;
   });
 
   it("returns false in non-browser environment", () => {
     const windowBackup = global.window;
-    // @ts-ignore
-    delete global.window;
+    delete (global as any).window;
     try {
       expect(isStandalonePWA()).toBe(false);
     } finally {

@@ -61,7 +61,7 @@ class NetworkUtils {
         'NetworkUtils: Certificate mismatch. Expected: $expectedHost, Found: ${hostnames.join(", ")}',
       );
       return false;
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('NetworkUtils: Certificate validation error', e);
       return false;
     }
@@ -71,7 +71,7 @@ class NetworkUtils {
     try {
       final uri = Uri.parse(AppConfig.ghostclassApiUrl);
       return uri.host;
-    } catch (e) {
+    } on Object {
       return 'ghostclass.devakesu.com';
     }
   }
@@ -126,7 +126,7 @@ class NetworkUtils {
           }
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.w('NetworkUtils: Failed to parse SAN from certificate DER', e);
     }
 

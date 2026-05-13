@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class GhostClassSettingsCard extends StatelessWidget {
+
+  const GhostClassSettingsCard({
+    required this.icon, required this.label, required this.value, required this.color, required this.onTap, super.key,
+    this.isActive = true,
+    this.isFullWidth = false,
+    this.showToggle = false,
+    this.toggleValue,
+    this.onToggle,
+    this.isDisabled = false,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -13,21 +23,6 @@ class GhostClassSettingsCard extends StatelessWidget {
   final bool? toggleValue;
   final ValueChanged<bool>? onToggle;
   final bool isDisabled;
-
-  const GhostClassSettingsCard({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.onTap,
-    this.isActive = true,
-    this.isFullWidth = false,
-    this.showToggle = false,
-    this.toggleValue,
-    this.onToggle,
-    this.isDisabled = false,
-  });
 
   @override
   Widget build(BuildContext context) {

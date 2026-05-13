@@ -3,16 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 @immutable
 class GhostColors extends ThemeExtension<GhostColors> {
-  final Color? brandPurple;
-  final Color? brandPink;
-  final Color? accentOrange;
-  final Color? accentBlue;
-  final Color? accentCyan;
-  final Color? successGreen;
-  final Color? warningYellow;
-  final Color? dangerRed;
-  final Color? chartBar;
-  final Color? surfaceLighter;
 
   const GhostColors({
     required this.brandPurple,
@@ -26,6 +16,16 @@ class GhostColors extends ThemeExtension<GhostColors> {
     required this.chartBar,
     required this.surfaceLighter,
   });
+  final Color? brandPurple;
+  final Color? brandPink;
+  final Color? accentOrange;
+  final Color? accentBlue;
+  final Color? accentCyan;
+  final Color? successGreen;
+  final Color? warningYellow;
+  final Color? dangerRed;
+  final Color? chartBar;
+  final Color? surfaceLighter;
 
   Color? get brandPrimary => brandPink;
 
@@ -169,7 +169,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border, width: 1),
+          side: const BorderSide(color: AppColors.border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -203,8 +203,6 @@ class AppTheme {
       primaryColor: AppColors.brandPink,
       colorScheme: const ColorScheme.light(
         primary: AppColors.brandPink,
-        onPrimary: Colors.white,
-        surface: AppColors.lightSurface,
         onSurface: AppColors.lightPrimary,
         secondary: AppColors.lightMuted,
         onSecondary: AppColors.lightMutedForeground,
@@ -255,7 +253,7 @@ class AppTheme {
         shadowColor: Colors.black.withValues(alpha: 0.05),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.lightBorder, width: 1),
+          side: const BorderSide(color: AppColors.lightBorder),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

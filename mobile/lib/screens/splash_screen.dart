@@ -1,8 +1,10 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
@@ -11,7 +13,6 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,7 +27,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    final _ = _initializeApp();
   }
 
   Future<void> _initializeApp() async {
@@ -59,13 +60,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             return;
           }
           try {
-            precacheImage(NetworkImage(user.profile!.avatarUrl!), context);
-          } catch (e, st) {
+            final _ = precacheImage(
+              NetworkImage(
+                user.profile!.avatarUrl!,
+                headers: {
+                  'Origin': AppConfig.supabaseOrigin,
+                },
+              ),
+              context,
+            );
+          } on Object catch (e, st) {
             AppLogger.e('SplashScreen: Avatar pre-cache failed', e, st);
           }
         }),
       ]);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('SplashScreen: Initialization error', e);
 
       if (!mounted) return;
@@ -90,24 +99,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // Use backend-provided strings directly for the main message
         final dialogMessage = '$reason\n\n$action';
 
-        SecurityUtils.showSecurityFailureDialog(
+        final _ = SecurityUtils.showSecurityFailureDialog(
           context,
           title: criticalRisk
               ? 'Security Verification Failed'
               : 'Security Handshake Failed',
           message: dialogMessage,
           technicalDetails: sanitizeTechnicalDetails(
-            '${e.toString()}\n\n'
+            '$e\n\n'
             '${appCheckError != null ? "Local Error: $appCheckError" : ""}'
           ),
           retryLabel: criticalRisk ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
-          isDismissible: false,
         );
         return;
       }
 
-      List<String> messages = [];
+      var messages = <String>[];
       if (e is DioException) {
         final appEx = api.mapDioError(e);
         messages = [appEx.message];
@@ -134,7 +142,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         onRetry: () {
           // Trigger a fresh build of the Ref which will re-run _initializeApp
           ref.invalidate(authProvider);
-          _initializeApp();
+          final _ = _initializeApp();
         },
       );
       return;
@@ -166,14 +174,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .fade(duration: 400.ms)
             .scale(
               begin: const Offset(0.7, 0.7),
-              end: const Offset(1.0, 1.0),
+              end: const Offset(1, 1),
               duration: 400.ms,
               curve: Curves.easeOutBack,
             )
             .then() // Chain effects after the entrance
             .animate(onPlay: (controller) => controller.repeat(reverse: true))
             .scale(
-              begin: const Offset(1.0, 1.0),
+              begin: const Offset(1, 1),
               end: const Offset(1.05, 1.05),
               duration: 400.ms,
               curve: Curves.easeInOut,

@@ -33,6 +33,8 @@ interface ErrorResponse {
   message: string;
 }
 
+type LoginMethod = "username" | "email" | "phone";
+
 const PASSWORD_VALIDATION = {
   MIN_LENGTH: 6,
   MAX_LENGTH: 128,
@@ -47,23 +49,41 @@ const validatePassword = (password: string): string | null => {
   return null;
 };
 
-const loginMethodProps = {
-  username: {
-    label: "Username",
-    type: "text",
-    placeholder: "academic_weapon_fr",
-  },
-  email: {
-    label: "Email",
-    type: "email",
-    placeholder: "cooked@attendance.edu",
-  },
-  phone: {
-    label: "Phone",
-    type: "tel",
-    placeholder: "919234567890",
-  },
-};
+function getLoginMethodProps(method: LoginMethod) {
+  switch (method) {
+    case "email":
+      return {
+        label: "Email",
+        type: "email",
+        placeholder: "cooked@attendance.edu",
+      };
+    case "phone":
+      return {
+        label: "Phone",
+        type: "tel",
+        placeholder: "919234567890",
+      };
+    case "username":
+    default:
+      return {
+        label: "Username",
+        type: "text",
+        placeholder: "academic_weapon_fr",
+      };
+  }
+}
+
+function getStepSubtitle(step: "username" | "option" | "otp", loginMethod: LoginMethod): string {
+  switch (step) {
+    case "option":
+      return "Choose how to receive your reset code";
+    case "otp":
+      return "Enter the code and your new password";
+    case "username":
+    default:
+      return `Enter your ${getLoginMethodProps(loginMethod).label.toLowerCase()} to begin`;
+  }
+}
 
 interface ResetOptions {
   username: string;
@@ -71,6 +91,108 @@ interface ResetOptions {
     emails: string[];
     mobiles: string[];
   };
+}
+
+async function refreshCsrfTokenPostReset(): Promise<void> {
+  try {
+    const csrfRefreshRes = await fetch("/api/csrf", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (csrfRefreshRes.ok) {
+      const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+      if (typeof csrfData?.token === "string") {
+        setCsrfToken(csrfData.token); // keep sessionStorage in sync
+      }
+    } else {
+      logger.error("CSRF refresh after password reset returned non-OK status", {
+        context: "PasswordResetForm/handleResetSubmit",
+        status: csrfRefreshRes.status,
+      });
+      setCsrfToken(null);
+    }
+  } catch (csrfError) {
+    logger.error("CSRF refresh after password reset threw an error", {
+      context: "PasswordResetForm/handleResetSubmit",
+      error: csrfError instanceof Error ? csrfError.message : String(csrfError),
+    });
+    Sentry.captureException(csrfError);
+    setCsrfToken(null);
+  }
+}
+
+function writeCustomPostResetSettings(
+  userId: string,
+  settings: NonNullable<Parameters<typeof persistPostResetSettings>[1]>
+): void {
+  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean" ? settings.bunk_calculator_enabled : true;
+  const rawTarget = settings.target_percentage;
+
+  let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
+  if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
+    const normalizedTarget = Math.round(rawTarget);
+    if (normalizedTarget >= 1 && normalizedTarget <= 100) {
+      targetPercentage = normalizedTarget;
+    }
+  }
+
+  try {
+    sessionStorage.setItem(
+      "prefetchedSettings",
+      JSON.stringify({
+        userId,
+        settings: {
+          bunk_calculator_enabled: bunkEnabled,
+          target_percentage: targetPercentage,
+        },
+      })
+    );
+    localStorage.setItem(`showBunkCalc_${userId}`, bunkEnabled.toString());
+    localStorage.setItem(`targetPercentage_${userId}`, targetPercentage.toString());
+  } catch (storageError) {
+    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    logger.dev("Failed to write settings to storage after password reset", {
+      context: "PasswordResetForm/handleResetSubmit",
+      error: msg,
+    });
+  }
+}
+
+function writeDefaultPostResetSettings(userId: string): void {
+  try {
+    localStorage.setItem(`showBunkCalc_${userId}`, "true");
+    localStorage.setItem(`targetPercentage_${userId}`, DEFAULT_TARGET_PERCENTAGE.toString());
+  } catch (storageError) {
+    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    logger.dev("Failed to write default settings to storage after password reset", {
+      context: "PasswordResetForm/handleResetSubmit",
+      error: msg,
+    });
+  }
+  logger.dev("No settings returned from /api/auth/save-token; applied default settings for new user.", {
+    context: "PasswordResetForm/handleResetSubmit",
+  });
+}
+
+async function persistPostResetSettings(
+  supabase: ReturnType<typeof createClient>,
+  settings: { bunk_calculator_enabled?: boolean; target_percentage?: number } | undefined
+): Promise<void> {
+  const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+  if (getUserError || !user) {
+    logger.error("User session not available after password reset; skipping settings prefetch", {
+      context: "PasswordResetForm/handleResetSubmit",
+      error: getUserError,
+    });
+    return;
+  }
+
+  if (settings) {
+    writeCustomPostResetSettings(user.id, settings);
+  } else {
+    writeDefaultPostResetSettings(user.id);
+  }
 }
 
 export function PasswordResetForm({
@@ -92,9 +214,7 @@ export function PasswordResetForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [loginMethod, setLoginMethod] = useState<
-    "username" | "email" | "phone"
-  >("username");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("username");
 
   // Initialize CSRF token
   useCSRFToken();
@@ -169,7 +289,7 @@ export function PasswordResetForm({
       setError(passwordError);
       return;
     }
-    if (password !== passwordConfirmation) {
+    if (password.localeCompare(passwordConfirmation) !== 0) {
       setError("Passwords do not match.");
       return;
     }
@@ -192,111 +312,18 @@ export function PasswordResetForm({
         throw new Error("CSRF token unavailable – please reload the page and try again.");
       }
 
-      // Use plain axios for internal auth endpoint (not proxied through /api/backend/)
+      // Use plain axios for internal auth endpoint
       const saveTokenResponse = await axios.post(
         "/api/auth/save-token",
         { token },
         { headers: { [CSRF_HEADER]: csrfToken } }
       );
 
-      // POST /api/csrf calls regenerateCsrfToken() which always issues a new token.
-      // Done AFTER save-token so the new CSRF token is bound to the authenticated
-      // session (not the pre-login unauthenticated one). Non-fatal if this fails
-      // since the user is already logged in and will get a fresh CSRF on dashboard load.
-      try {
-        const csrfRefreshRes = await fetch("/api/csrf", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-        });
-        if (csrfRefreshRes.ok) {
-          const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
-          if (typeof csrfData?.token === "string") {
-            setCsrfToken(csrfData.token); // keep sessionStorage in sync
-          }
-        } else {
-          logger.error("CSRF refresh after password reset returned non-OK status", {
-            context: "PasswordResetForm/handleResetSubmit",
-            status: csrfRefreshRes.status,
-          });
-          // Clear potentially stale pre-auth CSRF token to avoid silent 403s
-          setCsrfToken(null);
-        }
-      } catch (csrfError) {
-        logger.error("CSRF refresh after password reset threw an error", {
-          context: "PasswordResetForm/handleResetSubmit",
-          error: csrfError instanceof Error ? csrfError.message : String(csrfError),
-        });
-        Sentry.captureException(csrfError);
-        // Clear potentially stale pre-auth CSRF token to avoid silent 403s
-        setCsrfToken(null);
-      }
+      await refreshCsrfTokenPostReset();
 
-      // Pre-populate settings from save-token response for immediate availability
-      // Eliminates the 5-10 second delay showing defaults on first post-reset load
-      const settings = saveTokenResponse.data?.settings;
+      await persistPostResetSettings(supabase, saveTokenResponse.data?.settings);
 
-      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-      if (getUserError || !user) {
-        logger.error("User session not available after password reset; skipping settings prefetch", {
-          context: "PasswordResetForm/handleResetSubmit",
-          error: getUserError,
-        });
-      } else if (settings) {
-        const bunkEnabled =
-          typeof settings.bunk_calculator_enabled === "boolean"
-            ? settings.bunk_calculator_enabled
-            : true;
-        const rawTarget = settings.target_percentage;
-
-        let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
-        if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
-          const normalizedTarget = Math.round(rawTarget);
-          if (normalizedTarget >= 1 && normalizedTarget <= 100) {
-            targetPercentage = normalizedTarget;
-          }
-        }
-
-        try {
-          sessionStorage.setItem(
-            "prefetchedSettings",
-            JSON.stringify({
-              userId: user.id,
-              settings: {
-                bunk_calculator_enabled: bunkEnabled,
-                target_percentage: targetPercentage,
-              },
-            })
-          );
-          localStorage.setItem(`showBunkCalc_${user.id}`, bunkEnabled.toString());
-          localStorage.setItem(`targetPercentage_${user.id}`, targetPercentage.toString());
-        } catch (storageError) {
-          logger.dev("Failed to write settings to storage after password reset", {
-            context: "PasswordResetForm/handleResetSubmit",
-            error: storageError instanceof Error ? storageError.message : String(storageError),
-          });
-        }
-      } else {
-        // No settings returned — write defaults to localStorage only
-        // (not sessionStorage.prefetchedSettings so the settings provider creates the DB row)
-        try {
-          if (user) {
-            localStorage.setItem(`showBunkCalc_${user.id}`, "true");
-            localStorage.setItem(`targetPercentage_${user.id}`, DEFAULT_TARGET_PERCENTAGE.toString());
-          }
-        } catch (storageError) {
-          logger.dev("Failed to write default settings to storage after password reset", {
-            context: "PasswordResetForm/handleResetSubmit",
-            error: storageError instanceof Error ? storageError.message : String(storageError),
-          });
-        }
-        logger.dev(
-          "No settings returned from /api/auth/save-token; applied default settings for new user.",
-          { context: "PasswordResetForm/handleResetSubmit" }
-        );
-      }
-
-      // Navigate to dashboard — NProgress finishes via NextTopLoader on navigation
+      // Navigate to dashboard
       router.push("/dashboard");
     } catch (error: unknown) {
       NProgress.done();
@@ -337,6 +364,8 @@ export function PasswordResetForm({
     },
   };
 
+  const currentMethodProps = getLoginMethodProps(loginMethod);
+
   return (
     <motion.div
       className={cn("flex flex-col gap-8 login-page", className)}
@@ -347,13 +376,7 @@ export function PasswordResetForm({
       <div className="flex flex-col items-center gap-2">
         <h2 className="text-2xl font-semibold">Reset Password</h2>
         <p className="text-center text-sm text-muted-foreground font-medium">
-          {step === "username"
-            ? `Enter your ${loginMethodProps[
-                loginMethod
-              ].label.toLowerCase()} to begin`
-            : step === "option"
-            ? "Choose how to receive your reset code"
-            : "Enter the code and your new password"}
+          {getStepSubtitle(step, loginMethod)}
         </p>
       </div>
 
@@ -362,7 +385,7 @@ export function PasswordResetForm({
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="login">
-                {loginMethodProps[loginMethod].label}
+                {currentMethodProps.label}
               </Label>
               <div className="flex gap-1">
                 <Button
@@ -399,7 +422,7 @@ export function PasswordResetForm({
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full custom-input"
-              placeholder={loginMethodProps[loginMethod].placeholder}
+              placeholder={currentMethodProps.placeholder}
               required
             />
           </div>
@@ -410,7 +433,7 @@ export function PasswordResetForm({
               className="flex-1 font-semibold min-h-11.5 mt-4 rounded-[12px] font-sm"
               onClick={onCancel}
             >
-              Cancel
+               Cancel
             </Button>
             <Button
               type="submit"

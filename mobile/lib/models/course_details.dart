@@ -1,11 +1,4 @@
 class CourseDetails {
-  final int id;
-  final String name;
-  final String? code;
-  final String? academicYear;
-  final String? academicSemester;
-  final String? userGroupName;
-  final List<CourseInstitutionUser> institutionUsers;
 
   const CourseDetails({
     required this.id,
@@ -17,20 +10,17 @@ class CourseDetails {
     this.institutionUsers = const [],
   });
 
-  String get safeId =>
-      (code != null && code!.trim().isNotEmpty) ? code!.trim() : id.toString();
-
   factory CourseDetails.fromJson(Map<String, dynamic> json) {
     String? userGroupName;
     final usersubgroup = json['usersubgroup'];
-    if (usersubgroup is Map) {
+    if (usersubgroup is Map<dynamic, dynamic>) {
       final usergroup = usersubgroup['usergroup'];
-      if (usergroup is Map) {
+      if (usergroup is Map<dynamic, dynamic>) {
         userGroupName = usergroup['name']?.toString();
       }
     }
 
-    final rawInstitutionUsers = json['institution_users'] as List? ?? const [];
+    final rawInstitutionUsers = json['institution_users'] as List<dynamic>? ?? const [];
 
     return CourseDetails(
       id: _toInt(json['id']) ?? 0,
@@ -40,7 +30,7 @@ class CourseDetails {
       academicSemester: json['academic_semester'] as String?,
       userGroupName: userGroupName ?? json['user_group_name'] as String?,
       institutionUsers: rawInstitutionUsers
-          .whereType<Map>()
+          .whereType<Map<dynamic, dynamic>>()
           .map(
             (value) =>
                 CourseInstitutionUser.fromJson(value.cast<String, dynamic>()),
@@ -48,6 +38,16 @@ class CourseDetails {
           .toList(),
     );
   }
+  final int id;
+  final String name;
+  final String? code;
+  final String? academicYear;
+  final String? academicSemester;
+  final String? userGroupName;
+  final List<CourseInstitutionUser> institutionUsers;
+
+  String get safeId =>
+      (code != null && code!.trim().isNotEmpty) ? code!.trim() : id.toString();
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -60,14 +60,10 @@ class CourseDetails {
 }
 
 class CourseInstitutionUser {
-  final String? firstName;
-  final String? lastName;
-  final CourseInstitutionUserPivot pivot;
 
   const CourseInstitutionUser({
-    this.firstName,
+    required this.pivot, this.firstName,
     this.lastName,
-    required this.pivot,
   });
 
   factory CourseInstitutionUser.fromJson(Map<String, dynamic> json) {
@@ -75,15 +71,17 @@ class CourseInstitutionUser {
       firstName: json['first_name'] as String?,
       lastName: json['last_name'] as String?,
       pivot: CourseInstitutionUserPivot.fromJson(
-        (json['pivot'] as Map?)?.cast<String, dynamic>() ??
+        (json['pivot'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ??
             const <String, dynamic>{},
       ),
     );
   }
+  final String? firstName;
+  final String? lastName;
+  final CourseInstitutionUserPivot pivot;
 }
 
 class CourseInstitutionUserPivot {
-  final int courseroleId;
 
   const CourseInstitutionUserPivot({required this.courseroleId});
 
@@ -92,6 +90,7 @@ class CourseInstitutionUserPivot {
       courseroleId: _toInt(json['courserole_id']) ?? 0,
     );
   }
+  final int courseroleId;
 }
 
 int? _toInt(dynamic value) {

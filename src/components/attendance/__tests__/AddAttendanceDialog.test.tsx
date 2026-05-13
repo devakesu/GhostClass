@@ -92,7 +92,7 @@ vi.mock("@/components/ui/select", () => ({
       )}
     </div>
   ),
-  SelectTrigger: ({ children, _onValueChange: _, ...props }: any) => (
+  SelectTrigger: ({ children, ...props }: any) => (
     <button type="button" {...props}>
       {children}
     </button>
@@ -189,7 +189,7 @@ describe("AddAttendanceDialog", () => {
 
   it("does not show DL reason input when Present is selected (default)", () => {
     render(<AddAttendanceDialog {...defaultProps} />);
-    expect(screen.queryByPlaceholderText("Programme/Activity")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Required for Duty Leave")).not.toBeInTheDocument();
   });
 
   it("shows DL reason input when Duty Leave is selected via radioGroupCallbackRef", async () => {
@@ -202,7 +202,7 @@ describe("AddAttendanceDialog", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Programme/Activity")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Required for Duty Leave")).toBeInTheDocument();
     });
   });
 
@@ -213,7 +213,7 @@ describe("AddAttendanceDialog", () => {
     act(() => {
       radioGroupCallbackRef.current?.("Duty Leave");
     });
-    const reasonInput = await screen.findByPlaceholderText("Programme/Activity");
+    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
 
     // Type a reason
     fireEvent.change(reasonInput, { target: { value: "Sports Day" } });
@@ -225,7 +225,7 @@ describe("AddAttendanceDialog", () => {
 
     // Input should disappear
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Programme/Activity")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Required for Duty Leave")).not.toBeInTheDocument();
     });
   });
 
@@ -236,15 +236,19 @@ describe("AddAttendanceDialog", () => {
       radioGroupCallbackRef.current?.("Duty Leave");
     });
 
-    const reasonInput = await screen.findByPlaceholderText("Programme/Activity");
+    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
     fireEvent.change(reasonInput, { target: { value: "NSS Camp" } });
 
-    // Input is still visible
-    expect(screen.getByPlaceholderText("Programme/Activity")).toBeInTheDocument();
+    // Input is still visible and has the updated value
+    expect(reasonInput).toBeInTheDocument();
+    expect(reasonInput).toHaveValue("NSS Camp");
   });
 
   it("submits with DL remarks ternary (DL branch) – covers remarks ternary new lines", async () => {
     render(<AddAttendanceDialog {...defaultProps} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     // Set session via the Select mock (click the "1st Hour" option)
     const sessionOptions = screen.getAllByRole("option");
@@ -263,11 +267,15 @@ describe("AddAttendanceDialog", () => {
     });
 
     // Type a custom DL reason
-    const reasonInput = await screen.findByPlaceholderText("Programme/Activity");
+    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
     fireEvent.change(reasonInput, { target: { value: "Annual Sports Meet" } });
 
-    // Submit the form
-    const submitBtn = screen.getByRole("button", { name: /submit and add attendance record/i });
+    // Wait for button to be enabled before clicking
+    const submitBtn = screen.getByRole("button", { name: /save record/i });
+    await waitFor(() => {
+      expect(submitBtn).not.toBeDisabled();
+    });
+
     fireEvent.click(submitBtn);
 
     // Insert should be called with the custom DL reason in remarks
@@ -293,7 +301,7 @@ describe("AddAttendanceDialog", () => {
     fireEvent.click(courseOption);
 
     // Status is Present (default) – non-DL branch
-    const submitBtn = screen.getByRole("button", { name: /submit and add attendance record/i });
+    const submitBtn = screen.getByRole("button", { name: /save record/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {

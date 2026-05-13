@@ -5,11 +5,6 @@ final securityFailureProvider = NotifierProvider<SecurityFailureNotifier, Securi
 );
 
 class SecurityFailureState {
-  final String message;
-  final bool criticalRisk;
-  final String? reason;
-  final String? action;
-  final String? source;
 
   const SecurityFailureState({
     required this.message,
@@ -18,6 +13,11 @@ class SecurityFailureState {
     this.action,
     this.source,
   });
+  final String message;
+  final bool criticalRisk;
+  final String? reason;
+  final String? action;
+  final String? source;
 }
 
 class SecurityFailureNotifier extends Notifier<SecurityFailureState?> {

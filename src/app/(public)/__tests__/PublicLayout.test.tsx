@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import PublicLayout from '../layout';
 import { useScroll } from 'framer-motion';
+import React from 'react';
 
 // Mock components
 vi.mock("@/components/layout/public-navbar", () => ({
@@ -15,13 +16,19 @@ vi.mock("@/components/toaster", () => ({
   Toaster: () => <div data-testid="toaster">Toaster</div>,
 }));
 vi.mock("@/components/error-boundary", () => ({
-  ErrorBoundary: ({ children }: any) => <div data-testid="error-boundary">{children}</div>,
+  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <div data-testid="error-boundary">{children}</div>,
 }));
 
 // Mock framer-motion
 vi.mock('framer-motion', async () => {
-  const React = await import('react');
-  const MotionDiv = React.forwardRef(({ children, animate, _variants, _transition, ...props }: any, ref: any) => (
+  const actualReact = await import('react');
+  interface MotionProps extends React.HTMLAttributes<HTMLDivElement> {
+    animate?: string;
+    inert?: boolean;
+    variants?: unknown;
+    transition?: unknown;
+  }
+  const MotionDiv = actualReact.forwardRef<HTMLDivElement, MotionProps>(({ children, animate, ...props }, ref) => (
     <div 
       ref={ref} 
       data-testid="motion-div" 
@@ -43,7 +50,7 @@ vi.mock('framer-motion', async () => {
 
 describe('PublicLayout', () => {
   let scrollCallback: (latest: number) => void;
-  const mockOn = vi.fn((event, callback) => {
+  const mockOn = vi.fn((event: string, callback: (latest: number) => void) => {
     if (event === 'change') {
       scrollCallback = callback;
     }
@@ -52,10 +59,11 @@ describe('PublicLayout', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0));
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 1));
     vi.mocked(useScroll).mockReturnValue({
-      scrollY: { on: mockOn } as any,
-    } as any);
+      scrollY: { on: mockOn },
+    } as unknown as ReturnType<typeof useScroll>);
   });
 
   it('renders children and core components', () => {
@@ -71,7 +79,7 @@ describe('PublicLayout', () => {
     expect(screen.getByTestId('child-content')).toBeDefined();
   });
 
-  it('handles scroll to hide/show navbar', async () => {
+  it('handles scroll to hide/show navbar', () => {
     render(
       <PublicLayout>
         <div>Content</div>
@@ -84,37 +92,33 @@ describe('PublicLayout', () => {
     // Scroll down > 150
     act(() => {
       scrollCallback(200);
+      vi.advanceTimersByTime(10);
     });
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('hidden');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('hidden');
 
     // Scroll up
     act(() => {
       scrollCallback(100);
+      vi.advanceTimersByTime(10);
     });
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('visible');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('visible');
     
     // Scroll down but not enough
     act(() => {
-        scrollCallback(120);
+      scrollCallback(120);
+      vi.advanceTimersByTime(10);
     });
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('visible');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('visible');
     
     // Scroll down enough again
     act(() => {
-        scrollCallback(250);
+      scrollCallback(250);
+      vi.advanceTimersByTime(10);
     });
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('hidden');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('hidden');
   });
 
-  it('handles inert property when hidden', async () => {
+  it('handles inert property when hidden', () => {
     // Mock the prototype check to return true for "inert" in HTMLElement.prototype
     Object.defineProperty(HTMLElement.prototype, 'inert', {
       configurable: true,
@@ -130,21 +134,18 @@ describe('PublicLayout', () => {
     // Hide it
     act(() => {
       scrollCallback(200);
+      vi.advanceTimersByTime(10);
     });
-    
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-is-inert')).toBe('true');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-is-inert')).toBe('true');
     
     // Show it
     act(() => {
       scrollCallback(100);
+      vi.advanceTimersByTime(10);
     });
-    await waitFor(() => {
-        expect(screen.getByTestId('motion-div').getAttribute('data-is-inert')).toBe('false');
-    });
+    expect(screen.getByTestId('motion-div').getAttribute('data-is-inert')).toBe('false');
 
     // Clean up
-    delete (HTMLElement.prototype as any).inert;
+    Reflect.deleteProperty(HTMLElement.prototype, 'inert');
   });
 });

@@ -1,23 +1,24 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SecurityGuard {
+
+  SecurityGuard(this.storage);
   final SecureStorageService storage;
   static const _channel = MethodChannel('com.devakesu.apps.ghostclass/security');
 
-  SecurityGuard(this.storage);
-
 
   /// Toggles screenshot/screen recording protection on Android.
-  Future<void> setSecureScreen(bool enabled) async {
+  Future<void> setSecureScreen({required bool enabled}) async {
     if (!Platform.isAndroid) return;
     try {
       await _channel.invokeMethod('setSecureScreen', {'enabled': enabled});
       AppLogger.d('SecurityGuard: secure screen ${enabled ? 'enabled' : 'disabled'}');
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('SecurityGuard: Failed to set secure screen', e);
     }
   }
@@ -32,7 +33,7 @@ class SecurityGuard {
       } else {
         exit(0);
       }
-    } catch (e) {
+    } on Object {
       exit(1);
     }
   }

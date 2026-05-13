@@ -28,6 +28,7 @@ const BatchRequestSchema = z.object({
 interface ExamDetails {
   questions: ExamQuestion[];
   answers: ExamAnswer[];
+  error?: string;
 }
 
 const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: BatchRequest }) => {
@@ -72,7 +73,7 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
   const { examIds } = validation.data;
 
   const limitedIds = examIds;
-  const results: Record<number, ExamDetails> = {};
+  const resultsMap = new Map<number, ExamDetails>();
 
   const promises = limitedIds.map(async (id: number) => {
     try {
@@ -83,23 +84,23 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
         fetchEzygoData<ExamAnswer[]>(`/exams/${id}/institutionuser/examanswers`, token)
       ]);
       
-      results[id] = {
+      resultsMap.set(id, {
         questions: questions || [],
         answers: answers || []
-      };
+      });
     } catch (_err) {
       logger.warn(`[scores-batch] Failed to fetch details for exam ${id}:`, _err);
-      results[id] = {
+      resultsMap.set(id, {
         questions: [],
         answers: [],
         error: _err instanceof Error ? _err.message : "Failed to fetch from EzyGo"
-      } as any;
+      });
     }
   });
 
   await Promise.all(promises);
 
-  return NextResponse.json(results);
+  return NextResponse.json(Object.fromEntries(resultsMap));
 };
 
 export const POST = withSecurity<BatchRequest>(handler);

@@ -52,8 +52,8 @@ describe('DeleteAccount Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (createClient as any).mockReturnValue(mockSupabase);
-    (useQueryClient as any).mockReturnValue(mockQueryClient);
+    vi.mocked(createClient).mockReturnValue(mockSupabase as never);
+    vi.mocked(useQueryClient).mockReturnValue(mockQueryClient as never);
   });
 
   it('renders correctly', () => {

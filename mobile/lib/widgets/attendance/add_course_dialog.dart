@@ -8,16 +8,14 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class AddCourseDialog extends ConsumerStatefulWidget {
+
+  const AddCourseDialog({
+    required this.semester, required this.academicYear, super.key,
+    this.className,
+  });
   final String semester;
   final String academicYear;
   final String? className;
-
-  const AddCourseDialog({
-    super.key,
-    required this.semester,
-    required this.academicYear,
-    this.className,
-  });
 
   @override
   ConsumerState<AddCourseDialog> createState() => _AddCourseDialogState();
@@ -57,7 +55,8 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       );
 
       if (res.statusCode != 200 && res.statusCode != 201) {
-        throw Exception(res.data['error'] ?? 'Failed to add course');
+        final dataMap = res.data as Map<String, dynamic>? ?? {};
+        throw Exception(dataMap['error'] ?? 'Failed to add course');
       }
 
       if (!mounted) return;
@@ -71,7 +70,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       ref.invalidate(dashboardProvider);
 
       Navigator.pop(context);
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       ServiceToast.show(context, e.toString(), isError: true);
     } finally {

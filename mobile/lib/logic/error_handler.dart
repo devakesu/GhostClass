@@ -1,7 +1,6 @@
-import 'package:flutter/services.dart';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
@@ -29,7 +28,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
         final action = data['action'] ?? 'Please try again later';
         final isCritical = data['criticalRisk'] == true;
 
-        String dialogMessage = '$reason';
+        var dialogMessage = '$reason';
         if (!isCritical) {
           dialogMessage +=
               '\n\n$action\n\nPlease try again after some time if you think this is a temporary glitch. If the issue persists, contact support.';
@@ -43,8 +42,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
           message: dialogMessage,
           technicalDetails: error.message,
           retryLabel: isCritical ? 'Close App' : 'Restart App',
-          onRetry: () => SystemNavigator.pop(),
-          isDismissible: false,
+          onRetry: SystemNavigator.pop,
         );
         return;
       }
@@ -68,8 +66,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
             technicalDetails:
                 '${error.type.name.toUpperCase()}: ${error.message}',
             retryLabel: 'Restart App',
-            onRetry: () => SystemNavigator.pop(),
-            isDismissible: false,
+            onRetry: SystemNavigator.pop,
           );
           return;
         }

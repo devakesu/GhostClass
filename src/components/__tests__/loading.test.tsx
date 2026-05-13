@@ -18,7 +18,7 @@ describe('Loading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    // @ts-ignore
+    // @ts-expect-error - test-only: simulate missing DOM APIs
     delete window.location;
      (window as any).location = { ...originalLocation, reload: vi.fn() };
   });

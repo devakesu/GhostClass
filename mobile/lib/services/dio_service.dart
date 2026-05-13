@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
-
 import 'package:ghostclass/services/jwe_interceptor.dart';
-import 'package:ghostclass/services/stealth_headers_service.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:sentry_dio/sentry_dio.dart';
 
 /// DioService
@@ -18,23 +18,9 @@ import 'package:sentry_dio/sentry_dio.dart';
 /// Manages Dio instances for standard and security-sensitive requests.
 /// Configures interceptors for JWE, Sentry, and authentication headers.
 class DioService {
-  final Ref _ref;
-  late final Dio dio;
-  late final Dio securityDio;
-  
-  static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
-
-  final _unauthorizedController = StreamController<void>.broadcast();
-  Stream<void> get onUnauthorized => _unauthorizedController.stream;
-
-  final _lockdownController = StreamController<Map<String, String>>.broadcast();
-  Stream<Map<String, String>> get onSecurityLockdown => _lockdownController.stream;
-  
-  bool suppress401 = false;
-  DateTime? _last401Broadcast;
 
   DioService(this._ref) {
-    final timeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
+    const timeout = kDebugMode ? Duration(seconds: 40) : Duration(seconds: 20);
     
     dio = Dio(
       BaseOptions(
@@ -59,13 +45,11 @@ class DioService {
 
     if (kDebugMode) {
       (securityDio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-        return client;
+        return HttpClient()..badCertificateCallback = (cert, host, port) => true;
       };
     }
 
-    dio.interceptors.add(JweInterceptor(_ref));
+    dio.interceptors.add(JweInterceptor());
     dio.addSentry();
     securityDio.addSentry();
     
@@ -93,15 +77,15 @@ class DioService {
           }
           return handler.next(response);
         },
-        onError: (DioException e, handler) {
+        onError: (e, handler) {
           if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
             final data = e.response?.data;
             if (data is Map<String, dynamic> && data['criticalRisk'] == true) {
               AppLogger.e('DioService: CRITICAL SECURITY RISK DETECTED: ${data['error']}');
               _lockdownController.add({
-                'title': data['error'] ?? 'Security Handshake Failed',
-                'reason': data['reason'] ?? 'Device verification failed.',
-                'action': data['action'] ?? 'Please reinstall the app.',
+                'title': (data['error'] as String?) ?? 'Security Handshake Failed',
+                'reason': (data['reason'] as String?) ?? 'Device verification failed.',
+                'action': (data['action'] as String?) ?? 'Please reinstall the app.',
                 'technicalDetails': 'Context: ${e.requestOptions.path}\nResponse: ${jsonEncode(data)}',
               });
               return handler.reject(e); // Stop further processing
@@ -117,10 +101,24 @@ class DioService {
     );
 
     _ref.onDispose(() {
-      _unauthorizedController.close();
-      _lockdownController.close();
+      final _ = _unauthorizedController.close();
+      final _ = _lockdownController.close();
     });
   }
+  final Ref _ref;
+  late final Dio dio;
+  late final Dio securityDio;
+  
+  static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
+
+  final _unauthorizedController = StreamController<void>.broadcast();
+  Stream<void> get onUnauthorized => _unauthorizedController.stream;
+
+  final _lockdownController = StreamController<Map<String, String>>.broadcast();
+  Stream<Map<String, String>> get onSecurityLockdown => _lockdownController.stream;
+  
+  bool suppress401 = false;
+  DateTime? _last401Broadcast;
 
   void _handle401(RequestOptions options) {
     if (suppress401) return;
@@ -151,11 +149,11 @@ class DioService {
         AppLogger.w('DioService: App Check token is empty or null');
         options.extra['appCheckError'] = 'App Check token is empty - verify Firebase activation';
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.w('DioService: Security headers failed: $e');
       options.extra['appCheckError'] = e.toString();
     }
   }
 }
 
-final dioServiceProvider = Provider<DioService>((ref) => DioService(ref));
+final dioServiceProvider = Provider<DioService>(DioService.new);

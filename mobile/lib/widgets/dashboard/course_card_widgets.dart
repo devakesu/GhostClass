@@ -5,27 +5,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class StatBox extends StatelessWidget {
+
+  const StatBox({
+    required this.label, required this.base, required this.color, super.key,
+    this.correction,
+    this.extra,
+  });
   final String label;
   final int base;
   final int? correction;
   final int? extra;
   final Color color;
 
-  const StatBox({
-    super.key,
-    required this.label,
-    required this.base,
-    required this.color,
-    this.correction,
-    this.extra,
-  });
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ghostColors = Theme.of(context).extension<GhostColors>();
     
-    final int total = base + (correction ?? 0) + (extra ?? 0);
+    final total = base + (correction ?? 0) + (extra ?? 0);
 
     return Expanded(
       child: Semantics(
@@ -101,8 +98,8 @@ class StatBox extends StatelessWidget {
 }
 
 class SimpleBunkPanel extends StatelessWidget {
+  const SimpleBunkPanel({required this.result, super.key});
   final utils.AttendanceResult result;
-  const SimpleBunkPanel({super.key, required this.result});
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +107,11 @@ class SimpleBunkPanel extends StatelessWidget {
         ? (Theme.of(context).extension<GhostColors>()?.successGreen ?? Colors.green)
         : (Theme.of(context).extension<GhostColors>()?.dangerRed ?? Colors.red);
 
-    final String message = result.canBunk > 0
+    final message = result.canBunk > 0
         ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class' : 'classes'}'
         : result.requiredToAttend > 0
             ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class' : 'classes'}'
-            : 'You are on the edge. Skipping now\'s risky';
+            : "You are on the edge. Skipping now's risky";
 
     return Semantics(
       label: 'Attendance summary: $message',
@@ -131,7 +128,7 @@ class SimpleBunkPanel extends StatelessWidget {
               ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class 🥳' : 'classes 🥳🥳'}'
               : result.requiredToAttend > 0
                   ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
-                  : 'You are on the edge. Skipping now\'s risky 💀💀',
+                  : "You are on the edge. Skipping now's risky 💀💀",
           textAlign: TextAlign.center,
           style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w800, color: color),
         ),
@@ -141,13 +138,13 @@ class SimpleBunkPanel extends StatelessWidget {
 }
 
 class SafeBunkPanel extends StatelessWidget {
+  const SafeBunkPanel({required this.result, super.key});
   final utils.AttendanceResult result;
-  const SafeBunkPanel({super.key, required this.result});
 
   @override
   Widget build(BuildContext context) {
     final blue = Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue;
-    final String message = result.canBunk > 0 
+    final message = result.canBunk > 0 
         ? 'Safely bunkable: ${result.canBunk} classes based on official data'
         : result.requiredToAttend > 0 
             ? 'Must attend: ${result.requiredToAttend} classes to reach target'
@@ -199,14 +196,14 @@ class SafeBunkPanel extends StatelessWidget {
 }
 
 class TrackingBunkPanel extends StatelessWidget {
+  const TrackingBunkPanel({required this.result, super.key, this.isSolo = false});
   final utils.AttendanceResult result;
   final bool isSolo;
-  const TrackingBunkPanel({super.key, required this.result, this.isSolo = false});
 
   @override
   Widget build(BuildContext context) {
     final purple = Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Colors.purple;
-    final String message = result.canBunk > 0 
+    final message = result.canBunk > 0 
         ? 'Tracking bunkable: ${result.canBunk} classes including local data'
         : result.requiredToAttend > 0 
             ? 'Tracking must attend: ${result.requiredToAttend} classes'
@@ -258,18 +255,17 @@ class TrackingBunkPanel extends StatelessWidget {
 }
 
 class CourseToggleBadge extends StatelessWidget {
-  final bool isEnabled;
-  final bool noData;
-  final bool isTracking;
-  final VoidCallback? onTap;
 
   const CourseToggleBadge({
-    super.key,
-    required this.isEnabled,
+    required this.isEnabled, super.key,
     this.noData = false,
     this.isTracking = false,
     this.onTap,
   });
+  final bool isEnabled;
+  final bool noData;
+  final bool isTracking;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

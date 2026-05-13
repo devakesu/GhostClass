@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
@@ -42,7 +42,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
         LoadingOverlay.hide(context);
         context.go('/dashboard');
       }
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.eWithContext(
         'AcceptTermsScreen: Accept terms failed',
         error: e,
@@ -75,7 +75,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -195,7 +195,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
 
               // Full Policy Link (Moved outside)
               GestureDetector(
-                onTap: () => context.push('/legal'),
+                onTap: () { final _ = context.push('/legal'); },
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -301,7 +301,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (_accepted && !_isLoading) ? _handleAccept : null,
+                  onPressed: (_accepted && !_isLoading) ? () { final _ = _handleAccept(); } : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primary,
                     foregroundColor: Colors.white,

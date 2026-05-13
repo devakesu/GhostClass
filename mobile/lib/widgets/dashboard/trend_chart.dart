@@ -5,16 +5,14 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrendChartSection extends StatefulWidget {
+
+  const TrendChartSection({
+    required this.stats, required this.targetPercentage, super.key,
+    this.disabledCodes = const {},
+  });
   final DashboardStats stats;
   final double targetPercentage;
   final Set<String> disabledCodes;
-
-  const TrendChartSection({
-    super.key,
-    required this.stats,
-    required this.targetPercentage,
-    this.disabledCodes = const {},
-  });
 
   @override
   State<TrendChartSection> createState() => _TrendChartSectionState();
@@ -32,7 +30,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
         .where((p) => p > 0)
         .toList();
 
-    double minRef = widget.targetPercentage;
+    var minRef = widget.targetPercentage;
     if (nonZero.isNotEmpty) {
       final absMin = nonZero.reduce((a, b) => a < b ? a : b);
       minRef = absMin < widget.targetPercentage
@@ -72,9 +70,9 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 
     // Calculate fixed vertical position at the top of the bar
     final yMinVal = _calculateYMin();
-    const double maxYVal = 100.0;
+    const maxYVal = 100;
     final chartSize = box.size;
-    const double bottomReserved = 80.0;
+    const bottomReserved = 80;
     final dataAreaHeight = chartSize.height - bottomReserved;
 
     final barValue = spot.touchedRodData.toY;
@@ -119,8 +117,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
-    final double yMin = _calculateYMin();
-    const double maxY = 100.0;
+    final yMin = _calculateYMin();
+    const maxY = 100.0;
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -193,7 +191,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                       touchCallback: _onTouch,
                     ),
                     titlesData: FlTitlesData(
-                      show: true,
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
@@ -250,14 +247,13 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                         ),
                       ),
                       topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
+                        
                       ),
                       rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
+                        
                       ),
                     ),
                     gridData: FlGridData(
-                      show: true,
                       drawVerticalLine: false,
                       horizontalInterval: 5,
                       getDrawingHorizontalLine: (_) => FlLine(
@@ -273,7 +269,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                         HorizontalLine(
                           y: widget.targetPercentage,
                           color: Colors.amber.shade700,
-                          strokeWidth: 2,
                           dashArray: [5, 5],
                           label: HorizontalLineLabel(
                             show: true,
@@ -308,26 +303,26 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                         context,
                       ).extension<GhostColors>();
                       
-                      final Color baseColor = isSafe
+                      final baseColor = isSafe
                           ? (ghostColors?.successGreen ?? const Color(0xFF10B981))
                           : (ghostColors?.dangerRed ?? const Color(0xFFEF4444));
                       
-                      final bool extraIsDanger = isLoss || !isSafe;
-                      final Color extraColor = extraIsDanger
+                      final extraIsDanger = isLoss || !isSafe;
+                      final extraColor = extraIsDanger
                           ? (ghostColors?.dangerRed ?? const Color(0xFFEF4444))
                           : (ghostColors?.successGreen ?? const Color(0xFF10B981));
 
-                      final Color brightLine = extraColor.withValues(alpha: 0.75);
-                      final Color faintGap = extraColor.withValues(alpha: 0.15);
+                      final brightLine = extraColor.withValues(alpha: 0.75);
+                      final faintGap = extraColor.withValues(alpha: 0.15);
                       
                       // Pre-calculate stops to avoid recreating them in the loop
                       final hatchColors = <Color>[];
                       final hatchStops = <double>[];
-                      const int n = 16; // Optimized frequency
-                      for (int j = 0; j < n; j++) {
-                        final double s0 = j / n;
-                        final double mid = (j + 0.25) / n;
-                        final double s1 = (j + 1) / n;
+                      const n = 16; // Optimized frequency
+                      for (var j = 0; j < n; j++) {
+                        final s0 = j / n;
+                        final mid = (j + 0.25) / n;
+                        final s1 = (j + 1) / n;
                         hatchColors.addAll([brightLine, brightLine, faintGap, faintGap]);
                         hatchStops.addAll([s0, mid, mid, s1]);
                       }
@@ -350,8 +345,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                               show: totalVal > 0,
                               toY: totalVal,
                               gradient: LinearGradient(
-                                begin: const Alignment(-1.0, 1.0),
-                                end: const Alignment(1.0, -1.0),
+                                begin: Alignment.bottomLeft,
+                                end: Alignment.topRight,
                                 colors: hatchColors,
                                 stops: hatchStops,
                               ),
@@ -384,10 +379,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 }
 
 class _LocalChartTooltip extends StatelessWidget {
-  final CourseStat stat;
-  final double targetPercentage;
-  final Offset chartOffset;
-  final Offset chartOriginInCard;
 
   const _LocalChartTooltip({
     required this.stat,
@@ -395,6 +386,10 @@ class _LocalChartTooltip extends StatelessWidget {
     required this.chartOffset,
     required this.chartOriginInCard,
   });
+  final CourseStat stat;
+  final double targetPercentage;
+  final Offset chartOffset;
+  final Offset chartOriginInCard;
 
   @override
   Widget build(BuildContext context) {
@@ -402,19 +397,19 @@ class _LocalChartTooltip extends StatelessWidget {
     const double h = 85; 
     
     // The touch position in card coordinates
-    final double centerX = chartOriginInCard.dx + chartOffset.dx;
-    final double barTopY = chartOriginInCard.dy + chartOffset.dy;
+    final centerX = chartOriginInCard.dx + chartOffset.dx;
+    final barTopY = chartOriginInCard.dy + chartOffset.dy;
 
     // Card constraints: 320 height, width is screen.width - 40
     final screenWidth = MediaQuery.of(context).size.width;
     final cardWidth = screenWidth - 40;
-    final cardHeight = 320.0;
+    const cardHeight = 320.0;
 
     // Horizontal positioning clamped inside the card
-    double left = (centerX - w / 2).clamp(8.0, cardWidth - w - 8);
+    final left = (centerX - w / 2).clamp(8.0, cardWidth - w - 8);
 
     // Vertical positioning: Prefer above the bar top
-    double top = barTopY - h - 12;
+    var top = barTopY - h - 12;
     if (top < 8) {
       // Flip below if not enough space at top of card
       top = barTopY + 12;

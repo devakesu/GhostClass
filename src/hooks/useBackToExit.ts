@@ -4,48 +4,9 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { isStandalonePWA } from "@/lib/pwa";
 
-/**
- * Double-back-to-exit for standalone PWA.
- *
- * Behaviour
- * ---------
- * - Non-dashboard, non-sentinel backs count toward deep mode.
- * - After two qualifying deep-mode backs, an exit toast is shown.
- * - Another qualifying back within THRESHOLD_MS in deep mode exits the app.
- * - Back press at root (sentinel hit) arms root mode, shows toast, and re-pushes clean top.
- * - Second root-mode back within THRESHOLD_MS exits the app; otherwise it is treated as a fresh first root press.
- *
- * Sentinel mechanism
- * ------------------
- * The hook marks the current (root) history entry by merging __gce:true into
- * it via `replaceState`, then pushes a clean "top" entry above it:
- *
- *   [...real history, <root __gce:true>, <top clean> ← user starts here]
- *
- * When the user navigates within the app, normal entries pile up above "top
- * clean". Back-pressing through those entries fires `popstate` with states
- * that have NO sentinel key → on a dashboard route the press is ignored;
- * on any other route it counts toward deep-mode (see Behaviour above).
- *
- * When the user backs all the way to the __gce-marked root entry, `popstate`
- * fires with event.state containing __gce:true → toast is shown and a new
- * clean top is re-pushed so the next press within the threshold can also be
- * caught. The clean top is derived by stripping __gce from event.state, so
- * existing Next.js router metadata in history.state is always preserved.
- *
- * Only activates in standalone / installed PWA mode so it never interferes
- * with regular browser navigation.
- */
-
 const THRESHOLD_MS = 2000;
 const SENTINEL_KEY = "__gce";
 
-/**
- * Module-level flag prevents double-initialization across React StrictMode /
- * HMR re-mount cycles. The module is shared across remounts within the same
- * app session, so a single boolean is sufficient. `vi.resetModules()` in
- * tests resets this automatically for each test run.
- */
 let sentinelInitialized = false;
 
 function getHistoryState(): Record<string, unknown> {
@@ -59,30 +20,22 @@ export function useBackToExit(): void {
   const toastIdRef = useRef<ReturnType<typeof toast> | null>(null);
   const exitArmedRef = useRef(false);
   const exitModeRef = useRef<"root" | "deep" | null>(null);
-  // Counts qualifying non-sentinel back presses on non-dashboard routes since
-  // the last sentinel hit, dashboard visit, or clearState call (toast expiry).
-  // Incremented after any exit-state resets so each new sequence starts at 1.
-  // After two qualifying presses the deep-mode exit toast is shown.
   const navDepthRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isStandalonePWA()) return;
 
-    // Sentinel setup (runs exactly once per app session via sentinelInitialized):
-    //   1. Merge __gce:true into the current (root) history entry — preserves
-    //      any existing Next.js router state already in history.state.
-    //   2. Push a clean "top" entry (root state minus __gce) above it.
-    // Back from the clean top → popstate fires with root state (__gce:true) → detected!
     if (!sentinelInitialized) {
       sentinelInitialized = true;
       const rootState = getHistoryState();
-      history.replaceState({ ...rootState, [SENTINEL_KEY]: true }, "", window.location.href);
+      history.replaceState(
+        { ...rootState, [SENTINEL_KEY]: true },
+        "",
+        window.location.href
+      );
       history.pushState(rootState, "", window.location.href);
     }
 
-    // Resets all exit-state refs WITHOUT dismissing the active toast.
-    // Used by onDismiss/onAutoClose where the toast is already leaving,
-    // so calling toast.dismiss() again would be re-entrant.
     const clearState = () => {
       toastIdRef.current = null;
       firstBackTimeRef.current = null;
@@ -101,117 +54,91 @@ export function useBackToExit(): void {
     const showExitToast = () => {
       if (toastIdRef.current !== null) {
         const previousToastId = toastIdRef.current;
-        // Detach first so callbacks from the previous toast cannot clear the
-        // new state during a dismiss + recreate cycle.
         toastIdRef.current = null;
         toast.dismiss(previousToastId);
       }
 
-      // Capture the id in a closure so that if this toast is dismissed before
-      // its callbacks fire (e.g. during an exit animation after a rapid
-      // dismiss+create cycle), the stale callback won't clear state that
-      // already belongs to the newer, active toast.
-      let newToastId: ReturnType<typeof toast> | null = null;
+      let newId: ReturnType<typeof toast> | null = null;
       const handleClear = () => {
-        if (toastIdRef.current === newToastId) {
-          clearState();
-        }
+        if (toastIdRef.current === newId) clearState();
       };
 
-      newToastId = toast("Press back again to exit", {
+      newId = toast("Press back again to exit", {
         duration: THRESHOLD_MS,
         onDismiss: handleClear,
         onAutoClose: handleClear,
       });
 
-      toastIdRef.current = newToastId;
+      toastIdRef.current = newId;
     };
 
-    const handlePopState = (event: PopStateEvent) => {
-      // Ignore mid-app back presses — their state doesn't carry a true sentinel.
-      // Strict === true check avoids accidental matches if __gce ever appears
-      // with a falsy value in some other history entry.
-      if (
-        !event.state ||
-        typeof event.state !== "object" ||
-        (event.state as Record<string, unknown>)[SENTINEL_KEY] !== true
-      ) {
-        const isDashboardRoute = window.location.pathname.startsWith("/dashboard");
-
-        if (!isDashboardRoute) {
-          const now = Date.now();
-
-          if (exitModeRef.current === "root") {
-            resetExitState();
-          }
-
-          if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current !== null) {
-            if (now - firstBackTimeRef.current < THRESHOLD_MS) {
-              resetExitState();
-              window.close();
-              return;
-            }
-
-            resetExitState();
-          }
-
-          // Increment after any resets so the count begins at 1 in each new
-          // sequence; navDepthRef.current is 0 after clearState / resetExitState.
-          navDepthRef.current += 1;
-
-          // Outside dashboard: after two qualifying back presses, show toast.
-          // Next qualifying back within threshold closes the standalone app.
-          if (navDepthRef.current >= 2) {
-            firstBackTimeRef.current = now;
-            exitArmedRef.current = true;
-            exitModeRef.current = "deep";
-            showExitToast();
-          }
-          return;
-        }
-
-        // Dashboard route: reset depth and any pending non-dashboard exit state.
+    const handleDeepExit = (now: number) => {
+      const isDashboard = window.location.pathname.startsWith("/dashboard");
+      if (isDashboard) {
         resetExitState();
         return;
       }
 
-      // Sentinel hit: user backed all the way to the root entry. Always reset
-      // navDepthRef here, regardless of whether the arm/close branch fires,
-      // so deep-mode counting restarts cleanly from the root position.
+      if (exitModeRef.current === "root") resetExitState();
+
+      if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current) {
+        if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+          resetExitState();
+          window.close();
+          return;
+        }
+        resetExitState();
+      }
+
+      navDepthRef.current += 1;
+      if (navDepthRef.current >= 2) {
+        firstBackTimeRef.current = now;
+        exitArmedRef.current = true;
+        exitModeRef.current = "deep";
+        showExitToast();
+      }
+    };
+
+    const handleSentinelHit = (state: Record<string, unknown>, now: number) => {
       navDepthRef.current = 0;
-
-      const now = Date.now();
-
       if (
         exitArmedRef.current &&
         exitModeRef.current === "root" &&
-        firstBackTimeRef.current !== null &&
+        firstBackTimeRef.current &&
         now - firstBackTimeRef.current < THRESHOLD_MS
       ) {
-        // Second back at root within threshold — close the PWA.
         resetExitState();
         window.close();
         return;
       }
 
-      // First back at root (or threshold expired).
-      // Derive a clean top state by stripping __gce from the sentinel entry
-      // so Next.js router metadata is kept on the re-pushed entry.
       firstBackTimeRef.current = now;
       exitArmedRef.current = true;
       exitModeRef.current = "root";
-      const { [SENTINEL_KEY]: _sentinel, ...cleanState } =
-        event.state as Record<string, unknown>;
+
+      const cleanState = { ...state };
+      Reflect.deleteProperty(cleanState, SENTINEL_KEY);
+      
       history.pushState(cleanState, "", window.location.href);
       showExitToast();
+    };
+
+    const handlePopState = (event: PopStateEvent) => {
+      const now = Date.now();
+      const state = event.state as Record<string, unknown> | null;
+      const hasSentinel = state && typeof state === "object" && Reflect.get(state, SENTINEL_KEY) === true;
+
+      if (!hasSentinel) {
+        handleDeepExit(now);
+      } else {
+        handleSentinelHit(state, now);
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
-      // Dismiss any active toast and reset refs so stale UI is never left
-      // behind after unmount (e.g. during HMR or StrictMode double-effect).
       resetExitState();
     };
   }, []);

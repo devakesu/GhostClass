@@ -21,7 +21,7 @@ class SecurityUtils {
     bool isDismissible = false,
   }) async {
     final deviceInfo = DeviceInfoPlugin();
-    String deviceDetails = 'Unknown Device';
+    var deviceDetails = 'Unknown Device';
 
     try {
       if (Platform.isAndroid) {
@@ -31,13 +31,14 @@ class SecurityUtils {
         final iosInfo = await deviceInfo.iosInfo;
         deviceDetails = 'iOS ${iosInfo.systemVersion}, ${iosInfo.name}, Model: ${iosInfo.model}';
       }
-    } catch (_) {}
+    } on Object {
+      // Ignore device info retrieval failures gracefully.
+    }
 
     if (!context.mounted) return;
 
     await showGeneralDialog(
       context: context,
-      barrierDismissible: false,
       barrierLabel: 'Security Error',
       barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 300),

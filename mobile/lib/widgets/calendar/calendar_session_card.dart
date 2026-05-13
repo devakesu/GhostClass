@@ -4,20 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CalendarEvent {
-  final String courseName;
-  final String? courseCode;
-  final String displaySessionName;
-  final String rawSessionKey;
-  final String status;
-  final String? originalStatus;
-  final Color color;
-  final bool isCorrection;
-  final bool isExtra;
-  final String courseId;
-  final String dbDate;
-  final int? trackingId;
-  final bool isDisabled;
-  final String? remarks;
 
   const CalendarEvent({
     required this.courseName,
@@ -35,21 +21,34 @@ class CalendarEvent {
     this.trackingId,
     this.remarks,
   });
+  final String courseName;
+  final String? courseCode;
+  final String displaySessionName;
+  final String rawSessionKey;
+  final String status;
+  final String? originalStatus;
+  final Color color;
+  final bool isCorrection;
+  final bool isExtra;
+  final String courseId;
+  final String dbDate;
+  final int? trackingId;
+  final bool isDisabled;
+  final String? remarks;
 }
 
 class CalendarSessionCard extends StatelessWidget {
-  final CalendarEvent event;
-  final VoidCallback? onMarkPresent;
-  final VoidCallback? onMarkDl;
-  final VoidCallback? onDelete;
 
   const CalendarSessionCard({
-    super.key,
-    required this.event,
+    required this.event, super.key,
     this.onMarkPresent,
     this.onMarkDl,
     this.onDelete,
   });
+  final CalendarEvent event;
+  final VoidCallback? onMarkPresent;
+  final VoidCallback? onMarkDl;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -263,19 +262,18 @@ class CalendarSessionCard extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color, this.onTap,
+    this.isFullWidth = false,
+  });
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final Color color;
   final bool isFullWidth;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    this.onTap,
-    required this.color,
-    this.isFullWidth = false,
-  });
 
   @override
   Widget build(BuildContext context) {

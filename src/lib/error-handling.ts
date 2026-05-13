@@ -31,16 +31,55 @@ function normalizeError(error: unknown): { code: string; message: string; status
   const pg = error as PostgrestError;
   const raw = error as Record<string, unknown>;
 
-  return {
-    code: typeof pg.code === "string" ? pg.code : typeof raw.code === "string" ? raw.code : "",
-    message:
-      typeof pg.message === "string"
-        ? pg.message
-        : typeof raw.message === "string"
-          ? raw.message
-          : "",
-    status: typeof raw.status === "number" ? raw.status : typeof (raw.response as any)?.status === "number" ? (raw.response as any).status : undefined,
-  };
+  let code = "";
+  if (typeof pg.code === "string") {
+    code = pg.code;
+  } else if (typeof raw.code === "string") {
+    code = raw.code;
+  }
+
+  let message = "";
+  if (typeof pg.message === "string") {
+    message = pg.message;
+  } else if (typeof raw.message === "string") {
+    message = raw.message;
+  }
+
+  let status: number | undefined = undefined;
+  if (typeof raw.status === "number") {
+    status = raw.status;
+  } else if (raw.response && typeof raw.response === "object") {
+    const res = raw.response as Record<string, unknown>;
+    if (typeof res.status === "number") {
+      status = res.status;
+    }
+  }
+
+  return { code, message, status };
+}
+
+function handleSecurityOrUniqueViolation(code: string, lower: string, context: string): string | null {
+  if (code === "42501" || lower.includes("row-level security")) {
+    if (context === "adding course") {
+      return "You don't have permission to add courses to this class. Ensure your profile sync is complete.";
+    }
+    if (context === "attendance") {
+      return "Permission denied. You can only modify your own attendance records.";
+    }
+    return "You don't have permission to perform this action.";
+  }
+
+  if (code === "23505") {
+    if (context === "adding course") {
+      return "This course already exists in your class lineup for this semester.";
+    }
+    if (context === "attendance") {
+      return "A record already exists for this date and session.";
+    }
+    return "This record already exists.";
+  }
+
+  return null;
 }
 
 /**
@@ -53,27 +92,8 @@ export function getHumanReadableError(error: unknown, context: string = "operati
   const { code, message, status } = normalizeError(error);
   const lower = message.toLowerCase();
 
-  // Row Level Security (RLS) violations
-  if (code === "42501" || lower.includes("row-level security")) {
-    if (context === "adding course") {
-      return "You don't have permission to add courses to this class. Ensure your profile sync is complete.";
-    }
-    if (context === "attendance") {
-      return "Permission denied. You can only modify your own attendance records.";
-    }
-    return "You don't have permission to perform this action.";
-  }
-
-  // Unique constraint violations
-  if (code === "23505") {
-    if (context === "adding course") {
-      return "This course already exists in your class lineup for this semester.";
-    }
-    if (context === "attendance") {
-      return "A record already exists for this date and session.";
-    }
-    return "This record already exists.";
-  }
+  const violationMsg = handleSecurityOrUniqueViolation(code, lower, context);
+  if (violationMsg) return violationMsg;
 
   // Foreign key violations
   if (code === "23503") {
@@ -100,7 +120,6 @@ export function getHumanReadableError(error: unknown, context: string = "operati
     return "Too many requests. Please wait a few moments and try again.";
   }
 
-
   return message || `Failed to complete ${context}`;
 }
 
@@ -109,14 +128,6 @@ export function getHumanReadableError(error: unknown, context: string = "operati
  * 
  * @param error - The error object to check
  * @returns true if the error is a duty leave constraint violation, false otherwise
- * 
- * @example
- * ```ts
- * const error = { code: 'P0001', hint: 'Only 5 duty leaves allowed per semester per course' };
- * if (isDutyLeaveConstraintError(error)) {
- *   // Handle duty leave constraint violation
- * }
- * ```
  */
 export function isDutyLeaveConstraintError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -159,18 +170,13 @@ export function isDutyLeaveConstraintError(error: unknown): boolean {
  * @param courseId - The course ID
  * @param coursesData - The courses data object containing course information
  * @returns A user-friendly error message
- * 
- * @example
- * ```ts
- * const coursesData = { courses: { '123': { name: 'Computer Science' } } };
- * const message = getDutyLeaveErrorMessage('123', coursesData);
- * // Returns: "Cannot add Duty Leave: Maximum of 5 duty leaves per semester exceeded for Computer Science"
- * ```
  */
 export function getDutyLeaveErrorMessage(
   courseId: string, 
   coursesData?: { courses: Record<string, Course> }
 ): string {
-  const courseName = coursesData?.courses?.[courseId]?.name || `course ${courseId}`;
+  const courseEntries = coursesData?.courses ? Object.entries(coursesData.courses) : [];
+  const foundCourse = courseEntries.find(([k]) => k === courseId);
+  const courseName = foundCourse?.[1]?.name || `course ${courseId}`;
   return `Cannot add Duty Leave: Maximum of 5 duty leaves per semester exceeded for ${courseName}`;
 }

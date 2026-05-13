@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
@@ -6,7 +7,6 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -35,7 +35,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final notifier = ref.read(notificationsProvider.notifier);
       final state = ref.read(notificationsProvider).value;
       if (state != null && state.hasNextPage && !ref.read(notificationsProvider).isLoading) {
-        notifier.fetchNextPage();
+        final _ = notifier.fetchNextPage();
       }
     }
   }
@@ -58,7 +58,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               return IconButton(
                 icon: const Icon(LucideIcons.checkCheck),
                 onPressed: () {
-                  showDialog(
+                  final _ = showDialog<void>(
                     context: context,
                     builder: (context) => AlertDialog(
                       title: Text('Mark all as read?', style: GoogleFonts.manrope(fontWeight: FontWeight.w800)),
@@ -70,7 +70,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            ref.read(notificationsProvider.notifier).markAllAsRead();
+                            final _ = ref.read(notificationsProvider.notifier).markAllAsRead();
                             Navigator.pop(context);
                             ServiceToast.show(context, 'All notifications marked as read');
                           },
@@ -185,17 +185,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 }
 
 class _NotificationCard extends ConsumerWidget {
-  final AppNotification notification;
 
   const _NotificationCard({required this.notification, super.key});
+  final AppNotification notification;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isRead = notification.isRead;
     final topic = notification.topic?.toLowerCase() ?? '';
     
-    IconData icon = LucideIcons.info;
-    Color iconColor = Theme.of(context).colorScheme.primary;
+    var icon = LucideIcons.info;
+    var iconColor = Theme.of(context).colorScheme.primary;
     if (topic.contains('sync')) {
       icon = LucideIcons.refreshCcw;
       iconColor = Colors.green;
@@ -209,7 +209,7 @@ class _NotificationCard extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        ref.read(notificationsProvider.notifier).toggleRead(notification.id, isRead);
+        final _ = ref.read(notificationsProvider.notifier).toggleRead(notification.id, wasRead: isRead);
         ServiceToast.show(
           context, 
           isRead ? 'Marked as unread' : 'Marked as read',
@@ -313,7 +313,7 @@ class _NotificationCard extends ConsumerWidget {
       if (diff.inHours < 24) return '${diff.inHours}h ago';
       if (diff.inDays < 7) return '${diff.inDays}d ago';
       return DateFormat('MMM d').format(date);
-    } catch (e) {
+    } on Object {
       return '';
     }
   }

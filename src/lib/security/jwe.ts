@@ -7,7 +7,8 @@ const RESPONSE_ENC = "A256GCM";
 export async function decryptRequest(jweCompact: string): Promise<unknown> {
   try {
     const privateKey = await getJwePrivateKey();
-    const { plaintext } = await compactDecrypt(jweCompact, privateKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { plaintext } = await compactDecrypt(jweCompact, privateKey as any);
     const text = new TextDecoder().decode(plaintext);
     return JSON.parse(text) as unknown;
   } catch (error) {
@@ -39,5 +40,6 @@ export async function encryptResponse(
 
   return new CompactEncrypt(encoded)
     .setProtectedHeader({ alg: "dir", enc: RESPONSE_ENC })
-    .encrypt(cryptoKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .encrypt(cryptoKey as any);
 }

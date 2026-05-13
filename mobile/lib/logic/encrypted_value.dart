@@ -10,17 +10,36 @@ import 'package:ghostclass/services/logger.dart';
 /// The value is encrypted with a session-ephemeral key that is reconstructed 
 /// on-demand using XOR-masked entropy. This prevents a single static key from 
 /// being easily identifiable in RAM dumps.
+@immutable
 class EncryptedValue {
+
+  const EncryptedValue._(this._encryptedBase64);
+
+  @visibleForTesting
+  factory EncryptedValue.forTesting(String base64) => EncryptedValue._(base64);
+
+  /// Creates an encrypted wrapper for a plaintext string.
+  factory EncryptedValue.fromPlaintext(String plaintext) {
+    if (plaintext.isEmpty) return const EncryptedValue._('');
+
+    final key = _reconstructKey();
+    final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
+    
+    // Generate a fresh random IV for each encryption (prevents GCM nonce-reuse)
+    final iv = IV.fromSecureRandom(16);
+    final encrypted = encrypter.encrypt(plaintext, iv: iv);
+
+    // Prepend IV to ciphertext and encode as single base64 string
+    final combined = Uint8List.fromList([...iv.bytes, ...encrypted.bytes]);
+    final combinedBase64 = base64.encode(combined);
+
+    return EncryptedValue._(combinedBase64);
+  }
   // We store entropy in two separate buffers. XORing them reconstructs the key.
   static final Uint8List _entropyA = _generateRandomBytes(32);
   static final Uint8List _entropyB = _generateRandomBytes(32);
 
   final String _encryptedBase64;
-
-  EncryptedValue._(this._encryptedBase64);
-
-  @visibleForTesting
-  factory EncryptedValue.forTesting(String base64) => EncryptedValue._(base64);
 
   static Uint8List _generateRandomBytes(int length) {
     final random = Random.secure();
@@ -35,24 +54,6 @@ class EncryptedValue {
       keyBytes[i] = _entropyA[i] ^ _entropyB[i];
     }
     return Key(keyBytes);
-  }
-
-  /// Creates an encrypted wrapper for a plaintext string.
-  factory EncryptedValue.fromPlaintext(String plaintext) {
-    if (plaintext.isEmpty) return EncryptedValue._('');
-
-    final key = _reconstructKey();
-    final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
-    
-    // Generate a fresh random IV for each encryption (prevents GCM nonce-reuse)
-    final iv = IV.fromSecureRandom(16);
-    final encrypted = encrypter.encrypt(plaintext, iv: iv);
-
-    // Prepend IV to ciphertext and encode as single base64 string
-    final combined = Uint8List.fromList([...iv.bytes, ...encrypted.bytes]);
-    final combinedBase64 = base64.encode(combined);
-
-    return EncryptedValue._(combinedBase64);
   }
 
   /// Decrypts and returns the plaintext value.
@@ -75,7 +76,7 @@ class EncryptedValue {
       final encrypted = Encrypted(ciphertextBytes);
 
       return encrypter.decrypt(encrypted, iv: iv);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('EncryptedValue: Decryption failed', e);
       return '';
     }

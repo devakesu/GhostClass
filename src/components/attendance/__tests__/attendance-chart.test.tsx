@@ -36,7 +36,7 @@ type TooltipContentFn = (props: { active?: boolean; payload?: TooltipPayload[] }
 let capturedTooltipContent: TooltipContentFn | null = null;
 
 // Mock recharts so it renders minimal DOM without canvas/SVG complexities
-vi.mock('recharts', async (_importOriginal) => {
+vi.mock('recharts', async () => {
   const React = await import('react');
   const MockBarChart = ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'bar-chart' }, children);
@@ -45,7 +45,7 @@ vi.mock('recharts', async (_importOriginal) => {
     capturedTooltipContent = content ?? null;
     return null;
   };
-  const MockReferenceLine = ({ label }: any) => {
+  const MockReferenceLine = ({ label }: { label?: (props: { viewBox: { width: number; x: number; y: number } }) => React.ReactNode }) => {
     if (typeof label === 'function') {
       return React.createElement('div', { 'data-testid': 'reference-line-label' }, 
         label({ viewBox: { width: 100, x: 0, y: 0 } })
@@ -53,7 +53,7 @@ vi.mock('recharts', async (_importOriginal) => {
     }
     return null;
   };
-  const MockYAxis = ({ tickFormatter }: any) => {
+  const MockYAxis = ({ tickFormatter }: { tickFormatter?: (v: number) => void }) => {
     if (tickFormatter) tickFormatter(50);
     return null;
   };
@@ -148,7 +148,7 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: { studentAttendanceData: {} } as any,
+        attendanceData: { studentAttendanceData: {} } as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
         trackingData: [],
         coursesData: { courses: {} },
       })
@@ -181,9 +181,9 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: sampleAttendanceData as any,
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
         trackingData: [],
-        coursesData: sampleCourses as any,
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
       })
     );
 
@@ -379,9 +379,9 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: sampleAttendanceData as any,
-        trackingData: trackingData as any,
-        coursesData: sampleCourses as any,
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
+        trackingData: trackingData as unknown as React.ComponentProps<typeof AttendanceChart>['trackingData'],
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
       })
     );
 
@@ -411,9 +411,9 @@ describe('AttendanceChart', () => {
 
       render(
         React.createElement(AttendanceChart, {
-          attendanceData: sampleAttendanceData as any,
+          attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
           trackingData: [],
-          coursesData: sampleCourses as any,
+          coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
         })
       );
 
@@ -506,9 +506,9 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: sampleAttendanceData as any,
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
         trackingData: [],
-        coursesData: sampleCourses as any,
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
       })
     );
 

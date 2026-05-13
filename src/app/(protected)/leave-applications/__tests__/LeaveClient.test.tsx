@@ -84,7 +84,7 @@ describe('LeaveClient', () => {
   };
 
   it('renders error state when initialData is missing', () => {
-    renderWithClient(<LeaveClient initialData={null} />)
+    renderWithClient(<LeaveClient initialData={null as any} />)
     expect(screen.getByText(/Leave Data Sync Unavailable/i)).toBeInTheDocument()
   })
 
@@ -98,7 +98,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    renderWithClient(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
     
     // Total should be 0, and empty card should show
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
@@ -117,7 +117,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    renderWithClient(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
 
     // Total should be 3 (1, 2, 3)
     expect(screen.getAllByText('3').length).toBeGreaterThan(0)
@@ -147,7 +147,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    render(<LeaveClient initialData={initialData} />)
+    render(<LeaveClient initialData={initialData as any} />)
     expect(screen.getByText('medical_cert.pdf')).toBeInTheDocument()
     expect(screen.getByText(/\(1\.0 MB\)/)).toBeInTheDocument()
   })
@@ -179,7 +179,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    renderWithClient(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
     // Should show C D as the latest
     expect(screen.getByText('C D')).toBeInTheDocument()
   })
@@ -195,7 +195,7 @@ describe('LeaveClient', () => {
         }
       }
     }
-    renderWithClient(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
     expect(screen.getByText('CS101')).toBeInTheDocument()
     expect(screen.getByText('S: 1st Hour')).toBeInTheDocument()
   })
@@ -216,7 +216,7 @@ describe('LeaveClient', () => {
         student_leave_sessions: {}
       }
     }
-    renderWithClient(<LeaveClient initialData={initialData} />)
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
     
     // Status badge and workflow history should both show Forwarded
     expect(await screen.findAllByText('Forwarded')).toHaveLength(2)

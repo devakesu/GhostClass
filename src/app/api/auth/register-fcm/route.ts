@@ -14,7 +14,7 @@ const FcmTokenSchema = z.object({
   fcm_token: z.string().trim().min(1),
 });
 
-const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: any }) => {
+const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: unknown }) => {
   const ip = getClientIp(req.headers);
   if (!ip) {
     return NextResponse.json(
@@ -41,7 +41,7 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: an
 
   const supabaseAdmin = getAdminClient();
   const authHeader = req.headers.get("authorization");
-  let user: any;
+  let user: { id: string };
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
@@ -91,4 +91,4 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: an
   return NextResponse.json({ success: true });
 };
 
-export const POST = withSecurity(postHandler as any);
+export const POST = withSecurity(postHandler as unknown as typeof postHandler);

@@ -4,14 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class StatsGridSection extends StatelessWidget {
-  final DashboardStats stats;
-  final int activeCount;
 
   const StatsGridSection({
-    super.key,
-    required this.stats,
-    required this.activeCount,
+    required this.stats, required this.activeCount, super.key,
   });
+  final DashboardStats stats;
+  final int activeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +88,14 @@ class StatsGridSection extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
+
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.color, required this.icon, this.subtitle,
+    this.corrections = const [],
+    this.isFullWidth = false,
+  });
   final String title;
   final int value;
   final String? subtitle;
@@ -97,16 +103,6 @@ class _StatCard extends StatelessWidget {
   final Color color;
   final IconData icon;
   final bool isFullWidth;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    this.subtitle,
-    this.corrections = const [],
-    required this.color,
-    required this.icon,
-    this.isFullWidth = false,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +112,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: color.withValues(alpha: 0.4),
-          width: 2.0,
+          width: 2,
         ),
         boxShadow: [
           BoxShadow(
@@ -232,13 +228,13 @@ class _StatCard extends StatelessWidget {
 }
 
 class _Correction {
-  final int value;
-  final Color color;
-  final bool isNegative;
 
   _Correction({
     required this.value,
     required this.color,
     this.isNegative = false,
   });
+  final int value;
+  final Color color;
+  final bool isNegative;
 }

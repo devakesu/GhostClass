@@ -63,7 +63,7 @@ describe("Analytics Library", () => {
     it("should return empty string in server environment", () => {
       // Mock server environment
       const originalDocument = global.document;
-      // @ts-ignore
+      // @ts-expect-error - test-only: intentionally bypassing types for mock
       delete global.document;
       
       const clientId = getOrCreateClientId();

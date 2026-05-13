@@ -10,18 +10,18 @@ describe('CopyButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.alert = vi.fn();
-    // @ts-ignore
+    // @ts-expect-error delete navigator property for testing
     delete navigator.clipboard;
   });
 
   afterEach(() => {
-    // @ts-ignore
+    // @ts-expect-error restore navigator property after test
     navigator.clipboard = originalClipboard;
     window.alert = originalAlert;
   });
 
   it('handles clipboard unavailability', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock undefined clipboard
     navigator.clipboard = undefined;
 
     render(<CopyButton text="test" label="Copy Me" />);
@@ -34,7 +34,7 @@ describe('CopyButton', () => {
   });
 
   it('handles writeText failure', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock clipboard writeText failure
     navigator.clipboard = {
       writeText: vi.fn().mockRejectedValue(new Error('Copy failed')),
     };
@@ -51,7 +51,7 @@ describe('CopyButton', () => {
   });
 
   it('handles success and resets after 2s', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock clipboard writeText success
     navigator.clipboard = {
       writeText: vi.fn().mockResolvedValue(undefined),
     };
@@ -77,18 +77,18 @@ describe('InlineCopyButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.alert = vi.fn();
-    // @ts-ignore
+    // @ts-expect-error delete navigator property for testing
     delete navigator.clipboard;
   });
 
   afterEach(() => {
-    // @ts-ignore
+    // @ts-expect-error restore navigator property after test
     navigator.clipboard = originalClipboard;
     window.alert = originalAlert;
   });
 
   it('handles clipboard unavailability', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock undefined clipboard
     navigator.clipboard = undefined;
 
     render(<InlineCopyButton text="test" />);
@@ -101,7 +101,7 @@ describe('InlineCopyButton', () => {
   });
 
   it('handles writeText failure', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock clipboard writeText failure
     navigator.clipboard = {
       writeText: vi.fn().mockRejectedValue(new Error('Copy failed')),
     };

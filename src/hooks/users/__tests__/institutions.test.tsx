@@ -163,8 +163,8 @@ describe("institutions hooks", () => {
           await act(async () => {
               try {
                   await result.current.mutateAsync(123);
-              } catch (_e) {
-                  // Expected error
+              } catch {
+                  // expected to throw
               }
           });
           await waitFor(() => expect(result.current.isError).toBe(true));

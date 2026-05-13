@@ -14,21 +14,38 @@ vi.mock('serwist', () => {
   };
 });
 
+type Listener = (event: unknown) => unknown;
+
+type MockClients = {
+  get: ReturnType<typeof vi.fn>;
+};
+
+type MockSelf = {
+  addEventListener: ReturnType<typeof vi.fn>;
+  skipWaiting: ReturnType<typeof vi.fn>;
+  location: { origin: string };
+  clients: MockClients;
+  caches: { delete: ReturnType<typeof vi.fn> };
+  __SW_MANIFEST: [];
+};
+
 describe('Service Worker', () => {
-  let fetchHandler: any;
-  let activateHandler: any;
-  let messageHandler: any;
+  let fetchHandler: Listener | undefined;
+  let activateHandler: Listener | undefined;
+  let messageHandler: Listener | undefined;
+  let mockSelf: MockSelf;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
 
     // Mock ServiceWorkerGlobalScope
-    const listeners: Record<string, any[]> = {};
-    const mockSelf = {
-      addEventListener: vi.fn((type, handler) => {
-        if (!listeners[type]) listeners[type] = [];
-        listeners[type].push(handler);
+    const listeners = new Map<string, Listener[]>();
+    mockSelf = {
+      addEventListener: vi.fn((type: string, handler: Listener) => {
+        const handlers = listeners.get(type) ?? [];
+        handlers.push(handler);
+        listeners.set(type, handlers);
       }),
       skipWaiting: vi.fn(),
       location: { origin: 'https://example.com' },
@@ -47,9 +64,9 @@ describe('Service Worker', () => {
     // Import the SW file
     await import('../sw');
 
-    fetchHandler = listeners['fetch']?.[0];
-    activateHandler = listeners['activate']?.[1] || listeners['activate']?.[0]; // activate listener
-    messageHandler = listeners['message']?.[0];
+    fetchHandler = listeners.get('fetch')?.[0];
+    activateHandler = listeners.get('activate')?.[1] || listeners.get('activate')?.[0]; // activate listener
+    messageHandler = listeners.get('message')?.[0];
   });
 
   afterEach(() => {
@@ -63,7 +80,7 @@ describe('Service Worker', () => {
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
-      fetchHandler(event);
+      fetchHandler!(event);
       expect(event.stopImmediatePropagation).toHaveBeenCalled();
       expect(event.respondWith).not.toHaveBeenCalled();
     });
@@ -74,7 +91,7 @@ describe('Service Worker', () => {
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
-      fetchHandler(monitoringEvent);
+      fetchHandler!(monitoringEvent);
       expect(monitoringEvent.stopImmediatePropagation).toHaveBeenCalled();
 
       const apiEvent = {
@@ -82,7 +99,7 @@ describe('Service Worker', () => {
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
-      fetchHandler(apiEvent);
+      fetchHandler!(apiEvent);
       expect(apiEvent.stopImmediatePropagation).toHaveBeenCalled();
     });
 
@@ -92,7 +109,7 @@ describe('Service Worker', () => {
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
-      fetchHandler(staticEvent);
+      fetchHandler!(staticEvent);
       expect(staticEvent.stopImmediatePropagation).not.toHaveBeenCalled();
     });
   });
@@ -102,9 +119,9 @@ describe('Service Worker', () => {
       const event = {
         waitUntil: vi.fn((p) => p),
       };
-      await activateHandler(event);
-      expect((self.caches as any).delete).toHaveBeenCalledWith('attendance-data');
-      expect((self.caches as any).delete).toHaveBeenCalledWith('pages');
+      await activateHandler!(event);
+      expect(mockSelf.caches.delete).toHaveBeenCalledWith('attendance-data');
+      expect(mockSelf.caches.delete).toHaveBeenCalledWith('pages');
     });
   });
 
@@ -114,15 +131,15 @@ describe('Service Worker', () => {
         data: { type: 'SKIP_WAITING' },
         source: { id: 'client-1' },
       };
-      
-      ((self as any).clients.get as any).mockResolvedValue({
+
+      mockSelf.clients.get.mockResolvedValue({
         url: 'https://example.com/dashboard',
       });
 
-      await messageHandler(event);
+      await messageHandler!(event);
       
-      expect((self as any).clients.get).toHaveBeenCalledWith('client-1');
-      expect((self as any).skipWaiting).toHaveBeenCalled();
+      expect(mockSelf.clients.get).toHaveBeenCalledWith('client-1');
+      expect(mockSelf.skipWaiting).toHaveBeenCalled();
     });
 
     it('ignores SKIP_WAITING from cross-origin sources', async () => {
@@ -130,22 +147,22 @@ describe('Service Worker', () => {
         data: { type: 'SKIP_WAITING' },
         source: { id: 'client-1' },
       };
-      
-      ((self as any).clients.get as any).mockResolvedValue({
+
+      mockSelf.clients.get.mockResolvedValue({
         url: 'https://malicious.com/attack',
       });
 
-      await messageHandler(event);
+      await messageHandler!(event);
       
-      expect((self as any).skipWaiting).not.toHaveBeenCalled();
+      expect(mockSelf.skipWaiting).not.toHaveBeenCalled();
     });
 
     it('ignores other message types', async () => {
       const event = {
         data: { type: 'OTHER' },
       };
-      await messageHandler(event);
-      expect((self as any).skipWaiting).not.toHaveBeenCalled();
+      await messageHandler!(event);
+      expect(mockSelf.skipWaiting).not.toHaveBeenCalled();
     });
   });
 });

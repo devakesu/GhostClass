@@ -509,7 +509,7 @@ describe('validate-env utility', () => {
 
     it('logs success in development', () => {
       vi.stubEnv('NODE_ENV', 'development');
-      validateEnvironment();
+      expect(() => validateEnvironment()).not.toThrow();
     });
   });
 });

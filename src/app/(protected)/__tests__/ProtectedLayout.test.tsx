@@ -71,7 +71,7 @@ vi.mock('next/navigation', () => ({
 // Mock framer-motion
 vi.mock('framer-motion', async () => {
   const React = await import('react');
-  const MotionDiv = React.forwardRef(({ children, animate, _variants, _transition, ...props }: any, ref: any) => (
+  const MotionDiv = React.forwardRef(({ children, animate, ...props }: any, ref: any) => (
     <div 
       ref={ref} 
       data-testid="motion-div" 

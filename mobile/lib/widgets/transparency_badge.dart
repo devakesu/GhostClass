@@ -5,10 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TransparencyBadge extends StatelessWidget {
-  final VoidCallback? onTap;
-  final bool expanded;
 
   const TransparencyBadge({super.key, this.onTap, this.expanded = false});
+  final VoidCallback? onTap;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +64,6 @@ class TransparencyBadge extends StatelessWidget {
           Flexible(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   'Build transparency',

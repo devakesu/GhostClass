@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { GET } from '../route';
 
 vi.mock('@scalar/nextjs-api-reference', () => ({
-  ApiReference: vi.fn(() => (_req: any) => new Response('Scalar UI')),
+  ApiReference: vi.fn(() => () => new Response('Scalar UI')),
 }));
 
 vi.mock('@/lib/openapi', () => ({

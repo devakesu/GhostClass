@@ -13,7 +13,7 @@ vi.mock("@/components/ui/separator", () => ({
   Separator: () => React.createElement('hr'),
 }));
 vi.mock("date-fns", () => ({
-  format: vi.fn((_d, _f) => "formatted-date"),
+  format: vi.fn(() => "formatted-date"),
 }));
 vi.mock("../copy-button", () => ({
   CopyButton: () => React.createElement('div', {}, 'MockCopyButton'),

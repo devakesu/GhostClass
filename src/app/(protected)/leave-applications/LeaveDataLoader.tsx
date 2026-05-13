@@ -25,5 +25,6 @@ export async function LeaveDataLoader({ token }: { token: string }) {
     });
   }
 
-  return <LeaveClient initialData={initialData} />;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <LeaveClient initialData={initialData as any} />;
 }

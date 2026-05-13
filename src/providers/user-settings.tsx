@@ -60,53 +60,50 @@ const normalizeTarget = (val: number): number => Math.min(Math.max(val, 1), 100)
  * 2. If missing, checks localStorage for individual user-scoped keys (Stage 2).
  * 3. Validates the data shape and returns a clean UserSettings object or null.
  */
+const parsePrefetchedSession = (currentUserId: string): UserSettings | null => {
+  const prefetchedRaw = sessionStorage.getItem("prefetchedSettings");
+  if (!prefetchedRaw) return null;
+
+  try {
+    const parsed = JSON.parse(prefetchedRaw);
+    if (parsed && typeof parsed === 'object' && parsed.userId === currentUserId && parsed.settings) {
+      const s = parsed.settings;
+      if (typeof s.bunk_calculator_enabled === 'boolean' && 
+          typeof s.target_percentage === 'number' &&
+          s.disabled_courses) {
+        return s as UserSettings;
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  sessionStorage.removeItem("prefetchedSettings");
+  return null;
+};
+
+/**
+ * Stage 2 Hydration / Migration Helper.
+ */
 const loadPrefetchedSettings = (currentUserId: string | null): UserSettings | null => {
   if (typeof window === "undefined" || !currentUserId) return null;
 
   try {
-    // 1. Check sessionStorage for Stage 1 hydration (pre-fetched by server)
-    //    This is used for the very first load to avoid any flash of default settings.
-    const prefetchedRaw = sessionStorage.getItem("prefetchedSettings");
-    if (prefetchedRaw) {
-      try {
-        const parsed = JSON.parse(prefetchedRaw);
-        // Ensure the prefetched data belongs to the currently logged-in user
-        if (parsed && typeof parsed === 'object' && parsed.userId === currentUserId && parsed.settings) {
-          const s = parsed.settings;
-          // Basic validation of required fields
-          if (typeof s.bunk_calculator_enabled === 'boolean' && 
-              typeof s.target_percentage === 'number' &&
-              s.disabled_courses) {
-            return s as UserSettings;
-          }
-        }
-        // If mismatched, invalid format, or missing fields, clear it
-        sessionStorage.removeItem("prefetchedSettings");
-      } catch {
-        sessionStorage.removeItem("prefetchedSettings");
-      }
-    }
+    const fromSession = parsePrefetchedSession(currentUserId);
+    if (fromSession) return fromSession;
 
-    // 2. Rely on individual user-scoped localStorage keys (Stage 2).
-    //    These are updated on every successful DB fetch and are safer than 
-    //    a single large sessionStorage object for subsequent loads.
     const storedBunk = localStorage.getItem(`showBunkCalc_${currentUserId}`);
     const storedTarget = localStorage.getItem(`targetPercentage_${currentUserId}`);
     const storedDisabled = localStorage.getItem(`disabledCourses_${currentUserId}`);
 
     if (storedBunk === null && storedTarget === null) return null;
 
-    try {
-      return {
-        bunk_calculator_enabled: storedBunk === "true",
-        target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
-        disabled_courses: (storedDisabled && typeof storedDisabled === "string") 
-          ? JSON.parse(storedDisabled) 
-          : {},
-      };
-    } catch {
-      return null;
-    }
+    return {
+      bunk_calculator_enabled: storedBunk === "true",
+      target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
+      disabled_courses: (storedDisabled && typeof storedDisabled === "string") 
+        ? JSON.parse(storedDisabled) 
+        : {},
+    };
   } catch (err) {
     logger.error("Failed to load prefetched settings:", err);
     return null;

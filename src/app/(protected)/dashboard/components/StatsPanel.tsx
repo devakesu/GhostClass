@@ -8,21 +8,28 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatsPanelProps {
-  stats: any;
+  stats: {
+    rawOfficialPercentage: number;
+    rawPercentage: number;
+    finalPresent: number;
+    realPresent: number;
+    finalTotal: number;
+    realTotal: number;
+    officialPercentage: number;
+    percentage: number;
+    [key: string]: unknown;
+  };
   isLoadingAttendance: boolean;
   targetPercentage: number;
 }
 
 export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: StatsPanelProps) {
   const officialWidth = stats.rawOfficialPercentage;
-  let diffWidth = 0, isGain = false;
-  if (stats.rawPercentage >= stats.rawOfficialPercentage) {
-    isGain = true;
-    diffWidth = stats.rawPercentage - stats.rawOfficialPercentage;
-  } else {
-    isGain = false;
-    diffWidth = stats.rawOfficialPercentage - stats.rawPercentage;
-  }
+  const isGain = stats.rawPercentage >= stats.rawOfficialPercentage;
+  let diffWidth = isGain
+    ? stats.rawPercentage - stats.rawOfficialPercentage
+    : stats.rawOfficialPercentage - stats.rawPercentage;
+
   if (officialWidth + diffWidth > 100) diffWidth = 100 - officialWidth;
   if (diffWidth < 0) diffWidth = 0;
   const diffPresent = stats.finalPresent - stats.realPresent;

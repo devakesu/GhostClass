@@ -22,7 +22,7 @@ class SupportHelper {
     String? message,
   }) {
     final fullMessage = (message ?? '') + _persistanceMessage;
-    context.push(
+    final _ = context.push(
       '/contact',
       extra: {
         'subject': subject ?? 'GhostClass Support Request',
@@ -55,7 +55,7 @@ class SupportHelper {
       } else {
         AppLogger.e('SupportHelper: Could not launch email client');
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('SupportHelper: Email launch error', e);
     }
   }

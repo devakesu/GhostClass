@@ -1,15 +1,16 @@
 /** @vitest-environment jsdom */
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DashboardCharts } from '../DashboardCharts';
 import dynamic from 'next/dynamic';
 
 vi.mock('@/components/ui/card', () => ({
-  Card: ({ children }: any) => <div>{children}</div>,
-  CardContent: ({ children }: any) => <div>{children}</div>,
-  CardDescription: ({ children }: any) => <div>{children}</div>,
-  CardHeader: ({ children }: any) => <div>{children}</div>,
-  CardTitle: ({ children }: any) => <div>{children}</div>,
+  Card: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardDescription: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardTitle: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/skeleton', () => ({
@@ -17,12 +18,11 @@ vi.mock('@/components/ui/skeleton', () => ({
 }));
 
 vi.mock('@/components/error-boundary', () => ({
-  ErrorBoundary: ({ children }: any) => <>{children}</>,
+  ErrorBoundary: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('framer-motion', () => {
-  const mockComponent = ({ children, ...props }: any) => {
-    const { initial: _i, animate: _a, transition: _t, whileHover: _wh, whileTap: _wt, exit: _e, ...rest } = props;
+  const mockComponent = ({ children, ...rest }: { children?: ReactNode; [key: string]: unknown }) => {
     return <div {...rest}>{children}</div>;
   };
   return {
@@ -34,15 +34,15 @@ vi.mock('framer-motion', () => {
       div: mockComponent,
       button: mockComponent,
     },
-    AnimatePresence: ({ children }: any) => <>{children}</>,
-    LazyMotion: ({ children }: any) => <>{children}</>,
+    AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    LazyMotion: ({ children }: { children?: ReactNode }) => <>{children}</>,
     domAnimation: {},
   };
 });
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
-  default: (props: any) => <img {...props} data-testid="mock-image" src={props.src || ""} />,
+  default: (props: { src?: string; [key: string]: unknown }) => <img {...props} data-testid="mock-image" src={props.src || ""} />,
 }));
 
 vi.mock('@/components/loading', () => ({
@@ -51,7 +51,7 @@ vi.mock('@/components/loading', () => ({
 
 // Mock dynamic import correctly to capture the options
 vi.mock('next/dynamic', () => ({
-  default: vi.fn((_fn: any, _options: any) => {
+  default: vi.fn(() => {
     const MockChart = () => <div data-testid="attendance-chart" />;
     MockChart.displayName = 'AttendanceChart';
     return MockChart;

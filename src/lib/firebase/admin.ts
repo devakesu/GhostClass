@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 
 export interface DecodedAppCheckToken {
   appId: string;
-  token?: Record<string, any>;
+  token?: Record<string, unknown>;
 }
 
 export interface AppCheckVerifier {
@@ -28,7 +28,7 @@ export function getAppCheck(): AppCheckVerifier | null {
     }
 
     return {
-      async verifyToken(token: string, _options?: { consume?: boolean }) {
+      async verifyToken(token: string) {
         try {
           const appCheckService = admin.appCheck();
           const decodedToken = await appCheckService.verifyToken(token);
@@ -81,17 +81,17 @@ function initializeFirebaseAdmin() {
   }
 
   try {
-    let credentials: any;
+    let credentials: Record<string, unknown>;
     
     if (serviceAccountJson.startsWith("{")) {
-      credentials = JSON.parse(serviceAccountJson);
+      credentials = JSON.parse(serviceAccountJson) as Record<string, unknown>;
     } else {
-      credentials = JSON.parse(Buffer.from(serviceAccountJson, "base64").toString("utf-8"));
+      credentials = JSON.parse(Buffer.from(serviceAccountJson, "base64").toString("utf-8")) as Record<string, unknown>;
     }
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(credentials),
-      projectId: credentials.project_id,
+      projectId: credentials.project_id as string,
     });
 
     logger.info("Firebase Admin SDK initialized successfully");

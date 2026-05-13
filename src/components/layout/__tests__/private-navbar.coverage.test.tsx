@@ -1,11 +1,13 @@
 /** @vitest-environment jsdom */
 import { describe, it, vi, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
 import { Navbar } from '../private-navbar';
 
 // Mock all required hooks
+const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
   usePathname: () => '/dashboard',
 }));
 
@@ -20,19 +22,22 @@ vi.mock('@/hooks/users/profile', () => ({
   })),
 }));
 
+const mockUpdateBunkCalc = vi.fn();
+const mockUpdateTarget = vi.fn();
 vi.mock('@/providers/user-settings', () => ({
   useUserSettings: () => ({
     settings: { target_percentage: 75, bunk_calculator_enabled: true },
-    updateBunkCalc: vi.fn(),
-    updateTarget: vi.fn(),
+    updateBunkCalc: mockUpdateBunkCalc,
+    updateTarget: mockUpdateTarget,
     isLoading: false,
   }),
 }));
 
+const mockToggleTheme = vi.fn();
 vi.mock('@/providers/theme', () => ({
   useTheme: () => ({
     theme: 'dark',
-    toggleTheme: vi.fn(),
+    toggleTheme: mockToggleTheme,
   }),
 }));
 
@@ -74,32 +79,32 @@ vi.mock('lucide-react', () => {
 
 // Mock UI components
 vi.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children }: any) => <>{children}</>,
-  DropdownMenuTrigger: ({ children }: any) => <>{children}</>,
-  DropdownMenuContent: ({ children }: any) => <div data-testid="menu-content">{children}</div>,
-  DropdownMenuItem: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  DropdownMenuLabel: ({ children }: any) => <div>{children}</div>,
+  DropdownMenu: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children?: React.ReactNode }) => <div data-testid="menu-content">{children}</div>,
+  DropdownMenuItem: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+  DropdownMenuLabel: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
 }));
 
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children, onValueChange }: any) => (
+  Select: ({ children, onValueChange }: { children?: React.ReactNode; onValueChange?: (v: string) => void }) => (
     <div data-testid="select-root" onClick={() => onValueChange && onValueChange('80')}>{children}</div>
   ),
-  SelectTrigger: ({ children }: any) => <button>{children}</button>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children }: any) => <div>{children}</div>,
-  SelectValue: ({ children }: any) => <span>{children}</span>,
+  SelectTrigger: ({ children }: { children?: React.ReactNode }) => <button>{children}</button>,
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectValue: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
 }));
 
 vi.mock('@/components/ui/switch', () => ({
-  Switch: ({ checked, onCheckedChange }: any) => (
+  Switch: ({ checked, onCheckedChange }: { checked?: boolean; onCheckedChange: (v: boolean) => void }) => (
     <input type="checkbox" checked={checked} onChange={(e) => onCheckedChange(e.target.checked)} />
   ),
 }));
 
 vi.mock('@/components/ui/avatar', () => ({
-  Avatar: ({ children }: any) => <div>{children}</div>,
+  Avatar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 
 describe('Navbar Coverage Hardening', () => {
@@ -112,24 +117,24 @@ describe('Navbar Coverage Hardening', () => {
     expect(handleLogout).toHaveBeenCalled();
   });
 
-  it('handles theme toggle', async () => {
+  it('handles theme toggle', () => {
     render(<Navbar />);
     const switches = screen.getAllByRole('checkbox');
     fireEvent.click(switches[0]);
-    // expect toggleTheme to be called (mocked in providers/theme)
+    expect(mockToggleTheme).toHaveBeenCalled();
   });
 
-  it('handles bunk calculator toggle', async () => {
+  it('handles bunk calculator toggle', () => {
     render(<Navbar />);
     const switches = screen.getAllByRole('checkbox');
     fireEvent.click(switches[1]);
-    // expect updateBunkCalc to be called (mocked in providers/user-settings)
+    expect(mockUpdateBunkCalc).toHaveBeenCalled();
   });
 
-  it('handles navigation clicks in menu', async () => {
+  it('handles navigation clicks in menu', () => {
     render(<Navbar />);
     const trackingItems = screen.getAllByText('Tracking');
     fireEvent.click(trackingItems[0]);
-    // expect router.push to be called
+    expect(mockPush).toHaveBeenCalledWith('/tracking');
   });
 });

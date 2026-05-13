@@ -487,7 +487,8 @@ describe('handleLogout', () => {
     }) as any;
 
     await handleLogout();
-    // Hits line 106 false branch in fetchFreshCsrfToken
+    // Hits line 106 false branch in fetchFreshCsrfToken (non-string token rejected)
+    expect(global.fetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
   });
 
   it('should handle fetchFreshCsrfToken rejection in handleLogout catch block', async () => {
@@ -562,6 +563,7 @@ describe('handleLogout', () => {
       
       await handleLogout();
       // Should not throw, should just return
+      expect(mockSignOut).toHaveBeenCalled();
     } finally {
       global.window = windowBackup;
     }
@@ -576,6 +578,7 @@ describe('handleLogout', () => {
       
       await handleLogout();
       // Should not throw, should just return
+      expect(mockSignOut).toHaveBeenCalled();
     } finally {
       global.window = windowBackup;
     }

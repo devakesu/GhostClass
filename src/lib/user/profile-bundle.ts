@@ -10,7 +10,15 @@ import { logger } from "@/lib/logger";
  * @param academicOverride - Optional live academic context from EzyGo
  * @returns Full profile bundle or null if not found
  */
-export async function getProfileBundle(authId: string, academicOverride?: { current_semester?: string | null, current_year?: string | null }) {
+export async function getProfileBundle(
+  authId: string,
+  academicOverride?: {
+    current_semester?: string | null;
+    current_year?: string | null;
+    semester?: string | null;
+    year?: string | null;
+  },
+) {
   const supabaseAdmin = getAdminClient();
   
   // 1. Fetch user and settings in parallel
@@ -26,8 +34,8 @@ export async function getProfileBundle(authId: string, academicOverride?: { curr
 
   // 2. Resolve Academic Info (ONLY if explicitly overridden/synced)
   const academic = academicOverride ? calculateCurrentAcademicInfo({
-    year: academicOverride.current_year || (academicOverride as any).year,
-    semester: academicOverride.current_semester || (academicOverride as any).semester
+    year: academicOverride.current_year || academicOverride.year,
+    semester: academicOverride.current_semester || academicOverride.semester
   }) : null;
 
   // 2. Resolve decrypted fields

@@ -1,14 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import ReactQueryProvider from "../react-query";
 
 // Mock children providers to avoid heavy initialization
 vi.mock("../user-settings", () => ({
-  UserSettingsProvider: ({ children }: any) => <div data-testid="user-settings">{children}</div>,
+  UserSettingsProvider: ({ children }: { children: ReactNode }) => <div data-testid="user-settings">{children}</div>,
 }));
 
 vi.mock("../attendance-settings", () => ({
-  AttendanceSettingsProvider: ({ children }: any) => <div data-testid="attendance-settings">{children}</div>,
+  AttendanceSettingsProvider: ({ children }: { children: ReactNode }) => <div data-testid="attendance-settings">{children}</div>,
 }));
 
 describe("ReactQueryProvider", () => {

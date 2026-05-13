@@ -105,7 +105,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      const res = await POST(makePostReq(), {} as any);
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -123,7 +123,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      await POST(makePostReq(), {} as any);
+      await POST(makePostReq(), { params: {} });
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
     });
 
@@ -131,7 +131,7 @@ describe("POST /api/logout", () => {
       const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { POST } = await import("../route");
-      const res = await POST(makePostReq(), {} as any);
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe("POST /api/logout", () => {
   describe("successful logout", () => {
     it("returns 200 ok when rate limit passes", async () => {
       const { POST } = await import("../route");
-      const res = await POST(makePostReq(), {} as any);
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(200);
       const body = await res.json() as { ok: boolean };
       expect(body.ok).toBe(true);
@@ -149,7 +149,7 @@ describe("POST /api/logout", () => {
 
     it("clears auth cookie, CSRF token, and terms cookies on success", async () => {
       const { POST } = await import("../route");
-      await POST(makePostReq(), {} as any);
+      await POST(makePostReq(), { params: {} });
       expect(mockClearAuthCookie).toHaveBeenCalledOnce();
       expect(mockRemoveCsrfToken).toHaveBeenCalledOnce();
       expect(mockClearTermsVersionCookie).toHaveBeenCalledOnce();
@@ -165,7 +165,7 @@ describe("POST /api/logout", () => {
       ]);
       
       const { POST } = await import("../route");
-      await POST(makePostReq(), {} as any);
+      await POST(makePostReq(), { params: {} });
       
       expect(mockCookieSet).toHaveBeenCalledWith(
         "sb-project-auth-token.0",
@@ -184,7 +184,7 @@ describe("POST /api/logout", () => {
       vi.stubEnv("HTTPS", "true");
       
       const { POST } = await import("../route");
-      await POST(makePostReq(), {} as any);
+      await POST(makePostReq(), { params: {} });
       
       expect(mockCookieSet).toHaveBeenCalledWith(
         expect.any(String),
@@ -196,7 +196,7 @@ describe("POST /api/logout", () => {
     it("handles Supabase URL parsing failure gracefully", async () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "invalid-url-no-protocol");
       const { POST } = await import("../route");
-      const res = await POST(makePostReq(), {} as any);
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(200); // Should still succeed even if cookie cleanup fails
     });
   });

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:ghostclass/theme/app_theme.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
@@ -65,7 +65,7 @@ class HelpScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // --- Section 1: Course Card Explained ---
-            _SectionHeading(
+            const _SectionHeading(
               icon: LucideIcons.bookOpen,
               title: 'Course Card Explained',
             ),
@@ -113,7 +113,7 @@ class HelpScreen extends StatelessWidget {
                   label: 'Blue +N',
                   description: 'Extra absent classes (adds to total)',
                 ),
-                _LegendItem(
+                const _LegendItem(
                   color: Colors.transparent,
                   label: 'Total + Blue +N',
                   description: 'Official total + extra sessions added',
@@ -125,8 +125,8 @@ class HelpScreen extends StatelessWidget {
             _LegendBox(
               title: 'Progress Bar Legend',
               items: [
-                _LegendItem(
-                  color: const Color(0xFF0EA5E9),
+                const _LegendItem(
+                  color: Color(0xFF0EA5E9),
                   label: 'Sky blue bar',
                   description: 'Official attendance percentage',
                 ),
@@ -163,7 +163,7 @@ class HelpScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // --- Section 2: Correction vs Extra ---
-            _SectionHeading(
+            const _SectionHeading(
               icon: LucideIcons.layers,
               title: 'Correction vs Extra',
             ),
@@ -181,14 +181,14 @@ class HelpScreen extends StatelessWidget {
               title: 'Extra',
               color: Colors.blue.shade600,
               description:
-                  'Used for classes EzyGo doesn\'t know about yet. It ADDS to the total class count. Shown in blue on the course card.',
+                  "Used for classes EzyGo doesn't know about yet. It ADDS to the total class count. Shown in blue on the course card.",
               example:
                   'Example: "Professor held an extra class that hasn\'t appeared in EzyGo yet. Add an Extra → Present so GhostClass factors it in."',
             ),
             const SizedBox(height: 32),
 
             // --- Section 3: Attendance Chart Explained ---
-            _SectionHeading(
+            const _SectionHeading(
               icon: LucideIcons.barChart2,
               title: 'Attendance Chart Explained',
             ),
@@ -239,7 +239,7 @@ class HelpScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // --- Section 4: FAQ ---
-            _SectionHeading(
+            const _SectionHeading(
               icon: LucideIcons.messageSquare,
               title: 'Frequently Asked Questions',
             ),
@@ -247,8 +247,8 @@ class HelpScreen extends StatelessWidget {
             ..._faqs.map(
               (faq) => _buildFaqItem(
                 context,
-                faq['question'] as String,
-                faq['answer'] as String,
+                faq['question']!,
+                faq['answer']!,
               ),
             ),
             const SizedBox(height: 32),
@@ -275,8 +275,8 @@ class HelpScreen extends StatelessWidget {
         ),
       ),
       child: ExpansionTile(
-        shape: const RoundedRectangleBorder(side: BorderSide.none),
-        collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+        shape: const RoundedRectangleBorder(),
+        collapsedShape: const RoundedRectangleBorder(),
         title: Text(
           question,
           style: GoogleFonts.manrope(
@@ -370,7 +370,7 @@ class HelpScreen extends StatelessWidget {
     {
       'question': 'Does GhostClass change my real attendance?',
       'answer':
-          'No. GhostClass is a read-only calculator. It cannot modify any records in your institution\'s system.',
+          "No. GhostClass is a read-only calculator. It cannot modify any records in your institution's system.",
     },
     {
       'question': 'Is my EzyGo password stored anywhere?',
@@ -385,12 +385,12 @@ class HelpScreen extends StatelessWidget {
     {
       'question': 'Why are some classes missing from my total?',
       'answer':
-          'GhostClass intentionally excludes \'Revision\' and other non-mandatory class types from the attendance calculation.',
+          "GhostClass intentionally excludes 'Revision' and other non-mandatory class types from the attendance calculation.",
     },
     {
       'question': 'How can I verify if this app is secure?',
       'answer':
-          'Visit the \'Build Transparency\' section in the GhostClass screen. It displays the build attestation information & provides real-time verification of the app instance against Google Play Integrity.',
+          "Visit the 'Build Transparency' section in the GhostClass screen. It displays the build attestation information & provides real-time verification of the app instance against Google Play Integrity.",
     },
     {
       'question': 'How do I set my target attendance?',
@@ -406,10 +406,10 @@ class HelpScreen extends StatelessWidget {
 }
 
 class _SectionHeading extends StatelessWidget {
-  final IconData icon;
-  final String title;
 
   const _SectionHeading({required this.icon, required this.title});
+  final IconData icon;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -431,11 +431,11 @@ class _SectionHeading extends StatelessWidget {
 }
 
 class _LegendBox extends StatelessWidget {
+
+  const _LegendBox({required this.title, required this.items, this.footer});
   final String title;
   final List<_LegendItem> items;
   final String? footer;
-
-  const _LegendBox({required this.title, required this.items, this.footer});
 
   @override
   Widget build(BuildContext context) {
@@ -484,12 +484,6 @@ class _LegendBox extends StatelessWidget {
 }
 
 class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-  final String description;
-  final bool isStriped;
-  final bool isDashed;
-  final bool showIcon;
 
   const _LegendItem({
     required this.color,
@@ -499,6 +493,12 @@ class _LegendItem extends StatelessWidget {
     this.isDashed = false,
     this.showIcon = true,
   });
+  final Color color;
+  final String label;
+  final String description;
+  final bool isStriped;
+  final bool isDashed;
+  final bool showIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -570,10 +570,6 @@ class _LegendItem extends StatelessWidget {
 }
 
 class _DiffCard extends StatelessWidget {
-  final String title;
-  final Color color;
-  final String description;
-  final String? example;
 
   const _DiffCard({
     required this.title,
@@ -581,6 +577,10 @@ class _DiffCard extends StatelessWidget {
     required this.description,
     this.example,
   });
+  final String title;
+  final Color color;
+  final String description;
+  final String? example;
 
   @override
   Widget build(BuildContext context) {
@@ -633,8 +633,8 @@ class _DiffCard extends StatelessWidget {
 }
 
 class _StripedPainter extends CustomPainter {
-  final Color color;
   _StripedPainter({required this.color});
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -642,8 +642,8 @@ class _StripedPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1.5;
 
-    double step = 4;
-    for (double i = -size.height; i < size.width; i += step) {
+    const double step = 4;
+    for (var i = -size.height; i < size.width; i += step) {
       canvas.drawLine(
         Offset(i, 0),
         Offset(i + size.height, size.height),
@@ -657,8 +657,8 @@ class _StripedPainter extends CustomPainter {
 }
 
 class _DashedLinePainter extends CustomPainter {
-  final Color color;
   _DashedLinePainter({required this.color});
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -667,8 +667,8 @@ class _DashedLinePainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    double dashWidth = 3;
-    double dashSpace = 2;
+    const double dashWidth = 3;
+    const double dashSpace = 2;
     double startX = 0;
     while (startX < size.width) {
       canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
@@ -760,7 +760,7 @@ class _MockCourseCard extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              _CountText(value: '32', color: Colors.green, label: 'present'),
+              const _CountText(value: '32', color: Colors.green, label: 'present'),
               const SizedBox(width: 4),
               Text(
                 '+2',
@@ -780,7 +780,7 @@ class _MockCourseCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              _CountText(value: '8', color: Colors.red, label: 'absent'),
+              const _CountText(value: '8', color: Colors.red, label: 'absent'),
               const SizedBox(width: 4),
               Text(
                 '-2',
@@ -856,7 +856,7 @@ class _MockCourseCard extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: _BunkPanel(
                   title: 'Safe (Official)',
                   color: Colors.blue,
@@ -880,14 +880,14 @@ class _MockCourseCard extends StatelessWidget {
 }
 
 class _CountText extends StatelessWidget {
-  final String value;
-  final Color color;
-  final String label;
   const _CountText({
     required this.value,
     required this.color,
     required this.label,
   });
+  final String value;
+  final Color color;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -917,14 +917,14 @@ class _CountText extends StatelessWidget {
 }
 
 class _BunkPanel extends StatelessWidget {
-  final String title;
-  final Color color;
-  final String value;
   const _BunkPanel({
     required this.title,
     required this.color,
     required this.value,
   });
+  final String title;
+  final Color color;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -1029,7 +1029,7 @@ class _MockAttendanceChart extends StatelessWidget {
             ),
           ),
           // Bars
-          Positioned.fill(
+          const Positioned.fill(
             top: 20,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1042,7 +1042,6 @@ class _MockAttendanceChart extends StatelessWidget {
                   official: 110,
                   color: Colors.green,
                   adjusted: 130,
-                  isGain: true,
                 ),
                 _MockBar(
                   code: 'ENG401',
@@ -1061,11 +1060,6 @@ class _MockAttendanceChart extends StatelessWidget {
 }
 
 class _MockBar extends StatelessWidget {
-  final String code;
-  final double official;
-  final Color color;
-  final double? adjusted;
-  final bool isGain;
 
   const _MockBar({
     required this.code,
@@ -1074,13 +1068,18 @@ class _MockBar extends StatelessWidget {
     this.adjusted,
     this.isGain = true,
   });
+  final String code;
+  final double official;
+  final Color color;
+  final double? adjusted;
+  final bool isGain;
 
   @override
   Widget build(BuildContext context) {
-    final double overlayHeight = adjusted != null
+    final overlayHeight = adjusted != null
         ? (adjusted! - official).abs()
-        : 0;
-    final double totalHeight = adjusted != null
+        : 0.0;
+    final totalHeight = adjusted != null
         ? (isGain ? adjusted! : official)
         : official;
 

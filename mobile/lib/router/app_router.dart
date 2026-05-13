@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:ghostclass/constants/static_content.dart';
-import 'package:ghostclass/config/app_config.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/about_screen.dart';
 import 'package:ghostclass/screens/accept_terms_screen.dart';
@@ -13,6 +13,7 @@ import 'package:ghostclass/screens/dashboard_screen.dart';
 import 'package:ghostclass/screens/ghostclass_screen.dart';
 import 'package:ghostclass/screens/help_screen.dart';
 import 'package:ghostclass/screens/leaves_screen.dart';
+import 'package:ghostclass/screens/legal_screen.dart';
 import 'package:ghostclass/screens/login_screen.dart';
 import 'package:ghostclass/screens/navigation_shell.dart';
 import 'package:ghostclass/screens/notifications_screen.dart';
@@ -20,7 +21,6 @@ import 'package:ghostclass/screens/profile_dump_screen.dart';
 import 'package:ghostclass/screens/profile_screen.dart';
 import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
-import 'package:ghostclass/screens/legal_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -38,7 +38,7 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
   @override
   void dispose() {
-    _subscription.cancel();
+    unawaited(_subscription.cancel());
     super.dispose();
   }
 }
@@ -242,8 +242,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contact',
         pageBuilder: (context, state) {
-          final Map<String, dynamic>? extra = (state.extra is Map)
-              ? (state.extra as Map).cast<String, dynamic>()
+          final extra = (state.extra is Map)
+              ? (state.extra! as Map).cast<String, dynamic>()
               : null;
           final subject =
               extra?['subject'] as String? ?? state.uri.queryParameters['subject'];

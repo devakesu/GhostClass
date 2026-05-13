@@ -6,6 +6,11 @@ import AuthError from '../error';
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
+type ErrorFallbackProps = {
+  error: Error;
+  reset: () => void;
+};
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
@@ -17,7 +22,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/components/error-fallback", () => ({
-  ErrorFallback: ({ error, reset }: any) => (
+  ErrorFallback: ({ error, reset }: ErrorFallbackProps) => (
     <div data-testid="error-fallback">
       <span>{error.message}</span>
       <button onClick={reset}>Reset</button>
@@ -31,7 +36,7 @@ describe('AuthError', () => {
   });
 
   it('logs error and captures exception on mount', () => {
-    const error = new Error('Auth error') as any;
+    const error = new Error('Auth error') as Error & { digest?: string };
     error.digest = 'auth-digest';
     const reset = vi.fn();
 

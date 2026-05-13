@@ -44,9 +44,9 @@ export function OutageProvider({ children }: { children: ReactNode }) {
       setOutage(event.detail.messages, event.detail.details);
     };
 
-    window.addEventListener("gc:outage" as any, handleOutageEvent);
+    window.addEventListener("gc:outage", handleOutageEvent as EventListener);
     return () => {
-      window.removeEventListener("gc:outage" as any, handleOutageEvent);
+      window.removeEventListener("gc:outage", handleOutageEvent as EventListener);
     };
   }, [setOutage]);
 

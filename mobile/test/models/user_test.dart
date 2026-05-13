@@ -4,10 +4,10 @@ import 'package:ghostclass/models/user.dart';
 void main() {
   group('UserProfile & UserClass Models', () {
     test('UserProfile.fullName computes correctly', () {
-      expect(UserProfile(firstName: 'Jane', lastName: 'Smith').fullName, 'Jane Smith');
-      expect(UserProfile(firstName: 'Jane').fullName, 'Jane');
-      expect(UserProfile(lastName: 'Smith').fullName, 'Smith');
-      expect(UserProfile().fullName, isNull);
+      expect(const UserProfile(firstName: 'Jane', lastName: 'Smith').fullName, 'Jane Smith');
+      expect(const UserProfile(firstName: 'Jane').fullName, 'Jane');
+      expect(const UserProfile(lastName: 'Smith').fullName, 'Smith');
+      expect(const UserProfile().fullName, isNull);
     });
 
     test('UserProfile copyWith, equals, and hashCode work', () {

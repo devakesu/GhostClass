@@ -97,17 +97,13 @@ describe('axios lib', () => {
     });
 
     it('logs CSP warning in production if meta tag is missing', () => {
-      // @ts-ignore
-      const oldNodeEnv = process.env.NODE_ENV;
-      // @ts-ignore
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       
       try {
         getCsrfToken();
         expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('No CSP meta tag detected'));
       } finally {
-        // @ts-ignore
-        process.env.NODE_ENV = oldNodeEnv;
+        vi.unstubAllEnvs();
       }
     });
   });
@@ -122,7 +118,7 @@ describe('axios lib', () => {
         headers: new Map() 
       } as any;
       
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
       const resultConfig = await interceptor(config);
       
@@ -137,7 +133,7 @@ describe('axios lib', () => {
         headers: new Map() 
       } as any;
       
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
       const resultConfig = await interceptor(config);
       
@@ -154,7 +150,7 @@ describe('axios lib', () => {
         headers: new Map() 
       } as any;
       
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
       const resultConfig = await interceptor(config);
       
@@ -172,7 +168,7 @@ describe('axios lib', () => {
         config: { _jweCek: new Uint8Array([1, 2, 3]) }
       } as any;
       
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.response.handlers[0].fulfilled;
       const result = await interceptor(response);
       
@@ -196,7 +192,7 @@ describe('axios lib', () => {
 
       const requestSpy = vi.spyOn(axiosInstance, 'request').mockResolvedValue({ data: 'success' } as any);
       
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
       if (interceptor) await interceptor(error);
       
@@ -217,7 +213,7 @@ describe('axios lib', () => {
       });
       const requestSpy = vi.spyOn(axiosInstance, 'request').mockResolvedValue({ data: 'success' } as any);
 
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
       if (interceptor) await interceptor(error);
       
@@ -238,12 +234,12 @@ describe('axios lib', () => {
       
       const { handleLogout } = await import('@/lib/security/auth');
 
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
       try {
         if (interceptor) await interceptor(error);
-      } catch (_e) {
-        // Expected to reject with the error
+      } catch (e) {
+        logger.dev("Expected rejection in test", e);
       }
       
       expect(handleLogout).toHaveBeenCalled();
@@ -261,7 +257,7 @@ describe('axios lib', () => {
       
       vi.mocked(encryptRequest).mockRejectedValueOnce(new Error('Cipher error'));
 
-      // @ts-ignore
+      // @ts-expect-error -- accessing private interceptor handler for testing
       const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
       await expect(interceptor(config)).rejects.toThrow('Cipher error');
       expect(logger.error).toHaveBeenCalledWith('[axios] JWE request encryption failed', expect.any(Error));

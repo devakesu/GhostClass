@@ -63,8 +63,8 @@ const mockDisableCourse = vi.fn();
 const mockEnableCourse = vi.fn();
 
 const defaultDisabledCoursesReturn = {
-  isDisabled: (_code: string) => false,
-  getDisableReason: (_code: string): string | null => null,
+  isDisabled: (() => false) as (code: string) => boolean,
+  getDisableReason: (() => null) as (code: string) => string | null,
   disableCourse: mockDisableCourse,
   enableCourse: mockEnableCourse,
   disabledCodes: new Set<string>(),
@@ -72,10 +72,11 @@ const defaultDisabledCoursesReturn = {
   isLoading: false,
 };
 
-const mockUseDisabledCourses = vi.fn((_opts?: any) => defaultDisabledCoursesReturn);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const mockUseDisabledCourses = vi.fn((_opts?: unknown) => defaultDisabledCoursesReturn);
 
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({
-  useDisabledCourses: (opts: any) => mockUseDisabledCourses(opts),
+  useDisabledCourses: (opts: unknown) => mockUseDisabledCourses(opts),
 }));
 
 vi.mock('@/hooks/users/settings', () => ({
@@ -145,7 +146,7 @@ describe('CourseCard', () => {
 
   describe('statusColorClasses', () => {
     it('applies green border by default even when there is no attendance data (isLoading)', async () => {
-      vi.mocked(useCourseDetails).mockReturnValue({ data: undefined, isLoading: true } as any);
+      vi.mocked(useCourseDetails).mockReturnValue({ data: undefined, isLoading: true } as unknown as ReturnType<typeof useCourseDetails>);
       const noDataCourse: ExtendedCourse = { id: 1, name: 'No Data Course', code: 'ND101' };
       const { container } = render(<CourseCard course={noDataCourse} />);
       const card = container.querySelector('.custom-container');
@@ -154,7 +155,7 @@ describe('CourseCard', () => {
 
     it('applies green top border when attendance is at or above target', async () => {
       // 15/20 = 75% = target
-      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 15, total: 20, absent: 5 }, isLoading: false } as any);
+      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 15, total: 20, absent: 5 }, isLoading: false } as unknown as ReturnType<typeof useCourseDetails>);
       const { container } = render(<CourseCard course={sampleCourse} />);
       const card = container.querySelector('.custom-container');
       expect(await within(card as HTMLElement).findByText('Computer Science')).toBeInTheDocument();
@@ -163,7 +164,7 @@ describe('CourseCard', () => {
 
     it('applies amber top border when attendance is within 10% below target', async () => {
       // 10/15 ≈ 66.67%, target=75, target-10=65 → amber
-      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 10, total: 15, absent: 5 }, isLoading: false } as any);
+      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 10, total: 15, absent: 5 }, isLoading: false } as unknown as ReturnType<typeof useCourseDetails>);
       const amberCourse: ExtendedCourse = { id: 2, name: 'Amber Course', code: 'AM202', present: 10, total: 15 };
       const { container } = render(<CourseCard course={amberCourse} />);
       const card = container.querySelector('.custom-container');
@@ -173,7 +174,7 @@ describe('CourseCard', () => {
 
     it('applies red top border when attendance is more than 10% below target', async () => {
       // 6/15 = 40%, target=75, target-10=65 → red
-      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 6, total: 15, absent: 9 }, isLoading: false } as any);
+      vi.mocked(useCourseDetails).mockReturnValue({ data: { present: 6, total: 15, absent: 9 }, isLoading: false } as unknown as ReturnType<typeof useCourseDetails>);
       const redCourse: ExtendedCourse = { id: 3, name: 'Red Course', code: 'RD303', present: 6, total: 15 };
       const { container } = render(<CourseCard course={redCourse} />);
       const card = container.querySelector('.custom-container');
@@ -191,7 +192,7 @@ describe('CourseCard', () => {
     it('shows "Disabled" when course is disabled', async () => {
       mockUseDisabledCourses.mockReturnValue({
         isDisabled: (code: string) => code === 'CS101',
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -212,7 +213,7 @@ describe('CourseCard', () => {
     it('opens enable dialog when clicking Disabled toggle', async () => {
       mockUseDisabledCourses.mockReturnValue({
         isDisabled: (code: string) => code === 'CS101',
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -228,8 +229,8 @@ describe('CourseCard', () => {
 
     it('applies opacity to card when disabled', async () => {
       mockUseDisabledCourses.mockReturnValue({
-        isDisabled: (_code: string) => true,
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        isDisabled: (() => true) as (code: string) => boolean,
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -257,7 +258,7 @@ describe('CourseCard', () => {
     it('calls enableCourse with courseCode when Enable button is clicked', async () => {
       mockUseDisabledCourses.mockReturnValue({
         isDisabled: (code: string) => code === 'CS101',
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -290,8 +291,8 @@ describe('CourseCard', () => {
 
     it('applies red bg/border override to CardHeader when course is disabled', async () => {
       mockUseDisabledCourses.mockReturnValue({
-        isDisabled: (_code: string) => true,
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        isDisabled: (() => true) as (code: string) => boolean,
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -323,7 +324,7 @@ describe('CourseCard', () => {
     it('calls toast.success with courseCode after confirming enable', async () => {
       mockUseDisabledCourses.mockReturnValue({
         isDisabled: (code: string) => code === 'CS101',
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -370,7 +371,7 @@ describe('CourseCard', () => {
 
       mockUseDisabledCourses.mockReturnValue({
         isDisabled: (code: string) => code === 'CS101',
-        getDisableReason: (_code: string): string | null => 'Challenge passed',
+        getDisableReason: (() => 'Challenge passed') as (code: string) => string | null,
         disableCourse: mockDisableCourse,
         enableCourse: mockEnableCourse,
         disabledCodes: new Set(['CS101']),
@@ -402,7 +403,7 @@ describe('CourseCard', () => {
       vi.mocked(useCourseDetails).mockReturnValue({
         data: { present: 15, total: 20, absent: 5 },
         isLoading: false,
-      } as any);
+      } as unknown as ReturnType<typeof useCourseDetails>);
       render(<CourseCard course={sampleCourse} />);
 
       // Wait for component to finish loading and show bunk calc (default: true)
@@ -424,7 +425,7 @@ describe('CourseCard', () => {
       vi.mocked(useCourseDetails).mockReturnValue({
         data: { present: 15, total: 20, absent: 5 },
         isLoading: false,
-      } as any);
+      } as unknown as ReturnType<typeof useCourseDetails>);
       vi.stubGlobal('localStorage', {
         getItem: vi.fn().mockReturnValue('false'), // start hidden
         setItem: vi.fn(),
@@ -438,7 +439,7 @@ describe('CourseCard', () => {
       );
 
       // Bunk calculator should become visible
-      await screen.findByText('Computer Science');
+      expect(await screen.findByText('Computer Science')).toBeInTheDocument();
     });
   });
 
@@ -453,7 +454,7 @@ describe('CourseCard', () => {
           }),
           getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
         },
-      } as any);
+      } as unknown as ReturnType<typeof createClient>);
 
       vi.stubGlobal('localStorage', {
         getItem: vi.fn((key: string) => {
@@ -467,7 +468,7 @@ describe('CourseCard', () => {
       vi.mocked(useCourseDetails).mockReturnValue({
         data: { present: 15, total: 20, absent: 5 },
         isLoading: false,
-      } as any);
+      } as unknown as ReturnType<typeof useCourseDetails>);
 
       render(<CourseCard course={sampleCourse} />);
       await screen.findByText('Computer Science');

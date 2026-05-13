@@ -28,10 +28,6 @@ class ServiceToast {
 }
 
 class _ToastWidget extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback onDismiss;
-  final Duration duration;
 
   const _ToastWidget({
     required this.message,
@@ -39,6 +35,10 @@ class _ToastWidget extends StatefulWidget {
     required this.onDismiss,
     required this.duration,
   });
+  final String message;
+  final bool isError;
+  final VoidCallback onDismiss;
+  final Duration duration;
 
   @override
   State<_ToastWidget> createState() => _ToastWidgetState();
@@ -63,11 +63,11 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _controller.forward();
+    final _ = _controller.forward();
 
-    Future.delayed(widget.duration, () {
+    final _ = Future<void>.delayed(widget.duration, () {
       if (mounted) {
-        _controller.reverse().then((_) => widget.onDismiss());
+        final _ = _controller.reverse().then((_) => widget.onDismiss());
       }
     });
   }

@@ -54,7 +54,7 @@ vi.mock('@/lib/utils.server', () => ({
 vi.mock('@upstash/ratelimit', () => {
     return {
         Ratelimit: class {
-            static slidingWindow = vi.fn();
+            static readonly slidingWindow = vi.fn();
             limit = vi.fn().mockImplementation(() => Promise.resolve(rateLimitMock));
         }
     };
@@ -204,7 +204,7 @@ describe('app-check logic', () => {
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
         const req = new Request('https://test.com/api/some-api', { headers: h });
-        // @ts-ignore - mock request property for nextUrl
+        // @ts-expect-error - mock request property for nextUrl
         req.nextUrl = { pathname: '/api/some-api' };
         
         await wrapped(req as any, { params: {} });
@@ -221,7 +221,7 @@ describe('app-check logic', () => {
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
         const req = new Request('https://test.com/api/backend/test', { headers: h });
-        // @ts-ignore - mock request property for nextUrl
+        // @ts-expect-error - mock request property for nextUrl
         req.nextUrl = { pathname: '/api/backend/test' };
         
         await wrapped(req as any, { params: {} });
@@ -238,7 +238,7 @@ describe('app-check logic', () => {
 
         const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
         const req = new Request('https://test.com/api/test', { headers: h });
-        // @ts-ignore - mock request property for nextUrl
+        // @ts-expect-error - mock request property for nextUrl
         req.nextUrl = { pathname: '/api/test' };
         
         const res = await wrapped(req as any, { params: {} });

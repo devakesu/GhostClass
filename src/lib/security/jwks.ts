@@ -8,9 +8,9 @@ import { logger } from "@/lib/logger";
  * The private key is loaded from JWE_PRIVATE_KEY environment variable.
  */
 
-let cachedJwks: { keys: any[] } | null = null;
-let cachedPrivateKey: any | null = null;
-let jwksPromise: Promise<{ keys: any[] }> | null = null;
+let cachedJwks: { keys: Array<Record<string, unknown>> } | null = null;
+let cachedPrivateKey: unknown | null = null;
+let jwksPromise: Promise<{ keys: Array<Record<string, unknown>> }> | null = null;
 
 /**
  * FOR TESTING ONLY: Resets the cached JWKS and private key.

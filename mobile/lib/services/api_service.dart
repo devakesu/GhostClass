@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -9,17 +10,17 @@ import 'package:ghostclass/services/auth_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/ezygo_service.dart';
 import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/services/security_service.dart';
 
 /// ApiService
 /// ----------
 /// A centralized facade for accessing specialized API services (Auth, EzyGo, Security).
 /// This service acts as the primary entry point for network-related logic in the app.
 class ApiService {
-  final Ref _ref;
 
   ApiService(this._ref);
+  final Ref _ref;
 
   AuthService get _auth => _ref.read(authServiceProvider);
   EzygoService get _ezygo => _ref.read(ezygoServiceProvider);
@@ -108,7 +109,7 @@ class ApiService {
     final outage = _ref.read(outageProvider);
     if (outage) {
       AppLogger.d('ApiService: Skipping sync due to active outage.');
-      return Response(
+      return Response<dynamic>(
         requestOptions: RequestOptions(path: 'sync'),
         statusCode: 503,
         statusMessage: 'Outage active.',
@@ -119,7 +120,7 @@ class ApiService {
     final now = DateTime.now();
     if (!force && _lastSyncTime != null && now.difference(_lastSyncTime!) < _syncCooldown) {
       AppLogger.d('ApiService: Sync throttled.');
-      return Response(
+      return Response<dynamic>(
         requestOptions: RequestOptions(path: 'sync'),
         statusCode: 304,
         data: {'message': 'Throttled'},
@@ -128,7 +129,7 @@ class ApiService {
 
     _syncInFlight = () async {
       try {
-        final response = await client.get(
+        final response = await client.get<dynamic>(
           '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
           options: Options(
             headers: {'Authorization': 'Bearer $supabaseToken'},
@@ -139,10 +140,10 @@ class ApiService {
         );
         _lastSyncTime = DateTime.now();
         return response;
-      } catch (e) {
+      } on Object catch (e) {
         AppLogger.w('ApiService: Background sync failed', e);
         // Return a mock 304 to let downstream continue without hanging
-        return Response(
+        return Response<dynamic>(
           requestOptions: RequestOptions(path: 'sync'),
           statusCode: 304,
         );
@@ -219,4 +220,4 @@ class ApiService {
   }
 }
 
-final apiServiceProvider = Provider<ApiService>((ref) => ApiService(ref));
+final apiServiceProvider = Provider<ApiService>(ApiService.new);

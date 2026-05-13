@@ -8,7 +8,7 @@ describe('SW Reload', () => {
     vi.clearAllMocks();
     
     // Mock window.location.reload
-    // @ts-ignore
+    // @ts-expect-error - test-only: mocking ServiceWorker global state
     delete window.location;
      (window as any).location = { ...originalLocation, reload: vi.fn() } as any;
 
@@ -120,7 +120,7 @@ describe('SW Reload', () => {
         value: undefined,
         configurable: true,
       });
-      // @ts-ignore
+      // @ts-expect-error - test-only: mocking ServiceWorker global state
       delete navigator.serviceWorker;
 
       const { tryAutoUpdate } = await import('../sw-reload');

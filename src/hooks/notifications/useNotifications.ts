@@ -199,7 +199,7 @@ export function useNotifications(enabled = true, countOnly = false) {
 
       // Snapshot the previous values
       const previousUnread = queryClient.getQueryData<Notification[]>(["notifications", "unread"]);
-      const previousFeed = queryClient.getQueryData<{ pages: FetchResponse[]; pageParams: any[] }>(["notifications", "feed"]);
+      const previousFeed = queryClient.getQueryData<{ pages: FetchResponse[]; pageParams: Array<unknown> }>(["notifications", "feed"]);
       const previousUnreadCount = queryClient.getQueryData<number>(["notifications", "unreadCount"]);
 
       // 1. Optimistically update unread count
@@ -255,7 +255,7 @@ export function useNotifications(enabled = true, countOnly = false) {
 
       return { previousUnread, previousFeed, previousUnreadCount };
     },
-    onError: (err, variables, context: any) => {
+    onError: (err, variables, context: Record<string, unknown> | undefined) => {
       // Rollback on error
       if (context?.previousUnread) queryClient.setQueryData(["notifications", "unread"], context.previousUnread);
       if (context?.previousFeed) queryClient.setQueryData(["notifications", "feed"], context.previousFeed);

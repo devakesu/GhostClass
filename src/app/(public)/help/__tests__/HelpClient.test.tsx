@@ -44,5 +44,6 @@ describe('HelpClient', () => {
 
   it('handles malformed questions', () => {
     render(<HelpClient />);
+    expect(screen.getByRole('heading')).toBeInTheDocument();
   });
 });

@@ -2,8 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import LoginPage from '../page';
 
+type FooterProps = {
+  className?: string;
+};
+
 vi.mock('@/components/layout/footer', () => ({
-  Footer: ({ className }: any) => <footer className={className}>Footer</footer>,
+  Footer: ({ className }: FooterProps) => <footer className={className}>Footer</footer>,
 }));
 
 vi.mock('@/components/user/login-form-client', () => ({

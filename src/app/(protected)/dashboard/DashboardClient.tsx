@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AnimatePresence,
   domAnimation,
@@ -9,12 +9,10 @@ import {
 } from "framer-motion";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import axios from "@/lib/axios";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -57,14 +55,13 @@ import { AddCourseDialog } from "@/components/attendance/AddCourseDialog";
 import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
 import { EditInstructorDialog } from "@/components/attendance/EditInstructorDialog";
 import { useFetchCourseInstructors } from "@/hooks/courses/instructors";
-import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
-import { captureSentryException } from "@/lib/sentry-lazy";
+import { ClassCourse, useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { AttendanceReport, Course, TrackAttendance, UserProfile } from "@/types";
 
-// Extracted Sub-components
 import { StatsPanel } from "./components/StatsPanel";
 import { DashboardCharts } from "./components/DashboardCharts";
 import { CourseGrid } from "./components/CourseGrid";
@@ -86,300 +83,221 @@ const AttendanceCalendar = dynamic(
   },
 );
 
+interface MergedCourse {
+  id: string | number;
+  code?: string | null;
+  name?: string | null;
+  key: string;
+  [key: string]: unknown;
+}
+
+interface CustomInstructor {
+  instructor_name?: string | null;
+  [key: string]: unknown;
+}
+
+type InitialDashboardData = {
+  courses: unknown;
+  attendance: unknown;
+} | null;
+
 interface DashboardClientProps {
-  initialData?: {
-    courses: any;
-    attendance: any;
-  } | null;
+  initialData?: InitialDashboardData;
   serverError?: string | null;
 }
 
-export default function DashboardClient(
-  { initialData, serverError }: DashboardClientProps,
-) {
-  const {
-    data: profile,
-    isLoading: isLoadingProfile,
-    isFetching: isFetchingProfile,
-    refetch: refetchProfile,
-  } = useProfile({ sync: true });
-  const queryClient = useQueryClient();
+const getActiveCourseStats = (
+  attendanceData: AttendanceReport | undefined | null,
+  trackingData: TrackAttendance[],
+  coursesData: { courses: Record<string, Course> } | undefined | null,
+  classCourses: ClassCourse[],
+  disabledCodes: Set<string>,
+  selectedSemester: string | null,
+  selectedYear: string | null,
+  getCourseCode: (id: string | number) => string
+) => {
+  const activeIds = new Set<string>();
 
+  if (attendanceData?.studentAttendanceData) {
+    Object.values(attendanceData.studentAttendanceData).forEach((sessions) => {
+      if (!sessions) return;
+      Object.values(sessions).forEach((s) => {
+        const attCode = Number(s.attendance);
+        if ([110, 111, 225, 112].includes(attCode) && s.class_type !== "Revision" && s.course) {
+          activeIds.add(String(s.course));
+        }
+      });
+    });
+  }
+
+  if (trackingData) {
+    trackingData.forEach((t) => {
+      const isSameSemester = !selectedSemester || t.semester === selectedSemester;
+      const isSameYear = !selectedYear || t.year === selectedYear;
+      if (t.course && isSameSemester && isSameYear && t.attendance != null) {
+        activeIds.add(String(t.course));
+      }
+    });
+  }
+
+  const catalogCodes = new Set<string>();
+  if (coursesData?.courses) {
+    Object.values(coursesData.courses).forEach((c) => {
+      catalogCodes.add(c.code ? c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") : String(c.id).toUpperCase());
+    });
+  }
+  if (classCourses) {
+    classCourses.forEach((cc) => {
+      catalogCodes.add(cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, ""));
+    });
+  }
+
+  const activeCodes = new Set<string>();
+  const disabledWithDataCodes = new Set<string>();
+
+  activeIds.forEach((id) => {
+    const code = String(getCourseCode(id) || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    if (code !== "" && catalogCodes.has(code)) {
+      if (disabledCodes.has(code)) disabledWithDataCodes.add(code);
+      else activeCodes.add(code);
+    }
+  });
+
+  let noDataCount = 0;
+  catalogCodes.forEach((code) => {
+    if (!activeCodes.has(code) && !disabledWithDataCodes.has(code) && !disabledCodes.has(code)) noDataCount++;
+  });
+
+  return { active: activeCodes.size, noData: noDataCount, disabled: disabledCodes.size, total: catalogCodes.size };
+};
+
+const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
+  if (item.isDisabled) return 2;
+  if (item.isNew) return 1;
+  return 0;
+};
+
+export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
+  const { data: rawProfile, isLoading: isLoadingProfile } = useProfile({ sync: true });
+  const profile = rawProfile as UserProfile | undefined;
+  const queryClient = useQueryClient();
   const setSemesterMutation = useSetSemester();
   const setAcademicYearMutation = useSetAcademicYear();
   const { targetPercentage } = useAttendanceSettings();
 
-  useEffect(() => {
-    if (serverError) {
-      const isRateLimit = serverError.includes("429") ||
-        serverError.toLowerCase().includes("rate limit");
-
-      toast.error(
-        isRateLimit ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed",
-        {
-          description: isRateLimit
-            ? "Too many requests. Please wait a few minutes before trying again."
-            : "We couldn't pre-load your data. We'll try again from your browser.",
-          duration: 8000,
-          action: {
-            label: "Retry",
-            onClick: () => window.location.reload(),
-          },
-        },
-      );
-    }
-  }, [serverError]);
-
-  const { data: userSettings, isLoading: isSettingsLoading } =
-    useFetchUserSettings();
+  const { data: userSettings, isLoading: isSettingsLoading } = useFetchUserSettings();
   const ezygoSemester = userSettings?.semester;
   const ezygoYear = userSettings?.academicYear;
 
-  const [selectedSemester, setSelectedSemester] = useState<
-    "even" | "odd" | null
-  >(null);
+  const [selectedSemester, setSelectedSemester] = useState<"even" | "odd" | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
-  const isInitializedRef = useRef(false);
-  const syncFailedRef = useRef(false);
-  
+  const defaultAcademicInfo = useMemo(() => calculateCurrentAcademicInfo(), []);
+  const effectiveSemester = selectedSemester ?? ezygoSemester ?? defaultAcademicInfo.current_semester;
+  const effectiveYear = selectedYear ?? ezygoYear ?? defaultAcademicInfo.current_year;
+
+  const currentSem = effectiveSemester || undefined;
+  const currentYear = effectiveYear || undefined;
+
   useEffect(() => {
-    if (!isInitializedRef.current && !isSettingsLoading && ezygoSemester !== undefined && ezygoYear !== undefined) {
-      isInitializedRef.current = true;
-      
-      Promise.resolve().then(() => {
-        if (selectedSemester === null) {
-          if (ezygoSemester) {
-            setSelectedSemester(ezygoSemester);
-          } else if (profile && !setSemesterMutation.isPending) {
-            const info = calculateCurrentAcademicInfo();
-            setSelectedSemester(info.current_semester);
-          }
-        }
-        if (selectedYear === null) {
-          if (ezygoYear) {
-            setSelectedYear(ezygoYear);
-          } else if (profile && !setAcademicYearMutation.isPending) {
-            const info = calculateCurrentAcademicInfo();
-            setSelectedYear(info.current_year);
-          }
-        }
+    if (serverError) {
+      const isRateLimit = serverError.toLowerCase().includes("rate limit") || serverError.includes("429");
+      toast.error(isRateLimit ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed", {
+        description: isRateLimit ? "Too many requests. Please wait." : "Failed to pre-load your data.",
+        duration: 8000,
+        action: { label: "Retry", onClick: () => window.location.reload() },
       });
     }
-  }, [isSettingsLoading, ezygoSemester, ezygoYear, profile, selectedSemester, selectedYear, setSemesterMutation.isPending, setAcademicYearMutation.isPending]);
+  }, [serverError]);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [isAddAttendanceOpen, setIsAddAttendanceOpen] = useState(false);
-  const [pendingChange, setPendingChange] = useState<
-    | { type: "semester"; value: "even" | "odd" }
-    | { type: "academicYear"; value: string }
-    | null
-  >(null);
-
+  const [pendingChange, setPendingChange] = useState<{ type: "semester" | "academicYear"; value: string } | null>(null);
   const [isEditInstructorOpen, setIsEditInstructorOpen] = useState(false);
-  const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<
-    {
-      code: string;
-      name: string;
-      initialName: string;
-    } | null
-  >(null);
-
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<{ code: string; name: string; initialName: string } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Transform initial courses data into expected format
-  const initialCoursesData = initialData?.courses
-    ? {
-      courses: Array.isArray(initialData.courses)
-        ? initialData.courses.reduce(
-          (acc: Record<string, any>, course: any) => {
-            acc[course.id.toString()] = course;
-            return acc;
-          },
-          {},
-        )
-        : initialData.courses,
-    }
-    : undefined;
-
-  const currentSem = selectedSemester ?? undefined;
-  const currentYear = selectedYear ?? undefined;
-
-  const { syncCompleted } = useSyncOnMount({
-    username: profile?.username,
-    userId: profile?.id,
-    enabled: !!profile?.username,
+  const { syncCompleted } = useSyncOnMount({ 
+    username: profile?.username, 
+    userId: profile?.id ? String(profile.id) : undefined, 
+    enabled: !!profile?.username, 
     sentryLocation: "DashboardClient",
-    sentryTag: "background_sync",
+    sentryTag: "background_sync"
   });
 
-  const {
-    data: attendanceData,
-    isLoading: isLoadingAttendance,
-    isFetching: isFetchingAttendance,
-    isError: isAttendanceError,
-    refetch: refetchAttendance,
-  } = useAttendanceReport(
-    currentSem,
-    currentYear,
-    {
-      enabled: syncCompleted,
-      // Only use initialData if active semester/year matches initialData defaults
-      initialData: (selectedSemester === null && selectedYear === null)
-        ? (initialData?.attendance ?? undefined)
-        : undefined,
-    },
-  );
+  const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
+    enabled: syncCompleted,
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    initialData: (selectedSemester === null && selectedYear === null) ? (initialData?.attendance as any) : undefined,
+  });
+  const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 
-
-  const {
-    data: coursesData,
-    isLoading: isLoadingCourses,
-    isFetching: isFetchingCourses,
-    isError: isCoursesError,
-  } = useFetchCourses({
+  const { data: rawCoursesData, isLoading: isLoadingCourses } = useFetchCourses({
     semester: currentSem,
     year: currentYear,
-    // Only hydrate from SSR initialData on the very first load before any selection.
-    initialData: (selectedSemester === null && selectedYear === null)
-      ? initialCoursesData
-      : undefined,
     enabled: syncCompleted && !!currentSem && !!currentYear,
   });
+  const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
 
-  const {
-    data: trackingData,
-    isLoading: isLoadingTracking,
-    isFetching: isFetchingTracking,
-    isError: isTrackingError,
-    refetch: refetchTracking,
-  } = useTrackingData(profile, {
+  const { data: rawTrackingData, isLoading: isLoadingTracking, refetch: refetchTracking } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted,
   });
+  const trackingData = rawTrackingData as TrackAttendance[] | undefined;
 
-  const { data: customInstructors } = useFetchCourseInstructors({
-    semester: currentSem,
-    year: currentYear,
-    enabled: syncCompleted,
-  });
+  const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: syncCompleted });
+  const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncCompleted && !!profile?.class?.id });
+  const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
-  const { data: classCourses } = useFetchClassCourses({
-    semester: currentSem,
-    year: currentYear,
-    enabled: syncCompleted && !!profile?.class?.id,
-  });
-
-  const { getCourseCodeById: getCourseCode } = useCourseLookup({
-    coursesData,
-    classCourses,
-    attendanceData,
-  });
+  const { getCourseCodeById: getCourseCode } = useCourseLookup({ 
+    coursesData, 
+    classCourses, 
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    attendanceData: attendanceData as any 
+  }) as { getCourseCodeById: (id: string | number) => string };
 
   const courseList = useMemo(() => {
-    const registry: Record<string, { code: string; id: number; name: string }> = {};
+    const registry = new Map<string, { code: string; id: number; name: string }>();
     if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([code, c]: [string, any]) => {
-        const key = (c.code ?? code).toUpperCase().replace(/[\s\u00A0-]/g, "");
-        registry[key] = { code: c.code ?? code, id: Number(c.id), name: c.name };
+      Object.entries(coursesData.courses).forEach(([code, c]) => {
+        const actualCode = c.code ?? code;
+        const key = actualCode.toUpperCase().replace(/[\s\u00A0-]/g, "");
+        registry.set(key, { code: actualCode, id: Number(c.id), name: c.name || "" });
       });
     }
     if (classCourses) {
-      classCourses.forEach((cc: any) => {
+      classCourses.forEach((cc) => {
         const key = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (!registry[key]) {
-          registry[key] = { code: cc.course_code, id: 0, name: cc.course_name || cc.course_code };
-        }
+        if (!registry.has(key)) registry.set(key, { code: cc.course_code, id: 0, name: cc.course_name || cc.course_code });
       });
     }
-    return Object.values(registry);
+    return Array.from(registry.values());
   }, [coursesData, classCourses]);
 
-  const {
-    data: allCourseSummaries,
-    isError: isAllCourseSummariesError,
-    isLoading: isLoadingAllCourseSummaries,
-    isFetching: isFetchingAllCourseSummaries,
-  } = useAllCourseDetails(syncCompleted ? courseList : []);
+  const { data: allCourseSummaries, isLoading: isLoadingAllCourseSummaries } = useAllCourseDetails(syncCompleted ? courseList : []);
 
-  useEffect(() => {
-    if (!isTransitioning) return;
-
-    const isStillFetching = isFetchingAttendance || isFetchingCourses ||
-      isFetchingTracking || isFetchingProfile || isFetchingAllCourseSummaries;
-    const isStillLoading = isLoadingAttendance || isLoadingCourses ||
-      isLoadingTracking || isLoadingProfile || isLoadingAllCourseSummaries;
-
-    const timer = setTimeout(() => {
-      if (!isStillFetching && !isStillLoading) {
-        setIsTransitioning(false);
-      }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [isTransitioning, isFetchingAttendance, isFetchingCourses, isFetchingTracking, isFetchingProfile, isFetchingAllCourseSummaries, isLoadingAttendance, isLoadingCourses, isLoadingTracking, isLoadingProfile, isLoadingAllCourseSummaries]);
-
-  const { disabledCodes } = useDisabledCourses({
-    academicYear: currentYear,
-    semester: currentSem,
-  });
-
-  const handleSemesterChange = (value: "even" | "odd") => {
-    if (value === selectedSemester) return;
-    setPendingChange({ type: "semester", value });
-    setShowConfirmDialog(true);
-  };
-
-  const handleAcademicYearChange = (value: string) => {
-    if (value === selectedYear) return;
-    setPendingChange({ type: "academicYear", value });
-    setShowConfirmDialog(true);
-  };
+  const { disabledCodes } = useDisabledCourses({ academicYear: currentYear, semester: currentSem });
 
   const handleConfirmChange = async () => {
     if (!pendingChange || !profile?.username || isUpdating) return;
     setIsUpdating(true);
-    setIsTransitioning(true);
     setShowConfirmDialog(false);
-
-    await Promise.all([
-      queryClient.cancelQueries({ queryKey: ["attendance-report"] }),
-      queryClient.cancelQueries({ queryKey: ["courses"] }),
-      queryClient.cancelQueries({ queryKey: ["track_data"] }),
-      queryClient.cancelQueries({ queryKey: ["attendance-report-all"] }),
-      queryClient.cancelQueries({ queryKey: ["class_courses"] }),
-      queryClient.cancelQueries({ queryKey: ["course_instructors"] }),
-      queryClient.cancelQueries({ queryKey: ["exams"] }),
-      queryClient.cancelQueries({ queryKey: ["exam-questions"] }),
-      queryClient.cancelQueries({ queryKey: ["exam-answers"] }),
-    ]);
-
-    queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
-    queryClient.invalidateQueries({ queryKey: ["courses"] });
-    queryClient.invalidateQueries({ queryKey: ["track_data"] });
-    queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
-    queryClient.invalidateQueries({ queryKey: ["class_courses"] });
-    queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
-    queryClient.invalidateQueries({ queryKey: ["exams"] });
-    queryClient.invalidateQueries({ queryKey: ["exam-questions"] });
-    queryClient.invalidateQueries({ queryKey: ["exam-answers"] });
+    await queryClient.cancelQueries();
+    queryClient.invalidateQueries();
 
     try {
       if (pendingChange.type === "semester") {
-        await setSemesterMutation.mutateAsync({ default_semester: pendingChange.value });
-        setSelectedSemester(pendingChange.value);
+        await setSemesterMutation.mutateAsync({ default_semester: pendingChange.value as "even" | "odd" });
+        setSelectedSemester(pendingChange.value as "even" | "odd");
       } else {
         await setAcademicYearMutation.mutateAsync({ default_academic_year: pendingChange.value });
         setSelectedYear(pendingChange.value);
       }
-      await axios.get("/api/profile?sync=true", { baseURL: "" });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     } catch (error) {
-      logger.error("Settings Update Failed:", error);
-      captureSentryException(error, { tags: { type: "update_settings_failed" } });
+      logger.error("Update Failed:", error);
       toast.error("Failed to update settings");
     } finally {
       setIsUpdating(false);
@@ -387,455 +305,163 @@ export default function DashboardClient(
     }
   };
 
-  const handleCancelChange = () => {
-    setShowConfirmDialog(false);
-    setPendingChange(null);
-  };
-
   const academicYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2022;
-    const years: string[] = [];
-    for (let year = startYear; year <= currentYear; year++) {
-      years.push(`${year}-${(year + 1).toString().slice(-2)}`);
-    }
+    const current = new Date().getFullYear();
+    const years = [];
+    for (let y = 2022; y <= current; y++) years.push(`${y}-${(y + 1).toString().slice(-2)}`);
     return years;
   }, []);
 
-  useEffect(() => {
-    if (isInitializedRef.current && !syncFailedRef.current) {
-      if (selectedSemester && ezygoSemester === null && profile && !setSemesterMutation.isPending) {
-        setSemesterMutation.mutate({ default_semester: selectedSemester }, {
-          onError: () => { syncFailedRef.current = true; }
-        });
-      }
-      if (selectedYear && ezygoYear === null && profile && !setAcademicYearMutation.isPending) {
-        setAcademicYearMutation.mutate({ default_academic_year: selectedYear }, {
-          onError: () => { syncFailedRef.current = true; }
-        });
-      }
-    }
-  }, [selectedSemester, selectedYear, ezygoSemester, ezygoYear, profile, setSemesterMutation, setAcademicYearMutation]);
-
-
-  useEffect(() => {
-    if (syncCompleted && !profile?.first_name) {
-      void refetchProfile();
-    }
-  }, [syncCompleted, profile?.first_name, refetchProfile]);
-
-  // CALCULATE ACTIVE COURSES (Courses with at least 1 record)
-  const activeCourseCount = useMemo(() => {
-    const activeIds = new Set<string>();
-
-    // 1. Scan Official Data
-    if (attendanceData?.studentAttendanceData) {
-      Object.values(attendanceData.studentAttendanceData).forEach(
-        (sessions: any) => {
-          Object.values(sessions).forEach((session: any) => {
-            const attCode = Number(session.attendance);
-            const isValidAttendance = [110, 111, 225, 112].includes(attCode);
-            const isRevision = session.class_type === "Revision";
-
-            if (isValidAttendance && !isRevision && session.course) {
-              activeIds.add(String(session.course));
-            }
-          });
-        },
-      );
-    }
-
-    // 2. Scan Tracking Data
-    if (trackingData) {
-      trackingData.forEach((t: any) => {
-        const isSameSemester = !selectedSemester ||
-          t.semester === selectedSemester;
-        const isSameYear = !selectedYear || t.year === selectedYear;
-        const hasAttendance = t.attendance != null;
-
-        if (t.course && isSameSemester && isSameYear && hasAttendance) {
-          activeIds.add(String(t.course));
-        }
-      });
-    }
-
-    // 3. Normalize and categorize
-    const catalogCodes = new Set(
-      [
-        ...(coursesData?.courses
-          ? Object.values(coursesData.courses).map(
-              (c: any) =>
-                (c.code ? c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") : String(c.id).toUpperCase()),
-            )
-          : []),
-        ...(classCourses
-          ? classCourses.map((cc: any) => cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, ""))
-          : []),
-      ]
-    );
-
-    const activeCodes = new Set<string>();
-    const disabledWithDataCodes = new Set<string>();
-
-    activeIds.forEach((id) => {
-      const code = (getCourseCode(id) || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
-      if (code !== "" && catalogCodes.has(code)) {
-        if (disabledCodes.has(code)) {
-          disabledWithDataCodes.add(code);
-        } else {
-          activeCodes.add(code);
-        }
-      }
-    });
-
-    // 4. Count no-data courses (enabled only)
-    const noDataCodes = new Set<string>();
-    catalogCodes.forEach((code) => {
-      if (!activeCodes.has(code) && !disabledWithDataCodes.has(code) && !disabledCodes.has(code)) {
-        noDataCodes.add(code);
-      }
-    });
-
-    return {
-      active: activeCodes.size,
-      noData: noDataCodes.size,
-      disabled: disabledCodes.size,
-      total: catalogCodes.size,
-    };
-  }, [
-    attendanceData,
-    trackingData,
-    coursesData,
-    classCourses,
-    selectedSemester,
-    selectedYear,
-    disabledCodes,
-    getCourseCode,
-  ]);
-
-  // SPECIAL: Data-Rich Correction Effect
-  // If we just loaded a semester from settings and it's DEAD EMPTY, but another semester
-  // might have data, we log it for now. This helps debug "poisoned" stored settings.
-  useEffect(() => {
-    if (!attendanceData || activeCourseCount.active > 0 || !selectedSemester) {
-      return;
-    }
-
-    const rescueKey = `ghost_rescue_${profile?.auth_id}`;
-    const rescueAttempted = sessionStorage.getItem(rescueKey);
-    if (rescueAttempted) return;
-
-    if (activeCourseCount.active === 0 && activeCourseCount.total > 0) {
-      const otherSem = selectedSemester === "even" ? "odd" : "even";
-      logger.dev(
-        `Detected empty semester [${selectedSemester}]. Suggesting alternative [${otherSem}]...`,
-      );
-    }
-  }, [
-    attendanceData,
-    activeCourseCount.active,
-    activeCourseCount.total,
-    selectedSemester,
-    profile?.auth_id,
-  ]);
+  const activeCourseCount = useMemo(() => getActiveCourseStats(attendanceData, trackingData || [], coursesData, classCourses || [], disabledCodes, effectiveSemester, effectiveYear, getCourseCode), [attendanceData, trackingData, coursesData, classCourses, disabledCodes, effectiveSemester, effectiveYear, getCourseCode]);
 
   const filteredChartData = useMemo(() => {
     if (!attendanceData) return undefined;
-    // structuredClone is native and faster than JSON.parse(JSON.stringify()).
     const newData = structuredClone(attendanceData);
-
     if (newData.studentAttendanceData) {
-      Object.keys(newData.studentAttendanceData).forEach((date) => {
-        const sessions = { ...newData.studentAttendanceData[date] };
-        let modified = false;
-        Object.keys(sessions).forEach((sessionKey) => {
-          if (sessions[sessionKey].class_type === "Revision") {
-            delete sessions[sessionKey];
-            modified = true;
-          }
-        });
-        if (modified) newData.studentAttendanceData[date] = sessions;
+      const filteredEntries = Object.entries(newData.studentAttendanceData).map(([date, sessions]) => {
+        const filteredSessions = Object.fromEntries(
+          Object.entries(sessions).filter(([, s]) => s.class_type !== "Revision")
+        );
+        return [date, filteredSessions];
       });
+      newData.studentAttendanceData = Object.fromEntries(filteredEntries);
     }
     return newData;
   }, [attendanceData]);
 
-
-  // --- STATS CALCULATION ---
-  const stats = useDashboardStats({
-    coursesData,
-    attendanceData,
-    trackingData,
-    classCourses,
-    disabledCodes,
-    selectedSemester,
-    selectedYear,
-  });
-
+  const stats = useDashboardStats({ coursesData, attendanceData, trackingData, classCourses, disabledCodes, selectedSemester: effectiveSemester, selectedYear: effectiveYear });
 
   const courseRegistry = useMemo(() => {
-    const registry: Record<string, any> = {};
+    const registry = new Map<string, MergedCourse>();
     if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([id, course]: [string, any]) => {
-        registry[id] = { ...course, key: id };
+      Object.entries(coursesData.courses).forEach(([id, course]) => {
+        const basic: MergedCourse = { id: course.id || id, code: course.code, name: course.name, key: id };
+        registry.set(id, basic);
         const codeKey = (course.code || "").toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (codeKey && !registry[codeKey]) {
-          registry[codeKey] = { ...course, key: id };
-        }
+        if (codeKey && !registry.has(codeKey)) registry.set(codeKey, basic);
       });
     }
     if (classCourses) {
-      classCourses.forEach((cc: any) => {
+      classCourses.forEach((cc) => {
         const codeKey = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (!registry[codeKey]) {
-          registry[codeKey] = {
-            id: 0,
-            code: cc.course_code,
-            name: cc.course_name || cc.course_code,
-            institution_users: [],
-            key: codeKey,
-          };
+        if (!registry.has(codeKey)) {
+          registry.set(codeKey, { id: 0, code: cc.course_code, name: cc.course_name || cc.course_code, key: codeKey });
         }
       });
     }
-    return registry;
+    return Object.fromEntries(registry);
   }, [coursesData, classCourses]);
 
-
   const sortedCourses = useMemo(() => {
-    // For the UI list, we only want unique courses by code.
-    const seenCodes = new Set<string>();
-    const uniqueCourses: any[] = [];
-
-    Object.values(courseRegistry).forEach((course: any) => {
-      const codeKey = (course.code || course.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
-      if (!seenCodes.has(codeKey)) {
-        seenCodes.add(codeKey);
-        uniqueCourses.push({ ...course, codeKey });
-      }
+    const seen = new Set<string>();
+    const unique = Object.values(courseRegistry).filter((c) => {
+      const key = (c.code || c.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
 
-    return uniqueCourses.map((course: any) => {
-      const { codeKey } = course;
-      // Stats are keyed by the normalised code for both official and class courses.
-      const statsObj = stats.courseStats[codeKey] ||
-        stats.courseStats[course.key] ||
-        { present: 0, total: 0, officialPresent: 0, officialTotal: 0, correctionPresent: 0, extraPresent: 0, extrasCount: 0, extraAbsent: 0 };
-      const activeCourseDetails = allCourseSummaries?.[course.code || ""];
-      const {
-        present,
-        total,
-        officialPresent,
-        officialTotal,
-        correctionPresent,
-        extraPresent,
-        extrasCount,
-        extraAbsent
-      } = statsObj;
-      const isNew = total === 0;
-      const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-      let canBunk = 0, requiredToAttend = 0, safeBunkable = 0;
-      if (!isNew) {
-        const result = calculateAttendance(present, total, targetPercentage);
-        canBunk = result.canBunk;
-        requiredToAttend = result.requiredToAttend;
-        const safeResult = calculateAttendance(officialPresent, officialTotal, targetPercentage);
-        safeBunkable = safeResult.canBunk;
-      }
-      const isDisabled = !!course.code &&
-        disabledCodes.has(course.code.toUpperCase().replace(/[\s\u00A0-]/g, ""));
-      return {
-        ...course,
-        key: codeKey,
-        currentPercentage: pct,
-        bunkable: canBunk,
-        safeBunkable,
-        required: requiredToAttend,
-        isNew,
-        isDisabled,
-        present,
-        total,
-        officialPresent,
-        officialTotal,
-        correctionPresent,
-        extraPresent,
-        extrasCount,
-        extraAbsent,
-        activeCourseDetails,
-      };
-    }).sort((a: any, b: any) => {
-      const tierA = a.isDisabled ? 2 : a.isNew ? 1 : 0;
-      const tierB = b.isDisabled ? 2 : b.isNew ? 1 : 0;
-      if (tierA !== tierB) return tierA - tierB;
+    const statsMap = new Map(Object.entries(stats.courseStats || {}));
+    const summariesMap = new Map(allCourseSummaries ? Object.entries(allCourseSummaries) : []);
 
-      // For tiers 1 (New) and 2 (Disabled), mobile only uses alphabetical sorting.
-      // We only apply bunkable/required sorting for tier 0 (Active).
-      if (tierA === 0) {
+    return unique.map((course) => {
+      const codeKey = (course.code || course.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+      const courseCode = String(course.code || "");
+      const activeDetails = summariesMap.get(courseCode);
+      const stat = statsMap.get(codeKey) || statsMap.get(course.key) || { present: 0, total: 0, officialPresent: 0, officialTotal: 0 };
+
+      const isNew = stat.total === 0;
+      const res = isNew ? { canBunk: 0, requiredToAttend: 0 } : calculateAttendance(stat.present, stat.total, targetPercentage);
+      const safeRes = isNew ? { canBunk: 0 } : calculateAttendance(stat.officialPresent, stat.officialTotal, targetPercentage);
+
+      return {
+        ...course, currentPercentage: stat.total > 0 ? Math.round((stat.present / stat.total) * 100) : 0, bunkable: res.canBunk, safeBunkable: safeRes.canBunk, required: res.requiredToAttend, isNew, isDisabled: disabledCodes.has(codeKey), ...stat, activeCourseDetails: activeDetails, name: String(course.name || "")
+      };
+    }).sort((a, b) => {
+      const tA = getSortPriority(a);
+      const tB = getSortPriority(b);
+      if (tA !== tB) return tA - tB;
+      if (tA === 0) {
         if (b.bunkable !== a.bunkable) return b.bunkable - a.bunkable;
-        if (b.safeBunkable !== a.safeBunkable) return b.safeBunkable - a.safeBunkable;
         if (a.required !== b.required) return a.required - b.required;
       }
-
       return a.name.localeCompare(b.name);
     });
-  }, [
-    courseRegistry,
-    stats,
-    targetPercentage,
-    disabledCodes,
-    allCourseSummaries,
-  ]);
+  }, [courseRegistry, stats, targetPercentage, disabledCodes, allCourseSummaries]);
 
+  const renderAttendanceCalendarContent = () => {
+    if (isLoadingAttendance) {
+      return <Skeleton className="h-105 w-full" />;
+    }
+    if (attendanceData) {
+      return (
+        <AttendanceCalendar 
+          attendanceData={attendanceData} 
+          semester={effectiveSemester || undefined} 
+          year={effectiveYear || undefined} 
+          coursesData={{ courses: courseRegistry as unknown as Record<string, Course> }} 
+          classCourses={classCourses} 
+        />
+      );
+    }
+    return <div className="h-50 flex items-center justify-center">No data</div>;
+  };
 
-  const isInitialLoading = (!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating;
+  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating) return <CompLoading />;
 
-  if (isInitialLoading && !isAttendanceError && !isCoursesError && !isTrackingError && !isAllCourseSummariesError) return <CompLoading />;
-
-  const isGlobalLoading = isLoadingProfile || isUpdating || isTransitioning || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
+  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
 
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex flex-col bg-background font-manrope relative min-h-screen">
-        <AnimatePresence>
-          {isGlobalLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center"><div className="w-12 h-12 rounded-full bg-primary/10 animate-pulse" /></div>
-              </div>
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8 text-center px-6">
-                <h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing your academic profile...</h2>
-                <p className="mt-2 text-muted-foreground text-sm max-w-xs mx-auto">Updating your dashboard with the latest data for {selectedSemester?.toUpperCase()} {selectedYear}.</p>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
         <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
           <div className="mb-6 flex flex-col lg:flex-row gap-6 lg:items-end justify-between">
             <div className="flex flex-col gap-4 flex-1">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-4">
-                  <h1 className="text-2xl font-bold w-full">
-                    Welcome back,{" "}
-                    <span className="gradient-name w-full pr-2">
-                      {profile?.first_name} {profile?.last_name}!
-                    </span>
-                  </h1>
-                </div>
-                <div className="flex flex-col gap-1.5 mt-1 ml-0.5 mb-2">
-                  <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 w-fit">
-                    {profile?.class?.name || "Unassigned"}
-                  </span>
-                  <p className="text-muted-foreground font-normal italic text-sm">
-                    {"For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-center font-normal">
-                <p className="flex flex-wrap items-center gap-2.5 max-sm:text-md text-muted-foreground">
-                  <span>You&apos;re checking out the</span>
-                  <Select value={selectedSemester || ""} onValueChange={(v) => handleSemesterChange(v as "even" | "odd")} disabled={isUpdating || isTransitioning}>
-                    <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 uppercase custom-dropdown dark:bg-foreground/10 dark:border-foreground/20">{selectedSemester || "semester"}</SelectTrigger>
-                    <SelectContent className="custom-dropdown"><SelectItem value="odd">ODD</SelectItem><SelectItem value="even">EVEN</SelectItem></SelectContent>
+              <h1 className="text-2xl font-bold">Welcome back, <span className="gradient-name">{profile?.first_name} {profile?.last_name}!</span></h1>
+              <div className="flex gap-4 items-center">
+                <p className="flex flex-wrap items-center gap-2.5 text-muted-foreground">
+                  <span>Semester:</span>
+                  <Select value={effectiveSemester || ""} onValueChange={(v) => { setPendingChange({ type: "semester", value: v }); setShowConfirmDialog(true); }} disabled={isUpdating}>
+                    <SelectTrigger className="w-fit h-8 px-2 font-medium uppercase">{effectiveSemester || "semester"}</SelectTrigger>
+                    <SelectContent><SelectItem value="odd">ODD</SelectItem><SelectItem value="even">EVEN</SelectItem></SelectContent>
                   </Select>
-                  <span>semester reports for academic year</span>
-                  <Select value={selectedYear || ""} onValueChange={handleAcademicYearChange} disabled={isUpdating || isTransitioning}>
-                    <SelectTrigger className="w-fit h-8 px-2 text-[14px] font-medium rounded-xl pl-3 custom-dropdown dark:bg-foreground/10 dark:border-foreground/20">{selectedYear || "year"}</SelectTrigger>
-                    <SelectContent className="custom-dropdown max-h-70">{academicYears.map((y) => (<SelectItem key={y} value={y}>{y}</SelectItem>))}</SelectContent>
+                  <span>Year:</span>
+                  <Select value={effectiveYear || ""} onValueChange={(v) => { setPendingChange({ type: "academicYear", value: v }); setShowConfirmDialog(true); }} disabled={isUpdating}>
+                    <SelectTrigger className="w-fit h-8 px-2 font-medium">{effectiveYear || "year"}</SelectTrigger>
+                    <SelectContent className="max-h-70">{academicYears.map((y) => (<SelectItem key={y} value={y}>{y}</SelectItem>))}</SelectContent>
                   </Select>
                 </p>
               </div>
             </div>
-
             <StatsPanel stats={stats} isLoadingAttendance={isLoadingAttendance} targetPercentage={targetPercentage || 75} />
           </div>
 
-          <DashboardCharts
-            stats={stats}
-            isLoadingAttendance={isLoadingAttendance}
-            attendanceData={attendanceData}
-            filteredChartData={filteredChartData}
-            trackingData={trackingData}
-            courseRegistry={courseRegistry}
-            disabledCodes={disabledCodes}
-            activeCourseCount={activeCourseCount}
-            isLoadingCourses={isLoadingCourses}
-          />
-          <CourseGrid
-            isLoadingCourses={isLoadingCourses}
-            isLoadingAllCourseSummaries={isLoadingAllCourseSummaries}
-            sortedCourses={sortedCourses}
-            customInstructors={customInstructors || []}
-            allCourseSummaries={allCourseSummaries}
-            profile={profile}
-            onEditInstructor={(course, _name, hasCustomName, customInstructor) => {
-              const code = (course.code || String(course.id)).toUpperCase().replace(/[\s\u00A0-]/g, "");
-              setSelectedInstructorCourse({
-                code,
-                name: course.name,
-                initialName: hasCustomName ? (customInstructor?.instructor_name ?? "") : ""
-              });
+          <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
+          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses as Record<string, unknown>[]} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile as unknown as Record<string, unknown>} onEditInstructor={(course: Record<string, unknown>, _name: string, hasCustomName: boolean, customInstructor?: unknown) => {
+              const customInst = customInstructor as CustomInstructor | undefined;
+              setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
               setIsEditInstructorOpen(true);
-            }}
-            onAddCourse={() => setIsAddCourseOpen(true)}
-          />
+            }} onAddCourse={() => setIsAddCourseOpen(true)} />
 
           <div className="mb-6">
               <Card className="custom-container">
-                <CardHeader className="flex flex-col gap-0.5">
-                  <CardTitle className="text-[16px]">
-                    Attendance Calendar
-                  </CardTitle>
-                  <CardDescription className="text-accent-foreground/60 text-sm">
-                    Your attendance history at a glance
-                  </CardDescription>
-                </CardHeader>
+                <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
                 <CardContent>
-                  {isLoadingAttendance
-                    ? <Skeleton className="h-105 w-full rounded-xl" />
-                    : attendanceData
-                    ? (
-                      <AttendanceCalendar
-                        attendanceData={attendanceData}
-                        semester={selectedSemester || undefined}
-                        year={selectedYear || undefined}
-                        coursesData={{ courses: courseRegistry }}
-                        classCourses={classCourses}
-                      />
-                    )
-                    : (
-                      <div className="flex items-center justify-center h-50">
-                        <p className="text-muted-foreground">
-                          No attendance data available
-                        </p>
-                      </div>
-                    )}
+                  {renderAttendanceCalendarContent()}
                 </CardContent>
               </Card>
             </div>
 
           <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
             <AlertDialogContent className="custom-container">
-              <AlertDialogHeader><AlertDialogTitle>Confirm Change</AlertDialogTitle><AlertDialogDescription>You are about to change the {pendingChange?.type === "semester" ? "semester" : "academic year"}. Are you sure you want to continue?</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel onClick={handleCancelChange} className="custom-button">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmChange} className="custom-button bg-primary! border-accent-foreground!">Confirm</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogHeader><AlertDialogTitle>Confirm Change</AlertDialogTitle><AlertDialogDescription>Change {pendingChange?.type}?</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter><AlertDialogCancel onClick={() => { setShowConfirmDialog(false); setPendingChange(null); }}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmChange}>Confirm</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
 
           <AddCourseDialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen} semester={currentSem} academicYear={currentYear} />
-          <AddAttendanceDialog
-            open={isAddAttendanceOpen}
-            onOpenChange={setIsAddAttendanceOpen}
-            attendanceData={attendanceData}
-            trackingData={trackingData || []}
-            coursesData={coursesData || undefined}
-            user={profile ? { id: String(profile.id) } : { id: "" }}
-            onSuccess={async () => {
-              await Promise.all([refetchAttendance(), refetchTracking()]);
-            }}
-            selectedSemester={currentSem}
-            selectedYear={currentYear}
-          />
+          <AddAttendanceDialog open={isAddAttendanceOpen} onOpenChange={setIsAddAttendanceOpen} attendanceData={attendanceData} trackingData={trackingData || []} coursesData={coursesData || undefined} user={profile ? { id: String(profile.id) } : { id: "" }} onSuccess={() => Promise.all([refetchAttendance(), refetchTracking()])} selectedSemester={currentSem} selectedYear={currentYear} />
           <EditInstructorDialog open={isEditInstructorOpen} onOpenChange={setIsEditInstructorOpen} courseCode={selectedInstructorCourse?.code ?? ""} courseName={selectedInstructorCourse?.name ?? ""} initialName={selectedInstructorCourse?.initialName ?? ""} semester={currentSem || ""} academicYear={currentYear || ""} />
         </main>
       </div>

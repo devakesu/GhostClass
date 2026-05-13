@@ -8,20 +8,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingCourseSection extends StatelessWidget {
+
+  const TrackingCourseSection({
+    required this.courseKey, required this.records, required this.onDelete, super.key,
+    this.officialReport,
+    this.allCourses,
+  });
   final String courseKey;
   final List<TrackingRecord> records;
   final AttendanceReportDetailed? officialReport;
   final List<CourseDetails>? allCourses;
-  final Function(int) onDelete;
-
-  const TrackingCourseSection({
-    super.key,
-    required this.courseKey,
-    required this.records,
-    required this.onDelete,
-    this.officialReport,
-    this.allCourses,
-  });
+  final void Function(int) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +41,7 @@ class TrackingCourseSection extends StatelessWidget {
       officialReport: officialReport,
     );
 
-    final Map<String, List<TrackingRecord>> statusGroups = {
+    final statusGroups = <String, List<TrackingRecord>>{
       'Present': [],
       'Duty Leave': [],
       'Absent': [],
@@ -173,15 +170,15 @@ class TrackingCourseSection extends StatelessWidget {
 }
 
 class _StatusSubHeader extends StatelessWidget {
-  final String status;
-  final int count;
 
   const _StatusSubHeader({required this.status, required this.count});
+  final String status;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>()!;
-    Color color = ghostColors.successGreen ?? Colors.green;
+    var color = ghostColors.successGreen ?? Colors.green;
     if (status == 'Duty Leave') {
       color = ghostColors.accentOrange ?? Colors.orange;
     }
@@ -232,10 +229,10 @@ class _StatusSubHeader extends StatelessWidget {
 }
 
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double height;
-  final Widget child;
 
   _StickyHeaderDelegate({required this.height, required this.child});
+  final double height;
+  final Widget child;
 
   @override
   double get minExtent => height;
@@ -248,7 +245,7 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(
+    return ColoredBox(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: child,
     );

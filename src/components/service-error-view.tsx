@@ -11,7 +11,7 @@ interface ServiceErrorViewProps {
   description?: string;
   onRetry?: () => void;
   showHome?: boolean;
-  error?: any;
+  error?: unknown;
 }
 
 import { motion } from "framer-motion";
@@ -126,7 +126,7 @@ export function ServiceErrorView({
         </div>
 
         {/* Technical Details (Expandable) */}
-        {error && (
+        {error !== undefined && error !== null && (
           <div className="mt-12 w-full max-w-md overflow-hidden rounded-2xl border border-white/5 bg-white/2">
             <details className="group">
               <summary className="flex cursor-pointer items-center justify-center p-4 text-xs font-bold text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors uppercase tracking-widest">

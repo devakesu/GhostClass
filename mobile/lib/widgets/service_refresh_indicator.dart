@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/aesthetic_refresh_indicator.dart';
 
 class ServiceRefreshIndicator extends StatelessWidget {
+
+  const ServiceRefreshIndicator({
+    required this.child, required this.onRefresh, super.key,
+    this.useOverlay = true,
+  });
   final Widget child;
   final Future<void> Function() onRefresh;
   final bool useOverlay;
-
-  const ServiceRefreshIndicator({
-    super.key,
-    required this.child,
-    required this.onRefresh,
-    this.useOverlay = true,
-  });
 
   @override
   Widget build(BuildContext context) {

@@ -92,8 +92,77 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "content-length",
 ]);
 
-const SUPABASE_URL   = (process.env.SUPABASE_URL   ?? "").trim().replace(/\/+$/, "");
-const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN ?? "").trim().replace(/\/+$/, "");
+/**
+ * Strips all trailing slashes from a string without using regex backtracking.
+ */
+function stripTrailingSlashes(str) {
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
+const SUPABASE_URL   = stripTrailingSlashes(process.env.SUPABASE_URL   ?? "");
+const ALLOWED_ORIGIN = stripTrailingSlashes(process.env.ALLOWED_ORIGIN ?? "");
+
+function validateOrigin(eventHeaders) {
+  const requestOrigin = stripTrailingSlashes(eventHeaders?.["origin"] ?? "");
+  if (!requestOrigin) {
+    return { statusCode: 403, body: "Forbidden: Origin header is required" };
+  }
+  if (!ALLOWED_ORIGIN) {
+    return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
+  }
+  if (requestOrigin !== ALLOWED_ORIGIN) {
+    return { statusCode: 403, body: "Forbidden: origin not allowed" };
+  }
+  return null;
+}
+
+async function prepareLambdaResponse(response) {
+  // ── 7. Read response body ─────────────────────────────────────────────────
+  // Use text() for text/JSON responses (all Supabase Auth and PostgREST calls).
+  // Use arrayBuffer() + base64 for binary content (e.g. Supabase Storage downloads)
+  // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
+  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  // Default to text when content-type is absent — Supabase Auth and PostgREST
+  // always send a content-type header; a missing header means an unexpected
+  // response where text() is the safest fallback for logging/debugging.
+  const isTextResponse =
+    responseContentType === "" ||
+    responseContentType.startsWith("text/") ||
+    responseContentType.startsWith("application/json") ||
+    responseContentType.startsWith("application/vnd.pgrst.") ||
+    responseContentType.startsWith("application/x-www-form-urlencoded") ||
+    responseContentType.startsWith("application/xml");
+
+  let responseBody;
+  let isBase64Encoded;
+  if (isTextResponse) {
+    responseBody = await response.text();
+    isBase64Encoded = false;
+  } else {
+    const buffer = await response.arrayBuffer();
+    responseBody = Buffer.from(buffer).toString("base64");
+    isBase64Encoded = true;
+  }
+
+  // ── 8. Filter and forward response headers ────────────────────────────────
+  const responseHeaders = {};
+  for (const [key, value] of response.headers.entries()) {
+    if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
+      responseHeaders[key.toLowerCase()] = value;
+    }
+  }
+
+  return {
+    statusCode: response.status,
+    headers:    responseHeaders,
+    body:       responseBody,
+    isBase64Encoded,
+  };
+}
 
 export const handler = async (event) => {
   // ── 1. Config validation ──────────────────────────────────────────────────
@@ -111,15 +180,9 @@ export const handler = async (event) => {
   // All requests must supply an Origin header that exactly matches ALLOWED_ORIGIN.
   // Allowing origin-less requests would make this an open proxy to your Supabase
   // project — anyone with curl/Postman could relay arbitrary traffic at your cost.
-  const requestOrigin = (event.headers?.["origin"] ?? "").trim().replace(/\/+$/, "");
-  if (!requestOrigin) {
-    return { statusCode: 403, body: "Forbidden: Origin header is required" };
-  }
-  if (!ALLOWED_ORIGIN) {
-    return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
-  }
-  if (requestOrigin !== ALLOWED_ORIGIN) {
-    return { statusCode: 403, body: "Forbidden: origin not allowed" };
+  const originError = validateOrigin(event.headers);
+  if (originError) {
+    return originError;
   }
 
   // ── 3. Build target URL ───────────────────────────────────────────────────
@@ -165,45 +228,5 @@ export const handler = async (event) => {
     };
   }
 
-  // ── 7. Read response body ─────────────────────────────────────────────────
-  // Use text() for text/JSON responses (all Supabase Auth and PostgREST calls).
-  // Use arrayBuffer() + base64 for binary content (e.g. Supabase Storage downloads)
-  // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
-  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
-  // Default to text when content-type is absent — Supabase Auth and PostgREST
-  // always send a content-type header; a missing header means an unexpected
-  // response where text() is the safest fallback for logging/debugging.
-  const isTextResponse =
-    responseContentType === "" ||
-    responseContentType.startsWith("text/") ||
-    responseContentType.startsWith("application/json") ||
-    responseContentType.startsWith("application/vnd.pgrst.") ||
-    responseContentType.startsWith("application/x-www-form-urlencoded") ||
-    responseContentType.startsWith("application/xml");
-
-  let responseBody;
-  let isBase64Encoded;
-  if (isTextResponse) {
-    responseBody = await response.text();
-    isBase64Encoded = false;
-  } else {
-    const buffer = await response.arrayBuffer();
-    responseBody = Buffer.from(buffer).toString("base64");
-    isBase64Encoded = true;
-  }
-
-  // ── 8. Filter and forward response headers ────────────────────────────────
-  const responseHeaders = {};
-  response.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
-      responseHeaders[key] = value;
-    }
-  });
-
-  return {
-    statusCode: response.status,
-    headers:    responseHeaders,
-    body:       responseBody,
-    isBase64Encoded,
-  };
+  return prepareLambdaResponse(response);
 };

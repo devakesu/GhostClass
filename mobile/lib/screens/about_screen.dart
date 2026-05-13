@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/theme/app_theme.dart';
-import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:ghostclass/widgets/about/about_widgets.dart';
 import 'package:ghostclass/widgets/about/attestation_section.dart';
+import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -88,7 +88,7 @@ class AboutScreen extends ConsumerWidget {
                         _PillButton(
                           icon: LucideIcons.github,
                           label: 'Repo',
-                          onTap: () => _launchUrl(AppConfig.githubUrl),
+                          onTap: () { final _ = _launchUrl(AppConfig.githubUrl); },
                         ),
                       ],
                     ),
@@ -106,7 +106,7 @@ class AboutScreen extends ConsumerWidget {
                           'Release receipts, in-app.',
                           style: GoogleFonts.manrope(
                             fontSize: 34,
-                            height: 1.0,
+                            height: 1,
                             fontWeight: FontWeight.w900,
                             color: onSurface,
                             letterSpacing: -1.1,
@@ -150,9 +150,9 @@ class AboutScreen extends ConsumerWidget {
                         value: AppConfig.appVersion,
                         accent: primary,
                         onTap: AppConfig.isReleaseBuild
-                            ? () => _launchUrl(AppConfig.playStoreUrl)
+                            ? () { final _ = _launchUrl(AppConfig.playStoreUrl); }
                             : null,
-                        onLongPress: () => _copy(context, AppConfig.appVersion, 'Version'),
+                        onLongPress: () { final _ = _copy(context, AppConfig.appVersion, 'Version'); },
                       ),
                       MetricCard(
                         icon: LucideIcons.fileDigit,
@@ -161,18 +161,18 @@ class AboutScreen extends ConsumerWidget {
                         accent: accent,
                         onTap: (AppConfig.appCommitSha != 'local' &&
                                 AppConfig.appCommitSha.isNotEmpty)
-                            ? () => _launchUrl(
+                            ? () { final _ = _launchUrl(
                                 '${AppConfig.githubUrl}/commit/${AppConfig.appCommitSha}',
-                              )
+                              ); }
                             : null,
-                        onLongPress: () => _copy(context, AppConfig.appCommitSha, 'Commit SHA'),
+                        onLongPress: () { final _ = _copy(context, AppConfig.appCommitSha, 'Commit SHA'); },
                       ),
                       MetricCard(
                         icon: LucideIcons.clock3,
                         label: 'Built',
                         value: AppConfig.buildTimestamp,
                         accent: const Color(0xFF0EA5E9),
-                        onTap: () => _copy(context, AppConfig.buildTimestamp, 'Build timestamp'),
+                        onTap: () { final _ = _copy(context, AppConfig.buildTimestamp, 'Build timestamp'); },
                       ),
                       MetricCard(
                         icon: LucideIcons.hash,
@@ -181,11 +181,11 @@ class AboutScreen extends ConsumerWidget {
                         accent: ghostColors?.successGreen ?? const Color(0xFF10B981),
                         onTap: (AppConfig.githubRunId != 'local' &&
                                 AppConfig.githubRunId.isNotEmpty)
-                            ? () => _launchUrl(
+                            ? () { final _ = _launchUrl(
                                 '${AppConfig.githubUrl}/actions/runs/${AppConfig.githubRunId}',
-                              )
+                              ); }
                             : null,
-                        onLongPress: () => _copy(context, AppConfig.githubRunId, 'Workflow run'),
+                        onLongPress: () { final _ = _copy(context, AppConfig.githubRunId, 'Workflow run'); },
                       ),
                     ]),
                   ),
@@ -226,8 +226,8 @@ class AboutScreen extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
                     child: AttestationSection(
-                      onLaunch: _launchUrl,
-                      onCopy: _copy,
+                      onLaunch: (url) async { final _ = _launchUrl(url); },
+                      onCopy: (ctx, val, lbl) async { final _ = _copy(ctx, val, lbl); },
                     ),
                   ),
                 ),
@@ -243,25 +243,25 @@ class AboutScreen extends ConsumerWidget {
                           icon: LucideIcons.playCircle,
                           title: 'Google Play Store',
                           value: AppConfig.playStoreUrl,
-                          onTap: () => _launchUrl(AppConfig.playStoreUrl),
+                          onTap: () { final _ = _launchUrl(AppConfig.playStoreUrl); },
                         ),
                         LinkRow(
                           icon: LucideIcons.github,
                           title: 'GitHub repository',
                           value: AppConfig.githubUrl,
-                          onTap: () => _launchUrl(AppConfig.githubUrl),
+                          onTap: () { final _ = _launchUrl(AppConfig.githubUrl); },
                         ),
                         LinkRow(
                           icon: LucideIcons.globe,
                           title: 'Web app',
                           value: AppConfig.webUrl,
-                          onTap: () => _launchUrl(AppConfig.webUrl),
+                          onTap: () { final _ = _launchUrl(AppConfig.webUrl); },
                         ),
                         LinkRow(
                           icon: LucideIcons.mail,
                           title: 'Legal contact',
                           value: AppConfig.legalEmail,
-                          onTap: () => _copy(context, AppConfig.legalEmail, 'Legal email'),
+                          onTap: () { final _ = _copy(context, AppConfig.legalEmail, 'Legal email'); },
                         ),
                       ],
                     ),
@@ -278,15 +278,15 @@ class AboutScreen extends ConsumerWidget {
 }
 
 class _StatusBanner extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Color accent;
 
   const _StatusBanner({
     required this.title,
     required this.subtitle,
     required this.accent,
   });
+  final String title;
+  final String subtitle;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -338,15 +338,15 @@ class _StatusBanner extends StatelessWidget {
 }
 
 class _PillButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
 
   const _PillButton({
     required this.icon,
     required this.label,
     required this.onTap,
   });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -385,10 +385,10 @@ class _PillButton extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
 
   const _GlowBlob({required this.color, required this.size});
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {

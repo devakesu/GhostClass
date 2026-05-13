@@ -78,10 +78,9 @@ export function useDisabledCourses({
 
   /** Set of upper-cased course codes disabled for the current semester */
   const disabledCodes = useMemo(() => {
-    if (!semKey || !disabledCoursesMap[semKey]) return new Set<string>();
-    return new Set(
-      Object.keys(disabledCoursesMap[semKey]).map((c) => c.toUpperCase())
-    );
+    if (!semKey || !Object.prototype.hasOwnProperty.call(disabledCoursesMap, semKey)) return new Set<string>();
+    const semMap = Reflect.get(disabledCoursesMap, semKey) ?? {};
+    return new Set(Object.keys(semMap).map((c) => c.toUpperCase()));
   }, [semKey, disabledCoursesMap]);
 
   const isDisabled = useCallback(
@@ -92,7 +91,8 @@ export function useDisabledCourses({
   const getDisableReason = useCallback(
     (code: string): string | null => {
       if (!semKey) return null;
-      const semMap = disabledCoursesMap[semKey];
+      if (!Object.prototype.hasOwnProperty.call(disabledCoursesMap, semKey)) return null;
+      const semMap = Reflect.get(disabledCoursesMap, semKey);
       if (!semMap) return null;
       // Case-insensitive lookup
       const upperCode = code.toUpperCase();
@@ -108,8 +108,11 @@ export function useDisabledCourses({
     async (code: string, reason: string) => {
       if (!semKey) return;
       const newMap: DisabledCoursesMap = structuredClone(disabledCoursesMap);
-      if (!newMap[semKey]) newMap[semKey] = {};
-      newMap[semKey][code.toUpperCase()] = reason;
+      if (!Object.prototype.hasOwnProperty.call(newMap, semKey)) {
+        Reflect.set(newMap, semKey, {});
+      }
+      const semMap = Reflect.get(newMap, semKey)!;
+      Reflect.set(semMap, code.toUpperCase(), reason);
       await updateDisabledCourses(newMap);
     },
     [semKey, disabledCoursesMap, updateDisabledCourses]
@@ -119,18 +122,21 @@ export function useDisabledCourses({
     async (code: string) => {
       if (!semKey) return;
       const newMap: DisabledCoursesMap = structuredClone(disabledCoursesMap);
-      if (!newMap[semKey]) return;
+      if (!Object.prototype.hasOwnProperty.call(newMap, semKey)) return;
+      
+      const semMap = Reflect.get(newMap, semKey)!;
       const upperCode = code.toUpperCase();
+      
       // Remove (case-insensitive)
-      for (const key of Object.keys(newMap[semKey])) {
+      Object.keys(semMap).forEach((key) => {
         if (key.toUpperCase() === upperCode) {
-          delete newMap[semKey][key];
-          break;
+          Reflect.deleteProperty(semMap, key);
         }
-      }
+      });
+
       // Remove empty semester bucket
-      if (Object.keys(newMap[semKey]).length === 0) {
-        delete newMap[semKey];
+      if (Object.keys(semMap).length === 0) {
+        Reflect.deleteProperty(newMap, semKey);
       }
       await updateDisabledCourses(newMap);
     },

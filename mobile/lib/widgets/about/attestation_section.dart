@@ -3,19 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:ghostclass/widgets/about/about_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'about_widgets.dart';
 
 class AttestationSection extends ConsumerStatefulWidget {
-  final Future<void> Function(String) onLaunch;
-  final Future<void> Function(BuildContext, String, String) onCopy;
 
   const AttestationSection({
-    super.key,
-    required this.onLaunch,
-    required this.onCopy,
+    required this.onLaunch, required this.onCopy, super.key,
   });
+  final Future<void> Function(String) onLaunch;
+  final Future<void> Function(BuildContext, String, String) onCopy;
 
   @override
   ConsumerState<AttestationSection> createState() => _AttestationSectionState();
@@ -30,7 +28,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _verify();
+      final _ = _verify();
     });
   }
 
@@ -49,7 +47,9 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
       final response = await api.fetchAttestationDetails(supabaseToken);
 
       if (response.statusCode == 200) {
-        if (mounted) setState(() => _data = response.data);
+        if (mounted) {
+          setState(() => _data = response.data as Map<String, dynamic>?);
+        }
       } else {
         if (mounted) {
           setState(
@@ -57,7 +57,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
           );
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -94,44 +94,38 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
             ),
           ),
         if (_data != null) ...[
-          _StatusItem(
-            label: 'Hardware Attestation',
-            status: _data!['verified'] == true
-                ? ((_data!['details']?['provider']?.toString() == 'debug' ||
-                          _data!['details']?['issuer']?.toString().contains(
-                                'debug',
-                              ) ==
-                              true)
-                      ? 'DEBUG'
-                      : 'GENUINE')
-                : 'FAILED',
-            isSuccess: _data!['verified'] == true,
-            onInfoTap: () => _showStatusGuide(
-              context,
-              title: 'Hardware Attestation',
-              status: _data!['verified'] == true
-                  ? ((_data!['details']?['provider']?.toString() == 'debug' ||
-                            _data!['details']?['issuer']?.toString().contains(
-                                  'debug',
-                                ) ==
-                                true)
-                        ? 'DEBUG'
-                        : 'GENUINE')
-                  : 'FAILED',
-              isSuccess: _data!['verified'] == true,
-              summary:
-                  "Cloud-verified integrity check based on the project's security policy.",
-              technicalDetails: _data!['details'],
-              details: [
-                "Enforces the integrity policy configured in the Firebase Console.",
-                "Validates build authenticity and protection against automated abuse.",
-                "GENUINE: Compliance with the developer-defined security threshold.",
-                "DEBUG: Verification using a development-only testing provider.",
-                "Note: Specific integrity levels (Basic vs Strong) are managed in the Cloud.",
-                'Attestation: ${_data!['details']?['provider'] ?? 'Unknown'}',
-                'Policy: Managed via Firebase Console',
-              ],
-            ),
+          Builder(
+            builder: (context) {
+              final details = _data!['details'] as Map<String, dynamic>? ?? {};
+              final provider = details['provider']?.toString() ?? 'Unknown';
+              final issuer = details['issuer']?.toString() ?? '';
+              final isDebug = provider == 'debug' || issuer.contains('debug');
+              final statusStr = _data!['verified'] == true ? (isDebug ? 'DEBUG' : 'GENUINE') : 'FAILED';
+
+              return _StatusItem(
+                label: 'Hardware Attestation',
+                status: statusStr,
+                isSuccess: _data!['verified'] == true,
+                onInfoTap: () => _showStatusGuide(
+                  context,
+                  title: 'Hardware Attestation',
+                  status: statusStr,
+                  isSuccess: _data!['verified'] == true,
+                  summary:
+                      "Cloud-verified integrity check based on the project's security policy.",
+                  technicalDetails: details,
+                  details: [
+                    'Enforces the integrity policy configured in the Firebase Console.',
+                    'Validates build authenticity and protection against automated abuse.',
+                    'GENUINE: Compliance with the developer-defined security threshold.',
+                    'DEBUG: Verification using a development-only testing provider.',
+                    'Note: Specific integrity levels (Basic vs Strong) are managed in the Cloud.',
+                    'Attestation: $provider',
+                    'Policy: Managed via Firebase Console',
+                  ],
+                ),
+              );
+            },
           ),
           _StatusItem(
             label: 'App Identity',
@@ -208,7 +202,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
     String? error,
     Map<String, dynamic>? technicalDetails,
   }) {
-    showDialog<void>(
+    final _ = showDialog<void>(
       context: context,
       builder: (context) {
         final theme = Theme.of(context);
@@ -363,10 +357,6 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
 }
 
 class _StatusItem extends StatelessWidget {
-  final String label;
-  final String status;
-  final bool isSuccess;
-  final VoidCallback onInfoTap;
 
   const _StatusItem({
     required this.label,
@@ -374,6 +364,10 @@ class _StatusItem extends StatelessWidget {
     required this.isSuccess,
     required this.onInfoTap,
   });
+  final String label;
+  final String status;
+  final bool isSuccess;
+  final VoidCallback onInfoTap;
 
   @override
   Widget build(BuildContext context) {

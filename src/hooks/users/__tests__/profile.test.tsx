@@ -103,8 +103,8 @@ describe("profile hooks", () => {
         await act(async () => {
           await result.current.mutateAsync({ data: updateData });
         });
-      } catch (_e) {
-        // expected
+      } catch {
+        // expected error
       }
 
       // Check if Sentry was called
@@ -126,8 +126,8 @@ describe("profile hooks", () => {
             await act(async () => {
                 await result.current.mutateAsync({ data: { first_name: "New" } });
             });
-        } catch (_e) {
-            // Expected error
+        } catch {
+            // expected error
         }
 
         expect(queryClient.getQueryData(["profile"])).toBeUndefined();

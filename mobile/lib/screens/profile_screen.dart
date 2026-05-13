@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -6,8 +7,8 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
-import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/profile/profile_widgets.dart';
+import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,7 +52,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (user?.profile?.birthDate != null) {
       try {
         _selectedBirthDate = DateTime.parse(user!.profile!.birthDate!);
-      } catch (e) {
+      } on Object catch (e) {
         AppLogger.w('ProfileScreen: Failed to parse birth date', e);
       }
     }
@@ -98,7 +99,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           setState(() => _isEditing = false);
         }
       }
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('ProfileScreen: Save failed', e, st);
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -107,7 +108,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
+    final image = await picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 512,
       maxHeight: 512,
@@ -126,7 +127,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       await supabase.storage.from('avatars').upload(filePath, file);
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
       await ref.read(authProvider.notifier).updateAvatar(publicUrl);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('ProfileScreen: Upload failed', e, st);
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
@@ -546,10 +547,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         color: Colors.white,
                       ),
                     )
-                  : Row(
+                  : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(LucideIcons.check, size: 18, color: Colors.white),
                         SizedBox(width: 8),
                         Padding(
@@ -685,7 +686,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           'dd MMM yyyy',
                         ).format(DateTime.parse(user.profile!.ezygoCreatedAt!));
                       }
-                    } catch (e) {
+                    } on Object catch (e) {
                       AppLogger.w(
                         'ProfileScreen: Failed to parse EzyGo created date',
                         e,
@@ -697,7 +698,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           'dd MMM yyyy',
                         ).format(DateTime.parse(user.profile!.createdAt!));
                       }
-                    } catch (e) {
+                    } on Object catch (e) {
                       AppLogger.w(
                         'ProfileScreen: Failed to parse account created date',
                         e,

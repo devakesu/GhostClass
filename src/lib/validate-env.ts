@@ -10,24 +10,7 @@ function parseStrictInt(value: string): number {
   return Number.isSafeInteger(n) ? n : NaN;
 }
 
-/**
- * Validates required and critical environment variables at startup.
- * Throws an error and prevents app from starting if critical vars are missing or invalid.
- * * NOTE: This must only run on the server (instrumentation.ts or next.config.js).
- */
-export function validateEnvironment() {
-  // 1. Prevent Client-Side Execution
-  // Secrets like CRON_SECRET are undefined in the browser, so this would falsely fail on the client.
-  if (typeof window !== "undefined") return;
-
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  // ============================================================================
-  // CRITICAL - App won't work without these
-  // ============================================================================
-
-  // Security
+function validateSecurityEnv(errors: string[]) {
   if (!process.env.ENCRYPTION_KEY) {
     errors.push("❌ ENCRYPTION_KEY is required");
   } else if (!ENCRYPTION_KEY_PATTERN.test(process.env.ENCRYPTION_KEY)) {
@@ -41,47 +24,41 @@ export function validateEnvironment() {
   if (!process.env.JWE_PRIVATE_KEY) {
     errors.push("❌ JWE_PRIVATE_KEY is required for mobile communication");
   }
+}
 
-  // Supabase
+function validateSupabaseEnv(errors: string[]) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_URL is required");
   }
 
-  // Optional development Supabase URL validation
   const devSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL?.trim();
   if (devSupabaseUrl) {
     try {
       new URL(devSupabaseUrl);
     } catch {
-      errors.push(
-        "❌ NEXT_PUBLIC_SUPABASE_DEV_URL must be a valid absolute URL",
-      );
+      errors.push("❌ NEXT_PUBLIC_SUPABASE_DEV_URL must be a valid absolute URL");
     }
   }
   if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required");
   }
 
-  // Optional development Supabase Publishable Key validation
-  const devSupabasePublishableKey = process.env
-    .NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY?.trim();
+  const devSupabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY?.trim();
   if (devSupabasePublishableKey && devSupabasePublishableKey.length < 20) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY looks invalid");
   }
 
-  if (
-    process.env.NODE_ENV === "production" && !process.env.SUPABASE_SECRET_KEY
-  ) {
+  if (process.env.NODE_ENV === "production" && !process.env.SUPABASE_SECRET_KEY) {
     errors.push("❌ SUPABASE_SECRET_KEY is required in production");
   }
 
-  // Optional development Supabase Secret Key validation
   const devSupabaseSecretKey = (process.env.SUPABASE_DEV_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
   if (devSupabaseSecretKey && devSupabaseSecretKey.length < 20) {
     errors.push("❌ SUPABASE_DEV_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY looks invalid");
   }
+}
 
-  // Upstash Redis (Rate Limiting)
+function validateEmailAndRedisEnv(errors: string[]) {
   if (!process.env.UPSTASH_REDIS_REST_URL) {
     errors.push("❌ UPSTASH_REDIS_REST_URL is required");
   }
@@ -89,7 +66,6 @@ export function validateEnvironment() {
     errors.push("❌ UPSTASH_REDIS_REST_TOKEN is required");
   }
 
-  // Email Providers (AT LEAST ONE REQUIRED)
   const hasBrevo = !!process.env.BREVO_API_KEY;
   const hasSendPulse = !!(
     process.env.SENDPULSE_CLIENT_ID &&
@@ -99,23 +75,18 @@ export function validateEnvironment() {
   if (!hasBrevo && !hasSendPulse) {
     errors.push("❌ At least ONE email provider must be configured:");
     errors.push("   - BREVO_API_KEY (option 1)");
-    errors.push(
-      "   - SENDPULSE_CLIENT_ID + SENDPULSE_CLIENT_SECRET (option 2)",
-    );
+    errors.push("   - SENDPULSE_CLIENT_ID + SENDPULSE_CLIENT_SECRET (option 2)");
   }
+}
 
-  // Cloudflare Turnstile
+function validateTurnstileEnv(errors: string[], warnings: string[]) {
   if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
     errors.push("❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY is required");
   } else if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY.startsWith("1x0000")) {
     if (process.env.NODE_ENV === "production") {
-      errors.push(
-        "❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY is using TEST KEY in production!",
-      );
+      errors.push("❌ NEXT_PUBLIC_TURNSTILE_SITE_KEY is using TEST KEY in production!");
     } else {
-      warnings.push(
-        "⚠️  NEXT_PUBLIC_TURNSTILE_SITE_KEY is using Cloudflare test key (development only)",
-      );
+      warnings.push("⚠️  NEXT_PUBLIC_TURNSTILE_SITE_KEY is using Cloudflare test key (development only)");
     }
   }
 
@@ -125,13 +96,30 @@ export function validateEnvironment() {
     if (process.env.NODE_ENV === "production") {
       errors.push("❌ TURNSTILE_SECRET_KEY is using TEST KEY in production!");
     } else {
-      warnings.push(
-        "⚠️  TURNSTILE_SECRET_KEY is using Cloudflare test key (development only)",
-      );
+      warnings.push("⚠️  TURNSTILE_SECRET_KEY is using Cloudflare test key (development only)");
     }
   }
+}
 
-  // App Configuration
+function validateAppDomain(appDomain: string, errors: string[]) {
+  if (/^https?:\/\//i.test(appDomain)) {
+    errors.push("❌ NEXT_PUBLIC_APP_DOMAIN must not include protocol (use ghostclass.com, not https://ghostclass.com)");
+  } else if (appDomain.includes("/") || /\s/.test(appDomain)) {
+    errors.push("❌ NEXT_PUBLIC_APP_DOMAIN must be a bare domain without path or spaces");
+  } else if (
+    appDomain.length > 253 ||
+    appDomain.startsWith(".") ||
+    appDomain.endsWith(".") ||
+    appDomain.includes("..") ||
+    !/^[a-z0-9.-]+$/i.test(appDomain)
+  ) {
+    errors.push("❌ NEXT_PUBLIC_APP_DOMAIN contains invalid hostname characters");
+  } else if (!appDomain.includes(".") && appDomain !== "localhost") {
+    errors.push("❌ NEXT_PUBLIC_APP_DOMAIN must contain a dot-separated hostname (or be localhost in development)");
+  }
+}
+
+function validateAppConfigCore(errors: string[], warnings: string[]) {
   if (!process.env.NEXT_PUBLIC_APP_NAME) {
     errors.push("❌ NEXT_PUBLIC_APP_NAME is required");
   }
@@ -146,59 +134,28 @@ export function validateEnvironment() {
     try {
       const url = new URL(process.env.NEXT_PUBLIC_APP_URL);
       if (url.pathname !== "/") {
-        warnings.push(
-          `⚠️  NEXT_PUBLIC_APP_URL contains a path '${url.pathname}' but should typically only specify the domain (e.g., https://example.com)`,
-        );
+        warnings.push(`⚠️  NEXT_PUBLIC_APP_URL contains a path '${url.pathname}' but should typically only specify the domain (e.g., https://example.com)`);
       }
       if (process.env.NEXT_PUBLIC_APP_URL.endsWith("/")) {
-        warnings.push(
-          "⚠️  NEXT_PUBLIC_APP_URL ends with a slash. Recommended: remove the trailing slash.",
-        );
+        warnings.push("⚠️  NEXT_PUBLIC_APP_URL ends with a slash. Recommended: remove the trailing slash.");
       }
     } catch {
-      errors.push(
-        "❌ NEXT_PUBLIC_APP_URL must be a valid absolute URL (e.g. https://example.com)",
-      );
+      errors.push("❌ NEXT_PUBLIC_APP_URL must be a valid absolute URL (e.g. https://example.com)");
     }
   }
+}
 
+function validateAppConfigUrl(errors: string[]) {
   if (!process.env.NEXT_PUBLIC_APP_DOMAIN) {
-    errors.push(
-      '❌ NEXT_PUBLIC_APP_DOMAIN is required (e.g. "ghostclass.com")',
-    );
+    errors.push('❌ NEXT_PUBLIC_APP_DOMAIN is required (e.g. "ghostclass.com")');
   } else {
-    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN.trim();
-    if (/^https?:\/\//i.test(appDomain)) {
-      errors.push(
-        "❌ NEXT_PUBLIC_APP_DOMAIN must not include protocol (use ghostclass.com, not https://ghostclass.com)",
-      );
-    } else if (appDomain.includes("/") || /\s/.test(appDomain)) {
-      errors.push(
-        "❌ NEXT_PUBLIC_APP_DOMAIN must be a bare domain without path or spaces",
-      );
-    } else if (
-      appDomain.length > 253 ||
-      appDomain.startsWith(".") ||
-      appDomain.endsWith(".") ||
-      appDomain.includes("..") ||
-      !/^[a-z0-9.-]+$/i.test(appDomain)
-    ) {
-      errors.push("❌ NEXT_PUBLIC_APP_DOMAIN contains invalid hostname characters");
-    } else if (!appDomain.includes(".") && appDomain !== "localhost") {
-      errors.push(
-        "❌ NEXT_PUBLIC_APP_DOMAIN must contain a dot-separated hostname (or be localhost in development)",
-      );
-    }
+    validateAppDomain(process.env.NEXT_PUBLIC_APP_DOMAIN.trim(), errors);
   }
 
   if (!process.env.NEXT_PUBLIC_APP_EMAIL) {
-    errors.push(
-      "❌ NEXT_PUBLIC_APP_EMAIL is required (used for sender addresses)",
-    );
+    errors.push("❌ NEXT_PUBLIC_APP_EMAIL is required (used for sender addresses)");
   } else if (!/^@[^@]+$/.test(process.env.NEXT_PUBLIC_APP_EMAIL)) {
-    errors.push(
-      '❌ NEXT_PUBLIC_APP_EMAIL must start with "@" and be a valid email suffix (e.g. @example.com)',
-    );
+    errors.push('❌ NEXT_PUBLIC_APP_EMAIL must start with "@" and be a valid email suffix (e.g. @example.com)');
   }
 
   if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
@@ -207,40 +164,28 @@ export function validateEnvironment() {
     try {
       const backendUrl = new URL(process.env.NEXT_PUBLIC_BACKEND_URL);
       if (!["https:", "http:"].includes(backendUrl.protocol)) {
-        errors.push(
-          "❌ NEXT_PUBLIC_BACKEND_URL must use http or https protocol",
-        );
-      } else if (
-        process.env.NODE_ENV === "production" &&
-        backendUrl.protocol !== "https:"
-      ) {
-        errors.push(
-          "❌ NEXT_PUBLIC_BACKEND_URL must use https:// in production",
-        );
+        errors.push("❌ NEXT_PUBLIC_BACKEND_URL must use http or https protocol");
+      } else if (process.env.NODE_ENV === "production" && backendUrl.protocol !== "https:") {
+        errors.push("❌ NEXT_PUBLIC_BACKEND_URL must use https:// in production");
       }
     } catch {
-      errors.push(
-        "❌ NEXT_PUBLIC_BACKEND_URL must be a valid absolute URL (e.g. https://api.example.com)",
-      );
+      errors.push("❌ NEXT_PUBLIC_BACKEND_URL must be a valid absolute URL (e.g. https://api.example.com)");
     }
   }
+}
 
-  // Cloudflare Worker egress — optional tier 1. Set CF_PROXY_URL in your server env to enable.
+function validateCfProxyEgress(errors: string[]) {
   const cfProxyUrl = process.env.CF_PROXY_URL?.trim();
   if (cfProxyUrl) {
     try {
       const cfParsed = new URL(cfProxyUrl);
       if (!["https:", "http:"].includes(cfParsed.protocol)) {
         errors.push("❌ CF_PROXY_URL must use http or https protocol");
-      } else if (
-        process.env.NODE_ENV === "production" && cfParsed.protocol !== "https:"
-      ) {
+      } else if (process.env.NODE_ENV === "production" && cfParsed.protocol !== "https:") {
         errors.push("❌ CF_PROXY_URL must use https:// in production");
       }
     } catch {
-      errors.push(
-        "❌ CF_PROXY_URL must be a valid absolute URL (e.g. https://ezygo-proxy.<username>.workers.dev/api/v1/Xcr45_salt)",
-      );
+      errors.push("❌ CF_PROXY_URL must be a valid absolute URL (e.g. https://ezygo-proxy.<username>.workers.dev/api/v1/Xcr45_salt)");
     }
 
     if (!process.env.CF_PROXY_SECRET) {
@@ -257,23 +202,20 @@ export function validateEnvironment() {
       );
     }
   }
+}
 
-  // AWS Lambda egress — optional tier 2. Set AWS_SECONDARY_URL in your server env to enable.
+function validateAwsSecondaryEgress(errors: string[]) {
   const awsSecondaryUrl = process.env.AWS_SECONDARY_URL?.trim();
   if (awsSecondaryUrl) {
     try {
       const awsParsed = new URL(awsSecondaryUrl);
       if (!["https:", "http:"].includes(awsParsed.protocol)) {
         errors.push("❌ AWS_SECONDARY_URL must use http or https protocol");
-      } else if (
-        process.env.NODE_ENV === "production" && awsParsed.protocol !== "https:"
-      ) {
+      } else if (process.env.NODE_ENV === "production" && awsParsed.protocol !== "https:") {
         errors.push("❌ AWS_SECONDARY_URL must use https:// in production");
       }
     } catch {
-      errors.push(
-        "❌ AWS_SECONDARY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)",
-      );
+      errors.push("❌ AWS_SECONDARY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)");
     }
 
     if (!process.env.AWS_SECONDARY_SECRET) {
@@ -291,12 +233,10 @@ export function validateEnvironment() {
     }
   }
 
-  // Key-separation: CF and AWS secrets must not be the same value.
   if (
     process.env.CF_PROXY_SECRET?.trim() &&
     process.env.AWS_SECONDARY_SECRET?.trim() &&
-    process.env.CF_PROXY_SECRET.trim() ===
-      process.env.AWS_SECONDARY_SECRET.trim()
+    process.env.CF_PROXY_SECRET.trim() === process.env.AWS_SECONDARY_SECRET.trim()
   ) {
     errors.push(
       "❌ CF_PROXY_SECRET and AWS_SECONDARY_SECRET must be different values (key separation).\n" +
@@ -304,74 +244,53 @@ export function validateEnvironment() {
         "   Generate two distinct secrets: openssl rand -hex 32 (run twice).",
     );
   }
+}
 
-  // Service Worker in Dev
+function validateSwAndIp(errors: string[]) {
   const enableSwInDev = process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV;
   if (enableSwInDev && !["true", "false"].includes(enableSwInDev.toLowerCase())) {
     errors.push('❌ NEXT_PUBLIC_ENABLE_SW_IN_DEV must be either "true" or "false"');
   }
 
-  // Test Client IP
   const testClientIp = process.env.TEST_CLIENT_IP;
-  if (testClientIp && !/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(testClientIp) && !testClientIp.includes(':')) {
+  if (testClientIp && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(testClientIp) && !testClientIp.includes(':')) {
     errors.push("❌ TEST_CLIENT_IP must be a valid IPv4 or IPv6 address");
   }
+}
 
-  // Supabase browser proxy — optional CF Worker (Tier 1).
-  // No shared secret: browser proxies use ALLOWED_ORIGIN header checks (secrets
-  // would be visible in DevTools). Either or both proxy vars may be set.
-  const supabaseCfProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL
-    ?.trim();
+function validateSupabaseProxies(errors: string[]) {
+  const supabaseCfProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL?.trim();
   if (supabaseCfProxyUrl) {
     try {
       const parsed = new URL(supabaseCfProxyUrl);
       if (!["https:", "http:"].includes(parsed.protocol)) {
-        errors.push(
-          "❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use http or https protocol",
-        );
-      } else if (
-        process.env.NODE_ENV === "production" && parsed.protocol !== "https:"
-      ) {
-        errors.push(
-          "❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use https:// in production (proxies auth tokens)",
-        );
+        errors.push("❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use http or https protocol");
+      } else if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
+        errors.push("❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use https:// in production (proxies auth tokens)");
       }
     } catch {
-      errors.push(
-        "❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must be a valid absolute URL (e.g. https://supabase.example.workers.dev)",
-      );
+      errors.push("❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must be a valid absolute URL (e.g. https://supabase.example.workers.dev)");
     }
   }
 
-  // Supabase browser proxy — optional AWS Lambda (Tier 2 fallback).
-  const supabaseAwsProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL
-    ?.trim();
+  const supabaseAwsProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL?.trim();
   if (supabaseAwsProxyUrl) {
     try {
       const parsed = new URL(supabaseAwsProxyUrl);
       if (!["https:", "http:"].includes(parsed.protocol)) {
-        errors.push(
-          "❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use http or https protocol",
-        );
-      } else if (
-        process.env.NODE_ENV === "production" && parsed.protocol !== "https:"
-      ) {
-        errors.push(
-          "❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use https:// in production (proxies auth tokens)",
-        );
+        errors.push("❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use http or https protocol");
+      } else if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
+        errors.push("❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use https:// in production (proxies auth tokens)");
       }
     } catch {
-      errors.push(
-        "❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)",
-      );
+      errors.push("❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must be a valid absolute URL (e.g. https://abc123.execute-api.ap-south-1.amazonaws.com)");
     }
   }
+}
 
-  // Firebase App Check
+function validateServiceAccountJson(errors: string[], warnings: string[]) {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    warnings.push(
-      "ℹ️  GOOGLE_SERVICE_ACCOUNT_JSON not set - App Check verification will be disabled (optional for web-only)",
-    );
+    warnings.push("ℹ️  GOOGLE_SERVICE_ACCOUNT_JSON not set - App Check verification will be disabled (optional for web-only)");
   } else {
     try {
       const serviceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -384,73 +303,63 @@ export function validateEnvironment() {
       }
 
       if (!config.project_id || !config.private_key || !config.client_email) {
-        errors.push(
-          "❌ GOOGLE_SERVICE_ACCOUNT_JSON appears to be an invalid service account key (missing project_id, private_key, or client_email)",
-        );
+        errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON appears to be an invalid service account key (missing project_id, private_key, or client_email)");
       }
     } catch {
-      errors.push(
-        "❌ GOOGLE_SERVICE_ACCOUNT_JSON must be a valid JSON string or Base64 encoded JSON",
-      );
+      errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON must be a valid JSON string or Base64 encoded JSON");
     }
   }
+}
 
+function validateAppCheck(errors: string[]) {
   const enforceAppCheck = process.env.ENFORCE_APP_CHECK;
-  if (
-    enforceAppCheck &&
-    !["true", "false"].includes(enforceAppCheck.toLowerCase())
-  ) {
+  if (enforceAppCheck && !["true", "false"].includes(enforceAppCheck.toLowerCase())) {
     errors.push('❌ ENFORCE_APP_CHECK must be either "true" or "false"');
   }
 
-  // Application Identity
   if (process.env.NODE_ENV === "production") {
-    if (!process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME) {
-      errors.push("❌ NEXT_PUBLIC_ANDROID_PACKAGE_NAME is required");
-    }
-    if (!process.env.FIREBASE_APP_ID_ANDROID) {
-      errors.push("❌ FIREBASE_APP_ID_ANDROID is required");
-    }
+    if (!process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME) errors.push("❌ NEXT_PUBLIC_ANDROID_PACKAGE_NAME is required");
+    if (!process.env.FIREBASE_APP_ID_ANDROID) errors.push("❌ FIREBASE_APP_ID_ANDROID is required");
     if (process.env.ENFORCE_APP_CHECK === "true" && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
       errors.push("❌ GOOGLE_SERVICE_ACCOUNT_JSON is required when ENFORCE_APP_CHECK=true");
     }
   }
+}
 
-
-  // ============================================================================
-  // OPTIONAL - App works but features may be limited
-  // ============================================================================
-
-  if (!process.env.NEXT_PUBLIC_AUTHOR_NAME) {
-    warnings.push("⚠️  NEXT_PUBLIC_AUTHOR_NAME not set");
+function checkRateLimitVar(valStr: string | undefined, min: number, max: number, errorMsg: string, errors: string[]) {
+  if (valStr) {
+    const val = parseStrictInt(valStr);
+    if (isNaN(val) || val < min || val > max) {
+      errors.push(errorMsg);
+    }
   }
+}
 
-  if (!process.env.NEXT_PUBLIC_AUTHOR_URL) {
-    warnings.push("⚠️  NEXT_PUBLIC_AUTHOR_URL not set");
-  }
+function validateRateLimitsEnv(errors: string[]) {
+  checkRateLimitVar(process.env.RATE_LIMIT_REQUESTS, 1, 1000, "❌ RATE_LIMIT_REQUESTS must be a number between 1 and 1000 (default when unset: 10)", errors);
+  checkRateLimitVar(process.env.RATE_LIMIT_WINDOW, 1, 3600, "❌ RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)", errors);
+  checkRateLimitVar(process.env.SYNC_RATE_LIMIT_REQUESTS, 1, 1000, "❌ SYNC_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)", errors);
+  checkRateLimitVar(process.env.SYNC_RATE_LIMIT_WINDOW, 1, 3600, "❌ SYNC_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)", errors);
+  checkRateLimitVar(process.env.CONTACT_RATE_LIMIT_REQUESTS, 1, 1000, "❌ CONTACT_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)", errors);
+  checkRateLimitVar(process.env.CONTACT_RATE_LIMIT_WINDOW, 1, 3600, "❌ CONTACT_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)", errors);
+  checkRateLimitVar(process.env.AUTH_RATE_LIMIT_REQUESTS, 1, 1000, "❌ AUTH_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)", errors);
+  checkRateLimitVar(process.env.AUTH_RATE_LIMIT_WINDOW, 1, 3600, "❌ AUTH_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)", errors);
+  checkRateLimitVar(process.env.PROXY_RATE_LIMIT_REQUESTS, 1, 5000, "❌ PROXY_RATE_LIMIT_REQUESTS is invalid (must be 1–5000)", errors);
+  checkRateLimitVar(process.env.PROXY_RATE_LIMIT_WINDOW, 1, 3600, "❌ PROXY_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)", errors);
+}
 
-  if (!process.env.NEXT_PUBLIC_GITHUB_URL) {
-    warnings.push("⚠️  NEXT_PUBLIC_GITHUB_URL not set");
-  }
-
-
-
-  if (!process.env.NEXT_PUBLIC_LEGAL_EMAIL) {
-    warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EMAIL not set");
-  }
-
-  if (!process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE) {
-    warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE not set");
-  }
-
-  // Sentry (Error Monitoring)
+function validateOptionalMetadata(warnings: string[]) {
+  if (!process.env.NEXT_PUBLIC_AUTHOR_NAME) warnings.push("⚠️  NEXT_PUBLIC_AUTHOR_NAME not set");
+  if (!process.env.NEXT_PUBLIC_AUTHOR_URL) warnings.push("⚠️  NEXT_PUBLIC_AUTHOR_URL not set");
+  if (!process.env.NEXT_PUBLIC_GITHUB_URL) warnings.push("⚠️  NEXT_PUBLIC_GITHUB_URL not set");
+  if (!process.env.NEXT_PUBLIC_LEGAL_EMAIL) warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EMAIL not set");
+  if (!process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE) warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE not set");
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
-    warnings.push(
-      "⚠️  NEXT_PUBLIC_SENTRY_DSN not set - error monitoring disabled",
-    );
+    warnings.push("⚠️  NEXT_PUBLIC_SENTRY_DSN not set - error monitoring disabled");
   }
-  // SENTRY_AUTH_TOKEN is build-time only, often not available at runtime, so skipping warning
+}
 
+function validateSentryAndCommit(errors: string[], warnings: string[]) {
   if (!process.env.SENTRY_HASH_SALT) {
     if (process.env.NODE_ENV === "production") {
       errors.push(
@@ -461,18 +370,12 @@ export function validateEnvironment() {
           "   Treat with the same security as database credentials",
       );
     } else {
-      warnings.push(
-        "⚠️  SENTRY_HASH_SALT not set - using development-only fallback",
-      );
+      warnings.push("⚠️  SENTRY_HASH_SALT not set - using development-only fallback");
     }
   }
 
-  // Build ID / CI traceability
   if (!process.env.APP_COMMIT_SHA) {
     if (process.env.NODE_ENV === "production") {
-      // Error rather than warn: without a commit SHA the build ID falls back to a random
-      // UUID (see next.config.ts), which prevents stable asset URLs across rolling restarts.
-      // Stable build IDs also make it easier to correlate Sentry errors with deployments.
       warnings.push(
         "⚠️  APP_COMMIT_SHA is not set — Next.js will use a random UUID as the build ID.\n" +
           "   Set APP_COMMIT_SHA to the current git commit SHA in your CI/CD pipeline for\n" +
@@ -480,14 +383,12 @@ export function validateEnvironment() {
       );
     }
   }
+}
 
-  // Google Analytics (Server-side Measurement Protocol)
+function validateGaAndLimits(errors: string[], warnings: string[]) {
   if (!process.env.NEXT_PUBLIC_GA_ID) {
-    warnings.push(
-      "ℹ️  NEXT_PUBLIC_GA_ID not set - analytics disabled (optional)",
-    );
+    warnings.push("ℹ️  NEXT_PUBLIC_GA_ID not set - analytics disabled (optional)");
   } else if (!/^G-[A-Z0-9]{4,20}$/.test(process.env.NEXT_PUBLIC_GA_ID)) {
-    // GA4 Measurement IDs are always in the form G-XXXXXXXXXX
     errors.push(
       "❌ NEXT_PUBLIC_GA_ID appears invalid — GA4 Measurement IDs must match the G-XXXXXXXXXX format.\n" +
         "   Get from: Google Analytics → Admin → Data Streams → Measurement ID",
@@ -500,9 +401,7 @@ export function validateEnvironment() {
           "   Get from: Google Analytics → Admin → Data Streams → Measurement Protocol API secrets\n" +
           "   Used for: Server-side event tracking via GA4 Measurement Protocol",
       );
-    } else if (
-      !/^[A-Za-z0-9][A-Za-z0-9_-]{8,126}[A-Za-z0-9]$/.test(gaApiSecret)
-    ) {
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9_-]{8,126}[A-Za-z0-9]$/.test(gaApiSecret)) {
       errors.push(
         "❌ GA_API_SECRET appears invalid\n" +
           "   It should be an alphanumeric string (optionally including _ and -) between 10 and 128 characters.\n" +
@@ -512,166 +411,30 @@ export function validateEnvironment() {
     }
   }
 
-  // Attendance Target Minimum
-  const attendanceTargetMin = process.env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN;
-  if (attendanceTargetMin) {
-    const minValue = parseStrictInt(attendanceTargetMin);
-    if (isNaN(minValue) || minValue < 1 || minValue > 100) {
-      errors.push(
-        "❌ NEXT_PUBLIC_ATTENDANCE_TARGET_MIN must be a number between 1 and 100 (default: 75)",
-      );
-    }
-  }
+  checkRateLimitVar(process.env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN, 1, 100, "❌ NEXT_PUBLIC_ATTENDANCE_TARGET_MIN must be a number between 1 and 100 (default: 75)", errors);
+  checkRateLimitVar(process.env.AUTH_LOCK_TTL, 15, 60, "❌ AUTH_LOCK_TTL must be a number between 15 and 60 seconds (default: 20)", errors);
 
-  // Authentication Lock TTL
-  const authLockTtl = process.env.AUTH_LOCK_TTL;
-  if (authLockTtl) {
-    const ttlValue = parseStrictInt(authLockTtl);
-    if (isNaN(ttlValue) || ttlValue < 15 || ttlValue > 60) {
-      errors.push(
-        "❌ AUTH_LOCK_TTL must be a number between 15 and 60 seconds (default: 20)",
-      );
-    }
-  }
-
-  // Rate Limiting (all optional — defaults are hardcoded in ratelimit.ts)
-  const rateLimitRequests = process.env.RATE_LIMIT_REQUESTS;
-  if (rateLimitRequests) {
-    const val = parseStrictInt(rateLimitRequests);
-    if (isNaN(val) || val < 1 || val > 1000) {
-      errors.push(
-        "❌ RATE_LIMIT_REQUESTS must be a number between 1 and 1000 (default when unset: 10)",
-      );
-    }
-  }
-
-  const rateLimitWindow = process.env.RATE_LIMIT_WINDOW;
-  if (rateLimitWindow) {
-    const val = parseStrictInt(rateLimitWindow);
-    if (isNaN(val) || val < 1 || val > 3600) {
-      errors.push("❌ RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)");
-    }
-  }
-
-  const syncRateLimitRequests = process.env.SYNC_RATE_LIMIT_REQUESTS;
-  if (syncRateLimitRequests) {
-    const val = parseStrictInt(syncRateLimitRequests);
-    if (isNaN(val) || val < 1 || val > 1000) {
-      errors.push(
-        "❌ SYNC_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)",
-      );
-    }
-  }
-
-  const syncRateLimitWindow = process.env.SYNC_RATE_LIMIT_WINDOW;
-  if (syncRateLimitWindow) {
-    const val = parseStrictInt(syncRateLimitWindow);
-    if (isNaN(val) || val < 1 || val > 3600) {
-      errors.push(
-        "❌ SYNC_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)",
-      );
-    }
-  }
-
-  const contactRateLimitRequests = process.env.CONTACT_RATE_LIMIT_REQUESTS;
-  if (contactRateLimitRequests) {
-    const val = parseStrictInt(contactRateLimitRequests);
-    if (isNaN(val) || val < 1 || val > 1000) {
-      errors.push(
-        "❌ CONTACT_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)",
-      );
-    }
-  }
-
-  const contactRateLimitWindow = process.env.CONTACT_RATE_LIMIT_WINDOW;
-  if (contactRateLimitWindow) {
-    const val = parseStrictInt(contactRateLimitWindow);
-    if (isNaN(val) || val < 1 || val > 3600) {
-      errors.push(
-        "❌ CONTACT_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)",
-      );
-    }
-  }
-
-  const authRateLimitRequests = process.env.AUTH_RATE_LIMIT_REQUESTS;
-  if (authRateLimitRequests) {
-    const val = parseStrictInt(authRateLimitRequests);
-    if (isNaN(val) || val < 1 || val > 1000) {
-      errors.push("❌ AUTH_RATE_LIMIT_REQUESTS is invalid (must be 1–1000)");
-    }
-  }
-
-  const authRateLimitWindow = process.env.AUTH_RATE_LIMIT_WINDOW;
-  if (authRateLimitWindow) {
-    const val = parseStrictInt(authRateLimitWindow);
-    if (isNaN(val) || val < 1 || val > 3600) {
-      errors.push(
-        "❌ AUTH_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)",
-      );
-    }
-  }
-
-  const proxyRateLimitRequests = process.env.PROXY_RATE_LIMIT_REQUESTS;
-  if (proxyRateLimitRequests) {
-    const val = parseStrictInt(proxyRateLimitRequests);
-    if (isNaN(val) || val < 1 || val > 5000) {
-      errors.push(
-        "❌ PROXY_RATE_LIMIT_REQUESTS is invalid (must be 1–5000)",
-      );
-    }
-  }
-
-  const proxyRateLimitWindow = process.env.PROXY_RATE_LIMIT_WINDOW;
-  if (proxyRateLimitWindow) {
-    const val = parseStrictInt(proxyRateLimitWindow);
-    if (isNaN(val) || val < 1 || val > 3600) {
-      errors.push(
-        "❌ PROXY_RATE_LIMIT_WINDOW is invalid (must be 1–3600 seconds)",
-      );
-    }
-  }
-
-
-
-
-
-  // Sentry Replay Rate
   const sentryReplayRate = process.env.NEXT_PUBLIC_SENTRY_REPLAY_RATE;
   if (sentryReplayRate) {
     const replayRate = parseFloat(sentryReplayRate);
     if (isNaN(replayRate) || replayRate < 0 || replayRate > 1) {
-      errors.push(
-        "❌ NEXT_PUBLIC_SENTRY_REPLAY_RATE must be a number between 0.0 and 1.0 (default: 0)",
-      );
+      errors.push("❌ NEXT_PUBLIC_SENTRY_REPLAY_RATE must be a number between 0.0 and 1.0 (default: 0)");
     }
   }
+}
 
-  // ============================================================================
-  // DEPLOYMENT SECURITY VALIDATION
-  // ============================================================================
-
-  // Docker HOSTNAME binding security check
-  // When HOSTNAME="0.0.0.0", the container accepts connections from any network interface.
-  // This is ONLY safe when deployed behind a reverse proxy with proper access controls.
+function validateDeploymentSecurityEnv(warnings: string[]) {
   const hostname = process.env.HOSTNAME;
   if (hostname === "0.0.0.0") {
-    // Check for common reverse proxy headers that indicate proper deployment
-    // Note: This check runs at startup, so we can't check actual request headers
-    // Instead, we check if the app appears to be in a properly configured environment
-
     const isProduction = process.env.NODE_ENV === "production";
     const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || "";
 
-    // Extract hostname from NEXT_PUBLIC_APP_DOMAIN to check if it's a local address
     let isLocalDomain = false;
     try {
-      const appDomainHostname = new URL(`https://${appDomain}`).hostname
-        .toLowerCase();
-      // Exact match for localhost and loopback addresses
+      const appDomainHostname = new URL(`https://${appDomain}`).hostname.toLowerCase();
       isLocalDomain = appDomainHostname === "localhost" ||
         appDomainHostname === "127.0.0.1" || appDomainHostname === "::1";
     } catch {
-      // If parsing fails, fall back to string checks with word boundaries
       isLocalDomain = !appDomain ||
         appDomain === "localhost" ||
         appDomain === "127.0.0.1" ||
@@ -693,26 +456,47 @@ export function validateEnvironment() {
       );
     }
   }
+}
 
-  // ============================================================================
-  // REPORT RESULTS
-  // ============================================================================
+/**
+ * Validates required and critical environment variables at startup.
+ * Throws an error and prevents app from starting if critical vars are missing or invalid.
+ * * NOTE: This must only run on the server (instrumentation.ts or next.config.js).
+ */
+export function validateEnvironment() {
+  if (typeof window !== "undefined") return;
+
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  validateSecurityEnv(errors);
+  validateSupabaseEnv(errors);
+  validateEmailAndRedisEnv(errors);
+  validateTurnstileEnv(errors, warnings);
+  validateAppConfigCore(errors, warnings);
+  validateAppConfigUrl(errors);
+  validateCfProxyEgress(errors);
+  validateAwsSecondaryEgress(errors);
+  validateSwAndIp(errors);
+  validateSupabaseProxies(errors);
+  validateServiceAccountJson(errors, warnings);
+  validateAppCheck(errors);
+  validateRateLimitsEnv(errors);
+  validateOptionalMetadata(warnings);
+  validateSentryAndCommit(errors, warnings);
+  validateGaAndLimits(errors, warnings);
+  validateDeploymentSecurityEnv(warnings);
 
   if (errors.length > 0) {
     console.error("\n" + "=".repeat(80));
     console.error("🚨 CRITICAL: ENVIRONMENT VALIDATION FAILED");
     console.error("=".repeat(80));
-    console.error(
-      "The following required environment variables are missing or invalid:\n",
-    );
+    console.error("The following required environment variables are missing or invalid:\n");
     errors.forEach((error) => console.error(error));
     console.error("\n" + "=".repeat(80));
-    console.error(
-      "📚 Fix: Copy .example.env to .env and fill in all required values",
-    );
+    console.error("📚 Fix: Copy .example.env to .env and fill in all required values");
     console.error("=".repeat(80) + "\n");
 
-    // We throw an Error to stop the build/startup
     throw new Error("Environment validation failed");
   }
 
@@ -724,7 +508,6 @@ export function validateEnvironment() {
     console.warn("=".repeat(80) + "\n");
   }
 
-  // Only log success in dev to keep prod logs clean
   if (errors.length === 0 && process.env.NODE_ENV === "development") {
     logger.dev("✅ Environment validation passed");
   }

@@ -5,6 +5,13 @@
 import { isAxiosError } from "axios";
 import { isGlobalOutageDetected } from "@/lib/axios";
 
+function shouldAbortRetryForStatus(status: number | undefined): boolean {
+  if (status === undefined) return false;
+  if (status === 503 || status === 500) return true; // Circuit breaker active
+  if (status >= 400 && status < 500) return true;
+  return false;
+}
+
 /**
  * Returns a TanStack Query `retry` function that never retries on 4xx client
  * errors and retries up to `maxRetries` times for 5xx / network failures.
@@ -23,16 +30,10 @@ export function makeRetryFn(maxRetries = 1) {
     if (isGlobalOutageDetected()) return false;
     
     if (isAxiosError(error)) {
-      const status = error.response?.status;
-      if (status === 503 || status === 500) return false; // Circuit breaker active
       if (error.code === "ERR_NETWORK") return false; // Fail fast when offline
-      if (status !== undefined && status >= 400 && status < 500) return false;
-    }
-    // Fetch-based errors with a .status property manually attached
-    if (typeof error === "object" && error !== null) {
-      const status = (error as { status?: number }).status;
-      if (status === 503 || status === 500) return false; // Circuit breaker active
-      if (status !== undefined && status >= 400 && status < 500) return false;
+      if (shouldAbortRetryForStatus(error.response?.status)) return false;
+    } else if (typeof error === "object" && error !== null) {
+      if (shouldAbortRetryForStatus((error as { status?: number }).status)) return false;
     }
     return failureCount < maxRetries;
   };

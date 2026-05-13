@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final themeProvider = NotifierProvider<ThemeNotifier, ThemeMode>(
   ThemeNotifier.new,
@@ -15,8 +15,8 @@ class ThemeNotifier extends Notifier<ThemeMode> {
 
   @override
   ThemeMode build() {
-    _loadTheme();
-    return ThemeMode.system;
+    final _ = _loadTheme();
+    return ThemeMode.light;
   }
 
   Future<void> _loadTheme() async {
@@ -26,7 +26,7 @@ class ThemeNotifier extends Notifier<ThemeMode> {
       if (index != null && index < ThemeMode.values.length) {
         state = ThemeMode.values[index];
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('ThemeNotifier: Error loading theme', e);
     }
   }
@@ -36,13 +36,13 @@ class ThemeNotifier extends Notifier<ThemeMode> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_key, mode.index);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('ThemeNotifier: Error saving theme', e);
     }
   }
 
   void toggleTheme() {
     final newMode = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-    setTheme(newMode);
+    final _ = setTheme(newMode);
   }
 }

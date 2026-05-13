@@ -28,7 +28,8 @@ export function AnalyticsTracker() {
     const trackPageView = async () => {
       try {
         const clientId = getOrCreateClientId();
-        const url = `${window.location.origin}${pathname}${searchParams?.toString() ? `?${searchParams}` : ""}`;
+        const queryString = searchParams?.toString();
+        const url = `${window.location.origin}${pathname}${queryString ? "?" + queryString : ""}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -251,7 +252,7 @@ export function AnalyticsTracker() {
  */
 export async function trackEvent(
   eventName: string,
-  eventParams?: Record<string, any>
+  eventParams?: Record<string, unknown>
 ) {
   try {
     const clientId = getOrCreateClientId();

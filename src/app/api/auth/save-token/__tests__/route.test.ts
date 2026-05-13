@@ -376,7 +376,7 @@ describe("POST /api/auth/save-token", () => {
       from: vi.fn((table) => {
         if (table === "users") {
           const mockUsers = {
-            select: vi.fn().mockImplementation((_fields) => {
+            select: vi.fn().mockImplementation(() => {
               // The handler calls .select() in two ways:
               // 1. Initial lookup: .from("users").select(...).eq(...).single()
               // 2. Update bootstrap: .from("users").update(...).eq(...).is(...).select(...)

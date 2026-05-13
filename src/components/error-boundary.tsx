@@ -109,7 +109,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     const appDomain = getAppDomain();
     // Validate domain: proper hostname format (no consecutive dots, no leading/trailing hyphens in labels)
-    if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(appDomain)) return;
+    if (!/^[a-zA-Z0-9.-]+$/.test(appDomain) || appDomain.length > 253 || !appDomain.includes(".")) return;
     const subject = encodeURIComponent('Error Report - GhostClass');
     const body = encodeURIComponent(
       `Hi Admin,\n\nI encountered an error while using GhostClass.\n\n` +

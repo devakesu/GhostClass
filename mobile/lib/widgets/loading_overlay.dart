@@ -7,9 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class LoadingOverlay extends StatelessWidget {
-  final String message;
-  final bool isFullScreen;
-  final bool showLogo;
 
   const LoadingOverlay({
     super.key,
@@ -17,6 +14,9 @@ class LoadingOverlay extends StatelessWidget {
     this.isFullScreen = true,
     this.showLogo = true,
   });
+  final String message;
+  final bool isFullScreen;
+  final bool showLogo;
 
   @override
   Widget build(BuildContext context) {
@@ -167,11 +167,10 @@ class LoadingOverlay extends StatelessWidget {
     // If an overlay is already showing, don't push another
     if (_currentRoute != null) return;
 
-    showDialog(
+    final _ = showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,
-      useRootNavigator: true,
       builder: (_) => LoadingOverlay(message: message),
     ).then((_) => _currentRoute = null);
     

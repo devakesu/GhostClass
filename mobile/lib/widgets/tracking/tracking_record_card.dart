@@ -7,16 +7,14 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingRecordCard extends StatelessWidget {
+
+  const TrackingRecordCard({
+    required this.record, required this.onDelete, super.key,
+    this.officialReport,
+  });
   final TrackingRecord record;
   final AttendanceReportDetailed? officialReport;
   final VoidCallback onDelete;
-
-  const TrackingRecordCard({
-    super.key,
-    required this.record,
-    required this.onDelete,
-    this.officialReport,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,14 +26,14 @@ class TrackingRecordCard extends StatelessWidget {
         ? (ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary)
         : (ghostColors?.accentBlue ?? Colors.blue);
 
-    String statusText = _getUserLabel(record.attendance);
+    var statusText = _getUserLabel(record.attendance);
     if (isCorrection && officialReport != null) {
       final dateNorm = record.date.replaceAll('-', '');
       final sessionNorm = utils.toRoman(utils.normalizeSession(record.session));
       final session =
           officialReport!.studentAttendanceData[dateNorm]?[sessionNorm];
 
-      String officialLabel = 'Absent';
+      var officialLabel = 'Absent';
       if (session != null) {
         final offStatus = AttendanceStatus.fromCode(session.attendance);
         if (offStatus == AttendanceStatus.present) {
@@ -79,7 +77,6 @@ class TrackingRecordCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Text(
@@ -156,10 +153,10 @@ class TrackingRecordCard extends StatelessWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 11,
                   color:
-                      (Theme.of(
+                      Theme.of(
                         context,
                       ).extension<GhostColors>()?.accentOrange ??
-                      Colors.orange),
+                      Colors.orange,
                   fontStyle: FontStyle.italic,
                   fontWeight: FontWeight.w600,
                 ),
@@ -181,8 +178,8 @@ class TrackingRecordCard extends StatelessWidget {
     final sessions = report.studentAttendanceData[dateNorm];
     if (sessions == null) return record.session;
 
-    int idx = 0;
-    bool found = false;
+    var idx = 0;
+    var found = false;
     for (final key in sessions.keys) {
       if (key == record.session) {
         found = true;
@@ -226,9 +223,9 @@ class TrackingRecordCard extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
+  const _Badge({required this.label, required this.color});
   final String label;
   final Color color;
-  const _Badge({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -254,8 +251,8 @@ class _Badge extends StatelessWidget {
 }
 
 class _DeleteButton extends StatelessWidget {
-  final VoidCallback onPressed;
   const _DeleteButton({required this.onPressed});
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {

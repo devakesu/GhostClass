@@ -1,19 +1,20 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
-import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class LeaveState {
-  final List<Leave> leaves;
-  final Map<int, List<LeaveSession>> sessions;
 
   LeaveState({required this.leaves, required this.sessions});
 
   factory LeaveState.empty() => LeaveState(leaves: [], sessions: {});
+  final List<Leave> leaves;
+  final Map<int, List<LeaveSession>> sessions;
 }
 
 final leaveProvider = AsyncNotifierProvider<LeaveNotifier, LeaveState>(
@@ -38,13 +39,14 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final storage = ref.read(secureStorageProvider);
 
     final res = await api.fetchLeaveData(storage);
-    final data = res.data;
-    final rawLeaves = data['studentLeaves']?['student_leaves'] as List? ?? [];
-    final rawSessions =
-        data['studentLeaves']?['student_leave_sessions'] as Map? ?? {};
+    final data = res.data as Map<String, dynamic>? ?? {};
+    final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
+    final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
+    final rawSessions = studentLeaves['student_leave_sessions'] as Map<dynamic, dynamic>? ?? {};
 
     final leaves = rawLeaves
-        .map((l) => Leave.fromJson(l as Map<String, dynamic>))
+        .whereType<Map<dynamic, dynamic>>()
+        .map((l) => Leave.fromJson(l.cast<String, dynamic>()))
         .where((l) =>
             l.userSubgroup?.academicSemester == academic.semester &&
             l.userSubgroup?.academicYear == academic.year)
@@ -53,9 +55,10 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final sessions = <int, List<LeaveSession>>{};
     rawSessions.forEach((key, value) {
       final parsedKey = int.tryParse(key.toString());
-      if (parsedKey != null) {
-        sessions[parsedKey] = (value as List)
-            .map((s) => LeaveSession.fromJson(s as Map<String, dynamic>))
+      if (parsedKey != null && value is List<dynamic>) {
+        sessions[parsedKey] = value
+            .whereType<Map<dynamic, dynamic>>()
+            .map((s) => LeaveSession.fromJson(s.cast<String, dynamic>()))
             .toList();
       }
     });

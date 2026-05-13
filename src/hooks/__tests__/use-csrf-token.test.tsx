@@ -288,6 +288,7 @@ describe('useCSRFToken', () => {
     // Testing the "typeof window === 'undefined'" check requires a node environment test file.
     // We'll skip this specific branch test here to avoid messing with global state
     // and causing ReferenceErrors in afterEach/vitest.setup.ts.
+    expect(typeof window).toBe('object'); // Confirm jsdom environment
   })
 
   it('should retry initialization if another component initialization fails', async () => {

@@ -27,9 +27,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class NavigationShell extends ConsumerStatefulWidget {
-  final Widget child;
 
   const NavigationShell({required this.child, super.key});
+  final Widget child;
 
   @override
   ConsumerState<NavigationShell> createState() => _NavigationShellState();
@@ -52,13 +52,13 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   Future<void> _prewarmCalendarData() async {
     try {
       await ref.read(trackingProvider.future);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('NavigationShell: Failed to prewarm tracking data', e, st);
     }
 
     try {
       await ref.read(dashboardProvider.future);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('NavigationShell: Failed to prewarm dashboard data', e, st);
     }
   }
@@ -68,34 +68,34 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     super.initState();
 
 
-    ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
-      previous,
-      next,
-    ) {
-      final previousAcademic = previous == null
-          ? null
-          : _asyncValueOrNull(previous);
-      final nextAcademic = _asyncValueOrNull(next);
+    ref
+      ..listenManual<AsyncValue<AcademicState?>>(academicProvider, (
+        previous,
+        next,
+      ) {
+        final previousAcademic = previous == null
+            ? null
+            : _asyncValueOrNull(previous);
+        final nextAcademic = _asyncValueOrNull(next);
 
-      if (nextAcademic == null || next.isLoading) return;
-      if (previousAcademic == nextAcademic) return;
+        if (nextAcademic == null || next.isLoading) return;
+        if (previousAcademic == nextAcademic) return;
 
-      // Keep calendar dependencies warm in the background whenever the
-      // academic context changes, even if the calendar screen is not open.
-      unawaited(_prewarmCalendarData());
-    });
-
-    ref.listenManual<SecurityFailureState?>(securityFailureProvider, (
-      previous,
-      next,
-    ) {
-      if (next?.criticalRisk == true &&
-          !_criticalSecurityLogoutStarted &&
-          previous?.criticalRisk != true) {
-        _criticalSecurityLogoutStarted = true;
-        unawaited(ref.read(authProvider.notifier).logout(force: true));
-      }
-    });
+        // Keep calendar dependencies warm in the background whenever the
+        // academic context changes, even if the calendar screen is not open.
+        unawaited(_prewarmCalendarData());
+      })
+      ..listenManual<SecurityFailureState?>(securityFailureProvider, (
+        previous,
+        next,
+      ) {
+        if (next?.criticalRisk == true &&
+            !_criticalSecurityLogoutStarted &&
+            previous?.criticalRisk != true) {
+          _criticalSecurityLogoutStarted = true;
+          unawaited(ref.read(authProvider.notifier).logout(force: true));
+        }
+      });
   }
 
   @override
@@ -133,25 +133,20 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       switch (index) {
         case 0:
           context.go('/dashboard');
-          break;
         case 1:
           context.go('/calendar');
-          break;
         case 2:
           context.go('/scores');
-          break;
         case 3:
           context.go('/leaves');
-          break;
         case 4:
           context.go('/ghostclass');
-          break;
       }
     }
 
     Future<void> showTrackingOverlay() async {
       ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showModalBottomSheet(
+      await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -166,7 +161,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
     Future<void> showNotificationsOverlay() async {
       ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showModalBottomSheet(
+      await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -196,7 +191,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
     Future<void> showAddAttendanceDialog() async {
       ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showDialog(
+      await showDialog<void>(
         context: context,
         builder: (context) => const AddAttendanceDialog(),
       );
@@ -205,7 +200,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
     final mainScaffold = Scaffold(
       backgroundColor: bg,
-      extendBody: false,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
         child: SafeArea(
@@ -342,7 +336,12 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                               radius: 22,
                               backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
                               backgroundImage: user?.profile?.avatarUrl != null
-                                  ? NetworkImage(user!.profile!.avatarUrl!)
+                                  ? NetworkImage(
+                                      user!.profile!.avatarUrl!,
+                                      headers: {
+                                        'Origin': AppConfig.supabaseOrigin,
+                                      },
+                                    )
                                   : null,
                               child: user?.profile?.avatarUrl == null
                                   ? Icon(
@@ -475,15 +474,16 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(
+              child: ColoredBox(
                 color: bg.withValues(alpha: 0.9), // More opaque background
                 child: ServiceErrorView(
-                  error: (dashboardAsync.error ?? trackingAsync.error),
+                  error: dashboardAsync.error ?? trackingAsync.error,
                   onRetry: () async {
                     ref.read(apiServiceProvider).clearCaches();
-                    ref.invalidate(dashboardProvider);
-                    ref.invalidate(trackingProvider);
-                    ref.invalidate(academicProvider);
+                    ref
+                      ..invalidate(dashboardProvider)
+                      ..invalidate(trackingProvider)
+                      ..invalidate(academicProvider);
 
                     // Wait for critical providers to finish (success or new error)
                     // We add a 10s timeout so the UI doesn't feel 'stuck' if network hangs
@@ -498,7 +498,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       AppLogger.i(
                         'NavigationShell: Outage recovery wait completed (or partial success).',
                       );
-                    } catch (e) {
+                    } on Object catch (e) {
                       AppLogger.w(
                         'NavigationShell: Outage recovery wait timed out or failed ($e). Re-enabling UI.',
                       );
@@ -574,7 +574,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                            ref.read(securityFailureProvider.notifier).clearFailure();
                            try {
                              await ref.read(authProvider.notifier).refreshProfile(force: true);
-                           } catch (e) {
+                           } on Object {
                              // The 401 interceptor will catch it again if it still fails
                            }
                         },
@@ -634,10 +634,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 }
 
 class _NavButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
 
   const _NavButton({
     required this.icon,
@@ -645,6 +641,10 @@ class _NavButton extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
   });
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

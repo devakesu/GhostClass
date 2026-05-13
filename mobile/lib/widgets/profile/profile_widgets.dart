@@ -1,24 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ProfileHeader extends StatelessWidget {
+
+  const ProfileHeader({
+    required this.avatarUrl, required this.fullName, required this.username, required this.primary, required this.isUploadingAvatar, required this.onAvatarTap, super.key,
+  });
   final String? avatarUrl;
   final String fullName;
   final String username;
   final Color primary;
   final bool isUploadingAvatar;
   final VoidCallback onAvatarTap;
-
-  const ProfileHeader({
-    super.key,
-    required this.avatarUrl,
-    required this.fullName,
-    required this.username,
-    required this.primary,
-    required this.isUploadingAvatar,
-    required this.onAvatarTap,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +37,12 @@ class ProfileHeader extends StatelessWidget {
                     border: Border.all(color: primary.withValues(alpha: 0.2), width: 4),
                     image: avatarUrl != null
                         ? DecorationImage(
-                            image: NetworkImage(avatarUrl!),
+                            image: NetworkImage(
+                              avatarUrl!,
+                              headers: {
+                                'Origin': AppConfig.supabaseOrigin,
+                              },
+                            ),
                             fit: BoxFit.cover,
                           )
                         : null,
@@ -113,18 +113,14 @@ class ProfileHeader extends StatelessWidget {
 }
 
 class ProfileAccountItem extends StatelessWidget {
+
+  const ProfileAccountItem({
+    required this.icon, required this.label, required this.value, required this.primary, super.key,
+  });
   final IconData icon;
   final String label;
   final String value;
   final Color primary;
-
-  const ProfileAccountItem({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.primary,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -174,20 +170,17 @@ class ProfileAccountItem extends StatelessWidget {
 }
 
 class ProfileField extends StatelessWidget {
+
+  const ProfileField({
+    required this.label, required this.controller, required this.enabled, super.key,
+    this.maxLength,
+    this.validator,
+  });
   final String label;
   final TextEditingController controller;
   final bool enabled;
   final int? maxLength;
   final String? Function(String?)? validator;
-
-  const ProfileField({
-    super.key,
-    required this.label,
-    required this.controller,
-    required this.enabled,
-    this.maxLength,
-    this.validator,
-  });
 
   @override
   Widget build(BuildContext context) {

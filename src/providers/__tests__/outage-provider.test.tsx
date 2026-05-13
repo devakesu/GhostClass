@@ -4,7 +4,7 @@ import { OutageProvider, useOutage } from "../outage-provider";
 
 // Mock ServiceErrorView to avoid Radix/Framer issues in tests
 vi.mock("@/components/service-error-view", () => ({
-  ServiceErrorView: ({ messages, error }: any) => (
+  ServiceErrorView: ({ messages, error }: { messages: string[]; error?: string }) => (
     <div data-testid="error-view">
       <div data-testid="messages">{messages.join(", ")}</div>
       {error && <div data-testid="details">{error}</div>}

@@ -3,6 +3,7 @@
 
 import axios from "@/lib/axios";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { logger } from "@/lib/logger";
 import { useMemo } from "react";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
@@ -46,8 +47,9 @@ async function fetchCourseSummaryWithFallback(ezygoId: number) {
     );
     workingSummaryEndpoint = "summery";
     return res;
-  } catch (_err) {
-    // If 'summery' failed, try 'summary' and cache the result if successful
+  } catch (err) {
+    // If 'summery' failed, log and try 'summary' and cache the result if successful
+    logger?.dev?.("/summery attempt failed, falling back to /summary", err);
     const res = await axios.get(
       `/attendancereports/institutionuser/courses/${ezygoId}/summary`
     );
@@ -167,18 +169,24 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
       
       // Normalize each item and update the individual query cache
       const data: Record<string, CourseDetail> = {};
-      Object.entries(res.data as Record<string, any>).forEach(([code, rawDetail]) => {
-        const detail = normalizeCourseDetail(rawDetail);
-        data[code] = detail;
-        
-        const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
-        if (course) {
-          queryClient.setQueryData(
-            ["attendance-report", code],
-            detail
-          );
+      // Build a whitelist of expected course codes to avoid object-injection sinks
+      const validCodes = new Set(uniqueCourses.map((c) => c.code));
+      const resObj = res.data as Record<string, unknown> | null | undefined;
+      
+      if (resObj && typeof resObj === "object") {
+        for (const [code, rawDetail] of Object.entries(resObj)) {
+          if (typeof code !== "string" || !validCodes.has(code)) continue;
+          if (!Object.prototype.hasOwnProperty.call(resObj, code)) continue;
+
+          const detail = normalizeCourseDetail(rawDetail);
+          Reflect.set(data, code, detail);
+
+          const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
+          if (course) {
+            queryClient.setQueryData(["attendance-report", code], detail);
+          }
         }
-      });
+      }
 
       return data;
     },

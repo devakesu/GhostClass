@@ -1,23 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:go_router/go_router.dart';
 
 class LegalScreen extends StatefulWidget {
-  final String title;
-  final String body;
 
   const LegalScreen({
-    super.key,
-    required this.title,
-    required this.body,
+    required this.title, required this.body, super.key,
   });
+  final String title;
+  final String body;
 
   @override
   State<LegalScreen> createState() => _LegalScreenState();
@@ -140,7 +139,7 @@ class _LegalScreenState extends State<LegalScreen> {
                           widget.title,
                           style: GoogleFonts.manrope(
                             fontSize: 40,
-                            height: 1.0,
+                            height: 1,
                             fontWeight: FontWeight.w900,
                             color: onSurface,
                             letterSpacing: -1.5,
@@ -190,7 +189,7 @@ class _LegalScreenState extends State<LegalScreen> {
                           ? MarkdownBody(
                               data: widget.body,
                               onTapLink: (text, href, title) {
-                                if (href != null) _launchUrl(href);
+                                if (href != null) unawaited(_launchUrl(href));
                               },
                               styleSheet: MarkdownStyleSheet(
                                 p: GoogleFonts.manrope(
@@ -208,7 +207,7 @@ class _LegalScreenState extends State<LegalScreen> {
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                   color: onSurface,
-                                  height: 2.0,
+                                  height: 2,
                                 ),
                                 listBullet: GoogleFonts.manrope(
                                   color: primary,
@@ -242,7 +241,6 @@ class _LegalScreenState extends State<LegalScreen> {
                                   border: Border(
                                     top: BorderSide(
                                       color: onSurface.withValues(alpha: 0.1),
-                                      width: 1,
                                     ),
                                   ),
                                 ),
@@ -295,10 +293,6 @@ class _LegalScreenState extends State<LegalScreen> {
 }
 
 class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
 
   const _ActionCard({
     required this.icon,
@@ -306,6 +300,10 @@ class _ActionCard extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
   });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -373,15 +371,15 @@ class _ActionCard extends StatelessWidget {
 }
 
 class _PillButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
 
   const _PillButton({
     required this.icon,
     required this.label,
     required this.onTap,
   });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -422,10 +420,10 @@ class _PillButton extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
 
   const _GlowBlob({required this.color, required this.size});
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {

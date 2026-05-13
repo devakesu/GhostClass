@@ -141,10 +141,10 @@ describe("useDashboardStats", () => {
   it("returns zero when no data is available", () => {
     const { result } = renderHook(() =>
       useDashboardStats({
-        coursesData: null,
+        coursesData: undefined,
         attendanceData: undefined,
         trackingData: undefined,
-        classCourses: null,
+        classCourses: undefined,
         disabledCodes: new Set(),
         selectedSemester: null,
         selectedYear: null,

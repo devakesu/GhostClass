@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:ghostclass/config/app_secrets.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
-import 'app_secrets.dart';
 
 /// Centralized configuration for the application.
 ///
@@ -144,7 +144,7 @@ class AppConfig {
       // Normalize adds padding and handles URL-safe/standard base64 mixed alphabets.
       // If normalization or decoding fails, it's likely not base64, so we return raw.
       return utf8.decode(base64.decode(base64.normalize(trimmed)));
-    } catch (e) {
+    } on Object {
       // Return the raw string as fallback if it's not actually base64
       // This allows migration and reduces breakage for unencoded dev strings
       return encoded;

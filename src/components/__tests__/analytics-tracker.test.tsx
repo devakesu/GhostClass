@@ -31,7 +31,7 @@ describe('AnalyticsTracker', () => {
     vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams('?foo=bar') as any);
     
     // Mock window.location
-    // @ts-ignore
+    // @ts-expect-error - test-only: mocking external analytics client
     delete window.location;
      (window as any).location = {
       ...originalLocation,
@@ -170,7 +170,6 @@ describe('AnalyticsTracker', () => {
     });
 
     // Move to end
-    // @ts-ignore
     video.currentTime = 100;
     fireEvent.ended(video);
     await waitFor(() => {

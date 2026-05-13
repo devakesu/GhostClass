@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:ghostclass/logic/network_utils.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockX509Certificate extends Mock implements X509Certificate {}
 

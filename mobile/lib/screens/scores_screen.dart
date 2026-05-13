@@ -36,109 +36,141 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: ServiceRefreshIndicator(
-        useOverlay: false,
-        onRefresh: () async {
-          final scoreNotifier = ref.read(scoreProvider.notifier);
-          await scoreNotifier.refresh();
-        },
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: [
-          // --- Header ---
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Text(
-                'Internal Marks',
-                style: GoogleFonts.manrope(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  letterSpacing: -1.2,
-                ),
+      body: Stack(
+        children: [
+          // Background Decoration
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
-
-          // --- Service Filter Bar ---
-          SliverToBoxAdapter(
-            child: scoreState.when(
-              data: (data) => _ChipFilterBar(
-                selectedType: data.filterType,
-                onChanged: (type) => ref.read(scoreProvider.notifier).setFilter(type),
+          Positioned(
+            bottom: 100,
+            left: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (Theme.of(context).extension<GhostColors>()?.accentBlue ??
+                        Colors.blue)
+                    .withValues(alpha: 0.05),
               ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
             ),
           ),
-
-          // --- Stats (Matches Web: Total, Scored, Pending) ---
-          SliverToBoxAdapter(
-            child: scoreState.when(
-              data: (data) => Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                child: Row(
-                  children: [
-                    _StatCard(label: 'TOTAL', value: data.totalExams.toString(), color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 12),
-                    _StatCard(label: 'SCORED', value: data.scoredCount.toString(), color: Theme.of(context).extension<GhostColors>()?.successGreen ?? Colors.green),
-                    const SizedBox(width: 12),
-                    _StatCard(label: 'PENDING', value: data.pendingCount.toString(), color: Theme.of(context).extension<GhostColors>()?.dangerRed ?? Theme.of(context).colorScheme.error),
-                  ],
-                ),
-              ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
-          ),
-
-          // --- Content ---
-          scoreState.when(
-            data: (data) => data.groupedExams.isEmpty
-                ? const SliverFillRemaining(child: _EmptyState())
-                : SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final group = data.groupedExams[index];
-                          return _CourseGroupWidget(
-                            group: group,
-                            resolvedScores: data.resolvedScores,
-                            questions: data.questions,
-                            answers: data.answers,
-                            formatDate: _formatDate,
-                          );
-                        },
-                        childCount: data.groupedExams.length,
+          ServiceRefreshIndicator(
+            useOverlay: false,
+            onRefresh: () async {
+              final scoreNotifier = ref.read(scoreProvider.notifier);
+              await scoreNotifier.refresh();
+            },
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                // --- Header ---
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                    child: Text(
+                      'Internal Marks',
+                      style: GoogleFonts.manrope(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        letterSpacing: -1.2,
                       ),
                     ),
                   ),
-            loading: () => const SliverFillRemaining(child: SizedBox.shrink()),
-            error: (err, _) => SliverFillRemaining(
-              child: Center(
-                child: Text(
-                  'We encountered an error while loading your scores. Please try again later. If the issue persists, please contact us.',
-                  style: const TextStyle(color: Colors.redAccent),
-                  textAlign: TextAlign.center,
                 ),
-              ),
+
+                // --- Service Filter Bar ---
+                SliverToBoxAdapter(
+                  child: scoreState.when(
+                    data: (data) => _ChipFilterBar(
+                      selectedType: data.filterType,
+                      onChanged: (type) => ref.read(scoreProvider.notifier).setFilter(type),
+                    ),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
+                ),
+
+                // --- Stats (Matches Web: Total, Scored, Pending) ---
+                SliverToBoxAdapter(
+                  child: scoreState.when(
+                    data: (data) => Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                      child: Row(
+                        children: [
+                          _StatCard(label: 'TOTAL', value: data.totalExams.toString(), color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 12),
+                          _StatCard(label: 'SCORED', value: data.scoredCount.toString(), color: Theme.of(context).extension<GhostColors>()?.successGreen ?? Colors.green),
+                          const SizedBox(width: 12),
+                          _StatCard(label: 'PENDING', value: data.pendingCount.toString(), color: Theme.of(context).extension<GhostColors>()?.dangerRed ?? Theme.of(context).colorScheme.error),
+                        ],
+                      ),
+                    ),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
+                ),
+
+                // --- Content ---
+                scoreState.when(
+                  data: (data) => data.groupedExams.isEmpty
+                      ? const SliverFillRemaining(child: _EmptyState())
+                      : SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final group = data.groupedExams[index];
+                                return _CourseGroupWidget(
+                                  group: group,
+                                  resolvedScores: data.resolvedScores,
+                                  questions: data.questions,
+                                  answers: data.answers,
+                                  formatDate: _formatDate,
+                                );
+                              },
+                              childCount: data.groupedExams.length,
+                            ),
+                          ),
+                        ),
+                  loading: () => const SliverFillRemaining(child: SizedBox.shrink()),
+                  error: (err, _) => const SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'We encountered an error while loading your scores. Please try again later. If the issue persists, please contact us.',
+                        style: TextStyle(color: Colors.redAccent),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ],
             ),
           ),
-          
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
-    ));
+    );
   }
 }
 
 class _ChipFilterBar extends StatelessWidget {
-  final String selectedType;
-  final Function(String) onChanged;
 
   const _ChipFilterBar({required this.selectedType, required this.onChanged});
+  final String selectedType;
+  final void Function(String) onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +203,6 @@ class _ChipFilterBar extends StatelessWidget {
                     color: isSelected ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                     border: isDark ? Border.all(
                       color: isSelected ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.2) : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
-                      width: 1,
                     ) : null,
                     boxShadow: !isDark && isSelected ? [
                       BoxShadow(
@@ -202,11 +233,6 @@ class _ChipFilterBar extends StatelessWidget {
 }
 
 class _CourseGroupWidget extends ConsumerWidget {
-  final CourseGroup group;
-  final Map<int, ResolvedScore> resolvedScores;
-  final Map<int, List<ExamQuestion>> questions;
-  final Map<int, List<ExamAnswer>> answers;
-  final String Function(DateTime) formatDate;
 
   const _CourseGroupWidget({
     required this.group,
@@ -215,6 +241,11 @@ class _CourseGroupWidget extends ConsumerWidget {
     required this.answers,
     required this.formatDate,
   });
+  final CourseGroup group;
+  final Map<int, ResolvedScore> resolvedScores;
+  final Map<int, List<ExamQuestion>> questions;
+  final Map<int, List<ExamAnswer>> answers;
+  final String Function(DateTime) formatDate;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -268,7 +299,7 @@ class _CourseGroupWidget extends ConsumerWidget {
 
   Future<void> _showDetailSheet(BuildContext context, WidgetRef ref, Exam exam) async {
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       isScrollControlled: true,
@@ -289,11 +320,11 @@ class _CourseGroupWidget extends ConsumerWidget {
 }
 
 class _StatCard extends StatelessWidget {
+
+  const _StatCard({required this.label, required this.value, required this.color});
   final String label;
   final String value;
   final Color color;
-
-  const _StatCard({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -332,10 +363,6 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ScoreCard extends StatelessWidget {
-  final Exam exam;
-  final ResolvedScore? resolved;
-  final VoidCallback onTap;
-  final String Function(DateTime) formatDate;
 
   const _ScoreCard({
     required this.exam,
@@ -343,6 +370,10 @@ class _ScoreCard extends StatelessWidget {
     required this.onTap,
     required this.formatDate,
   });
+  final Exam exam;
+  final ResolvedScore? resolved;
+  final VoidCallback onTap;
+  final String Function(DateTime) formatDate;
 
   @override
   Widget build(BuildContext context) {
@@ -460,11 +491,6 @@ class _ScoreCard extends StatelessWidget {
 }
 
 class _ExamDetailSheet extends StatefulWidget {
-  final Exam exam;
-  final List<ExamQuestion> questions;
-  final List<ExamAnswer> answers;
-  final ResolvedScore? resolved;
-  final String Function(DateTime) formatDate;
 
   const _ExamDetailSheet({
     required this.exam,
@@ -473,6 +499,11 @@ class _ExamDetailSheet extends StatefulWidget {
     required this.resolved,
     required this.formatDate,
   });
+  final Exam exam;
+  final List<ExamQuestion> questions;
+  final List<ExamAnswer> answers;
+  final ResolvedScore? resolved;
+  final String Function(DateTime) formatDate;
 
   @override
   State<_ExamDetailSheet> createState() => _ExamDetailSheetState();
@@ -546,7 +577,7 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
           const SizedBox(height: 16),
           Flexible(
             child: ShaderMask(
-              shaderCallback: (Rect bounds) {
+              shaderCallback: (bounds) {
                 return const LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -648,10 +679,10 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
 }
 
 class _QuestionRow extends StatelessWidget {
-  final ExamQuestion question;
-  final ExamAnswer answer;
 
   const _QuestionRow({required this.question, required this.answer});
+  final ExamQuestion question;
+  final ExamAnswer answer;
 
   @override
   Widget build(BuildContext context) {

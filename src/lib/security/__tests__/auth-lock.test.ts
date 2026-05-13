@@ -78,7 +78,7 @@ describe("Auth Lock", () => {
       (redis.set as any).mockResolvedValue("OK");
       
       await getAuthLock("user-1");
-      // Indirectly verified by coverage report showing the branch is hit
+      expect(redis.set).toHaveBeenCalled();
       
       vi.stubEnv("NODE_ENV", original);
     });
@@ -87,6 +87,11 @@ describe("Auth Lock", () => {
       const original = process.env.NODE_ENV;
       vi.stubEnv("NODE_ENV", "production");
       (redis.eval as any).mockResolvedValue(1);
+      
+      await releaseAuthLock("user-1", "val");
+      expect(redis.eval).toHaveBeenCalled();
+      
+      vi.stubEnv("NODE_ENV", original);
       
       await releaseAuthLock("user-1", "val");
       

@@ -1,17 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/security_provider.dart';
-import 'dart:io';
 
 /// SecurityLockdownListener
 /// ------------------------
 /// A widget that listens for critical security failure states and
 /// displays a non-dismissible lockdown dialog to protect user data.
 class SecurityLockdownListener extends ConsumerWidget {
-  final Widget child;
 
-  const SecurityLockdownListener({super.key, required this.child});
+  const SecurityLockdownListener({required this.child, super.key});
+  final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,14 +28,13 @@ class SecurityLockdownListener extends ConsumerWidget {
   }
 
   void _handleLockdown(BuildContext context, SecurityFailureState state) {
-    SecurityUtils.showSecurityFailureDialog(
+    final _ = SecurityUtils.showSecurityFailureDialog(
       context,
       title: state.message,
       message: state.reason ?? 'Your device failed the security verification.',
       technicalDetails: state.source ?? 'Unknown security context.',
       retryLabel: 'Close App',
       onRetry: () => exit(0),
-      isDismissible: false,
     );
   }
 }

@@ -28,6 +28,7 @@ function normalizeLegalEffectiveDate(value: string): string {
   const dayNum = Number(day);
   if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) return trimmed;
 
+  // eslint-disable-next-line security/detect-object-injection -- monthIndex validated (0-11) above
   return `${months[monthIndex]} ${dayNum}, ${year}`;
 }
 

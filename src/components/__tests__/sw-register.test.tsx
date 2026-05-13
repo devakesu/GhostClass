@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, act, cleanup } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mocks — use vi.hoisted() so factory closures can reference these fns,
@@ -32,7 +32,7 @@ vi.mock('@/hooks/usePWAInstall', () => ({}));
 function makeEventSource() {
   const listeners = new Map<string, ((...args: unknown[]) => void)[]>();
   return {
-    addEventListener(event: string, cb: (...args: unknown[]) => void, _opts?: unknown) {
+    addEventListener(event: string, cb: (...args: unknown[]) => void) {
       listeners.set(event, [...(listeners.get(event) ?? []), cb]);
     },
     removeEventListener(event: string, cb: (...args: unknown[]) => void) {
@@ -71,7 +71,7 @@ function makeSWEnv() {
 // Component under test (static import — mocks above must be declared first)
 // ---------------------------------------------------------------------------
 
-import { ServiceWorkerRegister } from '@/components/sw-register';
+import { ServiceWorkerRegister, __resetRefreshingForTests } from '@/components/sw-register';
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -81,7 +81,7 @@ describe('ServiceWorkerRegister', () => {
   let reloadSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    __resetRefreshingForTests();
     vi.clearAllMocks();
     // Enable SW registration in development so the dev-guard is bypassed
     vi.stubEnv('NEXT_PUBLIC_ENABLE_SW_IN_DEV', 'true');
@@ -97,7 +97,7 @@ describe('ServiceWorkerRegister', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    cleanup();
     vi.unstubAllEnvs();
   });
 
@@ -167,6 +167,7 @@ describe('ServiceWorkerRegister', () => {
   });
 
   it('does not set up the hourly interval if unmounted before registration resolves', async () => {
+    vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
@@ -187,6 +188,7 @@ describe('ServiceWorkerRegister', () => {
       await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     });
     expect(registration.update).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   // -------------------------------------------------------------------------
@@ -393,6 +395,7 @@ describe('ServiceWorkerRegister', () => {
   // -------------------------------------------------------------------------
 
   it('sets up an hourly interval that calls registration.update()', async () => {
+    vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
@@ -409,9 +412,11 @@ describe('ServiceWorkerRegister', () => {
     });
 
     expect(registration.update).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('logs a dev message when the periodic update check fails', async () => {
+    vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
     registration.update.mockRejectedValue(new Error('network'));
     Object.defineProperty(navigator, 'serviceWorker', {
@@ -429,6 +434,7 @@ describe('ServiceWorkerRegister', () => {
       'Service worker update check failed',
       expect.anything(),
     );
+    vi.useRealTimers();
   });
 
   // -------------------------------------------------------------------------
@@ -436,6 +442,7 @@ describe('ServiceWorkerRegister', () => {
   // -------------------------------------------------------------------------
 
   it('clears the hourly update interval on unmount', async () => {
+    vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
@@ -454,5 +461,6 @@ describe('ServiceWorkerRegister', () => {
     });
 
     expect(registration.update).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

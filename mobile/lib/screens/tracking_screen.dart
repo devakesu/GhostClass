@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,10 +18,10 @@ import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
+import 'package:ghostclass/widgets/tracking/tracking_course_section.dart';
 import 'package:ghostclass/widgets/tracking/tracking_empty_state.dart';
 import 'package:ghostclass/widgets/tracking/tracking_filter_chip.dart';
 import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
-import 'package:ghostclass/widgets/tracking/tracking_course_section.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -60,7 +61,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             ref.invalidate(trackingProvider);
             try {
               await ref.read(trackingProvider.future);
-            } catch (e, st) {
+            } on Object catch (e, st) {
               AppLogger.e('TrackingScreen: Retry failed', e, st);
             }
           },
@@ -97,7 +98,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final filteredCourseKeys = _selectedCourse == 'all'
         ? sortedCourseKeys.where((k) {
             final mergedCourse = (dashboard?.courses ?? [])
-                .cast<dynamic>()
+                .cast<CourseDetails?>()
                 .firstWhere((c) => c?.safeId == k, orElse: () => null);
             final displayCode = utils.resolveCourseDisplayCode(
               courseKey: k,
@@ -113,7 +114,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         try {
           final trackingNotifier = ref.read(trackingProvider.notifier);
           await trackingNotifier.refresh(forceSync: true);
-        } catch (e, st) {
+        } on Object catch (e, st) {
           AppLogger.e('TrackingScreen: Pull-to-refresh failed', e, st);
           await handleError(e, title: 'Refresh Failed');
         }
@@ -167,7 +168,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                 label: _selectedCourse == 'all'
                                     ? 'Delete All'
                                     : 'Clear Subject',
-                                onPressed: () => _showDeleteAllConfirm(),
+                                onPressed: _showDeleteAllConfirm,
                               ),
                             ),
                           ],
@@ -287,7 +288,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               records: data.groupedByCourse[courseKey] ?? [],
               officialReport: data.officialReport,
               allCourses: dashboard?.courses,
-              onDelete: (id) => _showDeleteRecordConfirm(id),
+              onDelete: _showDeleteRecordConfirm,
             ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -302,23 +303,25 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     List<CourseDetails>? allCourses,
     List<String> keys,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(32)),
-      ),
-      builder: (context) => TrackingSubjectPicker(
-        selectedCourse: _selectedCourse,
-        courseKeys: keys,
-        groupedByCourse: groups,
-        officialReport: report,
-        allCourses: allCourses,
-        onSelected: (course) {
-          setState(() => _selectedCourse = course);
-          Navigator.pop(context);
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(32)),
+        ),
+        builder: (context) => TrackingSubjectPicker(
+          selectedCourse: _selectedCourse,
+          courseKeys: keys,
+          groupedByCourse: groups,
+          officialReport: report,
+          allCourses: allCourses,
+          onSelected: (course) {
+            setState(() => _selectedCourse = course);
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }
@@ -328,8 +331,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final dashboard = ref.read(dashboardProvider).value;
     final tracking = ref.read(trackingProvider).value;
 
-    final bool isFiltered = _selectedCourse != 'all';
-    String subjectName = '';
+    final isFiltered = _selectedCourse != 'all';
+    var subjectName = '';
 
     if (isFiltered) {
       final mergedCourse = (dashboard?.courses ?? [])
@@ -351,10 +354,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final title = isFiltered ? 'Clear Subject Records' : 'Delete All Records';
     final buttonText = isFiltered ? 'CLEAR SUBJECT' : 'DELETE ALL';
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        bool isDeleting = false;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) {
+        var isDeleting = false;
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -416,7 +420,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                               'Records deleted successfully',
                             );
                           }
-                        } catch (e, st) {
+                        } on Object catch (e, st) {
                           AppLogger.e(
                             'TrackingScreen: Clear records failed',
                             e,
@@ -466,14 +470,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           ),
         );
       },
-    );
+    ));
   }
 
   void _showDeleteRecordConfirm(int id) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        bool isDeleting = false;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) {
+        var isDeleting = false;
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -533,7 +538,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                               'Record deleted successfully',
                             );
                           }
-                        } catch (e, st) {
+                        } on Object catch (e, st) {
                           AppLogger.e(
                             'TrackingScreen: Delete record failed',
                             e,
@@ -583,14 +588,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           ),
         );
       },
-    );
+    ));
   }
 }
 
 class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final VoidCallback onClose;
 
   _ModalHeaderDelegate({required this.onClose});
+  final VoidCallback onClose;
 
   @override
   double get minExtent => 64;

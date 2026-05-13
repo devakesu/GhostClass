@@ -127,6 +127,21 @@ export function EditInstructorDialog({
     }
   };
 
+  const getButtonContent = () => {
+    if (isSubmitting) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Saving...
+        </>
+      );
+    }
+    if (!token) {
+      return "Waiting for Verification...";
+    }
+    return "Save for Class";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-106.25 border-border/50 bg-card/95 backdrop-blur-xl">
@@ -205,14 +220,7 @@ export function EditInstructorDialog({
               className="w-full h-12 text-lg font-bold"
               disabled={isSubmitting || !token}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                !token ? "Waiting for Verification..." : "Save for Class"
-              )}
+              {getButtonContent()}
             </Button>
           </DialogFooter>
         </form>

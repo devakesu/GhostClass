@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CalendarHeader extends StatelessWidget {
+
+  const CalendarHeader({
+    required this.focusedDay, required this.canMovePrev, required this.canMoveNext, required this.onPrevious, required this.onNext, required this.onToday, required this.onDateSelect, super.key,
+  });
   final DateTime focusedDay;
   final bool canMovePrev;
   final bool canMoveNext;
@@ -12,17 +16,6 @@ class CalendarHeader extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback? onToday;
   final VoidCallback onDateSelect;
-
-  const CalendarHeader({
-    super.key,
-    required this.focusedDay,
-    required this.canMovePrev,
-    required this.canMoveNext,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onToday,
-    required this.onDateSelect,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -107,15 +100,15 @@ class CalendarHeader extends StatelessWidget {
 }
 
 class _HeaderNavButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool enabled;
 
   const _HeaderNavButton({
     required this.icon,
     required this.onTap,
     required this.enabled,
   });
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {

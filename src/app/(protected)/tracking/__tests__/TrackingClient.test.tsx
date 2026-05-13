@@ -199,7 +199,7 @@ vi.mock('lucide-react', () => {
   ];
   const mock: any = { __esModule: true };
   commonIcons.forEach(icon => {
-    mock[icon] = Icon;
+    Reflect.set(mock, icon, Icon);
   });
   return mock;
 });

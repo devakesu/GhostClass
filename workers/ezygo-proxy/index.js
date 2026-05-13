@@ -81,9 +81,20 @@ async function constantTimeEqual(a, b) {
   // diff === 0 iff every byte pair is identical.
   let diff = 0;
   for (let i = 0; i < aView.length; i++) {
-    diff |= aView[i] ^ bView[i];
+    diff |= aView.at(i) ^ bView.at(i);
   }
   return diff === 0;
+}
+
+/**
+ * Strips all trailing slashes from a string without using regex backtracking.
+ */
+function stripTrailingSlashes(str) {
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
 }
 
 export default {
@@ -113,7 +124,7 @@ export default {
     } catch {
       return new Response("Misconfigured: EZYGO_API_URL is not a valid URL", { status: 500 });
     }
-    const basePath = upstreamBase.pathname.replace(/\/+$/, "");
+    const basePath = stripTrailingSlashes(upstreamBase.pathname);
     const incomingPath = url.pathname;
 
     // Path-join strategy (supports both caller styles):

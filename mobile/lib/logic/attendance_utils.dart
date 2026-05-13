@@ -1,11 +1,11 @@
-import '../models/attendance.dart';
-import '../models/course_details.dart';
-import '../services/logger.dart';
-import 'bunk.dart' as bunk;
+import 'package:ghostclass/logic/bunk.dart' as bunk;
+import 'package:ghostclass/models/attendance.dart';
+import 'package:ghostclass/models/course_details.dart';
+import 'package:ghostclass/services/logger.dart';
 
 /// Converts a numeric value (1, 2, 3...) to Roman numerals (I, II, III...).
 String toRoman(dynamic value) {
-  final int n = (value is String)
+  final n = (value is String)
       ? int.tryParse(value) ?? 0
       : (value is num ? value.toInt() : 0);
   if (n < 1) return n.toString();
@@ -79,14 +79,14 @@ String normalizeDate(dynamic date) {
     final y = date.year.toString();
     final m = date.month.toString().padLeft(2, '0');
     final d = date.day.toString().padLeft(2, '0');
-    return "$y$m$d";
+    return '$y$m$d';
   }
 
-  String s = date.toString().trim();
+  final s = date.toString().trim();
   if (s.isEmpty) return '';
 
   // Handle ISO datetime strings (2024-01-15T10:30:00Z)
-  final String base = s.contains('T') ? s.split('T')[0] : s;
+  final base = s.contains('T') ? s.split('T')[0] : s;
 
   // 1. YYYYMMDD (no separator)
   if (RegExp(r'^\d{8}$').hasMatch(base)) return base;
@@ -102,9 +102,9 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) && 
           RegExp(r'^\d+$').hasMatch(b) && 
           RegExp(r'^\d+$').hasMatch(c)) {
-        final int year = (a.length == 4) ? int.parse(a) : int.parse(c);
-        final int month = int.parse(b);
-        final int day = (a.length == 4) ? int.parse(c) : int.parse(a);
+        final year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        final month = int.parse(b);
+        final day = (a.length == 4) ? int.parse(c) : int.parse(a);
         
         if (month < 1 || month > 12 || day < 1 || day > 31) return '';
 
@@ -133,9 +133,9 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) && 
           RegExp(r'^\d+$').hasMatch(b) && 
           RegExp(r'^\d+$').hasMatch(c)) {
-        final int year = (a.length == 4) ? int.parse(a) : int.parse(c);
-        final int month = int.parse(b);
-        final int day = (a.length == 4) ? int.parse(c) : int.parse(a);
+        final year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        final month = int.parse(b);
+        final day = (a.length == 4) ? int.parse(c) : int.parse(a);
 
         if (month < 1 || month > 12 || day < 1 || day > 31) return '';
 
@@ -163,11 +163,11 @@ String normalizeDate(dynamic date) {
 /// Normalizes session identifiers (e.g., "1st Hour", "Session I") to a numeric string.
 String normalizeSession(dynamic session) {
   if (session == null) return '';
-  String s = session.toString().toLowerCase().trim();
+  var s = session.toString().toLowerCase().trim();
 
   // 1. Remove common noise
   s = s
-      .replaceAll(RegExp(r'session|lecture|lec|lab|hour|hr|period'), '')
+      .replaceAll(RegExp('session|lecture|lec|lab|hour|hr|period'), '')
       .trim();
   s = s.replaceAll(RegExp(r'(st|nd|rd|th)$'), '').trim(); // Remove ordinals
 
@@ -207,7 +207,7 @@ String normalizeSession(dynamic session) {
 String formatSessionName(String sessionName) {
   if (sessionName.isEmpty) return '';
   final clean = sessionName
-      .replaceAll(RegExp(r'Session|Hour', caseSensitive: false), '')
+      .replaceAll(RegExp('Session|Hour', caseSensitive: false), '')
       .trim();
 
   final lower = clean.toLowerCase();
@@ -248,7 +248,7 @@ int getSessionNumber(String name) {
   if (name.isEmpty) return 999;
   final clean = name
       .toLowerCase()
-      .replaceAll(RegExp(r'session|hour'), '')
+      .replaceAll(RegExp('session|hour'), '')
       .trim();
 
   const romanMap = {

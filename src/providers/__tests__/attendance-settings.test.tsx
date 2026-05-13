@@ -32,7 +32,7 @@ describe("AttendanceSettingsProvider", () => {
       settings: null,
       updateTarget: vi.fn(),
       isLoading: false,
-    } as any);
+    } as unknown as ReturnType<typeof useUserSettings>);
 
     render(
       <AttendanceSettingsProvider>

@@ -1,13 +1,7 @@
 class CourseInstructor {
-  final int? id;
-  final String courseCode;
-  final String instructorName;
-  final String? courseName;
 
   const CourseInstructor({
-    this.id,
-    required this.courseCode,
-    required this.instructorName,
+    required this.courseCode, required this.instructorName, this.id,
     this.courseName,
   });
 
@@ -21,6 +15,10 @@ class CourseInstructor {
           json['course_name'] as String? ?? json['courseName'] as String?,
     );
   }
+  final int? id;
+  final String courseCode;
+  final String instructorName;
+  final String? courseName;
 
   Map<String, dynamic> toJson() => {
     'id': id,

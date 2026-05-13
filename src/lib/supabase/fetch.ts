@@ -77,6 +77,130 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
   return { url: url!, key: key! };
 }
 
+function getInputUrlString(input: RequestInfo | URL): string {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.href;
+  }
+  return (input as Request).url;
+}
+
+function stripTrailingSlashes(str: string): string {
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
+interface TierConfig {
+  base: string;
+  name: string;
+}
+
+function configureTierHeaders(
+  input: RequestInfo | URL,
+  initHeaders: HeadersInit | undefined,
+  isDev: boolean,
+  tierName: string,
+): Headers {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined);
+  if (initHeaders) {
+    new Headers(initHeaders).forEach((v, k) => headers.set(k, v));
+  }
+
+  if (isDev && tierName === "DevProxy") {
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
+    if (appDomain) {
+      headers.set("x-ghostclass-proxy-origin", `https://${appDomain}`);
+    }
+  }
+  return headers;
+}
+
+function buildTierRequest(
+  url: string,
+  input: RequestInfo | URL,
+  effectiveInit: RequestInit,
+): { tierInput: RequestInfo | URL; tierInit: RequestInit } {
+  if (typeof input === "string") {
+    return { tierInput: url, tierInit: effectiveInit };
+  }
+  if (input instanceof URL) {
+    return { tierInput: new URL(url), tierInit: effectiveInit };
+  }
+  const originalRequest = input as Request;
+  return {
+    tierInput: url,
+    tierInit: {
+      method: originalRequest.method,
+      headers: originalRequest.headers,
+      ...effectiveInit,
+    },
+  };
+}
+
+async function attemptTierFetch(
+  tier: TierConfig,
+  path: string,
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  callerSignal: AbortSignal | null,
+  bodyOverride: ArrayBuffer | null,
+  isSafeMethod: boolean,
+  isLast: boolean,
+  isDev: boolean,
+): Promise<{ success: true; response: Response } | { success: false; retryable: boolean; error?: unknown }> {
+  const url = `${tier.base}${path}`;
+  const tierController = new AbortController();
+  const tierTimeout = setTimeout(() => tierController.abort(), SUPABASE_TIER_TIMEOUT_MS);
+  const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
+
+  const headers = configureTierHeaders(input, init?.headers, isDev, tier.name);
+  const effectiveInit: RequestInit = {
+    ...init,
+    headers,
+    signal: tierSignal,
+    ...(bodyOverride !== null ? { body: bodyOverride } : {}),
+  };
+
+  const { tierInput, tierInit } = buildTierRequest(url, input, effectiveInit);
+
+  try {
+    const res = await fetch(tierInput, tierInit);
+    clearTimeout(tierTimeout);
+
+    if (SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod) {
+      await res.body?.cancel();
+      return { success: false, retryable: true };
+    }
+    return { success: true, response: res };
+  } catch (err) {
+    clearTimeout(tierTimeout);
+    if (callerSignal?.aborted || isLast) {
+      return { success: false, retryable: false, error: err };
+    }
+    return { success: false, retryable: true };
+  }
+}
+
+async function extractBodyOverride(
+  init: RequestInit | undefined,
+  input: RequestInfo | URL,
+): Promise<ArrayBuffer | null> {
+  const rawBody = (init?.body as BodyInit | null | undefined) ?? (input instanceof Request && !input.bodyUsed ? input.body : null);
+  if (rawBody instanceof ReadableStream) {
+    try {
+      return await new Response(rawBody).arrayBuffer();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /**
  * Builds a tiered custom fetch function for Supabase requests.
  *
@@ -89,11 +213,11 @@ export function buildSupabaseTieredFetch(
   supabaseOrigin: string,
 ): typeof fetch | undefined {
   const parseProxyBase = (envVal: string | undefined): string | null => {
-    const u = envVal?.trim().replace(/\/+$/, "");
+    const u = stripTrailingSlashes(envVal ?? "");
     if (!u) return null;
     try {
       const url = new URL(u);
-      const basePath = url.pathname === "/" ? "" : url.pathname.replace(/\/+$/, "");
+      const basePath = url.pathname === "/" ? "" : stripTrailingSlashes(url.pathname);
       return `${url.origin}${basePath}`;
     } catch {
       return null;
@@ -105,7 +229,7 @@ export function buildSupabaseTieredFetch(
   const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
   const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
 
-  const tiers: Array<{ base: string; name: string }> = [];
+  const tiers: Array<TierConfig> = [];
   const isServer = typeof window === 'undefined';
   
   if (isServer) {
@@ -128,7 +252,7 @@ export function buildSupabaseTieredFetch(
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> {
-    const inputUrl = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
+    const inputUrl = getInputUrlString(input);
     let parsedInputUrl: URL;
     try {
       parsedInputUrl = new URL(inputUrl);
@@ -147,75 +271,28 @@ export function buildSupabaseTieredFetch(
 
     let bodyOverride: ArrayBuffer | null = null;
     if (tiers.length > 1) {
-      const rawBody = (init?.body as BodyInit | null | undefined) ?? (input instanceof Request && !input.bodyUsed ? input.body : null);
-      if (rawBody instanceof ReadableStream) {
-        try {
-          bodyOverride = await new Response(rawBody).arrayBuffer();
-        } catch {
-          bodyOverride = null;
-        }
-      }
+      bodyOverride = await extractBodyOverride(init, input);
     }
 
-    for (let i = 0; i < tiers.length; i++) {
-      const tier   = tiers[i];
+    for (const [i, tier] of tiers.entries()) {
       const isLast = i === tiers.length - 1;
-      const url    = `${tier.base}${path}`;
+      const result = await attemptTierFetch(
+        tier,
+        path,
+        input,
+        init,
+        callerSignal,
+        bodyOverride,
+        isSafeMethod,
+        isLast,
+        isDev,
+      );
 
-      const tierController = new AbortController();
-      const tierTimeout    = setTimeout(() => tierController.abort(), SUPABASE_TIER_TIMEOUT_MS);
-      const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
-
-      const headers = new Headers(input instanceof Request ? input.headers : undefined);
-      if (init?.headers) {
-        new Headers(init.headers).forEach((v, k) => headers.set(k, v));
+      if (result.success) {
+        return result.response;
       }
-
-      if (isDev && tier.name === "DevProxy") {
-        const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-        if (appDomain) {
-          headers.set("x-ghostclass-proxy-origin", `https://${appDomain}`);
-        }
-      }
-
-      const effectiveInit: RequestInit = {
-        ...init,
-        headers,
-        signal: tierSignal,
-        ...(bodyOverride !== null ? { body: bodyOverride } : {}),
-      };
-
-      let tierInput: RequestInfo | URL;
-      let tierInit: RequestInit = effectiveInit;
-
-      if (typeof input === "string") {
-        tierInput = url;
-      } else if (input instanceof URL) {
-        tierInput = new URL(url);
-      } else {
-        const originalRequest = input as Request;
-        tierInput = url;
-        tierInit = {
-          method: originalRequest.method,
-          headers: originalRequest.headers,
-          ...effectiveInit,
-        };
-      }
-
-      try {
-        const res = await fetch(tierInput, tierInit);
-        clearTimeout(tierTimeout);
-
-        if (SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod) {
-          await res.body?.cancel();
-          continue;
-        }
-        return res;
-      } catch (err) {
-        clearTimeout(tierTimeout);
-        if (callerSignal?.aborted) throw err;
-        if (isLast) throw err;
-        continue;
+      if (!result.retryable) {
+        throw result.error;
       }
     }
 

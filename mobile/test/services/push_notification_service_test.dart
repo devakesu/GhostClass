@@ -68,12 +68,12 @@ void main() {
     when(() => mockMessaging.getToken()).thenAnswer((_) async => 'new-fcm-token');
     when(() => mockMessaging.onTokenRefresh).thenAnswer((_) => const Stream.empty());
 
-    when(() => mockDio.post(
+    when(() => mockDio.post<dynamic>(
       any(),
       data: any(named: 'data'),
       options: any(named: 'options'),
-    )).thenAnswer((_) async => Response(
-      requestOptions: RequestOptions(path: ''),
+    )).thenAnswer((_) async => Response<dynamic>(
+      requestOptions: RequestOptions(),
       statusCode: 200,
     ));
 
@@ -99,6 +99,6 @@ void main() {
 
   test('dispose cancels token subscription safely', () {
     final service = container.read(pushNotificationServiceProvider);
-    expect(() => service.dispose(), returnsNormally);
+    expect(service.dispose, returnsNormally);
   });
 }

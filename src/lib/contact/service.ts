@@ -91,7 +91,9 @@ const getContactEmail = () => {
  * 4. Transactional Rollback (Delete from DB if emails fail)
  */
 export async function processContactSubmission(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any, // Required for rollback if RLS is strict
   payload: z.infer<typeof contactSchema>,
   ctx: ContactContext = {},
@@ -163,8 +165,9 @@ export async function processContactSubmission(
 
     return { success: true, id: insertedId };
 
-  } catch (error: any) {
-    logger.error("[ContactService] Contact flow failed:", error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error("[ContactService] Contact flow failed:", errorMsg);
 
     Sentry.captureException(error, {
         tags: { type: "contact_flow_failure", location: "ContactService" },
@@ -195,7 +198,7 @@ export async function processContactSubmission(
 
     return { 
       success: false, 
-      error: error.message || "Failed to process message. Please try again later." 
+      error: errorMsg || "Failed to process message. Please try again later." 
     };
   }
 }

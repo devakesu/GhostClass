@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, vi, expect, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AttendanceCalendar } from '../attendance-calendar';
 
 // Mock required hooks and components
@@ -67,9 +67,9 @@ vi.mock('@/lib/supabase/client', () => ({
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
 vi.mock('framer-motion', () => ({
-  AnimatePresence: ({ children }: any) => children,
+  AnimatePresence: ({ children }: React.PropsWithChildren) => children,
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: React.ComponentProps<'div'>) => <div {...props}>{children}</div>,
   },
 }));
 
@@ -84,54 +84,54 @@ vi.mock('lucide-react', () => {
 
 // Mock UI components
 vi.mock('@/components/ui/card', () => ({
-  Card: ({ children }: any) => <div>{children}</div>,
-  CardHeader: ({ children }: any) => <div>{children}</div>,
-  CardTitle: ({ children }: any) => <div>{children}</div>,
-  CardContent: ({ children }: any) => <div>{children}</div>,
+  Card: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  CardHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  CardTitle: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  CardContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children }: any) => <div>{children}</div>,
-  SelectTrigger: ({ children }: any) => <button>{children}</button>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children }: any) => <div>{children}</div>,
-  SelectValue: ({ children }: any) => <span>{children}</span>,
+  Select: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  SelectTrigger: ({ children }: React.PropsWithChildren) => <button>{children}</button>,
+  SelectContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  SelectItem: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  SelectValue: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
 }));
 
 vi.mock('@/components/ui/alert-dialog', () => ({
-  AlertDialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
-  AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+  AlertDialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) => (open ? <div>{children}</div> : null),
+  AlertDialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  AlertDialogAction: ({ children, onClick }: React.PropsWithChildren<{ onClick?: () => void }>) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({ children, onClick }: React.PropsWithChildren<{ onClick?: () => void }>) => <button onClick={onClick}>{children}</button>,
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <div>{children}</div>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DialogTitle: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DialogDescription: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, ...props }: any) => <button {...props} onClick={onClick}>{children}</button>,
+  Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => <button {...props} onClick={onClick}>{children}</button>,
 }));
 
 vi.mock('@/components/ui/badge', () => ({
-  Badge: ({ children }: any) => <span>{children}</span>,
+  Badge: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
 }));
 
 vi.mock('@/components/ui/input', () => ({
-  Input: (props: any) => <input {...props} />,
+  Input: (props: React.ComponentProps<'input'>) => <input {...props} />,
 }));
 
 vi.mock('@/components/ui/label', () => ({
-  Label: ({ children }: any) => <label>{children}</label>,
+  Label: ({ children }: React.PropsWithChildren) => <label>{children}</label>,
 }));
 
 describe('AttendanceCalendar Coverage Hardening', () => {
@@ -154,7 +154,7 @@ describe('AttendanceCalendar Coverage Hardening', () => {
       sessions: { '1': { name: '1st Hour' } }
     };
 
-    render(<AttendanceCalendar attendanceData={mockAttendanceData as any} semester="odd" year="2024-25" />);
+    render(<AttendanceCalendar attendanceData={mockAttendanceData as unknown as React.ComponentProps<typeof AttendanceCalendar>['attendanceData']} semester="odd" year="2024-25" />);
     
     // Select the date
     const dateBtn = await screen.findByLabelText(/September 1, 2024/i);
@@ -171,7 +171,7 @@ describe('AttendanceCalendar Coverage Hardening', () => {
       data: [{ id: 't1', course: 'CS101', session: '2nd Hour', date: '20240901', status: 'extra', semester: 'odd', year: '2024-25', attendance: 110 }],
       isLoading: false,
       refetch: vi.fn()
-    } as any);
+    } as unknown as ReturnType<typeof useTrackingData>);
 
     const mockAttendanceData = {
       studentAttendanceData: {
@@ -181,17 +181,23 @@ describe('AttendanceCalendar Coverage Hardening', () => {
       },
       sessions: { '1': { name: '1st Hour' } }
     };
-    render(<AttendanceCalendar attendanceData={mockAttendanceData as any} semester="odd" year="2024-25" />);
+    render(<AttendanceCalendar attendanceData={mockAttendanceData as unknown as React.ComponentProps<typeof AttendanceCalendar>['attendanceData']} semester="odd" year="2024-25" />);
     
     const dateBtn = await screen.findByLabelText(/September 1, 2024/i);
-    fireEvent.click(dateBtn);
+    await act(async () => {
+      fireEvent.click(dateBtn);
+    });
 
     const deleteBtn = await screen.findByLabelText(/Delete self-marked/i);
-    fireEvent.click(deleteBtn);
+    await act(async () => {
+      fireEvent.click(deleteBtn);
+    });
 
-    expect(screen.getByText('Delete Record')).toBeInTheDocument();
+    expect(await screen.findByText('Delete Record')).toBeInTheDocument();
     const confirmBtn = screen.getByText('DELETE');
-    fireEvent.click(confirmBtn);
+    await act(async () => {
+      fireEvent.click(confirmBtn);
+    });
     // Should trigger handleDeleteTrackData
   });
 });

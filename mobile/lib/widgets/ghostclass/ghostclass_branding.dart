@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:ghostclass/widgets/transparency_badge.dart';
 
 class GhostClassBranding extends StatelessWidget {
   const GhostClassBranding({super.key});
@@ -141,10 +141,6 @@ class GhostClassBranding extends StatelessWidget {
 }
 
 class _FooterActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
 
   const _FooterActionButton({
     required this.icon,
@@ -152,6 +148,10 @@ class _FooterActionButton extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -187,10 +187,10 @@ class _FooterActionButton extends StatelessWidget {
 }
 
 class _SecondaryLink extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
 
   const _SecondaryLink({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -211,10 +211,10 @@ class _SecondaryLink extends StatelessWidget {
 }
 
 class GhostClassSectionTitle extends StatelessWidget {
+
+  const GhostClassSectionTitle({required this.title, super.key, this.color});
   final String title;
   final Color? color;
-
-  const GhostClassSectionTitle({super.key, required this.title, this.color});
 
   @override
   Widget build(BuildContext context) {

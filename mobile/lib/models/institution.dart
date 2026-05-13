@@ -1,7 +1,4 @@
 class Institution {
-  final int id;
-  final String name;
-  final String role;
 
   const Institution({required this.id, required this.name, required this.role});
 
@@ -17,6 +14,9 @@ class Institution {
       role: (roleObj?['name'] ?? json['role'] ?? 'institution').toString(),
     );
   }
+  final int id;
+  final String name;
+  final String role;
 }
 
 int? _toInt(dynamic value) {

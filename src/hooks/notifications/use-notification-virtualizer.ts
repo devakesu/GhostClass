@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-// @ts-ignore
 import { useVirtualizerBridge } from "./virtualizer-bridge";
 import { Notification } from "@/hooks/notifications/useNotifications";
 
@@ -19,7 +18,8 @@ export function useNotificationVirtualizer({
   parentRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const estimateSize = useCallback((index: number) => {
-    const item = virtualItems[index];
+    if (index < 0 || index >= virtualItems.length) return 80;
+    const item = virtualItems.at(index);
     if (!item) return 80;
 
     if (item.type === "header") {
@@ -27,7 +27,7 @@ export function useNotificationVirtualizer({
     }
 
     const notification = item.data;
-    const description = notification.description ?? "";
+    const description = typeof notification?.description === "string" ? notification.description : "";
 
     const baseHeightShort = 80;
     const baseHeightMedium = 95;
@@ -50,7 +50,7 @@ export function useNotificationVirtualizer({
     count: virtualItems.length,
     getScrollElement,
     estimateSize,
-    measureElement: (el: any) => el.getBoundingClientRect().height,
+    measureElement: (el: Element) => (el as HTMLElement).getBoundingClientRect().height,
     overscan: 10,
   });
 }

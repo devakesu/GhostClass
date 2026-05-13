@@ -44,7 +44,8 @@ vi.mock('@/lib/utils', () => ({
   redact: vi.fn((_type, val) => `redacted-${val}`),
 }));
 
-const TabsContext = React.createContext({ value: '', setValue: (_v: string) => {} });
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const TabsContext = React.createContext({ value: '', setValue: (_val: string) => {} });
 
 vi.mock('@/components/ui/tabs', () => ({
   Tabs: ({ children, defaultValue }: any) => {
