@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,19 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+// The exact Riverpod 3.x auto-dispose future provider type is an internal
+// generic that cannot be named explicitly in consumer code.
+// ignore: specify_nonobvious_property_types
+final notificationPermissionProvider = FutureProvider.autoDispose<bool>((ref) async {
+  try {
+    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    return settings.authorizationStatus == AuthorizationStatus.denied;
+  } on Object {
+    return false;
+  }
+});
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -15,19 +29,30 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check permission as soon as the user returns from the Settings screen.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(notificationPermissionProvider);
+    }
   }
 
   void _onScroll() {
@@ -43,6 +68,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
+    final permissionAsync = ref.watch(notificationPermissionProvider);
+    final isDenied = permissionAsync.when(
+      data: (v) => v,
+      loading: () => false,
+      error: (_, e) => false,
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -53,6 +84,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (isDenied)
+            const Tooltip(
+              message: 'Push notifications are disabled',
+              child: _DeniedBellButton(),
+            ),
           notificationsAsync.whenData((data) {
             if (data.unreadCount > 0) {
               return IconButton(
@@ -87,13 +123,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           }).value ?? const SizedBox.shrink(),
         ],
       ),
-      body: notificationsAsync.when(
-        data: (data) => ServiceRefreshIndicator(
-          onRefresh: () => ref.refresh(notificationsProvider.future),
-          child: _buildList(context, ref, data),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text(error.toString())),
+      body: Column(
+        children: [
+          if (isDenied) const _PermissionBanner(),
+          Expanded(
+            child: notificationsAsync.when(
+              data: (data) => ServiceRefreshIndicator(
+                onRefresh: () => ref.refresh(notificationsProvider.future),
+                child: _buildList(context, ref, data),
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(child: Text(error.toString())),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -181,6 +224,93 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
       ],
     );
+  }
+}
+
+/// Amber bell-off AppBar icon that opens app settings.
+/// Extracted into its own const-constructible widget so the
+/// enclosing [Tooltip] can itself be const.
+class _DeniedBellButton extends StatelessWidget {
+  const _DeniedBellButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const IconButton(
+      icon: Icon(LucideIcons.bellOff),
+      color: Colors.amber,
+      onPressed: openAppSettings,
+    );
+  }
+}
+
+/// Banner shown at the top of the notifications screen when push
+/// notification permission has been denied by the user. Tapping it
+/// routes directly to the device's app-settings page.
+class _PermissionBanner extends StatelessWidget {
+  const _PermissionBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: openAppSettings,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.amber.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                LucideIcons.bellOff,
+                size: 18,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Notifications are paused',
+                    style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tap to enable push notifications in Settings.',
+                    style: GoogleFonts.manrope(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.amber.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              LucideIcons.arrowRight,
+              size: 16,
+              color: Colors.amber.withValues(alpha: 0.6),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1);
   }
 }
 

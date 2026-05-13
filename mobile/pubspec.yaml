@@ -1,5 +1,5 @@
 name: ghostclass
-description: "GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek dashboard with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in 'bunk calculator' to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life."
+description: "GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek web dashboard and a native Flutter mobile application with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in 'bunk calculator' to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built to integrate with existing attendance providers, GhostClass can fetch attendance and leave data from EzyGo and related sources and presents it with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -51,6 +51,7 @@ dependencies:
   markdown: any
   package_info_plus: ^9.0.1
   path: ^1.9.1
+  permission_handler: ^11.3.1
   pointycastle: ^3.9.1
   riverpod_annotation: ^4.0.2
   sentry_dio: ^9.18.0
@@ -76,7 +77,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
