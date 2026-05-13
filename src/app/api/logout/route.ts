@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearAuthCookie } from "@/lib/security/auth-cookie";
 import { removeCsrfToken } from "@/lib/security/csrf";
@@ -8,7 +8,7 @@ import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { withSecurity } from "@/lib/security/app-check";
 
-const handler = async (req: Request) => {
+const handler = async (req: NextRequest) => {
   // Rate limiting — prevents flooding the logout endpoint even with a valid CSRF token
   const ip = getClientIp(req.headers);
   if (!ip) {
@@ -79,4 +79,4 @@ const handler = async (req: Request) => {
   return NextResponse.json({ ok: true });
 };
 
-export const POST = withSecurity(handler as any);
+export const POST = withSecurity(handler);

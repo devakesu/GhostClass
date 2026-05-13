@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-os-command-from-path */
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
@@ -39,8 +40,8 @@ function compareSemver(a, b) {
   const bParts = b.split('.').map(Number);
   
   for (let i = 0; i < 3; i++) {
-    if (aParts[i] > bParts[i]) return 1;
-    if (aParts[i] < bParts[i]) return -1;
+    if (aParts.at(i) > bParts.at(i)) return 1;
+    if (aParts.at(i) < bParts.at(i)) return -1;
   }
   return 0;
 }
@@ -132,7 +133,7 @@ try {
     // Local development: use git command
     try {
       branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
-    } catch (_err) {
+    } catch {
       console.error(`${RED}❌ Failed to get git branch. Are you in a git repo?${RESET}`);
       process.exit(1);
     }
@@ -267,9 +268,10 @@ try {
 
   // 3. Update package.json & package-lock.json
   try {
+    // eslint-disable-next-line sonarjs/os-command
     execSync(`npm version ${newVersion} --no-git-tag-version --allow-same-version`, { stdio: 'ignore' });
     console.log(`${GREEN}   ✔ Updated package.json & package-lock.json${RESET}`);
-  } catch (_err) {
+  } catch {
     console.error(`${RED}   ❌ Failed to update package.json. Is the JSON valid?${RESET}`);
     process.exit(1);
   }
@@ -277,22 +279,49 @@ try {
   // 4. Update Flutter manifest and runtime version metadata.
   const mobilePubspecPath = path.join(process.cwd(), 'mobile', 'pubspec.yaml');
   if (fs.existsSync(mobilePubspecPath)) {
-    let mobilePubspec = fs.readFileSync(mobilePubspecPath, 'utf8');
-    const versionLineRegex = /^\s*version:\s*(\d+\.\d+\.\d+)(?:\+(\d+))?\s*$/m;
-    const versionMatch = mobilePubspec.match(versionLineRegex);
-    const buildNumber = versionMatch?.[2] ?? '1';
-    const nextVersionLine = `version: ${newVersion}+${buildNumber}`;
-
-    if (versionMatch) {
-      mobilePubspec = mobilePubspec.replace(versionLineRegex, nextVersionLine);
-    } else if (/^\s*version:\s*/m.test(mobilePubspec)) {
-      mobilePubspec = mobilePubspec.replace(/^\s*version:\s*.*$/m, nextVersionLine);
-    } else {
-      const prefix = mobilePubspec.endsWith('\n') || mobilePubspec.length === 0 ? '' : '\n';
-      mobilePubspec += `${prefix}${nextVersionLine}\n`;
+    const mobilePubspec = fs.readFileSync(mobilePubspecPath, 'utf8');
+    const lines = mobilePubspec.split(/\r?\n/);
+    let foundVersion = false;
+    let buildNumber = '1';
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('version:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          const val = parts[1].trim();
+          const plusParts = val.split('+');
+          if (plusParts.length >= 2) {
+            buildNumber = plusParts[1].trim();
+          }
+        }
+        break;
+      }
     }
-
-    fs.writeFileSync(mobilePubspecPath, mobilePubspec);
+    
+    const nextVersionLine = `version: ${newVersion}+${buildNumber}`;
+    const newLines = [];
+    
+    for (const line of lines) {
+      if (!foundVersion && line.trim().startsWith('version:')) {
+        newLines.push(nextVersionLine);
+        foundVersion = true;
+      } else {
+        newLines.push(line);
+      }
+    }
+    
+    if (!foundVersion) {
+      if (newLines.length > 0 && newLines[newLines.length - 1] === '') {
+        newLines.pop();
+        newLines.push(nextVersionLine);
+        newLines.push('');
+      } else {
+        newLines.push(nextVersionLine);
+      }
+    }
+    
+    fs.writeFileSync(mobilePubspecPath, newLines.join('\n'));
     console.log(`${GREEN}   ✔ Updated mobile/pubspec.yaml${RESET}`);
   } else {
     console.log(`${YELLOW}   ⚠  mobile/pubspec.yaml not found, skipping.${RESET}`);
@@ -346,13 +375,20 @@ try {
   const openApiPath = path.join(process.cwd(), 'public', 'openapi', 'openapi.yaml');
   
   if (fs.existsSync(openApiPath)) {
-    let openApiContent = fs.readFileSync(openApiPath, 'utf8');
+    const openApiContent = fs.readFileSync(openApiPath, 'utf8');
+    const lines = openApiContent.split(/\r?\n/);
+    const newLines = [];
     
-    // Update version in info section (YAML format: "  version: x.y.z")
-    const versionRegex = /^(\s*version:\s*)\d+\.\d+\.\d+$/gm;
-    openApiContent = openApiContent.replace(versionRegex, `$1${newVersion}`);
+    for (const line of lines) {
+      if (line.trim().startsWith('version:')) {
+        const leadingWhitespace = line.substring(0, line.indexOf('version:'));
+        newLines.push(`${leadingWhitespace}version: ${newVersion}`);
+      } else {
+        newLines.push(line);
+      }
+    }
     
-    fs.writeFileSync(openApiPath, openApiContent);
+    fs.writeFileSync(openApiPath, newLines.join('\n'));
     console.log(`${GREEN}   ✔ Updated public/openapi/openapi.yaml${RESET}`);
   } else {
     console.log(`${YELLOW}   ⚠  OpenAPI file not found, skipping.${RESET}`);

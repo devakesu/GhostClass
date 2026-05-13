@@ -1,28 +1,28 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_handler.dart';
 import 'package:ghostclass/models/attendance.dart';
+import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
+import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:ghostclass/widgets/calendar/calendar_day_details.dart';
+import 'package:ghostclass/widgets/calendar/calendar_header.dart';
+import 'package:ghostclass/widgets/calendar/calendar_session_card.dart';
+import 'package:ghostclass/widgets/calendar/calendar_widgets.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
-import 'package:ghostclass/providers/ui_state_provider.dart';
-import 'package:ghostclass/widgets/calendar/calendar_header.dart';
-import 'package:ghostclass/widgets/calendar/calendar_widgets.dart';
-import 'package:ghostclass/widgets/calendar/calendar_day_details.dart';
-import 'package:ghostclass/widgets/calendar/calendar_session_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-
-import '../models/course_details.dart';
 
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
@@ -65,7 +65,7 @@ class _AttendanceCalendarScreenState
       if (dash != null && track != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final now = DateTime.now();
-          final bool isTodayInRange =
+          final isTodayInRange =
               !now.isBefore(academic.startDate) &&
               !now.isAfter(academic.endDate);
 
@@ -114,17 +114,18 @@ class _AttendanceCalendarScreenState
           error: error,
           onRetry: () async {
             ref.read(apiServiceProvider).clearCaches();
-            ref.invalidate(dashboardProvider);
-            ref.invalidate(trackingProvider);
-            ref.invalidate(academicProvider);
+            ref
+              ..invalidate(dashboardProvider)
+              ..invalidate(trackingProvider)
+              ..invalidate(academicProvider);
 
             try {
-              await Future.wait([
+              await Future.wait<dynamic>([
                 ref.read(dashboardProvider.future),
                 ref.read(trackingProvider.future),
                 ref.read(academicProvider.future),
               ]);
-            } catch (e, st) {
+            } on Object catch (e, st) {
               AppLogger.e('AttendanceCalendarScreen: Retry failed', e, st);
             }
           },
@@ -134,43 +135,76 @@ class _AttendanceCalendarScreenState
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _CalendarContent(
-        dashboard: dash,
-        tracking: track,
-        focusedDay: _focusedDay,
-        selectedDay: _selectedDay,
-        scrollController: _scrollController,
-        onDaySelected: (day) => setState(() => _selectedDay = day),
-        onMonthChanged: (day) => setState(() => _focusedDay = day),
-        onToday: () {
-          final now = DateTime.now();
-          final academicValue = ref.read(academicProvider).value;
-          final bool isTodayInRange =
-              academicValue != null &&
-              !now.isBefore(academicValue.startDate) &&
-              !now.isAfter(academicValue.endDate);
+      body: Stack(
+        children: [
+          // Background Decoration
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (Theme.of(context).extension<GhostColors>()?.accentBlue ??
+                        Colors.blue)
+                    .withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          _CalendarContent(
+            dashboard: dash,
+            tracking: track,
+            focusedDay: _focusedDay,
+            selectedDay: _selectedDay,
+            scrollController: _scrollController,
+            onDaySelected: (day) => setState(() => _selectedDay = day),
+            onMonthChanged: (day) => setState(() => _focusedDay = day),
+            onToday: () {
+              final now = DateTime.now();
+              final academicValue = ref.read(academicProvider).value;
+              final isTodayInRange =
+                  academicValue != null &&
+                  !now.isBefore(academicValue.startDate) &&
+                  !now.isAfter(academicValue.endDate);
 
-          if (isTodayInRange) {
-            setState(() {
-              _focusedDay = now;
-              _selectedDay = now;
-            });
-            _scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeOutCubic,
-            );
-          } else {
-            ServiceToast.show(context, 'Today is outside the academic range');
-          }
-        },
+              if (isTodayInRange) {
+                setState(() {
+                  _focusedDay = now;
+                  _selectedDay = now;
+                });
+                unawaited(
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+              } else {
+                ServiceToast.show(context, 'Today is outside the academic range');
+              }
+            },
+          ),
+        ],
       ),
     );
   }
 
   DateTime _findLatestRecordDate(DashboardData dash, TrackingState track) {
-    DateTime latest = DateTime(2000);
-    bool found = false;
+    var latest = DateTime(2000);
+    var found = false;
 
     for (final dateKey in dash.attendance.studentAttendanceData.keys) {
       if (dateKey.length == 8) {
@@ -204,14 +238,6 @@ class _AttendanceCalendarScreenState
 }
 
 class _CalendarContent extends ConsumerWidget {
-  final DashboardData dashboard;
-  final TrackingState tracking;
-  final DateTime focusedDay;
-  final DateTime selectedDay;
-  final ValueChanged<DateTime> onDaySelected;
-  final ValueChanged<DateTime> onMonthChanged;
-  final VoidCallback onToday;
-  final ScrollController scrollController;
 
   const _CalendarContent({
     required this.dashboard,
@@ -223,6 +249,14 @@ class _CalendarContent extends ConsumerWidget {
     required this.onToday,
     required this.scrollController,
   });
+  final DashboardData dashboard;
+  final TrackingState tracking;
+  final DateTime focusedDay;
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onDaySelected;
+  final ValueChanged<DateTime> onMonthChanged;
+  final VoidCallback onToday;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -233,14 +267,14 @@ class _CalendarContent extends ConsumerWidget {
     final disabledMap = auth?.settings.disabledCourses ?? {};
     final semKey = '${dashboard.selectedYear}-${dashboard.selectedSemester}';
     final disabledCodes = (disabledMap[semKey] ?? {}).keys
-        .map((c) => c.toString().toUpperCase())
+        .map((c) => c.toUpperCase())
         .toSet();
     final now = DateTime.now();
-    final bool isTodayInRange =
+    final isTodayInRange =
         academic != null &&
         !now.isBefore(academic.startDate) &&
         !now.isAfter(academic.endDate);
-    final bool showJumpToToday = isTodayInRange && !isSameDay(selectedDay, now);
+    final showJumpToToday = isTodayInRange && !isSameDay(selectedDay, now);
 
     final events = _getEventsForDay(selectedDay, disabledCodes, context);
 
@@ -370,14 +404,14 @@ class _CalendarContent extends ConsumerWidget {
     required String initialStatus,
   }) {
     final controller = TextEditingController();
-    final int attendance = initialStatus == 'dutyLeave' ? 225 : 1;
+    final attendance = initialStatus == 'dutyLeave' ? 225 : 1;
     final hint =
         attendance == 225
             ? 'Enter reason for Duty Leave...'
             : 'Enter reason for being Present...';
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    showModalBottomSheet(
+    final _ = showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -503,7 +537,7 @@ class _CalendarContent extends ConsumerWidget {
                                   'Correction added successfully',
                                 );
                               }
-                            } catch (e) {
+                            } on Object {
                               if (context.mounted) {
                                 ServiceToast.show(
                                   context,
@@ -547,10 +581,10 @@ class _CalendarContent extends ConsumerWidget {
   }
 
   void _deleteRecord(BuildContext context, WidgetRef ref, int id) {
-    showDialog(
+    final _ = showDialog<void>(
       context: context,
       builder: (context) {
-        bool isDeleting = false;
+        var isDeleting = false;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -603,7 +637,7 @@ class _CalendarContent extends ConsumerWidget {
                                     'Record deleted successfully',
                                   );
                                 }
-                              } catch (e) {
+                              } on Object {
                                 if (context.mounted) {
                                   setDialogState(() => isDeleting = false);
                                   ServiceToast.show(
@@ -664,7 +698,7 @@ class _CalendarContent extends ConsumerWidget {
     Set<String> disabledCodes,
     BuildContext context,
   ) {
-    final List<CalendarEvent> events = [];
+    final events = <CalendarEvent>[];
     final dateStr = DateFormat('yyyyMMdd').format(day);
     final dbDate = DateFormat('yyyy-MM-dd').format(day);
 
@@ -680,7 +714,7 @@ class _CalendarContent extends ConsumerWidget {
 
     final sessions = dashboard.attendance.studentAttendanceData[dateStr];
     if (sessions != null) {
-      int idx = 0;
+      var idx = 0;
       sessions.forEach((key, data) {
         final rawId = data.course.toString();
         final safeId = _resolveSafeId(rawId);
@@ -701,8 +735,8 @@ class _CalendarContent extends ConsumerWidget {
           return;
         }
 
-        final String rawSessionKey = key;
-        String displaySessionName = data.session?.toString() ?? key;
+        final rawSessionKey = key;
+        var displaySessionName = data.session?.toString() ?? key;
         final sNumKey = int.tryParse(key);
         if ((data.session == null || data.session.toString() == 'null') &&
             sNumKey != null &&

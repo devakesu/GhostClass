@@ -5,14 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ServiceErrorDialog extends StatelessWidget {
-  final String title;
-  final List<String> messages;
-  final VoidCallback? onRetry;
-  final VoidCallback? onContactSupport;
-  final String? closeLabel;
-  final String? retryLabel;
-  final String? details;
-  final bool isDismissible;
 
   const ServiceErrorDialog({
     required this.title,
@@ -25,6 +17,14 @@ class ServiceErrorDialog extends StatelessWidget {
     this.details,
     this.isDismissible = true,
   });
+  final String title;
+  final List<String> messages;
+  final VoidCallback? onRetry;
+  final VoidCallback? onContactSupport;
+  final String? closeLabel;
+  final String? retryLabel;
+  final String? details;
+  final bool isDismissible;
 
   /// Shows the error dialog with a centralized design.
   static Future<void> show(
@@ -128,7 +128,7 @@ class ServiceErrorDialog extends StatelessWidget {
                 child: Column(
                   children: [
                     ...messages.where((m) => m.trim().isNotEmpty).map((msg) {
-                      final bool isList = messages.length > 1;
+                      final isList = messages.length > 1;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 14),
                         child: Row(

@@ -13,6 +13,74 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+const ChartBar = ({ 
+  course, 
+  target, 
+  chartHeight 
+}: { 
+  course: { 
+    readonly code: string; 
+    readonly official: number; 
+    readonly adjusted: number | null 
+  }; 
+  target: number; 
+  chartHeight: number;
+}) => {
+  const aboveTarget = course.official >= target;
+  const baseColor = aboveTarget ? "bg-green-600" : "bg-red-600";
+  const hasTracking = course.adjusted !== null;
+  const isGain = hasTracking && (course.adjusted!) >= course.official;
+
+  const baseHeight = (course.official / 100) * chartHeight;
+  const adjustedHeight = hasTracking ? (course.adjusted! / 100) * chartHeight : 0;
+  const overlayHeight = Math.abs(adjustedHeight - baseHeight);
+  const containerHeight = Math.max(baseHeight, adjustedHeight);
+
+  let solidBarHeight = baseHeight;
+  if (hasTracking && !isGain) {
+    solidBarHeight = adjustedHeight;
+  }
+
+  const roundedClass = (!hasTracking || !isGain) ? 'rounded-t' : '';
+
+  return (
+    <div className="flex flex-col items-center gap-1 w-14">
+      <div
+        className="relative w-10 rounded-t overflow-hidden"
+        style={{ height: containerHeight }}
+      >
+        <div
+          className={`absolute bottom-0 left-0 right-0 ${baseColor} ${roundedClass}`}
+          style={{ height: solidBarHeight }}
+        />
+        {hasTracking && (
+          <div
+            className={`absolute left-0 right-0 ${isGain ? 'rounded-t' : ''} border-x border-t`}
+            style={{
+              bottom: isGain ? baseHeight : adjustedHeight,
+              height: overlayHeight,
+              backgroundColor: isGain ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+              backgroundImage: `repeating-linear-gradient(45deg, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 0, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 2.5px, transparent 2.5px, transparent 5px)`,
+              borderColor: isGain ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
+            }}
+          />
+        )}
+      </div>
+      <span className="text-[10px] text-muted-foreground text-center leading-tight">
+        {course.code}
+      </span>
+      <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
+        {course.official}%
+        {hasTracking && (
+          <span className={isGain ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+            {" "} → {course.adjusted}%
+          </span>
+        )}
+      </span>
+    </div>
+  );
+};
+
 // ─── Section heading ───────────────────────────────────────────────────────────
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -24,12 +92,23 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ─── FAQ item ──────────────────────────────────────────────────────────────────
 function makePanelId(question: string): string {
-  const slug = question
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
+  const src = question.toLowerCase().trim();
+  let out = "";
+  for (const ch of src) {
+    const code = ch.charCodeAt(0);
+    const isAlnum = (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
+    if (isAlnum) {
+      out += ch;
+    } else {
+      if (out.endsWith("-")) continue;
+      out += "-";
+    }
+    if (out.length >= 40) break;
+  }
+  // Trim leading/trailing hyphens without regex
+  while (out.startsWith("-")) out = out.slice(1);
+  while (out.endsWith("-")) out = out.slice(0, -1);
+  const slug = out.slice(0, 40);
   return `faq-panel-${slug || "item"}`;
 }
 
@@ -231,65 +310,9 @@ function MockAttendanceChart() {
 
         {/* Bars */}
         <div className="absolute inset-0 flex items-end gap-2 justify-around px-2 pb-0">
-          {courses.map((c) => {
-            const aboveTarget = c.official >= TARGET;
-            const baseColor = aboveTarget ? "bg-green-600" : "bg-red-600";
-            const hasTracking = c.adjusted !== null;
-            const isGain = hasTracking && (c.adjusted!) >= c.official;
-
-            const baseHeightPct = (c.official / 100) * CHART_HEIGHT;
-            const adjustedHeightPct = hasTracking
-              ? (c.adjusted! / 100) * CHART_HEIGHT
-              : 0;
-            const overlayHeight = Math.abs(adjustedHeightPct - baseHeightPct);
-
-            return (
-              <div
-                key={c.code}
-                className="flex flex-col items-center gap-1 w-14"
-              >
-                <div
-                  className="relative w-10 rounded-t overflow-hidden"
-                  style={{ height: Math.max(baseHeightPct, adjustedHeightPct) }}
-                >
-                  {/* Base bar (solid) */}
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 ${baseColor} ${(!hasTracking || !isGain) ? 'rounded-t' : ''}`}
-                    style={{ height: !hasTracking ? baseHeightPct : (isGain ? baseHeightPct : adjustedHeightPct) }}
-                  />
-                  {/* Tracking overlay (hatched) */}
-                  {hasTracking && (
-                    <div
-                      className={`absolute left-0 right-0 ${isGain ? 'rounded-t' : ''} border-x border-t`}
-                      style={{
-                        bottom: isGain ? baseHeightPct : adjustedHeightPct,
-                        height: overlayHeight,
-                        backgroundColor: isGain ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-                        backgroundImage: `repeating-linear-gradient(45deg, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 0, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 2.5px, transparent 2.5px, transparent 5px)`,
-                        borderColor: isGain ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
-                      }}
-                    />
-                  )}
-                </div>
-                <span className="text-[10px] text-muted-foreground text-center leading-tight">
-                  {c.code}
-                </span>
-                <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
-                  {c.official}%
-                  {hasTracking && (
-                    <span
-                      className={
-                        isGain ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                      }
-                    >
-                      {" "}
-                      → {c.adjusted}%
-                    </span>
-                  )}
-                </span>
-              </div>
-            );
-          })}
+          {courses.map((c) => (
+            <ChartBar key={c.code} course={c} target={TARGET} chartHeight={CHART_HEIGHT} />
+          ))}
         </div>
       </div>
 

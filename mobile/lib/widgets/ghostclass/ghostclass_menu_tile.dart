@@ -2,22 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class GhostClassMenuTile extends StatelessWidget {
+
+  const GhostClassMenuTile({
+    required this.icon, required this.title, required this.subtitle, required this.onTap, required this.color, super.key,
+    this.isDanger = false,
+  });
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
   final Color color;
   final bool isDanger;
-
-  const GhostClassMenuTile({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    required this.color,
-    this.isDanger = false,
-  });
 
   @override
   Widget build(BuildContext context) {

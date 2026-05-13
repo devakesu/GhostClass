@@ -12,7 +12,6 @@ import { reloadWithUpdate, tryAutoUpdate } from "@/lib/sw-reload";
  */
 export default function GlobalError({
   error,
-  reset: _reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;

@@ -23,7 +23,7 @@ export async function DashboardDataLoader({ token, userId }: { token: string; us
       hasCourses: !!initialData.courses,
       hasAttendance: !!initialData.attendance,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Graceful degradation – client will refetch on mount
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error('[Dashboard] Failed to fetch initial data', {

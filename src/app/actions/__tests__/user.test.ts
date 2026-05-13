@@ -23,7 +23,7 @@ describe("user actions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(cookies).mockResolvedValue(mockCookieStore as any);
+    vi.mocked(cookies).mockResolvedValue(mockCookieStore as never);
   });
 
   describe("acceptTermsAction", () => {
@@ -36,7 +36,7 @@ describe("user actions", () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockResolvedValue({ error: null }),
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       await acceptTermsAction("v1");
 
@@ -56,7 +56,7 @@ describe("user actions", () => {
           getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         },
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       await expect(acceptTermsAction("v1")).rejects.toThrow("Unauthorized");
     });
@@ -70,7 +70,7 @@ describe("user actions", () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockResolvedValue({ error: { message: "DB Error" } }),
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       await expect(acceptTermsAction("v1")).rejects.toThrow("DB Error");
     });

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  *
  * Logic matches acceptTermsAction in src/app/actions/user.ts
  */
-const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any }) => {
+const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { version?: unknown } }) => {
   const supabaseAdmin = getAdminClient();
 
   // withSecurity handles auth and JWE. We expect a Bearer token or cookie.
@@ -43,7 +43,7 @@ const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any })
     }
   }
 
-  const { version } = body;
+  const { version } = (body || {}) as { version?: unknown };
   if (!version) {
     return NextResponse.json({ error: "Version is required" }, { status: 400 });
   }
@@ -80,4 +80,4 @@ const handler = async (req: Request, { decryptedBody }: { decryptedBody?: any })
   return NextResponse.json({ success: true, version });
 };
 
-export const POST = withSecurity(handler as any);
+export const POST = withSecurity(handler);

@@ -124,6 +124,232 @@ const CustomTargetLabel = (props: LabelProps) => {
   );
 };
 
+interface CourseStats {
+  id: string;
+  code: string;
+  present: number;
+  absent: number;
+  total: number;
+  selfPresent: number;
+  selfTotal: number;
+  name: string;
+  fullName: string;
+}
+
+interface CourseData extends CourseStats {
+  officialPercentage: number;
+  totalPercentage: number;
+  displayedBase: number;
+  displayedExtra: number;
+  baseSuccess: number;
+  baseDanger: number;
+  extraSuccess: number;
+  extraDanger: number;
+  isLoss: boolean;
+  mergedPresent: number;
+  mergedTotal: number;
+}
+
+function processOfficialData(
+  attendanceData: AttendanceReport,
+  idToCodeMap: Map<string, string>,
+  courseAttendance: Map<string, CourseStats>,
+  officialSessionMap: Map<string, number>
+) {
+  Object.entries(attendanceData.studentAttendanceData).forEach(([dateStr, dateData]) => {
+    Object.entries(dateData).forEach(([sessionKey, session]: [string, unknown], index) => {
+      const sessionData = session as { course: string | number | null; attendance: string | number; session?: string };
+      const rawId = sessionData.course?.toString() || "";
+      const courseId = idToCodeMap.get(rawId) || rawId;
+      
+      const stats = courseAttendance.get(courseId);
+      if (sessionData.course !== null && stats) {
+        const status = Number(sessionData.attendance);
+        
+        let sessionName = sessionData.session;
+        if (!sessionName || sessionName === "null") {
+           if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
+               sessionName = sessionKey;
+           } else {
+               sessionName = String(index + 1); 
+           }
+        }
+
+        const key = generateSlotKey(courseId, dateStr, sessionName);
+        officialSessionMap.set(key, status);
+
+        if (
+          status === ATTENDANCE_STATUS.PRESENT ||
+          status === ATTENDANCE_STATUS.DUTY_LEAVE ||
+          status === ATTENDANCE_STATUS.OTHER_LEAVE
+        ) {
+          stats.present += 1;
+          stats.total += 1;
+        } else if (status === ATTENDANCE_STATUS.ABSENT) {
+          stats.absent += 1;
+          stats.total += 1;
+        }
+      }
+    });
+  });
+}
+
+function processTrackingData(
+  trackingData: TrackAttendance[],
+  idToCodeMap: Map<string, string>,
+  courseAttendance: Map<string, CourseStats>,
+  officialSessionMap: Map<string, number>
+) {
+  for (const courseStats of courseAttendance.values()) {
+    const targetId = String(courseStats.id);
+    const targetName = normalize(courseStats.fullName);
+    const targetCode = normalize(courseStats.code);
+
+    const courseTracks = trackingData.filter(t => {
+        const tCodeRaw = String(t.course);
+        const tCodeResolved = idToCodeMap.get(tCodeRaw) || tCodeRaw;
+        if (tCodeResolved === targetId) return true;
+        const tName = normalize(tCodeRaw);
+        return tName === targetName || (targetCode && tName === targetCode);
+    });
+    
+    let selfPresentDelta = 0;
+    let selfTotalDelta = 0;
+
+    courseTracks.forEach((t) => {
+        const trackIsPresent = isPresent(Number(t.attendance));
+        const tCourseRaw = String(t.course);
+        const tCourseCode = idToCodeMap.get(tCourseRaw) || tCourseRaw;
+        const key = generateSlotKey(tCourseCode, t.date, t.session);
+        const officialStatus = officialSessionMap.get(key);
+
+        if (t.status === 'extra') {
+            selfTotalDelta += 1;
+            if (trackIsPresent) selfPresentDelta += 1;
+        } else {
+            const officialIsPresent = officialStatus !== undefined && isPresent(officialStatus);
+            if (!officialIsPresent && trackIsPresent) {
+                selfPresentDelta += 1;
+            } else if (officialIsPresent && !trackIsPresent) selfPresentDelta -= 1;
+        }
+    });
+
+    courseStats.selfPresent = selfPresentDelta;
+    courseStats.selfTotal = selfTotalDelta; 
+  }
+}
+
+function computeAttendanceChartData(
+  attendanceData: AttendanceReport | undefined,
+  trackingData: TrackAttendance[] | undefined,
+  coursesData: { courses: Record<string, Course> } | undefined,
+  safeTarget: number,
+  disabledCodes: Set<string> | undefined
+): CourseData[] {
+  if (!coursesData?.courses || !attendanceData?.studentAttendanceData) {
+    return [];
+  }
+
+  const courseAttendance = new Map<string, CourseStats>();
+  const officialSessionMap = new Map<string, number>();
+  const idToCodeMap = new Map<string, string>();
+
+  // 1. Initialize Courses
+  Object.entries(coursesData.courses).forEach(([key, course]) => {
+    const codeKey = (course.code || key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    idToCodeMap.set(key, codeKey);
+
+    if (!courseAttendance.has(codeKey)) {
+      courseAttendance.set(codeKey, {
+        id: codeKey,
+        code: course.code ?? course.name ?? "",
+        present: 0,
+        absent: 0,
+        total: 0,
+        selfPresent: 0,
+        selfTotal: 0, 
+        name: formatCourseCode(course.code || course.name),
+        fullName: course.name,
+      });
+    }
+  });
+
+  // 2. Process Official Data
+  processOfficialData(attendanceData, idToCodeMap, courseAttendance, officialSessionMap);
+
+  // 3. Process Tracking Data
+  if (trackingData) {
+    processTrackingData(trackingData, idToCodeMap, courseAttendance, officialSessionMap);
+  }
+
+  return Array.from(courseAttendance.values())
+    .filter((course) => {
+      // Exclude courses with no data
+      if ((course.total + course.selfTotal) <= 0) return false;
+      // Exclude disabled courses
+      if (disabledCodes?.has((course.code ?? "").toUpperCase())) return false;
+      return true;
+    })
+    .map((course): CourseData => {
+      const officialPct = course.total > 0 ? parseFloat(((course.present / course.total) * 100).toFixed(2)) : 0;
+      
+      const mergedTotal = Math.max(course.total + course.selfTotal, 0); 
+      const mergedPresent = Math.min(course.present + course.selfPresent, mergedTotal); 
+
+      const mergedPct = mergedTotal > 0 ? parseFloat(((mergedPresent / mergedTotal) * 100).toFixed(2)) : 0;
+      const isLoss = mergedPct < officialPct;
+      
+      const displayedBase = Math.min(officialPct, mergedPct);
+      const displayedExtra = parseFloat(Math.abs(mergedPct - officialPct).toFixed(2));
+      const isSafe = mergedPct >= safeTarget;
+
+      const baseSuccess = isSafe ? displayedBase : 0;
+      const baseDanger = !isSafe ? displayedBase : 0;
+      
+      const extraSuccess = (displayedExtra > 0 && !isLoss && isSafe) ? displayedExtra : 0;
+      const extraDanger = (displayedExtra > 0 && (isLoss || !isSafe)) ? displayedExtra : 0;
+
+      return {
+        ...course,
+        officialPercentage: officialPct,
+        totalPercentage: mergedPct, 
+        displayedBase,
+        displayedExtra,
+        baseSuccess,
+        baseDanger,
+        extraSuccess,
+        extraDanger,
+        isLoss,
+        mergedPresent,
+        mergedTotal,
+        present: course.present,
+        total: course.total,
+        selfPresent: course.selfPresent,
+        selfTotal: course.selfTotal
+      };
+    })
+    .sort((a, b) => a.totalPercentage - b.totalPercentage);
+}
+
+const getGainLossText = (totalPercentage: number, officialPercentage: number) => {
+  if (totalPercentage > officialPercentage) return "Gain";
+  if (totalPercentage < officialPercentage) return "Loss";
+  return "Neutral";
+};
+
+const getGainLossColor = (totalPercentage: number, officialPercentage: number) => {
+  if (totalPercentage > officialPercentage) return "text-green-500";
+  if (totalPercentage < officialPercentage) return "text-red-500";
+  return "text-muted-foreground";
+};
+
+const getPercentageColor = (totalPercentage: number, officialPercentage: number, safeTarget: number) => {
+  if (totalPercentage < officialPercentage) return "text-red-600 dark:text-red-400";
+  if (totalPercentage > officialPercentage) return "text-green-600 dark:text-green-400";
+  if (totalPercentage < safeTarget) return "text-red-600 dark:text-red-400";
+  return "text-green-600 dark:text-green-400";
+};
+
 export function AttendanceChart({ attendanceData, trackingData, coursesData, disabledCodes }: AttendanceChartProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -212,189 +438,7 @@ export function AttendanceChart({ attendanceData, trackingData, coursesData, dis
   }, [isMobile]);
 
   const data = useMemo(() => {
-    if (!coursesData?.courses || !attendanceData?.studentAttendanceData) {
-      return [];
-    }
-
-    interface CourseStats {
-      id: string;
-      code: string;
-      present: number;
-      absent: number;
-      total: number;
-      selfPresent: number;
-      selfTotal: number;
-      name: string;
-      fullName: string;
-    }
-
-    const courseAttendance: Record<string, CourseStats> = {};
-    const officialSessionMap = new Map<string, number>();
-    const idToCodeMap = new Map<string, string>();
-
-    // 1. Initialize Courses (Deduplicated by Code)
-    Object.entries(coursesData.courses).forEach(([key, course]) => {
-      const codeKey = (course.code || key).toUpperCase().replace(/[\s\u00A0-]/g, "");
-      
-      // Map this ID (key) to the codeKey for later lookup
-      idToCodeMap.set(key, codeKey);
-
-      if (!courseAttendance[codeKey]) {
-        courseAttendance[codeKey] = {
-          id: codeKey,
-          code: course.code ?? course.name ?? "",
-          present: 0,
-          absent: 0,
-          total: 0,
-          selfPresent: 0,
-          selfTotal: 0, 
-          name: formatCourseCode(course.code || course.name),
-          fullName: course.name,
-        };
-      }
-    });
-
-    // 2. Process Official Data
-    Object.entries(attendanceData.studentAttendanceData).forEach(([dateStr, dateData]) => {
-      Object.entries(dateData).forEach(([sessionKey, session]: [string, unknown], index) => {
-        const sessionData = session as { course: string | number | null; attendance: string | number; session?: string };
-        const rawId = sessionData.course?.toString() || "";
-        const courseId = idToCodeMap.get(rawId) || rawId;
-        
-        if (sessionData.course !== null && courseAttendance[courseId]) {
-          const stats = courseAttendance[courseId];
-          const status = Number(sessionData.attendance);
-          
-          let sessionName = sessionData.session;
-          if (!sessionName || sessionName === "null") {
-             if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
-                 sessionName = sessionKey;
-             } else {
-                 sessionName = String(index + 1); 
-             }
-          }
-
-          const key = generateSlotKey(courseId, dateStr, sessionName);
-          officialSessionMap.set(key, status);
-
-          if (
-            status === ATTENDANCE_STATUS.PRESENT ||
-            status === ATTENDANCE_STATUS.DUTY_LEAVE ||
-            status === ATTENDANCE_STATUS.OTHER_LEAVE
-          ) {
-            stats.present += 1;
-            stats.total += 1;
-          } else if (status === ATTENDANCE_STATUS.ABSENT) {
-            stats.absent += 1;
-            stats.total += 1;
-          }
-        }
-      });
-    });
-
-    // 3. Process Tracking Data
-    if (trackingData) {
-      Object.values(courseAttendance).forEach((courseStats) => {
-        const targetId = String(courseStats.id);
-        const targetName = normalize(courseStats.fullName);
-        const targetCode = normalize(courseStats.code);
-
-        const courseTracks = trackingData.filter(t => {
-            const tCodeRaw = String(t.course);
-            const tCodeResolved = idToCodeMap.get(tCodeRaw) || tCodeRaw;
-            if (tCodeResolved === targetId) return true;
-            const tName = normalize(tCodeRaw);
-            return tName === targetName || (targetCode && tName === targetCode);
-        });
-        
-        let selfPresentDelta = 0;
-        let selfTotalDelta = 0;
-
-        courseTracks.forEach((t) => {
-            const trackIsPresent = isPresent(Number(t.attendance));
-            const tCourseRaw = String(t.course);
-            const tCourseCode = idToCodeMap.get(tCourseRaw) || tCourseRaw;
-            const key = generateSlotKey(tCourseCode, t.date, t.session);
-            const officialStatus = officialSessionMap.get(key);
-
-            if (t.status === 'extra') {
-                selfTotalDelta += 1;
-                if (trackIsPresent) selfPresentDelta += 1;
-            } else {
-                const officialIsPresent = officialStatus !== undefined && isPresent(officialStatus);
-                if (!officialIsPresent && trackIsPresent) {
-                    selfPresentDelta += 1;
-                } else if (officialIsPresent && !trackIsPresent) selfPresentDelta -= 1;
-            }
-        });
-
-        courseStats.selfPresent = selfPresentDelta;
-        courseStats.selfTotal = selfTotalDelta; 
-      });
-    }
-
-    interface CourseData extends CourseStats {
-      officialPercentage: number;
-      totalPercentage: number;
-      displayedBase: number;
-      displayedExtra: number;
-      baseSuccess: number;
-      baseDanger: number;
-      extraSuccess: number;
-      extraDanger: number;
-      isLoss: boolean;
-      mergedPresent: number;
-      mergedTotal: number;
-    }
-
-    return Object.values(courseAttendance)
-      .filter((course) => {
-        // Exclude courses with no data
-        if ((course.total + course.selfTotal) <= 0) return false;
-        // Exclude disabled courses
-        if (disabledCodes?.has((course.code ?? "").toUpperCase())) return false;
-        return true;
-      })
-      .map((course): CourseData => {
-        const officialPct = course.total > 0 ? parseFloat(((course.present / course.total) * 100).toFixed(2)) : 0;
-        
-        const mergedTotal = Math.max(course.total + course.selfTotal, 0); 
-        const mergedPresent = Math.min(course.present + course.selfPresent, mergedTotal); 
-
-        const mergedPct = mergedTotal > 0 ? parseFloat(((mergedPresent / mergedTotal) * 100).toFixed(2)) : 0;
-        const isLoss = mergedPct < officialPct;
-        
-        const displayedBase = Math.min(officialPct, mergedPct);
-        const displayedExtra = parseFloat(Math.abs(mergedPct - officialPct).toFixed(2));
-        const isSafe = mergedPct >= safeTarget;
-
-        const baseSuccess = isSafe ? displayedBase : 0;
-        const baseDanger = !isSafe ? displayedBase : 0;
-        
-        // Fix: extraSuccess should only be green if the final percentage is safe
-        const extraSuccess = (displayedExtra > 0 && !isLoss && isSafe) ? displayedExtra : 0;
-        const extraDanger = (displayedExtra > 0 && (isLoss || !isSafe)) ? displayedExtra : 0;
-
-        return {
-          ...course,
-          officialPercentage: officialPct,
-          totalPercentage: mergedPct, 
-          displayedBase,
-          displayedExtra,
-          baseSuccess,
-          baseDanger,
-          extraSuccess,
-          extraDanger,
-          isLoss,
-          mergedPresent,
-          mergedTotal,
-          present: course.present,
-          total: course.total,
-          selfPresent: course.selfPresent,
-          selfTotal: course.selfTotal
-        };
-      })
-      .sort((a, b) => a.totalPercentage - b.totalPercentage);
+    return computeAttendanceChartData(attendanceData, trackingData, coursesData, safeTarget, disabledCodes);
   }, [attendanceData, trackingData, coursesData, safeTarget, disabledCodes]);
 
   const allPercentages = data.flatMap(d => [d.totalPercentage, d.officialPercentage]);
@@ -420,6 +464,98 @@ const renderTargetLabel = (props: LabelProps) => {
 };
 /* eslint-enable react/prop-types */
 
+const renderChartContent = () => {
+  if (!dimensions.width || !dimensions.height) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+        <BarChart3 className="w-8 h-8 animate-pulse opacity-50" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground/30">
+         <BarChart3 className="w-8 h-8 mb-2 opacity-50"  aria-hidden="true" />
+         <span className="text-xs font-medium">No attendance data</span>
+      </div>
+    );
+  }
+
+  return (
+    <BarChart 
+      data={data} 
+      margin={{ top: 20, right: 20, left: -12, bottom: isMobile ? 80 : 60 }} 
+      maxBarSize={50}
+      width={dimensions.width}
+      height={dimensions.height}
+    >
+        <defs>
+          <pattern id="striped-green" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="#10b981" fillOpacity="0.25" />
+            <line x1="0" y="0" x2="0" y2="8" stroke="#10b981" strokeWidth="4" strokeOpacity={0.4} />
+          </pattern>
+          <pattern id="striped-red" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="#ef4444" fillOpacity="0.25" />
+            <line x1="0" y="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="4" strokeOpacity={0.4} />
+          </pattern>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-muted-foreground)" strokeOpacity={0.2} />
+        
+        <XAxis 
+          dataKey="name" 
+          interval={0} 
+          textAnchor="end" 
+          angle={isMobile ? -90 : -45} 
+          height={isMobile ? 100 : 80} 
+          tick={{ fontSize: 11, fill: "var(--color-muted-foreground)", dy: 10 }} 
+          tickMargin={isMobile ? 12 : 8} 
+        />
+        <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
+        <Tooltip
+          active={isMobile && tooltipHidden ? false : undefined}
+          contentStyle={{ backgroundColor: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)" }}
+          itemStyle={{ color: "var(--color-foreground)", padding: 0 }} labelStyle={{ color: "var(--color-muted-foreground)", marginBottom: '0.5rem' }} cursor={{ fill: "rgba(128, 128, 128, 0.08)" }} formatter={() => null} 
+          content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const d = payload[0].payload as CourseData;
+                return (
+                  <div className="bg-popover border border-border p-3 rounded-lg shadow-md text-xs">
+                    <p className="text-muted-foreground mb-2 font-medium">{d.fullName}</p>
+                    <div className="flex justify-between gap-4 mb-1">
+                      <span className="text-muted-foreground/60">Official:</span>
+                      <span className={`font-mono font-bold ${d.officialPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                        {d.officialPercentage}% <span className="text-muted-foreground/40 font-normal">({d.present}/{d.total})</span>
+                      </span>
+                    </div>
+                    {(d.mergedTotal !== d.total || d.mergedPresent !== d.present) && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground/60">
+                            Adjusted (<span className={getGainLossColor(d.totalPercentage, d.officialPercentage)}>
+                              {getGainLossText(d.totalPercentage, d.officialPercentage)}
+                            </span>):
+                          </span>
+                          <span className={`font-mono font-bold ${getPercentageColor(d.totalPercentage, d.officialPercentage, safeTarget)}`}>
+                            {d.totalPercentage}% <span className="text-muted-foreground/40 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
+                          </span>
+                        </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+          }}
+        />
+        <Bar dataKey="baseSuccess" stackId="a" isAnimationActive={false} fill="#10b981" shape={renderBottomBar} />
+        <Bar dataKey="baseDanger" stackId="a" isAnimationActive={false} fill="#ef4444" shape={renderBottomBar} />
+        <Bar dataKey="extraSuccess" stackId="a" isAnimationActive={false} fill="url(#striped-green)" stroke="#10b981" shape={renderHatchedBar} />
+        <Bar dataKey="extraDanger" stackId="a" isAnimationActive={false} fill="url(#striped-red)" stroke="#ef4444" shape={renderHatchedBar} />
+
+        <ReferenceLine y={safeTarget} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={2} strokeOpacity={1} label={renderTargetLabel} />
+      </BarChart>
+  );
+};
+
 return (
   <div
     ref={containerRef}
@@ -427,89 +563,7 @@ return (
     role="img"
     aria-label="Attendance overview bar chart"
   >
-    {!dimensions.width || !dimensions.height ? (
-      <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
-        <BarChart3 className="w-8 h-8 animate-pulse opacity-50" aria-hidden="true" />
-      </div>
-    ) : data.length > 0 ? (
-      <BarChart 
-        data={data} 
-        margin={{ top: 20, right: 20, left: -12, bottom: isMobile ? 80 : 60 }} 
-        maxBarSize={50}
-        width={dimensions.width}
-        height={dimensions.height}
-      >
-          <defs>
-            <pattern id="striped-green" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-              <rect width="8" height="8" fill="#10b981" fillOpacity="0.25" />
-              <line x1="0" y="0" x2="0" y2="8" stroke="#10b981" strokeWidth="4" strokeOpacity={0.4} />
-            </pattern>
-            <pattern id="striped-red" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-              <rect width="8" height="8" fill="#ef4444" fillOpacity="0.25" />
-              <line x1="0" y="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="4" strokeOpacity={0.4} />
-            </pattern>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-muted-foreground)" strokeOpacity={0.2} />
-          
-          <XAxis 
-            dataKey="name" 
-            interval={0} 
-            textAnchor="end" 
-            angle={isMobile ? -90 : -45} 
-            height={isMobile ? 100 : 80} 
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)", dy: 10 }} 
-            tickMargin={isMobile ? 12 : 8} 
-          />
-          <YAxis domain={[yAxisMin, 100]} type="number" allowDecimals={false} allowDataOverflow={true} tickCount={Math.ceil((100 - yAxisMin) / 5) + 1} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} axisLine={false} tickLine={false} />
-          <Tooltip
-            active={isMobile && tooltipHidden ? false : undefined}
-            contentStyle={{ backgroundColor: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "13px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)" }}
-            itemStyle={{ color: "var(--color-foreground)", padding: 0 }} labelStyle={{ color: "var(--color-muted-foreground)", marginBottom: '0.5rem' }} cursor={{ fill: "rgba(128, 128, 128, 0.08)" }} formatter={() => null} 
-            content={({ active, payload }) => {
-                if (active && payload && payload.length) {
-                  const d = payload[0].payload;
-                  return (
-                    <div className="bg-popover border border-border p-3 rounded-lg shadow-md text-xs">
-                      <p className="text-muted-foreground mb-2 font-medium">{d.fullName}</p>
-                      <div className="flex justify-between gap-4 mb-1">
-                        <span className="text-muted-foreground/60">Official:</span>
-                        <span className={`font-mono font-bold ${d.officialPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                          {d.officialPercentage}% <span className="text-muted-foreground/40 font-normal">({d.present}/{d.total})</span>
-                        </span>
-                      </div>
-                      {(d.mergedTotal !== d.total || d.mergedPresent !== d.present) && (
-                          <div className="flex justify-between gap-4">
-                            <span className="text-muted-foreground/60">
-                              Adjusted (
-                              <span className={d.totalPercentage > d.officialPercentage ? "text-green-500" : (d.totalPercentage < d.officialPercentage ? "text-red-500" : "text-muted-foreground")}>
-                                {d.totalPercentage > d.officialPercentage ? "Gain" : (d.totalPercentage < d.officialPercentage ? "Loss" : "Neutral")}
-                              </span>
-                              ):
-                            </span>
-                            <span className={`font-mono font-bold ${d.totalPercentage < d.officialPercentage ? 'text-red-600 dark:text-red-400' : (d.totalPercentage > d.officialPercentage ? 'text-green-600 dark:text-green-400' : (d.totalPercentage < safeTarget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'))}`}>
-                              {d.totalPercentage}% <span className="text-muted-foreground/40 font-normal">({d.mergedPresent}/{d.mergedTotal})</span>
-                            </span>
-                          </div>
-                      )}
-                    </div>
-                  );
-                }
-                return null;
-            }}
-          />
-          <Bar dataKey="baseSuccess" stackId="a" isAnimationActive={false} fill="#10b981" shape={renderBottomBar} />
-          <Bar dataKey="baseDanger" stackId="a" isAnimationActive={false} fill="#ef4444" shape={renderBottomBar} />
-          <Bar dataKey="extraSuccess" stackId="a" isAnimationActive={false} fill="url(#striped-green)" stroke="#10b981" shape={renderHatchedBar} />
-          <Bar dataKey="extraDanger" stackId="a" isAnimationActive={false} fill="url(#striped-red)" stroke="#ef4444" shape={renderHatchedBar} />
-
-          <ReferenceLine y={safeTarget} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={2} strokeOpacity={1} label={renderTargetLabel} />
-        </BarChart>
-    ) : (
-      <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground/30">
-         <BarChart3 className="w-8 h-8 mb-2 opacity-50"  aria-hidden="true" />
-         <span className="text-xs font-medium">No attendance data</span>
-      </div>
-    )}
+    {renderChartContent()}
   </div>
 );
 }

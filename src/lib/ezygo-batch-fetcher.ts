@@ -66,7 +66,7 @@ export class QueueTimeoutError extends NonBreakerError {
 // TTL must be >= QUEUE_TIMEOUT_MS (30s) + fetch timeout (15s) to ensure the promise
 // doesn't expire while waiting in queue or during the fetch operation
 // Resolved results remain cached for any remaining TTL after completion
-const requestCache = new LRUCache<string, Promise<any>>({
+const requestCache = new LRUCache<string, Promise<unknown>>({
   max: 500,
   ttl: 60000, // 60 seconds - accounts for 30s queue wait + 15s fetch + buffer
   updateAgeOnGet: false, // Don't reset TTL on access
@@ -208,7 +208,7 @@ export function fetchEzygoData<T>(
   // Check if request is already in-flight
   const existingRequest = requestCache.get(cacheKey);
   if (existingRequest) {
-    return existingRequest;
+    return existingRequest as Promise<T>;
   }
   
   // Create a deferred promise that we control
@@ -380,7 +380,7 @@ export function getRateLimiterStats() {
 export function invalidateEzygoCacheForUser(token: string) {
   const tokenHash = createHash('sha256').update(token).digest('hex');
   const iterableCache = requestCache as unknown as Iterable<
-    [string, Promise<any>]
+    [string, Promise<unknown>]
   >;
 
   for (const [key] of iterableCache) {

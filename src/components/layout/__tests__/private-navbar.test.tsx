@@ -9,6 +9,7 @@ import { isValidAvatarUrl } from "@/lib/utils";
 import { Navbar } from "../private-navbar";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import React from "react";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -67,7 +68,7 @@ vi.mock("nextjs-toploader", () => ({
 }));
 
 vi.mock("@/components/attendance/AddRecordTrigger", () => ({
-  AddRecordTrigger: ({ onSuccess }: any) => (
+  AddRecordTrigger: ({ onSuccess }: { onSuccess: () => void }) => (
     <div data-testid="add-record-trigger" onClick={onSuccess}>Add</div>
   ),
 }));
@@ -86,7 +87,7 @@ vi.mock("@/providers/theme", () => ({
 
 // Mock UI components to simplify testing
 vi.mock("@/components/ui/switch", () => ({
-  Switch: ({ checked, onCheckedChange, "aria-label": ariaLabel, id, "aria-labelledby": ariaLabelledBy }: any) => (
+  Switch: ({ checked, onCheckedChange, "aria-label": ariaLabel, id, "aria-labelledby": ariaLabelledBy }: { checked?: boolean; onCheckedChange: (v: boolean) => void; "aria-label"?: string; id?: string; "aria-labelledby"?: string }) => (
     <input 
       type="checkbox" 
       id={id}
@@ -99,7 +100,7 @@ vi.mock("@/components/ui/switch", () => ({
 }));
 
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ children, value, onValueChange }: any) => (
+  Select: ({ children, value, onValueChange }: { children: React.ReactNode; value?: string; onValueChange?: (v: string) => void }) => (
     <div 
       data-testid="select-root" 
       data-value={value} 
@@ -111,21 +112,21 @@ vi.mock("@/components/ui/select", () => ({
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, "aria-label": ariaLabel, id }: any) => <button id={id} aria-label={ariaLabel}>{children}</button>,
-  SelectValue: ({ children }: any) => <div>{children}</div>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+  SelectTrigger: ({ children, "aria-label": ariaLabel, id }: { children: React.ReactNode; "aria-label"?: string; id?: string }) => <button id={id} aria-label={ariaLabel}>{children}</button>,
+  SelectValue: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <div data-value={value}>{children}</div>,
 }));
 
 // Mock DropdownMenu to render children directly
 vi.mock("@/components/ui/dropdown-menu", () => ({
-  DropdownMenu: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuTrigger: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onClick }: any) => (
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
     <div onClick={onClick} role="menuitem">{children}</div>
   ),
-  DropdownMenuLabel: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
 }));
 
@@ -142,21 +143,21 @@ describe("Navbar", () => {
     vi.mocked(useProfile).mockReturnValue({ 
       data: { username: "testuser", email: "test@example.com", avatar_url: null }, 
       isLoading: false 
-    } as any);
+    } as never);
     
     vi.mocked(useUserSettings).mockReturnValue({
       settings: { bunk_calculator_enabled: true, target_percentage: 75 },
       updateBunkCalc: mockUpdateBunkCalc,
       updateTarget: mockUpdateTarget,
       isLoading: false,
-    } as any);
+    } as never);
     
-    vi.mocked(useInstitutions).mockReturnValue({ data: [], isLoading: false } as any);
-    vi.mocked(useDefaultInstitutionUser).mockReturnValue({ data: null } as any);
-    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate: vi.fn() } as any);
-    vi.mocked(useTheme).mockReturnValue({ theme: "dark", toggleTheme: mockToggleTheme } as any);
+    vi.mocked(useInstitutions).mockReturnValue({ data: [], isLoading: false } as never);
+    vi.mocked(useDefaultInstitutionUser).mockReturnValue({ data: null } as never);
+    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate: vi.fn() } as never);
+    vi.mocked(useTheme).mockReturnValue({ theme: "dark", toggleTheme: mockToggleTheme } as never);
     vi.mocked(isValidAvatarUrl).mockReturnValue(false);
-    vi.mocked(useQueryClient).mockReturnValue({ invalidateQueries: mockInvalidateQueries } as any);
+    vi.mocked(useQueryClient).mockReturnValue({ invalidateQueries: mockInvalidateQueries } as never);
   });
 
   it("renders without crashing", () => {
@@ -201,7 +202,7 @@ describe("Navbar", () => {
     vi.mocked(useUserSettings).mockReturnValue({
       settings: { bunk_calculator_enabled: false },
       updateBunkCalc: mockUpdateBunkCalc,
-    } as any);
+    } as never);
     render(<Navbar />);
     const newToggle = screen.getAllByLabelText("Toggle bunk calculator feature")[1];
     fireEvent.click(newToggle);
@@ -241,7 +242,7 @@ describe("Navbar", () => {
     vi.mocked(useProfile).mockReturnValue({ 
       data: { avatar_url: "http://example.com/avatar.png", username: "testuser" },
       isLoading: false 
-    } as any);
+    } as never);
     
     render(<Navbar />);
     const avatarImg = screen.getByAltText(/testuser profile picture/i);
@@ -253,11 +254,11 @@ describe("Navbar", () => {
       if (options.onSuccess) options.onSuccess();
       if (options.onError) options.onError();
     });
-    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate } as any);
+    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate } as never);
     vi.mocked(useInstitutions).mockReturnValue({ 
       data: [{ id: 1, institution: { name: "Inst 1" } }], 
       isLoading: false 
-    } as any);
+    } as never);
     
     render(<Navbar />);
     const selects = screen.getAllByTestId("select-root");

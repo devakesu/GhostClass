@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -10,22 +11,21 @@ import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 // ─── Tracking State ──────────────────────────────────────────────────────────
 
 class TrackingState {
-  final Map<String, List<TrackingRecord>> groupedByCourse;
-  final AttendanceReportDetailed? officialReport;
-  final int totalCount;
-  final bool isSyncing;
-  final bool syncCompleted;
 
   TrackingState({
     required this.groupedByCourse,
     required this.totalCount, required this.isSyncing, required this.syncCompleted, this.officialReport,
   });
+  final Map<String, List<TrackingRecord>> groupedByCourse;
+  final AttendanceReportDetailed? officialReport;
+  final int totalCount;
+  final bool isSyncing;
+  final bool syncCompleted;
 
   TrackingState copyWith({
     Map<String, List<TrackingRecord>>? groupedByCourse,
@@ -101,7 +101,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    bool syncCompleted = false;
+    var syncCompleted = false;
     if (forceSync) {
       if (_isSyncingExternal) {
         syncCompleted = true;
@@ -143,16 +143,16 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         .eq('auth_user_id', auth.supabaseUserId)
         .eq('semester', academic.semester)
         .eq('year', academic.year);
-    final List<dynamic> data = response as List<dynamic>;
+    final data = response as List<dynamic>;
     records.addAll(
       data.map(
         (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
       ),
     );
 
-    final Map<String, List<TrackingRecord>> grouped = {};
+    final grouped = <String, List<TrackingRecord>>{};
     for (final record in records) {
-      final String safeId = _resolveToSafeId(
+      final safeId = _resolveToSafeId(
         record.course,
         officialReport,
         academic,
@@ -225,7 +225,6 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     state = await AsyncValue.guard(
       () => _fetchAndProcess(
         academic: academic,
-        isInitial: false,
         forceSync: forceSync,
       ),
     );
@@ -282,15 +281,13 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           newGrouped[safeCourseId] = [];
         }
 
-        final list = List<TrackingRecord>.from(newGrouped[safeCourseId]!);
-        list.add(newRecord);
-
-        // Mantain Sort (Newest First)
-        list.sort((a, b) {
-          final cmp = b.date.compareTo(a.date);
-          if (cmp != 0) return cmp;
-          return b.session.compareTo(a.session);
-        });
+        final list = List<TrackingRecord>.from(newGrouped[safeCourseId]!)
+          ..add(newRecord)
+          ..sort((a, b) {
+            final cmp = b.date.compareTo(a.date);
+            if (cmp != 0) return cmp;
+            return b.session.compareTo(a.session);
+          });
 
         newGrouped[safeCourseId] = list;
 
@@ -322,7 +319,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           current.groupedByCourse,
         );
 
-        bool removed = false;
+        var removed = false;
         for (final cid in newGrouped.keys.toList()) {
           final list = List<TrackingRecord>.from(newGrouped[cid]!);
           final idx = list.indexWhere((r) => r.id == recordId);
@@ -373,12 +370,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         // ID-CODE Mismatch Safety: 
         // We aggregate both the numeric ID and the Alphanumeric Code to ensure
         // all variants stored in the DB (via Web vs Mobile) are cleared.
-        final Set<String> keys = {courseId, utils.standardizeCourseCode(courseId)};
+        final keys = <String>{courseId, utils.standardizeCourseCode(courseId)};
         if (officialReport != null) {
           // Find the course in the report
           for (final c in officialReport.courses.values) {
-            final String cId = c.id.toString();
-            final String? cCode = c.code;
+            final cId = c.id.toString();
+            final cCode = c.code;
             if (cId == courseId || (cCode != null && utils.standardizeCourseCode(cCode) == utils.standardizeCourseCode(courseId))) {
               keys.add(cId);
               if (cCode != null) keys.add(utils.standardizeCourseCode(cCode));

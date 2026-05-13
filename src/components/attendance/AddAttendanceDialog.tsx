@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import {
@@ -28,7 +28,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -72,6 +71,13 @@ interface User {
   auth_id?: string;
 }
 
+type AttendanceStatusType = "Present" | "Absent" | "Duty Leave";
+
+type AttendanceSlot = {
+  course: string | number | null;
+  session?: string | number | null;
+};
+
 /**
  * Props for AddAttendanceDialog component.
  */
@@ -97,6 +103,210 @@ interface AddAttendanceDialogProps {
 }
 
 const SESSIONS = ["1", "2", "3", "4", "5", "6", "7"];
+
+// --- HELPER FUNCTIONS FOR USEMEMOs ---
+
+function computeSortedCourses(
+  coursesData: { courses: Record<string, Course> } | undefined,
+  classCourses: { course_code: string; course_name: string }[] | undefined,
+  isDisabled: (code: string) => boolean,
+  getCourseCodeById: (id: string) => string
+) {
+  const courses: { key: string; name: string }[] = [];
+  
+  if (coursesData?.courses) {
+    Object.entries(coursesData.courses).forEach(([key, c]) => {
+      courses.push({ key, name: c.name });
+    });
+  }
+  
+  if (classCourses) {
+    classCourses.forEach(cc => {
+      const code = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+      if (!courses.some(c => c.key.toUpperCase().replace(/[\s\u00A0-]/g, "") === code)) {
+        courses.push({ key: cc.course_code, name: cc.course_name });
+      }
+    });
+  }
+
+  return courses.sort((a, b) => {
+    const codeA = getCourseCodeById(a.key);
+    const codeB = getCourseCodeById(b.key);
+    const disabledA = isDisabled(codeA);
+    const disabledB = isDisabled(codeB);
+    if (disabledA && !disabledB) return 1;
+    if (!disabledA && disabledB) return -1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function computeSemesterBounds(selectedSemester?: "odd" | "even", selectedYear?: string) {
+  if (!selectedYear || !selectedSemester) {
+    return { min: undefined, max: undefined };
+  }
+
+  try {
+    const startYear = parseInt(selectedYear.split("-")[0], 10);
+    if (isNaN(startYear)) throw new Error("Invalid year format");
+
+    const endYear = startYear + 1;
+
+    if (selectedSemester === "odd") {
+      return {
+        min: new Date(startYear, 6, 1),
+        max: new Date(startYear, 11, 31),
+      };
+    } else {
+      return {
+        min: new Date(endYear, 0, 1),
+        max: new Date(endYear, 5, 30),
+      };
+    }
+  } catch (e) {
+    logger.warn("Invalid semester bounds:", e);
+    return { min: undefined, max: undefined };
+  }
+}
+
+function computeAutoSession(open: boolean, attendanceData: AttendanceReport | undefined, trackingData: TrackAttendance[], date: Date) {
+  if (!open || !attendanceData) return "";
+  const occupiedSessions = new Set<string>();
+  const dateKey = normalizeDate(date);
+
+  // eslint-disable-next-line security/detect-object-injection
+  const officialDay = attendanceData.studentAttendanceData?.[dateKey];
+  if (officialDay) {
+    Object.entries(officialDay).forEach(([key, s], index) => {
+      const slot = s as AttendanceSlot;
+      if (
+        slot.course == null || slot.course === "null" ||
+        slot.course === 0 || slot.course === "0"
+      ) return;
+
+      // eslint-disable-next-line security/detect-object-injection
+      let name = attendanceData.sessions?.[key]?.name;
+      if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+      if (!name) {
+        const keyInt = parseInt(key);
+        name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+      }
+      if (name) occupiedSessions.add(normalizeSession(name));
+    });
+  }
+
+  const targetDbDate = normalizeDate(date);
+  trackingData?.forEach((t) => {
+    if (normalizeDate(t.date) === targetDbDate) {
+      occupiedSessions.add(normalizeSession(t.session));
+    }
+  });
+
+  return SESSIONS.find((s) => !occupiedSessions.has(normalizeSession(s))) || "";
+}
+
+function computeBestCourse(
+  session: string, 
+  date: Date, 
+  attendanceData: AttendanceReport | undefined, 
+  getCourseCodeById: (id: string) => string
+) {
+  if (!session || !attendanceData?.studentAttendanceData) return "";
+  const dayOfWeek = date.getDay();
+  const frequencyMap: Record<string, number> = {};
+  const target = normalizeSession(session);
+
+  Object.entries(attendanceData.studentAttendanceData).forEach(
+    ([dStr, sessions]: [string, Record<string, unknown>]) => {
+      const y = parseInt(dStr.substring(0, 4));
+      const m = parseInt(dStr.substring(4, 6)) - 1;
+      const d = parseInt(dStr.substring(6, 8));
+      if (new Date(y, m, d).getDay() === dayOfWeek) {
+        Object.entries(sessions).forEach(([key, s], index) => {
+          const slot = s as AttendanceSlot;
+          if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
+
+          // eslint-disable-next-line security/detect-object-injection
+          let name = attendanceData.sessions?.[key]?.name;
+          if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+          if (!name) {
+            const keyInt = parseInt(key);
+            name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+          }
+          if (name && normalizeSession(name) === target) {
+            const cid = getCourseCodeById(String(slot.course));
+            // eslint-disable-next-line security/detect-object-injection
+            frequencyMap[cid] = (frequencyMap[cid] || 0) + 1;
+          }
+        });
+      }
+    },
+  );
+
+  let best = "";
+  let max = 0;
+  Object.entries(frequencyMap).forEach(([cid, count]) => {
+    if (count > max) { max = count; best = cid; }
+  });
+  return best;
+}
+
+function checkIfSessionBlocked(
+  session: string, 
+  date: Date, 
+  attendanceData: AttendanceReport | undefined, 
+  trackingData: TrackAttendance[]
+) {
+  if (!session) return false;
+
+  const targetSession = normalizeSession(session);
+  const dateKey = normalizeDate(date);
+  // eslint-disable-next-line security/detect-object-injection
+  const officialDay = attendanceData?.studentAttendanceData?.[dateKey];
+  let isBlocked = false;
+
+  if (officialDay) {
+    isBlocked = Object.entries(officialDay).some(([key, s], index) => {
+      const slot = s as AttendanceSlot;
+
+      if (
+        slot.course == null || slot.course === "null" || slot.course === 0 ||
+        slot.course === "0"
+      ) {
+        return false;
+      }
+
+      // eslint-disable-next-line security/detect-object-injection
+      let effectiveName: string | undefined = attendanceData.sessions?.[key]?.name;
+
+      if (!effectiveName && slot.session && slot.session !== "null") {
+        effectiveName = String(slot.session);
+      }
+
+      if (!effectiveName) {
+        const keyInt = parseInt(key);
+        effectiveName = (!isNaN(keyInt) && keyInt < 20)
+          ? key
+          : String(index + 1);
+      }
+
+      if (effectiveName && normalizeSession(effectiveName) === targetSession) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (!isBlocked && trackingData) {
+    const targetDbDate = normalizeDate(date);
+    isBlocked = trackingData.some((t) => {
+      const isMatch = normalizeDate(t.date) === targetDbDate &&
+        normalizeSession(t.session) === targetSession;
+      return isMatch;
+    });
+  }
+
+  return isBlocked;
+}
 
 /**
  * Dialog for manually adding attendance records.
@@ -135,9 +345,7 @@ export function AddAttendanceDialog({
   const [date, setDate] = useState<Date>(new Date());
   const [session, setSession] = useState<string>("");
   const [courseId, setCourseId] = useState<string>("");
-  const [statusType, setStatusType] = useState<
-    "Present" | "Absent" | "Duty Leave"
-  >("Present");
+  const [statusType, setStatusType] = useState<AttendanceStatusType>("Present");
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -164,248 +372,75 @@ export function AddAttendanceDialog({
   });
 
   const sortedCourses = useMemo(() => {
-    const courses: { key: string; name: string }[] = [];
-    
-    // 1. Official Courses
-    if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([key, c]) => {
-        courses.push({ key, name: c.name });
-      });
-    }
-    
-    // 2. Custom (Class) Courses - Add if not already present
-    if (classCourses) {
-      classCourses.forEach(cc => {
-        const code = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (!courses.some(c => c.key.toUpperCase().replace(/[\s\u00A0-]/g, "") === code)) {
-          courses.push({ key: cc.course_code, name: cc.course_name });
-        }
-      });
-    }
-
-    return courses.sort((a, b) => {
-      const codeA = getCourseCodeById(a.key);
-      const codeB = getCourseCodeById(b.key);
-      const disabledA = isDisabled(codeA);
-      const disabledB = isDisabled(codeB);
-      // Deprioritize disabled courses: push them to the end
-      if (disabledA && !disabledB) return 1;
-      if (!disabledA && disabledB) return -1;
-      return a.name.localeCompare(b.name);
-    });
+    return computeSortedCourses(coursesData, classCourses, isDisabled, getCourseCodeById);
   }, [coursesData, classCourses, isDisabled, getCourseCodeById]);
 
   // 1. CALCULATE SEMESTER BOUNDS
   const semesterBounds = useMemo(() => {
-    if (!selectedYear || !selectedSemester) {
-      return { min: undefined, max: undefined };
-    }
-
-    try {
-      const startYear = parseInt(selectedYear.split("-")[0], 10);
-      if (isNaN(startYear)) throw new Error("Invalid year format");
-
-      const endYear = startYear + 1;
-
-      if (selectedSemester === "odd") {
-        return {
-          min: new Date(startYear, 6, 1),
-          max: new Date(startYear, 11, 31),
-        };
-      } else {
-        return {
-          min: new Date(endYear, 0, 1),
-          max: new Date(endYear, 5, 30),
-        };
-      }
-    } catch (e) {
-      logger.warn("Invalid semester bounds:", e);
-      return { min: undefined, max: undefined };
-    }
+    return computeSemesterBounds(selectedSemester, selectedYear);
   }, [selectedSemester, selectedYear]);
 
-  // 2. VALIDATE AND RESET ON OPEN (Adjusting state during render)
-  const [prevOpenTrigger, setPrevOpenTrigger] = useState(false);
-  if (open && !prevOpenTrigger) {
-    setPrevOpenTrigger(true);
-    // 1. Clamp date within semester bounds
-    if (semesterBounds.min && semesterBounds.max) {
-      if (isBefore(date, semesterBounds.min)) {
-        setDate(semesterBounds.min);
-        setCurrentMonth(semesterBounds.min);
-      } else if (isAfter(date, semesterBounds.max)) {
-        setDate(semesterBounds.max);
-        setCurrentMonth(semesterBounds.max);
-      } else {
-        setCurrentMonth(date);
-      }
+  // 2. VALIDATE AND RESET ON OPEN
+  useEffect(() => {
+    if (open) {
+      queueMicrotask(() => {
+        // 1. Clamp date within semester bounds
+        if (semesterBounds.min && semesterBounds.max) {
+          if (isBefore(date, semesterBounds.min)) {
+            setDate(semesterBounds.min);
+            setCurrentMonth(semesterBounds.min);
+          } else if (isAfter(date, semesterBounds.max)) {
+            setDate(semesterBounds.max);
+            setCurrentMonth(semesterBounds.max);
+          } else {
+            setCurrentMonth(date);
+          }
+        }
+        // 2. Reset other fields
+        setSession("");
+        setCourseId("");
+        setRemarks("");
+        setStatusType("Present");
+      });
     }
-    // 2. Reset other fields
-    setSession("");
-    setCourseId("");
-    setRemarks("");
-    setStatusType("Present");
-  } else if (!open && prevOpenTrigger) {
-    setPrevOpenTrigger(false);
-  }
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, semesterBounds.min, semesterBounds.max]);
 
   // --- 3. SMART DEFAULTS (Occupancy Check) ---
   const autoSession = useMemo(() => {
-    if (!open || !attendanceData) return "";
-    const occupiedSessions = new Set<string>();
-    const dateKey = getDateKey(date);
-
-    // A. Official Data
-    const officialDay = attendanceData.studentAttendanceData?.[dateKey];
-    if (officialDay) {
-      Object.entries(officialDay).forEach(([key, s], index) => {
-        const slot = s as {
-          course: string | number | null;
-          session?: string | number | null;
-        };
-        if (
-          slot.course == null || slot.course === "null" ||
-          slot.course === 0 || slot.course === "0"
-        ) return;
-
-        let name = attendanceData.sessions?.[key]?.name;
-        if (!name && slot.session && slot.session !== "null") name = String(slot.session);
-        if (!name) {
-          const keyInt = parseInt(key);
-          name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
-        }
-        if (name) occupiedSessions.add(normalizeSession(name));
-      });
-    }
-
-    // B. Tracking Data
-    const targetDbDate = normalizeDate(date);
-    trackingData?.forEach((t) => {
-      if (normalizeDate(t.date) === targetDbDate) {
-        occupiedSessions.add(normalizeSession(t.session));
-      }
-    });
-
-    return SESSIONS.find((s) => !occupiedSessions.has(normalizeSession(s))) || "";
+    return computeAutoSession(open, attendanceData, trackingData, date);
   }, [date, open, attendanceData, trackingData]);
 
-  // Adjust session state during render
-  const [prevAutoTrigger, setPrevAutoTrigger] = useState("");
-  const autoTrigger = `${open}-${getDateKey(date)}-${attendanceData ? "1" : "0"}`;
-  if (autoTrigger !== prevAutoTrigger) {
-    setPrevAutoTrigger(autoTrigger);
-    if (!session && autoSession) setSession(autoSession);
-  }
+  // Adjust session state
+  useEffect(() => {
+    if (open && !session && autoSession) {
+      queueMicrotask(() => {
+        setSession(autoSession);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, getDateKey(date), attendanceData, autoSession]);
 
   // --- 4. PREFILL COURSE ---
   const bestCourse = useMemo(() => {
-    if (!session || !attendanceData?.studentAttendanceData) return "";
-    const dayOfWeek = date.getDay();
-    const frequencyMap: Record<string, number> = {};
-    const target = normalizeSession(session);
-
-    Object.entries(attendanceData.studentAttendanceData).forEach(
-      ([dStr, sessions]: [string, any]) => {
-        const y = parseInt(dStr.substring(0, 4));
-        const m = parseInt(dStr.substring(4, 6)) - 1;
-        const d = parseInt(dStr.substring(6, 8));
-        if (new Date(y, m, d).getDay() === dayOfWeek) {
-          Object.entries(sessions).forEach(([key, s], index) => {
-            const slot = s as { course: string | number | null; session?: string | number | null };
-            if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
-
-            let name = attendanceData.sessions?.[key]?.name;
-            if (!name && slot.session && slot.session !== "null") name = String(slot.session);
-            if (!name) {
-              const keyInt = parseInt(key);
-              name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
-            }
-            if (name && normalizeSession(name) === target) {
-              const cid = getCourseCodeById(String(slot.course));
-              frequencyMap[cid] = (frequencyMap[cid] || 0) + 1;
-            }
-          });
-        }
-      },
-    );
-
-    let best = "";
-    let max = 0;
-    Object.entries(frequencyMap).forEach(([cid, count]) => {
-      if (count > max) { max = count; best = cid; }
-    });
-    return best;
+    return computeBestCourse(session, date, attendanceData, getCourseCodeById);
   }, [session, date, attendanceData, getCourseCodeById]);
 
-  // Adjust courseId state during render
-  const [prevCourseTrigger, setPrevCourseTrigger] = useState("");
-  const courseTrigger = `${open}-${date.getDay()}-${session}`;
-  if (courseTrigger !== prevCourseTrigger) {
-    setPrevCourseTrigger(courseTrigger);
-    if (!courseId) {
-      if (bestCourse) setCourseId(bestCourse);
-      else if (sortedCourses.length > 0) setCourseId(sortedCourses[0].key);
+  // Adjust courseId state
+  useEffect(() => {
+    if (open && !courseId) {
+      queueMicrotask(() => {
+        if (bestCourse) setCourseId(bestCourse);
+        else if (sortedCourses.length > 0) setCourseId(sortedCourses[0].key);
+      });
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, date.getDay(), session, bestCourse, sortedCourses]);
 
 
   // --- 5. VALIDATION (Is Session Blocked?) ---
   const isSessionBlocked = useMemo(() => {
-    if (!session) return false;
-
-    const targetSession = normalizeSession(session);
-    const dateKey = getDateKey(date);
-    const officialDay = attendanceData?.studentAttendanceData?.[dateKey];
-    let isBlocked = false;
-
-    if (officialDay) {
-      isBlocked = Object.entries(officialDay).some(([key, s], index) => {
-        const slot = s as {
-          course: string | number | null;
-          session?: string | number | null;
-        };
-
-        if (
-          slot.course == null || slot.course === "null" || slot.course === 0 ||
-          slot.course === "0"
-        ) {
-          return false;
-        }
-
-        let effectiveName: string | undefined = attendanceData.sessions?.[key]
-          ?.name;
-
-        if (!effectiveName && slot.session && slot.session !== "null") {
-          effectiveName = String(slot.session);
-        }
-
-        if (!effectiveName) {
-          const keyInt = parseInt(key);
-          effectiveName = (!isNaN(keyInt) && keyInt < 20)
-            ? key
-            : String(index + 1);
-        }
-
-        if (
-          effectiveName && normalizeSession(effectiveName) === targetSession
-        ) {
-          return true;
-        }
-        return false;
-      });
-    }
-
-    if (!isBlocked && trackingData) {
-      const targetDbDate = normalizeDate(date);
-      isBlocked = trackingData.some((t) => {
-        const isMatch = normalizeDate(t.date) === targetDbDate &&
-          normalizeSession(t.session) === targetSession;
-        return isMatch;
-      });
-    }
-
-    return isBlocked;
+    return checkIfSessionBlocked(session, date, attendanceData, trackingData);
   }, [date, session, attendanceData, trackingData]);
 
   const handleSubmit = async () => {
@@ -433,6 +468,7 @@ export function AddAttendanceDialog({
       }
 
       let courseIdToSave = courseId.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+      // eslint-disable-next-line security/detect-object-injection
       const selectedCourse = coursesData?.courses?.[courseId];
       if (selectedCourse?.code) {
         courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
@@ -465,7 +501,7 @@ export function AddAttendanceDialog({
       toast.success("Extra class added successfully");
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (isDutyLeaveConstraintError(error)) {
         toast.error(getDutyLeaveErrorMessage(courseId, coursesData));
         return;
@@ -714,7 +750,7 @@ export function AddAttendanceDialog({
                   </div>
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
-                  {sortedCourses.map((c: any) => {
+                  {sortedCourses.map((c: { key: string; name: string; }) => {
                     const code = getCourseCodeById(c.key);
                     const isCourseDisabled = isDisabled(code);
                     return (
@@ -743,7 +779,7 @@ export function AddAttendanceDialog({
             <Label className="text-right text-muted-foreground">Status</Label>
             <RadioGroup
               value={statusType}
-              onValueChange={(v: any) => {
+              onValueChange={(v: AttendanceStatusType) => {
                 setStatusType(v);
               }}
               className="col-span-3 flex gap-4"
@@ -802,37 +838,62 @@ export function AddAttendanceDialog({
             <div className="col-span-3">
               <Input
                 id="remarks-dialog"
-                placeholder={statusType === "Duty Leave" ? "Programme/Activity" : "Notes (optional)"}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                className="bg-accent/20 border-border/50"
+                placeholder={statusType === "Duty Leave"
+                  ? "Required for Duty Leave"
+                  : "Optional notes"}
+                className={cn(
+                  "bg-accent/20 border-border/50",
+                  statusType === "Duty Leave" && remarks.length === 0 &&
+                    "border-red-500/50 focus-visible:ring-red-500",
+                )}
+                required={statusType === "Duty Leave"}
                 maxLength={255}
               />
+              {statusType === "Duty Leave" && remarks.length === 0 && (
+                <p className="text-[10px] text-red-500 mt-1.5 ml-1 flex items-center gap-1">
+                  Reason is required to add Duty Leave
+                </p>
+              )}
             </div>
           </div>
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="mt-2 sm:mt-0">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="hover:bg-accent/50"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || isSessionBlocked || !session || !courseId}
-            className="w-full h-11 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
-            title={!courseId
-              ? "Please select a course to continue"
-              : "Add attendance record"}
-            aria-label="Submit and add attendance record"
-            aria-describedby={isSessionBlocked
-              ? "session-blocked-warning"
-              : undefined}
+            disabled={isSubmitting || !courseId || !session || isSessionBlocked ||
+              (statusType === "Duty Leave" && remarks.trim().length === 0)}
+            className={cn(
+              "custom-button transition-colors min-w-[120px]",
+              statusType === "Present" &&
+                "bg-green-600 hover:bg-green-700 text-white",
+              statusType === "Absent" &&
+                "bg-red-600 hover:bg-red-700 text-white",
+              statusType === "Duty Leave" &&
+                "bg-yellow-600 hover:bg-yellow-700 text-white",
+            )}
           >
             {isSubmitting
               ? (
-                <Loader2
-                  className="w-4 h-4 animate-spin mr-2"
-                  aria-hidden="true"
-                />
+                <>
+                  <Loader2
+                    className="mr-2 h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  Saving
+                </>
               )
-              : <Plus className="w-4 h-4 mr-2" aria-hidden="true" />}
-            Add Record
+              : "Save Record"}
           </Button>
         </DialogFooter>
       </DialogContent>

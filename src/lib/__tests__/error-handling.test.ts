@@ -117,7 +117,6 @@ describe("error-handling.ts", () => {
 
   describe("Edge cases", () => {
     it("handles error objects with non-string code/message", () => {
-      // @ts-ignore
       const error = { code: 123, message: true };
       const result = getHumanReadableError(error);
       expect(result).toBe("Failed to complete operation");

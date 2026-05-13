@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
@@ -13,7 +14,7 @@ final trackingSortedKeysProvider = Provider<List<String>>((ref) {
 
   if (trackingState == null) return const [];
 
-  final Set<String> uniqueKeys = {
+  final uniqueKeys = <String>{
     ...trackingState.groupedByCourse.keys.where(
       (k) => trackingState.groupedByCourse[k]?.isNotEmpty ?? false,
     ),
@@ -30,10 +31,10 @@ final trackingSortedKeysProvider = Provider<List<String>>((ref) {
 
   courseKeys.sort((a, b) {
     final mergedA = (dashboard?.courses ?? [])
-        .cast<dynamic>()
+        .cast<CourseDetails?>()
         .firstWhere((c) => c?.safeId == a, orElse: () => null);
     final mergedB = (dashboard?.courses ?? [])
-        .cast<dynamic>()
+        .cast<CourseDetails?>()
         .firstWhere((c) => c?.safeId == b, orElse: () => null);
 
     final codeA = utils.resolveCourseDisplayCode(

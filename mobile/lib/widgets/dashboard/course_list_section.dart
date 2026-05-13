@@ -55,6 +55,11 @@ class CourseLineupHeader extends StatelessWidget {
 }
 
 class CourseListSection extends StatelessWidget {
+
+  const CourseListSection({
+    required this.courses, required this.stats, required this.selectedSemester, required this.selectedYear, required this.bunkEnabled, required this.targetPercentage, required this.instructors, super.key,
+    this.className,
+  });
   final List<CourseDetails> courses;
   final DashboardStats stats;
   final String selectedSemester;
@@ -63,18 +68,6 @@ class CourseListSection extends StatelessWidget {
   final double targetPercentage;
   final List<CourseInstructor> instructors;
   final String? className;
-
-  const CourseListSection({
-    super.key,
-    required this.courses,
-    required this.stats,
-    required this.selectedSemester,
-    required this.selectedYear,
-    required this.bunkEnabled,
-    required this.targetPercentage,
-    required this.instructors,
-    this.className,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -121,15 +114,15 @@ class CourseListSection extends StatelessWidget {
 }
 
 class _AddCourseCard extends StatelessWidget {
-  final String semester;
-  final String academicYear;
-  final String? className;
 
   const _AddCourseCard({
     required this.semester,
     required this.academicYear,
     this.className,
   });
+  final String semester;
+  final String academicYear;
+  final String? className;
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +213,7 @@ class _AddCourseCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "Add it manually to your lineup\nand start tracking.",
+                              'Add it manually to your lineup\nand start tracking.',
                               style: GoogleFonts.manrope(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -248,7 +241,7 @@ class _AddCourseCard extends StatelessWidget {
   }
 
   void _showAddCourseDialog(BuildContext context) {
-    showDialog(
+    final _ = showDialog<void>(
       context: context,
       builder: (context) => AddCourseDialog(
         semester: semester,

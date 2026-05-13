@@ -48,7 +48,7 @@ describe("instructor actions", () => {
 
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: true }),
-      } as any);
+      } as never);
 
       const mockSupabase = {
         auth: {
@@ -60,7 +60,7 @@ describe("instructor actions", () => {
         single: vi.fn().mockResolvedValue({ data: { class_id: "class-id" } }),
         upsert: vi.fn().mockResolvedValue({ error: null }),
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       const result = await upsertInstructorAction(formData);
 
@@ -78,7 +78,7 @@ describe("instructor actions", () => {
         formData.append("instructorName", "John");
         formData.append("cf-turnstile-response", "valid");
   
-        vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as any);
+        vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as never);
   
         const mockSupabase = {
           auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }) },
@@ -88,7 +88,7 @@ describe("instructor actions", () => {
           single: vi.fn().mockResolvedValue({ data: { class_id: "c" } }),
           upsert: vi.fn().mockResolvedValue({ error: { message: "Fail" } }),
         };
-        vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+        vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
   
         const result = await upsertInstructorAction(formData);
         expect(result.error).toBe("Failed to save instructor to database");

@@ -5,6 +5,12 @@ import AuthError from '../error';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
 
+type ErrorFallbackProps = {
+  error: Error;
+  reset: () => void;
+  homeUrl?: string;
+};
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     error: vi.fn(),
@@ -16,7 +22,7 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 vi.mock('@/components/error-fallback', () => ({
-  ErrorFallback: ({ error, reset, homeUrl }: any) => (
+  ErrorFallback: ({ error, reset, homeUrl }: ErrorFallbackProps) => (
     <div data-testid="error-fallback">
       <span>{error.message}</span>
       <button onClick={reset}>Reset</button>

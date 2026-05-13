@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 
 // Mock dependencies
 vi.mock("@/lib/security/app-check", () => ({
-  withSecurity: (handler: any) => (req: any, context: any = {}) => handler(req, context),
+  withSecurity: (handler: (req: NextRequest, ctx: unknown) => unknown) => (req: NextRequest, context: unknown = {}) => handler(req, context),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -116,7 +116,7 @@ describe("POST /api/scores/batch", () => {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: new Error("Auth failed") }),
       },
-    } as any);
+    } as never);
 
     const req = new NextRequest("http://localhost/api/scores/batch", {
       method: "POST",

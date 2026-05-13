@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ghostclass/models/user.dart';
-import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/services/logger.dart';
 
 /// Keys for all secure storage entries.
 /// Centralised here so key names never drift across the codebase.
@@ -27,22 +27,17 @@ abstract final class _Keys {
 /// All values are encrypted at rest via AES on Android (Keystore) and
 /// Keychain on iOS/macOS — no plaintext is ever written to disk.
 class SecureStorageService {
-  final FlutterSecureStorage _storage;
-  
-  @visibleForTesting
-  FlutterSecureStorage get storage => _storage;
 
   SecureStorageService([FlutterSecureStorage? storage])
       : _storage = storage ?? const FlutterSecureStorage(
-          aOptions: AndroidOptions(
-            keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-            storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-            migrateOnAlgorithmChange: true,
-          ),
           iOptions: IOSOptions(
             accessibility: KeychainAccessibility.first_unlock,
           ),
         );
+  final FlutterSecureStorage _storage;
+  
+  @visibleForTesting
+  FlutterSecureStorage get storage => _storage;
 
   // ─── EzyGo Token ─────────────────────────────────────────────────────────
 
@@ -94,11 +89,11 @@ class SecureStorageService {
     final raw = await _storage.read(key: _Keys.profile);
     if (raw == null) return null;
     try {
-      final Map<String, dynamic> data = jsonDecode(raw) as Map<String, dynamic>;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
       // Backwards compatibility for old profile structure if needed, 
       // but here we just rely on fromJson
       return UserProfile.fromJson(data);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('SecureStorage: Error decoding profile', e);
       return null;
     }
@@ -110,13 +105,13 @@ class SecureStorageService {
   Future<void> saveSettings(UserSettings settings) =>
       _storage.write(key: _Keys.settings, value: jsonEncode(settings.toJson()));
 
-  /// Returns [null] if no settings have been saved yet.
+  /// Returns `null` if no settings have been saved yet.
   Future<UserSettings?> getSettings() async {
     final raw = await _storage.read(key: _Keys.settings);
     if (raw == null) return null;
     try {
       return UserSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('SecureStorage: Error decoding settings', e, st);
       return null;
     }
@@ -140,7 +135,7 @@ class SecureStorageService {
     if (raw == null) return null;
     try {
       return StealthInfo.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('SecureStorage: Error decoding stealth info', e, st);
       return null;
     }
@@ -170,7 +165,7 @@ class SecureStorageService {
         return null;
       }
       return decoded['data'];
-    } catch (e) {
+    } on Object {
       AppLogger.w('SecureStorage: Error decoding cache for $key');
       return null;
     }
@@ -186,8 +181,11 @@ class SecureStorageService {
     if (raw == null) return null;
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return AcademicState(semester: decoded['semester'], year: decoded['year']);
-    } catch (e) {
+      return AcademicState(
+        semester: decoded['semester'] as String,
+        year: decoded['year'] as String,
+      );
+    } on Object {
       AppLogger.w('SecureStorage: Error decoding academic state');
       return null;
     }

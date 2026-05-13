@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ghostclass/logic/type_utils.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/type_utils.dart';
 
 void main() {
   group('Type Utils - toInt', () {

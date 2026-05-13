@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
 
 // Mock lucide-react at the very top
 vi.mock('lucide-react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
-  const Icon = (props: any) => actual.createElement('div', props);
+  const Icon = (props: Record<string, unknown>) => actual.createElement('div', props);
   return {
     __esModule: true,
     AlertCircle: Icon,
@@ -173,14 +174,19 @@ vi.mock('@/lib/axios', () => ({
 }));
 
 // Mock Framer Motion to avoid issues with animations
+type MockComponentProps = {
+  children?: ReactNode;
+  [key: string]: unknown;
+};
+
 vi.mock('framer-motion', () => ({
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-  LazyMotion: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: MockComponentProps) => <>{children}</>,
+  LazyMotion: ({ children }: MockComponentProps) => <>{children}</>,
   domAnimation: {},
   m: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    section: ({ children, ...props }: any) => <section {...props}>{children}</section>,
-    h2: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>,
+    div: ({ children, ...props }: MockComponentProps) => <div {...props}>{children}</div>,
+    section: ({ children, ...props }: MockComponentProps) => <section {...props}>{children}</section>,
+    h2: ({ children, ...props }: MockComponentProps) => <h2 {...props}>{children}</h2>,
   },
 }));
 

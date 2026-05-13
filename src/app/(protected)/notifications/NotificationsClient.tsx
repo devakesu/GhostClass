@@ -310,6 +310,15 @@ export default function NotificationsPage() {
           >
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
               const item = virtualItems[virtualRow.index];
+              let headerToneClass = 'text-muted-foreground';
+
+              if (item.type === 'header') {
+                if (item.label === 'ACTION REQUIRED') {
+                  headerToneClass = 'text-amber-500';
+                } else if (item.label === 'UNREAD') {
+                  headerToneClass = 'text-blue-500';
+                }
+              }
 
               return (
                 <div
@@ -326,24 +335,20 @@ export default function NotificationsPage() {
                   className="px-4"
                 >
                   {item.type === 'header' ? (
-                  // SECTION HEADER (Colors match mobile)
-                  <div className={cn(
-                    "flex items-center gap-2 px-1 pt-6 pb-3",
-                    item.label === 'ACTION REQUIRED' ? "text-amber-500" : 
-                    item.label === 'UNREAD' ? "text-blue-500" : 
-                    "text-muted-foreground"
-                  )}>
-                    {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
-                    <h3 className="text-[11px] font-black uppercase tracking-widest">{item.label}</h3>
-                  </div>
-                ) : (
-                  // NOTIFICATION CARD
-                  <NotificationCard
-                    n={item.data}
-                    onMarkRead={handleToggleRead}
-                    isReading={readingId === item.id}
-                  />
-                )}
+                    <div className={cn(
+                      "flex items-center gap-2 px-1 pt-6 pb-3",
+                      headerToneClass
+                    )}>
+                      {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <h3 className="text-[11px] font-black uppercase tracking-widest">{item.label}</h3>
+                    </div>
+                  ) : (
+                    <NotificationCard
+                      n={item.data}
+                      onMarkRead={handleToggleRead}
+                      isReading={readingId === item.id}
+                    />
+                  )}
                 </div>
               );
             })}

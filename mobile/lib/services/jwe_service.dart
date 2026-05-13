@@ -1,31 +1,29 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:io';
+import 'dart:math';
+// Preserved for potential platform-specific overrides
 // ignore: unnecessary_import
 import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/network_utils.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:jose/jose.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ghostclass/config/app_config.dart';
-import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/logic/network_utils.dart';
 
 /// JweService
 /// ----------
 /// Handles Bi-directional End-to-End Encryption (E2EE) for GhostClass.
 class JweService {
-  static final JweService _instance = JweService._internal();
-  static JweService get instance => _instance;
-
-  late final Dio _dio;
 
   JweService._internal() {
-    final networkTimeout = kDebugMode
-        ? const Duration(seconds: 40)
-        : const Duration(seconds: 20);
+    const networkTimeout = kDebugMode
+        ? Duration(seconds: 40)
+        : Duration(seconds: 20);
     
     _dio = Dio(
       BaseOptions(
@@ -37,17 +35,20 @@ class JweService {
 
     if (kDebugMode) {
       (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
-        return client;
+        return HttpClient()
+          ..badCertificateCallback = NetworkUtils.validateCertificateHostname;
       };
     }
   }
+  static final JweService _instance = JweService._internal();
+  static JweService get instance => _instance;
+
+  late final Dio _dio;
 
   JsonWebKeySet? _cachedJwks;
   DateTime? _lastFetch;
 
-  final _ghostclassApiUrl = AppConfig.ghostclassApiUrl;
+  final String _ghostclassApiUrl = AppConfig.ghostclassApiUrl;
 
   /// No longer needed internally, delegated to NetworkUtils.
 
@@ -87,23 +88,25 @@ class JweService {
         try {
           final cachedTime = DateTime.parse(cachedTimeStr);
           if (DateTime.now().difference(cachedTime).inHours < 1) {
-            _cachedJwks = JsonWebKeySet.fromJson(json.decode(cachedJson));
+            _cachedJwks = JsonWebKeySet.fromJson(
+              json.decode(cachedJson) as Map<String, dynamic>,
+            );
             _lastFetch = cachedTime;
             AppLogger.d('JweService: Loaded JWKS from persistent cache.');
             return;
           }
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('JweService: Failed to parse cached JWKS time', e);
         }
       }
 
       // 4. Network fetch
       final url = '$_ghostclassApiUrl/.well-known/jwks.json';
-      final response = await _dio.get(url);
+      final response = await _dio.get<dynamic>(url);
 
       if (response.statusCode == 200) {
         final data = response.data;
-        _cachedJwks = JsonWebKeySet.fromJson(data);
+        _cachedJwks = JsonWebKeySet.fromJson(data as Map<String, dynamic>);
         _lastFetch = DateTime.now();
         
         // Update persistent cache
@@ -114,7 +117,7 @@ class JweService {
       } else {
         throw Exception('Failed to fetch JWKS: ${response.statusCode}');
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('JweService: JWKS Fetch Error', e);
       rethrow;
     }
@@ -123,7 +126,7 @@ class JweService {
   Future<void> preWarm() async {
     try {
       await _fetchJwks();
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.d('JweService: Pre-warm skipped.', e);
     }
   }
@@ -227,7 +230,7 @@ class JweService {
       final payload = await jweObj.getPayload(keyStore);
 
       return json.decode(utf8.decode(payload.data));
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('JweService: Response Decryption Error', e);
       throw Exception('Security sync failed: Response could not be verified.');
     }

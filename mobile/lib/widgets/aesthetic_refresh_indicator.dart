@@ -1,27 +1,26 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 /// AestheticRefreshIndicator
 /// -------------------------
 /// A custom, high-fidelity refresh indicator that provides smooth visual feedback
 /// and ensures reliable sync state across different platforms.
 class AestheticRefreshIndicator extends StatefulWidget {
+
+  const AestheticRefreshIndicator({
+    required this.child, required this.onRefresh, super.key,
+    this.loadingMessage,
+    this.useOverlay = true,
+  });
   final Widget child;
   final RefreshCallback onRefresh;
   final String? loadingMessage;
   final bool useOverlay;
-
-  const AestheticRefreshIndicator({
-    super.key,
-    required this.child,
-    required this.onRefresh,
-    this.loadingMessage,
-    this.useOverlay = true,
-  });
 
   @override
   State<AestheticRefreshIndicator> createState() =>
@@ -29,7 +28,7 @@ class AestheticRefreshIndicator extends StatefulWidget {
 }
 
 class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
-  double _pullDistance = 0.0;
+  double _pullDistance = 0;
   bool _isRefreshing = false;
 
   void _safeSetState(VoidCallback fn) {
@@ -73,11 +72,11 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
       // If it finished in less than 500ms, wait a bit to ensure overlay stability
       final duration = endTime.difference(startTime);
       if (duration.inMilliseconds < 500 && widget.useOverlay) {
-        await Future.delayed(
+        await Future<void>.delayed(
           Duration(milliseconds: 500 - duration.inMilliseconds),
         );
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.w('AestheticRefreshIndicator: Refresh failed', e);
     } finally {
       if (widget.useOverlay) {
@@ -85,7 +84,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
           if (rootNavigator.canPop()) {
             rootNavigator.pop();
           }
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('AestheticRefreshIndicator: Failed to hide overlay', e);
         }
       }
@@ -111,7 +110,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
             // Trigger refresh exactly when user releases (dragDetails becomes null)
             // and we are past the threshold.
             if (notification.dragDetails == null && distance >= 0.8) {
-              _handleRefresh();
+              final _ = _handleRefresh();
             }
           } else if (_pullDistance > 0) {
             _safeSetState(() => _pullDistance = 0.0);
@@ -124,7 +123,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
             _safeSetState(() => _pullDistance = distance);
             
             if (notification.dragDetails == null && distance >= 0.8) {
-              _handleRefresh();
+              final _ = _handleRefresh();
             }
           }
         }
@@ -168,9 +167,9 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
 /// ---------------
 /// Visual representation of the refresh pull action.
 class RefreshGlowIcon extends StatelessWidget {
-  final double pullDistance;
 
-  const RefreshGlowIcon({super.key, required this.pullDistance});
+  const RefreshGlowIcon({required this.pullDistance, super.key});
+  final double pullDistance;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +196,6 @@ class RefreshGlowIcon extends StatelessWidget {
                 BoxShadow(
                   color: primary.withValues(alpha: 0.1 * pullDistance),
                   blurRadius: 12 * pullDistance,
-                  spreadRadius: 0,
                 ),
               ],
             ),

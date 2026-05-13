@@ -5,7 +5,9 @@ const JWKS_URL = "/api/.well-known/jwks.json";
 const KEY_ALG = "RSA-OAEP-256";
 const CONTENT_ENC = "A256GCM";
 
-let cachedPublicKey: any | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedPublicKey: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let publicKeyPromise: Promise<any> | null = null;
 
 /**
@@ -28,7 +30,7 @@ async function getPublicKey() {
       const res = await fetch(JWKS_URL);
       if (!res.ok) throw new Error(`Failed to fetch JWKS: ${res.status}`);
       const jwks = await res.json();
-      const key = jwks.keys.find((k: any) => k.use === "enc" || k.alg === KEY_ALG);
+      const key = jwks.keys.find((k: Record<string, unknown>) => k.use === "enc" || k.alg === KEY_ALG);
       if (!key) throw new Error("No suitable encryption key found in JWKS");
       
       cachedPublicKey = await importJWK(key, KEY_ALG);
@@ -49,7 +51,7 @@ async function getPublicKey() {
  * 
  * @returns { jwe: string, cek: Uint8Array }
  */
-export async function encryptRequest(payload: any): Promise<{ jwe: string; cek: Uint8Array }> {
+export async function encryptRequest(payload: unknown): Promise<{ jwe: string; cek: Uint8Array }> {
   const publicKey = await getPublicKey();
   
   // 1. Generate a random 256-bit CEK (Content Encryption Key)
@@ -66,7 +68,8 @@ export async function encryptRequest(payload: any): Promise<{ jwe: string; cek: 
   const data = new TextEncoder().encode(JSON.stringify(envelope));
   const jwe = await new CompactEncrypt(data)
     .setProtectedHeader({ alg: KEY_ALG, enc: CONTENT_ENC })
-    .encrypt(publicKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .encrypt(publicKey as any);
 
   return { jwe, cek };
 }
@@ -93,7 +96,8 @@ export async function encryptHeader(): Promise<{ jwe: string; cek: Uint8Array }>
   const data = new TextEncoder().encode(JSON.stringify(envelope));
   const jwe = await new CompactEncrypt(data)
     .setProtectedHeader({ alg: KEY_ALG, enc: CONTENT_ENC })
-    .encrypt(publicKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .encrypt(publicKey as any);
 
   return { jwe, cek };
 }
@@ -101,11 +105,12 @@ export async function encryptHeader(): Promise<{ jwe: string; cek: Uint8Array }>
 /**
  * Decrypts a response payload from the server using the provided CEK.
  */
-export async function decryptResponse(jwe: string, cek: Uint8Array): Promise<any> {
+export async function decryptResponse(jwe: string, cek: Uint8Array): Promise<unknown> {
   try {
     // Import the raw CEK as a CryptoKey for decryption
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       cek as any,
       { name: "AES-GCM", length: 256 },
       false,

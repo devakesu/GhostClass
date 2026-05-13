@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/logic/support_helper.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ServiceErrorView extends ConsumerWidget {
-  final String title;
-  final String description;
-  final VoidCallback? onRetry;
-  final bool showHome;
-  final Object? error;
 
   const ServiceErrorView({
     super.key,
@@ -24,6 +19,11 @@ class ServiceErrorView extends ConsumerWidget {
     this.showHome = true,
     this.error,
   });
+  final String title;
+  final String description;
+  final VoidCallback? onRetry;
+  final bool showHome;
+  final Object? error;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -7,6 +7,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 class AttendanceCalendarWidget extends StatelessWidget {
+
+  const AttendanceCalendarWidget({
+    required this.focusedDay, required this.selectedDay, required this.onDaySelected, required this.dashboard, required this.tracking, required this.disabledCodes, super.key,
+  });
   final DateTime focusedDay;
   final DateTime selectedDay;
   final ValueChanged<DateTime> onDaySelected;
@@ -14,21 +18,11 @@ class AttendanceCalendarWidget extends StatelessWidget {
   final TrackingState tracking;
   final Set<String> disabledCodes;
 
-  const AttendanceCalendarWidget({
-    super.key,
-    required this.focusedDay,
-    required this.selectedDay,
-    required this.onDaySelected,
-    required this.dashboard,
-    required this.tracking,
-    required this.disabledCodes,
-  });
-
   @override
   Widget build(BuildContext context) {
-    final firstDay = DateTime(focusedDay.year, focusedDay.month, 1);
+    final firstDay = DateTime(focusedDay.year, focusedDay.month);
     final daysInMonth = DateTime(focusedDay.year, focusedDay.month + 1, 0).day;
-    final paddingDays = (firstDay.weekday % 7);
+    final paddingDays = firstDay.weekday % 7;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -177,10 +171,10 @@ class AttendanceCalendarWidget extends StatelessWidget {
 
     if (sessions == null && extraTracking.isEmpty) return null;
 
-    bool hasAbsent = false;
-    bool hasDutyLeave = false;
-    bool hasOtherLeave = false;
-    bool hasPresent = false;
+    var hasAbsent = false;
+    var hasDutyLeave = false;
+    var hasOtherLeave = false;
+    var hasPresent = false;
 
     if (sessions != null) {
       sessions.forEach((_, s) {
@@ -304,15 +298,15 @@ class CalendarLegend extends StatelessWidget {
 }
 
 class _LegendItem extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool isRing;
 
   const _LegendItem({
     required this.label,
     required this.color,
     this.isRing = false,
   });
+  final String label;
+  final Color color;
+  final bool isRing;
 
   @override
   Widget build(BuildContext context) {

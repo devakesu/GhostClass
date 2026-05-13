@@ -17,16 +17,16 @@ class LeavesScreen extends ConsumerWidget {
     try {
       final date = DateTime.parse(dateString);
       return DateFormat('MMM d, yyyy').format(date);
-    } catch (e) {
+    } on Object {
       return 'N/A';
     }
   }
 
   String _formatBytes(int bytes) {
-    if (bytes <= 0) return "0 B";
-    if (bytes < 1024) return "$bytes B";
-    if (bytes < 1048576) return "${(bytes / 1024).toStringAsFixed(1)} KB";
-    return "${(bytes / 1048576).toStringAsFixed(1)} MB";
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / 1048576).toStringAsFixed(1)} MB';
   }
 
   @override
@@ -348,12 +348,12 @@ class LeavesScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      leave.attendanceType?.name.toUpperCase() ?? "LEAVE",
+                      leave.attendanceType?.name.toUpperCase() ?? 'LEAVE',
                       style: GoogleFonts.manrope(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                        letterSpacing: 1.0,
+                        letterSpacing: 1,
                       ),
                     ),
                   ],
@@ -428,7 +428,7 @@ class LeavesScreen extends ConsumerWidget {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  s.course?.name ?? s.course?.code ?? "Unknown Course",
+                                  s.course?.name ?? s.course?.code ?? 'Unknown Course',
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -521,7 +521,7 @@ class LeavesScreen extends ConsumerWidget {
                       final isForwarded = approver.actionType == 'forward';
                       final isRecommended = approver.actionType == 'recommend';
                       final color = isApproved ? const Color(0xFF10B981) : isRejected ? Colors.red : isForwarded ? Colors.indigo : isRecommended ? Colors.blue : Colors.grey;
-                      final label = isApproved ? "Approved" : isForwarded ? "Forwarded" : isRecommended ? "Recommended" : isRejected ? "Rejected" : (approver.actionType ?? 'Action');
+                      final label = isApproved ? 'Approved' : isForwarded ? 'Forwarded' : isRecommended ? 'Recommended' : isRejected ? 'Rejected' : (approver.actionType ?? 'Action');
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -660,9 +660,9 @@ class LeavesScreen extends ConsumerWidget {
 }
 
 class _LeaveStatus {
+
+  _LeaveStatus(this.label, this.color, this.icon);
   final String label;
   final Color color;
   final IconData icon;
-
-  _LeaveStatus(this.label, this.color, this.icon);
 }

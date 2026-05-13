@@ -124,15 +124,14 @@ describe('ezygo-batch-fetcher', () => {
   it('throws QueueFullError if queue is too long', async () => {
     (egressFetch as any).mockReturnValue(new Promise(() => {}));
     
-    const promises: Promise<any>[] = [];
     // Occupy all slots (3)
-    promises.push(fetchEzygoData('/1', 'token').catch(() => {}));
-    promises.push(fetchEzygoData('/2', 'token').catch(() => {}));
-    promises.push(fetchEzygoData('/3', 'token').catch(() => {}));
+    fetchEzygoData('/1', 'token').catch(() => {});
+    fetchEzygoData('/2', 'token').catch(() => {});
+    fetchEzygoData('/3', 'token').catch(() => {});
     
     // Fill queue (100)
     for (let i = 0; i < 100; i++) {
-      promises.push(fetchEzygoData(`/q${i}`, 'token').catch(() => {}));
+      fetchEzygoData(`/q${i}`, 'token').catch(() => {});
     }
     
     expect(getRateLimiterStats().queueLength).toBe(100);

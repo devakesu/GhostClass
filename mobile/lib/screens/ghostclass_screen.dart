@@ -6,11 +6,11 @@ import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
-import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_branding.dart';
-import 'package:ghostclass/widgets/ghostclass/ghostclass_settings_card.dart';
-import 'package:ghostclass/widgets/ghostclass/ghostclass_menu_tile.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_footer.dart';
+import 'package:ghostclass/widgets/ghostclass/ghostclass_menu_tile.dart';
+import 'package:ghostclass/widgets/ghostclass/ghostclass_settings_card.dart';
+import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -76,7 +76,7 @@ class GhostClassScreen extends ConsumerWidget {
                       value: '${user.settings.targetPercentage}%',
                       color: primary,
                       isDisabled: user.isUpdatingSettings,
-                      onTap: () => _showTargetPicker(context, ref, user),
+                      onTap: () { final _ = _showTargetPicker(context, ref, user); },
                     ),
                     // Bunk Calculator Switch
                     GhostClassSettingsCard(
@@ -89,10 +89,10 @@ class GhostClassScreen extends ConsumerWidget {
                       toggleValue: user.settings.bunkCalculatorEnabled,
                       isDisabled: user.isUpdatingSettings,
                       onToggle: (val) {
-                        ref.read(authProvider.notifier).updateSettings(bunkEnabled: val);
+                        final _ = ref.read(authProvider.notifier).updateSettings(bunkEnabled: val);
                       },
                       onTap: () {
-                        ref.read(authProvider.notifier).updateSettings(
+                        final _ = ref.read(authProvider.notifier).updateSettings(
                           bunkEnabled: !user.settings.bunkCalculatorEnabled,
                         );
                       },
@@ -160,35 +160,35 @@ class GhostClassScreen extends ConsumerWidget {
                       icon: LucideIcons.userCircle,
                       title: 'Profile',
                       subtitle: 'Personal details',
-                      onTap: () => context.push('/profile'),
+                      onTap: () { final _ = context.push('/profile'); },
                       color: ghostColors?.accentOrange ?? const Color(0xFFFACC15),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.helpCircle,
                       title: 'Help Center',
                       subtitle: 'FAQs and support',
-                      onTap: () => context.push('/help'),
+                      onTap: () { final _ = context.push('/help'); },
                       color: ghostColors?.accentBlue ?? const Color(0xFF6366F1),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.mail,
                       title: 'Contact Us',
                       subtitle: 'Get in touch with our team',
-                      onTap: () => context.push('/contact'),
+                      onTap: () { final _ = context.push('/contact'); },
                       color: ghostColors?.accentOrange ?? const Color(0xFFF59E0B),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.shieldCheck,
                       title: 'Legal',
                       subtitle: 'Terms, Privacy & Licenses',
-                      onTap: () => context.push('/legal'),
+                      onTap: () { final _ = context.push('/legal'); },
                       color: ghostColors?.successGreen ?? const Color(0xFF10B981),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.database,
                       title: 'Account Dump',
                       subtitle: 'Detailed account information',
-                      onTap: () => context.push('/profile-dump'),
+                      onTap: () { final _ = context.push('/profile-dump'); },
                       color: primary,
                     ),
                     const SizedBox(height: 40),
@@ -203,7 +203,7 @@ class GhostClassScreen extends ConsumerWidget {
                       subtitle: 'Sign out of GhostClass',
                       color: primary,
                       isDanger: true,
-                      onTap: () => _handleLogout(context, ref),
+                      onTap: () { final _ = _handleLogout(context, ref); },
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.trash2,
@@ -211,7 +211,7 @@ class GhostClassScreen extends ConsumerWidget {
                       subtitle: 'Permanently remove all data',
                       color: primary,
                       isDanger: true,
-                      onTap: () => _handleDeleteAccount(context, ref),
+                      onTap: () { final _ = _handleDeleteAccount(context, ref); },
                     ),
                     const SizedBox(height: 8),
                   ]),
@@ -286,7 +286,7 @@ class GhostClassScreen extends ConsumerWidget {
   }
 
   Future<void> _handleDeleteAccount(BuildContext context, WidgetRef ref) async {
-    final TextEditingController controller = TextEditingController();
+    final controller = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -429,7 +429,7 @@ class GhostClassScreen extends ConsumerWidget {
       LoadingOverlay.show(context, message: 'Purging your mortal data... 💀');
       try {
         await ref.read(authProvider.notifier).deleteAccount();
-      } catch (e, st) {
+      } on Object catch (e, st) {
         AppLogger.e('GhostClassScreen: Account deletion failed', e, st);
         if (context.mounted) {
           Navigator.of(context, rootNavigator: true).pop();
@@ -453,7 +453,7 @@ class GhostClassScreen extends ConsumerWidget {
     final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       isScrollControlled: true,
@@ -462,7 +462,7 @@ class GhostClassScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder: (context) {
-        int localTarget = user.settings.targetPercentage;
+        var localTarget = user.settings.targetPercentage;
         return StatefulBuilder(
           builder: (context, setModalState) => Container(
             padding: const EdgeInsets.all(32),
@@ -522,7 +522,7 @@ class GhostClassScreen extends ConsumerWidget {
                 SliderTheme(
                   data: SliderThemeData(
                     showValueIndicator: ShowValueIndicator.onDrag,
-                    tickMarkShape: _CustomSliderTickMarkShape(tickMarkRadius: 2.5),
+                    tickMarkShape: const _CustomSliderTickMarkShape(tickMarkRadius: 2.5),
                     activeTickMarkColor: Colors.white.withValues(alpha: 0.4),
                     inactiveTickMarkColor: primary.withValues(alpha: 0.4),
                     activeTrackColor: primary,
@@ -548,7 +548,7 @@ class GhostClassScreen extends ConsumerWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      ref.read(authProvider.notifier).updateSettings(targetPercentage: localTarget);
+                      final _ = ref.read(authProvider.notifier).updateSettings(targetPercentage: localTarget);
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
@@ -579,7 +579,7 @@ class GhostClassScreen extends ConsumerWidget {
         ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    showModalBottomSheet(
+    final _ = showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       isScrollControlled: true,
@@ -741,8 +741,8 @@ class GhostClassScreen extends ConsumerWidget {
 }
 
 class _CustomSliderTickMarkShape extends SliderTickMarkShape {
-  final double tickMarkRadius;
   const _CustomSliderTickMarkShape({required this.tickMarkRadius});
+  final double tickMarkRadius;
 
   @override
   Size getPreferredSize({
@@ -761,11 +761,11 @@ class _CustomSliderTickMarkShape extends SliderTickMarkShape {
     required Offset thumbCenter,
     required bool isEnabled,
   }) {
-    final Canvas canvas = context.canvas;
+    final canvas = context.canvas;
     
-    final bool isBeforeThumb = center.dx < thumbCenter.dx;
+    final isBeforeThumb = center.dx < thumbCenter.dx;
     
-    final Paint paint = Paint()
+    final paint = Paint()
       ..color = isBeforeThumb 
           ? Colors.white.withValues(alpha: 0.4)
           : (sliderTheme.inactiveTickMarkColor ?? Colors.grey);

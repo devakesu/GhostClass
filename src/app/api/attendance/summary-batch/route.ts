@@ -116,7 +116,8 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
         try {
           data = await fetchEzygoData(`/attendancereports/institutionuser/courses/${course.id}/summery`, token);
           workingEndpoint = "summery";
-        } catch (_err) {
+        } catch (err) {
+          logger.dev(`[summary-batch] summery endpoint failed for ${course.id}, trying summary`, err);
           data = await fetchEzygoData(`/attendancereports/institutionuser/courses/${course.id}/summary`, token);
           workingEndpoint = "summary";
         }

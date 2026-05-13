@@ -4,12 +4,6 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppNotification {
-  final int id;
-  final String title;
-  final String description;
-  final String createdAt;
-  final String? topic;
-  final bool isRead;
 
   const AppNotification({
     required this.id,
@@ -30,13 +24,15 @@ class AppNotification {
       isRead: json['is_read'] as bool? ?? false,
     );
   }
+  final int id;
+  final String title;
+  final String description;
+  final String createdAt;
+  final String? topic;
+  final bool isRead;
 }
 
 class NotificationsState {
-  final List<AppNotification> actionNotifications;
-  final List<AppNotification> regularNotifications;
-  final int unreadCount;
-  final bool hasNextPage;
 
   const NotificationsState({
     required this.actionNotifications,
@@ -50,6 +46,10 @@ class NotificationsState {
         regularNotifications: [],
         unreadCount: 0,
       );
+  final List<AppNotification> actionNotifications;
+  final List<AppNotification> regularNotifications;
+  final int unreadCount;
+  final bool hasNextPage;
 
   List<AppNotification> get allNotifications =>
       [...actionNotifications, ...regularNotifications];
@@ -97,11 +97,11 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     ]);
 
     final allUnread = (results[0] as List)
-        .map((n) => AppNotification.fromJson(n))
+        .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
         .toList();
 
     final feedItems = (results[1] as List)
-        .map((n) => AppNotification.fromJson(n))
+        .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
         .toList();
 
     // Separate unread into Actions (Conflicts) and Regular
@@ -149,8 +149,9 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         .order('created_at', ascending: false)
         .range(from, to);
 
-    final List<AppNotification> newFeedItems =
-        (response as List).map((n) => AppNotification.fromJson(n)).toList();
+    final newFeedItems = (response as List)
+        .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
+        .toList();
 
     // Use null-safe access instead of force-unwrap: although fetchNextPage()
     // guards on current != null, state is async and could theoretically
@@ -195,14 +196,14 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     }
   }
 
-  Future<void> toggleRead(int id, bool wasRead) async {
+  Future<void> toggleRead(int id, {required bool wasRead}) async {
     final previousState = state.value;
     if (previousState == null) return;
 
     final newIsRead = !wasRead;
 
     // 1. Update in actionNotifications
-    final List<AppNotification> updatedActions = [];
+    final updatedActions = <AppNotification>[];
     AppNotification? movedToRegular;
 
     for (final n in previousState.actionNotifications) {
@@ -226,7 +227,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     }
 
     // 2. Update in regularNotifications
-    final List<AppNotification> updatedRegular = [];
+    final updatedRegular = <AppNotification>[];
     AppNotification? movedToAction;
 
     for (final n in previousState.regularNotifications) {
@@ -252,14 +253,16 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     }
 
     if (movedToAction != null) {
-      updatedActions.insert(0, movedToAction);
-      updatedActions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      updatedActions
+        ..insert(0, movedToAction)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
     if (movedToRegular != null) {
-      updatedRegular.insert(0, movedToRegular);
-      // Re-sort regular by date if needed, but inserting at 0 is fine for now
-      updatedRegular.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      updatedRegular
+        ..insert(0, movedToRegular)
+        // Re-sort regular by date if needed, but inserting at 0 is fine for now
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
     final unreadChange = wasRead ? 1 : -1;
@@ -286,7 +289,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     if (previousState == null) return;
 
     // Move all unread actions to regular notifications as read
-    final List<AppNotification> readActions = previousState.actionNotifications
+    final readActions = previousState.actionNotifications
         .map((n) => AppNotification(
               id: n.id,
               title: n.title,
@@ -297,7 +300,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
             ))
         .toList();
 
-    final List<AppNotification> readRegular = previousState.regularNotifications
+    final readRegular = previousState.regularNotifications
         .map((n) => AppNotification(
               id: n.id,
               title: n.title,
@@ -308,8 +311,8 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
             ))
         .toList();
 
-    final allReadRegular = [...readActions, ...readRegular];
-    allReadRegular.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final allReadRegular = [...readActions, ...readRegular]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     state = AsyncValue.data(NotificationsState(
       actionNotifications: [],

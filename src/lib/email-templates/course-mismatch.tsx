@@ -46,6 +46,7 @@ export const CourseMismatchEmail = ({
           </Text>
 
           <Section style={emailStyles.conflictBox}>
+            {/* eslint-disable-next-line sonarjs/table-header -- Email uses label/value with <td> */}
             <table style={tableStyles.table}>
               <tbody>
                 <tr>

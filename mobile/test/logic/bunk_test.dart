@@ -18,7 +18,7 @@ void main() {
     });
 
     test('exactly at target', () {
-      final res = calculateAttendance(75, 100, targetPercentage: 75);
+      final res = calculateAttendance(75, 100);
       expect(res.canBunk, 0);
       expect(res.requiredToAttend, 0);
       expect(res.isExact, true);
@@ -27,7 +27,7 @@ void main() {
     test('above target - can bunk', () {
       // 80% attendance, target 75%
       // Bunkable = (100 * 80 - 75 * 100) / 75 = (8000 - 7500) / 75 = 500 / 75 = 6.66 -> 6
-      final res = calculateAttendance(80, 100, targetPercentage: 75);
+      final res = calculateAttendance(80, 100);
       expect(res.canBunk, 6);
       expect(res.requiredToAttend, 0);
       expect(res.isBorderline, false);
@@ -36,7 +36,7 @@ void main() {
     test('below target - required to attend', () {
       // 70% attendance, target 75%
       // Required = (75 * 100 - 100 * 70) / (100 - 75) = (7500 - 7000) / 25 = 500 / 25 = 20
-      final res = calculateAttendance(70, 100, targetPercentage: 75);
+      final res = calculateAttendance(70, 100);
       expect(res.canBunk, 0);
       expect(res.requiredToAttend, 20);
     });
@@ -46,7 +46,7 @@ void main() {
       // If we have 16/21 = 76.19%.
       // If we have 75% but slightly above?
       // bunkableExact = (100 * 75.1 - 75 * 100) / 75 = 0.1 / 75 = 0.0013 -> bunkable 0, borderline true
-      final res = calculateAttendance(76, 101, targetPercentage: 75);
+      final res = calculateAttendance(76, 101);
       // current = 75.24%
       // bunkableExact = (7600 - 7575) / 75 = 25 / 75 = 0.33
       // bunkable = 0, isBorderline = true

@@ -1,20 +1,21 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/institution.dart';
 import 'package:ghostclass/models/user.dart';
-import 'package:ghostclass/logic/error_utils.dart';
-import 'package:ghostclass/services/api_service.dart';
-import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/security_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
-import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
@@ -22,19 +23,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginException implements Exception {
-  final String message;
   LoginException(this.message);
+  final String message;
   @override
   String toString() => 'LoginException: $message';
 }
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final stealthHeadersServiceProvider = Provider(
+final Provider<StealthHeadersService> stealthHeadersServiceProvider = Provider(
   (ref) => StealthHeadersService(ref.watch(secureStorageProvider)),
 );
-final profileServiceProvider = Provider((ref) => ProfileService());
-final settingsServiceProvider = Provider(
+final Provider<ProfileService> profileServiceProvider = Provider((ref) => ProfileService());
+final Provider<SettingsService> settingsServiceProvider = Provider(
   (ref) => SettingsService(ref.watch(secureStorageProvider)),
 );
 
@@ -54,16 +55,8 @@ final institutionsProvider = FutureProvider<List<Institution>>((ref) async {
 
 // ─── Authenticated User Model ─────────────────────────────────────────────────
 
+@immutable
 class AuthenticatedUser {
-  final String supabaseUserId;
-  final EncryptedValue ezygoToken;
-  final String? ezygoId;
-  final String? username;
-  final String? termsVersion;
-  final UserSettings settings;
-  final UserProfile? profile;
-  final bool isSyncing;
-  final bool isUpdatingSettings;
 
   const AuthenticatedUser({
     required this.supabaseUserId,
@@ -76,6 +69,15 @@ class AuthenticatedUser {
     this.isSyncing = false,
     this.isUpdatingSettings = false,
   });
+  final String supabaseUserId;
+  final EncryptedValue ezygoToken;
+  final String? ezygoId;
+  final String? username;
+  final String? termsVersion;
+  final UserSettings settings;
+  final UserProfile? profile;
+  final bool isSyncing;
+  final bool isUpdatingSettings;
 
   bool get termsAccepted => termsVersion == AppConfig.termsVersion;
 
@@ -159,18 +161,16 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     final apiService = ref.read(apiServiceProvider);
     final unauthorizedSub = apiService.onUnauthorized.listen((_) {
-      _handleUnauthorized();
+      final _ = _handleUnauthorized();
     });
 
-    final lockdownSub = apiService.onSecurityLockdown.listen((data) {
-      _handleSecurityLockdown(data);
-    });
+    final lockdownSub = apiService.onSecurityLockdown.listen(_handleSecurityLockdown);
 
     ref.onDispose(() {
       WidgetsBinding.instance.removeObserver(this);
       _refreshTimer?.cancel();
-      unauthorizedSub.cancel();
-      lockdownSub.cancel();
+      unawaited(unauthorizedSub.cancel());
+      unawaited(lockdownSub.cancel());
     });
 
     _startPeriodicRefresh();
@@ -195,14 +195,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         final backgroundDuration = now.difference(_lastBackgroundedAt!);
         if (backgroundDuration < const Duration(minutes: 15)) return;
       }
-      refreshProfile(force: true, sync: true);
+      final _ = refreshProfile(force: true, sync: true);
     }
   }
 
   void _startPeriodicRefresh() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(const Duration(minutes: 30), (_) {
-      refreshProfile();
+      final _ = refreshProfile();
     });
   }
 
@@ -210,8 +210,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     if (_isRefreshing || _isInitializing) return;
     _isRefreshing = true;
 
-    final api = ref.read(apiServiceProvider);
-    api.suppress401 = true;
+    final api = ref.read(apiServiceProvider)..suppress401 = true;
     AppLogger.w('AuthNotifier: 401 DETECTED. Attempting self-healing...');
 
     try {
@@ -273,7 +272,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           }
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: Self-healing error', e);
       if (e is AppException && e.isAuthError) {
         final isSecurityError = e.details?['type'] == 'security';
@@ -290,7 +289,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
     } finally {
       // Cooldown before allowing next 401 triggers to prevent tight cascades
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
       api.suppress401 = false;
       _isRefreshing = false;
     }
@@ -336,7 +335,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       await _fetchAndApplyServerProfile(currentUser, supabaseToken: token, sync: sync);
-    } catch (e) {
+    } on Object catch (e) {
       if (e is AppException && e.isAuthError) {
         final isSecurityError = e.details?['type'] == 'security';
         final isCritical = e.details?['criticalRisk'] == true;
@@ -388,8 +387,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ezygoToken: ezygoToken ?? '',
     );
 
-    final api = ref.read(apiServiceProvider);
-    api.suppress401 = true;
+    final api = ref.read(apiServiceProvider)..suppress401 = true;
     try {
       final token = await _getFreshSupabaseToken();
       if (token == null) {
@@ -404,7 +402,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         user,
         supabaseToken: token,
         updateState: false,
-        sync: false,
       );
       _lastRefresh = DateTime.now();
 
@@ -421,7 +418,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           await api.triggerSync(token, force: true);
           // Refresh profile after cron so class name, etc. are accurate
           await refreshProfile(force: true);
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('AuthNotifier: Background startup tasks failed', e);
         } finally {
           final finalUser = state.value;
@@ -432,7 +429,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }));
 
       return syncingUser;
-    } catch (e) {
+    } on Object catch (e) {
       if (e is AppException && e.isAuthError) {
         await logout();
         return null;
@@ -462,12 +459,12 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         api.fetchAcademicYear(storage),
       ]);
 
-      final semRes = results[0];
-      final yearRes = results[1];
+      final semRes = results[0] as Response<dynamic>;
+      final yearRes = results[1] as Response<dynamic>;
 
       String? extract(dynamic raw, String key) {
         if (raw == null) return null;
-        if (raw is! Map) {
+        if (raw is! Map<dynamic, dynamic>) {
           final s = raw.toString().trim();
           return s.isEmpty ? null : s;
         }
@@ -476,8 +473,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         for (final k in ['data', 'value']) {
           final val = map[k];
           if (val == null) continue;
-          if (val is! Map) return val.toString().trim().isEmpty ? null : val.toString().trim();
-          if (val[key] != null) return val[key].toString().trim().isEmpty ? null : val[key].toString().trim();
+          if (val is! Map<dynamic, dynamic>) return val.toString().trim().isEmpty ? null : val.toString().trim();
+          final nested = val;
+          if (nested[key] != null) return nested[key].toString().trim().isEmpty ? null : nested[key].toString().trim();
         }
         return null;
       }
@@ -501,7 +499,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             api.updateSemester(semester, storage),
             api.updateAcademicYear(year, storage),
           ]);
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('AuthNotifier: Could not POST fallback academic context to EzyGo', e);
         }
       }
@@ -509,7 +507,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final academicState = AcademicState(semester: semester, year: year);
       await storage.saveAcademicState(academicState);
       AppLogger.i('AuthNotifier: Academic context saved — $semester / $year');
-    } catch (e) {
+    } on Object catch (e) {
       // EzyGo is down: calculate fallback and persist it so the app still works
       AppLogger.w('AuthNotifier: Failed to fetch academic context from EzyGo. Using date-based fallback.', e);
       final fallback = calculateCurrentAcademicInfo();
@@ -546,12 +544,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
       }
 
+      final bridgeData = bridgeResponse.data as Map<String, dynamic>;
+
       if (kDebugMode) {
-        AppLogger.d('AuthNotifier: Bridge response data: ${bridgeResponse.data}');
+        AppLogger.d('AuthNotifier: Bridge response data: $bridgeData');
       }
 
       final sessionData =
-          (bridgeResponse.data['session'] ?? bridgeResponse.data)
+          (bridgeData['session'] ?? bridgeData)
               as Map<String, dynamic>?;
       final refreshToken = sessionData?['refresh_token'] as String?;
       if (refreshToken == null) {
@@ -568,25 +568,29 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           .setSession(refreshToken);
       final supabaseUser = authResponse.user;
       if (supabaseUser == null) {
-        throw AppException(
+        throw const AppException(
           message: 'Identity recovery failed',
           type: AppExceptionType.unauthorized,
         );
       }
 
-      final settingsFallback = bridgeResponse.data['settings'] != null
-          ? UserSettings.fromJson(bridgeResponse.data['settings'])
+      final settingsFallback = bridgeData['settings'] != null
+          ? UserSettings.fromJson(
+              bridgeData['settings'] as Map<String, dynamic>,
+            )
           : UserSettings.defaults();
 
       final ezygoId =
-          (bridgeResponse.data['id'] ?? bridgeResponse.data['user_id'])
+          (bridgeData['id'] ?? bridgeData['user_id'])
               ?.toString();
-      final termsVersion = _extractTermsVersion(bridgeResponse.data);
-      final ezygoToken = (bridgeResponse.data['ezygo_token'] as String?) ?? '';
+      final termsVersion = _extractTermsVersion(
+        bridgeData,
+      );
+      final ezygoToken = (bridgeData['ezygo_token'] as String?) ?? '';
 
       // Extract initial academic context from bridge response
-      final initialSem = bridgeResponse.data['current_semester'] ?? bridgeResponse.data['semester'];
-      final initialYear = bridgeResponse.data['current_year'] ?? bridgeResponse.data['academic_year'];
+      final initialSem = bridgeData['current_semester'] ?? bridgeData['semester'];
+      final initialYear = bridgeData['current_year'] ?? bridgeData['academic_year'];
 
       final settingsWithAcademic = settingsFallback.copyWith(
         semester: initialSem?.toString(),
@@ -638,7 +642,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             
             await ref.read(apiServiceProvider).triggerSync(token, force: true);
             await refreshProfile(force: true);
-          } catch (e) {
+          } on Object catch (e) {
             AppLogger.w('AuthNotifier: Post-login cron sync failed', e);
           } finally {
             final finalUser = state.value;
@@ -673,7 +677,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         storage.clearAll(),
         _clearSharedPrefs(),
       ]);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: LOGOUT CLEANUP ERROR', e);
     }
   }
@@ -682,7 +686,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('AuthNotifier: Failed to clear shared preferences', e, st);
     }
   }
@@ -770,15 +774,17 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     try {
       // 1. Inform Ezygo of the change first (matches web parity)
-      final List<Future> updates = [];
+      final updates = <Future<dynamic>>[];
       if (sem != null) updates.add(api.updateSemester(sem, storage));
       if (year != null) updates.add(api.updateAcademicYear(year, storage));
 
       if (updates.isNotEmpty) {
         final results = await Future.wait(updates);
-        for (var res in results) {
+        for (final r in results) {
+          final res = r as Response<dynamic>;
           if (res.statusCode != 200 && res.statusCode != 201) {
-            throw Exception(formatApiError(res.data, 'Auth.AcademicUpdate'));
+            final resData = res.data as Map<String, dynamic>?;
+            throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
           }
         }
       }
@@ -838,8 +844,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       throw Exception(formatApiError(response.data, 'Institution Fetch'));
     }
 
-    final all =
-        (response.data as List).map((i) => Institution.fromJson(i)).toList();
+    final all = (response.data as List)
+        .map((i) => Institution.fromJson(i as Map<String, dynamic>))
+        .toList();
 
     // Achieve parity with web app: Only show institutions where user is a student
     return all.where((i) => i.role.toLowerCase() == 'student').toList();
@@ -891,7 +898,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   }) async {
     final token = supabaseToken ?? await _getFreshSupabaseToken();
     if (token == null) {
-      throw AppException(
+      throw const AppException(
         message: 'Session dead',
         type: AppExceptionType.unauthorized,
       );
@@ -912,12 +919,12 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     if (response.statusCode != 200 || response.data == null) {
       if (response.statusCode != null && response.statusCode! >= 500) {
-        throw AppException(
+        throw const AppException(
           message: 'Ezygo issues (5xx)',
           type: AppExceptionType.server,
         );
       }
-      throw AppException(
+      throw const AppException(
         message: 'Profile sync failed',
         type: AppExceptionType.server,
       );
@@ -939,7 +946,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           api.clearCaches();
           await api.triggerSync(token, force: true);
           await refreshProfile(force: true);
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('AuthNotifier: Profile-triggered cron sync failed', e);
         } finally {
           final finalUser = state.value;
@@ -967,7 +974,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     final settings = baseSettings;
 
     final rawProfile = data.containsKey('profile') 
-        ? Map<String, dynamic>.from(data['profile'] as Map) 
+        ? Map<String, dynamic>.from(data['profile'] as Map<dynamic, dynamic>) 
         : Map<String, dynamic>.from(data);
         
     // Ensure current_semester/year are explicitly included in the map passed to fromJson
@@ -980,7 +987,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       settings: settings,
       profile: profile,
       ezygoToken: EncryptedValue.fromPlaintext(
-        data['ezygo_token'] ?? currentUser.ezygoToken.value,
+        (data['ezygo_token'] as String?) ?? currentUser.ezygoToken.value,
       ),
       ezygoId: (data['id'] ?? data['user_id'] ?? data['ezygo_user_id'] ?? data['ezygo_id'])?.toString() ?? currentUser.ezygoId,
       termsVersion: _extractTermsVersion(data) ?? currentUser.termsVersion,
@@ -1039,7 +1046,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         type: AppExceptionType.network,
         originalError: e,
       );
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.w(
         'AuthNotifier: Network error during token refresh. Preventing logout.',
         e,
@@ -1054,7 +1061,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
   String? _extractTermsVersion(Map<String, dynamic> data) {
     if (data['terms_version'] != null) return data['terms_version'].toString();
-    final profile = data['profile'] as Map?;
+    final profile = data['profile'] as Map<dynamic, dynamic>?;
     if (profile != null && profile['terms_version'] != null) {
       return profile['terms_version'].toString();
     }

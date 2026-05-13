@@ -8,8 +8,14 @@
  * Falls back to an empty string for local dev/test where APP_URL may not be set.
  */
 export const getLogoUrl = (): string => {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
-  if (appUrl) return `${appUrl}/logo.png`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    let cleanUrl = appUrl;
+    while (cleanUrl.endsWith("/")) {
+      cleanUrl = cleanUrl.slice(0, -1);
+    }
+    return `${cleanUrl}/logo.png`;
+  }
   const domain = process.env.NEXT_PUBLIC_APP_DOMAIN;
   if (domain) return `https://${domain}/logo.png`;
   return "";

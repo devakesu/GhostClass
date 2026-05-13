@@ -85,10 +85,21 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "upgrade",
 ]);
 
+/**
+ * Strips all trailing slashes from a string without using regex backtracking.
+ */
+function stripTrailingSlashes(str) {
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
 export default {
   async fetch(request, env) {
     // ── 1. Config validation ──────────────────────────────────────────────────
-    const rawSupabaseUrl = (env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+    const rawSupabaseUrl = stripTrailingSlashes(env.SUPABASE_URL ?? "");
     if (!rawSupabaseUrl) {
       return new Response("Misconfigured: SUPABASE_URL is not set", { status: 500 });
     }
@@ -100,7 +111,7 @@ export default {
       return new Response("Misconfigured: SUPABASE_URL is not a valid URL", { status: 500 });
     }
 
-    const allowedOrigin = (env.ALLOWED_ORIGIN ?? "").trim().replace(/\/+$/, "");
+    const allowedOrigin = stripTrailingSlashes(env.ALLOWED_ORIGIN ?? "");
 
     const requestOrigin = request.headers.get("origin");
 
@@ -123,8 +134,8 @@ export default {
     }
 
     // Normalise both sides before comparing.
-    const normReq = requestOrigin.trim().replace(/\/+$/, "");
-    const normAllowed = allowedOrigin.trim().replace(/\/+$/, "");
+    const normReq = stripTrailingSlashes(requestOrigin);
+    const normAllowed = allowedOrigin;
     if (normReq !== normAllowed) {
       return new Response("Forbidden: origin not allowed", {
         status: 403,

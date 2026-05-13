@@ -1,16 +1,16 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
-import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockDio extends Mock implements Dio {}
 
 void main() {
   group('EzygoBatchFetcher', () {
     late MockDio mockDio;
-    bool outageState = false;
-    bool backendUnauthorized = false;
+    var outageState = false;
+    var backendUnauthorized = false;
 
     setUp(() {
       mockDio = MockDio();
@@ -19,14 +19,12 @@ void main() {
     });
 
     EzygoBatchFetcher createFetcher() {
-      final fetcher = EzygoBatchFetcher(
+      return EzygoBatchFetcher(
         mockDio,
         getOutage: () => outageState,
         setOutage: (val) => outageState = val,
         isBackendUnauthorized: () => backendUnauthorized,
-      );
-      fetcher.clearAll();
-      return fetcher;
+      )..clearAll();
     }
 
     test('throws when token is empty', () async {
@@ -64,7 +62,7 @@ void main() {
 
     test('executes successful request and caches result', () async {
       final fetcher = createFetcher();
-      final res = Response(
+      final res = Response<dynamic>(
         requestOptions: RequestOptions(path: '/test'),
         statusCode: 200,
         data: {'success': true},
@@ -95,7 +93,7 @@ void main() {
 
     test('negative caches 5xx responses and sets outage', () async {
       final fetcher = createFetcher();
-      final res500 = Response(
+      final res500 = Response<dynamic>(
         requestOptions: RequestOptions(path: '/test'),
         statusCode: 500,
       );
@@ -143,7 +141,7 @@ void main() {
 
     test('encodes POST request data and caches successfully', () async {
       final fetcher = createFetcher();
-      final res = Response(
+      final res = Response<dynamic>(
         requestOptions: RequestOptions(path: '/post'),
         statusCode: 200,
         data: {'posted': true},
@@ -168,7 +166,7 @@ void main() {
 
     test('deduplicates identical concurrent in-flight requests', () async {
       final fetcher = createFetcher();
-      final res = Response(
+      final res = Response<dynamic>(
         requestOptions: RequestOptions(path: '/dedup'),
         statusCode: 200,
         data: {'ok': true},
@@ -212,7 +210,7 @@ void main() {
         ),
       ).thenAnswer((invocation) async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
-        return Response(
+        return Response<dynamic>(
           requestOptions: RequestOptions(path: invocation.positionalArguments[0] as String),
           statusCode: 200,
         );

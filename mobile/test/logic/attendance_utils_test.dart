@@ -139,10 +139,10 @@ void main() {
   });
 
   group('Attendance Utils - resolveCourseDisplayName', () {
-    final courseDetails = const CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
-    final officialReport = AttendanceReportDetailed(
+    const courseDetails = CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
+    const officialReport = AttendanceReportDetailed(
       courses: {
-        'C1': const AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
+        'C1': AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
       },
       studentAttendanceData: {},
       attendanceDates: {},
@@ -186,10 +186,10 @@ void main() {
   });
 
   group('Attendance Utils - resolveCourseDisplayCode', () {
-    final courseDetails = const CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
-    final officialReport = AttendanceReportDetailed(
+    const courseDetails = CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
+    const officialReport = AttendanceReportDetailed(
       courses: {
-        'C1': const AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
+        'C1': AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
       },
       studentAttendanceData: {},
       attendanceDates: {},

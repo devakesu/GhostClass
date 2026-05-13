@@ -3,10 +3,10 @@ import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SettingsService {
-  final SecureStorageService storage;
-  final _client = Supabase.instance.client;
 
   SettingsService(this.storage);
+  final SecureStorageService storage;
+  final SupabaseClient _client = Supabase.instance.client;
 
   Future<void> updateSettings(
     String userId, {
@@ -14,7 +14,7 @@ class SettingsService {
     int? targetPercentage,
     Map<String, Map<String, dynamic>>? disabledCourses,
   }) async {
-    final Map<String, dynamic> updates = {};
+    final updates = <String, dynamic>{};
     if (bunkEnabled != null) updates['bunk_calculator_enabled'] = bunkEnabled;
     if (targetPercentage != null) updates['target_percentage'] = targetPercentage;
     if (disabledCourses != null) updates['disabled_courses'] = disabledCourses;

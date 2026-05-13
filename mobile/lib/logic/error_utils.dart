@@ -1,14 +1,14 @@
 import 'package:dio/dio.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 String formatApiError(dynamic response, String context) {
   if (response == null) {
     if (context == 'ApiService.Dio') {
-      return "Connectivity problem: The server is taking too long to respond.";
+      return 'Connectivity problem: The server is taking too long to respond.';
     }
     if (context == 'Tracking.OfficialReport') {
-      return "The attendance report is currently unavailable. Please check your connection and try again.";
+      return 'The attendance report is currently unavailable. Please check your connection and try again.';
     }
     return 'Failed to complete $context';
   }
@@ -19,8 +19,8 @@ String formatApiError(dynamic response, String context) {
   }
 
   // Extract code and message
-  String code = '';
-  String message = '';
+  var code = '';
+  var message = '';
   int? status;
 
   if (response is PostgrestException) {
@@ -52,7 +52,7 @@ String formatApiError(dynamic response, String context) {
       return "You don't have permission to add courses to this class. Ensure your profile sync is complete.";
     }
     if (context == 'attendance') {
-      return "Permission denied. You can only modify your own attendance records.";
+      return 'Permission denied. You can only modify your own attendance records.';
     }
     return "You don't have permission to perform this action.";
   }
@@ -60,37 +60,37 @@ String formatApiError(dynamic response, String context) {
   // Unique constraint violations
   if (code == '23505') {
     if (context == 'adding course') {
-      return "This course already exists in your class lineup for this semester.";
+      return 'This course already exists in your class lineup for this semester.';
     }
     if (context == 'attendance') {
-      return "A record already exists for this date and session.";
+      return 'A record already exists for this date and session.';
     }
-    return "This record already exists.";
+    return 'This record already exists.';
   }
 
   // Foreign key violations
   if (code == '23503') {
-    return "The related record was not found or has been deleted.";
+    return 'The related record was not found or has been deleted.';
   }
 
   // Data type / UUID mismatch
   if (code == '22P02') {
-    return "Invalid data format. Please check your input and try again.";
+    return 'Invalid data format. Please check your input and try again.';
   }
 
   // Network / timeout
   if (lower.contains('fetch') || lower.contains('network') || code == 'ERR_NETWORK') {
-    return "Connection failed. Please check your internet and try again.";
+    return 'Connection failed. Please check your internet and try again.';
   }
 
   // Circuit Breaker (503)
   if (status == 503 || lower.contains('technical issues')) {
-    return "EzyGo servers are currently down. Please try again later.";
+    return 'EzyGo servers are currently down. Please try again later.';
   }
 
   // Rate limiting
   if (code == '429' || lower.contains('too many requests') || status == 429) {
-    return "Too many requests. Please wait a few moments and try again.";
+    return 'Too many requests. Please wait a few moments and try again.';
   }
 
   return message.isNotEmpty ? message : 'Failed to complete $context';
@@ -99,7 +99,7 @@ String formatApiError(dynamic response, String context) {
 /// Redacts sensitive information like IP addresses, ports, and file paths from error logs.
 String sanitizeTechnicalDetails(String error) {
   // Remove IP addresses (v4)
-  String sanitized = error.replaceAll(
+  var sanitized = error.replaceAll(
       RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'), '[REDACTED_IP]');
 
   // Remove Port numbers in common formats

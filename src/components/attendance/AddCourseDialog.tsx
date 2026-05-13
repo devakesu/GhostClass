@@ -116,13 +116,28 @@ export function AddCourseDialog({
       setToken("");
       turnstile.reset();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error adding course:", error);
       Sentry.captureException(error, { tags: { type: "course_mutation_error", location: "AddCourseDialog" } });
       toast.error("Failed to add course. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getButtonContent = () => {
+    if (isSubmitting) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Adding Course...
+        </>
+      );
+    }
+    if (!token) {
+      return "Waiting for Verification...";
+    }
+    return "Add Course to Lineup";
   };
 
   return (
@@ -218,16 +233,7 @@ export function AddCourseDialog({
               className="w-full h-12 text-lg font-bold transition-all hover:scale-[1.02]"
               disabled={isSubmitting || !token}
             >
-              {isSubmitting
-                ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Adding Course...
-                  </>
-                )
-                : (
-                  !token ? "Waiting for Verification..." : "Add Course to Lineup"
-                )}
+              {getButtonContent()}
             </Button>
           </DialogFooter>
         </form>

@@ -23,6 +23,27 @@ export interface PushNotificationResult {
   error?: string;
 }
 
+function sanitizePayload(data?: Record<string, string>): Record<string, string> {
+  if (!data) return {};
+  return Object.fromEntries(
+    Object.entries(data)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [key, String(value)])
+  );
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "code" in error) {
+    const codeVal = (error as Record<string, unknown>).code;
+    return typeof codeVal === "string" ? codeVal : undefined;
+  }
+  return undefined;
+}
+
+function isTerminalError(code?: string): boolean {
+  return code === "messaging/invalid-registration-token" || code === "messaging/registration-token-not-registered";
+}
+
 /**
  * Dispatches a secure push notification via Firebase Cloud Messaging (FCM).
  * Integrates error tracking and logging with redacting to protect device identifiers.
@@ -49,15 +70,7 @@ export async function sendPushNotification({
   }
 
   try {
-    // Sanitize string mapping for data payload fields to ensure type compatibility with FCM API
-    const sanitizedData: Record<string, string> = {};
-    if (data) {
-      for (const [key, value] of Object.entries(data)) {
-        if (value !== undefined && value !== null) {
-          sanitizedData[key] = String(value);
-        }
-      }
-    }
+    const sanitizedData = sanitizePayload(data);
 
     const messageId = await messaging.send({
       token,
@@ -84,16 +97,14 @@ export async function sendPushNotification({
 
     logger.dev(`[push] Successfully dispatched notification. Message ID: ${messageId}`);
     return { success: true, messageId };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown push dispatch failure";
     const safeToken = redact("id", token);
-    const errorMsg = error?.message || "Unknown push dispatch failure";
     
     logger.error(`[push] Failed to send notification to token ${safeToken}:`, errorMsg);
     
-    // Check if the error indicates a stale, unregistered, or invalid token
-    const isTerminalTokenError = 
-      error?.code === "messaging/invalid-registration-token" ||
-      error?.code === "messaging/registration-token-not-registered";
+    const errorCode = getErrorCode(error);
+    const isTerminalTokenError = isTerminalError(errorCode);
 
     Sentry.captureException(error, {
       tags: { 
@@ -103,7 +114,7 @@ export async function sendPushNotification({
       extra: { 
         token_redacted: safeToken, 
         title,
-        error_code: error?.code,
+        error_code: errorCode,
       },
     });
 

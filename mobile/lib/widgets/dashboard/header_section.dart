@@ -7,9 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class HeaderSection extends ConsumerWidget {
-  final DashboardData data;
 
-  const HeaderSection({super.key, required this.data});
+  const HeaderSection({required this.data, super.key});
+  final DashboardData data;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,7 +63,7 @@ class HeaderSection extends ConsumerWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
+                  letterSpacing: 1,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
@@ -128,7 +128,7 @@ class HeaderSection extends ConsumerWidget {
     WidgetRef ref,
     String current,
   ) {
-    showModalBottomSheet(
+    final _ = showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
@@ -155,7 +155,7 @@ class HeaderSection extends ConsumerWidget {
       (i) => '${2022 + i}-${(2023 + i).toString().substring(2)}',
     );
 
-    showModalBottomSheet(
+    final _ = showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
@@ -175,7 +175,7 @@ class HeaderSection extends ConsumerWidget {
     );
   }
 
-  void _handleAcademicChange(
+  Future<void> _handleAcademicChange(
     BuildContext context,
     WidgetRef ref, {
     required String type,
@@ -194,15 +194,15 @@ class HeaderSection extends ConsumerWidget {
 }
 
 class _SelectorButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
 
   const _SelectorButton({
     required this.label,
     required this.icon,
     required this.onTap,
   });
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -253,10 +253,6 @@ class _SelectorButton extends StatelessWidget {
 }
 
 class _PickerSheet extends StatelessWidget {
-  final String title;
-  final List<String> options;
-  final String selected;
-  final Function(String) onSelected;
 
   const _PickerSheet({
     required this.title,
@@ -264,6 +260,10 @@ class _PickerSheet extends StatelessWidget {
     required this.selected,
     required this.onSelected,
   });
+  final String title;
+  final List<String> options;
+  final String selected;
+  final void Function(String) onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +306,7 @@ class _PickerSheet extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 8),
                 child: Column(
                   children: options.map((opt) {
-                    final bool isSelected =
+                    final isSelected =
                         opt.toLowerCase() == selected.toLowerCase();
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),

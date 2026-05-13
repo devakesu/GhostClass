@@ -11,7 +11,7 @@ import { Footer } from "@/components/layout/footer";
  * Custom Error Page for client-side errors
  * Catches errors that occur during rendering in client components
  */
-export default function Error({
+export default function ErrorPage({
   error,
   reset,
 }: {

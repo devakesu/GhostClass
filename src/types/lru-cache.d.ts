@@ -1,5 +1,5 @@
 declare module 'lru-cache' {
-  export class LRUCache<K = any, V = any> {
+  export class LRUCache<K = unknown, V = unknown> {
     constructor(options: {
       max: number;
       ttl?: number;

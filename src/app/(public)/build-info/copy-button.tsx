@@ -1,8 +1,40 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Check } from "lucide-react";
+
+/**
+ * Shared clipboard copy & visual feedback state machine.
+ * Returns a handleCopy function and the current copied state.
+ */
+function useClipboardCopy(text: string) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      window.alert("Copy to clipboard is not supported in this browser or context.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.alert("Failed to copy to clipboard. Please copy the text manually.");
+    }
+  }, [text]);
+
+  return { copied, handleCopy };
+}
 
 interface CopyButtonProps {
   /** The text to copy to clipboard */
@@ -22,29 +54,7 @@ interface CopyButtonProps {
  * Shows a "Copied" confirmation for 2 seconds after a successful copy.
  */
 export function CopyButton({ text, label, className, size = "sm", variant = "ghost" }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const handleCopy = async () => {
-    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-      window.alert("Copy to clipboard is not supported in this browser or context.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      window.alert("Failed to copy to clipboard. Please copy the text manually.");
-    }
-  };
+  const { copied, handleCopy } = useClipboardCopy(text);
 
   return (
     <Button variant={variant} size={size} className={className} onClick={handleCopy} aria-label={label}>
@@ -72,29 +82,7 @@ interface InlineCopyButtonProps {
  * A minimal inline copy icon button for compact spaces (e.g., digest display).
  */
 export function InlineCopyButton({ text }: InlineCopyButtonProps) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const handleCopy = async () => {
-    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-      window.alert("Copy to clipboard is not supported in this browser or context.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      window.alert("Failed to copy to clipboard. Please copy the text manually.");
-    }
-  };
+  const { copied, handleCopy } = useClipboardCopy(text);
 
   return (
     <button

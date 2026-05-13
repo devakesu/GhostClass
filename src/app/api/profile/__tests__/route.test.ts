@@ -65,7 +65,7 @@ vi.mock("@/lib/security/csrf", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", async () => {
-  const actual = await vi.importActual<any>("@/lib/security/app-check");
+  const actual = await vi.importActual<typeof import("@/lib/security/app-check")>("@/lib/security/app-check");
   return {
     ...actual,
     withSecurity: vi.fn((handler) => handler),

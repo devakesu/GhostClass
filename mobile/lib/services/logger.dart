@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:ghostclass/logic/error_utils.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Centralized logging service for the application.
 ///
@@ -46,7 +47,7 @@ class AppLogger {
 
     // Redact emails
     s = s.replaceAll(
-      RegExp(r"[\w.+%-]+@[\w.-]+\.[a-zA-Z]{2,}"),
+      RegExp(r'[\w.+%-]+@[\w.-]+\.[a-zA-Z]{2,}'),
       '[REDACTED_EMAIL]',
     );
 
@@ -64,7 +65,7 @@ class AppLogger {
     return s;
   }
 
-  static final RegExp _safeTagChars = RegExp(r'[^a-z0-9._-]');
+  static final RegExp _safeTagChars = RegExp('[^a-z0-9._-]');
 
   static String _toSafeTagValue(String value) {
     final normalized = value.trim().toLowerCase().replaceAll(' ', '_');
@@ -97,7 +98,7 @@ class AppLogger {
   static void i(String message) {
     _addToBuffer('INFO', message);
     if (kDebugMode) debugPrint('[INFO] $message');
-    Sentry.addBreadcrumb(Breadcrumb(message: message, level: SentryLevel.info));
+    unawaited(Sentry.addBreadcrumb(Breadcrumb(message: message, level: SentryLevel.info)));
   }
 
   /// Logs a warning message.
@@ -107,11 +108,13 @@ class AppLogger {
       debugPrint('[WARNING] $message');
       if (error != null) debugPrint('Details: $error');
     }
-    Sentry.addBreadcrumb(
-      Breadcrumb(
-        message: message,
-        level: SentryLevel.warning,
-        data: error != null ? {'error': error.toString()} : null,
+    unawaited(
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          message: message,
+          level: SentryLevel.warning,
+          data: error != null ? {'error': error.toString()} : null,
+        ),
       ),
     );
   }
@@ -158,27 +161,31 @@ class AppLogger {
         uuidRegex.firstMatch(error?.toString() ?? '');
     if (match != null) hashedUserId = _hashString(match.group(0)!);
 
-    Sentry.captureException(
-      error ?? message,
-      stackTrace: stackTrace,
-      withScope: (scope) {
-        scope.setTag('logger_message', sanitizedMessage);
-        for (final entry in _deriveTags(message).entries) {
-          scope.setTag(entry.key, entry.value);
-        }
-        if (tags != null) {
-          for (final entry in tags.entries) {
-            scope.setTag(entry.key, _toSafeTagValue(entry.value));
+    unawaited(
+      Sentry.captureException(
+        error ?? message,
+        stackTrace: stackTrace,
+        withScope: (scope) async {
+          await scope.setTag('logger_message', sanitizedMessage);
+          for (final entry in _deriveTags(message).entries) {
+            await scope.setTag(entry.key, entry.value);
           }
-        }
-        if (hashedUserId != null) scope.setTag('user_id_hashed', hashedUserId);
-        final loggerContext = <String, dynamic>{'message': sanitizedMessage};
-        if (sanitizedError != null) loggerContext['error'] = sanitizedError;
-        if (sanitizedExtras.isNotEmpty) {
-          loggerContext['details'] = sanitizedExtras;
-        }
-        scope.setContexts('logger', loggerContext);
-      },
+          if (tags != null) {
+            for (final entry in tags.entries) {
+              await scope.setTag(entry.key, _toSafeTagValue(entry.value));
+            }
+          }
+          if (hashedUserId != null) {
+            await scope.setTag('user_id_hashed', hashedUserId);
+          }
+          final loggerContext = <String, dynamic>{'message': sanitizedMessage};
+          if (sanitizedError != null) loggerContext['error'] = sanitizedError;
+          if (sanitizedExtras.isNotEmpty) {
+            loggerContext['details'] = sanitizedExtras;
+          }
+          await scope.setContexts('logger', loggerContext);
+        },
+      ),
     );
   }
 }

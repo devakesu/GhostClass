@@ -18,10 +18,10 @@ const mockMutate = vi.fn();
 const mockMutateAsync = vi.fn().mockResolvedValue({});
 
 // Auth state change handler captured on subscription
-let authStateCallback: ((event: string, session: any) => void) | null = null;
+let authStateCallback: ((event: string, session: unknown) => void) | null = null;
 const mockUnsubscribe = vi.fn();
 
-const mockOnAuthStateChange = vi.fn((callback: (event: string, session: any) => void) => {
+const mockOnAuthStateChange = vi.fn((callback: (event: string, session: unknown) => void) => {
   authStateCallback = callback;
   return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
 });
@@ -120,12 +120,12 @@ describe('UserSettingsProvider', () => {
     authStateCallback = null;
 
     const createMockStorage = () => {
-      const store: Record<string, string> = {};
+      const store = new Map<string, string>();
       return {
-        getItem: vi.fn((key: string) => store[key] ?? null),
-        setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-        removeItem: vi.fn((key: string) => { delete store[key]; }),
-        clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]); }),
+        getItem: vi.fn((key: string) => store.get(key) ?? null),
+        setItem: vi.fn((key: string, value: string) => { store.set(key, value); }),
+        removeItem: vi.fn((key: string) => { store.delete(key); }),
+        clear: vi.fn(() => { store.clear(); }),
         length: 0,
         key: vi.fn(),
       };
@@ -134,17 +134,17 @@ describe('UserSettingsProvider', () => {
     vi.stubGlobal('localStorage', createMockStorage());
     vi.stubGlobal('sessionStorage', createMockStorage());
 
-    vi.mocked(useQuery).mockImplementation((options: any) => ({
-      data: options.placeholderData,
+    vi.mocked(useQuery).mockImplementation((options: unknown) => ({
+      data: (options as { placeholderData?: unknown })?.placeholderData,
       isLoading: false,
       isFetching: false,
-    } as any));
+    } as unknown as ReturnType<typeof useQuery>));
 
     vi.mocked(useMutation).mockReturnValue({
       mutate: mockMutate,
       mutateAsync: mockMutateAsync,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useMutation>);
   });
 
   afterEach(() => {
@@ -168,7 +168,7 @@ describe('UserSettingsProvider', () => {
       data: undefined,
       isLoading: true,
       isFetching: false,
-    } as any);
+    } as unknown as ReturnType<typeof useQuery>);
     render(<WrappedConsumer />);
     expect(screen.getByTestId('loading').textContent).toBe('true');
   });
@@ -178,7 +178,7 @@ describe('UserSettingsProvider', () => {
       data: undefined,
       isLoading: false,
       isFetching: true,
-    } as any);
+    } as unknown as ReturnType<typeof useQuery>);
     render(<WrappedConsumer />);
     expect(screen.getByTestId('loading').textContent).toBe('true');
   });
@@ -188,7 +188,7 @@ describe('UserSettingsProvider', () => {
       data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
       isLoading: false,
       isFetching: false,
-    } as any);
+    } as unknown as ReturnType<typeof useQuery>);
     render(<WrappedConsumer />);
     expect(screen.getByTestId('settings').textContent).toBe('has-settings');
   });
@@ -198,7 +198,7 @@ describe('UserSettingsProvider', () => {
       data: null,
       isLoading: false,
       isFetching: false,
-    } as any);
+    } as unknown as ReturnType<typeof useQuery>);
     render(<WrappedConsumer />);
     expect(screen.getByTestId('settings').textContent).toBe('no-settings');
   });
@@ -206,7 +206,7 @@ describe('UserSettingsProvider', () => {
   it('configures stable refetch policy for user settings', () => {
     render(<WrappedConsumer />);
 
-    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as any;
+    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as { refetchOnWindowFocus?: boolean; refetchInterval?: boolean } | undefined;
 
     expect(firstCallArgs).toBeDefined();
     expect(firstCallArgs?.refetchOnWindowFocus).toBe(false);
@@ -404,12 +404,12 @@ describe('UserSettingsProvider', () => {
         data: undefined,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
       vi.mocked(useQuery).mockReturnValue({
         data: settings,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
 
@@ -428,12 +428,12 @@ describe('UserSettingsProvider', () => {
         data: undefined,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
       vi.mocked(useQuery).mockReturnValue({
         data: null,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
 
@@ -459,12 +459,12 @@ describe('UserSettingsProvider', () => {
         data: undefined,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
       vi.mocked(useQuery).mockReturnValue({
         data: null,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
 
@@ -487,7 +487,7 @@ describe('UserSettingsProvider', () => {
         data: undefined,
         isLoading: true,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
       expect(mockMutate).not.toHaveBeenCalled();
@@ -498,12 +498,12 @@ describe('UserSettingsProvider', () => {
         mutate: mockMutate,
         mutateAsync: mockMutateAsync,
         isPending: true,
-      } as any);
+      } as unknown as ReturnType<typeof useMutation>);
       vi.mocked(useQuery).mockReturnValue({
         data: null,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
       expect(mockMutate).not.toHaveBeenCalled();
@@ -520,7 +520,7 @@ describe('UserSettingsProvider', () => {
         data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       render(<WrappedConsumer />);
 
@@ -545,7 +545,7 @@ describe('UserSettingsProvider', () => {
         data: undefined,
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       const { rerender } = render(<WrappedConsumer />);
 
@@ -553,7 +553,7 @@ describe('UserSettingsProvider', () => {
         data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} },
         isLoading: false,
         isFetching: false,
-      } as any);
+      } as unknown as ReturnType<typeof useQuery>);
 
       await act(async () => {
         authStateCallback?.('INITIAL_SESSION', { user: { id: 'error-user-unique-2' } });
@@ -646,11 +646,11 @@ describe('UserSettingsProvider', () => {
       const settings = { bunk_calculator_enabled: false, target_percentage: 88, disabled_courses: {} };
       window.sessionStorage.setItem('prefetchedSettings', JSON.stringify({ userId, settings }));
 
-      vi.mocked(useQuery).mockImplementation((_options: any) => ({
+      vi.mocked(useQuery).mockImplementation(() => ({
         data: null, 
         isLoading: false,
         isFetching: false,
-      } as any));
+      } as unknown as ReturnType<typeof useQuery>));
 
       render(<WrappedConsumer />);
       await act(async () => {
@@ -668,11 +668,11 @@ describe('UserSettingsProvider', () => {
       window.localStorage.setItem('showBunkCalc', 'false');
       window.localStorage.setItem('targetPercentage', '92');
 
-      vi.mocked(useQuery).mockImplementation((_options: any) => ({
+      vi.mocked(useQuery).mockImplementation(() => ({
         data: null,
         isLoading: false,
         isFetching: false,
-      } as any));
+      } as unknown as ReturnType<typeof useQuery>));
 
       render(<WrappedConsumer />);
       await act(async () => {
@@ -696,8 +696,8 @@ describe('UserSettingsProvider', () => {
         authStateCallback?.('SIGNED_IN', { user: { id: userId } });
       });
 
-      const queryCall = vi.mocked(useQuery).mock.calls.find(c => (c[0] as any).queryKey[1] === userId);
-      const queryFn = (queryCall?.[0] as any)?.queryFn;
+      const queryCall = vi.mocked(useQuery).mock.calls.find(c => (c[0] as { queryKey?: unknown[] })?.queryKey?.[1] === userId);
+      const queryFn = (queryCall?.[0] as { queryFn?: () => Promise<unknown> })?.queryFn;
       
       if (queryFn) {
         // Success case
@@ -705,7 +705,7 @@ describe('UserSettingsProvider', () => {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: { bunk_calculator_enabled: true }, error: null }),
-        } as any);
+        } as unknown as ReturnType<typeof mockFrom>);
         await queryFn();
 
         // Error case
@@ -713,7 +713,7 @@ describe('UserSettingsProvider', () => {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: null, error: new Error('db_fail') }),
-        } as any);
+        } as unknown as ReturnType<typeof mockFrom>);
         await expect(queryFn()).rejects.toThrow('db_fail');
       }
     });
@@ -725,22 +725,25 @@ describe('UserSettingsProvider', () => {
         authStateCallback?.('SIGNED_IN', { user: { id: userId } });
       });
 
-      const mutationCall = vi.mocked(useMutation).mock.calls[0];
-      const mutationFn = (mutationCall?.[0] as any)?.mutationFn;
+      const calls = vi.mocked(useMutation).mock.calls;
+      const mutationCall = calls[calls.length - 1];
+      const mutationFn = (mutationCall?.[0] as { mutationFn?: (vars: unknown) => Promise<unknown> })?.mutationFn;
 
       if (mutationFn) {
         // Success case
+        const upsertMock = vi.fn().mockResolvedValue({ error: null });
         mockFrom.mockReturnValue({
-          upsert: vi.fn().mockResolvedValue({ error: null }),
-        } as any);
+          upsert: upsertMock,
+        } as unknown as ReturnType<typeof mockFrom>);
         await mutationFn({ bunk_calculator_enabled: true });
+        expect(upsertMock).toHaveBeenCalled();
       }
     });
 
     it('exercises retry logic branches', () => {
       render(<WrappedConsumer />);
       const queryCall = vi.mocked(useQuery).mock.calls[0];
-      const retry = (queryCall?.[0] as any)?.retry;
+      const retry = (queryCall?.[0] as { retry?: (count: number, err: unknown) => boolean })?.retry;
       if (retry) {
         expect(retry(0, { code: 'PGRST116' })).toBe(false);
         expect(retry(1, new Error('other'))).toBe(true);

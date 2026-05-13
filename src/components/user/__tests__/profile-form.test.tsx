@@ -1,3 +1,4 @@
+ 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ProfileForm } from '../profile-form';
@@ -53,10 +54,10 @@ describe('ProfileForm Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useUpdateProfile as any).mockReturnValue({
+    vi.mocked(useUpdateProfile).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    });
+    } as never);
   });
 
   it('renders correctly in read-only mode', () => {

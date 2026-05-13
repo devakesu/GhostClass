@@ -9,6 +9,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CourseCard extends StatelessWidget {
+
+  const CourseCard({
+    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.instructors, this.className, super.key,
+    this.isEnabled = true,
+    this.onToggleTap,
+  });
   final CourseDetails course;
   final CourseStat stat;
   final utils.AttendanceResult bunkResult;
@@ -18,14 +24,8 @@ class CourseCard extends StatelessWidget {
   final List<CourseInstructor> instructors;
   final String? className;
 
-  const CourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.instructors, this.className, super.key,
-    this.isEnabled = true,
-    this.onToggleTap,
-  });
-
   List<Color> _getCourseColors(BuildContext context, Color statusColor) {
-    final bool noData = stat.finalTotal == 0;
+    final noData = stat.finalTotal == 0;
     if (!isEnabled || noData) {
       return [
         Theme.of(context).colorScheme.surfaceContainer.withValues(alpha: 0.6),
@@ -42,7 +42,7 @@ class CourseCard extends StatelessWidget {
   }
 
   Color _getPrimaryColor(BuildContext context) {
-    final bool noData = stat.finalTotal == 0;
+    final noData = stat.finalTotal == 0;
     if (!isEnabled || noData) {
       return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3);
     }
@@ -69,17 +69,17 @@ class CourseCard extends StatelessWidget {
       targetPercentage: bunkResult.targetPercentage,
     );
 
-    final bool trackingIsBetter =
+    final trackingIsBetter =
         bunkResult.canBunk > safeMetrics.canBunk ||
         (bunkResult.canBunk == 0 &&
             safeMetrics.canBunk == 0 &&
             bunkResult.requiredToAttend < safeMetrics.requiredToAttend);
 
-    final bool noOfficialData = stat.officialTotal == 0;
-    final bool noDataAtAll = stat.finalTotal == 0;
-    final bool isTrackingOnly = noOfficialData && stat.finalTotal > 0;
-    final bool isDormant = noDataAtAll;
-    final bool isCardInactive = !isEnabled || isDormant;
+    final noOfficialData = stat.officialTotal == 0;
+    final noDataAtAll = stat.finalTotal == 0;
+    final isTrackingOnly = noOfficialData && stat.finalTotal > 0;
+    final isDormant = noDataAtAll;
+    final isCardInactive = !isEnabled || isDormant;
 
     // Status Color for the tag
     final Color statusColor;
@@ -104,7 +104,6 @@ class CourseCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           borderRadius: BorderRadius.circular(28),
-          onTap: null, // Removed navigation as requested
           child: Container(
             decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -116,7 +115,6 @@ class CourseCard extends StatelessWidget {
                     : Theme.of(
                         context,
                       ).colorScheme.outlineVariant.withValues(alpha: 0.05),
-                width: 1,
               )
             : null,
         boxShadow: [
@@ -148,7 +146,6 @@ class CourseCard extends StatelessWidget {
                             ? statusColor.withValues(alpha: 0.3)
                             : Theme.of(context).colorScheme.outlineVariant
                                   .withValues(alpha: 0.1),
-                        width: 1.0,
                       ),
                     )
                   : null,
@@ -294,15 +291,17 @@ class CourseCard extends StatelessWidget {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () => showDialog(
-                                context: context,
-                                builder: (context) => EditInstructorDialog(
-                                  courseCode: course.code ?? '',
-                                  courseName: course.name,
-                                  initialName: instructor?.instructorName,
-                                  className: className,
-                                ),
-                              ),
+                              onTap: () {
+                                final _ = showDialog<void>(
+                                  context: context,
+                                  builder: (context) => EditInstructorDialog(
+                                    courseCode: course.code ?? '',
+                                    courseName: course.name,
+                                    initialName: instructor?.instructorName,
+                                    className: className,
+                                  ),
+                                );
+                              },
                               borderRadius: BorderRadius.circular(8),
                               child: Padding(
                                 padding: const EdgeInsets.all(4),
@@ -451,8 +450,8 @@ class CourseCard extends StatelessWidget {
                                 children: [
                                   Container(
                                     height: 10,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0EA5E9),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF0EA5E9),
                                     ),
                                   ),
                                   Align(
@@ -493,8 +492,8 @@ class CourseCard extends StatelessWidget {
                                 children: [
                                   Container(
                                     height: 10,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0EA5E9),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF0EA5E9),
                                     ),
                                   ),
                                   Align(
@@ -653,17 +652,17 @@ class CourseCard extends StatelessWidget {
 }
 
 class StatBox extends StatelessWidget {
-  final String label;
-  final int base;
-  final int? correction;
-  final int? extra;
-  final Color color;
 
   const StatBox({
     required this.label, required this.base, required this.color, super.key,
     this.correction,
     this.extra,
   });
+  final String label;
+  final int base;
+  final int? correction;
+  final int? extra;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -758,8 +757,8 @@ class StatBox extends StatelessWidget {
 }
 
 class SimpleBunkPanel extends StatelessWidget {
-  final utils.AttendanceResult result;
   const SimpleBunkPanel({required this.result, super.key});
+  final utils.AttendanceResult result;
 
   @override
   Widget build(BuildContext context) {
@@ -787,7 +786,7 @@ class SimpleBunkPanel extends StatelessWidget {
                 ? 'Impossible to reach target 💀'
                 : result.requiredToAttend > 0
                 ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
-                : 'You are on the edge. Skipping now\'s risky 💀💀',
+                : "You are on the edge. Skipping now's risky 💀💀",
             textAlign: TextAlign.center,
             style: GoogleFonts.manrope(
               fontSize: 13,
@@ -802,8 +801,8 @@ class SimpleBunkPanel extends StatelessWidget {
 }
 
 class SafeBunkPanel extends StatelessWidget {
-  final utils.AttendanceResult result;
   const SafeBunkPanel({required this.result, super.key});
+  final utils.AttendanceResult result;
 
   @override
   Widget build(BuildContext context) {
@@ -877,9 +876,9 @@ class SafeBunkPanel extends StatelessWidget {
 }
 
 class TrackingBunkPanel extends StatelessWidget {
+  const TrackingBunkPanel({required this.result, super.key, this.isSolo = false});
   final utils.AttendanceResult result;
   final bool isSolo;
-  const TrackingBunkPanel({required this.result, super.key, this.isSolo = false});
 
   @override
   Widget build(BuildContext context) {
@@ -955,10 +954,6 @@ class TrackingBunkPanel extends StatelessWidget {
 
 
 class CourseToggleBadge extends StatelessWidget {
-  final bool isEnabled;
-  final bool noData;
-  final bool isTracking;
-  final VoidCallback? onTap;
 
   const CourseToggleBadge({
     required this.isEnabled, super.key,
@@ -966,6 +961,10 @@ class CourseToggleBadge extends StatelessWidget {
     this.isTracking = false,
     this.onTap,
   });
+  final bool isEnabled;
+  final bool noData;
+  final bool isTracking;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -978,7 +977,7 @@ class CourseToggleBadge extends StatelessWidget {
       color = ghostColors.dangerRed ?? Colors.red;
       label = 'DISABLED';
     } else if (noData) {
-      color = (Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.4);
+      color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4);
       label = 'NO DATA';
     } else if (isTracking) {
       color = ghostColors.brandPrimary ?? Theme.of(context).colorScheme.primary;

@@ -11,10 +11,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class EditInstructorDialog extends ConsumerStatefulWidget {
-  final String courseCode;
-  final String courseName;
-  final String? initialName;
-  final String? className;
 
   const EditInstructorDialog({
     required this.courseCode,
@@ -23,6 +19,10 @@ class EditInstructorDialog extends ConsumerStatefulWidget {
     this.initialName,
     this.className,
   });
+  final String courseCode;
+  final String courseName;
+  final String? initialName;
+  final String? className;
 
   @override
   ConsumerState<EditInstructorDialog> createState() =>
@@ -74,7 +74,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       await ref.read(dashboardProvider.notifier).refresh();
 
       if (mounted) Navigator.pop(context);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.eWithContext(
         'EditInstructorDialog: Save failed',
         error: e,
@@ -347,7 +347,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                       ? null
                                       : () {
                                           if (_formKey.currentState?.validate() ?? false) {
-                                            _handleSave();
+                                            final _ = _handleSave();
                                           }
                                         },
                                   style: ElevatedButton.styleFrom(

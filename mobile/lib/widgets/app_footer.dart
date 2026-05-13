@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/theme/app_theme.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -53,7 +53,7 @@ class AppFooter extends StatelessWidget {
                     icon: LucideIcons.lock,
                     label: "GHOSTS DON'T SNOOP 😁",
                     subtitle:
-                        "Your EzyGo password is safe. We strictly do not read, store, or share your login password. GhostClass is just here to help you skip. 👻",
+                        'Your EzyGo password is safe. We strictly do not read, store, or share your login password. GhostClass is just here to help you skip. 👻',
                     color: primary.withValues(alpha: 0.08),
                     iconColor: primary,
                     onTap: () {},
@@ -147,13 +147,6 @@ class AppFooter extends StatelessWidget {
 }
 
 class _CompactActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final VoidCallback onTap;
-  final List<Color>? gradientColors;
-  final Color? color;
-  final Color? iconColor;
 
   const _CompactActionTile({
     required this.icon,
@@ -164,6 +157,13 @@ class _CompactActionTile extends StatelessWidget {
     this.color,
     this.iconColor,
   });
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  final List<Color>? gradientColors;
+  final Color? color;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -241,15 +241,15 @@ class _CompactActionTile extends StatelessWidget {
 }
 
 class _FooterTextButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
 
   const _FooterTextButton({
     required this.icon,
     required this.label,
     required this.onTap,
   });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -282,9 +282,9 @@ class _FooterTextButton extends StatelessWidget {
 }
 
 class _CoffeeButton extends StatelessWidget {
-  final VoidCallback onTap;
 
   const _CoffeeButton({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

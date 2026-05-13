@@ -1,43 +1,9 @@
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
-import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/services/logger.dart';
 
 class DashboardStats {
-  final int percentage;
-  final double rawPercentage;
-  final int officialPercentage;
-  final double rawOfficialPercentage;
-
-  // Present components
-  final int officialPresent;
-  final int corrPresent;
-  final int extraPresent;
-  final int finalPresent;
-
-  // Absent components
-  final int officialAbsent;
-  final int savedAbsent;
-  final int extraAbsent;
-  final int finalAbsent;
-
-  // Total components
-  final int officialTotal;
-  final int finalTotal;
-  final int manualTotalGain;
-
-  // Leave components
-  final int officialDL;
-  final int corrDL;
-  final int extraDL;
-  final int dlCount;
-  final int specialLeaveCount;
-
-  // Course components
-  final int activeCourses;
-  final int totalCoursesCount;
-
-  final Map<String, CourseStat> courseStats;
 
   DashboardStats({
     required this.percentage,
@@ -73,30 +39,30 @@ class DashboardStats {
     Set<String> disabledCourseCodes = const <String>{},
     List<CourseDetails>? allCourses,
   }) {
-    int officialPresent = 0;
-    int officialAbsent = 0;
-    int officialDL = 0;
-    int officialOther = 0;
-    int officialTotal = 0;
+    var officialPresent = 0;
+    var officialAbsent = 0;
+    var officialDL = 0;
+    var officialOther = 0;
+    var officialTotal = 0;
 
-    int corrPresent = 0;
-    int savedAbsent = 0;
-    int corrDL = 0;
-    int extraPresent = 0;
-    int extraAbsent = 0;
-    int extraDL = 0;
+    var corrPresent = 0;
+    var savedAbsent = 0;
+    var corrDL = 0;
+    var extraPresent = 0;
+    var extraAbsent = 0;
+    var extraDL = 0;
 
-    final Map<String, CourseStat> courseStats = {};
+    final courseStats = <String, CourseStat>{};
 
     // --- 1. Robust Identity Resolution System (Web Parity) ---
-    final Map<String, String> lookupMap = {}; // StandardizedCode -> SafeId
-    final Map<String, String> idToSafeId = {}; // NumericID -> SafeId
-    final Set<String> catalogCodesSet = {}; // For denominator filtering
+    final lookupMap = <String, String>{}; // StandardizedCode -> SafeId
+    final idToSafeId = <String, String>{}; // NumericID -> SafeId
+    final catalogCodesSet = <String>{}; // For denominator filtering
 
     if (allCourses != null) {
       for (final course in allCourses) {
-        final String safeId = course.safeId;
-        final String stdCode = standardize(course.code ?? course.id.toString());
+        final safeId = course.safeId;
+        final stdCode = standardize(course.code ?? course.id.toString());
 
         catalogCodesSet.add(stdCode);
         courseStats.putIfAbsent(
@@ -114,49 +80,49 @@ class DashboardStats {
     }
 
     String resolveSafeId(String input) {
-      final String raw = input.trim();
-      final String std = standardize(raw);
+      final raw = input.trim();
+      final std = standardize(raw);
       if (lookupMap.containsKey(std)) return lookupMap[std]!;
       if (idToSafeId.containsKey(raw)) return idToSafeId[raw]!;
       return raw;
     }
 
     // --- 2. Process Official Data ---
-    final Map<String, int> officialMap = {};
+    final officialMap = <String, int>{};
 
     attendanceData.studentAttendanceData.forEach((date, dailySessions) {
       dailySessions.forEach((sessionKey, session) {
         if (session.course != null && session.classType != 'Revision') {
-          final String rawCid = session.course.toString();
-          final String cid = resolveSafeId(rawCid);
+          final rawCid = session.course.toString();
+          final cid = resolveSafeId(rawCid);
 
-          final int status = _parseStatus(session.attendance);
-          final String rawCourseCode =
+          final status = _parseStatus(session.attendance);
+          final rawCourseCode =
               attendanceData.courses[rawCid]?.code ?? rawCid;
-          final String stdCourseCode = standardize(rawCourseCode);
-          final bool courseDisabled = disabledCourseCodes.contains(
+          final stdCourseCode = standardize(rawCourseCode);
+          final courseDisabled = disabledCourseCodes.contains(
             stdCourseCode,
           );
 
           // Web Parity: Only specific codes count toward official stats
           final attStatus = AttendanceStatus.fromCode(status);
-          final bool isPos = attStatus.isPositive;
-          final bool isNeg = attStatus.isNegative;
-          final bool isValid = isPos || isNeg;
+          final isPos = attStatus.isPositive;
+          final isNeg = attStatus.isNegative;
+          final isValid = isPos || isNeg;
 
           if (isValid) {
-            final String normalizedDate = utils.normalizeDate(date);
-            final String normalizedSessionNum = utils.normalizeSession(
+            final normalizedDate = utils.normalizeDate(date);
+            final normalizedSessionNum = utils.normalizeSession(
               session.session ?? sessionKey,
             );
-            final String key =
-                "${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}";
+            final key =
+                '${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}';
 
             officialMap[key] = status;
 
-            CourseStat? course = courseStats[cid];
+            var course = courseStats[cid];
             if (course == null) {
-              final String name = attendanceData.courses[rawCid]?.name ?? rawCid;
+              final name = attendanceData.courses[rawCid]?.name ?? rawCid;
               course = CourseStat(id: cid, code: stdCourseCode, name: name);
               courseStats[cid] = course;
             }
@@ -193,29 +159,27 @@ class DashboardStats {
         continue;
       }
 
-      final String rawCid = item.course.toString();
-      final String cid = resolveSafeId(rawCid);
+      final rawCid = item.course;
+      final cid = resolveSafeId(rawCid);
 
-      final String normalizedDate = utils.normalizeDate(item.date);
-      final String normalizedSessionNum = utils.normalizeSession(item.session);
-      final String key =
-          "${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}";
+      final normalizedDate = utils.normalizeDate(item.date);
+      final normalizedSessionNum = utils.normalizeSession(item.session);
+      final key =
+          '${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}';
 
-      final int trackerStatus = _parseStatus(item.attendance);
-      final int? officialStatus = officialMap[key];
-      final String courseCode = standardize(
+      final trackerStatus = _parseStatus(item.attendance);
+      final officialStatus = officialMap[key];
+      final courseCode = standardize(
         attendanceData.courses[rawCid]?.code ?? rawCid,
       );
-      final bool courseDisabled = disabledCourseCodes.contains(courseCode);
+      final courseDisabled = disabledCourseCodes.contains(courseCode);
 
-      final bool isTrulyExtra =
+      final isTrulyExtra =
           item.status == 'extra' && officialStatus == null;
-      final bool trackerPositive = _isPositive(trackerStatus);
-      final bool trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
-      final bool officialPositive = officialStatus != null
-          ? _isPositive(officialStatus)
-          : false;
-      final bool officialDLStatus = officialStatus == AttendanceStatus.dutyLeave.code;
+      final trackerPositive = _isPositive(trackerStatus);
+      final trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
+      final officialPositive = officialStatus != null && _isPositive(officialStatus);
+      final officialDLStatus = officialStatus == AttendanceStatus.dutyLeave.code;
 
       final course = courseStats[cid];
       if (course != null) {
@@ -281,14 +245,14 @@ class DashboardStats {
       );
     }
 
-    final double rawPercentage = finalTotal > 0
+    final rawPercentage = finalTotal > 0
         ? (finalPresentCount / finalTotal) * 100
         : 0.0;
-    final double rawOfficialPercentage = officialTotal > 0
+    final rawOfficialPercentage = officialTotal > 0
         ? (officialPresent / officialTotal) * 100
         : 0.0;
 
-    final Set<String> activeCodes = {};
+    final activeCodes = <String>{};
     courseStats.forEach((cid, stat) {
       if (stat.finalTotal > 0 && !disabledCourseCodes.contains(stat.code)) {
         activeCodes.add(stat.code);
@@ -322,6 +286,40 @@ class DashboardStats {
       courseStats: courseStats,
     );
   }
+  final int percentage;
+  final double rawPercentage;
+  final int officialPercentage;
+  final double rawOfficialPercentage;
+
+  // Present components
+  final int officialPresent;
+  final int corrPresent;
+  final int extraPresent;
+  final int finalPresent;
+
+  // Absent components
+  final int officialAbsent;
+  final int savedAbsent;
+  final int extraAbsent;
+  final int finalAbsent;
+
+  // Total components
+  final int officialTotal;
+  final int finalTotal;
+  final int manualTotalGain;
+
+  // Leave components
+  final int officialDL;
+  final int corrDL;
+  final int extraDL;
+  final int dlCount;
+  final int specialLeaveCount;
+
+  // Course components
+  final int activeCourses;
+  final int totalCoursesCount;
+
+  final Map<String, CourseStat> courseStats;
 
   static int _parseStatus(dynamic val) {
     if (val == null) return 0;
@@ -340,6 +338,12 @@ class DashboardStats {
 }
 
 class CourseStat {
+
+  CourseStat({
+    required this.id,
+    required this.code,
+    String? name,
+  }) : name = name ?? '';
   final String id;
   final String code;
   final String name;
@@ -351,12 +355,6 @@ class CourseStat {
   int corrPresent = 0;
   int extraPresent = 0;
   int extraAbsent = 0;
-
-  CourseStat({
-    required this.id,
-    required this.code,
-    String? name,
-  }) : name = name ?? '';
 
   int get officialAbsent => officialTotal - officialPresent;
   int get finalAbsent => finalTotal - finalPresent;

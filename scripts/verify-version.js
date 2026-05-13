@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-os-command-from-path */
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
@@ -35,16 +36,35 @@ function extractPubspecVersion(filePath) {
   if (!fs.existsSync(filePath)) return null;
 
   const content = fs.readFileSync(filePath, 'utf8');
-  const versionMatch = content.match(/^\s*version:\s*(\d+\.\d+\.\d+)(?:\+\d+)?\s*$/m);
-  return versionMatch ? versionMatch[1] : undefined;
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('version:')) {
+      const parts = trimmed.split(':');
+      if (parts.length >= 2) {
+        const fullVer = parts[1].trim();
+        return fullVer.split('+')[0].trim();
+      }
+    }
+  }
+  return undefined;
 }
 
 function extractGetterVersion(filePath, getterName) {
   if (!fs.existsSync(filePath)) return null;
 
   const content = fs.readFileSync(filePath, 'utf8');
-  const getterMatch = content.match(new RegExp(`static\\s+String\\s+get\\s+${getterName}\\s+=>\\s+'(\\d+\\.\\d+\\.\\d+)';`));
-  return getterMatch ? getterMatch[1] : undefined;
+  const targetPrefix = `static String get ${getterName} => '`;
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.includes(targetPrefix)) {
+      const startIdx = trimmed.indexOf(targetPrefix) + targetPrefix.length;
+      const endIdx = trimmed.indexOf("';", startIdx);
+      if (endIdx !== -1) {
+        return trimmed.substring(startIdx, endIdx);
+      }
+    }
+  }
+  return undefined;
 }
 
 try {
@@ -70,9 +90,18 @@ try {
   const openApiPath = path.join(process.cwd(), 'public', 'openapi', 'openapi.yaml');
   let openApiVersion = null;
   if (fs.existsSync(openApiPath)) {
+    openApiVersion = undefined;
     const openApiContent = fs.readFileSync(openApiPath, 'utf8');
-    const versionMatch = openApiContent.match(/^\s*version:\s*(\d+\.\d+\.\d+)$/m);
-    openApiVersion = versionMatch ? versionMatch[1] : undefined;
+    for (const line of openApiContent.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('version:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          openApiVersion = parts[1].trim();
+          break;
+        }
+      }
+    }
   }
 
   // 6. Mobile pubspec
@@ -87,7 +116,9 @@ try {
   let branchName = 'unknown';
   try {
     branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
-  } catch (_err) { /* ignore if no git */ }
+  } catch {
+    branchName = 'unknown';
+  }
   const normalizedBranch = branchName.replace(/^(v|release\/)/, '');
 
 

@@ -41,11 +41,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           error: dashboardState.error,
           onRetry: () async {
             ref.read(apiServiceProvider).clearCaches();
-            ref.invalidate(dashboardProvider);
-            ref.invalidate(institutionsProvider);
+            ref
+              ..invalidate(dashboardProvider)
+              ..invalidate(institutionsProvider);
             try {
               await ref.read(dashboardProvider.future);
-            } catch (e, st) {
+            } on Object catch (e, st) {
               AppLogger.e('DashboardScreen: Retry failed', e, st);
             }
           },
@@ -61,8 +62,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _DashboardContent extends ConsumerWidget {
-  final DashboardData data;
   const _DashboardContent({required this.data});
+  final DashboardData data;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

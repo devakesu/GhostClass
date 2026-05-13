@@ -1,22 +1,12 @@
 
 
+import 'package:flutter/foundation.dart';
+
+@immutable
 class UserProfile {
-  final String? firstName;
-  final String? lastName;
-  final String? avatarUrl;
-  final String? email;
-  final String? phone;
-  final String? birthDate;
-  final String? gender;
-  final String? lastSyncedAt;
-  final String? currentSemester;
-  final String? currentYear;
-  final String? createdAt;
-  final String? ezygoCreatedAt;
-  final UserClass? classField;
 
 
-  UserProfile({
+  const UserProfile({
     this.firstName,
     this.lastName,
     this.avatarUrl,
@@ -31,6 +21,57 @@ class UserProfile {
     this.ezygoCreatedAt,
     this.classField,
   });
+
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    String? createdAt;
+    final rawCreated = json['created_at'];
+    if (rawCreated is String) {
+      createdAt = rawCreated;
+    } else if (rawCreated is num) {
+      final ms = rawCreated < 100000000000 ? (rawCreated * 1000).toInt() : rawCreated.toInt();
+      createdAt = DateTime.fromMillisecondsSinceEpoch(ms).toIso8601String();
+    }
+
+    String? ezygoCreatedAt;
+    final rawEzygoCreated = json['ezygo_created_at'];
+    if (rawEzygoCreated is String) {
+      ezygoCreatedAt = rawEzygoCreated;
+    }
+
+    return UserProfile(
+      firstName: json['first_name'] as String?,
+      lastName: json['last_name'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      birthDate: json['birth_date'] as String?,
+      gender: json['gender'] as String?,
+      lastSyncedAt: json['last_synced_at'] as String?,
+      currentSemester: json['current_semester'] as String?,
+      currentYear: json['current_year'] as String?,
+      createdAt: createdAt,
+      ezygoCreatedAt: ezygoCreatedAt,
+      classField: json['class'] != null
+          ? (json['class'] is Map<dynamic, dynamic>
+              ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
+              : UserClass(id: '', name: json['class'].toString()))
+          : null,
+    );
+  }
+  final String? firstName;
+  final String? lastName;
+  final String? avatarUrl;
+  final String? email;
+  final String? phone;
+  final String? birthDate;
+  final String? gender;
+  final String? lastSyncedAt;
+  final String? currentSemester;
+  final String? currentYear;
+  final String? createdAt;
+  final String? ezygoCreatedAt;
+  final UserClass? classField;
 
 
   String? get fullName {
@@ -106,44 +147,6 @@ class UserProfile {
       classField.hashCode;
 
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
-    String? createdAt;
-    final rawCreated = json['created_at'];
-    if (rawCreated is String) {
-      createdAt = rawCreated;
-    } else if (rawCreated is num) {
-      final ms = rawCreated < 100000000000 ? (rawCreated * 1000).toInt() : rawCreated.toInt();
-      createdAt = DateTime.fromMillisecondsSinceEpoch(ms).toIso8601String();
-    }
-
-    String? ezygoCreatedAt;
-    final rawEzygoCreated = json['ezygo_created_at'];
-    if (rawEzygoCreated is String) {
-      ezygoCreatedAt = rawEzygoCreated;
-    }
-
-    return UserProfile(
-      firstName: json['first_name'] as String?,
-      lastName: json['last_name'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      birthDate: json['birth_date'] as String?,
-      gender: json['gender'] as String?,
-      lastSyncedAt: json['last_synced_at'] as String?,
-      currentSemester: json['current_semester'] as String?,
-      currentYear: json['current_year'] as String?,
-      createdAt: createdAt,
-      ezygoCreatedAt: ezygoCreatedAt,
-      classField: json['class'] != null
-          ? (json['class'] is Map
-              ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
-              : UserClass(id: '', name: json['class'].toString()))
-          : null,
-    );
-  }
-
-
   Map<String, dynamic> toJson() => {
         'first_name': firstName,
         'last_name': lastName,
@@ -163,8 +166,6 @@ class UserProfile {
 }
 
 class UserClass {
-  final String id;
-  final String name;
 
   UserClass({required this.id, required this.name});
 
@@ -172,6 +173,8 @@ class UserClass {
         id: json['id'] as String? ?? '',
         name: json['name'] as String? ?? 'Unknown Class',
       );
+  final String id;
+  final String name;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -179,12 +182,8 @@ class UserClass {
       };
 }
 
+@immutable
 class UserSettings {
-  final bool bunkCalculatorEnabled;
-   final int targetPercentage;
-  final String? semester;
-  final String? academicYear;
-  final Map<String, Map<String, String>> disabledCourses;
 
   const UserSettings({
     required this.bunkCalculatorEnabled,
@@ -197,10 +196,35 @@ class UserSettings {
   factory UserSettings.defaults() => const UserSettings(
         bunkCalculatorEnabled: true,
         targetPercentage: 75,
-        semester: null,
-        academicYear: null,
         disabledCourses: {},
       );
+
+  factory UserSettings.fromJson(Map<String, dynamic> json) {
+    // Parse nested map safely
+    final rawDisabled = json['disabled_courses'] as Map<String, dynamic>? ?? {};
+    final disabled = <String, Map<String, String>>{};
+
+    rawDisabled.forEach((semester, courses) {
+      if (courses is Map<String, dynamic>) {
+        disabled[semester] = courses.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
+      }
+    });
+
+    return UserSettings(
+      bunkCalculatorEnabled: json['bunk_calculator_enabled'] as bool? ?? true,
+      targetPercentage: (json['target_percentage'] as num?)?.toInt() ?? 75,
+      semester: json['semester'] as String?,
+      academicYear: json['academic_year'] as String?,
+      disabledCourses: disabled,
+    );
+  }
+  final bool bunkCalculatorEnabled;
+   final int targetPercentage;
+  final String? semester;
+  final String? academicYear;
+  final Map<String, Map<String, String>> disabledCourses;
 
   UserSettings copyWith({
     bool? bunkCalculatorEnabled,
@@ -220,40 +244,18 @@ class UserSettings {
   }
 
   int get disabledCount {
-    int count = 0;
+    var count = 0;
     disabledCourses.forEach((_, courses) => count += courses.length);
     return count;
   }
 
   /// Returns a list of unique course codes that are disabled in any semester
   List<String> get flatDisabledCourses {
-    final Set<String> courses = {};
+    final courses = <String>{};
     for (final semester in disabledCourses.values) {
       courses.addAll(semester.keys);
     }
     return courses.toList()..sort();
-  }
-
-  factory UserSettings.fromJson(Map<String, dynamic> json) {
-    // Parse nested map safely
-    final rawDisabled = json['disabled_courses'] as Map<String, dynamic>? ?? {};
-    final Map<String, Map<String, String>> disabled = {};
-
-    rawDisabled.forEach((semester, courses) {
-      if (courses is Map<String, dynamic>) {
-        disabled[semester] = courses.map(
-          (key, value) => MapEntry(key.toString(), value.toString()),
-        );
-      }
-    });
-
-    return UserSettings(
-      bunkCalculatorEnabled: json['bunk_calculator_enabled'] as bool? ?? true,
-      targetPercentage: (json['target_percentage'] as num?)?.toInt() ?? 75,
-      semester: json['semester'] as String?,
-      academicYear: json['academic_year'] as String?,
-      disabledCourses: disabled,
-    );
   }
 
   Map<String, dynamic> toJson() => {
@@ -283,13 +285,13 @@ class UserSettings {
       academicYear.hashCode ^
       disabledCourses.hashCode;
 
-  bool _mapsEqual(Map m1, Map m2) {
+  bool _mapsEqual(Map<dynamic, dynamic> m1, Map<dynamic, dynamic> m2) {
     if (m1.length != m2.length) return false;
     for (final key in m1.keys) {
       if (!m2.containsKey(key) || m1[key] != m2[key]) {
         // Nested map check for disabledCourses
-        if (m1[key] is Map && m2[key] is Map) {
-          if (!_mapsEqual(m1[key] as Map, m2[key] as Map)) return false;
+        if (m1[key] is Map<dynamic, dynamic> && m2[key] is Map<dynamic, dynamic>) {
+          if (!_mapsEqual(m1[key] as Map<dynamic, dynamic>, m2[key] as Map<dynamic, dynamic>)) return false;
         } else {
           return false;
         }
@@ -299,11 +301,7 @@ class UserSettings {
   }
 }
 
-class StealthInfo {
-  final String browserName; // e.g., "Chrome", "Edge"
-  final String browserVersion; // e.g., "148.0.0.0"
-  final String userAgent; // FULL Generated UA
-  final String secChUa; // Formatted for header
+class StealthInfo { // Formatted for header
 
   StealthInfo({
     required this.browserName,
@@ -318,6 +316,10 @@ class StealthInfo {
         userAgent: json['userAgent'] as String,
         secChUa: json['secChUa'] as String,
       );
+  final String browserName; // e.g., "Chrome", "Edge"
+  final String browserVersion; // e.g., "148.0.0.0"
+  final String userAgent; // FULL Generated UA
+  final String secChUa;
 
   Map<String, dynamic> toJson() => {
         'browserName': browserName,

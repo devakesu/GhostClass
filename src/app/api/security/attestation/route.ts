@@ -11,19 +11,20 @@ export async function GET(req: Request) {
   const result = await verifyAppCheckToken(req);
   
   // Extract non-sensitive details for transparency
-  let tokenDetails: Record<string, any> = {};
+  let tokenDetails: Record<string, unknown> = {};
+  let appIdVal: unknown = undefined;
+
   if (result.integrity && typeof result.integrity === 'object') {
-    const sensitiveKeys = ['iss', 'sub', 'aud', 'exp', 'iat', 'app_id'];
-    tokenDetails = Object.keys(result.integrity)
-      .filter(key => !sensitiveKeys.includes(key))
-      .reduce((obj, key) => {
-        obj[key] = (result.integrity as any)[key];
-        return obj;
-      }, {} as Record<string, any>);
+    const payload = result.integrity as Record<string, unknown>;
+    appIdVal = payload.appId;
+    const sensitiveKeys = new Set(['iss', 'sub', 'aud', 'exp', 'iat', 'app_id']);
+    tokenDetails = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => !sensitiveKeys.has(key))
+    );
       
     // Add issuer for context
-    if ((result.integrity as any).iss) {
-      tokenDetails.issuer = (result.integrity as any).iss;
+    if (typeof payload.iss === 'string') {
+      tokenDetails.issuer = payload.iss;
     }
   }
 
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
     appCheck: result.isValid,
     appCheckCriticalRisk: result.criticalRisk || false,
     appCheckError: result.error,
-    appId: (result.integrity as any)?.appId,
+    appId: appIdVal,
     details: tokenDetails,
     enforced: process.env.ENFORCE_APP_CHECK === "true",
     reason: result.reason || "Device verified successfully",

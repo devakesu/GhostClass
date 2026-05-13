@@ -9,10 +9,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContactScreen extends ConsumerStatefulWidget {
-  final String? prefilledSubject;
-  final String? prefilledMessage;
 
   const ContactScreen({this.prefilledSubject, this.prefilledMessage, super.key});
+  final String? prefilledSubject;
+  final String? prefilledMessage;
 
   @override
   ConsumerState<ContactScreen> createState() => _ContactScreenState();
@@ -235,7 +235,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
             ? appEx.message
             : 'We encountered an error while sending your message. Please try again later. If the issue persists, please contact us.',
       );
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       AppLogger.e('ContactScreen: Unexpected contact form failure', e);
       await _showDialog(
@@ -335,7 +335,6 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
                 background: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -420,7 +419,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _sending ? null : _handleSend,
+                      onPressed: _sending ? null : () { final _ = _handleSend(); },
                       icon: _sending
                         ? const SizedBox(
                           width: 16,

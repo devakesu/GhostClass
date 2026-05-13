@@ -38,14 +38,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
     _securityGuard = ref.read(securityGuardProvider);
     // Enable screen protection only for the Login screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _securityGuard.setSecureScreen(true);
+      final _ = _securityGuard.setSecureScreen(enabled: true);
     });
   }
 
   @override
   void dispose() {
     // Disable screen protection when leaving the Login screen
-    _securityGuard.setSecureScreen(false);
+    final _ = _securityGuard.setSecureScreen(enabled: false);
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -57,13 +57,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
     if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
        const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
        try {
-         final bool isDebuggerAttached = await channel.invokeMethod('isDebuggerAttached') ?? false;
+         final isDebuggerAttached = await channel.invokeMethod<bool>('isDebuggerAttached') ?? false;
         if (isDebuggerAttached) {
           await _securityGuard.wipeAndExit();
           return;
         }
 
-        final bool isWindowObscured = await channel.invokeMethod('isWindowObscured') ?? false;
+        final isWindowObscured = await channel.invokeMethod<bool>('isWindowObscured') ?? false;
         if (isWindowObscured) {
           if (mounted) {
             await handleError(
@@ -73,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
           }
           return;
         }
-      } catch (e) {
+      } on Object catch (_) {
         // Silently ignore
       }
     }
@@ -107,7 +107,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
       if (!mounted) return;
       LoadingOverlay.hide(context);
       await handleError(e.message, title: 'Login Failed');
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       LoadingOverlay.hide(context);
       await handleError(e);
@@ -164,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   child: AutofillGroup(
                     child: Form(
                       key: _formKey,
@@ -206,9 +206,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                           const SizedBox(height: 24),
 
                           // Username Field
-                          _FieldLabel(
+                          const _FieldLabel(
                             label: 'Username, Email, or Phone',
-                            icons: const [LucideIcons.user, LucideIcons.mail, LucideIcons.phone],
+                            icons: [LucideIcons.user, LucideIcons.mail, LucideIcons.phone],
                           ),
                           TextFormField(
                             controller: _usernameController,
@@ -338,17 +338,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 }
 
 class _FieldLabel extends StatelessWidget {
+
+  const _FieldLabel({required this.label, this.icons, this.trailing})
+      : assert(
+          icons == null || trailing == null,
+          'Cannot provide both icons and trailing widget',
+        );
   final String label;
   final List<IconData>? icons;
   final Widget? trailing;
 
-  const _FieldLabel({required this.label, this.icons, this.trailing})
-      : assert(icons == null || trailing == null);
-
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0, left: 4.0, right: 4.0),
+      padding: const EdgeInsets.only(bottom: 6, left: 4, right: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -364,7 +367,7 @@ class _FieldLabel extends StatelessWidget {
             Row(
               children: i
                   .map((icon) => Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
+                        padding: const EdgeInsets.only(left: 8),
                         child: Icon(
                           icon,
                           size: 14,
@@ -384,10 +387,10 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
 
   const _GlowBlob({required this.color, required this.size});
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {

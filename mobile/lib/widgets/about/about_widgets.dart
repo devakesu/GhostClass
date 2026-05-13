@@ -3,22 +3,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class MetricCard extends StatelessWidget {
+
+  const MetricCard({
+    required this.icon, required this.label, required this.value, required this.accent, super.key,
+    this.onTap,
+    this.onLongPress,
+  });
   final IconData icon;
   final String label;
   final String value;
   final Color accent;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
-
-  const MetricCard({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
-    this.onTap,
-    this.onLongPress,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -84,16 +80,13 @@ class MetricCard extends StatelessWidget {
 }
 
 class SectionCard extends StatelessWidget {
+
+  const SectionCard({
+    required this.title, required this.subtitle, required this.children, super.key,
+  });
   final String title;
   final String subtitle;
   final List<Widget> children;
-
-  const SectionCard({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    required this.children,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -137,16 +130,13 @@ class SectionCard extends StatelessWidget {
 }
 
 class ProofRow extends StatelessWidget {
+
+  const ProofRow({
+    required this.icon, required this.label, required this.value, super.key,
+  });
   final IconData icon;
   final String label;
   final String value;
-
-  const ProofRow({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -193,18 +183,14 @@ class ProofRow extends StatelessWidget {
 }
 
 class LinkRow extends StatelessWidget {
+
+  const LinkRow({
+    required this.icon, required this.title, required this.value, required this.onTap, super.key,
+  });
   final IconData icon;
   final String title;
   final String value;
   final VoidCallback onTap;
-
-  const LinkRow({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {

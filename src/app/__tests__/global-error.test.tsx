@@ -18,7 +18,7 @@ describe('GlobalError', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // @ts-ignore
+    // @ts-expect-error - test-only: simulate global error object
     delete window.location;
      (window as any).location = { ...originalLocation, href: '' };
   });

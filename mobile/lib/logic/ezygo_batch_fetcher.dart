@@ -14,8 +14,18 @@ import 'package:ghostclass/services/logger.dart';
 /// which helps avoid triggering EzyGo's server-side rate limits that might
 /// occur if all requests were proxied through the GhostClass backend.
 class EzygoBatchFetcher {
+
+  EzygoBatchFetcher(this._dio, {
+    required bool Function() getOutage,
+    // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
+    required void Function(bool) setOutage,
+    required bool Function() isBackendUnauthorized,
+  }) : _getOutage = getOutage, 
+       _setOutage = setOutage,
+       _isBackendUnauthorized = isBackendUnauthorized;
   final Dio _dio;
   final bool Function() _getOutage;
+  // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
   final void Function(bool) _setOutage;
   final bool Function() _isBackendUnauthorized;
   
@@ -23,7 +33,7 @@ class EzygoBatchFetcher {
   static const Duration _cacheTtl = Duration(seconds: 60);
   
   // In-flight request map for deduplication
-  static final Map<String, Future<Response>> _inFlight = {};
+  static final Map<String, Future<Response<dynamic>>> _inFlight = {};
   
   // Rate limiting (parity with Next.js MAX_CONCURRENT = 3)
   static const int _maxConcurrent = 3;
@@ -36,21 +46,13 @@ class EzygoBatchFetcher {
   // Tracker for log throttling
   static DateTime? _lastCircuitBreakerLog;
 
-  EzygoBatchFetcher(this._dio, {
-    required bool Function() getOutage,
-    required void Function(bool) setOutage,
-    required bool Function() isBackendUnauthorized,
-  }) : _getOutage = getOutage, 
-       _setOutage = setOutage,
-       _isBackendUnauthorized = isBackendUnauthorized;
-
   /// Executes an authenticated request with deduplication and caching.
   /// 
   /// [path] The full URL or relative path.
   /// [token] The EzyGo Bearer token.
   /// [method] The HTTP method (GET or POST).
   /// [data] Optional request body (only empty bodies are currently cached for POST).
-  Future<Response> fetch({
+  Future<Response<dynamic>> fetch({
     required String path,
     required String token,
     String method = 'GET',
@@ -67,7 +69,7 @@ class EzygoBatchFetcher {
         requestOptions: RequestOptions(path: path),
         type: DioExceptionType.cancel,
         message: 'Security Verification Required: App Check failed.',
-        response: Response(
+        response: Response<dynamic>(
           requestOptions: RequestOptions(path: path),
           statusCode: 401,
           statusMessage: 'Security Handshake Required',
@@ -95,7 +97,7 @@ class EzygoBatchFetcher {
         requestOptions: RequestOptions(path: path),
         type: DioExceptionType.cancel,
         message: 'EzyGo Outage Lock: Please press retry to attempt recovery.',
-        response: Response(
+        response: Response<dynamic>(
           requestOptions: RequestOptions(path: path),
           statusCode: 503,
           statusMessage: 'Service Unavailable (Outage Lock)',
@@ -125,7 +127,7 @@ class EzygoBatchFetcher {
     // 3. Rate Limiting: Wait for an available slot.
     // Track acquisition so _releaseSlot() is only called if we actually got one,
     // preventing the active-request counter from going below zero on early throws.
-    bool slotAcquired = false;
+    var slotAcquired = false;
     try {
       await _waitForSlot();
       slotAcquired = true;
@@ -191,7 +193,7 @@ class EzygoBatchFetcher {
       } finally {
         // 6. Clean up in-flight map REGARDLESS of outcome.
         // Map.remove() is synchronous — do NOT wrap in unawaited().
-        _inFlight.remove(cacheKey);
+        final _ = _inFlight.remove(cacheKey);
       }
     } finally {
       // Only release the slot if we successfully acquired one.
@@ -213,25 +215,24 @@ class EzygoBatchFetcher {
     _activeRequests--;
     if (_queue.isNotEmpty) {
       _activeRequests++;
-      final next = _queue.removeAt(0);
-      next.complete();
+      _queue.removeAt(0).complete();
     }
   }
 
 
-  Future<Response> _executeRequest({
+  Future<Response<dynamic>> _executeRequest({
     required String path,
     required String token,
     required String method,
     dynamic data,
   }) {
     if (token.isEmpty) {
-      return Future.error(AppException(
+      return Future.error(const AppException(
         message: 'No EzyGo credentials found. Please log in.',
         type: AppExceptionType.unauthorized,
       ));
     }
-    return _dio.request(
+    return _dio.request<dynamic>(
       path,
       data: data,
       options: Options(
@@ -253,8 +254,8 @@ class EzygoBatchFetcher {
 }
 
 class _CacheEntry {
-  final Response response;
-  final DateTime expiry;
 
   _CacheEntry({required this.response, required this.expiry});
+  final Response<dynamic> response;
+  final DateTime expiry;
 }

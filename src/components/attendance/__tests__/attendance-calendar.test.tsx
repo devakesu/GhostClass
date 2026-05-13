@@ -32,10 +32,13 @@ vi.mock('@/hooks/courses/useDisabledCourses', () => ({
   useDisabledCourses: () => ({ isDisabled: () => false }),
 }));
 
+const mockEq = () => ({ delete: vi.fn() });
+const mockMatch = () => ({ eq: mockEq });
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({ 
     auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) },
-    from: () => ({ match: () => ({ eq: () => ({ delete: vi.fn() }) }), insert: vi.fn() })
+    from: () => ({ match: mockMatch, insert: vi.fn() })
   }),
 }));
 
@@ -56,13 +59,13 @@ describe('AttendanceCalendar', () => {
       data: [],
       isLoading: false,
       refetch: vi.fn().mockResolvedValue({ data: [] }),
-    } as any);
+    } as unknown as ReturnType<typeof mockUseTrackingData>);
     
     mockUseTrackingCount.mockReturnValue({
       data: 0,
       isLoading: false,
       refetch: vi.fn().mockResolvedValue({ data: 0 }),
-    } as any);
+    } as unknown as ReturnType<typeof mockUseTrackingCount>);
   });
 
   const renderWithProviders = (ui: React.ReactElement) => {
@@ -97,7 +100,7 @@ describe('AttendanceCalendar', () => {
       ],
       isLoading: false,
       refetch: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof mockUseTrackingData>);
 
     renderWithProviders(<AttendanceCalendar attendanceData={undefined} semester="even" year="2025-26" />);
     expect(await screen.findByText('NSS Camp 2026')).toBeInTheDocument();

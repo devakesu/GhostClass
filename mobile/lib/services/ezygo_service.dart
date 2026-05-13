@@ -2,20 +2,17 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
+import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
-import 'package:ghostclass/providers/outage_provider.dart';
 
 /// EzygoService
 /// ------------
 /// Orchestrates data fetching from the EzyGo portal, utilizing batching
 /// and deduplication to optimize performance and reduce backend load.
 class EzygoService {
-  final Ref _ref;
-  late final EzygoBatchFetcher _fetcher;
-  static final String _ezygoApiRoot = AppConfig.ezygoApiRoot;
 
   EzygoService(this._ref) {
     _fetcher = EzygoBatchFetcher(
@@ -25,6 +22,9 @@ class EzygoService {
       isBackendUnauthorized: () => false, 
     );
   }
+  final Ref _ref;
+  late final EzygoBatchFetcher _fetcher;
+  static final String _ezygoApiRoot = AppConfig.ezygoApiRoot;
 
   void clearCaches() => _fetcher.clearAll();
 
@@ -41,14 +41,14 @@ class EzygoService {
     if (token == null) {
       return _ref.read(dioServiceProvider).dio.post(
         path,
-        data: {},
+        data: <String, dynamic>{},
       );
     }
     return _fetcher.fetch(
       path: path,
       token: token,
       method: 'POST',
-      data: {},
+      data: <String, dynamic>{},
     );
   }
 
@@ -115,7 +115,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchLeaveData(SecureStorageService storage) async {
     final token = await storage.getEzygoToken();
     if (token == null) {
-      throw AppException(
+      throw const AppException(
         message: 'No EzyGo credentials found. Please log in.',
         type: AppExceptionType.unauthorized,
       );
@@ -145,7 +145,7 @@ class EzygoService {
           .map((r) => '${r.requestOptions.path} -> ${r.statusCode}')
           .join(', ');
       AppLogger.e('EzygoService.fetchLeaveData: Partial failure — [$summary]. Aborting.');
-      throw AppException(
+      throw const AppException(
         message: 'Failed to fetch complete leave data. Please try again.',
         type: AppExceptionType.network,
       );
@@ -162,7 +162,7 @@ class EzygoService {
       'leaveApprovalLevel': results[6].data,
     };
 
-    return Response(
+    return Response<dynamic>(
       requestOptions: results[0].requestOptions,
       data: mergedData,
       statusCode: 200,
@@ -191,4 +191,4 @@ class EzygoService {
   }
 }
 
-final ezygoServiceProvider = Provider<EzygoService>((ref) => EzygoService(ref));
+final ezygoServiceProvider = Provider<EzygoService>(EzygoService.new);

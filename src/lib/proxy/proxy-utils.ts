@@ -18,7 +18,9 @@ export class UpstreamResponseTooLargeError extends Error {
 export function buildEgressTargets(): EgressTarget[] {
   const targets: EgressTarget[] = [];
 
-  const cfUrl = process.env.CF_PROXY_URL?.trim().replace(/\/+$/, "");
+  const cfUrlRaw = process.env.CF_PROXY_URL?.trim();
+  let cfUrl = cfUrlRaw ?? "";
+  while (cfUrl.endsWith("/")) cfUrl = cfUrl.slice(0, -1);
   if (cfUrl) {
     const secret = process.env.CF_PROXY_SECRET?.trim();
     targets.push({
@@ -30,7 +32,9 @@ export function buildEgressTargets(): EgressTarget[] {
     });
   }
 
-  const awsUrl = process.env.AWS_SECONDARY_URL?.trim().replace(/\/+$/, "");
+  const awsUrlRaw = process.env.AWS_SECONDARY_URL?.trim();
+  let awsUrl = awsUrlRaw ?? "";
+  while (awsUrl.endsWith("/")) awsUrl = awsUrl.slice(0, -1);
   if (awsUrl) {
     const secret = process.env.AWS_SECONDARY_SECRET?.trim();
     targets.push({
@@ -42,7 +46,9 @@ export function buildEgressTargets(): EgressTarget[] {
     });
   }
 
-  const directUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, "");
+  const directUrlRaw = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
+  let directUrl = directUrlRaw ?? "";
+  while (directUrl.endsWith("/")) directUrl = directUrl.slice(0, -1);
   if (directUrl) {
     targets.push({
       baseUrl: directUrl,

@@ -10,11 +10,11 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// Handles authentication logic, including EzyGo login, session provisioning
 /// with the GhostClass backend, and user profile management.
 class AuthService {
+
+  AuthService(this._ref);
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
   static final String _ezygoAuthUrl = AppConfig.ezygoAuthUrl;
-
-  AuthService(this._ref);
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
@@ -25,9 +25,10 @@ class AuthService {
     final ezygoResponse = await loginEzygo(username, password);
     if (ezygoResponse.statusCode != 200) return ezygoResponse;
 
-    final ezygoToken = ezygoResponse.data['token'] ?? ezygoResponse.data['access_token'];
+    final data = ezygoResponse.data as Map<String, dynamic>?;
+    final ezygoToken = data?['token'] ?? data?['access_token'];
     if (ezygoToken?.toString().isEmpty ?? true) {
-      throw AppException(
+      throw const AppException(
         message: 'Portal returned no token.',
         type: AppExceptionType.unauthorized,
       );
@@ -137,4 +138,4 @@ class AuthService {
   }
 }
 
-final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref));
+final authServiceProvider = Provider<AuthService>(AuthService.new);

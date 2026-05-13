@@ -31,58 +31,26 @@ describe("Provenance API Route", () => {
   const originalImageDigest = process.env.IMAGE_DIGEST;
 
   afterEach(() => {
-    // Restore original environment variables
-    if (originalCommitSha !== undefined) {
-      process.env.APP_COMMIT_SHA = originalCommitSha;
-    } else {
-      delete process.env.APP_COMMIT_SHA;
-    }
-    if (originalAppVersion !== undefined) {
-      process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
-    } else {
-      delete process.env.NEXT_PUBLIC_APP_VERSION;
-    }
-    if (originalGithubRunId !== undefined) {
-      process.env.GITHUB_RUN_ID = originalGithubRunId;
-    } else {
-      delete process.env.GITHUB_RUN_ID;
-    }
-    if (originalGithubRunNumber !== undefined) {
-      process.env.GITHUB_RUN_NUMBER = originalGithubRunNumber;
-    } else {
-      delete process.env.GITHUB_RUN_NUMBER;
-    }
-    if (originalGithubRepository !== undefined) {
-      process.env.GITHUB_REPOSITORY = originalGithubRepository;
-    } else {
-      delete process.env.GITHUB_REPOSITORY;
-    }
-    if (originalGithubUrl !== undefined) {
-      process.env.NEXT_PUBLIC_GITHUB_URL = originalGithubUrl;
-    } else {
-      delete process.env.NEXT_PUBLIC_GITHUB_URL;
+    const envs = [
+      ["APP_COMMIT_SHA", originalCommitSha],
+      ["NEXT_PUBLIC_APP_VERSION", originalAppVersion],
+      ["GITHUB_RUN_ID", originalGithubRunId],
+      ["GITHUB_RUN_NUMBER", originalGithubRunNumber],
+      ["GITHUB_REPOSITORY", originalGithubRepository],
+      ["NEXT_PUBLIC_GITHUB_URL", originalGithubUrl],
+      ["BUILD_TIMESTAMP", originalBuildTimestamp],
+      ["AUDIT_STATUS", originalAuditStatus],
+      ["SIGNATURE_STATUS", originalSignatureStatus],
+      ["IMAGE_DIGEST", originalImageDigest],
+    ];
+    for (const [key, val] of envs) {
+      if (val !== undefined) {
+        process.env[key!] = val;
+      } else {
+        delete process.env[key!];
+      }
     }
     vi.resetModules();
-    if (originalBuildTimestamp !== undefined) {
-      process.env.BUILD_TIMESTAMP = originalBuildTimestamp;
-    } else {
-      delete process.env.BUILD_TIMESTAMP;
-    }
-    if (originalAuditStatus !== undefined) {
-      process.env.AUDIT_STATUS = originalAuditStatus;
-    } else {
-      delete process.env.AUDIT_STATUS;
-    }
-    if (originalSignatureStatus !== undefined) {
-      process.env.SIGNATURE_STATUS = originalSignatureStatus;
-    } else {
-      delete process.env.SIGNATURE_STATUS;
-    }
-    if (originalImageDigest !== undefined) {
-      process.env.IMAGE_DIGEST = originalImageDigest;
-    } else {
-      delete process.env.IMAGE_DIGEST;
-    }
   });
 
   it("should return commit sha from environment", async () => {

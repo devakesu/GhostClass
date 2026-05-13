@@ -1,5 +1,7 @@
+ 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
 import { OutageBarrier } from '../outage-barrier';
 import { useOutage } from '@/providers/outage-provider';
 

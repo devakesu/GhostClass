@@ -9,7 +9,7 @@ import { toTitleCase } from "@/lib/utils";
  * Primarily used by the mobile app which bypasses the Turnstile check 
  * but uses JWE/AppCheck/PlayIntegrity for security.
  */
-async function handler(req: Request, { decryptedBody }: { decryptedBody?: any }) {
+async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknown }) {
   try {
     const body = decryptedBody || await req.json();
     

@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { fetchEzygoData } from "@/lib/ezygo-batch-fetcher";
 import { proxyRateLimiter } from "@/lib/ratelimit";
-import { getClientIp as _getClientIp } from "@/lib/utils.server";
 
 // Mock dependencies
 vi.mock("server-only", () => ({}));

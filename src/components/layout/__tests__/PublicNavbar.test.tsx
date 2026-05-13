@@ -1,5 +1,7 @@
+ 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
 import { PublicNavbar } from '../public-navbar';
 
 // Mock Next.js Link and Image

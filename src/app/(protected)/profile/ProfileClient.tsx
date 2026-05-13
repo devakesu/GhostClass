@@ -47,6 +47,15 @@ export default function ProfileClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoading = (profileLoading && !profile);
 
+  const joinedTargetDate = profile?.ezygo_created_at || profile?.created_at;
+  const joinedDateString = joinedTargetDate
+    ? new Date(joinedTargetDate).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+    : "N/A";
+
   // Priority: 1. User Upload Preview -> 2. Fetched DB URL -> 3. Fallback Placeholder
   const displayAvatar = avatarPreview || profile?.avatar_url || UserPlaceholder;
 
@@ -69,6 +78,40 @@ export default function ProfileClient() {
     return <CompLoading />;
   }
 
+  const getUploadableFile = async (originalFile: File): Promise<File> => {
+    if (originalFile.size <= 5 * 1024 * 1024) {
+      return originalFile;
+    }
+    toast.info("Compressing large image...", { duration: 2000 });
+    try {
+      const compressed = await compressImage(originalFile, 0.7);
+      const bestCompressed =
+        compressed.size > 5 * 1024 * 1024
+          ? await compressImage(originalFile, 0.5)
+          : compressed;
+      if (bestCompressed.size > 5 * 1024 * 1024) {
+        throw new Error(
+          "Image is too large to upload even after compression. Please choose a smaller image (under 5 MB).",
+        );
+      }
+      return bestCompressed;
+    } catch (error) {
+      logger.warn("Compression failed, falling back to original:", error);
+      Sentry.captureException(error, {
+        tags: {
+          type: "image_compression",
+          location: "ProfileClient/handleFileChange",
+        },
+        extra: {
+          original_size: originalFile.size,
+          user_id: redact("id", String(profile?.id ?? "unknown")),
+        },
+      });
+      toast.warning("Could not compress image. Uploading original.");
+      return originalFile;
+    }
+  };
+
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -87,82 +130,39 @@ export default function ProfileClient() {
       return;
     }
 
-    // Keep track of the temporary URL to clean it up later
     let optimisticPreviewUrl: string | null = null;
 
     try {
       setIsUploading(true);
 
-      // 1. Optimistic UI: Show immediate local preview
       optimisticPreviewUrl = URL.createObjectURL(originalFile);
       setAvatarPreview(optimisticPreviewUrl);
 
-      let fileToUpload: File = originalFile;
+      const fileToUpload = await getUploadableFile(originalFile);
 
-      // 2. Compression Logic
-      if (originalFile.size > 5 * 1024 * 1024) {
-        toast.info("Compressing large image...", { duration: 2000 });
-        try {
-          const compressed = await compressImage(originalFile, 0.7);
-          // Compress harder if first pass is still > 5MB
-          const bestCompressed = compressed.size > 5 * 1024 * 1024
-            ? await compressImage(originalFile, 0.5)
-            : compressed;
-          // Final guard: reject cleanly if still over limit after best-effort compression
-          // rather than letting a 50 MB file reach Supabase and get a server error.
-          if (bestCompressed.size > 5 * 1024 * 1024) {
-            throw new Error(
-              "Image is too large to upload even after compression. Please choose a smaller image (under 5 MB).",
-            );
-          }
-          fileToUpload = bestCompressed;
-        } catch (error) {
-          logger.warn("Compression failed, falling back to original:", error);
-
-          // Report non-fatal error to Sentry
-          Sentry.captureException(error, {
-            tags: {
-              type: "image_compression",
-              location: "ProfileClient/handleFileChange",
-            },
-            // file_name omitted — original filenames are user PII (e.g. "john_doe_photo.jpg").
-            extra: {
-              original_size: originalFile.size,
-              user_id: redact("id", String(profile?.id ?? "unknown")),
-            },
-          });
-          toast.warning("Could not compress image. Uploading original.");
-        }
-      }
-
-      // 3. Upload to Supabase
       const newAvatarUrl = await uploadUserAvatar(fileToUpload);
 
-      // 4. Success: Switch to remote URL
       setAvatarPreview(newAvatarUrl);
       toast.success("Profile picture updated!");
 
-      // Sync DB changes
       refetchProfile();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Upload error:", error);
 
-      // 5. Revert to previous valid avatar on failure (Better UX than showing nothing)
       setAvatarPreview(profile?.avatar_url || null);
 
+      const errObj = error as { message?: unknown } | null;
       const safeMessage =
-        typeof error?.message === "string" && /too large/i.test(error.message)
-          ? error.message
+        typeof errObj?.message === "string" && /too large/i.test(errObj.message)
+          ? errObj.message
           : "We encountered an error while updating your profile picture. Please try again later. If the issue persists, please contact us.";
       toast.error(safeMessage);
 
-      // Report fatal error to Sentry
       Sentry.captureException(error, {
         tags: {
           type: "avatar_upload",
           location: "ProfileClient/handleFileChange",
         },
-        // file_name omitted — original filenames are user PII (e.g. "john_doe_photo.jpg").
         extra: {
           user_id: redact("id", String(profile?.id ?? "unknown")),
           file_size: originalFile.size,
@@ -171,10 +171,8 @@ export default function ProfileClient() {
     } finally {
       setIsUploading(false);
 
-      // Reset input to allow re-uploading the same file if needed
       if (fileInputRef.current) fileInputRef.current.value = "";
 
-      // 6. Cleanup Memory: Revoke the blob URL now that we have the real URL (or reverted)
       if (optimisticPreviewUrl) {
         URL.revokeObjectURL(optimisticPreviewUrl);
       }
@@ -502,25 +500,7 @@ export default function ProfileClient() {
                               Joined EzyGo
                             </span>
                             <span className="text-sm font-bold text-foreground/90">
-                              {profile?.ezygo_created_at
-                                ? new Date(profile.ezygo_created_at).toLocaleDateString(
-                                  "en-GB",
-                                  {
-                                    day: "2-digit",
-                                    month: "short",
-                                    year: "numeric",
-                                  },
-                                )
-                                : profile?.created_at 
-                                  ? new Date(profile.created_at).toLocaleDateString(
-                                    "en-GB",
-                                    {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    },
-                                  )
-                                  : "N/A"}
+                              {joinedDateString}
                             </span>
                           </div>
                         </motion.div>

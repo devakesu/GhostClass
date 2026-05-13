@@ -4,14 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class SelectedDayHeader extends StatelessWidget {
-  final DateTime selectedDay;
-  final int eventCount;
 
   const SelectedDayHeader({
-    super.key,
-    required this.selectedDay,
-    required this.eventCount,
+    required this.selectedDay, required this.eventCount, super.key,
   });
+  final DateTime selectedDay;
+  final int eventCount;
 
   @override
   Widget build(BuildContext context) {

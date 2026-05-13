@@ -3,14 +3,13 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class StaticPageScreen extends StatelessWidget {
-  final String title;
-  final String body;
 
   const StaticPageScreen({
-    super.key,
-    required this.title,
+    required this.title, super.key,
     this.body = 'Coming soon',
   });
+  final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) {

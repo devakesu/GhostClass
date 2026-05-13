@@ -9,8 +9,8 @@ import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -18,15 +18,6 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 
 class DashboardData {
-  final List<CourseDetails> courses;
-  final AttendanceReportDetailed attendance;
-  final List<TrackingRecord> tracking;
-  final DashboardStats stats;
-  final String selectedSemester;
-  final String selectedYear;
-  final List<CourseInstructor> instructors;
-  final String? className;
-  final Set<String> disabledCodes;
 
   DashboardData({
     required this.courses,
@@ -39,6 +30,15 @@ class DashboardData {
     this.className,
     this.disabledCodes = const {},
   });
+  final List<CourseDetails> courses;
+  final AttendanceReportDetailed attendance;
+  final List<TrackingRecord> tracking;
+  final DashboardStats stats;
+  final String selectedSemester;
+  final String selectedYear;
+  final List<CourseInstructor> instructors;
+  final String? className;
+  final Set<String> disabledCodes;
 }
 
 class DashboardNotifier extends AsyncNotifier<DashboardData> {
@@ -123,12 +123,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final storage = ref.read(secureStorageProvider);
 
       final coursesResponse = await api.fetchCourses(storage);
-      final AttendanceReportDetailed? attendance = trackedAttendance ??
+      final attendance = trackedAttendance ??
           await _fetchAttendanceOnce(api: api, storage: storage);
 
       // 2. Fetch Shared Resources (Class Courses & Instructors)
-      List<CourseDetails> sharedCourses = [];
-      List<CourseInstructor> sharedInstructors = [];
+      var sharedCourses = <CourseDetails>[];
+      var sharedInstructors = <CourseInstructor>[];
 
       final classId = ref.read(authProvider).value?.profile?.classField?.id;
       if (classId != null) {
@@ -143,13 +143,16 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             .eq('semester', academic.semester);
         
         if (coursesRes.isNotEmpty) {
-           sharedCourses = (coursesRes as List).map((c) => CourseDetails(
-             id: 0, // Mark as shared/custom
-             name: c['course_name'] as String? ?? 'Unnamed Course',
-             code: c['course_code'] as String?,
-             academicYear: academic.year,
-             academicSemester: academic.semester,
-           )).toList();
+           sharedCourses = (coursesRes as List).map((raw) {
+             final c = raw as Map<String, dynamic>;
+             return CourseDetails(
+               id: 0, // Mark as shared/custom
+               name: c['course_name'] as String? ?? 'Unnamed Course',
+               code: c['course_code'] as String?,
+               academicYear: academic.year,
+               academicSemester: academic.semester,
+             );
+           }).toList();
         }
 
         // Fetch Instructor Mappings
@@ -175,17 +178,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         throw Exception(formatApiError(coursesResponse.data, 'Dashboard.Courses'));
       }
 
-      final List<CourseDetails> officialCourses = (coursesResponse.data as List)
+      final officialCourses = (coursesResponse.data as List)
           .map((c) => CourseDetails.fromJson(c as Map<String, dynamic>))
           .toList();
 
       // Merge Shared Courses (Priority to Official if code matches, but we add non-existent ones)
-      final Map<String, CourseDetails> merged = {};
-      for (var c in officialCourses) {
+      final merged = <String, CourseDetails>{};
+      for (final c in officialCourses) {
         final code = (c.code ?? '').toUpperCase();
         if (code.isNotEmpty) merged[code] = c;
       }
-      for (var c in sharedCourses) {
+      for (final c in sharedCourses) {
         final code = (c.code ?? '').toUpperCase();
         if (code.isNotEmpty && !merged.containsKey(code)) {
           merged[code] = c;
@@ -205,8 +208,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
   AttendanceReportDetailed _mergeAttendanceCourses(
       AttendanceReportDetailed attendance, List<CourseDetails> shared) {
-    final Map<String, AttendanceCourse> mergedMap = Map.from(attendance.courses);
-    for (var c in shared) {
+    final mergedMap = Map<String, AttendanceCourse>.from(attendance.courses);
+    for (final c in shared) {
       final stdCode = utils.standardizeCourseCode(c.code ?? '');
       if (stdCode.isNotEmpty && !mergedMap.containsKey(stdCode)) {
         mergedMap[stdCode] = AttendanceCourse(
@@ -246,7 +249,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final auth = ref.read(authProvider).value;
     final disabledMap = auth?.settings.disabledCourses ?? {};
     final semKey = '${academic.year}-${academic.semester}';
-    final Set<String> disabledCodes = (disabledMap[semKey] as Map?)
+    final disabledCodes = (disabledMap[semKey] as Map?)
             ?.keys
             .map((c) => DashboardStats.standardize(c.toString()))
             .toSet() ??
@@ -265,11 +268,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // We prioritize the explicit class name from the user's profile.
     // If not available, we fall back to deriving it from the courses' userGroupName.
     final profileClassName = auth?.profile?.classField?.name;
-    String? finalClassName = (profileClassName != null && profileClassName.trim().isNotEmpty) ? profileClassName : null;
+    var finalClassName = (profileClassName != null && profileClassName.trim().isNotEmpty) ? profileClassName : null;
 
     if (finalClassName == null) {
-      final Map<String, int> groupCounts = {};
-      for (var c in courses) {
+      final groupCounts = <String, int>{};
+      for (final c in courses) {
         if (c.userGroupName != null && c.userGroupName!.isNotEmpty) {
           groupCounts[c.userGroupName!] = (groupCounts[c.userGroupName!] ?? 0) + 1;
         }
@@ -285,18 +288,18 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // Pre-calculate sorting criteria to avoid redundant math during sort
     final target = (auth?.settings.targetPercentage ?? 75).toDouble();
     
-    int getTier(CourseStat? s, bool disabled) {
+    int getTier(CourseStat? s, {required bool disabled}) {
       if (disabled) return 2; // Absolute bottom
       if (s == null || s.finalTotal == 0) return 1;
       return 0;
     }
 
-    final Map<String, ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})> metaMap = {
-      for (var c in courses)
+    final metaMap = <String, ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})>{
+      for (final c in courses)
         c.safeId: (() {
           final s = stats.courseStats[c.safeId];
           final disabled = disabledCodes.contains(utils.standardizeCourseCode(c.code ?? ''));
-          final tier = getTier(s, disabled);
+          final tier = getTier(s, disabled: disabled);
           
           if (s == null) {
             return (tier: tier, canBunk: 0, safeCanBunk: 0, requiredToAttend: 0);
@@ -314,8 +317,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         })()
     };
 
-    final sortedCourses = List<CourseDetails>.from(courses);
-    sortedCourses.sort((a, b) {
+    final sortedCourses = List<CourseDetails>.from(courses)
+      ..sort((a, b) {
       final metaA = metaMap[a.safeId]!;
       final metaB = metaMap[b.safeId]!;
 
@@ -323,7 +326,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
       if (metaA.tier == 0) {
         // 1. Safety Sort: Bunkable (Descending)
-        int cmp = metaB.canBunk.compareTo(metaA.canBunk);
+        var cmp = metaB.canBunk.compareTo(metaA.canBunk);
         if (cmp != 0) return cmp;
 
         // 2. Tie-breaker: Safe Bunkable (Official Only)
@@ -371,7 +374,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
     // 3. Refresh Tracking (Official Report + Tracker Records)
     // We don't need forceSync: true here because we already triggered it above
-    await ref.read(trackingProvider.notifier).refresh(forceSync: false);
+    await ref.read(trackingProvider.notifier).refresh();
 
     // 4. Force a rebuild of the dashboard with fresh data
     // We clear local caches to ensure we don't return stale combined data

@@ -16,6 +16,7 @@ export function readPublicPngAsDataUri(fileName: string): string | null {
     return null;
   }
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- Filename is strictly validated against path traversal regex above
     const buf = readFileSync(path.join(process.cwd(), 'public', fileName));
     return `data:image/png;base64,${buf.toString('base64')}`;
   } catch {

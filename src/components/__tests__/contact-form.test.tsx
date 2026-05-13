@@ -169,7 +169,7 @@ describe('ContactForm', () => {
     const submitButton = await screen.findByRole('button', { name: /Send Message/i });
     
     const originalSet = FormData.prototype.set;
-    // @ts-ignore
+    // @ts-expect-error - test-only: override private implementation for testing
     delete FormData.prototype.set;
     
     try {

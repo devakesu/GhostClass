@@ -10,9 +10,9 @@ class GhostClassVersionFooter extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Column(
+      child: const Column(
         children: [
-          const _VersionText(),
+          _VersionText(),
         ],
       ),
     );

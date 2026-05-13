@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class HeaderBadge extends StatelessWidget {
+  const HeaderBadge({required this.count, super.key});
   final int count;
-  const HeaderBadge({super.key, required this.count});
 
   @override
   Widget build(BuildContext context) {
@@ -40,9 +40,9 @@ class HeaderBadge extends StatelessWidget {
 }
 
 class DeleteAllButton extends StatelessWidget {
+  const DeleteAllButton({required this.label, required this.onPressed, super.key});
   final String label;
   final VoidCallback onPressed;
-  const DeleteAllButton({super.key, required this.label, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {

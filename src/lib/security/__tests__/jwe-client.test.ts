@@ -38,12 +38,10 @@ describe("JWE Client Security", () => {
       ok: true,
       json: vi.fn().mockResolvedValue(mockJWKS)
     });
-    // @ts-ignore
     global.crypto.getRandomValues = vi.fn().mockImplementation((arr) => {
       arr.fill(1);
       return arr;
     });
-    // @ts-ignore
     Object.defineProperty(global.crypto, 'subtle', {
       value: {
         importKey: vi.fn().mockResolvedValue({ type: "secret" })

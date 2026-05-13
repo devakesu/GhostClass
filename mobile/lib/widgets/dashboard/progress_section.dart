@@ -3,21 +3,19 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class OverallProgressSection extends StatelessWidget {
+
+  const OverallProgressSection({
+    required this.stats, required this.targetValue, super.key,
+  });
   final DashboardStats stats;
   final double targetValue;
 
-  const OverallProgressSection({
-    super.key,
-    required this.stats,
-    required this.targetValue,
-  });
-
   @override
   Widget build(BuildContext context) {
-    final bool isBelowTarget = stats.rawPercentage < targetValue;
-    final bool showChange = stats.rawOfficialPercentage != stats.rawPercentage;
-    final bool isGain = stats.rawPercentage >= stats.rawOfficialPercentage;
-    final double diffPercentage =
+    final isBelowTarget = stats.rawPercentage < targetValue;
+    final showChange = stats.rawOfficialPercentage != stats.rawPercentage;
+    final isGain = stats.rawPercentage >= stats.rawOfficialPercentage;
+    final diffPercentage =
         (stats.rawPercentage - stats.rawOfficialPercentage).abs();
 
     final diffPresent = stats.finalPresent - stats.officialPresent;
@@ -61,12 +59,12 @@ class OverallProgressSection extends StatelessWidget {
             child: Stack(
               children: [
                 // Subtle background icon
-                Positioned(
+                const Positioned(
                   right: -5,
                   bottom: -35,
                   child: Opacity(
                     opacity: 0.1,
-                    child: const Icon(
+                    child: Icon(
                       Icons.trending_up_rounded,
                       size: 110,
                       color: Colors.white,
@@ -192,15 +190,15 @@ class OverallProgressSection extends StatelessWidget {
                                 child: Stack(
                                   children: [
                                     Container(
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
                                           colors: [
                                             Color(0xFFA855F7), // Purple 500
                                             Color(0xFF9333EA), // Purple 600
                                           ],
                                         ),
                                         borderRadius:
-                                            const BorderRadius.horizontal(
+                                            BorderRadius.horizontal(
                                               left: Radius.circular(9),
                                             ),
                                       ),
@@ -302,10 +300,6 @@ class OverallProgressSection extends StatelessWidget {
 }
 
 class _CountBadge extends StatelessWidget {
-  final int value;
-  final String label;
-  final int diff;
-  final Color color;
 
   const _CountBadge({
     required this.value,
@@ -313,6 +307,10 @@ class _CountBadge extends StatelessWidget {
     required this.diff,
     required this.color,
   });
+  final int value;
+  final String label;
+  final int diff;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {

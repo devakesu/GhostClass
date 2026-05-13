@@ -12,6 +12,10 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DisableAwareCourseCard extends ConsumerStatefulWidget {
+
+  const DisableAwareCourseCard({
+    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.selectedSemester, required this.selectedYear, required this.instructors, this.className, super.key,
+  });
   final CourseDetails course;
   final CourseStat stat;
   final utils.AttendanceResult bunkResult;
@@ -20,10 +24,6 @@ class DisableAwareCourseCard extends ConsumerStatefulWidget {
   final String selectedYear;
   final List<CourseInstructor> instructors;
   final String? className;
-
-  const DisableAwareCourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.selectedSemester, required this.selectedYear, required this.instructors, this.className, super.key,
-  });
 
   @override
   ConsumerState<DisableAwareCourseCard> createState() =>
@@ -130,13 +130,13 @@ class _DisableAwareCourseCardState
     final code = _courseCode;
     if (code == null) return;
 
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return DisableDialogContent(
           courseCode: code,
           semesterKey: _semesterKey,
-          onDisable: (reason) => _disableCourse(reason),
+          onDisable: _disableCourse,
           reasons: _disableReasons,
         );
       },
@@ -146,10 +146,10 @@ class _DisableAwareCourseCardState
   Future<void> _showEnableDialog() async {
     final code = _courseCode;
     if (code == null) return;
-    bool isSaving = false;
+    var isSaving = false;
     final reason = _disableReason ?? 'N/A';
 
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -218,7 +218,7 @@ class _DisableAwareCourseCardState
                             if (!dialogContext.mounted) return;
                             Navigator.pop(dialogContext);
                             ServiceToast.show(context, '$code enabled');
-                          } catch (e) {
+                          } on Object catch (e) {
                             if (!mounted) return;
                             if (dialogContext.mounted) {
                               setDialogState(() => isSaving = false);
@@ -293,14 +293,14 @@ class _DisableAwareCourseCardState
 }
 
 class DisableDialogContent extends StatefulWidget {
-  final String courseCode;
-  final String? semesterKey;
-  final List<String> reasons;
-  final Future<void> Function(String reason) onDisable;
 
   const DisableDialogContent({
     required this.courseCode, required this.semesterKey, required this.reasons, required this.onDisable, super.key,
   });
+  final String courseCode;
+  final String? semesterKey;
+  final List<String> reasons;
+  final Future<void> Function(String reason) onDisable;
 
   @override
   State<DisableDialogContent> createState() => _DisableDialogContentState();
@@ -460,7 +460,7 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
                       context,
                       '${widget.courseCode} disabled: $reason',
                     );
-                  } catch (e, st) {
+                  } on Object catch (e, st) {
                     AppLogger.eWithContext(
                       'DisableAwareCourseCard: Disable action failed',
                       error: e,

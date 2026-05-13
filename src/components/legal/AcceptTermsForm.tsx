@@ -68,11 +68,13 @@ export function AcceptTermsForm() {
           <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
             <ReactMarkdown
               components={{
+                /* eslint-disable @typescript-eslint/no-unused-vars */
                 h1: ({node: _node, ...props}) => <h1 className="text-sm font-bold text-foreground uppercase tracking-wider mb-2 mt-4" {...props} />,
                 p: ({node: _node, ...props}) => <p className="text-xs leading-relaxed text-muted-foreground mb-1.5" {...props} />,
                 ul: ({node: _node, ...props}) => <ul className="list-disc pl-4 mb-3 space-y-1" {...props} />,
                 li: ({node: _node, ...props}) => <li className="text-xs text-muted-foreground pl-1" {...props} />,
                 strong: ({node: _node, ...props}) => <strong className="text-purple-600 dark:text-purple-300 font-semibold" {...props} />
+                /* eslint-enable @typescript-eslint/no-unused-vars */
               }}
             >
               {BUNK_DISCLAIMER}

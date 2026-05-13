@@ -11,9 +11,7 @@ const coverage = JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
 const lowCoverageFiles = [];
 const allFiles = [];
 
-for (const file in coverage) {
-  const data = coverage[file];
-  
+for (const [file, data] of Object.entries(coverage)) {
   const s = data.s;
   const sTotal = Object.keys(s).length;
   const sCovered = Object.values(s).filter(v => v > 0).length;

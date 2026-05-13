@@ -1,23 +1,23 @@
 import 'dart:io';
+
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ghostclass/logic/security_utils.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:ghostclass/theme/app_theme.dart';
-import 'package:ghostclass/router/app_router.dart';
-import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/config/app_config.dart';
-
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:ghostclass/firebase_options.dart';
-import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/logic/network_utils.dart';
+import 'package:ghostclass/logic/security_utils.dart';
+import 'package:ghostclass/providers/theme_provider.dart';
+import 'package:ghostclass/router/app_router.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
+import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// MyHttpOverrides
 /// ---------------
@@ -26,8 +26,8 @@ import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
-    final client = super.createHttpClient(context);
-    client.connectionTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
+    final client = super.createHttpClient(context)
+      ..connectionTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
     
     // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.
     // In release mode, standard certificate validation is enforced.
@@ -41,13 +41,13 @@ class MyHttpOverrides extends HttpOverrides {
 
 
 class _SecurityFailureApp extends StatelessWidget {
-  final String friendlyMessage;
-  final String technicalDetails;
 
   const _SecurityFailureApp({
     required this.friendlyMessage,
     required this.technicalDetails,
   });
+  final String friendlyMessage;
+  final String technicalDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -57,14 +57,13 @@ class _SecurityFailureApp extends StatelessWidget {
       home: Builder(
         builder: (context) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            SecurityUtils.showSecurityFailureDialog(
+            final _ = SecurityUtils.showSecurityFailureDialog(
               context,
               title: 'Security Handshake Failed',
               message: friendlyMessage,
               technicalDetails: technicalDetails,
               retryLabel: 'Close App',
               onRetry: () => exit(0),
-              isDismissible: false,
             );
           });
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -75,10 +74,10 @@ class _SecurityFailureApp extends StatelessWidget {
 }
 
 Future<void> _handleSecurityFailure(Object error) async {
-  final String errorMessage = error.toString();
-  final String friendlyMessage = errorMessage.contains('-3')
+  final errorMessage = error.toString();
+  final friendlyMessage = errorMessage.contains('-3')
       ? 'GhostClass encountered a network security issue while verifying your device. This often happens on restricted WiFi or with custom DNS settings.'
-      : 'We couldn\'t verify the integrity of this app. To protect your data, GhostClass requires a secure, unmodified environment.';
+      : "We couldn't verify the integrity of this app. To protect your data, GhostClass requires a secure, unmodified environment.";
 
   runApp(_SecurityFailureApp(friendlyMessage: friendlyMessage, technicalDetails: errorMessage));
 }
@@ -99,16 +98,15 @@ void main() async {
 
     if (kDebugMode) {
       await FirebaseAppCheck.instance.activate(
-        providerAndroid: AndroidDebugProvider(),
-        providerApple: AppleDebugProvider(),
+        providerAndroid: const AndroidDebugProvider(),
+        providerApple: const AppleDebugProvider(),
       );
     } else {
       await FirebaseAppCheck.instance.activate(
-        providerAndroid: const AndroidPlayIntegrityProvider(),
         providerApple: const AppleAppAttestProvider(),
       );
     }
-  } catch (e) {
+  } on Object catch (e) {
     AppLogger.e('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE', e);
     await _handleSecurityFailure(e);
     return;
@@ -128,12 +126,13 @@ void main() async {
   // Initialize Sentry
   await SentryFlutter.init(
     (options) {
-      options.dsn = AppConfig.sentryDsn;
-      options.tracesSampleRate = kDebugMode ? 1.0 : 0.1;
-      options.release = 'ghostclass@${AppConfig.appVersion}';
-      options.environment = kDebugMode ? 'development' : 'production';
-      options.attachStacktrace = true;
-      options.enableAutoPerformanceTracing = true;
+      options
+        ..dsn = AppConfig.sentryDsn
+        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
+        ..release = 'ghostclass@${AppConfig.appVersion}'
+        ..environment = kDebugMode ? 'development' : 'production'
+        ..attachStacktrace = true
+        ..enableAutoPerformanceTracing = true;
     },
     appRunner: () {
       return runApp(const ProviderScope(child: MyApp()));
@@ -168,7 +167,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     super.initState();
     // Initialize push notification listeners and tokens after layout mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(pushNotificationServiceProvider).initialize();
+      final _ = ref.read(pushNotificationServiceProvider).initialize();
     });
   }
 

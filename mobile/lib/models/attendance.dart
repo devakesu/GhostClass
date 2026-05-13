@@ -1,9 +1,6 @@
 import 'package:ghostclass/logic/type_utils.dart';
 
 class AttendanceCourse {
-  final int id;
-  final String name;
-  final String? code;
 
   const AttendanceCourse({required this.id, required this.name, this.code});
 
@@ -14,15 +11,14 @@ class AttendanceCourse {
       code: json['code'] as String?,
     );
   }
+  final int id;
+  final String name;
+  final String? code;
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'code': code};
 }
 
 class AttendanceSession {
-  final dynamic course;
-  final dynamic attendance;
-  final dynamic session;
-  final String? classType;
 
   const AttendanceSession({
     this.course,
@@ -39,13 +35,13 @@ class AttendanceSession {
       classType: (json['class_type'] ?? json['classType']) as String?,
     );
   }
+  final dynamic course;
+  final dynamic attendance;
+  final dynamic session;
+  final String? classType;
 }
 
 class AttendanceReportDetailed {
-  final Map<String, AttendanceCourse> courses;
-  final Map<String, Map<String, AttendanceSession>> studentAttendanceData;
-  final Map<String, dynamic> attendanceDates;
-  final Map<String, dynamic> sessions;
 
   const AttendanceReportDetailed({
     required this.courses,
@@ -92,16 +88,17 @@ class AttendanceReportDetailed {
           }
           return MapEntry(
             date,
-            (sessions).map(
+            sessions.map(
               (sessionKey, sessionValue) {
+                final keyStr = sessionKey.toString();
                 if (sessionValue is! Map) {
                   return MapEntry(
-                    sessionKey,
+                    keyStr,
                     const AttendanceSession(course: 0, attendance: 0),
                   );
                 }
                 return MapEntry(
-                  sessionKey,
+                  keyStr,
                   AttendanceSession.fromJson(
                     Map<String, dynamic>.from(sessionValue),
                   ),
@@ -115,6 +112,10 @@ class AttendanceReportDetailed {
       sessions: rawSessions,
     );
   }
+  final Map<String, AttendanceCourse> courses;
+  final Map<String, Map<String, AttendanceSession>> studentAttendanceData;
+  final Map<String, dynamic> attendanceDates;
+  final Map<String, dynamic> sessions;
 
   Map<String, dynamic> toJson() => {
     'courses': courses.map((key, value) => MapEntry(key, value.toJson())),
@@ -137,23 +138,9 @@ class AttendanceReportDetailed {
 }
 
 class TrackingRecord {
-  final int id;
-  final String course;
-  final String date;
-  final String session;
-  final String status;
-  final dynamic attendance;
-  final String? semester;
-  final String? year;
-  final String? remarks;
 
   const TrackingRecord({
-    this.id = 0,
-    required this.course,
-    required this.date,
-    required this.session,
-    required this.status,
-    required this.attendance,
+    required this.course, required this.date, required this.session, required this.status, required this.attendance, this.id = 0,
     this.semester,
     this.year,
     this.remarks,
@@ -172,6 +159,15 @@ class TrackingRecord {
       remarks: json['remarks'] as String?,
     );
   }
+  final int id;
+  final String course;
+  final String date;
+  final String session;
+  final String status;
+  final dynamic attendance;
+  final String? semester;
+  final String? year;
+  final String? remarks;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -192,10 +188,10 @@ enum AttendanceStatus {
   otherLeave(112),
   dutyLeave(225);
 
-  final int code;
   const AttendanceStatus(this.code);
+  final int code;
 
-  static AttendanceStatus fromCode(dynamic code) {
+  static AttendanceStatus fromCode(Object? code) {
     final intCode = toInt(code) ?? 110;
     return AttendanceStatus.values.firstWhere(
       (e) => e.code == intCode,
@@ -209,5 +205,3 @@ enum AttendanceStatus {
       this == AttendanceStatus.otherLeave;
   bool get isNegative => this == AttendanceStatus.absent;
 }
-
-

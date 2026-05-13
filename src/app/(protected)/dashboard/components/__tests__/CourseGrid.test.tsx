@@ -1,10 +1,20 @@
 /** @vitest-environment jsdom */
+import type { ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CourseGrid } from '../CourseGrid';
 
+type MockComponentProps = {
+  children?: ReactNode;
+  [key: string]: unknown;
+};
+
+type MockCourseCardProps = {
+  course: { code?: string; id: number };
+};
+
 vi.mock('@/components/attendance/course-card', () => ({
-  CourseCard: ({ course }: any) => <div data-testid="course-card">{course.code || course.id}</div>,
+  CourseCard: ({ course }: MockCourseCardProps) => <div data-testid="course-card">{course.code || course.id}</div>,
 }));
 
 vi.mock('@/components/ui/skeleton', () => ({
@@ -12,8 +22,7 @@ vi.mock('@/components/ui/skeleton', () => ({
 }));
 
 vi.mock('framer-motion', () => {
-  const mockComponent = ({ children, ...props }: any) => {
-    const { initial: _i, animate: _a, transition: _t, whileHover: _wh, whileTap: _wt, exit: _e, ...rest } = props;
+  const mockComponent = ({ children, ...rest }: MockComponentProps) => {
     return <div {...rest}>{children}</div>;
   };
   return {
@@ -29,8 +38,8 @@ vi.mock('framer-motion', () => {
       h3: mockComponent,
       p: mockComponent,
     },
-    AnimatePresence: ({ children }: any) => <>{children}</>,
-    LazyMotion: ({ children }: any) => <>{children}</>,
+    AnimatePresence: ({ children }: MockComponentProps) => <>{children}</>,
+    LazyMotion: ({ children }: MockComponentProps) => <>{children}</>,
     domAnimation: {},
   };
 });

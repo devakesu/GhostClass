@@ -24,7 +24,6 @@ export async function getAuthLock(
 
   try {
     // NX: Only set if not exists, PX: Set expiry in ms
-    // @ts-ignore - Upstash Redis 'set' signature supports NX and PX options
     const acquired = await redis.set(lockKey, lockValue, {
       nx: true,
       px: ttlMs,

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/models/user.dart';
-import 'package:go_router/go_router.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -43,9 +43,9 @@ class _LoadingWidget extends StatelessWidget {
 }
 
 class _ProfileDumpContent extends ConsumerWidget {
+  const _ProfileDumpContent({required this.user, this.academic});
   final AuthenticatedUser user;
   final AcademicState? academic;
-  const _ProfileDumpContent({required this.user, this.academic});
 
   String _capitalize(String s) {
     if (s.isEmpty) return s;
@@ -77,7 +77,7 @@ class _ProfileDumpContent extends ConsumerWidget {
         }
       }
       return s;
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.w('ProfileDumpScreen: Failed to format date', e);
       return s;
     }
@@ -90,13 +90,13 @@ class _ProfileDumpContent extends ConsumerWidget {
     final bg = Theme.of(context).scaffoldBackgroundColor;
 
     final institutionsAsync = ref.watch(institutionsProvider);
-    final String institutionName = institutionsAsync.when(
+    final institutionName = institutionsAsync.when(
       data: (insts) {
         if (user.ezygoId == null) return insts.isNotEmpty ? insts.first.name : '—';
         try {
           final searchId = user.ezygoId!.trim();
           return insts.firstWhere((i) => i.id.toString().trim() == searchId).name;
-        } catch (e) {
+        } on Object catch (e) {
           AppLogger.w('ProfileDumpScreen: Failed to resolve institution by id', e);
           // Fallback to first available for UI consistency, similar to GhostClassScreen
           return insts.isNotEmpty ? insts.first.name : 'Unknown';
@@ -325,10 +325,10 @@ class _ProfileDumpContent extends ConsumerWidget {
                     iconColor: Color(0xFFF59E0B),
                     rows: [_InfoRow(label: 'Status', value: 'Loading...')],
                   ),
-                  error: (e, _) => _InfoCard(
+                  error: (e, _) => const _InfoCard(
                     icon: LucideIcons.building,
                     title: 'Available Institutions',
-                    iconColor: const Color(0xFFF59E0B),
+                    iconColor: Color(0xFFF59E0B),
                     rows: [_InfoRow(label: 'Error', value: 'Failed to fetch')],
                   ),
                 ),
@@ -392,7 +392,7 @@ class _ProfileDumpContent extends ConsumerWidget {
   }
 
   void _showDisabledCoursesBottomSheet(BuildContext context, UserSettings settings) {
-    showModalBottomSheet(
+    final _ = showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
@@ -476,7 +476,6 @@ class _ProfileDumpContent extends ConsumerWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 18),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -524,11 +523,6 @@ class _ProfileDumpContent extends ConsumerWidget {
 }
 
 class _InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color iconColor;
-  final List<_InfoRow> rows;
-  final int delay;
 
   const _InfoCard({
     required this.icon,
@@ -537,6 +531,11 @@ class _InfoCard extends StatelessWidget {
     required this.rows,
     this.delay = 0,
   });
+  final IconData icon;
+  final String title;
+  final Color iconColor;
+  final List<_InfoRow> rows;
+  final int delay;
 
   @override
   Widget build(BuildContext context) {
@@ -585,12 +584,6 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _InfoRow {
-  final String label;
-  final String value;
-  final Color? valueColor;
-  final bool copyable;
-  final VoidCallback? onTap;
-  final IconData? trailingIcon;
 
   const _InfoRow({
     required this.label,
@@ -600,12 +593,18 @@ class _InfoRow {
     this.onTap,
     this.trailingIcon,
   });
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool copyable;
+  final VoidCallback? onTap;
+  final IconData? trailingIcon;
 
   Widget _buildRow(BuildContext context) {
     return GestureDetector(
       onTap: onTap ?? (copyable
           ? () {
-              Clipboard.setData(ClipboardData(text: value));
+              final _ = Clipboard.setData(ClipboardData(text: value));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('$label copied', style: const TextStyle(fontSize: 13)),

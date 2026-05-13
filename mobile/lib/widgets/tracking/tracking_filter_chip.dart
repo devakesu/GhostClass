@@ -7,25 +7,22 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingFilterChip extends StatelessWidget {
+
+  const TrackingFilterChip({
+    required this.selectedCourse, required this.onTap, required this.onClear, super.key,
+    this.officialReport,
+    this.allCourses,
+  });
   final String selectedCourse;
   final AttendanceReportDetailed? officialReport;
   final List<CourseDetails>? allCourses;
   final VoidCallback onTap;
   final VoidCallback onClear;
 
-  const TrackingFilterChip({
-    super.key,
-    required this.selectedCourse,
-    required this.onTap,
-    required this.onClear,
-    this.officialReport,
-    this.allCourses,
-  });
-
   @override
   Widget build(BuildContext context) {
     final isFiltered = selectedCourse != 'all';
-    String label = 'All Subjects';
+    var label = 'All Subjects';
 
     if (isFiltered) {
       final normKey = selectedCourse.trim().toUpperCase();

@@ -1,22 +1,24 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:ghostclass/logic/attendance_utils.dart';
-import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:dio/dio.dart';
 
 /// AcademicState
 /// -------------
 /// Represents the current academic context (semester and year) for the user.
 /// Provides utility methods to derive start and end dates for filtering logs.
+@immutable
 class AcademicState {
-  final String semester;
-  final String year;
 
   const AcademicState({required this.semester, required this.year});
+  final String semester;
+  final String year;
 
   AcademicState copyWith({String? semester, String? year}) {
     return AcademicState(
@@ -40,17 +42,17 @@ class AcademicState {
     final parsed = _parseAcademicYear(year);
     final semLower = semester.toLowerCase();
     if (semLower.contains('odd')) {
-      return DateTime(parsed.$1, 7, 1);
+      return DateTime(parsed.$1, 7);
     }
     if (semLower.contains('even') || semLower.contains('spring')) {
-      return DateTime(parsed.$2, 1, 1);
+      return DateTime(parsed.$2);
     }
     // Unrecognised semester name — default to even-semester dates and warn.
     AppLogger.w(
       'AcademicState.startDate: Unrecognised semester "$semester" for year "$year". '
       'Defaulting to even-semester start (Jan 1). Consider mapping this name.',
     );
-    return DateTime(parsed.$2, 1, 1);
+    return DateTime(parsed.$2);
   }
 
   DateTime get endDate {
@@ -194,7 +196,7 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
   final parts = year.split('-');
 
   // Expand short-form start year: "25-26" → "2025-2026".
-  String startPart = parts.isNotEmpty ? parts.first : '';
+  var startPart = parts.isNotEmpty ? parts.first : '';
   if (startPart.length == 2) startPart = '20$startPart';
   final start = int.tryParse(startPart) ?? DateTime.now().year;
 

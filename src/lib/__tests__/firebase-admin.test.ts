@@ -36,7 +36,7 @@ describe('firebase-admin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
-    // @ts-ignore
+    // @ts-expect-error -- setting mock apps array for testing
     admin.apps = [];
   });
 
@@ -69,7 +69,7 @@ describe('firebase-admin', () => {
 
     it('uses existing firebase app if already initialized', () => {
       process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ project_id: 'test-project' });
-      // @ts-ignore
+      // @ts-expect-error -- setting mock apps array for testing
       admin.apps = [{ name: 'default' }];
       
       getAppCheck();
@@ -98,7 +98,7 @@ describe('firebase-admin', () => {
 
     it('returns null if token verification fails catastrophically', async () => {
       process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ project_id: 'test-project' });
-      // @ts-ignore
+      // @ts-expect-error -- setting mock apps array for testing
       admin.apps = [{ name: 'default' }];
       vi.mocked(admin.app).mockImplementationOnce(() => { throw new Error('Fatal'); });
       

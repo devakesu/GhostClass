@@ -139,6 +139,40 @@ export const Navbar = () => {
     ? settings.bunk_calculator_enabled
     : true;
 
+  const renderAvatarContent = () => {
+    if (!profile) {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-full bg-muted animate-pulse">
+          <div className="h-5 w-5 rounded-full bg-muted-foreground/20"></div>
+        </div>
+      );
+    }
+    if (profile.avatar_url && isValidAvatarUrl(profile.avatar_url)) {
+      return (
+        <Image
+          src={profile.avatar_url}
+          alt={`${profile.username || "User"} profile picture`}
+          fill
+          className="object-cover rounded-full"
+          priority
+          sizes="36px"
+        />
+      );
+    }
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-full bg-muted">
+        <Image
+          src={UserPlaceholder}
+          alt="Default avatar"
+          width={36}
+          height={36}
+          className="object-contain brightness-150 dark:brightness-100"
+          priority
+        />
+      </div>
+    );
+  };
+
   return (
     <header className="top-0 z-10 flex h-20 items-center justify-between gap-4 border-b-2 bg-background px-4 md:px-6 text-foreground border-border/50 overflow-hidden">
       <div className="flex items-center gap-2 shrink-0">
@@ -220,7 +254,7 @@ export const Navbar = () => {
 
           <div className="gap-3 flex items-center">
             {profile && (
-              <AddRecordTrigger user={profile as any} onSuccess={handleAddSuccess} />
+              <AddRecordTrigger user={profile as never} onSuccess={handleAddSuccess} />
             )}
           </div>
 
@@ -359,37 +393,7 @@ export const Navbar = () => {
                 aria-label="Open user menu"
               >
                 <Avatar className="h-9 w-9 outline-2 relative">
-                  {!profile
-                    ? (
-                      <div className="flex h-full w-full items-center justify-center rounded-full bg-muted animate-pulse">
-                        <div className="h-5 w-5 rounded-full bg-muted-foreground/20">
-                        </div>
-                      </div>
-                    )
-                    : profile?.avatar_url &&
-                        isValidAvatarUrl(profile.avatar_url)
-                    ? (
-                      <Image
-                        src={profile.avatar_url}
-                        alt={`${profile?.username || "User"} profile picture`}
-                        fill
-                        className="object-cover rounded-full"
-                        priority
-                        sizes="36px"
-                      />
-                    )
-                    : (
-                      <div className="flex h-full w-full items-center justify-center rounded-full bg-muted">
-                        <Image
-                          src={UserPlaceholder}
-                          alt="Default avatar"
-                          width={36}
-                          height={36}
-                          className="object-contain brightness-150 dark:brightness-100"
-                          priority
-                        />
-                      </div>
-                    )}
+                  {renderAvatarContent()}
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>

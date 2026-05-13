@@ -16,7 +16,7 @@ export function GET(req: Request) {
   const signatureStatus = process.env.SIGNATURE_STATUS ?? "UNSIGNED";
   const imageDigest = process.env.IMAGE_DIGEST ?? commitSha;
 
-  const response: any = {
+  const response: Record<string, unknown> = {
     commit: commitSha,
     commit_sha: commitSha,
     build_id: githubRunId || commitSha,

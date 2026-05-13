@@ -183,7 +183,7 @@ describe('DashboardClient', () => {
     vi.mocked(useSetAcademicYear).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
   });
 
-  it.only('renders correctly with default settings', async () => {
+  it('renders correctly with default settings', async () => {
     render(<DashboardClient />);
     
     await waitFor(() => {

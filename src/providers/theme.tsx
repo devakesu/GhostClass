@@ -23,18 +23,18 @@ const STORAGE_KEY = "ghostclass-theme";
 
 /**
  * Reads the persisted theme from localStorage.
- * Falls back to "dark" when no stored preference exists.
+ * Falls back to "light" when no stored preference exists.
  */
 function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // localStorage may be blocked (e.g. tracking prevention)
   }
-  // No stored preference → always default to dark
-  return "dark";
+  // No stored preference → always default to light
+  return "light";
 }
 
 function applyTheme(theme: Theme) {

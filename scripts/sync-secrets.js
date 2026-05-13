@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable sonarjs/no-os-command-from-path */
 
 /**
  * sync-secrets.js - Push local .env values to GitHub Actions Secrets and Variables
@@ -75,7 +76,7 @@ function parseEnvFile(filePath) {
     return null;
   }
 
-  const envConfig = {};
+  const envConfig = new Map();
   const content = fs.readFileSync(filePath, 'utf8');
 
   content.split(/\r?\n/).forEach((line) => {
@@ -90,7 +91,7 @@ function parseEnvFile(filePath) {
       // Remove quotes if present
       value = value.replace(/^["']|["']$/g, '');
 
-      envConfig[key] = value;
+      envConfig.set(key, value);
     }
   });
 
@@ -99,26 +100,23 @@ function parseEnvFile(filePath) {
 
 // Set GitHub secret
 function setSecret(repo, name, value) {
-  try {
-    const command = `gh secret set ${name} --repo ${repo} --app actions`;
-    execSync(command, {
-      input: value,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf8',
-    });
+  const result = spawnSync('gh', ['secret', 'set', name, '--repo', repo, '--app', 'actions'], {
+    input: value,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    encoding: 'utf8',
+  });
+  if (result.status === 0 && !result.error) {
     return { success: true };
-  } catch (error) {
-    let message;
-    if (error instanceof Error) {
-      const stderr = error.stderr
-        ? String(error.stderr).trim()
-        : '';
-      message = stderr ? `${error.message}: ${stderr}` : error.message;
-    } else {
-      message = String(error);
-    }
-    return { success: false, error: message };
   }
+  let message;
+  if (result.error instanceof Error) {
+    const stderr = result.stderr ? String(result.stderr).trim() : '';
+    message = stderr ? `${result.error.message}: ${stderr}` : result.error.message;
+  } else {
+    const stderr = result.stderr ? String(result.stderr).trim() : '';
+    message = stderr || `Process exited with code ${result.status}`;
+  }
+  return { success: false, error: message };
 }
 
 // Set GitHub Actions variable (non-sensitive — not masked in logs)
@@ -141,16 +139,7 @@ function setVariable(repo, name, value) {
   return { success: false, error: message };
 }
 
-// Main function
-function main() {
-  log.info('🚀 GitHub Actions Sync (Variables + Secrets)\n');
-
-  // Auto-skip in CI environments
-  if (process.env.CI) {
-    log.info('⏭️  Secret sync skipped in CI environment.\n');
-    return;
-  }
-  // Check prerequisites - FAIL if not met
+function checkPrerequisites() {
   if (!isGhInstalled()) {
     log.error('❌ ERROR: GitHub CLI (gh) is not installed.');
     log.error('📥 Install from: https://cli.github.com/');
@@ -184,6 +173,74 @@ function main() {
     log.error('\nSync failed - .env file is required.');
     process.exit(1);
   }
+
+  return { repo, envConfig };
+}
+
+function syncVariables(repo, envConfig, context) {
+  log.info('📋 Syncing Variables (non-sensitive)...');
+  for (const varName of context.variablesToSync) {
+    const varValue = envConfig.get(varName);
+
+    if (varValue === undefined || varValue === null || varValue === '') {
+      log.warning(`⊘ Skipping ${varName} (not set in .env)`);
+      context.missing.push(varName);
+      context.skipCount++;
+      continue;
+    }
+
+    const result = setVariable(repo, varName, varValue);
+
+    if (result.success) {
+      log.success(`✓ Variable: ${varName}`);
+      context.successCount++;
+    } else {
+      log.error(`✗ Failed to set variable ${varName}`);
+      log.error(`  Error: ${result.error}`);
+      context.errors.push({ name: varName, error: result.error });
+      context.errorCount++;
+    }
+  }
+}
+
+function syncSecrets(repo, envConfig, context) {
+  console.log();
+  log.info('🔐 Syncing Secrets (sensitive)...');
+  for (const secretName of context.secretsToSync) {
+    const secretValue = envConfig.get(secretName);
+
+    if (secretValue === undefined || secretValue === null || secretValue === '') {
+      log.warning(`⊘ Skipping ${secretName} (not set in .env)`);
+      context.missing.push(secretName);
+      context.skipCount++;
+      continue;
+    }
+
+    const result = setSecret(repo, secretName, secretValue);
+
+    if (result.success) {
+      log.success(`✓ Secret:   ${secretName}`);
+      context.successCount++;
+    } else {
+      log.error(`✗ Failed to sync secret ${secretName}`);
+      log.error(`  Error: ${result.error}`);
+      context.errors.push({ name: secretName, error: result.error });
+      context.errorCount++;
+    }
+  }
+}
+
+// Main function
+function main() {
+  log.info('🚀 GitHub Actions Sync (Variables + Secrets)\n');
+
+  // Auto-skip in CI environments
+  if (process.env.CI) {
+    log.info('⏭️  Secret sync skipped in CI environment.\n');
+    return;
+  }
+
+  const { repo, envConfig } = checkPrerequisites();
 
   log.success(`🔄 Syncing to: ${repo}\n`);
 
@@ -280,91 +337,47 @@ function main() {
     'GOOGLE_SERVICE_ACCOUNT_JSON',
   ];
 
-  let successCount = 0;
-  let skipCount = 0;
-  let errorCount = 0;
-  const errors = [];
-  const missing = [];
+  const context = {
+    variablesToSync,
+    secretsToSync,
+    successCount: 0,
+    skipCount: 0,
+    errorCount: 0,
+    errors: [],
+    missing: [],
+  };
 
-  // Sync variables
-  log.info('📋 Syncing Variables (non-sensitive)...');
-  for (const varName of variablesToSync) {
-    const varValue = envConfig[varName];
-
-    if (varValue === undefined || varValue === null || varValue === '') {
-      log.warning(`⊘ Skipping ${varName} (not set in .env)`);
-      missing.push(varName);
-      skipCount++;
-      continue;
-    }
-
-    const result = setVariable(repo, varName, varValue);
-
-    if (result.success) {
-      log.success(`✓ Variable: ${varName}`);
-      successCount++;
-    } else {
-      log.error(`✗ Failed to set variable ${varName}`);
-      log.error(`  Error: ${result.error}`);
-      errors.push({ name: varName, error: result.error });
-      errorCount++;
-    }
-  }
-
-  // Sync secrets
-  console.log();
-  log.info('🔐 Syncing Secrets (sensitive)...');
-  for (const secretName of secretsToSync) {
-    const secretValue = envConfig[secretName];
-
-    if (secretValue === undefined || secretValue === null || secretValue === '') {
-      log.warning(`⊘ Skipping ${secretName} (not set in .env)`);
-      missing.push(secretName);
-      skipCount++;
-      continue;
-    }
-
-    const result = setSecret(repo, secretName, secretValue);
-
-    if (result.success) {
-      log.success(`✓ Secret:   ${secretName}`);
-      successCount++;
-    } else {
-      log.error(`✗ Failed to sync secret ${secretName}`);
-      log.error(`  Error: ${result.error}`);
-      errors.push({ name: secretName, error: result.error });
-      errorCount++;
-    }
-  }
+  syncVariables(repo, envConfig, context);
+  syncSecrets(repo, envConfig, context);
 
   // Summary
   console.log('\n' + colors.cyan + '═══════════════════════════════════════' + colors.reset);
   log.info('📊 Sync Summary');
   console.log(colors.cyan + '═══════════════════════════════════════' + colors.reset);
-  log.success(`  ✓ Successfully synced: ${successCount} (${variablesToSync.length} variables + ${secretsToSync.length} secrets possible)`);
+  log.success(`  ✓ Successfully synced: ${context.successCount} (${variablesToSync.length} variables + ${secretsToSync.length} secrets possible)`);
   
-  if (skipCount > 0) {
-    log.warning(`  ⊘ Skipped (not in .env): ${skipCount}`);
+  if (context.skipCount > 0) {
+    log.warning(`  ⊘ Skipped (not in .env): ${context.skipCount}`);
   }
   
-  if (errorCount > 0) {
-    log.error(`  ✗ Failed: ${errorCount}`);
+  if (context.errorCount > 0) {
+    log.error(`  ✗ Failed: ${context.errorCount}`);
   }
   
   console.log(colors.cyan + '═══════════════════════════════════════' + colors.reset);
 
   // Show missing secrets (warnings only)
-  if (missing.length > 0) {
+  if (context.missing.length > 0) {
     log.warning('\n⚠️  Missing secrets in .env:');
-    missing.forEach((name) => {
+    context.missing.forEach((name) => {
       log.warning(`   - ${name}`);
     });
   }
 
   // Show errors in detail
-  if (errors.length > 0) {
+  if (context.errors.length > 0) {
     log.error('\n❌ Failed to sync the following secrets:');
-    errors.forEach(({ name, error }) => {
+    context.errors.forEach(({ name, error }) => {
       log.error(`   - ${name}`);
       log.error(`     ${error}`);
     });

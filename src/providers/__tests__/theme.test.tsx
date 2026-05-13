@@ -32,15 +32,15 @@ function ThrowingConsumer() {
 // ---------------------------------------------------------------------------
 
 describe('ThemeProvider', () => {
-  let localStorageMock: Record<string, string>;
+  let localStorageMock: Map<string, string>;
 
   beforeEach(() => {
     // Reset localStorage mock
-    localStorageMock = {};
+    localStorageMock = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+      getItem: vi.fn((key: string) => localStorageMock.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => { localStorageMock.set(key, value); }),
+      removeItem: vi.fn((key: string) => { localStorageMock.delete(key); }),
     });
     // Reset documentElement classList
     document.documentElement.classList.remove('dark', 'light');
@@ -52,17 +52,17 @@ describe('ThemeProvider', () => {
   });
 
   describe('getInitialTheme', () => {
-    it('defaults to dark when no stored preference exists', () => {
+    it('defaults to light when no stored preference exists', () => {
       render(
         <ThemeProvider>
           <ThemeDisplay />
         </ThemeProvider>
       );
-      expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+      expect(screen.getByTestId('theme-value').textContent).toBe('light');
     });
 
     it('reads stored "dark" preference from localStorage', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -72,7 +72,7 @@ describe('ThemeProvider', () => {
     });
 
     it('reads stored "light" preference from localStorage', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'light';
+      localStorageMock.set(THEME_STORAGE_KEY, 'light');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -81,17 +81,17 @@ describe('ThemeProvider', () => {
       expect(screen.getByTestId('theme-value').textContent).toBe('light');
     });
 
-    it('falls back to dark when stored value is invalid', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'invalid';
+    it('falls back to light when stored value is invalid', () => {
+      localStorageMock.set(THEME_STORAGE_KEY, 'invalid');
       render(
         <ThemeProvider>
           <ThemeDisplay />
         </ThemeProvider>
       );
-      expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+      expect(screen.getByTestId('theme-value').textContent).toBe('light');
     });
 
-    it('falls back to dark when localStorage throws', () => {
+    it('falls back to light when localStorage throws', () => {
       vi.stubGlobal('localStorage', {
         getItem: vi.fn(() => { throw new Error('blocked'); }),
         setItem: vi.fn(),
@@ -102,13 +102,13 @@ describe('ThemeProvider', () => {
           <ThemeDisplay />
         </ThemeProvider>
       );
-      expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+      expect(screen.getByTestId('theme-value').textContent).toBe('light');
     });
   });
 
   describe('applyTheme', () => {
     it('adds "dark" class to documentElement when theme is dark', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -119,7 +119,7 @@ describe('ThemeProvider', () => {
 
     it('removes "dark" class from documentElement when theme is light', () => {
       document.documentElement.classList.add('dark');
-      localStorageMock[THEME_STORAGE_KEY] = 'light';
+      localStorageMock.set(THEME_STORAGE_KEY, 'light');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -133,7 +133,7 @@ describe('ThemeProvider', () => {
       meta.setAttribute('name', 'theme-color');
       document.head.appendChild(meta);
 
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -148,7 +148,7 @@ describe('ThemeProvider', () => {
       meta.setAttribute('name', 'theme-color');
       document.head.appendChild(meta);
 
-      localStorageMock[THEME_STORAGE_KEY] = 'light';
+      localStorageMock.set(THEME_STORAGE_KEY, 'light');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -172,7 +172,7 @@ describe('ThemeProvider', () => {
 
   describe('toggleTheme', () => {
     it('switches from dark to light', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -186,7 +186,7 @@ describe('ThemeProvider', () => {
     });
 
     it('switches from light to dark', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'light';
+      localStorageMock.set(THEME_STORAGE_KEY, 'light');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -200,7 +200,7 @@ describe('ThemeProvider', () => {
     });
 
     it('persists toggled theme to localStorage', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       const setItemSpy = vi.spyOn(window.localStorage, 'setItem');
 
       render(
@@ -217,7 +217,7 @@ describe('ThemeProvider', () => {
 
   describe('setTheme', () => {
     it('sets theme to light explicitly', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'dark';
+      localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -230,7 +230,7 @@ describe('ThemeProvider', () => {
     });
 
     it('sets theme to dark explicitly', () => {
-      localStorageMock[THEME_STORAGE_KEY] = 'light';
+      localStorageMock.set(THEME_STORAGE_KEY, 'light');
       render(
         <ThemeProvider>
           <ThemeDisplay />
@@ -282,14 +282,14 @@ describe('useTheme', () => {
 });
 
 describe('ThemeProvider system preference', () => {
-  let localStorageMock: Record<string, string>;
+  let localStorageMock: Map<string, string>;
 
   beforeEach(() => {
-    localStorageMock = {};
+    localStorageMock = new Map<string, string>();
     vi.stubGlobal('localStorage', {
-      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
-      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+      getItem: vi.fn((key: string) => localStorageMock.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => { localStorageMock.set(key, value); }),
+      removeItem: vi.fn((key: string) => { localStorageMock.delete(key); }),
     });
     // Mock matchMedia
     vi.stubGlobal('window', {
@@ -308,9 +308,9 @@ describe('ThemeProvider system preference', () => {
   });
 
   it('listens for system preference changes and updates theme if no manual choice exists', async () => {
-    let changeHandler: (e: any) => void = () => {};
-    const addEventListenerMock = vi.fn((event, handler) => {
-      if (event === 'change') changeHandler = handler;
+    let changeHandler: (e: { matches: boolean }) => void = () => {};
+    const addEventListenerMock = vi.fn((event: string, handler: unknown) => {
+      if (event === 'change') changeHandler = handler as (e: { matches: boolean }) => void;
     });
     const removeEventListenerMock = vi.fn();
 
@@ -334,13 +334,13 @@ describe('ThemeProvider system preference', () => {
 
     // Simulate system change to dark
     await act(async () => {
-      changeHandler({ matches: true } as any);
+      changeHandler({ matches: true });
     });
     expect(screen.getByTestId('theme-value').textContent).toBe('dark');
 
     // Simulate system change to light
     await act(async () => {
-      changeHandler({ matches: false } as any);
+      changeHandler({ matches: false });
     });
     expect(screen.getByTestId('theme-value').textContent).toBe('light');
     
@@ -350,14 +350,14 @@ describe('ThemeProvider system preference', () => {
   });
 
   it('ignores system preference changes if manual choice exists', async () => {
-    localStorageMock[THEME_STORAGE_KEY] = 'dark';
-    let changeHandler: (e: any) => void = () => {};
+    localStorageMock.set(THEME_STORAGE_KEY, 'dark');
+    let changeHandler: (e: { matches: boolean }) => void = () => {};
     
     vi.stubGlobal('window', {
       ...window,
       matchMedia: vi.fn().mockReturnValue({
         matches: false,
-      addEventListener: (_event: any, handler: any) => { changeHandler = handler; },
+        addEventListener: (_event: string, handler: unknown) => { changeHandler = handler as (e: { matches: boolean }) => void; },
         removeEventListener: vi.fn(),
       }),
     });
@@ -370,18 +370,18 @@ describe('ThemeProvider system preference', () => {
 
     // Simulate system change to light — should stay dark due to localStorage
     await act(async () => {
-      changeHandler({ matches: false } as any);
+      changeHandler({ matches: false });
     });
     expect(screen.getByTestId('theme-value').textContent).toBe('dark');
   });
   
   it('handles localStorage errors in system change handler', async () => {
-    let changeHandler: (e: any) => void = () => {};
+    let changeHandler: (e: { matches: boolean }) => void = () => {};
     vi.stubGlobal('window', {
       ...window,
       matchMedia: vi.fn().mockReturnValue({
         matches: false,
-      addEventListener: (_event: any, handler: any) => { changeHandler = handler; },
+        addEventListener: (_event: string, handler: unknown) => { changeHandler = handler as (e: { matches: boolean }) => void; },
         removeEventListener: vi.fn(),
       }),
     });
@@ -401,7 +401,7 @@ describe('ThemeProvider system preference', () => {
     
     // Simulate system change to light
     await act(async () => {
-      changeHandler({ matches: false } as any);
+      changeHandler({ matches: false });
     });
     expect(screen.getByTestId('theme-value').textContent).toBe('light');
   });

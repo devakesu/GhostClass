@@ -3,8 +3,13 @@ import { render, screen } from '@testing-library/react';
 import { DashboardDataLoader } from '../DashboardDataLoader';
 import { fetchDashboardData } from '@/lib/ezygo-batch-fetcher';
 
+type DashboardClientProps = {
+  initialData?: unknown;
+  serverError?: string;
+};
+
 vi.mock('../DashboardClient', () => ({
-  default: ({ initialData, serverError }: any) => (
+  default: ({ initialData, serverError }: DashboardClientProps) => (
     <div data-testid="dashboard-client">
       <span data-testid="data">{initialData ? 'has-data' : 'no-data'}</span>
       <span data-testid="error">{serverError || 'no-error'}</span>

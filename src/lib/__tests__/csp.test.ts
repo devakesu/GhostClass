@@ -403,10 +403,8 @@ describe("Content Security Policy", () => {
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
       
       vi.spyOn(console, 'warn').mockImplementation(() => {});
-      // In csp.ts it uses lib/logger, which we might need to mock or just check the output
-      getCspHeader("nonce");
-      // Since it's production and no nonce was handled in a previous test, 
-      // let's just assume calling it hits the branch.
+      const header = getCspHeader("nonce");
+      expect(header).toBeTruthy();
     });
   });
 });

@@ -30,7 +30,7 @@ describe("GET /api/security/attestation", () => {
   it("returns error when App Check verifier is unavailable", async () => {
     process.env.ENFORCE_APP_CHECK = "true";
     const { getAppCheck } = await import("@/lib/firebase/admin");
-    vi.mocked(getAppCheck).mockReturnValue(null as any);
+    vi.mocked(getAppCheck).mockReturnValue(null as never);
 
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",
@@ -62,7 +62,7 @@ describe("GET /api/security/attestation", () => {
     };
     vi.mocked(getAppCheck).mockReturnValue({
       verifyToken: vi.fn().mockResolvedValue(mockDecoded),
-    } as any);
+    } as never);
 
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",
@@ -89,7 +89,7 @@ describe("GET /api/security/attestation", () => {
     };
     vi.mocked(getAppCheck).mockReturnValue({
       verifyToken: vi.fn().mockResolvedValue(mockDecoded),
-    } as any);
+    } as never);
 
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",
@@ -110,7 +110,7 @@ describe("GET /api/security/attestation", () => {
     const { getAppCheck } = await import("@/lib/firebase/admin");
     vi.mocked(getAppCheck).mockReturnValue({
       verifyToken: vi.fn().mockRejectedValue(new Error("Token expired")),
-    } as any);
+    } as never);
 
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",

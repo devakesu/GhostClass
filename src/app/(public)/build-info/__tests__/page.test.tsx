@@ -66,24 +66,6 @@ describe('BuildInfoPage', () => {
     expect(screen.getByText('UNKNOWN')).toBeInTheDocument(); // Image digest fallback or similar
   });
 
-  /*
-  it('should copy JSON metadata to clipboard when Copy Button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<BuildInfoPage />);
-
-    const copyButton = screen.getByRole('button', { name: /Copy JSON/i });
-    await user.click(copyButton);
-
-    expect(mockWriteText).toHaveBeenCalled();
-    const copiedText = mockWriteText.mock.calls[0][0];
-    const parsed = JSON.parse(copiedText);
-    expect(parsed.commit_sha).toBe('abc123def456');
-    expect(parsed.app_version).toBe('1.8.0');
-    
-    expect(screen.getByText(/Copied/i)).toBeInTheDocument();
-  });
-  */
-
   it('should link to GitHub commit and run when repo and IDs are valid', () => {
     render(<BuildInfoPage />);
 

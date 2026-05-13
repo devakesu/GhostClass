@@ -3,11 +3,6 @@
 /// Custom exception class for handling application-specific errors with
 /// structured types and technical details.
 class AppException implements Exception {
-  final String message;
-  final AppExceptionType type;
-  final Object? originalError;
-  final int? statusCode;
-  final Map<String, dynamic>? details;
 
   const AppException({
     required this.message,
@@ -16,6 +11,11 @@ class AppException implements Exception {
     this.statusCode,
     this.details,
   });
+  final String message;
+  final AppExceptionType type;
+  final Object? originalError;
+  final int? statusCode;
+  final Map<String, dynamic>? details;
 
   bool get isAuthError =>
       type == AppExceptionType.unauthorized ||

@@ -25,7 +25,7 @@ describe('ProfileError', () => {
   });
 
   it('logs error and captures exception', () => {
-    const error = new Error('Test profile error') as any;
+    const error = new Error('Test profile error') as Error & { digest?: string };
     error.digest = 'profile-digest';
     const reset = vi.fn();
 

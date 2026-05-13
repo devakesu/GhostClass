@@ -46,6 +46,13 @@ export const RevisionClassEmail = ({
 
           <Section style={emailStyles.conflictBox}>
             <table style={tableStyles.table}>
+              <thead>
+                <tr>
+                  <th colSpan={2} style={{ ...tableStyles.cellLabel, borderBottom: "1px solid #e5e7eb", textAlign: "left" }} scope="col">
+                    Class Details
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 <tr>
                   <td style={tableStyles.cellLabel}>📚 Course</td>

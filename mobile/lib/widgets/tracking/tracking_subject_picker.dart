@@ -8,22 +8,18 @@ import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrackingSubjectPicker extends ConsumerWidget {
+
+  const TrackingSubjectPicker({
+    required this.selectedCourse, required this.courseKeys, required this.groupedByCourse, required this.onSelected, super.key,
+    this.officialReport,
+    this.allCourses,
+  });
   final String selectedCourse;
   final List<String> courseKeys;
   final Map<String, List<TrackingRecord>> groupedByCourse;
   final AttendanceReportDetailed? officialReport;
   final List<CourseDetails>? allCourses;
-  final Function(String) onSelected;
-
-  const TrackingSubjectPicker({
-    super.key,
-    required this.selectedCourse,
-    required this.courseKeys,
-    required this.groupedByCourse,
-    required this.onSelected,
-    this.officialReport,
-    this.allCourses,
-  });
+  final void Function(String) onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -139,14 +135,6 @@ class TrackingSubjectPicker extends ConsumerWidget {
 }
 
 class _PickerChip extends StatelessWidget {
-  final String label;
-  final int count;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color primary;
-  final Color surface;
-
-  final bool isDisabled;
 
   const _PickerChip({
     required this.label,
@@ -157,6 +145,14 @@ class _PickerChip extends StatelessWidget {
     required this.surface,
     this.isDisabled = false,
   });
+  final String label;
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color primary;
+  final Color surface;
+
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {

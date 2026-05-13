@@ -14,9 +14,10 @@ export async function safeEzygoJson<T>(res: Response): Promise<T | null> {
     if (!text || text.trim() === "") return null;
     try {
       return JSON.parse(text);
-    } catch (_parseError) {
+    } catch (parseError) {
       // EzyGo occasionally returns naked (non-JSON) strings.
       // Preserve this legacy behavior for callers that can handle text payloads.
+      logger.dev("[ezygo] safeEzygoJson fallback to raw text payload", parseError);
       return text as unknown as T;
     }
   } catch (err) {

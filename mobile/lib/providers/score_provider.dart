@@ -1,27 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/score.dart';
-import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:ghostclass/logic/error_utils.dart';
 
 final scoreProvider = AsyncNotifierProvider<ScoreNotifier, ScoreState>(
   ScoreNotifier.new,
 );
 
 class ScoreState {
-  final List<Exam> rawExams;
-  final List<CourseGroup> groupedExams;
-  final Map<int, List<ExamQuestion>> questions;
-  final Map<int, List<ExamAnswer>> answers;
-  final Map<int, ResolvedScore> resolvedScores;
-  final String filterType;
-  final int totalExams;
-  final int scoredCount;
-  final int pendingCount;
 
   ScoreState({
     required this.rawExams,
@@ -34,6 +26,15 @@ class ScoreState {
     required this.scoredCount,
     required this.pendingCount,
   });
+  final List<Exam> rawExams;
+  final List<CourseGroup> groupedExams;
+  final Map<int, List<ExamQuestion>> questions;
+  final Map<int, List<ExamAnswer>> answers;
+  final Map<int, ResolvedScore> resolvedScores;
+  final String filterType;
+  final int totalExams;
+  final int scoredCount;
+  final int pendingCount;
 
   ScoreState copyWith({
     List<Exam>? rawExams,
@@ -61,9 +62,9 @@ class ScoreState {
 }
 
 class CourseGroup {
+  CourseGroup({required this.label, required this.exams});
   final String label;
   final List<Exam> exams;
-  CourseGroup({required this.label, required this.exams});
 }
 
 class ScoreNotifier extends AsyncNotifier<ScoreState> {
@@ -97,7 +98,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         throw Exception(formatApiError(examsRes.data, 'Scores.Exams'));
       }
 
-      final List<dynamic> examsJson = examsRes.data;
+      final examsJson = examsRes.data as List<dynamic>;
       final allExams = examsJson
           .map((j) => Exam.fromJson(j as Map<String, dynamic>))
           .toList();
@@ -144,10 +145,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         return true;
       }).toList();
 
-      final int scored = visibleExams
+      final scored = visibleExams
           .where((e) => resolvedScores.containsKey(e.id))
           .length;
-      final int pending = visibleExams.length - scored;
+      final pending = visibleExams.length - scored;
 
       final state = ScoreState(
         rawExams: visibleExams,
@@ -168,14 +169,14 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   }
 
   ScoreState _applyFilter(ScoreState baseState, String type) {
-    List<Exam> filtered = baseState.rawExams;
+    var filtered = baseState.rawExams;
     if (type != 'all') {
       filtered = baseState.rawExams
           .where((e) => e.activityType == type)
           .toList();
     }
 
-    final Map<String, List<Exam>> groupedMap = {};
+    final groupedMap = <String, List<Exam>>{};
     for (final exam in filtered) {
       groupedMap.putIfAbsent(exam.courseName, () => []).add(exam);
     }
@@ -184,11 +185,11 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         .map((entry) => CourseGroup(label: entry.key, exams: entry.value))
         .toList();
 
-    final int total = filtered.length;
-    final int scored = filtered
+    final total = filtered.length;
+    final scored = filtered
         .where((e) => baseState.resolvedScores.containsKey(e.id))
         .length;
-    final int pending = total - scored;
+    final pending = total - scored;
 
     return baseState.copyWith(
       filterType: type,
@@ -256,10 +257,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       }
     }
 
-    final qs = (qsData is List ? qsData : [])
+    final qs = (qsData is List<dynamic> ? qsData : <dynamic>[])
         .map((j) => ExamQuestion.fromJson(j as Map<String, dynamic>))
         .toList();
-    final ans = (ansData is List ? ansData : [])
+    final ans = (ansData is List<dynamic> ? ansData : <dynamic>[])
         .map((j) => ExamAnswer.fromJson(j as Map<String, dynamic>))
         .toList();
 
@@ -271,16 +272,16 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     answersMap[exam.id] = uniqueAnswers;
     
     double? finalScore;
-    final bool hasAnyGrade = uniqueAnswers.isNotEmpty && uniqueAnswers.any((a) => a.score != null);
+    final hasAnyGrade = uniqueAnswers.isNotEmpty && uniqueAnswers.any((a) => a.score != null);
 
     if (hasAnyGrade) {
-      finalScore = uniqueAnswers.fold<double>(0.0, (sum, a) => sum + (a.score ?? 0.0));
+      finalScore = uniqueAnswers.fold<double>(0, (sum, a) => sum + (a.score ?? 0.0));
     } else {
       finalScore = exam.apiScore;
     }
 
     // --- Robust Max Mark Calculation (matches web app) ---
-    double? finalMax = exam.maximumMark;
+    var finalMax = exam.maximumMark;
     
     if (finalMax == null || finalMax == 0) {
       if (uniqueQuestions.isNotEmpty) {
@@ -306,7 +307,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         
         // Handle OR-groups
         final orGroups = <int, double>{};
-        double total = 0.0;
+        var total = 0.0;
         
         for (final q in targetSet) {
           if (q.orQuestionGroupId != null) {
@@ -328,8 +329,8 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     }
 
     if (finalScore != null) {
-      final double? m = finalMax;
-      final bool isMaxUnresolvable = (m == null || m <= 0);
+      final m = finalMax;
+      final isMaxUnresolvable = m == null || m <= 0;
       resolvedScores[exam.id] = ResolvedScore(
         score: finalScore,
         maxMark: isMaxUnresolvable ? 0.0 : m,

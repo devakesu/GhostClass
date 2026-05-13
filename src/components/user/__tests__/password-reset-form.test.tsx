@@ -121,8 +121,6 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // Mock the Shadcn UI RadioGroup components so radio selection works in jsdom.
-// Radix UI primitives don't fire change events correctly without a browser.
-// radioGroupCallbackRef is declared via vi.hoisted() so it's available in the factory.
 vi.mock("@/components/ui/radio-group", () => {
   return {
     RadioGroup: ({
@@ -183,6 +181,48 @@ function fillUsername(value = "testuser") {
   fireEvent.change(screen.getByPlaceholderText("academic_weapon_fr"), {
     target: { value },
   });
+}
+
+async function reachOptionStep() {
+  mockEzygoPost
+    .mockResolvedValueOnce({ data: { users: ["testuser"] } })
+    .mockResolvedValueOnce({
+      data: {
+        username: "testuser",
+        options: { emails: ["t***@example.com"], mobiles: ["91****7890"] },
+      },
+    });
+
+  renderForm();
+  fillUsername("testuser");
+  fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+
+  await waitFor(() => expect(screen.getByText("Send Code")).toBeInTheDocument());
+  vi.clearAllMocks();
+}
+
+async function reachOtpStep() {
+  mockEzygoPost
+    .mockResolvedValueOnce({ data: { users: ["testuser"] } })
+    .mockResolvedValueOnce({
+      data: {
+        username: "testuser",
+        options: { emails: ["t***@example.com"], mobiles: [] },
+      },
+    })
+    .mockResolvedValueOnce({});
+
+  renderForm();
+  fillUsername("testuser");
+  fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+
+  await waitFor(() => screen.getByText("Send Code"));
+  const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
+  fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
+  fireEvent.submit(screen.getByText("Send Code").closest("form")!);
+
+  await waitFor(() => screen.getByLabelText("Reset Code"));
+  vi.clearAllMocks();
 }
 
 // ---------------------------------------------------------------------------
@@ -289,24 +329,6 @@ describe("PasswordResetForm – handleOptionSubmit", () => {
     global.fetch = mockFetch;
   });
 
-  async function reachOptionStep() {
-    mockEzygoPost
-      .mockResolvedValueOnce({ data: { users: ["testuser"] } })
-      .mockResolvedValueOnce({
-        data: {
-          username: "testuser",
-          options: { emails: ["t***@example.com"], mobiles: ["91****7890"] },
-        },
-      });
-
-    renderForm();
-    fillUsername("testuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
-
-    await waitFor(() => expect(screen.getByText("Send Code")).toBeInTheDocument());
-    vi.clearAllMocks();
-  }
-
   it("moves to OTP step after selecting an option and submitting", async () => {
     await reachOptionStep();
     mockEzygoPost.mockResolvedValueOnce({});
@@ -341,30 +363,6 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     vi.clearAllMocks();
     global.fetch = mockFetch;
   });
-
-  async function reachOtpStep() {
-    mockEzygoPost
-      .mockResolvedValueOnce({ data: { users: ["testuser"] } })
-      .mockResolvedValueOnce({
-        data: {
-          username: "testuser",
-          options: { emails: ["t***@example.com"], mobiles: [] },
-        },
-      })
-      .mockResolvedValueOnce({});
-
-    renderForm();
-    fillUsername("testuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
-
-    await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
-    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
-    fireEvent.submit(screen.getByText("Send Code").closest("form")!);
-
-    await waitFor(() => screen.getByLabelText("Reset Code"));
-    vi.clearAllMocks();
-  }
 
   it("shows error when password is too short (less than 6 chars)", async () => {
     await reachOtpStep();
@@ -438,30 +436,6 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
     global.fetch = mockFetch;
   });
 
-  async function reachOtpStep() {
-    mockEzygoPost
-      .mockResolvedValueOnce({ data: { users: ["testuser"] } })
-      .mockResolvedValueOnce({
-        data: {
-          username: "testuser",
-          options: { emails: ["t***@example.com"], mobiles: [] },
-        },
-      })
-      .mockResolvedValueOnce({});
-
-    renderForm();
-    fillUsername("testuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
-
-    await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
-    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
-    fireEvent.submit(screen.getByText("Send Code").closest("form")!);
-
-    await waitFor(() => screen.getByLabelText("Reset Code"));
-    vi.clearAllMocks();
-  }
-
   it("navigates to dashboard on successful password reset with settings", async () => {
     await reachOtpStep();
 
@@ -518,30 +492,6 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     vi.clearAllMocks();
     global.fetch = mockFetch;
   });
-
-  async function reachOtpStep() {
-    mockEzygoPost
-      .mockResolvedValueOnce({ data: { users: ["testuser"] } })
-      .mockResolvedValueOnce({
-        data: {
-          username: "testuser",
-          options: { emails: ["t***@example.com"], mobiles: [] },
-        },
-      })
-      .mockResolvedValueOnce({});
-
-    renderForm();
-    fillUsername("testuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
-
-    await waitFor(() => screen.getByText("Send Code"));
-    const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
-    fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
-    fireEvent.submit(screen.getByText("Send Code").closest("form")!);
-
-    await waitFor(() => screen.getByLabelText("Reset Code"));
-    vi.clearAllMocks();
-  }
 
   function fillOtpForm(otp = "123456", password = "newpassword123") {
     fireEvent.change(screen.getByPlaceholderText("Enter the reset code"), {
@@ -616,8 +566,6 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
       fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
     });
 
-    // The CSRF error is a plain Error; the catch block now surfaces its message
-    // directly to give the user an actionable reload prompt.
     await waitFor(() =>
       expect(screen.getByText("CSRF token unavailable – please reload the page and try again.")).toBeInTheDocument()
     );
@@ -630,7 +578,6 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     const passwordInput = screen.getByPlaceholderText("Enter your new password");
     expect(passwordInput).toHaveAttribute("type", "password");
 
-    // Find the toggle button (Eye icon) near the password input
     const eyeButtons = screen.getAllByRole("button").filter((btn) => {
       const parent = btn.closest(".relative");
       return parent?.contains(passwordInput);

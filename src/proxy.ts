@@ -45,11 +45,12 @@ function isRefreshTokenNotFoundError(error: unknown): boolean {
 /**
  * Attempts to get the user with a single retry on network failure.
  */
-async function getUserWithRetry(supabase: any) {
+async function getUserWithRetry(supabase: { auth: { getUser(): Promise<{ data: { user: { id: string } | null }; error: unknown }> } }) {
   try {
     const res = await supabase.auth.getUser();
     return res;
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as { message?: string; status?: number };
     const isTransient = error?.message?.includes('fetch') || 
                        error?.message?.includes('Network') || 
                        error?.status === 502 || 
@@ -70,117 +71,89 @@ async function getUserWithRetry(supabase: any) {
   }
 }
 
-export async function proxy(request: NextRequest) {
-  const nonce = createNonce();
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  const isNavigationRequest = request.method === "GET" || request.method === "HEAD";
-  const redirectStatus = isNavigationRequest ? 307 : 303;
-
-  const cspHeader = getCspHeader(nonce);
-  let response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
-
-  const pathname = request.nextUrl.pathname;
-  const isApiDocs = pathname === '/api-docs' || pathname.startsWith('/api-docs/');
-  const effectiveCspHeader = isApiDocs
-    ? [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-        "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' data: https://fonts.gstatic.com",
-        "img-src 'self' data: blob: https://cdn.jsdelivr.net",
-        "connect-src 'self' https://cdn.jsdelivr.net",
-        "worker-src 'self' blob:",
-        "frame-ancestors 'none'",
-        "object-src 'none'",
-        "base-uri 'self'",
-      ].join("; ")
-    : cspHeader;
-    
-  response.headers.set('Content-Security-Policy', effectiveCspHeader);
-  response.headers.set("x-nonce", nonce);
-
-  // Initialize Supabase
-  const isProd = process.env.NODE_ENV === "production";
-  const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-    : process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
-    : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  const supabase = createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request: { headers: requestHeaders } });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-          response.headers.set('Content-Security-Policy', effectiveCspHeader);
-          response.headers.set("x-nonce", nonce);
-        },
-      },
-    }
-  );
-
-  let user: any = null;
-  let isUnauthenticatedCertain = false;
-
+async function selfHealEzygoCookie(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  response: NextResponse,
+  isProd: boolean
+): Promise<void> {
   try {
-    const { data, error } = await getUserWithRetry(supabase);
-    if (error) {
-      if (isRefreshTokenNotFoundError(error) || isAuthSessionMissingError(error)) {
-        isUnauthenticatedCertain = true;
-      } else {
-        logger.warn("Supabase auth refresh failed in middleware; treating as unauthenticated.", { error });
-        isUnauthenticatedCertain = true;
-      }
-    } else {
-      user = data.user;
-      if (!user) {
-        isUnauthenticatedCertain = true;
-      } else {
-        // Self-Healing: If user is authenticated in Supabase but EzyGo cookie is missing, restore it.
-        const ezygoCookie = request.cookies.get("ezygo_access_token")?.value;
-        if (!ezygoCookie) {
-          try {
-            const { data: dbUser } = await supabase
-              .from("users")
-              .select("ezygo_token, ezygo_iv")
-              .eq("auth_id", user.id)
-              .maybeSingle();
+    const { data: dbUser } = await supabase
+      .from("users")
+      .select("ezygo_token, ezygo_iv")
+      .eq("auth_id", userId)
+      .maybeSingle();
 
-            if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
-              const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
-              response.cookies.set("ezygo_access_token", token, {
-                httpOnly: true,
-                secure: isProd,
-                sameSite: "lax",
-                path: "/",
-                maxAge: 31 * 24 * 60 * 60, // 31 days
-              });
-              logger.info("EzyGo session cookie self-healed in middleware", { userId: user.id });
-            }
-          } catch (err) {
-            logger.warn("Non-critical: EzyGo self-healing failed in middleware", err);
-          }
-        }
-      }
+    if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
+      const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
+      response.cookies.set("ezygo_access_token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 31 * 24 * 60 * 60, // 31 days
+      });
+      logger.info("EzyGo session cookie self-healed in middleware", { userId });
     }
+  } catch (err) {
+    logger.warn("Non-critical: EzyGo self-healing failed in middleware", err);
+  }
+}
+
+async function resolveSessionUser(
+  supabase: ReturnType<typeof createServerClient>,
+  request: NextRequest,
+  response: NextResponse,
+  isProd: boolean
+): Promise<{ user: { id: string } | null; isUnauthenticatedCertain: boolean }> {
+  try {
+    const { data, error } = await getUserWithRetry(supabase as unknown as Parameters<typeof getUserWithRetry>[0]);
+    if (error) {
+      if (!isRefreshTokenNotFoundError(error) && !isAuthSessionMissingError(error)) {
+        logger.warn("Supabase auth refresh failed in middleware; treating as unauthenticated.", { error });
+      }
+      return { user: null, isUnauthenticatedCertain: true };
+    }
+    
+    const user = data.user;
+    if (!user) {
+      return { user: null, isUnauthenticatedCertain: true };
+    }
+
+    const ezygoCookie = request.cookies.get("ezygo_access_token")?.value;
+    if (!ezygoCookie) {
+      await selfHealEzygoCookie(supabase, user.id, response, isProd);
+    }
+
+    return { user, isUnauthenticatedCertain: false };
   } catch (error) {
     logger.warn("Supabase auth getUser threw unexpectedly in middleware", { error });
-    isUnauthenticatedCertain = true;
+    return { user: null, isUnauthenticatedCertain: true };
   }
+}
 
+async function enforceRoutingScenarios({
+  request,
+  response,
+  user,
+  isUnauthenticatedCertain,
+  supabase,
+  cspHeader,
+  nonce,
+  redirectStatus,
+  isProd,
+}: {
+  request: NextRequest;
+  response: NextResponse;
+  user: { id: string } | null;
+  isUnauthenticatedCertain: boolean;
+  supabase: ReturnType<typeof createServerClient>;
+  cspHeader: string;
+  nonce: string;
+  redirectStatus: number;
+  isProd: boolean;
+}): Promise<NextResponse | null> {
+  const pathname = request.nextUrl.pathname;
   const termsVersion = request.cookies.get("terms_version")?.value;
   const protectedRoutePrefixes = [
     "/dashboard",
@@ -192,6 +165,7 @@ export async function proxy(request: NextRequest) {
   ];
   const isAuthRoute = pathname === "/";
   const isAcceptTermsRoute = pathname === "/accept-terms";
+  const isNavigationRequest = request.method === "GET" || request.method === "HEAD";
 
   const isProtectedRoute = protectedRoutePrefixes.some((routePrefix) => pathname.startsWith(routePrefix));
 
@@ -274,6 +248,89 @@ export async function proxy(request: NextRequest) {
     redirectRes.headers.set("x-nonce", nonce);
     redirectRes.cookies.delete('terms_redirect_count');
     return redirectRes;
+  }
+
+  return null;
+}
+
+export async function proxy(request: NextRequest) {
+  const nonce = createNonce();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  const isNavigationRequest = request.method === "GET" || request.method === "HEAD";
+  const redirectStatus = isNavigationRequest ? 307 : 303;
+
+  const cspHeader = getCspHeader(nonce);
+  let response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+
+  const pathname = request.nextUrl.pathname;
+  const isApiDocs = pathname === '/api-docs' || pathname.startsWith('/api-docs/');
+  const effectiveCspHeader = isApiDocs
+    ? [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://cdn.jsdelivr.net",
+        "connect-src 'self' https://cdn.jsdelivr.net",
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; ")
+    : cspHeader;
+    
+  response.headers.set('Content-Security-Policy', effectiveCspHeader);
+  response.headers.set("x-nonce", nonce);
+
+  // Initialize Supabase
+  const isProd = process.env.NODE_ENV === "production";
+  const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+    : process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
+    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
+    : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  const supabase = createServerClient(
+    supabaseUrl!,
+    supabaseKey!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request: { headers: requestHeaders } });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+          response.headers.set('Content-Security-Policy', effectiveCspHeader);
+          response.headers.set("x-nonce", nonce);
+        },
+      },
+    }
+  );
+
+  const { user, isUnauthenticatedCertain } = await resolveSessionUser(supabase, request, response, isProd);
+
+  const scenarioRes = await enforceRoutingScenarios({
+    request,
+    response,
+    user,
+    isUnauthenticatedCertain,
+    supabase,
+    cspHeader,
+    nonce,
+    redirectStatus,
+    isProd,
+  });
+
+  if (scenarioRes !== null) {
+    return scenarioRes;
   }
 
   return response;

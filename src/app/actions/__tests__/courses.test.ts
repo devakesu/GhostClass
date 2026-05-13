@@ -54,7 +54,7 @@ describe("course actions", () => {
 
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: false }),
-      } as any);
+      } as never);
 
       const result = await addCourseAction(formData);
       expect(result.error).toBe("Security verification failed. Please try again.");
@@ -70,7 +70,7 @@ describe("course actions", () => {
 
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: true }),
-      } as any);
+      } as never);
 
       const mockSupabase = {
         auth: {
@@ -82,7 +82,7 @@ describe("course actions", () => {
         single: vi.fn().mockResolvedValue({ data: { class_id: "class-id" } }),
         insert: vi.fn().mockResolvedValue({ error: null }),
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       const result = await addCourseAction(formData);
 
@@ -100,7 +100,7 @@ describe("course actions", () => {
       formData.append("courseName", "Intro CS");
       formData.append("cf-turnstile-response", "valid");
 
-      vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as any);
+      vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as never);
 
       const mockSupabase = {
         auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }) },
@@ -110,7 +110,7 @@ describe("course actions", () => {
         single: vi.fn().mockResolvedValue({ data: { class_id: "c" } }),
         insert: vi.fn().mockResolvedValue({ error: { code: "23505" } }),
       };
-      vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+      vi.mocked(createClient).mockResolvedValue(mockSupabase as never);
 
       const result = await addCourseAction(formData);
       expect(result.error).toBe("This course is already in your class lineup.");
