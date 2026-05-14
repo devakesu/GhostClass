@@ -8,24 +8,33 @@ void main() {
         const UserProfile(firstName: 'Jane', lastName: 'Smith').fullName,
         'Jane Smith',
       );
-      expect(const UserProfile(firstName: 'Jane').fullName, 'Jane');
-      expect(const UserProfile(lastName: 'Smith').fullName, 'Smith');
+      expect(
+        const UserProfile(firstName: 'Jane').fullName,
+        'Jane',
+      );
+      expect(
+        const UserProfile(lastName: 'Smith').fullName,
+        'Smith',
+      );
       expect(const UserProfile().fullName, isNull);
     });
 
-    test('UserProfile.fromJson handles class strings and missing timestamps', () {
-      final profile = UserProfile.fromJson({
-        'first_name': 'Alex',
-        'class': 'Evening Cohort',
-      });
+    test(
+      'UserProfile.fromJson handles class strings and missing timestamps',
+      () {
+        final profile = UserProfile.fromJson(const {
+          'first_name': 'Alex',
+          'class': 'Evening Cohort',
+        });
 
-      expect(profile.firstName, 'Alex');
-      expect(profile.classField?.id, '');
-      expect(profile.classField?.name, 'Evening Cohort');
-      expect(profile.createdAt, isNull);
-      expect(profile.ezygoCreatedAt, isNull);
-      expect(profile.toJson()['class'], isNotNull);
-    });
+        expect(profile.firstName, 'Alex');
+        expect(profile.classField?.id, '');
+        expect(profile.classField?.name, 'Evening Cohort');
+        expect(profile.createdAt, isNull);
+        expect(profile.ezygoCreatedAt, isNull);
+        expect(profile.toJson()['class'], isNotNull);
+      },
+    );
 
     test('UserProfile copyWith, equals, and hashCode work', () {
       final p1 = UserProfile(

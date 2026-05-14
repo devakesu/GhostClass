@@ -4,41 +4,44 @@ import 'package:ghostclass/models/score.dart';
 
 void main() {
   group('Exam', () {
-    test('fromJson prefers summery and derives scores from nested payloads', () {
-      final exam = Exam.fromJson({
-        'id': '88',
-        'name': 'Midterm',
-        'summery': 'Historical typo should win',
-        'summary': 'Fallback summary',
-        'activity_type': 'assignment',
-        'starts_at': '2026-05-14T09:00:00Z',
-        'end_at': '2026-05-14T11:00:00Z',
-        'maximum_mark': null,
-        'settings': {'questionPaperMaximumMark': 75},
-        'participants': [
-          {
-            'pivot': {'score': '61.5'},
-          },
-        ],
-        'course': [
-          {
-            'id': 3,
-            'name': 'Physics',
-            'code': 'PHY101',
-          },
-        ],
-      });
+    test(
+      'fromJson prefers summery and derives scores from nested payloads',
+      () {
+        final exam = Exam.fromJson({
+          'id': '88',
+          'name': 'Midterm',
+          'summery': 'Historical typo should win',
+          'summary': 'Fallback summary',
+          'activity_type': 'assignment',
+          'starts_at': '2026-05-14T09:00:00Z',
+          'end_at': '2026-05-14T11:00:00Z',
+          'maximum_mark': null,
+          'settings': {'questionPaperMaximumMark': 75},
+          'participants': [
+            {
+              'pivot': {'score': '61.5'},
+            },
+          ],
+          'course': [
+            {
+              'id': 3,
+              'name': 'Physics',
+              'code': 'PHY101',
+            },
+          ],
+        });
 
-      expect(exam.id, 88);
-      expect(exam.summary, 'Historical typo should win');
-      expect(exam.activityType, 'assignment');
-      expect(exam.startsAt, DateTime.parse('2026-05-14T09:00:00Z'));
-      expect(exam.endsAt, DateTime.parse('2026-05-14T11:00:00Z'));
-      expect(exam.maximumMark, 75);
-      expect(exam.apiScore, 61.5);
-      expect(exam.courseName, 'PHY101 – Physics');
-      expect(exam.date, DateTime.parse('2026-05-14T09:00:00Z'));
-    });
+        expect(exam.id, 88);
+        expect(exam.summary, 'Historical typo should win');
+        expect(exam.activityType, 'assignment');
+        expect(exam.startsAt, DateTime.parse('2026-05-14T09:00:00Z'));
+        expect(exam.endsAt, DateTime.parse('2026-05-14T11:00:00Z'));
+        expect(exam.maximumMark, 75);
+        expect(exam.apiScore, 61.5);
+        expect(exam.courseName, 'PHY101 – Physics');
+        expect(exam.date, DateTime.parse('2026-05-14T09:00:00Z'));
+      },
+    );
 
     test('fromJson falls back to defaults when optional fields are absent', () {
       final exam = Exam.fromJson({'id': 1});
@@ -56,7 +59,7 @@ void main() {
     });
 
     test('courseName falls back when course list is empty', () {
-      var exam = Exam(
+      final exam = Exam(
         id: 1,
         name: 'Quiz',
         activityType: 'assessment',

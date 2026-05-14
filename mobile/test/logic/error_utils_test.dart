@@ -119,7 +119,10 @@ void main() {
         'EzyGo servers are currently down. Please try again later.',
       );
       expect(
-        formatApiError({'code': '42501', 'message': 'row-level security'}, 'attendance'),
+        formatApiError({
+          'code': '42501',
+          'message': 'row-level security',
+        }, 'attendance'),
         'Permission denied. You can only modify your own attendance records.',
       );
     });

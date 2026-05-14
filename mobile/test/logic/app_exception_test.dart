@@ -22,21 +22,21 @@ void main() {
 
     test('isAuthError identifies authorization errors', () {
       expect(
-        AppException(
+        const AppException(
           message: 'Unauthorized',
           type: AppExceptionType.unauthorized,
         ).isAuthError,
         true,
       );
       expect(
-        AppException(
+        const AppException(
           message: 'Forbidden',
           type: AppExceptionType.forbidden,
         ).isAuthError,
         true,
       );
       expect(
-        AppException(
+        const AppException(
           message: 'Server error',
           type: AppExceptionType.server,
         ).isAuthError,
@@ -45,12 +45,15 @@ void main() {
     });
 
     test('toString formats exception info', () {
-      final appEx = AppException(
+      const appEx = AppException(
         message: 'Network timeout',
         type: AppExceptionType.network,
       );
 
-      expect(appEx.toString(), 'AppException(AppExceptionType.network): Network timeout');
+      expect(
+        appEx.toString(),
+        'AppException(AppExceptionType.network): Network timeout',
+      );
     });
 
     test('all exception types are accessible', () {

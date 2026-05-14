@@ -60,10 +60,38 @@ void main() {
       });
 
       test('converts id from int, double, and string', () {
-        expect(CourseInstructor.fromJson({'id': 25, 'course_code': 'C', 'instructor_name': 'I'}).id, 25);
-        expect(CourseInstructor.fromJson({'id': 26.7, 'course_code': 'C', 'instructor_name': 'I'}).id, 26);
-        expect(CourseInstructor.fromJson({'id': '27', 'course_code': 'C', 'instructor_name': 'I'}).id, 27);
-        expect(CourseInstructor.fromJson({'id': 'invalid', 'course_code': 'C', 'instructor_name': 'I'}).id, isNull);
+        expect(
+          CourseInstructor.fromJson({
+            'id': 25,
+            'course_code': 'C',
+            'instructor_name': 'I',
+          }).id,
+          25,
+        );
+        expect(
+          CourseInstructor.fromJson({
+            'id': 26.7,
+            'course_code': 'C',
+            'instructor_name': 'I',
+          }).id,
+          26,
+        );
+        expect(
+          CourseInstructor.fromJson({
+            'id': '27',
+            'course_code': 'C',
+            'instructor_name': 'I',
+          }).id,
+          27,
+        );
+        expect(
+          CourseInstructor.fromJson({
+            'id': 'invalid',
+            'course_code': 'C',
+            'instructor_name': 'I',
+          }).id,
+          isNull,
+        );
       });
 
       test('handles null id explicitly', () {

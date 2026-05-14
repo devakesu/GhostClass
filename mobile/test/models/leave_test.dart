@@ -58,10 +58,10 @@ void main() {
       });
 
       test('supports minimal payloads and default labels', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 99,
           'created_at': '2026-05-17T00:00:00Z',
-          'approvers': [],
+          'approvers': <dynamic>[],
         });
 
         expect(leave.id, 99);
@@ -74,54 +74,54 @@ void main() {
       });
 
       test('handles string id conversion', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': '150',
           'created_at': '2026-05-18T00:00:00Z',
-          'approvers': [],
+          'approvers': <dynamic>[],
         });
 
         expect(leave.id, 150);
-        expect(leave.id is int, true);
+        expect(leave.id, isA<int>());
       });
 
       test('handles null attendancetype gracefully', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 160,
           'created_at': '2026-05-19T00:00:00Z',
           'attendancetype': null,
-          'approvers': [],
+          'approvers': <dynamic>[],
         });
 
         expect(leave.attendanceType, isNull);
       });
 
       test('handles null event gracefully', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 170,
           'created_at': '2026-05-20T00:00:00Z',
           'event': null,
-          'approvers': [],
+          'approvers': <dynamic>[],
         });
 
         expect(leave.event, isNull);
       });
 
       test('handles null usersubgroup gracefully', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 180,
           'created_at': '2026-05-21T00:00:00Z',
           'usersubgroup': null,
-          'approvers': [],
+          'approvers': <dynamic>[],
         });
 
         expect(leave.userSubgroup, isNull);
       });
 
       test('handles multiple approvers with mixed data', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 230,
           'created_at': '2026-05-26T00:00:00Z',
-          'approvers': [
+          'approvers': <dynamic>[
             {'id': 1, 'updated_at': '2026-05-26T01:00:00Z'},
             {
               'id': 2,
@@ -129,7 +129,11 @@ void main() {
               'action_type': 'rejected',
               'action_by_user': {'first_name': 'Dean', 'last_name': 'Johnson'},
             },
-            {'id': 3, 'updated_at': '2026-05-26T03:00:00Z', 'action_type': 'pending'},
+            {
+              'id': 3,
+              'updated_at': '2026-05-26T03:00:00Z',
+              'action_type': 'pending',
+            },
           ],
         });
 
@@ -139,11 +143,11 @@ void main() {
       });
 
       test('handles multiple files with valid data', () {
-        final leave = Leave.fromJson({
+        final leave = Leave.fromJson(<String, dynamic>{
           'id': 240,
           'created_at': '2026-05-27T00:00:00Z',
-          'approvers': [],
-          'files': [
+          'approvers': <dynamic>[],
+          'files': <dynamic>[
             {'id': 1, 'file_name': 'file1.pdf', 'size_byte': 1024},
             {'id': 2, 'file_name': 'file2.pdf', 'size_byte': 2048},
             {'id': 3, 'file_name': 'file3.pdf', 'size_byte': 4096},
@@ -376,9 +380,13 @@ void main() {
           'attendancetype': {'id': 1, 'name': 'Leave'},
           'event': {'id': 1, 'name': 'Family Event'},
           'approvers': [
-            {'id': 1, 'updated_at': '2026-05-30T12:00:00Z', 'action_type': 'approved'}
+            {
+              'id': 1,
+              'updated_at': '2026-05-30T12:00:00Z',
+              'action_type': 'approved',
+            },
           ],
-          'files': [],
+          'files': <dynamic>[],
         };
 
         final leave = Leave.fromJson(data);
@@ -393,7 +401,7 @@ void main() {
         final data = {
           'id': 301,
           'created_at': '2026-05-31T00:00:00Z',
-          'approvers': [],
+          'approvers': <dynamic>[],
         };
 
         final leave = Leave.fromJson(data);

@@ -114,7 +114,7 @@ void main() {
 
     group('fullName getter', () {
       test('returns combined first and last name', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
           lastName: 'Doe',
         );
@@ -123,17 +123,15 @@ void main() {
       });
 
       test('returns only first name when last name is null', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
-          lastName: null,
         );
 
         expect(profile.fullName, 'John');
       });
 
       test('returns only last name when first name is null', () {
-        final profile = UserProfile(
-          firstName: null,
+        const profile = UserProfile(
           lastName: 'Doe',
         );
 
@@ -141,18 +139,14 @@ void main() {
       });
 
       test('returns null when both names are null', () {
-        final profile = UserProfile(
-          firstName: null,
-          lastName: null,
-        );
+        const profile = UserProfile();
 
         expect(profile.fullName, isNull);
       });
 
       test('trims extra whitespace', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
-          lastName: '',
         );
 
         expect(profile.fullName, 'John');
@@ -161,7 +155,7 @@ void main() {
 
     group('copyWith', () {
       test('creates a copy with updated fields', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
           lastName: 'Doe',
           email: 'john@example.com',
@@ -180,7 +174,7 @@ void main() {
       });
 
       test('preserves original instance', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
           email: 'john@example.com',
         );
@@ -192,7 +186,7 @@ void main() {
       });
 
       test('updates multiple fields at once', () {
-        final profile = UserProfile(
+        const profile = UserProfile(
           firstName: 'John',
           lastName: 'Doe',
           phone: '+1234567890',
@@ -213,13 +207,13 @@ void main() {
 
     group('equality', () {
       test('two profiles with same data are equal', () {
-        final profile1 = UserProfile(
+        const profile1 = UserProfile(
           firstName: 'John',
           lastName: 'Doe',
           email: 'john@example.com',
         );
 
-        final profile2 = UserProfile(
+        const profile2 = UserProfile(
           firstName: 'John',
           lastName: 'Doe',
           email: 'john@example.com',
@@ -229,12 +223,12 @@ void main() {
       });
 
       test('two profiles with different data are not equal', () {
-        final profile1 = UserProfile(
+        const profile1 = UserProfile(
           firstName: 'John',
           email: 'john@example.com',
         );
 
-        final profile2 = UserProfile(
+        const profile2 = UserProfile(
           firstName: 'Jane',
           email: 'john@example.com',
         );

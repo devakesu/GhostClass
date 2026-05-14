@@ -69,22 +69,25 @@ void main() {
         'usersubgroup': {
           'usergroup': {
             'name': 'Lecture B',
-          }
+          },
         },
       };
       final course = CourseDetails.fromJson(json);
       expect(course.userGroupName, 'Lecture B');
     });
 
-    test('falls back to user_group_name if nested structure is unavailable', () {
-      final json = {
-        'id': 30,
-        'name': 'DBMS',
-        'user_group_name': 'Tutorial 1',
-      };
-      final course = CourseDetails.fromJson(json);
-      expect(course.userGroupName, 'Tutorial 1');
-    });
+    test(
+      'falls back to user_group_name if nested structure is unavailable',
+      () {
+        final json = {
+          'id': 30,
+          'name': 'DBMS',
+          'user_group_name': 'Tutorial 1',
+        };
+        final course = CourseDetails.fromJson(json);
+        expect(course.userGroupName, 'Tutorial 1');
+      },
+    );
 
     test('handles malformed usersubgroup gracefully', () {
       final json = {
@@ -100,7 +103,7 @@ void main() {
       final json = {
         'id': 50,
         'name': 'Operating Systems',
-        'institution_users': [],
+        'institution_users': <dynamic>[],
       };
       final course = CourseDetails.fromJson(json);
       expect(course.institutionUsers, isEmpty);
@@ -110,10 +113,10 @@ void main() {
       final json = {
         'id': 60,
         'name': 'Compiler Design',
-        'institution_users': [
+        'institution_users': <dynamic>[
           'string_item',
           null,
-          {'first_name': 'Dr', 'last_name': 'Lee', 'pivot': {}},
+          <String, dynamic>{'first_name': 'Dr', 'last_name': 'Lee', 'pivot': <String, dynamic>{}},
           123,
         ],
       };
@@ -163,7 +166,7 @@ void main() {
           'course_id': 101,
           'institution_user_id': 50,
           'courserole_id': 1,
-        }
+        },
       };
       final user = CourseInstitutionUser.fromJson(json);
       expect(user.firstName, 'Prof');

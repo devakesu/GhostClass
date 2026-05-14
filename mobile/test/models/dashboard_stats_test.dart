@@ -4,28 +4,28 @@ import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 
 AttendanceReportDetailed _buildAttendanceReport() {
-  return AttendanceReportDetailed(
+  return const AttendanceReportDetailed(
     courses: {
-      '1': const AttendanceCourse(id: 1, name: 'Math', code: 'MATH101'),
-      '2': const AttendanceCourse(id: 2, name: 'Chem', code: 'CHEM201'),
-      '3': const AttendanceCourse(id: 3, name: 'English', code: 'ENG300'),
-      '4': const AttendanceCourse(id: 4, name: 'History', code: 'HIST400'),
+      '1': AttendanceCourse(id: 1, name: 'Math', code: 'MATH101'),
+      '2': AttendanceCourse(id: 2, name: 'Chem', code: 'CHEM201'),
+      '3': AttendanceCourse(id: 3, name: 'English', code: 'ENG300'),
+      '4': AttendanceCourse(id: 4, name: 'History', code: 'HIST400'),
     },
     studentAttendanceData: {
       '2026-05-10': {
-        's1': const AttendanceSession(
+        's1': AttendanceSession(
           course: '1',
           attendance: 110,
           session: '1',
           classType: 'Lecture',
         ),
-        's2': const AttendanceSession(
+        's2': AttendanceSession(
           course: '2',
           attendance: 111,
           session: '1',
           classType: 'Lecture',
         ),
-        's3': const AttendanceSession(
+        's3': AttendanceSession(
           course: '3',
           attendance: 225,
           session: '1',
@@ -33,7 +33,7 @@ AttendanceReportDetailed _buildAttendanceReport() {
         ),
       },
       '2026-05-11': {
-        's4': const AttendanceSession(
+        's4': AttendanceSession(
           course: '3',
           attendance: 112,
           session: '2',
@@ -41,7 +41,7 @@ AttendanceReportDetailed _buildAttendanceReport() {
         ),
       },
     },
-    attendanceDates: const {
+    attendanceDates: {
       '2026-05-10': true,
       '2026-05-11': true,
     },
@@ -230,7 +230,6 @@ void main() {
         trackingRecords: const [],
         selectedSemester: 'S1',
         selectedYear: '2026',
-        allCourses: null,
       );
 
       expect(stats.courseStats, isEmpty);
@@ -334,13 +333,13 @@ void main() {
 
     test('counts duty leaves (code 225) correctly', () {
       final stats = DashboardStats.calculate(
-        attendanceData: AttendanceReportDetailed(
+        attendanceData: const AttendanceReportDetailed(
           courses: {
-            '1': const AttendanceCourse(id: 1, name: 'Course1', code: 'C101'),
+            '1': AttendanceCourse(id: 1, name: 'Course1', code: 'C101'),
           },
           studentAttendanceData: {
             '2026-05-20': {
-              's1': const AttendanceSession(
+              's1': AttendanceSession(
                 course: '1',
                 attendance: 225,
                 session: '1',
@@ -348,13 +347,13 @@ void main() {
               ),
             },
           },
-          attendanceDates: const {'2026-05-20': true},
+          attendanceDates: {'2026-05-20': true},
         ),
         trackingRecords: const [],
         selectedSemester: 'S1',
         selectedYear: '2026',
-        allCourses: const [
-          CourseDetails(id: 1, name: 'Course1', code: 'C101'),
+        allCourses: [
+          const CourseDetails(id: 1, name: 'Course1', code: 'C101'),
         ],
       );
 
@@ -394,7 +393,7 @@ void main() {
     });
 
     test('courseStats includes all provided courses', () {
-      final allCourses = const [
+      const allCourses = [
         CourseDetails(id: 1, name: 'Math', code: 'MATH101'),
         CourseDetails(id: 2, name: 'Chem', code: 'CHEM201'),
         CourseDetails(id: 3, name: 'English', code: 'ENG300'),
