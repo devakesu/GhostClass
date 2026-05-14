@@ -268,14 +268,18 @@ class AttendanceCalendarWidget extends StatelessWidget {
 
   Color _getStatusColor(String? status, BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    if (status == 'absent')
+    if (status == 'absent') {
       return ghostColors?.dangerRed ?? const Color(0xFFEF4444);
-    if (status == 'dutyLeave')
+    }
+    if (status == 'dutyLeave') {
       return ghostColors?.accentOrange ?? const Color(0xFFF59E0B);
-    if (status == 'otherLeave')
+    }
+    if (status == 'otherLeave') {
       return ghostColors?.accentBlue ?? const Color(0xFF3B82F6);
-    if (status == 'present')
+    }
+    if (status == 'present') {
       return ghostColors?.successGreen ?? const Color(0xFF10B981);
+    }
     return Theme.of(context).colorScheme.onSurface;
   }
 }

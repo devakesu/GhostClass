@@ -210,12 +210,15 @@ class TrackingRecordCard extends StatelessWidget {
   Color _getStatusColor(BuildContext context, dynamic attendance) {
     final status = AttendanceStatus.fromCode(attendance);
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    if (status == AttendanceStatus.dutyLeave)
+    if (status == AttendanceStatus.dutyLeave) {
       return ghostColors?.accentOrange ?? Colors.orange;
-    if (status == AttendanceStatus.absent)
+    }
+    if (status == AttendanceStatus.absent) {
       return ghostColors?.dangerRed ?? Colors.red;
-    if (status == AttendanceStatus.otherLeave)
+    }
+    if (status == AttendanceStatus.otherLeave) {
       return ghostColors?.accentBlue ?? Colors.blue;
+    }
     return ghostColors?.successGreen ?? Colors.green;
   }
 

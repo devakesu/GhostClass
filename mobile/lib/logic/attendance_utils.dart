@@ -114,8 +114,9 @@ String normalizeDate(dynamic date) {
         if (parsed == null ||
             parsed.year != year ||
             parsed.month != month ||
-            parsed.day != day)
+            parsed.day != day) {
           return '';
+        }
 
         if (a.length == 4) {
           // YYYY-MM-DD
@@ -151,8 +152,9 @@ String normalizeDate(dynamic date) {
         if (parsed == null ||
             parsed.year != year ||
             parsed.month != month ||
-            parsed.day != day)
+            parsed.day != day) {
           return '';
+        }
 
         if (a.length == 4) {
           // YYYY/MM/DD

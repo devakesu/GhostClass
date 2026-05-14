@@ -492,20 +492,23 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           return s.isEmpty ? null : s;
         }
         final map = raw;
-        if (map[key] != null)
+        if (map[key] != null) {
           return map[key].toString().trim().isEmpty
               ? null
               : map[key].toString().trim();
+        }
         for (final k in ['data', 'value']) {
           final val = map[k];
           if (val == null) continue;
-          if (val is! Map<dynamic, dynamic>)
+          if (val is! Map<dynamic, dynamic>) {
             return val.toString().trim().isEmpty ? null : val.toString().trim();
+          }
           final nested = val;
-          if (nested[key] != null)
+          if (nested[key] != null) {
             return nested[key].toString().trim().isEmpty
                 ? null
                 : nested[key].toString().trim();
+          }
         }
         return null;
       }

@@ -93,8 +93,9 @@ class _ProfileDumpContent extends ConsumerWidget {
     final institutionsAsync = ref.watch(institutionsProvider);
     final institutionName = institutionsAsync.when(
       data: (insts) {
-        if (user.ezygoId == null)
+        if (user.ezygoId == null) {
           return insts.isNotEmpty ? insts.first.name : '—';
+        }
         try {
           final searchId = user.ezygoId!.trim();
           return insts

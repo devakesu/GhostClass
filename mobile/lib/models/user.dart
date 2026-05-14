@@ -287,8 +287,9 @@ class UserSettings {
           if (!_mapsEqual(
             m1[key] as Map<dynamic, dynamic>,
             m2[key] as Map<dynamic, dynamic>,
-          ))
+          )) {
             return false;
+          }
         } else {
           return false;
         }
