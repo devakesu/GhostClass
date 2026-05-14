@@ -116,7 +116,11 @@ void main() {
         'institution_users': <dynamic>[
           'string_item',
           null,
-          <String, dynamic>{'first_name': 'Dr', 'last_name': 'Lee', 'pivot': <String, dynamic>{}},
+          <String, dynamic>{
+            'first_name': 'Dr',
+            'last_name': 'Lee',
+            'pivot': <String, dynamic>{},
+          },
           123,
         ],
       };
