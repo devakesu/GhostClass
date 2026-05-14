@@ -4,6 +4,7 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch: # Allows manual triggering if GitHub path filtering skips a commit
   push:
     branches:
       - main
@@ -14,20 +15,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
+
+      - name: Fetch CI secrets from Infisical
+        uses: infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          env-slug: "production"
+          secret-path: "/ci"
+        continue-on-error: true
 
       - uses: supabase/setup-cli@0abc813ee30fc6710a975fb92db02aa8a6b14501 # v1.6.0
         with:
           version: 2.76.10
 
       - name: Link Project
+        env:
+          SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
         run: supabase link --project-ref $SUPABASE_PROJECT_ID
 
       - name: Deploy Database Changes (Migrations)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ env.SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ env.SUPABASE_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
         run: supabase db push
