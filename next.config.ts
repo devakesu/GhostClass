@@ -243,6 +243,7 @@ const nextConfig = {
       }),
     ],
   },
+  // eslint-disable-next-line sonarjs/no-hardcoded-ip
   allowedDevOrigins: ['192.168.0.103']
 } satisfies NextConfig;
 

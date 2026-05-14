@@ -77,8 +77,13 @@ vi.mock('next/navigation', () => ({
 
 // Mock Next.js Image
 vi.mock('next/image', () => ({
-  default: ({ alt, fill: _fill, priority: _priority, placeholder: _placeholder, blurDataURL: _blurDataURL, ...props }: any) => {
-    return React.createElement('img', { alt, ...props })
+  default: ({ alt, ...props }: Record<string, unknown>) => {
+    const cleanProps = { ...props };
+    delete cleanProps.fill;
+    delete cleanProps.priority;
+    delete cleanProps.placeholder;
+    delete cleanProps.blurDataURL;
+    return React.createElement('img', { alt: alt as string, ...cleanProps })
   },
 }))
 
@@ -104,7 +109,7 @@ vi.mock('@/lib/supabase/client', () => ({
 // Mock CircuitBreaker to prevent interference with unit tests
 vi.mock('@/lib/circuit-breaker', () => {
   class MockCircuitBreaker {
-    async execute(fn: any) { return await fn(); }
+    async execute(fn: () => unknown) { return await fn(); }
     on() {}
     getState() { return 'CLOSED'; }
     getStatus() { return { state: 'CLOSED', failures: 0, timeUntilReset: 0, successCount: 0, isOpen: false }; }
@@ -144,7 +149,7 @@ vi.mock('@/lib/circuit-breaker', () => {
 vi.mock('@/components/loading', async () => {
   const React = await import('react');
   return {
-    Loading: ({ minimal, message }: any) => {
+    Loading: ({ minimal, message }: { minimal?: boolean; message?: string }) => {
       return React.createElement('div', { 'data-testid': 'loading-spinner' },
         minimal ? 'Minimal Loading...' : 'Full Loading...',
         message ? React.createElement('span', null, message) : null
@@ -281,32 +286,37 @@ vi.mock('@/hooks/use-build-info', () => ({
 
 // Mock framer-motion
 vi.mock('framer-motion', () => {
-  const MockDiv = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('div', { ref, ...props }, children));
+  interface MotionProps extends Record<string, unknown> {
+    children?: React.ReactNode;
+  }
+  type MotionRef = React.Ref<unknown>;
+
+  const MockDiv = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('div', { ref, ...props }, children));
   MockDiv.displayName = 'MotionDiv';
   
-  const MockButton = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('button', { ref, ...props }, children));
+  const MockButton = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('button', { ref, ...props }, children));
   MockButton.displayName = 'MotionButton';
   
-  const MockP = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('p', { ref, ...props }, children));
+  const MockP = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('p', { ref, ...props }, children));
   MockP.displayName = 'MotionP';
   
-  const MockSpan = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('span', { ref, ...props }, children));
+  const MockSpan = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('span', { ref, ...props }, children));
   MockSpan.displayName = 'MotionSpan';
   
-  const MockSection = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('section', { ref, ...props }, children));
+  const MockSection = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('section', { ref, ...props }, children));
   MockSection.displayName = 'MotionSection';
   
-  const MockNav = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('nav', { ref, ...props }, children));
+  const MockNav = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('nav', { ref, ...props }, children));
   MockNav.displayName = 'MotionNav';
   
-  const MockHeader = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('header', { ref, ...props }, children));
+  const MockHeader = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('header', { ref, ...props }, children));
   MockHeader.displayName = 'MotionHeader';
   
-  const MockFooter = React.forwardRef(({ children, ...props }: any, ref: any) => React.createElement('footer', { ref, ...props }, children));
+  const MockFooter = React.forwardRef(({ children, ...props }: MotionProps, ref: MotionRef) => React.createElement('footer', { ref, ...props }, children));
   MockFooter.displayName = 'MotionFooter';
 
   return {
-    LazyMotion: ({ children }: any) => children,
+    LazyMotion: ({ children }: { children?: React.ReactNode }) => children,
     domAnimation: {},
     m: {
       div: MockDiv,
@@ -318,7 +328,7 @@ vi.mock('framer-motion', () => {
       header: MockHeader,
       footer: MockFooter,
     },
-    AnimatePresence: ({ children }: any) => children,
+    AnimatePresence: ({ children }: { children?: React.ReactNode }) => children,
     motion: {
       div: MockDiv,
       button: MockButton,
@@ -334,19 +344,19 @@ vi.mock('framer-motion', () => {
 
 // Mock lucide-react icons globally
 vi.mock('lucide-react', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = await importOriginal() as Record<string, unknown>;
   const mockIcon = (name: string) => {
-    const Icon = (props: any) => React.createElement('div', { ...props, 'data-testid': `icon-${name.toLowerCase()}` });
+    const Icon = (props: Record<string, unknown>) => React.createElement('div', { ...props, 'data-testid': `icon-${name.toLowerCase()}` });
     Icon.displayName = name;
     return Icon;
   };
 
-  const mocks: any = {};
-  Object.keys(actual).forEach(key => {
-    if (typeof actual[key] === 'function' || (actual[key] && actual[key].$$typeof)) {
-      mocks[key] = mockIcon(key);
+  const mocksMap = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(actual)) {
+    if (typeof value === 'function' || (value && typeof value === 'object' && '$$typeof' in value)) {
+      mocksMap.set(key, mockIcon(key));
     }
-  });
+  }
 
   // Ensure common ones are there even if not in keys
   const commonIcons = [
@@ -357,11 +367,13 @@ vi.mock('lucide-react', async (importOriginal) => {
     'Settings', 'Trash2', 'User', 'X', 'BookOpen', 'CalendarClock'
   ];
   
-  commonIcons.forEach(icon => {
-    if (!mocks[icon]) mocks[icon] = mockIcon(icon);
-  });
+  for (const icon of commonIcons) {
+    if (!mocksMap.has(icon)) {
+      mocksMap.set(icon, mockIcon(icon));
+    }
+  }
 
-  return mocks;
+  return Object.fromEntries(mocksMap);
 });
 
 
