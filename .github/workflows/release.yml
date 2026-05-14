@@ -57,7 +57,7 @@ jobs:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "production"
+          env-slug: "prod"
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
@@ -379,7 +379,7 @@ jobs:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "production"
+          env-slug: "prod"
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
@@ -445,6 +445,15 @@ jobs:
 
           mkdir -p app
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+
+          # Derive dynamic API key directly from the decoded file if not set manually
+          if [ -z "${FIREBASE_API_KEY_ANDROID:-}" ]; then
+            DERIVED_KEY=$(jq -r '.client[0].api_key[0].current_key // empty' app/google-services.json)
+            if [ -n "$DERIVED_KEY" ]; then
+              echo "FIREBASE_API_KEY_ANDROID=$DERIVED_KEY" >> "$GITHUB_ENV"
+              echo "✓ Derived FIREBASE_API_KEY_ANDROID directly from google-services.json"
+            fi
+          fi
 
       - name: Generate mobile/lib/config/app_secrets.dart
         working-directory: mobile
@@ -518,7 +527,8 @@ jobs:
             --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
             --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
             --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
-            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }}
+            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }} \
+            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}"
 
           dart run sentry_dart_plugin
 
@@ -541,7 +551,8 @@ jobs:
             --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
             --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
             --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
-            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }}
+            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }} \
+            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}"
 
       - name: Generate mobile SBOM
         working-directory: mobile
@@ -663,7 +674,7 @@ jobs:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "production"
+          env-slug: "prod"
           secret-path: "/build-time"
         continue-on-error: true
 

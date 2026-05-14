@@ -1,5 +1,5 @@
 # Base Image
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04@sha256:81380e4c9c14e8a629ff39029639e4b7893e67400246fa7782a0fe7dc193a02a
 
 USER root
 
@@ -13,8 +13,10 @@ RUN apt-get update && apt-get install -y \
     && sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # 2. Node.js 24
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y nodejs
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y nodejs
 
 # 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
@@ -37,9 +39,9 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
     && mv supabase /usr/local/bin/ \
     && chmod +x /usr/local/bin/supabase \
     && rm supabase.tar.gz \
-    && npm install -g playwright \
+    && npm install -g playwright@1.44.0 \
     && npx playwright install-deps \
-    && npm install -g firebase-tools
+    && npm install -g firebase-tools@13.10.0
 
 # Switch to vscode user for user-space SDKs
 USER vscode
@@ -101,7 +103,13 @@ export PATH="$DENO_INSTALL/bin:$PATH"
 
 if [ ! -f "$DENO_INSTALL/bin/deno" ]; then
     echo "⬇️ Installing Deno..."
-    curl -fsSL https://deno.land/install.sh | sh
+    mkdir -p "/tmp/deno_install"
+    wget -q https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -O /tmp/deno_install/deno.zip
+    unzip -q /tmp/deno_install/deno.zip -d "/tmp/deno_install"
+    mkdir -p "$DENO_INSTALL/bin"
+    mv /tmp/deno_install/deno "$DENO_INSTALL/bin/deno"
+    chmod +x "$DENO_INSTALL/bin/deno"
+    rm -rf "/tmp/deno_install"
 fi
 
 if ! grep -q "DENO_INSTALL" ~/.bashrc; then
@@ -160,7 +168,7 @@ flutter config --android-sdk "$ANDROID_HOME"
 # 6. Workspace Dependencies
 if [ -f "/workspace/package.json" ]; then
     echo "📦 Installing NPM dependencies..."
-    cd /workspace && npm install --legacy-peer-deps
+    cd /workspace && npm ci --legacy-peer-deps
 fi
 
 if [ -d "/workspace/mobile" ]; then
