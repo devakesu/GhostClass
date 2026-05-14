@@ -41,6 +41,7 @@ vi.mock("@/lib/security/app-check", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: {
     warn: vi.fn(),
+    dev: vi.fn(),
   },
 }));
 

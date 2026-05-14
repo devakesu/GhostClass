@@ -322,12 +322,12 @@ To enable automated workflows and deployments, maintainers need:
 
 ### Maintainer Tools
 
-**Sync Script** (`npm run sync-secrets`)
+#### Infisical Secret Orchestration
 
-- Syncs `.env` values to GitHub Actions: non-sensitive build values as **Variables**, sensitive values as **Secrets**
-- Only needed when updating build-time environment values
-- Requires GitHub CLI (`gh`) with authentication
-- External contributors don't need this
+- Centralized management via Infisical Dashboard acts as the single source of truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
+- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations, Coolify production runtime environments inject `/runtime` secrets dynamically into memory at boot time using the Infisical CLI wrapper.
+- Eliminates manual script execution and plaintext storage on disk.
+- External contributors don't need access to Infisical to submit code.
 
 ### Version Management
 

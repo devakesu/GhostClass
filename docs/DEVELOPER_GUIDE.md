@@ -44,11 +44,12 @@ cd GhostClass
 npm install --legacy-peer-deps
 
 # 3. Set up environment
-cp .example.env .env
-# Edit .env with your configuration
+# Secrets are mapped in 3 Infisical folders: /build-time, /runtime, /ci
+infisical login
+# Provision local environment variables in-memory
 
 # 4. Start development server
-npm run dev
+infisical run -- npm run dev
 
 # 5. Run tests
 npm run test
@@ -916,7 +917,7 @@ openssl rand -base64 32
 ```
 
 ```env
-# .env (runtime secret — never bake into the image)
+# Infisical Secret Mapping (Store in `/runtime` folder — injected dynamically into memory at boot time)
 CRON_SECRET=<your-generated-secret>
 ```
 

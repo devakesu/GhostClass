@@ -250,7 +250,9 @@ WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
-    apk add --no-cache curl
+    apk add --no-cache bash curl && \
+    curl -1sLf 'https://artifacts-cli.infisical.com/setup.apk.sh' | bash && \
+    apk add --no-cache infisical
 
 # Core Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -276,4 +278,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl --fail --silent --show-error http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+# Wrap the start command with Infisical CLI to dynamically fetch runtime secrets into memory at boot time.
+# In Coolify, configure two environment variables:
+# 1. INFISICAL_TOKEN (your Machine Identity token)
+# 2. INFISICAL_PROJECT_ID (your target Infisical Project ID)
+# The Infisical CLI automatically detects both variables and injects secrets directly into Node.js without disk storage.
+CMD ["infisical", "run", "--path", "/runtime", "--env", "production", "--", "node", "server.js"]

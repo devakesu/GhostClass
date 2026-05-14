@@ -96,7 +96,7 @@ async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (!origin || !host) return "Invalid origin";
 
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-  if (!appDomain?.trim()) return "Server configuration error";
+  if (!appDomain?.trim() || appDomain.includes("://")) return "Server configuration error";
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
@@ -120,7 +120,7 @@ async function verifyEzygoToken(token: string) {
       headers: { Authorization: `Bearer ${token}` },
       signal: abortCtrl.signal,
     });
-    if (res.status === 401) throw { status: 401, message: "Invalid token" };
+    if (res.status === 401) throw { status: 401, message: "Invalid or expired token" };
     if (res.status !== 200) throw { status: 502, message: "Service error" };
 
     const data = await res.json().catch(() => null);
@@ -158,7 +158,7 @@ async function handleOrphanUser(
 async function validateClientIpAndRateLimit(headerList: Headers): Promise<NextResponse | null> {
   const ip = getClientIp(headerList);
   if (!ip) {
-    return NextResponse.json({ error: "No IP determined" }, { status: 400 });
+    return NextResponse.json({ error: "Unable to determine client IP" }, { status: 400 });
   }
 
   const { success } = await authRateLimiter.limit(ip);
@@ -178,9 +178,27 @@ async function provisionSupabaseAuthUser(
     .from("users")
     .select("*")
     .eq("id", verifiedId)
-    .maybeSingle();
+    .single();
 
   if (existing?.auth_id) {
+    if (!existing.auth_password) {
+      const canonicalPass = crypto.randomBytes(32).toString("hex");
+      await supabaseAdmin.auth.admin.updateUserById(existing.auth_id, { password: canonicalPass });
+      const { iv: pIv, content: pContent } = encrypt(canonicalPass);
+      await supabaseAdmin
+        .from("users")
+        .update({ auth_password: pContent, auth_password_iv: pIv })
+        .eq("id", verifiedId)
+        .is("auth_password", null)
+        .select();
+
+      return {
+        authUserId: existing.auth_id,
+        passwordToUse: canonicalPass,
+        isFirstLogin: false,
+      };
+    }
+
     return {
       authUserId: existing.auth_id,
       passwordToUse: decrypt(existing.auth_password_iv!, existing.auth_password!),
@@ -221,7 +239,8 @@ const handler = async (
   const headerList = await headers();
   const originError = await validateOrigin(headerList, authType === "app-check");
   if (originError) {
-    return NextResponse.json({ error: originError }, { status: 403 });
+    const status = originError === "Server configuration error" ? 500 : 403;
+    return NextResponse.json({ error: originError }, { status });
   }
 
   const rateLimitErr = await validateClientIpAndRateLimit(headerList);
@@ -234,12 +253,16 @@ const handler = async (
     const body = decryptedBody || (await req.json());
     const validation = SaveTokenRequestSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Bad format" }, { status: 400 });
+      return NextResponse.json({ message: "Invalid request format" }, { status: 400 });
     }
 
     const { token, fcm_token } = validation.data;
     const ezyUser = await verifyEzygoToken(token);
     verifiedId = ezyUser.id;
+
+    if (!/^[a-zA-Z0-9-_]+$/.test(verifiedId)) {
+      return NextResponse.json({ message: "Invalid user identifier" }, { status: 400 });
+    }
 
     lockValue = await acquireAuthLock(verifiedId);
     if (!lockValue) {
@@ -289,12 +312,15 @@ const handler = async (
       updateData.auth_password_iv = pIv;
     }
 
-    await supabaseAdmin.from("users").upsert(updateData);
+    const { error: upsertErr } = await supabaseAdmin.from("users").upsert(updateData);
+    if (upsertErr) throw new Error("Upsert failed");
+
     const syncRes = await performProfileSync(token, verifiedId, authUserId);
     const info = calculateCurrentAcademicInfo();
 
     const response = {
       success: true,
+      userId: authUserId,
       current_semester: syncRes?.academic?.current_semester ?? info.current_semester,
       current_year: syncRes?.academic?.current_year ?? info.current_year,
     };
@@ -312,6 +338,16 @@ const handler = async (
 
   } catch (error: unknown) {
     logger.error("Auth Failed:", error);
+    const errObj = error as { status?: number; message?: string; name?: string } | undefined;
+    if (errObj?.status) {
+      return NextResponse.json({ message: errObj.message || "Auth error" }, { status: errObj.status });
+    }
+    if (errObj?.name === "AbortError" || errObj?.message === "AbortError") {
+      return NextResponse.json({ message: "Gateway Timeout" }, { status: 504 });
+    }
+    if (errObj?.message?.includes("Redis")) {
+      return NextResponse.json({ message: "Service Unavailable" }, { status: 503 });
+    }
     return NextResponse.json({ error: "Auth failed" }, { status: 500 });
   } finally {
     if (lockValue && verifiedId) {

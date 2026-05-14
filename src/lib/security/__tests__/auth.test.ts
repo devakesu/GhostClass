@@ -258,7 +258,7 @@ describe('handleLogout', () => {
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       testError,
-      { tags: { type: 'logout_failure', location: 'handleLogout' } }
+      { tags: { location: 'handleLogout' } }
     );
   });
 

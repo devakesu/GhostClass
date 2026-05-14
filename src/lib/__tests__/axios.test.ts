@@ -51,6 +51,12 @@ describe('axios lib', () => {
       cookie: '',
       querySelector: vi.fn().mockReturnValue(null),
     });
+
+    // Mock window
+    vi.stubGlobal('window', {
+      location: { origin: 'http://localhost:3000' },
+      dispatchEvent: vi.fn(),
+    });
   });
 
   afterEach(() => {

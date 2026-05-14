@@ -70,17 +70,17 @@ async function validateOrigin(req: NextRequest, fullPath: string, isPublic: bool
     if (isRead && secFetchSite === "same-origin" && !!requestHostname && allowedHosts?.has(requestHostname)) {
       return null;
     }
-    return { message: "Origin header required", status: 400 };
+    return { message: "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.", status: 400 };
   }
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
     if (!allowedHosts?.has(originHostname)) {
       logger.warn("Origin validation failed", { origin: originHostname, path: fullPath });
-      return { message: "Origin not allowed", status: 403 };
+      return { message: "Origin not allowed. This endpoint only accepts requests from authorized domains.", status: 403 };
     }
   } catch {
-    return { message: "Invalid origin format", status: 400 };
+    return { message: "Invalid origin header format", status: 400 };
   }
   return null;
 }
@@ -115,7 +115,7 @@ function validateProxyRequestPath(path?: string[]): { fullPath: string; errorRes
   }
   const fullPath = path.join("/");
   if (fullPath.includes("#") || fullPath.includes("?")) {
-    return { fullPath, errorResponse: NextResponse.json({ message: "Invalid path" }, { status: 400 }) };
+    return { fullPath, errorResponse: NextResponse.json({ message: "Invalid path format" }, { status: 400 }) };
   }
   if (MISCONFIGURED_EGRESS_TARGET) {
     return { fullPath, errorResponse: NextResponse.json({ message: "Proxy config error" }, { status: 500 }) };
@@ -158,6 +158,9 @@ function handleProxyUpstreamError(err: unknown, lastAttemptedEgressName: string)
   const isUpstreamErr = err instanceof UpstreamServerError || errObj?.name === "UpstreamServerError";
   if (isUpstreamErr) {
     const uStatus = errObj?.status ?? 502;
+    if (uStatus === 429) {
+      logger.warn('Proxy upstream rate limit (429)', { status: 429 });
+    }
     const rawHeaders = errObj?.headers;
     const headers = getSanitizedHeaders(
       rawHeaders instanceof Headers ? rawHeaders : new Headers((rawHeaders as Record<string, string>) || {})
@@ -168,7 +171,11 @@ function handleProxyUpstreamError(err: unknown, lastAttemptedEgressName: string)
     return NextResponse.json({ message: msg, status: uStatus }, { status: uStatus, headers: { ...headers, ...egressHeader } });
   }
   
-  return NextResponse.json({ message: "Service issues." }, { status: 502, headers: egressHeader });
+  if (errObj?.name === "AbortError") {
+    return NextResponse.json({ message: "Upstream timed out" }, { status: 502, headers: egressHeader });
+  }
+  
+  return NextResponse.json({ message: "EzyGo servers are having technical issues. Exception: EzyGo servers" }, { status: 502, headers: egressHeader });
 }
 
 async function handleBatchedEgress(
@@ -332,7 +339,7 @@ async function forward(
     if (!result.res.ok) {
       const isRateLimit = result.res.status === 429;
       if (isRateLimit) {
-        logger.warn(`Proxy error ${result.res.status}`, { path: fullPath });
+        logger.warn('Proxy upstream rate limit (429)', { path: fullPath, status: 429 });
       } else {
         logger.error(`Proxy error ${result.res.status}`, { path: fullPath });
       }

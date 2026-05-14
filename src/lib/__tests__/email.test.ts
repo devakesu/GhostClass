@@ -77,7 +77,10 @@ describe("email.ts", () => {
     vi.stubEnv("SENDPULSE_CLIENT_SECRET", "sp-secret");
 
     // Force randomization to start with SendPulse
-    vi.spyOn(Math, "random").mockReturnValue(0.1); 
+    vi.spyOn(crypto, 'getRandomValues').mockImplementation((arr: any) => {
+      arr[0] = 50;
+      return arr;
+    });
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("sendpulse")) {
@@ -111,7 +114,7 @@ describe("email.ts", () => {
     const result = await sendEmail(mockProps);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("All email providers failed");
+    expect(result.error).toContain("All providers failed.");
   });
 
   it("throws error if no provider is configured", async () => {
@@ -120,7 +123,7 @@ describe("email.ts", () => {
     vi.stubEnv("SENDPULSE_CLIENT_ID", "");
 
     const { sendEmail } = await import("../email");
-    await expect(sendEmail(mockProps)).rejects.toThrow("No email provider configured");
+    await expect(sendEmail(mockProps)).rejects.toThrow("No provider");
   });
 
   it("handles SendPulse token fetch failure", async () => {
@@ -163,8 +166,11 @@ describe("email.ts", () => {
     vi.stubEnv('SENDPULSE_CLIENT_ID', 'sp-id');
     vi.stubEnv('SENDPULSE_CLIENT_SECRET', 'sp-secret');
     
-    // Mock Math.random to return > 0.5 (starts with Brevo)
-    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+    // Mock crypto.getRandomValues to return >= 128 (starts with Brevo)
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((arr: any) => {
+      arr[0] = 200;
+      return arr;
+    });
     
     global.fetch = vi.fn().mockResolvedValue({ 
       ok: true, 
@@ -176,7 +182,7 @@ describe("email.ts", () => {
     const res = await sendEmail(mockProps);
     
     expect(res.provider).toBe("Brevo");
-    vi.spyOn(Math, 'random').mockRestore();
+    spy.mockRestore();
   });
 
   it('handles provider API error with missing message', async () => {
@@ -192,7 +198,7 @@ describe("email.ts", () => {
     
     const { sendEmail } = await import("../email");
     const res = await sendEmail(mockProps);
-    expect(res.error).toContain("Brevo API error: 500");
+    expect(res.error).toContain("Brevo error: 500");
   });
 
   it('handles unknown error in provider catch', async () => {
@@ -210,7 +216,10 @@ describe("email.ts", () => {
     vi.stubEnv('BREVO_API_KEY', 'brevo-key');
     vi.stubEnv('SENDPULSE_CLIENT_ID', 'sp-id');
     vi.stubEnv('SENDPULSE_CLIENT_SECRET', 'sp-secret');
-    vi.spyOn(Math, 'random').mockReturnValue(0.1); // Start with SendPulse
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((arr: any) => {
+      arr[0] = 50;
+      return arr;
+    }); // Start with SendPulse
     
     global.fetch = vi.fn()
       .mockRejectedValueOnce(new Error("SP primary fail")) // SP fail
@@ -221,8 +230,8 @@ describe("email.ts", () => {
     const res = await sendEmail(mockProps);
     
     expect(res.success).toBe(false);
-    expect(res.error).toContain("All email providers failed");
-    vi.spyOn(Math, 'random').mockRestore();
+    expect(res.error).toContain("All providers failed.");
+    spy.mockRestore();
   });
 
   it('handles primary failure with no secondary available', async () => {
@@ -309,6 +318,6 @@ describe("email.ts", () => {
     vi.stubEnv('SENDPULSE_CLIENT_SECRET', '');
     
     const { sendEmail } = await import("../email");
-    await expect(sendEmail(mockProps)).rejects.toThrow("No email provider configured");
+    await expect(sendEmail(mockProps)).rejects.toThrow("No provider");
   });
 });

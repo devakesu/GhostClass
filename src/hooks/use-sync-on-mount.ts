@@ -118,8 +118,12 @@ export function useSyncOnMount({
         finalizeSync(res.status, res.data);
       } catch (error: unknown) {
         if (isCleanedUp) return;
+        const errName = error instanceof Error ? error.name : (error as { name?: string })?.name;
+        if (errName === "CanceledError" || errName === "AbortError") {
+          logger.dev(`[${sentryLocation}] Sync request aborted`);
+          return;
+        }
         if (isAxiosError(error)) {
-          if (error.name === "CanceledError") return;
           if (error.response?.status === 500 || error.response?.status === 503) {
             setIsSyncing(false);
             return;

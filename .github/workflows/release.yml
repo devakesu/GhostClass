@@ -213,6 +213,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Fetch build-time secrets from Infisical
+        uses: infisical/secrets-action@v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: "production"
+          secret-path: "/build-time"
+        continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
+
       - name: Prepare derived values
         id: prep
         env:
@@ -220,7 +229,7 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           # Set APP_DOMAIN with validation; avoid silent localhost fallback for real releases
-          APP_DOMAIN="${{ vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          APP_DOMAIN="${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}"
           if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
             # For tag-push releases, require NEXT_PUBLIC_APP_DOMAIN to be configured
             if [ "${{ github.event_name }}" = "push" ]; then
@@ -229,7 +238,7 @@ jobs:
             fi
 
             # For non-push events, allow localhost fallback only with explicit opt-in
-            if [ "${{ vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
+            if [ "${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
               echo "::warning::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured. Falling back to APP_DOMAIN=localhost."
               echo "::warning::To explicitly allow this fallback without warnings, set vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK=true."
             fi
@@ -301,7 +310,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ needs.calculate-version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:latest
           secrets: |
-            sentry_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+            sentry_token=${{ env.SENTRY_AUTH_TOKEN || secrets.SENTRY_AUTH_TOKEN }}
           platforms: ${{ steps.prep.outputs.platforms }}
           # Enable layer caching for faster builds
           cache-from: type=gha
@@ -309,35 +318,35 @@ jobs:
           build-args: |
             APP_COMMIT_SHA=${{ github.sha }}
             SOURCE_DATE_EPOCH=${{ steps.prep.outputs.source_date_epoch }}
-            NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
-            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_SUPABASE_DEV_URL=${{ vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
-            NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
-            NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
-            NEXT_PUBLIC_GITHUB_URL=${{ vars.NEXT_PUBLIC_GITHUB_URL }}
-            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
-            NEXT_PUBLIC_ANDROID_PACKAGE_NAME=${{ vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME }}
-            SENTRY_ORG=${{ vars.SENTRY_ORG }}
-            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
-            NEXT_PUBLIC_APP_NAME=${{ vars.NEXT_PUBLIC_APP_NAME }}
-            NEXT_PUBLIC_APP_VERSION=${{ needs.calculate-version.outputs.version }}
-            NEXT_PUBLIC_APP_DOMAIN=${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
-            NEXT_PUBLIC_AUTHOR_NAME=${{ vars.NEXT_PUBLIC_AUTHOR_NAME }}
-            NEXT_PUBLIC_AUTHOR_URL=${{ vars.NEXT_PUBLIC_AUTHOR_URL }}
-            NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE=${{ vars.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE }}
+            NEXT_PUBLIC_BACKEND_URL=${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_DEV_URL=${{ env.NEXT_PUBLIC_SUPABASE_DEV_URL || vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+            NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
+            NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
+            NEXT_PUBLIC_GITHUB_URL=${{ env.NEXT_PUBLIC_GITHUB_URL || vars.NEXT_PUBLIC_GITHUB_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN || vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_GA_ID=${{ env.NEXT_PUBLIC_GA_ID || vars.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_ANDROID_PACKAGE_NAME=${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME }}
+            SENTRY_ORG=${{ env.SENTRY_ORG || vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ env.SENTRY_PROJECT || vars.SENTRY_PROJECT }}
+            NEXT_PUBLIC_APP_NAME=${{ env.NEXT_PUBLIC_APP_NAME || vars.NEXT_PUBLIC_APP_NAME }}
+            NEXT_PUBLIC_APP_VERSION=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || needs.calculate-version.outputs.version }}
+            NEXT_PUBLIC_APP_DOMAIN=${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
+            NEXT_PUBLIC_AUTHOR_NAME=${{ env.NEXT_PUBLIC_AUTHOR_NAME || vars.NEXT_PUBLIC_AUTHOR_NAME }}
+            NEXT_PUBLIC_AUTHOR_URL=${{ env.NEXT_PUBLIC_AUTHOR_URL || vars.NEXT_PUBLIC_AUTHOR_URL }}
+            NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE=${{ env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || vars.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE }}
             NEXT_PUBLIC_APP_URL=${{ steps.prep.outputs.app_url }}
             NEXT_PUBLIC_SITEMAP_URL=${{ steps.prep.outputs.sitemap_url }}
             NEXT_PUBLIC_APP_EMAIL=${{ steps.prep.outputs.app_email }}
             NEXT_PUBLIC_LEGAL_EMAIL=${{ steps.prep.outputs.legal_email }}
-            NEXT_PUBLIC_DONATE_URL=${{ vars.NEXT_PUBLIC_DONATE_URL }}
-            NEXT_PUBLIC_DEFAULT_DOMAIN=${{ vars.NEXT_PUBLIC_DEFAULT_DOMAIN }}
-            NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
-            NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
-            NEXT_PUBLIC_FORCE_STRICT_CSP=${{ vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
+            NEXT_PUBLIC_DONATE_URL=${{ env.NEXT_PUBLIC_DONATE_URL || vars.NEXT_PUBLIC_DONATE_URL }}
+            NEXT_PUBLIC_DEFAULT_DOMAIN=${{ env.NEXT_PUBLIC_DEFAULT_DOMAIN || vars.NEXT_PUBLIC_DEFAULT_DOMAIN }}
+            NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN || vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
+            NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ env.NEXT_PUBLIC_SENTRY_REPLAY_RATE || vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
+            NEXT_PUBLIC_FORCE_STRICT_CSP=${{ env.NEXT_PUBLIC_FORCE_STRICT_CSP || vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
             GITHUB_REPOSITORY=${{ github.repository }}
             GITHUB_RUN_ID=${{ github.run_id }}
             GITHUB_RUN_NUMBER=${{ github.run_number }}
@@ -348,7 +357,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.version=${{ needs.calculate-version.outputs.version }}
+            org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || needs.calculate-version.outputs.version }}
 
       # Attest build provenance
       - name: Attest Build Provenance
@@ -547,6 +556,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Fetch build-time secrets from Infisical
+        uses: infisical/secrets-action@v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: "production"
+          secret-path: "/build-time"
+        continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
+
       - name: Prepare mobile release paths
         id: mobile-prep
         run: |
@@ -554,7 +572,7 @@ jobs:
 
           mkdir -p mobile/release-assets
 
-          echo "build_name=${{ needs.calculate-version.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "build_name=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || needs.calculate-version.outputs.version }}" >> "$GITHUB_OUTPUT"
           echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
           BUILD_TIMESTAMP="${{ github.event.head_commit.timestamp }}"
@@ -582,6 +600,10 @@ jobs:
           : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
           : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
 
+          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          echo "::add-mask::$ANDROID_KEY_ALIAS"
+          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > ghostclass.p12
 
           cat > key.properties << EOF
@@ -597,14 +619,14 @@ jobs:
       - name: Generate mobile/lib/config/app_secrets.dart
         working-directory: mobile
         env:
-          SUPABASE_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_ANON_KEY_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_URL_DEV: ${{ vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
-          SUPABASE_ANON_KEY_DEV: ${{ vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
-          SUPABASE_CF_PROXY_URL_PROD: ${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
-          SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
-          BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
-          APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+          SUPABASE_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_URL || vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+          SUPABASE_ANON_KEY_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
+          SUPABASE_CF_PROXY_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
+          SENTRY_DSN: ${{ env.NEXT_PUBLIC_SENTRY_DSN || vars.NEXT_PUBLIC_SENTRY_DSN }}
+          BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+          APP_DOMAIN: ${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
         run: |
           set -euo pipefail
 
@@ -659,6 +681,7 @@ jobs:
           flutter build apk --release \
             --build-name="${{ steps.mobile-prep.outputs.build_name }}" \
             --build-number="${{ steps.mobile-prep.outputs.build_number }}" \
+            --dart-define=APP_VERSION="${{ steps.mobile-prep.outputs.build_name }}" \
             --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
             --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
             --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
@@ -970,6 +993,10 @@ jobs:
           : "${COOLIFY_BASE_URL:?COOLIFY_BASE_URL secret is required}"
           : "${COOLIFY_APP_ID:?COOLIFY_APP_ID secret is required}"
           : "${COOLIFY_API_TOKEN:?COOLIFY_API_TOKEN secret is required}"
+
+          echo "::add-mask::$COOLIFY_API_TOKEN"
+          echo "::add-mask::$COOLIFY_BASE_URL"
+          echo "::add-mask::$COOLIFY_APP_ID"
 
           echo "Deploying version ${{ needs.calculate-version.outputs.version_tag }} to Coolify"
           echo "Note: Ensure Coolify is configured to pull the versioned tag (e.g., ${{ needs.calculate-version.outputs.version_tag }})"

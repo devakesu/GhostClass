@@ -249,7 +249,7 @@ class AppSecrets {
 }
 ```
 
-> **Tip:** You can use `node scripts/sync-secrets.js` to sync these to GitHub Actions for CI builds.
+> **Tip:** Securely manage and inject these values into CI builds via Infisical Native Integrations from the `/ci` folder without executing local sync scripts.
 
 ### Firebase Setup
 

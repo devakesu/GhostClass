@@ -105,15 +105,16 @@ flutter build ios --release   # macOS + Xcode required
 
 ### Web env
 
-Copy `.example.env` to `.env` and fill required values.
+GhostClass utilizes **Infisical** as the single source of truth, organized into 3 folders: `/build-time`, `/runtime`, and `/ci`.
+Instruct developers to authenticate via `infisical login` and run services using `infisical run -- npm run dev`.
 
-Critical keys include:
+Critical upstream dashboard variables mapped include:
 
-- `ENCRYPTION_KEY` (64 hex chars, AES-256-GCM)
-- `REQUEST_SIGNING_SECRET` (64 hex chars; must differ from `ENCRYPTION_KEY`)
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY` (server-only)
+- `ENCRYPTION_KEY` (64 hex chars, AES-256-GCM - stored as masked secret)
+- `REQUEST_SIGNING_SECRET` (64 hex chars; stored as masked secret)
+- `NEXT_PUBLIC_SUPABASE_URL` (synced automatically as GitHub Actions Variable)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (synced automatically as GitHub Actions Variable)
+- `SUPABASE_SECRET_KEY` (server-only secret)
 - `NEXT_PUBLIC_BACKEND_URL`
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`
 - `CF_PROXY_URL` / `CF_PROXY_SECRET` and optional AWS failover proxy vars

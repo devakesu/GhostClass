@@ -2,24 +2,33 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // --- Mocks ---
-const mockGetUser = vi.fn();
-const mockFrom = vi.fn();
-const mockMaybeSingle = vi.fn();
-const mockSingle = vi.fn();
-const mockCreateServerClient = vi.fn();
+const { mockGetUser, mockFrom, mockMaybeSingle, mockSingle, mockCreateServerClient } = vi.hoisted(() => {
+  return {
+    mockGetUser: vi.fn(),
+    mockFrom: vi.fn(),
+    mockMaybeSingle: vi.fn(),
+    mockSingle: vi.fn(),
+    mockCreateServerClient: vi.fn(),
+  };
+});
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: mockCreateServerClient.mockImplementation((_url, _key, options) => {
-    // Call getAll to cover the branch in proxy.ts
-    options.cookies.getAll();
-    // Call setAll to cover the branch in proxy.ts
-    options.cookies.setAll([{ name: 'test', value: 'val', options: {} }]);
+  createServerClient: (...args: any[]) => {
+    const res = mockCreateServerClient(...args);
+    if (res) return res;
+    const options = args[2];
+    if (options?.cookies) {
+      // Call getAll to cover the branch in proxy.ts
+      if (typeof options.cookies.getAll === 'function') options.cookies.getAll();
+      // Call setAll to cover the branch in proxy.ts
+      if (typeof options.cookies.setAll === 'function') options.cookies.setAll([{ name: 'test', value: 'val', options: {} }]);
+    }
     
     return {
       auth: { getUser: mockGetUser },
       from: mockFrom,
     };
-  }),
+  },
 }));
 
 vi.mock("../lib/crypto", () => ({
@@ -146,8 +155,7 @@ describe("proxy.ts coverage hardening", () => {
     // Force getUserWithRetry to throw by making supabase.auth undefined
     // This is tricky because createServerClient is called inside proxy()
     // I'll mock createServerClient to return an object where auth is a getter that throws
-    const { createServerClient } = await import("@supabase/ssr");
-    vi.mocked(createServerClient).mockReturnValueOnce({
+    mockCreateServerClient.mockReturnValueOnce({
       get auth() { throw new Error("Unexpected auth failure"); },
       from: mockFrom
     });
@@ -156,7 +164,7 @@ describe("proxy.ts coverage hardening", () => {
     const response = await proxy(request);
     
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost/");
+    expect(response.headers.get("location")).toBe("https://localhost/");
   });
 
   it("covers getUserWithRetry non-transient error", async () => {
@@ -230,7 +238,7 @@ describe("proxy.ts coverage hardening", () => {
     
     const response = await proxy(request);
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost/");
+    expect(response.headers.get("location")).toBe("https://localhost/");
   });
 
   it("covers isRefreshTokenNotFoundError with status 400 and message branch", async () => {
