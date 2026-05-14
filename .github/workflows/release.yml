@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # Initial repository check guard
   guard:
@@ -418,9 +421,9 @@ jobs:
           : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
           : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
 
-          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
-          echo "::add-mask::$ANDROID_KEY_ALIAS"
-          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+          [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$ANDROID_KEY_ALIAS" ] && echo "::add-mask::$ANDROID_KEY_ALIAS"
+          [ -n "$ANDROID_KEY_PASSWORD" ] && echo "::add-mask::$ANDROID_KEY_PASSWORD"
 
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > ghostclass.p12
 
@@ -594,12 +597,17 @@ jobs:
             echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
           } > mobile-checksums.txt
 
-      - name: Upload mobile release artifacts
+      - name: Upload mobile APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: mobile-release-artifacts
+          name: mobile-app-apk
+          path: mobile/release-assets/mobile-app-release.apk
+
+      - name: Upload mobile security metadata artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: mobile-security-metadata
           path: |
-            mobile/release-assets/mobile-app-release.apk
             mobile/release-assets/mobile-sbom.json
             mobile/release-assets/mobile-provenance.intoto.jsonl
             mobile/release-assets/mobile-checksums.txt
@@ -698,10 +706,16 @@ jobs:
           name: release-artifacts
           path: ./artifacts/web
 
-      - name: Download mobile artifacts
+      - name: Download mobile APK artifact
         uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
         with:
-          name: mobile-release-artifacts
+          name: mobile-app-apk
+          path: ./artifacts/mobile
+
+      - name: Download mobile security metadata artifacts
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
+        with:
+          name: mobile-security-metadata
           path: ./artifacts/mobile
 
       - name: Verify downloaded artifacts
@@ -883,7 +897,7 @@ jobs:
             ./artifacts/web/sbom.json \
             ./artifacts/web/sbom.json.bundle \
             ./artifacts/web/checksums.txt \
-            ./artifacts/web/VERIFY.md \
+            ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \
             ./artifacts/mobile/mobile-app-release.apk \
             ./artifacts/mobile/mobile-sbom.json \
