@@ -56,6 +56,7 @@ jobs:
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
           env-slug: "production"
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
@@ -377,6 +378,7 @@ jobs:
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
           env-slug: "production"
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
@@ -431,6 +433,18 @@ jobs:
           EOF
 
           chmod 600 key.properties ghostclass.p12
+
+      - name: Prepare google-services.json
+        working-directory: mobile/android
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ env.GOOGLE_SERVICES_JSON_BASE64 || secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          : "${GOOGLE_SERVICES_JSON_BASE64:?GOOGLE_SERVICES_JSON_BASE64 environment variable or secret is required}"
+
+          mkdir -p app
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
 
       - name: Generate mobile/lib/config/app_secrets.dart
         working-directory: mobile
@@ -508,6 +522,27 @@ jobs:
 
           dart run sentry_dart_plugin
 
+      - name: Build Android App Bundle
+        working-directory: mobile
+        env:
+          BUILD_TIMESTAMP: ${{ steps.mobile-prep.outputs.build_timestamp }}
+        run: |
+          set -euo pipefail
+
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+
+          flutter build appbundle --release \
+            --obfuscate \
+            --split-debug-info=build/debug-info \
+            --extra-gen-snapshot-options=--save-obfuscation-map=build/app/obfuscation.map.json \
+            --build-name="${{ steps.mobile-prep.outputs.build_name }}" \
+            --build-number="${{ steps.mobile-prep.outputs.build_number }}" \
+            --dart-define=APP_VERSION="${{ steps.mobile-prep.outputs.build_name }}" \
+            --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
+            --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+            --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
+            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }}
+
       - name: Generate mobile SBOM
         working-directory: mobile
         run: |
@@ -520,6 +555,12 @@ jobs:
         uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
         with:
           subject-path: mobile/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Attest mobile AAB provenance
+        id: attest-mobile-aab
+        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
+        with:
+          subject-path: mobile/build/app/outputs/bundle/release/app-release.aab
 
       - name: Assemble mobile release assets
         working-directory: mobile
@@ -552,6 +593,56 @@ jobs:
             mobile/release-assets/mobile-provenance.intoto.jsonl
             mobile/release-assets/mobile-checksums.txt
 
+      - name: Assemble Play Console internal assets
+        working-directory: mobile
+        env:
+          AAB_ATTESTATION_BUNDLE: ${{ steps.attest-mobile-aab.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p play-console-assets
+          cp build/app/outputs/bundle/release/app-release.aab play-console-assets/mobile-app-release.aab
+          cp "$AAB_ATTESTATION_BUNDLE" play-console-assets/aab-provenance.intoto.jsonl
+
+          if [ -f build/app/outputs/mapping/release/mapping.txt ]; then
+            cp build/app/outputs/mapping/release/mapping.txt play-console-assets/mapping.txt
+          else
+            echo "mapping.txt not found, skipping"
+          fi
+
+          cd play-console-assets
+          {
+            echo "# Play Console Internal Artifact Checksums"
+            echo ""
+            sha256sum mobile-app-release.aab
+            sha256sum aab-provenance.intoto.jsonl
+            [ -f mapping.txt ] && sha256sum mapping.txt || true
+            echo ""
+            echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          } > play-console-checksums.txt
+
+      - name: Upload Play Console internal assets to Private S3 Storage
+        working-directory: mobile/play-console-assets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+          AWS_S3_PRIVATE_BUCKET: ${{ secrets.AWS_S3_PRIVATE_BUCKET || vars.AWS_S3_PRIVATE_BUCKET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${AWS_S3_PRIVATE_BUCKET:-}" ]; then
+            echo "::warning::AWS_S3_PRIVATE_BUCKET is not configured. Internal artifacts (.aab, mapping.txt) will not be archived to cloud storage."
+            echo "::warning::To enable secure private storage, populate the AWS_S3_PRIVATE_BUCKET secret."
+            exit 0
+          fi
+
+          echo "Uploading private internal release assets to s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/"
+
+          aws s3 cp . "s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/" --recursive
+
+          echo "✓ Internal artifacts securely archived to private S3 bucket"
+
   # Create GitHub Release with artifacts
   create-github-release:
     name: Create GitHub Release
@@ -571,6 +662,7 @@ jobs:
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
           env-slug: "production"
           secret-path: "/build-time"
         continue-on-error: true
