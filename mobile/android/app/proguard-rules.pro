@@ -8,3 +8,6 @@
 -keep class io.flutter.view.**  { *; }
 -keep class io.flutter.**  { *; }
 -keep class plugins.flutter.io.**  { *; }
+
+# Suppress warnings for optional Play Core split install classes referenced by Flutter embedding
+-dontwarn com.google.android.play.core.**
