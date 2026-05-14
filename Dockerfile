@@ -247,9 +247,8 @@ WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
-    apk add --no-cache bash curl && \
-    curl -1sLf 'https://artifacts-cli.infisical.com/setup.apk.sh' | bash && \
-    apk add --no-cache infisical
+    apk add --no-cache wget tar && \
+    wget -qO- https://github.com/Infisical/cli/releases/download/v0.43.84/cli_0.43.84_linux_amd64.tar.gz | tar -xz -C /usr/local/bin infisical
 
 # Core Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

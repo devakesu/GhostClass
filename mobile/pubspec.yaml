@@ -46,7 +46,7 @@ dependencies:
   google_fonts: ^8.0.2
   image_picker: ^1.1.2
   intl: ^0.20.2
-  jose: ^0.3.5
+  jose: ^0.3.5+1
   lucide_icons: ^0.257.0
   markdown: any
   package_info_plus: ^9.0.1
