@@ -50,8 +50,6 @@ class DioService {
     }
 
     dio.interceptors.add(JweInterceptor());
-    dio.addSentry();
-    securityDio.addSentry();
     
     // Auth & Security Interceptor
     dio.interceptors.add(
@@ -99,6 +97,10 @@ class DioService {
         },
       ),
     );
+
+    // Add Sentry interceptors last
+    dio.addSentry(captureFailedRequests: true);
+    securityDio.addSentry(captureFailedRequests: true);
 
     _ref.onDispose(() {
       final _ = _unauthorizedController.close();

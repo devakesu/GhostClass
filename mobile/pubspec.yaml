@@ -70,6 +70,7 @@ dev_dependencies:
     sdk: flutter
   mocktail: ^1.0.5
   riverpod_generator: ^4.0.3
+  sentry_dart_plugin: ^3.3.0
   very_good_analysis: ^10.2.0
 
 # For information on the generic Dart part of this file, see the
@@ -117,3 +118,10 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/icon.png"
   min_sdk_android: 29 # android min sdk min:16, default:21
+
+sentry:
+  project: ghostclass-f
+  org: devakesu
+  upload_debug_symbols: true
+  upload_sources: true
+  dart_symbol_map_path: build/app/obfuscation.map.json

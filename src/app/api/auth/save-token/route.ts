@@ -232,12 +232,8 @@ async function provisionSupabaseAuthUser(
   return { authUserId: retry.user.id, passwordToUse: canonicalPass, isFirstLogin: true };
 }
 
-const handler = async (
-  req: Request,
-  { decryptedBody, authType }: { decryptedBody?: unknown; authType?: string }
-) => {
-  const headerList = await headers();
-  const originError = await validateOrigin(headerList, authType === "app-check");
+async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean): Promise<NextResponse | null> {
+  const originError = await validateOrigin(headerList, isAppCheck);
   if (originError) {
     const status = originError === "Server configuration error" ? 500 : 403;
     return NextResponse.json({ error: originError }, { status });
@@ -245,6 +241,32 @@ const handler = async (
 
   const rateLimitErr = await validateClientIpAndRateLimit(headerList);
   if (rateLimitErr) return rateLimitErr;
+
+  return null;
+}
+
+function handleAuthError(error: unknown) {
+  logger.error("Auth Failed:", error);
+  const errObj = error as { status?: number; message?: string; name?: string } | undefined;
+  if (errObj?.status) {
+    return NextResponse.json({ message: errObj.message || "Auth error" }, { status: errObj.status });
+  }
+  if (errObj?.name === "AbortError" || errObj?.message === "AbortError") {
+    return NextResponse.json({ message: "Gateway Timeout" }, { status: 504 });
+  }
+  if (errObj?.message?.includes("Redis")) {
+    return NextResponse.json({ message: "Service Unavailable" }, { status: 503 });
+  }
+  return NextResponse.json({ error: "Auth failed" }, { status: 500 });
+}
+
+const handler = async (
+  req: Request,
+  { decryptedBody, authType }: { decryptedBody?: unknown; authType?: string }
+) => {
+  const headerList = await headers();
+  const headerErr = await validateRequestHeaders(headerList, authType === "app-check");
+  if (headerErr) return headerErr;
 
   let lockValue: string | null = null;
   let verifiedId = "";
@@ -337,18 +359,7 @@ const handler = async (
     });
 
   } catch (error: unknown) {
-    logger.error("Auth Failed:", error);
-    const errObj = error as { status?: number; message?: string; name?: string } | undefined;
-    if (errObj?.status) {
-      return NextResponse.json({ message: errObj.message || "Auth error" }, { status: errObj.status });
-    }
-    if (errObj?.name === "AbortError" || errObj?.message === "AbortError") {
-      return NextResponse.json({ message: "Gateway Timeout" }, { status: 504 });
-    }
-    if (errObj?.message?.includes("Redis")) {
-      return NextResponse.json({ message: "Service Unavailable" }, { status: 503 });
-    }
-    return NextResponse.json({ error: "Auth failed" }, { status: 500 });
+    return handleAuthError(error);
   } finally {
     if (lockValue && verifiedId) {
       await releaseAuthLock(verifiedId, lockValue);

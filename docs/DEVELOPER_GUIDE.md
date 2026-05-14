@@ -599,11 +599,11 @@ Navigate to the **Variables** tab and create the following:
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | Supabase publishable key (public, in JS bundle) |
 | `NEXT_PUBLIC_GITHUB_URL` | `https://github.com/…` | Public repository URL |
 | `NEXT_PUBLIC_SENTRY_DSN` | `https://…@…ingest…` | Sentry DSN (compiled into JS bundle) |
+| `NEXT_PUBLIC_MOBILE_SENTRY_DSN` | `https://…@…ingest…` | Sentry DSN for mobile app (compiled into APK); falls back to `NEXT_PUBLIC_SENTRY_DSN` if unset |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `0x4AAAA…` | Cloudflare Turnstile site key (in HTML) |
 | `NEXT_PUBLIC_GA_ID` | `G-XXXXXXXXXX` | Google Analytics measurement ID |
 | `NEXT_PUBLIC_AUTHOR_NAME` | `@handle` | Author display name |
 | `NEXT_PUBLIC_AUTHOR_URL` | `https://example.com` | Author URL |
-| `NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE` | `March 6, 2026` | Legal docs effective date |
 | `SENTRY_ORG` | `devakesu` | Sentry organisation slug |
 | `SENTRY_PROJECT` | `ghostclass` | Sentry project slug |
 | `NEXT_PUBLIC_ANDROID_PACKAGE_NAME` | `com.ghostclass.app` | Android package name for app linking |
@@ -642,6 +642,7 @@ Navigate to the **Secrets** tab and create the following:
 | Secret | Description |
 | --- | --- |
 | `SENTRY_AUTH_TOKEN` | Sentry auth token for source map upload during Docker build (`sntrys_…`) |
+| `MOBILE_SENTRY_AUTH_TOKEN` | Optional separate Sentry auth token for Flutter mobile debug symbol uploads |
 | `BOT_PAT` | Classic PAT with `repo` + `workflow` scopes for auto-version-bump commits |
 | `GPG_PRIVATE_KEY` | Armoured GPG private key for commit/tag signing |
 | `GPG_PASSPHRASE` | GPG key passphrase (omit secret if key uses `%no-protection`) |

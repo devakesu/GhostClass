@@ -1,7 +1,19 @@
-String getLegalPageContent(String effectiveDate, String appVersion) =>
+/// Effective date for legal terms.
+const String legalEffectiveDate = 'May 14, 2026';
+
+/// Required Terms of Service version.
+const String termsVersion = '2.8';
+
+/// The governing law region for terms.
+const String governingLawRegion = 'India';
+
+/// The specific legal jurisdiction.
+const String governingLawSpecific = 'Kochi, Kerala, India';
+
+String getLegalPageContent() =>
     """
 ## Disclaimer
-**Educational Tool Only:** GhostClass (v$appVersion) is an independent attendance calculation tool designed to help students manage their time.
+**Educational Tool Only:** GhostClass is an independent attendance calculation tool designed to help students manage their time.
 
 **No Liability:** You acknowledge that:
 * Official college records are the final authority.
@@ -13,7 +25,7 @@ String getLegalPageContent(String effectiveDate, String appVersion) =>
 ---
 
 ## Privacy Policy
-**Effective Date:** $effectiveDate
+**Effective Date:** $legalEffectiveDate
 
 
 **1. Information We Collect**
@@ -86,6 +98,9 @@ You retain full ownership and control over your data.
 ---
 
 ## Terms of Service
+**Version:** $termsVersion
+
+
 **1. Acceptance of Terms**
 By accessing, browsing, or using GhostClass ("the Service"), including the web app, mobile app, APIs, and related services, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you disagree with any part of the terms, you must discontinue use immediately.
 

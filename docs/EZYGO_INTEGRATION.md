@@ -556,7 +556,7 @@ GhostClass Mobile implements the same three-layer protection system as the web a
 
 | Layer | Web Implementation | Mobile Implementation |
 | :--- | :--- | :--- |
-| **1. Deduplication** | LRU Cache (`lru-cache`) | In-memory `ContentCache` & `AsyncValue` (Riverpod) |
+| **1. Deduplication** | LRU Cache (`lru-cache`) | In-memory map caching & `AsyncValue` (Riverpod) |
 | **2. Rate Limiting** | `MAX_CONCURRENT` Queue | `EzygoBatchFetcher` (3 concurrent max) |
 | **3. Circuit Breaker** | `CircuitBreaker` class | `OutageProvider` + `CircuitBreaker` mixin |
 

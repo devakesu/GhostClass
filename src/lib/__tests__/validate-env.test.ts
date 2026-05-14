@@ -41,7 +41,6 @@ describe('validate-env utility', () => {
       client_email: 'test@test.com'
     }));
     vi.stubEnv('NEXT_PUBLIC_LEGAL_EMAIL', 'legal@ghostclass.io');
-    vi.stubEnv('NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE', '2024-01-01');
     vi.stubEnv('NEXT_PUBLIC_AUTHOR_NAME', 'GhostClass');
     vi.stubEnv('NEXT_PUBLIC_AUTHOR_URL', 'https://ghostclass.io');
     vi.stubEnv('GOOGLE_SERVICE_ACCOUNT_JSON', JSON.stringify({

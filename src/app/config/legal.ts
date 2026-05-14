@@ -1,38 +1,5 @@
 export const TERMS_VERSION = "2.8";
-const RAW_LEGAL_EFFECTIVE_DATE = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "2026-05-11";
-
-function normalizeLegalEffectiveDate(value: string): string {
-  const trimmed = value.trim();
-  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!isoMatch) return trimmed;
-
-  const [, year, month, day] = isoMatch;
-  const monthIndex = Number(month) - 1;
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-
-  if (monthIndex < 0 || monthIndex > 11) return trimmed;
-
-  const dayNum = Number(day);
-  if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) return trimmed;
-
-  // eslint-disable-next-line security/detect-object-injection -- monthIndex validated (0-11) above
-  return `${months[monthIndex]} ${dayNum}, ${year}`;
-}
-
-export const LEGAL_EFFECTIVE_DATE = normalizeLegalEffectiveDate(RAW_LEGAL_EFFECTIVE_DATE);
+export const LEGAL_EFFECTIVE_DATE = "May 14, 2026";
 const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@ghostclass.devakesu.com";
 
 // ------------------------------------------------------------------

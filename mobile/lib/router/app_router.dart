@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/about_screen.dart';
@@ -26,7 +25,9 @@ import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {
@@ -45,7 +46,7 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRefreshNotifier = ValueNotifier<bool>(false);
-  
+
   // Create a listener that triggers router refresh when terms acceptance status changes
   ref.listen(authProvider, (previous, next) {
     if (previous?.value?.termsAccepted != next.value?.termsAccepted) {
@@ -65,7 +66,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final path = state.uri.path;
       final isSplash = path == '/splash';
       final isRoot = path == '/';
-      
+
       // 1. Always allow Splash and Root to load without triggering auth hydration.
       // This ensures SplashScreen can perform its security handshake first.
       if (isSplash || isRoot) return null;
@@ -75,12 +76,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authAsync = ref.read(authProvider);
       final authResolved = !authAsync.isLoading;
       final hydratedUser = authAsync.value;
-      
+
       final isLogin = path == '/login';
       final isLegal = path == '/legal';
-      final isPublic = isLegal || path == '/help' || path == '/contact' || path == '/about';
+      final isPublic =
+          isLegal || path == '/help' || path == '/contact' || path == '/about';
       final isAcceptTerms = path == '/accept-terms';
-      
+
       // Handle Public pages - always accessible
       if (isPublic) return null;
 
@@ -127,33 +129,50 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
+        name: 'root',
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
         path: '/splash',
+        name: 'splash',
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
         path: '/login',
+        name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: '/accept-terms',
+        name: 'accept-terms',
         builder: (context, state) => const AcceptTermsScreen(),
       ),
       GoRoute(
         path: '/about',
+        name: 'about',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const AboutScreen(),
           transitionDuration: const Duration(milliseconds: 380),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-            return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
+            final slide =
+                Tween<Offset>(
+                  begin: const Offset(0, 0.08),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: slide, child: child),
+            );
           },
         ),
       ),
-      
+
       // Bottom Navigation Shell
       ShellRoute(
         navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'shell'),
@@ -161,30 +180,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/dashboard',
+            name: 'dashboard',
             builder: (context, state) => const DashboardScreen(),
           ),
           GoRoute(
             path: '/calendar',
+            name: 'calendar',
             builder: (context, state) => const AttendanceCalendarScreen(),
           ),
           GoRoute(
             path: '/tracking',
+            name: 'tracking',
             builder: (context, state) => const TrackingScreen(),
           ),
           GoRoute(
             path: '/scores',
+            name: 'scores',
             builder: (context, state) => const ScoresScreen(),
           ),
           GoRoute(
             path: '/leaves',
+            name: 'leaves',
             builder: (context, state) => const LeavesScreen(),
           ),
           GoRoute(
             path: '/ghostclass',
+            name: 'ghostclass',
             builder: (context, state) => const GhostClassScreen(),
           ),
           GoRoute(
             path: '/notifications',
+            name: 'notifications',
             builder: (context, state) => const NotificationsScreen(),
           ),
         ],
@@ -193,33 +219,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Profile Sub-pages
       GoRoute(
         path: '/profile-dump',
+        name: 'profile-dump',
         builder: (context, state) => const ProfileDumpScreen(),
       ),
       GoRoute(
         path: '/profile',
+        name: 'profile',
         builder: (context, state) => const ProfileScreen(),
       ),
 
       // Static Pages
       GoRoute(
         path: '/legal',
+        name: 'legal',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: LegalScreen(
             title: 'Legal',
-            body: getLegalPageContent(
-              AppConfig.legalEffectiveDate,
-              AppConfig.appVersion,
-            ),
+            body: getLegalPageContent(),
           ),
           transitionDuration: const Duration(milliseconds: 380),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide = Tween<Offset>(
-              begin: const Offset(0, 0.06),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-            );
+            final slide =
+                Tween<Offset>(
+                  begin: const Offset(0, 0.06),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
             return FadeTransition(
               opacity: animation,
               child: SlideTransition(position: slide, child: child),
@@ -229,26 +259,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/help',
+        name: 'help',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const HelpScreen(),
           transitionDuration: const Duration(milliseconds: 380),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-            return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
+            final slide =
+                Tween<Offset>(
+                  begin: const Offset(0, 0.06),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: slide, child: child),
+            );
           },
         ),
       ),
       GoRoute(
         path: '/contact',
+        name: 'contact',
         pageBuilder: (context, state) {
           final extra = (state.extra is Map)
               ? (state.extra! as Map).cast<String, dynamic>()
               : null;
           final subject =
-              extra?['subject'] as String? ?? state.uri.queryParameters['subject'];
+              extra?['subject'] as String? ??
+              state.uri.queryParameters['subject'];
           final message =
-              extra?['message'] as String? ?? state.uri.queryParameters['message'];
+              extra?['message'] as String? ??
+              state.uri.queryParameters['message'];
 
           return CustomTransitionPage(
             key: state.pageKey,
@@ -257,17 +303,23 @@ final routerProvider = Provider<GoRouter>((ref) {
               prefilledMessage: message,
             ),
             transitionDuration: const Duration(milliseconds: 380),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              final slide =
-                  Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
-                      .animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-              );
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: slide, child: child),
-              );
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  final slide =
+                      Tween<Offset>(
+                        begin: const Offset(0, 0.06),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      );
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  );
+                },
           );
         },
       ),

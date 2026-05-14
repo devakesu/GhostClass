@@ -27,21 +27,21 @@ class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context)
-      ..connectionTimeout = kDebugMode ? const Duration(seconds: 40) : const Duration(seconds: 20);
-    
+      ..connectionTimeout = kDebugMode
+          ? const Duration(seconds: 40)
+          : const Duration(seconds: 20);
+
     // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.
     // In release mode, standard certificate validation is enforced.
     if (kDebugMode) {
       client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
     }
-    
+
     return client;
   }
 }
 
-
 class _SecurityFailureApp extends StatelessWidget {
-
   const _SecurityFailureApp({
     required this.friendlyMessage,
     required this.technicalDetails,
@@ -66,7 +66,9 @@ class _SecurityFailureApp extends StatelessWidget {
               onRetry: () => exit(0),
             );
           });
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         },
       ),
     );
@@ -79,15 +81,19 @@ Future<void> _handleSecurityFailure(Object error) async {
       ? 'GhostClass encountered a network security issue while verifying your device. This often happens on restricted WiFi or with custom DNS settings.'
       : "We couldn't verify the integrity of this app. To protect your data, GhostClass requires a secure, unmodified environment.";
 
-  runApp(_SecurityFailureApp(friendlyMessage: friendlyMessage, technicalDetails: errorMessage));
+  runApp(
+    _SecurityFailureApp(
+      friendlyMessage: friendlyMessage,
+      technicalDetails: errorMessage,
+    ),
+  );
 }
 
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
-  
 
   HttpOverrides.global = MyHttpOverrides();
-  
+
   // Initialize Firebase & App Check
   try {
     await Firebase.initializeApp(
@@ -121,7 +127,10 @@ void main() async {
     },
   );
 
-  await GoogleFonts.pendingFonts([GoogleFonts.manrope(), GoogleFonts.firaCode()]);
+  await GoogleFonts.pendingFonts([
+    GoogleFonts.manrope(),
+    GoogleFonts.firaCode(),
+  ]);
 
   // Initialize Sentry
   await SentryFlutter.init(
@@ -135,7 +144,11 @@ void main() async {
         ..enableAutoPerformanceTracing = true;
     },
     appRunner: () {
-      return runApp(const ProviderScope(child: MyApp()));
+      return runApp(
+        ProviderScope(
+          child: SentryWidget(child: const MyApp()),
+        ),
+      );
     },
   );
 

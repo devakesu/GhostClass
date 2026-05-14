@@ -187,26 +187,10 @@ run: |
 
 #### Protected Workflows
 
-##### auto-version-bump.yml
-
-- `github.actor` → `ACTOR` environment variable
-- `github.head_ref` → `HEAD_REF` environment variable
-- `github.event.pull_request.head.repo.full_name` → `PR_HEAD_REPO` environment variable
-- Prevents malicious branch names from executing code during Dependabot detection
-
 ##### release.yml
 
-- `github.event.client_payload.version_tag` → `INPUT_VERSION_TAG_DISPATCH` environment variable
-- `github.event.inputs.version_tag` → `INPUT_VERSION_TAG_MANUAL` environment variable
-- `github.ref_name` → `REF_NAME` environment variable
-- `github.ref_type` → `REF_TYPE` environment variable
-- Prevents malicious tag names in repository_dispatch and manual workflow triggers
-
-##### pipeline.yml
-
-- `github.repository` → `REPO` environment variable
-- `github.run_id` → `RUN_ID` environment variable
-- Prevents repository name manipulation in GitHub API calls
+- Dynamic versions injected from Infisical are processed via intermediate environment mapping (`env.VERSION_TAG`, `env.VERSION`) during markdown verification and release generation loops.
+- `github.repository` and `github.repository_owner` are passed via localized `env:` blocks to prevent repository name manipulation during container image publishing and artifact attestation steps.
 
 #### References
 
@@ -256,13 +240,13 @@ For maximum security, verify against specific workflow:
 ```bash
 # Latest release (release.yml)
 cosign verify \
-  --certificate-identity="https://github.com/devakesu/GhostClass/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
+  --certificate-identity="https://github.com/devakesu/GhostClass/.github/workflows/release.yml@refs/heads/main" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   ghcr.io/devakesu/ghostclass:latest
 
 # Specific version tag (release.yml)
 cosign verify \
-  --certificate-identity="https://github.com/devakesu/GhostClass/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
+  --certificate-identity="https://github.com/devakesu/GhostClass/.github/workflows/release.yml@refs/heads/main" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   ghcr.io/devakesu/ghostclass:vX.Y.Z
 ```

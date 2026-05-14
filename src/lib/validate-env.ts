@@ -353,7 +353,6 @@ function validateOptionalMetadata(warnings: string[]) {
   if (!process.env.NEXT_PUBLIC_AUTHOR_URL) warnings.push("⚠️  NEXT_PUBLIC_AUTHOR_URL not set");
   if (!process.env.NEXT_PUBLIC_GITHUB_URL) warnings.push("⚠️  NEXT_PUBLIC_GITHUB_URL not set");
   if (!process.env.NEXT_PUBLIC_LEGAL_EMAIL) warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EMAIL not set");
-  if (!process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE) warnings.push("⚠️  NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE not set");
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
     warnings.push("⚠️  NEXT_PUBLIC_SENTRY_DSN not set - error monitoring disabled");
   }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/config/app_secrets.dart';
+import 'package:ghostclass/constants/static_content.dart';
 
 void main() {
   group('AppSecrets', () {
@@ -46,7 +47,7 @@ void main() {
       expect(AppConfig.githubRunId, isNotEmpty);
       expect(AppConfig.githubRunNumber, isNotEmpty);
       expect(AppConfig.isReleaseBuild, isA<bool>());
-      expect(AppConfig.legalEffectiveDate, isNotEmpty);
+      expect(legalEffectiveDate, isNotEmpty);
       expect(AppConfig.authorName, isNotEmpty);
       expect(AppConfig.authorUrl, isNotEmpty);
       expect(AppConfig.githubUrl, isNotEmpty);
@@ -56,8 +57,8 @@ void main() {
       expect(AppConfig.playStoreUrl, isNotEmpty);
       expect(AppConfig.legalEmail, isNotEmpty);
       expect(AppConfig.supportEmail, isNotEmpty);
-      expect(AppConfig.governingLawRegion, isNotEmpty);
-      expect(AppConfig.governingLawSpecific, isNotEmpty);
+      expect(governingLawRegion, isNotEmpty);
+      expect(governingLawSpecific, isNotEmpty);
       expect(AppConfig.termsVersion, isNotEmpty);
       expect(AppConfig.syncLoadingMessage, isNotEmpty);
     });

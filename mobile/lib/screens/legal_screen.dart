@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -158,7 +159,7 @@ class _LegalScreenState extends State<LegalScreen> {
                             ).animate().fadeIn(delay: 200.ms).scaleX(begin: 0),
                             const SizedBox(width: 12),
                             Text(
-                              'Effective: ${AppConfig.legalEffectiveDate}',
+                              'Effective: $legalEffectiveDate  •  v$termsVersion',
                               style: GoogleFonts.manrope(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,

@@ -109,8 +109,7 @@ mobile/
 │   │   ├── app_config.dart   # Runtime config (API URLs, feature flags)
 │   │   └── app_secrets.dart  # ⚠️ GITIGNORED — local secrets (keys, tokens)
 │   ├── constants/
-│   │   ├── static_content.dart  # Help/legal Markdown content
-│   │   └── content_cache.dart   # In-memory content cache
+│   │   └── static_content.dart  # Help/legal Markdown content
 │   ├── logic/
 │   │   ├── bunk.dart            # Attendance calculation algorithm (mirrors web)
 │   │   ├── attendance_utils.dart # Attendance data helpers

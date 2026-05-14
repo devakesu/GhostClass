@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:ghostclass/config/app_secrets.dart';
+import 'package:ghostclass/constants/static_content.dart' as static_content;
 import 'package:ghostclass/logic/encrypted_value.dart';
 
 /// Centralized configuration for the application.
@@ -31,8 +32,14 @@ class AppConfig {
         ),
       );
 
+  /// The app domain (no scheme), used to derive emails and web URL.
+  static String get _appDomain => const String.fromEnvironment(
+        'APP_DOMAIN',
+        defaultValue: 'ghostclass.devakesu.com',
+      );
+
   /// The official GhostClass web application URL.
-  static String get webUrl => 'https://ghostclass.devakesu.com';
+  static String get webUrl => 'https://$_appDomain';
 
   /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
   /// Spoofed to match the official app domain.
@@ -87,45 +94,57 @@ class AppConfig {
   /// Whether this binary was produced as a release build.
   static bool get isReleaseBuild => kReleaseMode;
 
-  /// Effective date for legal terms.
-  static String get legalEffectiveDate => 'May 11, 2026';
 
   /// Author branding.
-  static String get authorName => '@deva.kesu';
+  static String get authorName => const String.fromEnvironment(
+        'AUTHOR_NAME',
+        defaultValue: '@deva.kesu',
+      );
 
   /// Author portfolio URL.
-  static String get authorUrl => 'https://devakesu.com';
+  static String get authorUrl => const String.fromEnvironment(
+        'AUTHOR_URL',
+        defaultValue: 'https://devakesu.com',
+      );
 
   /// Project source URL.
-  static String get githubUrl => 'https://github.com/devakesu/GhostClass';
+  static String get githubUrl => const String.fromEnvironment(
+        'GITHUB_URL',
+        defaultValue: 'https://github.com/devakesu/GhostClass',
+      );
 
   /// Original project credits URL.
   static String get creditsUrl => 'https://github.com/ABHAY-100/Bunkr';
 
   /// Optional donation URL.
-  static String get donateUrl => 'https://pages.razorpay.com/devakesu';
+  static String get donateUrl => const String.fromEnvironment(
+        'DONATE_URL',
+        defaultValue: 'https://pages.razorpay.com/devakesu',
+      );
 
   /// Display name of the application.
-  static String get appName => 'GhostClass';
+  static String get appName => const String.fromEnvironment(
+        'APP_NAME',
+        defaultValue: 'GhostClass',
+      );
 
   /// The Play Store URL for the application.
-  static String get playStoreUrl =>
-      'https://play.google.com/store/apps/details?id=com.devakesu.apps.ghostclass';
+  static String get playStoreUrl {
+    const pkg = String.fromEnvironment(
+      'ANDROID_PACKAGE_NAME',
+      defaultValue: 'com.devakesu.apps.ghostclass',
+    );
+    return 'https://play.google.com/store/apps/details?id=$pkg';
+  }
 
   /// Official legal contact email.
-  static String get legalEmail => 'legal@ghostclass.devakesu.com';
+  static String get legalEmail => 'legal@$_appDomain';
 
   /// Official support email.
-  static String get supportEmail => 'contact@ghostclass.devakesu.com';
-
-  /// The governing law region for terms.
-  static String get governingLawRegion => 'India';
-
-  /// The specific legal jurisdiction.
-  static String get governingLawSpecific => 'Kochi, Kerala, India';
+  static String get supportEmail => 'contact@$_appDomain';
 
   /// Required Terms of Service version.
-  static String get termsVersion => '2.8';
+  static String get termsVersion => static_content.termsVersion;
 
   /// Message displayed during background synchronization.
   static String get syncLoadingMessage =>

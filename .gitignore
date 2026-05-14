@@ -76,6 +76,7 @@ certificates/
 /mobile/.packages
 /mobile/.pub-cache/
 /mobile/.pub/
+/mobile/.kotlin/
 /mobile/build/
 /mobile/ios/Flutter/.last_build_id
 /mobile/ios/Flutter/Generated.xcconfig
