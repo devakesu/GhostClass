@@ -32,9 +32,7 @@
 
 GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek web dashboard and a native Flutter mobile application with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in "bunk calculator" to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built to integrate with existing attendance providers, GhostClass can fetch attendance and leave data from EzyGo and related sources and presents it with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!
 
-## 🎯 Core Features
-
-### Key Vibes
+## 🎯 Key Vibes
 
 - **Student-First Dashboard** 🎈: A friendly dashboard with quick insights and a cheeky tone that still gets serious about accuracy.
 - **The Bunk Calc** 🧮: Precise, actionable bunk counts presented with both "official" and "what-you-see" metrics so you know exactly how many classes you can miss before the threshold comes for your neck.
@@ -159,7 +157,7 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 3. **Secrets**: Copy `app_secrets.dart.example` to `app_secrets.dart` and fill your API keys.
 4. **Run**: Connect a device and run `flutter run`.
 
-For detailed setup guides, see **[DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**.
+For contribution rules and environment configurations, please refer to **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** and **[SECURITY.md](SECURITY.md)**.
 
 ## ⚡ Performance Optimizations
 

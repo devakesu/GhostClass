@@ -26,6 +26,6 @@ console.log(`GhostClass now uses ${colors.cyan}Infisical${colors.reset} for cent
 console.log(`GitHub Actions secrets/variables and Coolify runtime environments are automatically`);
 console.log(`synchronized via native Infisical integrations.\n`);
 console.log(`To run locally with injected secrets, use:\n  ${colors.cyan}infisical run -- npm run dev${colors.reset}\n`);
-console.log(`For full environment configuration documentation, refer to docs/DEVELOPER_GUIDE.md.`);
+console.log(`For full environment configuration documentation, refer to SECURITY.md and .example.env.`);
 
 process.exit(0);
