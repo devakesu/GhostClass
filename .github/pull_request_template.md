@@ -31,14 +31,6 @@ Relates to #
 -
 -
 
-## Version Bump
-
-<!-- This section is auto-completed by the workflow -->
-
-- [ ] Version automatically bumped by workflow (same-repo PRs)
-- [ ] Version manually bumped using `node scripts/bump-version.js` (fork PRs)
-- [ ] Version already up-to-date (no bump needed)
-
 ## Testing
 
 <!-- Describe the tests you ran and how to reproduce them -->
@@ -99,7 +91,6 @@ Relates to #
 **For maintainers:**
 
 - [ ] PR title follows conventional commit format
-- [ ] Version bump is correct
 - [ ] All checks pass
 - [ ] Documentation is complete
 - [ ] Ready to merge
