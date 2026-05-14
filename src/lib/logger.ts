@@ -20,14 +20,14 @@
 const isDevelopment = process.env.NODE_ENV === 'development';
 // Detect test environment via the VITEST env var (set automatically by Vitest runner).
 // NOTE: vitest.config.ts sets NODE_ENV='development' (not 'test') so we use VITEST instead.
-const isTest = !!process.env.VITEST;
+const isTest = process.env.VITEST === "true";
 
 export const logger = {
   /**
    * Development-only logging
    * Suppressed in production to keep logs clean
    */
-  dev: (...args: any[]) => {
+  dev: (...args: unknown[]) => {
     if (isDevelopment) {
       console.log(...args);
     }
@@ -37,7 +37,7 @@ export const logger = {
    * Warning messages - always logged (suppressed in test to avoid noisy CI output)
    * Use for non-critical issues that should be investigated
    */
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     if (!isTest) console.warn(...args);
   },
 
@@ -45,7 +45,7 @@ export const logger = {
    * Error messages - always logged (suppressed in test to avoid noisy CI output)
    * Use for errors that need immediate attention
    */
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     if (!isTest) console.error(...args);
   },
 
@@ -53,7 +53,7 @@ export const logger = {
    * Info messages - always logged for important production events
    * Uses console.info (semantically distinct from logger.dev/console.log)
    */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     console.info(...args);
   },
 };

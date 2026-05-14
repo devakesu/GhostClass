@@ -1,0 +1,144 @@
+import 'package:dio/dio.dart';
+import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/services/jwe_service.dart';
+import 'package:ghostclass/services/logger.dart';
+import 'package:uuid/uuid.dart';
+
+/// Interceptor that handles JSON Web Encryption (JWE) for all GhostClass API requests.
+///
+/// 1. [onRequest]: Encrypts outgoing POST/PUT request bodies and attaches the RCEK
+///    (Response Content Encryption Key) to the headers for server-side use.
+/// 2. [onResponse]: Decrypts incoming encrypted responses using the stored RCEK.
+class JweInterceptor extends Interceptor {
+  JweInterceptor();
+  // Use a map to store RCEKs for concurrent requests
+  static final Map<String, String> _rcekMap = {};
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final baseUrl = AppConfig.ghostclassApiUrl;
+    // Ensure we only encrypt requests targeting our own backend.
+    // Check both absolute paths and relative paths combined with baseUrl.
+    final fullUrl = options.path.startsWith('http')
+        ? options.path
+        : '${options.baseUrl}${options.path}';
+    final isGhostClassApi = fullUrl.startsWith(baseUrl);
+    final isWrite =
+        options.method == 'POST' ||
+        options.method == 'PUT' ||
+        options.method == 'PATCH';
+
+    if (isGhostClassApi && isWrite && options.data is Map<String, dynamic>) {
+      try {
+        final jweService = JweService.instance;
+        final result = await jweService.encryptRequest(
+          options.data as Map<String, dynamic>,
+        );
+
+        // Store the RCEK for this request's response decryption using a unique request ID
+        final requestId = const Uuid().v4();
+        _rcekMap[requestId] = result.rcek;
+        options.headers['X-GhostClass-Request-ID'] = requestId;
+
+        options.data = result.jwe;
+        options.headers['x-jwe'] = 'true';
+        options.headers['Content-Type'] = 'application/jose';
+        // The server needs the RCEK to decrypt the request and to encrypt the response
+        // In the GhostClass protocol, we send the RCEK encrypted with the server's public key
+        final keyResult = await jweService.encryptHeaderKey();
+        options.headers['X-JWE-Key'] = keyResult.jwe;
+
+        AppLogger.d('JweInterceptor: Request encrypted for ${options.path}');
+      } on Object catch (e) {
+        AppLogger.e('JweInterceptor: Encryption failed', e);
+        // Fail the request if encryption for our backend fails to avoid sending
+        // sensitive payloads unencrypted.
+        return handler.reject(
+          DioException(
+            requestOptions: options,
+            error: 'JWE encryption failed',
+          ),
+        );
+      }
+    } else if (isGhostClassApi && options.method == 'GET') {
+      // For GET requests, we still need to send a JWE key if we want the response to be encrypted
+      try {
+        final jweService = JweService.instance;
+        final keyResult = await jweService.encryptHeaderKey();
+
+        final requestId = const Uuid().v4();
+        _rcekMap[requestId] = keyResult.rcek;
+        options.headers['X-GhostClass-Request-ID'] = requestId;
+
+        options.headers['x-jwe-key'] = keyResult.jwe;
+      } on Object catch (e) {
+        AppLogger.e('JweInterceptor: GET Key setup failed', e);
+        // Fail GET if we cannot establish a header key for our backend.
+        return handler.reject(
+          DioException(
+            requestOptions: options,
+            error: 'JWE header key setup failed',
+          ),
+        );
+      }
+    }
+
+    return handler.next(options);
+  }
+
+  @override
+  Future<void> onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) async {
+    final contentType = response.headers.value('content-type') ?? '';
+    final isEncrypted =
+        contentType.contains('application/jose') ||
+        response.headers.value('x-jwe') == 'true';
+    final requestId =
+        response.requestOptions.headers['X-GhostClass-Request-ID'];
+    final rcek = _rcekMap.remove(requestId);
+
+    if (isEncrypted && rcek != null) {
+      String? jwe;
+      if (response.data is String) {
+        jwe = response.data as String;
+      }
+
+      if (jwe != null) {
+        try {
+          final jweService = JweService.instance;
+          final decryptedData = await jweService.decryptResponse(jwe, rcek);
+          response.data = decryptedData;
+          AppLogger.d(
+            'JweInterceptor: Response decrypted for ${response.requestOptions.path}',
+          );
+        } on Object catch (e) {
+          AppLogger.e('JweInterceptor: Decryption failed', e);
+          // If decryption fails, reject the response so callers don't process
+          // potentially tampered or unreadable data.
+          return handler.reject(
+            DioException(
+              requestOptions: response.requestOptions,
+              error: 'JWE response decryption failed',
+              type: DioExceptionType.badResponse,
+            ),
+          );
+        }
+      }
+    }
+
+    return handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    // Clean up RCEK on error to prevent memory leaks
+    final requestId = err.requestOptions.headers['X-GhostClass-Request-ID'];
+    _rcekMap.remove(requestId);
+    return handler.next(err);
+  }
+}

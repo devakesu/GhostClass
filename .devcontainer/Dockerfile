@@ -1,0 +1,204 @@
+# Base Image
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+
+USER root
+
+# 1. System Dependencies, Java 17, and SSH Setup
+RUN apt-get update && apt-get install -y \
+    openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https \
+    && mkdir /var/run/sshd \
+    && echo 'vscode:root' | chpasswd \
+    && echo 'root:root' | chpasswd \
+    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# 2. Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs
+
+# 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y \
+       docker-ce-cli \
+       docker-buildx-plugin \
+       docker-compose-plugin \
+       gh \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "Downloading latest Supabase CLI for ${ARCH}..." \
+    && curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${ARCH}.tar.gz" -o supabase.tar.gz \
+    && tar -xzf supabase.tar.gz \
+    && mv supabase /usr/local/bin/ \
+    && chmod +x /usr/local/bin/supabase \
+    && rm supabase.tar.gz \
+    && npm install -g playwright \
+    && npx playwright install-deps \
+    && npm install -g firebase-tools
+
+# Switch to vscode user for user-space SDKs
+USER vscode
+ENV HOME="/home/vscode"
+ENV FLUTTER_HOME="$HOME/flutter-sdk"
+ENV NODE_OPTIONS="--max-old-space-size=9216"
+ENV PATH="$PATH:$FLUTTER_HOME/bin"
+
+# 4. Flutter SDK Pre-cache
+RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
+    && $FLUTTER_HOME/bin/flutter precache
+
+# 5. Workspace Injector Script
+# Switch to root to safely write and change file ownership
+USER root
+RUN cat << 'EOF' > /home/vscode/init_workspace.sh
+#!/bin/bash
+echo "🚀 Starting Full Environment Setup..."
+
+# 1. Git Configuration
+# Tell Git to use a writeable file for global settings instead of the busy mount
+export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"
+export NODE_OPTIONS="--max-old-space-size=9216"
+
+if [ ! -f "$GIT_CONFIG_GLOBAL" ]; then
+    cp /home/vscode/.gitconfig "$GIT_CONFIG_GLOBAL" 2>/dev/null || touch "$GIT_CONFIG_GLOBAL"
+fi
+
+if ! grep -q "GIT_CONFIG_GLOBAL" ~/.bashrc; then
+    echo 'export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"' >> ~/.bashrc
+fi
+
+git config --global --add safe.directory /workspace
+
+# 2. Secure Local SSH Key Setup
+MOUNTED_KEY="/home/vscode/.ssh/id_ed25519"
+LOCAL_KEY="/home/vscode/.ssh/id_ed25519_local"
+
+# Use sudo to ensure we can create/fix the directory
+sudo mkdir -p /home/vscode/.ssh
+sudo chown -R vscode:vscode /home/vscode/.ssh
+chmod 700 /home/vscode/.ssh
+
+if [ -f "$MOUNTED_KEY" ]; then
+    cp "$MOUNTED_KEY" "$LOCAL_KEY"
+    chmod 600 "$LOCAL_KEY"
+    
+    git config --global user.signingkey "$LOCAL_KEY"
+    git config --global gpg.format ssh
+    git config --global commit.gpgsign true
+    echo "✅ Dedicated Sub-key secured and Git signing configured."
+else
+    echo "❌ Private key mount missing at $MOUNTED_KEY!"
+fi
+
+# 3. Deno Setup
+export DENO_INSTALL="/home/vscode/.deno"
+export PATH="$DENO_INSTALL/bin:$PATH"
+
+if [ ! -f "$DENO_INSTALL/bin/deno" ]; then
+    echo "⬇️ Installing Deno..."
+    curl -fsSL https://deno.land/install.sh | sh
+fi
+
+if ! grep -q "DENO_INSTALL" ~/.bashrc; then
+    echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
+    echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
+fi
+
+mkdir -p ~/.vscode-server/data/Machine
+
+if [ ! -f ~/.vscode-server/data/Machine/settings.json ]; then
+    echo '{}' > ~/.vscode-server/data/Machine/settings.json
+fi
+
+grep -q '"deno.path"' ~/.vscode-server/data/Machine/settings.json || \
+sed -i 's|}|,\n  "deno.path": "/home/vscode/.deno/bin/deno",\n  "deno.enable": true\n}|' \
+~/.vscode-server/data/Machine/settings.json
+
+# 4. Android SDK Setup
+export ANDROID_HOME="/home/vscode/android-sdk"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+export PATH="$PATH":"$HOME/.pub-cache/bin"
+
+# Download Linux cmdline-tools if missing
+if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+    echo "⬇️ Downloading Linux Android SDK Command-line Tools..."
+    mkdir -p "/home/vscode/android-sdk/cmdline-tools"
+    
+    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
+    unzip -q /tmp/cmdline-tools.zip -d "/home/vscode/android-sdk/cmdline-tools"
+    
+    mv "/home/vscode/android-sdk/cmdline-tools/cmdline-tools" "/home/vscode/android-sdk/cmdline-tools/latest"
+    rm /tmp/cmdline-tools.zip
+    
+    echo "📦 Installing Android Platform Tools..."
+    yes | /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+    /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+fi
+
+if ! grep -q "ANDROID_HOME" ~/.bashrc; then
+    echo "export ANDROID_HOME=\"/home/vscode/android-sdk\"" >> ~/.bashrc
+    echo "export PATH=\"\$PATH:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools\"" >> ~/.bashrc
+fi
+
+# 5. Flutter SDK Setup
+export FLUTTER_HOME="/home/vscode/flutter-sdk"
+export PATH="$PATH:$FLUTTER_HOME/bin"
+
+if ! grep -q "flutter-sdk" ~/.bashrc; then
+    echo "📝 Updating ~/.bashrc..."
+    echo 'export FLUTTER_HOME="/home/vscode/flutter-sdk"' >> ~/.bashrc
+    echo "export PATH=\"\$PATH:\$FLUTTER_HOME/bin\"" >> ~/.bashrc
+fi
+
+flutter config --android-sdk "$ANDROID_HOME"
+
+# 6. Workspace Dependencies
+if [ -f "/workspace/package.json" ]; then
+    echo "📦 Installing NPM dependencies..."
+    cd /workspace && npm install --legacy-peer-deps
+fi
+
+if [ -d "/workspace/mobile" ]; then
+    echo "🐦 Running flutter pub get..."
+    cd /workspace/mobile && flutter pub get
+fi
+
+# 7. IDE Extensions Installation
+EXTENSIONS=(
+  "Dart-Code.flutter" "Dart-Code.dart-code" "dsznajder.es7-react-js-snippets"
+  "esbenp.prettier-vscode" "bradlc.vscode-tailwindcss" "formulahendry.auto-rename-tag"
+  "christian-kohler.path-intellisense" "christian-kohler.npm-intellisense" "vitest.explorer"
+  "ms-playwright.playwright" "ms-edgedevtools.vscode-edge-devtools" "davidanson.vscode-markdownlint"
+  "meezilla.json" "ms-vscode.vscode-typescript-next" "oderwat.indent-rainbow"
+  "dbaeumer.vscode-eslint" "usernamehw.errorlens" "supabase.vscode-supabase-extension"
+  "denoland.vscode-deno"
+)
+
+for CLI_PATH in \
+    $(find ~/.vscode-server/bin ~/.antigravity-server/bin \
+    -type f \( -name "code-server" -o -name "antigravity-server" \) \
+    -executable 2>/dev/null); do
+
+    echo "Using $CLI_PATH"
+
+    for ext in "${EXTENSIONS[@]}"; do
+        "$CLI_PATH" --install-extension "$ext" --force --telemetry-level off
+    done
+done
+
+hash -r
+echo "🎯 All systems go!"
+EOF
+
+# Fix permissions so vscode owns the script
+RUN chmod +x /home/vscode/init_workspace.sh && chown vscode:vscode /home/vscode/init_workspace.sh
+
+# Start the SSH Daemon
+WORKDIR /workspace
+EXPOSE 22 3000
+CMD ["/usr/sbin/sshd", "-D"]

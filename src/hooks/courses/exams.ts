@@ -5,6 +5,7 @@ import axios from "@/lib/axios";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Exam, ExamAnswer, ExamQuestion } from "@/types";
 import { retryOnce } from "@/lib/query-utils";
+import { useFetchAcademicYear, useFetchSemester } from "../users/settings";
 
 /**
  * React Query hook for fetching the current user's exams and scores.
@@ -26,8 +27,11 @@ import { retryOnce } from "@/lib/query-utils";
  * ```
  */
 export const useExams = (options?: { enabled?: boolean }) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQuery<Exam[]>({
-    queryKey: ["exams"],
+    queryKey: ["exams", semester, year],
     queryFn: async () => {
       const res = await axios.get("/exams");
       if (!res) throw new Error("Failed to fetch exams data");
@@ -57,8 +61,11 @@ export const useExams = (options?: { enabled?: boolean }) => {
  * ```
  */
 export const useExamQuestions = (examId: number | null) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQuery<ExamQuestion[]>({
-    queryKey: ["exam-questions", examId],
+    queryKey: ["exam-questions", examId, semester, year],
     queryFn: async () => {
       const res = await axios.get(`/exams/${examId}/examquestions`, {
         params: { from_view_score: true },
@@ -88,8 +95,11 @@ export const useExamQuestions = (examId: number | null) => {
  * ```
  */
 export const useExamAnswers = (examId: number | null) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQuery<ExamAnswer[]>({
-    queryKey: ["exam-answers", examId],
+    queryKey: ["exam-answers", examId, semester, year],
     queryFn: async () => {
       const res = await axios.get(
         `/exams/${examId}/institutionuser/examanswers`
@@ -98,7 +108,7 @@ export const useExamAnswers = (examId: number | null) => {
       return res.data;
     },
     enabled: examId !== null,
-    staleTime: 0,
+    staleTime: 10 * 60 * 1000, // 10 minutes - scores are stable
     gcTime: 15 * 60 * 1000,
     retry: retryOnce,
   });
@@ -117,9 +127,12 @@ export const useExamAnswers = (examId: number | null) => {
  * ```
  */
 export const useAllExamAnswers = (examIds: number[]) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQueries({
     queries: examIds.map((id) => ({
-      queryKey: ["exam-answers", id],
+      queryKey: ["exam-answers", id, semester, year],
       queryFn: async () => {
         const res = await axios.get(
           `/exams/${id}/institutionuser/examanswers`
@@ -141,9 +154,12 @@ export const useAllExamAnswers = (examIds: number[]) => {
  * @param examIds - Array of exam IDs to pre-fetch questions for.
  */
 export const useAllExamQuestions = (examIds: number[]) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQueries({
     queries: examIds.map((id) => ({
-      queryKey: ["exam-questions", id],
+      queryKey: ["exam-questions", id, semester, year],
       queryFn: async () => {
         const res = await axios.get(`/exams/${id}/examquestions`, {
           params: { from_view_score: true },
@@ -155,5 +171,24 @@ export const useAllExamQuestions = (examIds: number[]) => {
       gcTime: 15 * 60 * 1000,
       retry: retryOnce,
     })),
+  });
+};
+
+/**
+ * Batch fetches details (questions + answers) for multiple exams via the custom batch API.
+ * This is the preferred way to pre-fetch data for the Scores page.
+ */
+export const useBatchExamDetails = (examIds: number[], options?: { enabled?: boolean }) => {
+  return useQuery<Record<number, { questions: ExamQuestion[]; answers: ExamAnswer[] }>>({
+    queryKey: ["exam-details-batch", examIds],
+    queryFn: async () => {
+      if (!examIds.length) return {};
+      const res = await axios.post("/scores/batch", { examIds });
+      return res.data;
+    },
+    enabled: (options?.enabled !== false) && examIds.length > 0,
+    staleTime: 15 * 60 * 1000, // Cache batch heavily (15 mins)
+    gcTime: 20 * 60 * 1000,
+    retry: retryOnce,
   });
 };

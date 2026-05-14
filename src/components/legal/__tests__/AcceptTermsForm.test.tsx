@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import React from 'react';
 import { AcceptTermsForm } from '../AcceptTermsForm';
 
 const { mockNProgressStart, mockNProgressDone } = vi.hoisted(() => ({
@@ -22,7 +23,7 @@ vi.mock('next/navigation', () => ({
 // Mock the acceptTermsAction
 const mockAcceptTermsAction = vi.fn();
 vi.mock('@/app/actions/user', () => ({
-  acceptTermsAction: (...args: any[]) => mockAcceptTermsAction(...args),
+  acceptTermsAction: (...args: unknown[]) => mockAcceptTermsAction(...args),
 }));
 
 // Mock logger
@@ -48,7 +49,7 @@ vi.mock('sonner', () => ({
 
 // Mock ReactMarkdown
 vi.mock('react-markdown', () => ({
-  default: ({ children }: any) => <div>{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('nprogress', () => ({

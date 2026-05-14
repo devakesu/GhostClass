@@ -35,7 +35,7 @@ paste console output here (if any)
 
 ## Environment
 
-- **App version**: <!-- e.g. v1.8.6 — visible in the footer or /build-info -->
+- **App version**: <!-- e.g. 3.0.8 — visible in the footer or /build-info -->
 - **Browser**: <!-- e.g. Chrome 122, Safari 17 -->
 - **OS**: <!-- e.g. Windows 11, macOS Sonoma, Android 14 -->
 - **Device**: <!-- e.g. Desktop, iPhone 15 -->

@@ -46,14 +46,14 @@ function createTimeoutSignal(timeoutMs: number): { signal: AbortSignal; cleanup:
  * Queue-related errors that should not trip the circuit breaker
  * These indicate local resource constraints, not API failure
  */
-class QueueFullError extends NonBreakerError {
+export class QueueFullError extends NonBreakerError {
   constructor(size: number) {
     super(`Request queue is full (${size} items). Please try again later.`);
     this.name = 'QueueFullError';
   }
 }
 
-class QueueTimeoutError extends NonBreakerError {
+export class QueueTimeoutError extends NonBreakerError {
   constructor(timeoutMs: number) {
     super(`Request queue timeout: waited ${timeoutMs}ms without getting a slot`);
     this.name = 'QueueTimeoutError';
@@ -66,7 +66,7 @@ class QueueTimeoutError extends NonBreakerError {
 // TTL must be >= QUEUE_TIMEOUT_MS (30s) + fetch timeout (15s) to ensure the promise
 // doesn't expire while waiting in queue or during the fetch operation
 // Resolved results remain cached for any remaining TTL after completion
-const requestCache = new LRUCache<string, Promise<any>>({
+const requestCache = new LRUCache<string, Promise<unknown>>({
   max: 500,
   ttl: 60000, // 60 seconds - accounts for 30s queue wait + 15s fetch + buffer
   updateAgeOnGet: false, // Don't reset TTL on access
@@ -128,8 +128,11 @@ function waitForSlot(): Promise<number> {
     const itemId = ++queueItemId;
     const timeoutId = setTimeout(() => {
       // Remove from queue if still present
+      // CRITICAL: Guard splice to prevent removing wrong item when index is -1
+      // If item is not found (index === -1), splice(-1, 1) would remove the last queue item,
+      // corrupting fairness for another user and causing their request to never execute.
       const index = requestQueue.findIndex(item => item.id === itemId);
-      if (index !== -1) {
+      if (index >= 0) {
         requestQueue.splice(index, 1);
       }
       reject(new QueueTimeoutError(QUEUE_TIMEOUT_MS));
@@ -179,11 +182,12 @@ function releaseSlot(slotGeneration: number) {
  * @param body - Request body for POST requests
  * @returns Promise with API response data
  */
-export async function fetchEzygoData<T>(
+export function fetchEzygoData<T>(
   endpoint: string,
   token: string,
   method: 'GET' | 'POST' = 'GET',
-  body?: Record<string, unknown> | unknown[] | null
+  body?: Record<string, unknown> | unknown[] | null,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
   // Normalize endpoint for consistent cache key (remove leading slashes)
   const normalizedEndpoint = endpoint.replace(/^\/+/, '');
@@ -204,7 +208,7 @@ export async function fetchEzygoData<T>(
   // Check if request is already in-flight
   const existingRequest = requestCache.get(cacheKey);
   if (existingRequest) {
-    return existingRequest;
+    return existingRequest as Promise<T>;
   }
   
   // Create a deferred promise that we control
@@ -254,6 +258,7 @@ export async function fetchEzygoData<T>(
       const result = await ezygoCircuitBreaker.execute(async () => {
         const fetchHeaders: Record<string, string> = {
           'Authorization': `Bearer ${token}`,
+          ...(extraHeaders ?? {}),
         };
 
         // Only include Content-Type and body for POST requests with a body
@@ -290,7 +295,19 @@ export async function fetchEzygoData<T>(
             throw new Error(errorMsg);
           }
 
-          return response.json();
+          const text = await response.text();
+          try {
+            // EzyGo endpoints usually return JSON, but some settings endpoints 
+            // return plain strings (e.g. "even", "odd") which are not valid JSON.
+            // We try to parse as JSON first, but fallback to raw text if it's a 
+            // SyntaxError and the response was OK.
+            return JSON.parse(text);
+          } catch (err) {
+            if (err instanceof SyntaxError && response.ok) {
+              return text as unknown as T;
+            }
+            throw err;
+          }
         } finally {
           cleanup();
         }
@@ -358,6 +375,22 @@ export function getRateLimiterStats() {
 }
 
 /**
+ * Invalidates all cached EzyGo requests for a specific user token.
+ */
+export function invalidateEzygoCacheForUser(token: string) {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const iterableCache = requestCache as unknown as Iterable<
+    [string, Promise<unknown>]
+  >;
+
+  for (const [key] of iterableCache) {
+    if (key.includes(`:${tokenHash}:`)) {
+      requestCache.delete(key);
+    }
+  }
+}
+
+/**
  * Reset rate limiter state (for testing only)
  * Clears all in-flight requests, queue, and cache
  * Cancels pending timeouts and rejects queued promises
@@ -376,10 +409,9 @@ export function resetRateLimiterState() {
   // Note: We don't need to explicitly clearTimeout here because the reject 
   // handler (defined in waitForSlot at line 120-123) already clears the timeout
   while (requestQueue.length > 0) {
-    const item = requestQueue.shift();
-    if (item) {
-      item.reject(new Error('Rate limiter state reset'));
-    }
+    const item = requestQueue.shift()!;
+    clearTimeout(item.timeoutId);
+    item.reject(new Error('Rate limiter state reset'));
   }
   
   // Clear LRU cache

@@ -1,29 +1,14 @@
 "use client";
 
-/**
- * useSyncOnMount
- *
- * Runs exactly one background sync against /api/cron/sync per real navigation.
- *
- * De-duplication strategy
- * -----------------------
- * React Strict-Mode double-invokes effects. To survive this without double-
- * syncing we track a `mountId` (random string assigned at component creation)
- * alongside `lastSyncMountId` (the mountId whose sync has already completed).
- * If they match, the sync is skipped.
- *
- * A second **empty-dep** effect regenerates `mountId` after every real mount so
- * that genuine page navigations always trigger a fresh sync.
- */
-
 import { useState, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
-import { captureSentryException, captureSentryMessage } from "@/lib/sentry-lazy";
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
+import {
+  captureSentryException,
+  captureSentryMessage,
+} from "@/lib/sentry-lazy";
+import axios from "@/lib/axios";
+import { isAxiosError } from "axios";
 
 export interface SyncResponse {
   success?: boolean;
@@ -35,45 +20,33 @@ export interface SyncResponse {
 }
 
 export interface UseSyncOnMountOptions {
-  /**
-   * EzyGo username to sync. When falsy but `userId` is present the hook
-   * immediately marks sync as completed so the page can render.
-   */
   username: string | undefined;
-  /** User ID; used only to decide whether to short-circuit when username is absent. */
   userId: string | number | undefined;
-  /**
-   * Set to `false` to defer the sync until prerequisite data is ready
-   * (e.g. attendance and tracking queries have finished loading).
-   * Defaults to `true`.
-   */
   enabled?: boolean;
-  /**
-   * Called on HTTP 207 Partial Content – some records synced, others failed.
-   * Use this to show a warning toast and/or trigger targeted refetches.
-   */
   onPartialSync?: (data: SyncResponse) => void | Promise<void>;
-  /**
-   * Called on a fully successful sync that produced changes
-   * (deletions + conflicts + updates > 0).
-   */
   onSuccess?: (data: SyncResponse) => void | Promise<void>;
-  /** Human-readable component name used in Sentry context (`location` tag). */
   sentryLocation: string;
-  /** Short identifier used as the Sentry `type` tag (e.g. `"background_sync"`). */
   sentryTag: string;
 }
 
 export interface UseSyncOnMountReturn {
-  /** True while the `/api/cron/sync` fetch is in-flight. */
   isSyncing: boolean;
-  /** True once sync has finished (or been skipped). Safe to render page content. */
   syncCompleted: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+let lastSyncMountId: string | null = null;
+
+function generateRandomId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return String(Date.now());
+}
 
 export function useSyncOnMount({
   username,
@@ -84,13 +57,12 @@ export function useSyncOnMount({
   sentryLocation,
   sentryTag,
 }: UseSyncOnMountOptions): UseSyncOnMountReturn {
-  const mountId = useRef(Math.random().toString(36));
-  const lastSyncMountId = useRef<string | null>(null);
+  const [mountId] = useState(() => generateRandomId());
+  const syncFinishedRef = useRef(false);
 
-  // Keep callbacks in refs so the sync effect never needs to re-run when the
-  // caller re-creates the callback functions.
   const onPartialSyncRef = useRef(onPartialSync);
   const onSuccessRef = useRef(onSuccess);
+
   useEffect(() => {
     onPartialSyncRef.current = onPartialSync;
     onSuccessRef.current = onSuccess;
@@ -99,94 +71,86 @@ export function useSyncOnMount({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncCompleted, setSyncCompleted] = useState(false);
 
-  // Regenerate the mountId on every real navigation so that navigating back to
-  // the same page triggers a fresh sync. This runs after the sync effect so the
-  // stable initial ID is used for the first sync and the new ID is ready for the
-  // next real mount.
   useEffect(() => {
-    mountId.current = Math.random().toString(36);
-  }, []);
-
-  useEffect(() => {
-    // Wait until the caller signals all prerequisite queries have loaded.
-    if (!enabled) return;
-
-    if (!username) {
-      // User is authenticated but has no EzyGo username – nothing to sync.
-      // Unblock the page immediately.
-      if (userId) setSyncCompleted(true);
+    const isAlreadySynced =
+      typeof window !== "undefined" && lastSyncMountId === mountId;
+    if (!enabled || !username || syncFinishedRef.current || isAlreadySynced)
       return;
-    }
-
-    // Dedup: this mount already ran a sync – skip.
-    if (lastSyncMountId.current === mountId.current) {
-      logger.dev(`[${sentryLocation}] Sync already completed for this mount, skipping`);
-      setSyncCompleted(true);
-      return;
-    }
 
     const abortController = new AbortController();
     let isCleanedUp = false;
 
-    const performSync = async () => {
-      logger.dev(`[${sentryLocation}] Starting sync for mount: ${mountId.current}`);
+    const finalizeSync = (status: number, data: SyncResponse) => {
+      syncFinishedRef.current = true;
+      lastSyncMountId = mountId;
+
+      if (status === 207) {
+        captureSentryMessage(`Partial sync failure in ${sentryLocation}`, {
+          level: "warning",
+          tags: {
+            type: `${sentryTag}_partial_sync`,
+            location: `${sentryLocation}/useSyncOnMount`,
+          },
+          extra: { userId: redact("id", String(userId)), response: data },
+        });
+        onPartialSyncRef.current?.(data);
+      } else if (
+        data.success &&
+        (data.deletions ?? 0) + (data.conflicts ?? 0) + (data.updates ?? 0) > 0
+      ) {
+        onSuccessRef.current?.(data);
+      }
+    };
+
+    const runSync = async () => {
+      logger.dev(`[${sentryLocation}] Starting sync for mount: ${mountId}`);
       setIsSyncing(true);
 
       try {
-        const res = await fetch(`/api/cron/sync`, {
+        const res = await axios.get(`/api/cron/sync`, {
           signal: abortController.signal,
+          baseURL: "",
         });
 
-        const data: SyncResponse = await res.json();
-
         if (isCleanedUp) return;
+        if (!res.data) throw new Error("Empty response");
 
-        if (res.status === 207) {
-          // Partial failure – call the page-specific handler.
-          captureSentryMessage(`Partial sync failure in ${sentryLocation}`, {
-            level: "warning",
-            tags: { type: `${sentryTag}_partial_sync`, location: `${sentryLocation}/useSyncOnMount` },
-            extra: { userId: redact("id", String(userId)), response: data },
-          });
-          await onPartialSyncRef.current?.(data);
-        } else if (!res.ok) {
-          throw new Error(`Sync API responded with status: ${res.status}`);
-        } else if (
-          data.success &&
-          ((data.deletions ?? 0) + (data.conflicts ?? 0) + (data.updates ?? 0)) > 0
-        ) {
-          await onSuccessRef.current?.(data);
-        }
+        finalizeSync(res.status, res.data);
       } catch (error: unknown) {
         if (isCleanedUp) return;
-        const e = error as Error;
-        if (e.name === "AbortError") {
+        const errName = error instanceof Error ? error.name : (error as { name?: string })?.name;
+        if (errName === "CanceledError" || errName === "AbortError") {
           logger.dev(`[${sentryLocation}] Sync request aborted`);
           return;
         }
-
-        logger.error(`${sentryLocation} background sync failed`, error);
+        if (isAxiosError(error)) {
+          if (error.response?.status === 500 || error.response?.status === 503) {
+            setIsSyncing(false);
+            return;
+          }
+        }
+        logger.error(`${sentryLocation} sync failed`, error);
         captureSentryException(error, {
           tags: { type: sentryTag, location: `${sentryLocation}/useSyncOnMount` },
           extra: { userId: redact("id", String(userId)) },
         });
       } finally {
         if (!isCleanedUp) {
-          logger.dev(`[${sentryLocation}] Sync completed for mount: ${mountId.current}`);
-          lastSyncMountId.current = mountId.current;
           setIsSyncing(false);
           setSyncCompleted(true);
         }
       }
     };
 
-    performSync();
-
+    runSync();
     return () => {
       isCleanedUp = true;
       abortController.abort();
     };
-  }, [enabled, username, userId, sentryLocation, sentryTag]);
+  }, [enabled, username, userId, sentryLocation, sentryTag, mountId]);
 
-  return { isSyncing, syncCompleted };
+  const isComplete =
+    syncCompleted || (!username && !!userId) || lastSyncMountId === mountId;
+
+  return { isSyncing, syncCompleted: isComplete };
 }

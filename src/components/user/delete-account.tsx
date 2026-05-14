@@ -22,6 +22,58 @@ import { useQueryClient } from "@tanstack/react-query";
 import { handleLogout } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
 
+async function cleanupUserAvatars(supabase: ReturnType<typeof createClient>, userId: string): Promise<void> {
+  try {
+    const limit = 100;
+    const maxIterations = 20; // Safety cap to avoid infinite loops in case of unexpected behavior.
+    const allPaths: string[] = [];
+    let offset = 0;
+
+    for (let i = 0; i < maxIterations; i++) {
+      const { data: files, error: listError } = await supabase.storage
+        .from('avatars')
+        .list(userId, { limit, offset }, { signal: AbortSignal.timeout(5000) });
+
+      if (listError) {
+        // Log but don't block account deletion if storage listing fails.
+        logger.error("Failed to list avatar files during account deletion:", listError);
+        break;
+      }
+
+      if (!files || files.length === 0) {
+        break;
+      }
+
+      allPaths.push(...files.map((f) => `${userId}/${f.name}`));
+
+      // If we received fewer than `limit` files, we've reached the last page.
+      if (files.length < limit) {
+        break;
+      }
+
+      offset += files.length;
+    }
+
+    if (allPaths.length > 0) {
+      const { error: removeError } = await supabase.storage
+        .from('avatars')
+        .remove(allPaths);
+      if (removeError) {
+        // Log but still proceed with account deletion even if removal fails.
+        logger.error("Failed to remove avatar files during account deletion:", removeError);
+      }
+    }
+  } catch (storageError: unknown) {
+    // Best-effort cleanup: log and continue with account deletion even if storage throws.
+    const errObj = storageError as { name?: string };
+    if (storageError && typeof storageError === "object" && errObj.name === "AbortError") {
+      logger.warn("Avatar storage cleanup aborted during account deletion:", storageError);
+    } else {
+      logger.error("Unexpected error during avatar storage cleanup:", storageError);
+    }
+  }
+}
+
 export function DeleteAccount() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -34,64 +86,12 @@ export function DeleteAccount() {
     
     setIsDeleting(true);
     try {
-      // 1. Delete storage objects (avatars) using the Storage API.
+      // 1. Delete storage objects (avatars) using the Storage API helper.
       // Direct deletion from storage.objects is blocked by Supabase; the JS client
       // is the correct way to remove files before the account RPC runs.
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        try {
-          const limit = 100;
-          const maxIterations = 20; // Safety cap to avoid infinite loops in case of unexpected behavior.
-          const allPaths: string[] = [];
-          let offset = 0;
-
-          for (let i = 0; i < maxIterations; i++) {
-            const { data: files, error: listError } = await supabase.storage
-              .from('avatars')
-              .list(user.id, { limit, offset }, { signal: AbortSignal.timeout(5000) });
-
-            if (listError) {
-              // Log but don't block account deletion if storage listing fails.
-              logger.error("Failed to list avatar files during account deletion:", listError);
-              break;
-            }
-
-            if (!files || files.length === 0) {
-              break;
-            }
-
-            allPaths.push(...files.map((f) => `${user.id}/${f.name}`));
-
-            // If we received fewer than `limit` files, we've reached the last page.
-            if (files.length < limit) {
-              break;
-            }
-
-            offset += files.length;
-          }
-
-          if (allPaths.length > 0) {
-            const { error: removeError } = await supabase.storage
-              .from('avatars')
-              .remove(allPaths);
-            if (removeError) {
-              // Log but still proceed with account deletion even if removal fails.
-              logger.error("Failed to remove avatar files during account deletion:", removeError);
-            }
-          }
-        } catch (storageError: unknown) {
-          // Best-effort cleanup: log and continue with account deletion even if storage throws.
-          if (
-            storageError &&
-            typeof storageError === "object" &&
-            "name" in storageError &&
-            (storageError as { name?: string }).name === "AbortError"
-          ) {
-            logger.warn("Avatar storage cleanup aborted during account deletion:", storageError);
-          } else {
-            logger.error("Unexpected error during avatar storage cleanup:", storageError);
-          }
-        }
+        await cleanupUserAvatars(supabase, user.id);
       }
 
       // 2. Delete account data from database (public tables + auth user)
@@ -108,22 +108,23 @@ export function DeleteAccount() {
       // handleLogout will lazy-load CSRF token handling when needed
       await handleLogout();
       
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete account");
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast.error(err.message || "Failed to delete account");
       setIsDeleting(false);
     }
   };
 
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 p-4 md:p-5 dark:border-red-900/50 dark:bg-red-950/10">
-      <div className="flex flex-wrap gap-4 md:flex-nowrap md:items-start md:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h3 className="font-medium text-red-900 dark:text-red-200 flex items-center gap-2">
+          <h3 className="font-bold text-red-900 dark:text-red-200 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             Delete Account
           </h3>
-          <p className="text-sm text-red-700 dark:text-red-300/80">
-            Permanently remove your account and all of its data. This action cannot be undone.
+          <p className="text-sm text-red-800/80 dark:text-red-300/70 leading-relaxed max-w-xl">
+            Permanently remove your account and all associated attendance data. This action is irreversible and cannot be undone.
           </p>
         </div>
         
@@ -138,12 +139,16 @@ export function DeleteAccount() {
               Delete Account
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your
-                account, attendance data, settings, and remove your data from our servers. Data at EzyGo is unaffected and has no relation with us.
+          <AlertDialogContent className="max-w-[400px] rounded-[24px] border-destructive/20 shadow-2xl">
+            <AlertDialogHeader className="flex flex-col items-center text-center pt-2">
+              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4 animate-pulse">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl font-bold tracking-tight">Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground text-sm px-2 mt-2">
+                This will permanently erase your <span className="text-foreground font-semibold">GhostClass</span> account, including all attendance logs and personal settings.
+                <br /><br />
+                <span className="text-[11px] opacity-70">Note: Your official EzyGo account remains unaffected.</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             
@@ -160,15 +165,20 @@ export function DeleteAccount() {
               />
             </div>
 
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="sm:justify-center gap-2 pt-2">
+              <AlertDialogCancel 
+                disabled={isDeleting}
+                className="rounded-xl border-border/40 hover:bg-muted"
+              >
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => {
                   e.preventDefault();
                   handleDelete();
                 }}
                 disabled={confirmation !== "DELETE" || isDeleting}
-                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl px-6"
               >
                 {isDeleting ? (
                   <>
@@ -176,7 +186,7 @@ export function DeleteAccount() {
                     Deleting...
                   </>
                 ) : (
-                  "Delete Account"
+                  "Permanently Delete"
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

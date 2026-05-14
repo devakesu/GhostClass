@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loading } from "@/components/loading";
-import { useExams, useExamAnswers, useExamQuestions, useAllExamAnswers, useAllExamQuestions } from "@/hooks/courses/exams";
+import { useExams, useExamAnswers, useExamQuestions, useBatchExamDetails } from "@/hooks/courses/exams";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import type { Exam, ExamAnswer, ExamQuestion } from "@/types";
@@ -74,11 +74,69 @@ function getCourseName(exam: Exam): string {
   return c.code ? `${c.code} – ${c.name}` : c.name;
 }
 
+function safeParseFloat(val: unknown): number {
+  if (val === null || val === undefined) return 0;
+  const n = parseFloat(String(val));
+  return isNaN(n) ? 0 : n;
+}
+
 function getScoreColorClass(score: number, max: number) {
-  const pct = (score / max) * 100;
-  if (pct >= 75) return { text: "text-green-600 dark:text-green-400", bar: "bg-green-500" };
-  if (pct >= 50) return { text: "text-yellow-600 dark:text-yellow-400", bar: "bg-yellow-500" };
-  return { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" };
+  const pct = max > 0 ? (score / max) * 100 : 0;
+  if (pct >= 75) return { text: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" };
+  if (pct >= 50) return { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" };
+  return { text: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" };
+}
+
+function computeQuestionsMaxMark(qData: ExamQuestion[], answers: ExamAnswer[]): number {
+  if (!qData || qData.length === 0) return 0;
+  const uniqueQuestions = Array.from(new Map(qData.map((q) => [q.id, q])).values());
+  const parentIds = new Set(
+    uniqueQuestions
+      .map((q) => q.subquestion_parent_id)
+      .filter((id): id is number => id !== null)
+  );
+  const leaves = uniqueQuestions.filter((q) => !parentIds.has(q.id));
+
+  const gradedQuestionIds = new Set(
+    answers.filter((a) => a.score !== null).map((a) => a.examquestion_id)
+  );
+  const gradedLeaves = leaves.filter((q) => gradedQuestionIds.has(q.id));
+  const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
+
+  const orGroups = new Map<number, number>();
+  let total = 0;
+
+  for (const q of targetSet) {
+    const mark = safeParseFloat(q.maximum_mark);
+    if (q.orquestion_group_id != null) {
+      const currentMax = orGroups.get(q.orquestion_group_id) || 0;
+      orGroups.set(q.orquestion_group_id, Math.max(currentMax, mark));
+    } else {
+      total += mark;
+    }
+  }
+
+  for (const groupMark of orGroups.values()) {
+    total += groupMark;
+  }
+  return total;
+}
+
+function formatGroupCounts(nAssessments: number, nAssignments: number): string {
+  let asmtStr = "";
+  if (nAssessments > 0) {
+    asmtStr = `${nAssessments} assessment`;
+    if (nAssessments !== 1) asmtStr += "s";
+  }
+
+  let asgnStr = "";
+  if (nAssignments > 0) {
+    asgnStr = `${nAssignments} assignment`;
+    if (nAssignments !== 1) asgnStr += "s";
+  }
+
+  if (asmtStr && asgnStr) return `${asmtStr} · ${asgnStr}`;
+  return asmtStr || asgnStr;
 }
 
 /**
@@ -93,11 +151,10 @@ function groupByCourse(
   for (const exam of exams) {
     const course = exam.course?.[0];
     const key = course ? String(course.id) : "__none__";
-    const label = course
-      ? course.code
-        ? `${course.code} – ${course.name}`
-        : course.name
-      : "Unknown Course";
+    let label = "Unknown Course";
+    if (course) {
+      label = course.code ? `${course.code} – ${course.name}` : course.name;
+    }
     if (!map.has(key)) {
       map.set(key, { id: key, label, exams: [] });
       order.push(key);
@@ -128,7 +185,7 @@ function ScoreCard({
   // getMaxMark reads exam-level API fields that are frequently null;
   // fall back to resolvedMaxMark (summed from examquestions).
   const apiMaxMark = getMaxMark(exam);
-  const maxNum = apiMaxMark ? parseFloat(apiMaxMark) : (resolvedMaxMark ?? null);
+  const maxNum = apiMaxMark ? safeParseFloat(apiMaxMark) : (resolvedMaxMark ?? null);
   const maxMark = apiMaxMark ?? (resolvedMaxMark != null ? String(resolvedMaxMark) : null);
   const date = getExamDate(exam);
   const isAssessment = exam.activity_type === "assessment";
@@ -146,7 +203,7 @@ function ScoreCard({
       className="h-full"
     >
       <Card
-        className="bg-card border border-border/50 hover:border-purple-500/60 hover:ring-1 hover:ring-purple-500/30 transition-all duration-200 h-full flex flex-col cursor-pointer"
+        className="custom-container hover:border-primary/60 hover:ring-1 hover:ring-primary/30 transition-all duration-200 h-full flex flex-col cursor-pointer"
         onClick={onClick}
         role="button"
         tabIndex={0}
@@ -242,8 +299,8 @@ function ScoreCard({
 
           {/* View details hint */}
           <div className="flex items-center gap-1 mt-auto pt-1 -mb-1">
-            <span className="text-[10px] text-purple-600 dark:text-purple-400">View details</span>
-            <ChevronRight className="h-3 w-3 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+            <span className="text-[10px] text-primary">View details</span>
+            <ChevronRight className="h-3 w-3 text-primary" aria-hidden="true" />
           </div>
         </CardContent>
       </Card>
@@ -267,25 +324,34 @@ function QuestionRow({
   answer: ExamAnswer | undefined;
   index: number;
 }) {
-  const maxNum = parseFloat(question.maximum_mark);
+  const maxNum = safeParseFloat(question.maximum_mark);
   const scored = answer?.score != null;
-  const scoreNum = scored ? parseFloat(answer!.score!) : null;
+  const scoreNum = scored ? safeParseFloat(answer!.score!) : null;
 
-  const chipClass =
-    scoreNum != null
-      ? scoreNum === 0
-        ? "bg-red-500/15 text-red-600 dark:text-red-300 border-red-500/50 dark:border-red-500/30"
-        : scoreNum >= maxNum
-          ? "bg-green-500/15 text-green-600 dark:text-green-300 border-green-500/50 dark:border-green-500/30"
-          : "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/50 dark:border-yellow-500/30"
-      : "bg-foreground/10 text-muted-foreground border-foreground/10";
+  let chipClass = "bg-foreground/10 text-muted-foreground border-foreground/10";
+  if (scoreNum != null) {
+    if (scoreNum === 0) {
+      chipClass =
+        "bg-rose-500/15 text-rose-600 dark:text-rose-300 border-rose-500/50 dark:border-rose-500/30";
+    } else if (scoreNum >= maxNum) {
+      chipClass =
+        "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/50 dark:border-emerald-500/30";
+    } else {
+      chipClass =
+        "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/50 dark:border-amber-500/30";
+    }
+  }
 
-  const displayScore =
-    scoreNum != null
-      ? Number.isInteger(scoreNum)
-        ? String(scoreNum)
-        : scoreNum.toFixed(1)
-      : "—";
+  let displayScore = "—";
+  if (scoreNum != null) {
+    displayScore = Number.isInteger(scoreNum)
+      ? String(scoreNum)
+      : scoreNum.toFixed(1);
+  }
+
+  let barColor = "bg-amber-500";
+  if (scoreNum === 0) barColor = "bg-rose-500";
+  else if (scoreNum != null && scoreNum >= maxNum) barColor = "bg-emerald-500";
 
   return (
     <motion.div
@@ -315,11 +381,7 @@ function QuestionRow({
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                scoreNum === 0
-                  ? "bg-red-500"
-                  : scoreNum >= maxNum
-                    ? "bg-green-500"
-                    : "bg-yellow-500"
+                barColor
               )}
               style={{ width: `${Math.min(100, (scoreNum / maxNum) * 100)}%` }}
             />
@@ -398,11 +460,12 @@ function ExamDetailDrawer({
    */
   const computedTotal = useMemo(() => {
     if (!answers || answers.length === 0) return null;
-    // Return null when none of the answers have been graded yet.
-    const hasAnyScore = answers.some((a) => a.score != null);
+    // Deduplicate by unique answer ID to prevent inflation from API duplicates
+    const uniqueAnswers = Array.from(new Map(answers.map((a) => [a.id, a])).values());
+    const hasAnyScore = uniqueAnswers.some((a) => a.score != null);
     if (!hasAnyScore) return null;
-    return answers.reduce(
-      (sum, a) => sum + (a.score != null ? parseFloat(a.score) : 0),
+    return uniqueAnswers.reduce(
+      (sum, a) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
       0
     );
   }, [answers]);
@@ -412,13 +475,62 @@ function ExamDetailDrawer({
    * (sum of question.maximum_mark across all questions).
    * More reliable than exam.settings.questionPaperMaximumMark.
    */
+  /**
+   * Total possible marks derived from the question paper.
+   * Priority: 
+   * 1. exam.maximum_mark (most reliable official total)
+   * 2. exam.settings.questionPaperMaximumMark
+   * 3. sum of unique leaf question maximum marks that HAVE AN ANSWER (for flexible/optional papers)
+   * 4. sum of all unique leaf question maximum marks (fallback)
+   */
   const totalPossible = useMemo(() => {
+    // 1 & 2: Check exam-level totals first
+    const apiMaxMark = getMaxMark(exam);
+    if (apiMaxMark) return safeParseFloat(apiMaxMark);
+
     if (!questions || questions.length === 0) return null;
-    return questions.reduce(
-      (sum, q) => sum + parseFloat(q.maximum_mark),
-      0
+    
+    // Deduplicate by unique question ID
+    const uniqueQuestions = Array.from(new Map(questions.map((q) => [q.id, q])).values());
+    
+    // Identify parents to find leaves
+    const parentIds = new Set(
+      uniqueQuestions
+        .map((q) => q.subquestion_parent_id)
+        .filter((id): id is number => id !== null)
     );
-  }, [questions]);
+    const leaves = uniqueQuestions.filter((q) => !parentIds.has(q.id));
+    
+    // Priority 3: Only sum leaves that have been graded (have a non-null score).
+    // This is the most reliable way to handle flexible papers in EzyGo,
+    // where unattempted optional questions are returned but shouldn't count.
+    const gradedQuestionIds = new Set(
+      answers?.filter((a) => a.score !== null).map((a) => a.examquestion_id) || []
+    );
+    const gradedLeaves = leaves.filter((q) => gradedQuestionIds.has(q.id));
+    
+    const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
+    
+    // Handle OR-groups within the target set
+    const orGroups = new Map<number, number>();
+    let total = 0;
+    
+    for (const q of targetSet) {
+      const mark = safeParseFloat(q.maximum_mark);
+      if (q.orquestion_group_id != null) {
+        const currentMax = orGroups.get(q.orquestion_group_id) || 0;
+        orGroups.set(q.orquestion_group_id, Math.max(currentMax, mark));
+      } else {
+        total += mark;
+      }
+    }
+    
+    for (const groupMark of orGroups.values()) {
+      total += groupMark;
+    }
+
+    return total > 0 ? total : null;
+  }, [exam, questions, answers]);
 
   const totalColors =
     computedTotal != null && totalPossible != null && totalPossible > 0
@@ -631,13 +743,108 @@ const TABS: { key: ActivityFilter; label: string }[] = [
   { key: "assignment", label: "Assignments" },
 ];
 
+function CourseGroupsSection({
+  filtered,
+  filter,
+  openDrawer,
+  resolvedScores,
+  resolvedMaxMarks,
+  isCourseDisabled,
+}: {
+  filtered: Exam[];
+  filter: ActivityFilter;
+  openDrawer: (exam: Exam) => void;
+  resolvedScores: Map<number, number>;
+  resolvedMaxMarks: Map<number, number>;
+  isCourseDisabled: (code: string) => boolean;
+}) {
+  const groups = [...groupByCourse(filtered)].sort((a, b) => {
+    const codeA = (a.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
+    const codeB = (b.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
+    const aDisabled = isCourseDisabled(codeA);
+    const bDisabled = isCourseDisabled(codeB);
+    if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+    return 0;
+  });
+  let globalIndex = 0;
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={filter}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="flex flex-col gap-8 pb-6"
+      >
+        {groups.map((group) => {
+          const nAssessments = group.exams.filter(
+            (e) => e.activity_type === "assessment",
+          ).length;
+          const nAssignments = group.exams.filter(
+            (e) => e.activity_type === "assignment",
+          ).length;
+          const countLabel = formatGroupCounts(nAssessments, nAssignments);
+          return (
+            <div key={group.id}>
+              {/* Course heading */}
+              <div className="flex items-center gap-3 mb-4">
+                <BookOpen
+                  className="h-4 w-4 text-primary shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="text-sm font-semibold text-foreground">
+                  {group.label}
+                </span>
+                {isCourseDisabled(
+                  (group.exams[0]?.course?.[0]?.code ?? "").toUpperCase(),
+                ) && (
+                  <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">
+                    Disabled
+                  </Badge>
+                )}
+                <div className="flex-1 h-px bg-foreground/10" />
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  {countLabel}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {group.exams.map((exam) => {
+                  const idx = globalIndex++;
+                  return (
+                    <ScoreCard
+                      key={exam.id}
+                      exam={exam}
+                      index={idx}
+                      onClick={() => openDrawer(exam)}
+                      resolvedScore={resolvedScores.get(exam.id)}
+                      resolvedMaxMark={resolvedMaxMarks.get(exam.id)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 export default function ScoresClient() {
   const [filter, setFilter] = useState<ActivityFilter>("all");
-  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } = useExams();
+
+  // URL-driven panel state
+  const panel = searchParams.get("panel");
+  const selectedExam = useMemo(() => {
+    if (!panel) return null;
+    return exams?.find((e) => e.id.toString() === panel) ?? null;
+  }, [panel, exams]);
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
   const { isDisabled: isCourseDisabled } = useDisabledCourses({
@@ -656,38 +863,41 @@ export default function ScoresClient() {
         .map((e) => e.id) ?? [],
     [exams]
   );
-  const allAnswersQueries = useAllExamAnswers(examIds);
-  const allQuestionsQueries = useAllExamQuestions(examIds);
+  // Pre-fetch all exam answers in parallel on load via a single batch request.
+  const batchQuery = useBatchExamDetails(examIds);
 
-  // Block render until exams list + every answers + every questions request has settled.
-  const isLoading =
-    examsLoading ||
-    allAnswersQueries.some((q) => q.isPending) ||
-    allQuestionsQueries.some((q) => q.isPending);
+  // Block render until exams list + batch details have settled.
+  const isLoading = examsLoading || batchQuery.isPending;
 
   /**
    * Map of examId → computed total score from examanswers.
    * Derived directly from the parallel queries; no mutable state needed.
    */
   const resolvedScores = useMemo(() => {
-    const map: Record<number, number> = {};
-    allAnswersQueries.forEach((q, i) => {
-      const id = examIds[i];
-      if (id !== undefined && q.data && q.data.length > 0) {
-        // Only record a score when at least one answer has been graded.
-        // If all scores are null the exam was submitted but not yet graded —
-        // we want the card to show "Pending", not "0 / 25".
-        const hasAnyScore = q.data.some((a) => a.score != null);
+    const resMap = new Map<number, number>();
+    if (!batchQuery.data) return resMap;
+
+    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+      const id = parseInt(idStr, 10);
+      const answers = details.answers;
+      if (answers && answers.length > 0) {
+        const uniqueAnswers = Array.from(
+          new Map(answers.map((a) => [a.id, a])).values(),
+        );
+        const hasAnyScore = uniqueAnswers.some((a) => a.score != null);
         if (hasAnyScore) {
-          map[id] = q.data.reduce(
-            (sum, a) => sum + (a.score != null ? parseFloat(a.score) : 0),
-            0
+          resMap.set(
+            id,
+            uniqueAnswers.reduce(
+              (sum, a) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
+              0,
+            ),
           );
         }
       }
     });
-    return map;
-  }, [allAnswersQueries, examIds]);
+    return resMap;
+  }, [batchQuery.data]);
 
   /**
    * Map of examId → total possible marks, summed from examquestions.
@@ -695,35 +905,37 @@ export default function ScoresClient() {
    * which are frequently null in the API list response.
    */
   const resolvedMaxMarks = useMemo(() => {
-    const map: Record<number, number> = {};
-    allQuestionsQueries.forEach((q, i) => {
-      const id = examIds[i];
-      if (id !== undefined && q.data && q.data.length > 0) {
-        map[id] = q.data.reduce(
-          (sum, question) => sum + parseFloat(question.maximum_mark),
-          0
-        );
+    const resMap = new Map<number, number>();
+    if (!batchQuery.data) return resMap;
+
+    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+      const id = parseInt(idStr, 10);
+      const exam = exams?.find((e) => e.id === id);
+      const qData = details.questions;
+
+      if (id !== undefined) {
+        const apiMaxMark = exam ? getMaxMark(exam) : null;
+        if (apiMaxMark) {
+          resMap.set(id, safeParseFloat(apiMaxMark));
+        } else if (qData && qData.length > 0) {
+          resMap.set(id, computeQuestionsMaxMark(qData, details.answers || []));
+        }
       }
     });
-    return map;
-  }, [allQuestionsQueries, examIds]);
-
-  // Derive a stable primitive so useEffect below has a deterministic dependency.
-  const panel = searchParams.get("panel");
+    return resMap;
+  }, [batchQuery.data, exams]);
 
   // Open the drawer and push a history entry so the back button can close it.
-  // Only push when panel is absent; replace if a different panel value exists;
-  // do nothing if panel=1 is already set. Preserves any existing query params.
   const openDrawer = useCallback(
     (exam: Exam) => {
-      setSelectedExam(exam);
-      const currentPanel = searchParams.get("panel");
       const nextParams = new URLSearchParams(searchParams.toString());
-      nextParams.set("panel", "1");
+      nextParams.set("panel", exam.id.toString());
       const nextUrl = `${pathname}?${nextParams.toString()}`;
-      if (currentPanel === null) {
+      
+      // If no panel is present, push; otherwise replace to avoid history bloat
+      if (!searchParams.has("panel")) {
         router.push(nextUrl, { scroll: false });
-      } else if (currentPanel !== "1") {
+      } else {
         router.replace(nextUrl, { scroll: false });
       }
     },
@@ -731,33 +943,14 @@ export default function ScoresClient() {
   );
 
   // Programmatic close: replace the URL with panel param removed.
-  // This is safe regardless of whether openDrawer used push or replace,
-  // since we never risk navigating to a different page.
-  // The Android back button still works via the history entry pushed by openDrawer
-  // (when panel was absent), caught by the useEffect below.
   const closeDrawer = useCallback(() => {
-    if (searchParams.get("panel")) {
+    if (searchParams.has("panel")) {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.delete("panel");
       const params = nextParams.toString();
       router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
-    } else {
-      setSelectedExam(null);
     }
   }, [router, pathname, searchParams]);
-
-  // When the back button (or any navigation) removes ?panel= from the URL,
-  // searchParams loses the param and this effect clears the selected exam
-  // to close the drawer.
-  //
-  // The effect depends only on `panel`, so it runs when the URL panel state
-  // changes, and always resets `selectedExam` when there is no active panel.
-  // setSelectedExam(null) is a no-op when selectedExam is already null.
-  useEffect(() => {
-    if (!panel) {
-      setSelectedExam(null);
-    }
-  }, [panel]);
 
   /**
    * Mirror EzyGo's visibility rules:
@@ -771,14 +964,14 @@ export default function ScoresClient() {
     return exams.filter((e) => {
       if (!e.participants || e.participants.length === 0) return false;
       if (e.activity_type === "assignment") {
-        const idx = examIds.indexOf(e.id);
-        if (idx === -1) return false;
-        const q = allAnswersQueries[idx];
-        return q?.data !== undefined && q.data.length > 0;
+        const details = batchQuery.data?.[e.id];
+        const hasAnswers = details?.answers !== undefined && details.answers.length > 0;
+        const hasScore = resolvedScores.has(e.id) || getScore(e) !== null;
+        return hasAnswers || hasScore;
       }
       return true;
     });
-  }, [exams, examIds, allAnswersQueries]);
+  }, [exams, batchQuery.data, resolvedScores]);
 
   const filtered = useMemo(() => {
     const base =
@@ -787,8 +980,8 @@ export default function ScoresClient() {
         : participatedExams.filter((e) => e.activity_type === filter);
     // Marked (has resolved score) first, then pending
     return [...base].sort((a, b) => {
-      const aScored = resolvedScores[a.id] !== undefined || getScore(a) !== null ? 1 : 0;
-      const bScored = resolvedScores[b.id] !== undefined || getScore(b) !== null ? 1 : 0;
+      const aScored = resolvedScores.has(a.id) || getScore(a) !== null ? 1 : 0;
+      const bScored = resolvedScores.has(b.id) || getScore(b) !== null ? 1 : 0;
       return bScored - aScored;
     });
   }, [participatedExams, filter, resolvedScores]);
@@ -802,25 +995,26 @@ export default function ScoresClient() {
   }, [participatedExams]);
 
   const stats = useMemo(() => {
-    if (participatedExams.length === 0) return null;
-    const scored = participatedExams.filter(
-      (e) => (resolvedScores[e.id] ?? getScore(e)) != null
+    if (filtered.length === 0) return null;
+    const scored = filtered.filter(
+      (e) => (resolvedScores.get(e.id) ?? getScore(e)) != null
     ).length;
-    const pending = participatedExams.length - scored;
-    const percentages = participatedExams
+    const pending = filtered.length - scored;
+    const percentages = filtered
       .map((e) => {
-        const s = resolvedScores[e.id] ?? getScore(e);
-        const m = resolvedMaxMarks[e.id];
-        if (s == null || m == null || m === 0) return null;
-        return (s / m) * 100;
+        const s = resolvedScores.get(e.id) ?? getScore(e);
+        const m = resolvedMaxMarks.get(e.id);
+        if (s == null || m == null || m <= 0) return null;
+        return (safeParseFloat(s) / m) * 100;
       })
       .filter((v): v is number => v !== null);
     const avg =
       percentages.length > 0
         ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
         : null;
-    return { total: participatedExams.length, scored, pending, avg };
-  }, [participatedExams, resolvedScores, resolvedMaxMarks]);
+    return { total: filtered.length, scored, pending, avg };
+  }, [filtered, resolvedScores, resolvedMaxMarks]);
+
 
   if (isLoading || (!exams && !isError)) {
     return (
@@ -830,20 +1024,20 @@ export default function ScoresClient() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <div className="flex-1 flex flex-col gap-6 p-4 pt-12 sm:p-8 sm:pt-16 max-w-7xl mx-auto w-full">
+      <div className="flex-1 container mx-auto max-w-7xl px-4 md:px-6 pt-4 md:pt-6">
 
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-4 mb-8"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/50 dark:border-purple-500/30 shrink-0">
-            <GraduationCap className="h-5 w-5 text-purple-600 dark:text-purple-300" aria-hidden="true" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 border border-primary/50 dark:border-primary/30 shrink-0">
+            <GraduationCap className="h-6 w-6 text-primary" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight mb-1">
               Scores
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -858,7 +1052,7 @@ export default function ScoresClient() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8"
           >
             {[
               { label: "Total", value: String(stats.total) },
@@ -868,7 +1062,7 @@ export default function ScoresClient() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-xl border border-border/50 bg-card p-3 sm:p-4"
+                className="custom-container p-3 sm:p-4"
                 aria-label={`${s.label}: ${s.value}`}
               >
                 <div className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">
@@ -887,7 +1081,7 @@ export default function ScoresClient() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="flex items-center gap-2 flex-wrap mb-2"
+          className="flex items-center gap-3 flex-wrap mb-6"
         >
           {TABS.map((tab) => (
             <Button
@@ -897,7 +1091,7 @@ export default function ScoresClient() {
               className={cn(
                 "custom-button rounded-lg text-xs font-medium transition-all",
                 filter === tab.key
-                  ? "border-purple-500/60 bg-purple-500/15 text-purple-700 dark:text-purple-200"
+                  ? "border-primary/60 bg-primary/15 text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setFilter(tab.key)}
@@ -906,7 +1100,7 @@ export default function ScoresClient() {
               <span
                 className={cn(
                   "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                  filter === tab.key ? "bg-purple-500/30" : "bg-foreground/10"
+                  filter === tab.key ? "bg-primary/30" : "bg-foreground/10"
                 )}
               >
                 {counts[tab.key]}
@@ -972,74 +1166,16 @@ export default function ScoresClient() {
         )}
 
         {/* Cards grouped by course */}
-        {!isError && filtered.length > 0 && (() => {
-          const groups = [...groupByCourse(filtered)].sort((a, b) => {
-            const codeA = (a.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
-            const codeB = (b.exams[0]?.course?.[0]?.code ?? "").toUpperCase();
-            const aDisabled = isCourseDisabled(codeA);
-            const bDisabled = isCourseDisabled(codeB);
-            if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
-            return 0;
-          });
-          let globalIndex = 0;
-          return (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={filter}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex flex-col gap-8 pb-6"
-              >
-                {groups.map((group) => {
-                  const nAssessments = group.exams.filter((e) => e.activity_type === "assessment").length;
-                  const nAssignments = group.exams.filter((e) => e.activity_type === "assignment").length;
-                  const countLabel =
-                    nAssessments > 0 && nAssignments > 0
-                      ? `${nAssessments} assessment${nAssessments !== 1 ? "s" : ""} · ${nAssignments} assignment${nAssignments !== 1 ? "s" : ""}`
-                      : nAssessments > 0
-                      ? `${nAssessments} assessment${nAssessments !== 1 ? "s" : ""}`
-                      : `${nAssignments} assignment${nAssignments !== 1 ? "s" : ""}`;
-                  return (
-                  <div key={group.id}>
-                    {/* Course heading */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" aria-hidden="true" />
-                      <span className="text-sm font-semibold text-foreground">
-                        {group.label}
-                      </span>
-                      {isCourseDisabled((group.exams[0]?.course?.[0]?.code ?? "").toUpperCase()) && (
-                        <Badge className="text-[10px] px-1.5 h-4 bg-muted text-muted-foreground border-border">Disabled</Badge>
-                      )}
-                      <div className="flex-1 h-px bg-foreground/10" />
-                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                        {countLabel}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {group.exams.map((exam) => {
-                        const idx = globalIndex++;
-                        return (
-                          <ScoreCard
-                            key={exam.id}
-                            exam={exam}
-                            index={idx}
-                            onClick={() => openDrawer(exam)}
-                            resolvedScore={resolvedScores[exam.id]}
-                            resolvedMaxMark={resolvedMaxMarks[exam.id]}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                  );
-                })}
-              </motion.div>
-            </AnimatePresence>
-          );
-        })()}
+        {!isError && filtered.length > 0 && (
+          <CourseGroupsSection
+            filtered={filtered}
+            filter={filter}
+            openDrawer={openDrawer}
+            resolvedScores={resolvedScores}
+            resolvedMaxMarks={resolvedMaxMarks}
+            isCourseDisabled={isCourseDisabled}
+          />
+        )}
       </div>
 
       {/* Detail drawer */}

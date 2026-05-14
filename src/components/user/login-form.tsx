@@ -10,15 +10,15 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-import axios, { AxiosError } from "axios"; 
-import { getCsrfToken, setCsrfToken } from "@/lib/axios";
+import axios from "@/lib/axios";
+import { AxiosError } from "axios"; 
 import { useCSRFToken } from "@/hooks/use-csrf-token"; 
+import { useQueryClient } from "@tanstack/react-query";
 
 import { PasswordResetForm } from "./password-reset-form";
 import { motion, HTMLMotionProps, Variants } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
 import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
 import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
@@ -32,23 +32,52 @@ interface ErrorResponse {
   message: string;
 }
 
-const loginMethodProps = {
-  username: {
-    label: "Username",
-    type: "text",
-    placeholder: "academic_weapon_fr",
-  },
-  email: {
-    label: "Email",
-    type: "email",
-    placeholder: "cooked@attendance.edu",
-  },
-  phone: {
-    label: "Phone",
-    type: "tel",
-    placeholder: "919234567890",
-  },
-};
+interface SaveTokenData {
+  userId?: string | null;
+  settings?: {
+    bunk_calculator_enabled?: boolean;
+    target_percentage?: number;
+    disabled_courses?: string[];
+  };
+}
+
+type LoginMethod = "username" | "email" | "phone";
+
+function getLoginMethodProps(method: LoginMethod) {
+  switch (method) {
+    case "email":
+      return {
+        label: "Email",
+        type: "email",
+        placeholder: "cooked@attendance.edu",
+      };
+    case "phone":
+      return {
+        label: "Phone",
+        type: "tel",
+        placeholder: "919234567890",
+      };
+    case "username":
+    default:
+      return {
+        label: "Username",
+        type: "text",
+        placeholder: "academic_weapon_fr",
+      };
+  }
+}
+
+function getLoginMethodAriaLabel(method: LoginMethod): string {
+  switch (method) {
+    case "email":
+      return "Login with email";
+    case "phone":
+      return "Login with phone";
+    case "username":
+    default:
+      return "Login with username";
+  }
+}
 
 const PASSWORD_VALIDATION = {
   MIN_LENGTH: 6,  // Conservative (most systems use 6-8)
@@ -74,7 +103,7 @@ const validatePassword = (password: string): string | null => {
   return null; // Valid
 };
 
-const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
+const detectLoginMethod = (value: string): LoginMethod => {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) return "username";
@@ -91,16 +120,172 @@ const detectLoginMethod = (value: string): "username" | "email" | "phone" => {
   return "username";
 };
 
+function clearLocalUserStorage(): void {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.clear();
+      sessionStorage.removeItem("prefetchedSettings");
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+async function verifyActiveSessionAndCleanup(
+  supabase: ReturnType<typeof createClient>,
+  router: ReturnType<typeof useRouter>,
+  isMounted: boolean
+): Promise<void> {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    const isMissing = error ? isAuthSessionMissingError(error) : false;
+    const isLock = error ? isSupabaseLockTimeoutError(error) : false;
+
+    if (error && !isMissing && !isLock) {
+      throw error;
+    }
+
+    if (session?.user) {
+      if (isMounted) router.push("/dashboard");
+      return;
+    }
+
+    if (!isLock) {
+      clearLocalUserStorage();
+    }
+  } catch (err) {
+    if (err instanceof Error) {
+      if (isSupabaseLockTimeoutError(err)) {
+        logger.dev("Supabase auth lock timeout during page-load session check");
+      } else if (!isAuthSessionMissingError(err)) {
+        logger.error("Unexpected error checking user session:", err);
+      }
+    }
+  }
+}
+
+async function ensureCsrfTokenPreloaded(): Promise<void> {
+  const { getCsrfToken, setCsrfToken } = await import("@/lib/axios");
+  if (!getCsrfToken()) {
+    try {
+      const csrfResponse = await fetch("/api/csrf", { credentials: "include" });
+      if (csrfResponse.ok) {
+        const { token } = await csrfResponse.json();
+        setCsrfToken(token);
+      }
+    } catch (csrfErr) {
+      logger.dev("CSRF pre-fetch failed during login submission; proceeding with default interceptor logic", csrfErr);
+    }
+  }
+}
+
+function writeCustomSettingsToStorage(
+  supabaseUserId: string,
+  settings: NonNullable<SaveTokenData["settings"]>,
+  queryClient: ReturnType<typeof useQueryClient>
+): void {
+  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean" ? settings.bunk_calculator_enabled : true;
+  const rawTarget = settings.target_percentage;
+
+  let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
+  if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
+    const normalizedTarget = Math.round(rawTarget);
+    if (normalizedTarget >= 1 && normalizedTarget <= 100) {
+      targetPercentage = normalizedTarget;
+    }
+  }
+
+  const bunkValue = bunkEnabled.toString();
+  const targetValue = targetPercentage.toString();
+
+  try {
+    sessionStorage.setItem("prefetchedSettings", JSON.stringify({
+      userId: supabaseUserId,
+      settings: {
+        bunk_calculator_enabled: bunkEnabled,
+        target_percentage: targetPercentage
+      }
+    }));
+
+    localStorage.setItem(`showBunkCalc_${supabaseUserId}`, bunkValue);
+    localStorage.setItem(`targetPercentage_${supabaseUserId}`, targetValue);
+
+    queryClient.setQueryData(["userSettings", supabaseUserId], {
+      bunk_calculator_enabled: bunkEnabled,
+      target_percentage: targetPercentage,
+      disabled_courses: settings.disabled_courses || []
+    });
+  } catch (storageError) {
+    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    logger.dev("Failed to write returned settings to storage after login", {
+      context: "LoginForm/handleSubmit",
+      error: msg,
+    });
+  }
+}
+
+function writeDefaultSettingsToStorage(supabaseUserId: string): void {
+  try {
+    localStorage.setItem(`showBunkCalc_${supabaseUserId}`, "true");
+    localStorage.setItem(`targetPercentage_${supabaseUserId}`, "75");
+  } catch (storageError) {
+    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    logger.dev("Failed to write default settings to storage after login", {
+      context: "LoginForm/handleSubmit",
+      error: msg,
+    });
+  }
+  logger.dev("No settings returned from /api/auth/save-token; applied default settings for new user.", {
+    context: "LoginForm/handleSubmit",
+  });
+}
+
+function persistPrefetchedSettings(
+  data: SaveTokenData | undefined,
+  queryClient: ReturnType<typeof useQueryClient>
+): void {
+  const settings = data?.settings;
+  const supabaseUserId = data?.userId ?? null;
+
+  if (!supabaseUserId) {
+    logger.error("User ID not returned from save-token; skipping settings prefetch", {
+      context: "LoginForm/handleSubmit",
+    });
+    return;
+  }
+
+  if (settings) {
+    writeCustomSettingsToStorage(supabaseUserId, settings, queryClient);
+  } else {
+    writeDefaultSettingsToStorage(supabaseUserId);
+  }
+}
+
+function announceToScreenReader(errorMsg: string): void {
+  if (typeof window !== 'undefined' && document.body) {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('role', 'alert');
+    announcement.setAttribute('aria-live', 'assertive');
+    announcement.className = 'sr-only';
+    announcement.textContent = errorMsg;
+    document.body.appendChild(announcement);
+    setTimeout(() => {
+      if (document.body?.contains(announcement)) {
+        document.body.removeChild(announcement);
+      }
+    }, 5000);
+  }
+}
+
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
-  const manuallySelectedLoginMethodRef = useRef<"email" | "phone" | null>(null);
+  const queryClient = useQueryClient();
+  const manuallySelectedLoginMethodRef = useRef<LoginMethod | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordResetForm, setShowPasswordResetForm] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<
-    "username" | "email" | "phone"
-  >("username");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("username");
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -113,17 +298,6 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   useCSRFToken();
   
   // Create stable Supabase client reference to avoid unnecessary re-renders
-  // SAFETY: The Supabase client returned by createClient() is stateless and safe to memoize.
-  // It doesn't contain any user-specific state - auth state is managed separately via
-  // Supabase's internal session management. Memoizing prevents unnecessary client recreation
-  // on each render, which could cause performance issues and potential memory leaks.
-  //
-  // WARNING FOR FUTURE DEVELOPERS:
-  // This memoization creates a hidden assumption: createClient() must ALWAYS return a stateless,
-  // user-agnostic client. If createClient() were ever changed to return a user-specific client
-  // (e.g., based on auth state), this memoization would break and cause bugs. In such a case,
-  // either remove the memoization entirely or use a ref (useRef) instead to make it clearer
-  // this is meant to be a stable reference that doesn't depend on component state.
   const supabase = useMemo(() => createClient(), []);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,8 +322,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     setFormData((prev) => ({ ...prev, username: loginValue }));
 
-    // Preserve explicit email/phone selector choices while typing ambiguous input,
-    // but allow inferred modes to fall back to username when the value no longer matches.
+    // Preserve explicit email/phone selector choices while typing ambiguous input
     const manuallySelectedMethod = manuallySelectedLoginMethodRef.current;
     if (manuallySelectedMethod && inferredMethod === "username") {
       setLoginMethod(manuallySelectedMethod);
@@ -163,51 +336,14 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   useEffect(() => {
     let isMounted = true;
     
-    const checkUser = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        // Ignore auth session missing errors - they're expected when not logged in
-        if (error && !isAuthSessionMissingError(error) && !isSupabaseLockTimeoutError(error)) {
-          throw error;
-        }
-        if (session?.user && isMounted) {
-          router.push("/dashboard");
-          return;
-        }
-
-        // No active session — clear any stale user data left by a previous session.
-        // This handles the case where the proxy force-redirected to "/" server-side
-        // (e.g. expired Supabase token, terms redirect loop) without client JS having
-        // run handleLogout(), so localStorage/sessionStorage were never cleared.
-        // We only clear localStorage and the prefetchedSettings sessionStorage key;
-        // the CSRF token (csrf_token_memory) is freshly initialized by useCSRFToken()
-        // earlier in this render and must not be removed.
-        // Important: skip storage cleanup when Supabase returned a lock-timeout error,
-        // because the user may still have a valid session and we treat that error as recoverable.
-        if (!session?.user && (!error || isAuthSessionMissingError(error)) && !isSupabaseLockTimeoutError(error)) {
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.clear();
-              sessionStorage.removeItem("prefetchedSettings");
-            } catch {
-              // Ignore restricted-storage environments (e.g. private browsing with blocked storage)
-            }
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && !isAuthSessionMissingError(err) && !isSupabaseLockTimeoutError(err)) {
-          logger.error("Unexpected error checking user session:", err);
-        } else if (err instanceof Error && isSupabaseLockTimeoutError(err)) {
-          logger.dev("Supabase auth lock timeout during page-load session check; continuing without redirect");
-        }
-      }
+    const checkUser = () => {
+      void verifyActiveSessionAndCleanup(supabase, router, isMounted);
     };
     checkUser();
     
     return () => {
       isMounted = false;
     };
-    // supabase is memoized with empty deps, so including it here is safe and stable
   }, [router, supabase]);
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -224,132 +360,23 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         return;
       }
 
-      // 1. Login to Ezygo (public endpoint - exempt from CSRF, listed in PUBLIC_PATHS)
-      const response = await axios.post("/api/backend/login", formData);
-      const token = response.data.access_token;
+      await ensureCsrfTokenPreloaded();
 
-      if (!token) throw new Error("Invalid response from server");
+      // 1. Login to Ezygo (public endpoint)
+      const response = await axios.post("login", {
+        username: formData.username.trim(),
+        password: formData.password.trim(),
+        stay_logged_in: true
+      });
+      
+      const token = response.data.access_token || response.data.token;
+      if (!token) throw new Error("Invalid response from server: Access token missing");
 
-      // 2. Securely Save Token (Bridge to GhostClass) - requires CSRF token.
-      // getCsrfToken() reads the stored CSRF token (backed by sessionStorage and
-      // initialized by useCSRFToken()). On very fast submissions (e.g. password manager
-      // autofill) the async CSRF fetch may not have completed yet, which would send no
-      // header and cause a 403. If the token is missing here, attempt a one-time re-fetch
-      // before giving up.
-      let csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        try {
-          // Token not yet available — the async CSRF init may not have finished
-          // (e.g. password manager autofill + instant submit). Re-fetch directly
-          // and store the token so the Axios interceptor also picks it up.
-          const csrfRes = await fetch("/api/csrf", { credentials: "include" });
-          if (csrfRes.ok) {
-            const data = await csrfRes.json();
-            const tokenFromResponse =
-              typeof data?.token === "string" ? data.token : null;
-            csrfToken = tokenFromResponse;
-            if (csrfToken) setCsrfToken(csrfToken);
-          }
-        } catch {
-          // If the re-fetch itself fails, proceed without the token — the server
-          // will reject with 403 and the catch block will surface the right error.
-        }
-      }
+      // 2. Securely Save Token (Bridge to GhostClass)
+      const saveTokenResponse = await axios.post("/api/auth/save-token", { token }, { baseURL: "/" });
 
-      const saveTokenResponse = await axios.post("/api/auth/save-token", 
-        { token }, 
-        { 
-          headers: csrfToken ? { [CSRF_HEADER]: csrfToken } : {}
-        }
-      );
-
-      // 3. Pre-populate settings from save-token response for immediate availability.
-      // Use the Supabase auth user ID returned by the server — avoids an extra getUser() round-trip.
-      const settings = saveTokenResponse.data?.settings;
-      const supabaseUserId: string | null = saveTokenResponse.data?.userId ?? null;
-
-      if (!supabaseUserId) {
-        // Server did not return a user ID (unexpected); skip settings prefetch.
-        // The dashboard will fetch settings from DB on next load.
-        logger.error("User ID not returned from save-token; skipping settings prefetch", {
-          context: "LoginForm/handleSubmit",
-        });
-      } else if (settings) {
-        // Validate and normalize settings values before using them to prevent
-        // prototype pollution or injection attacks
-        const bunkEnabled =
-          typeof settings.bunk_calculator_enabled === "boolean"
-            ? settings.bunk_calculator_enabled
-            : true;
-        const rawTarget = settings.target_percentage;
-
-        // Normalize target percentage using the same logic as normalizeTarget in user-settings.ts
-        // This handles decimal percentages (e.g., 75.5) by rounding, and ensures values are
-        // within valid range [1-100]. If the value is invalid, falls back to DEFAULT_TARGET_PERCENTAGE.
-        let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
-
-        if (typeof rawTarget === "number" && Number.isFinite(rawTarget)) {
-          const normalizedTarget = Math.round(rawTarget);
-          if (normalizedTarget >= 1 && normalizedTarget <= 100) {
-            targetPercentage = normalizedTarget;
-          }
-        }
-
-        const bunkValue = bunkEnabled.toString();
-        const targetValue = targetPercentage.toString();
-
-        try {
-          // Store settings with user ID to ensure they belong to the current user.
-          // Use sessionStorage for reliable cross-navigation transfer.
-          // Include userId to prevent cross-user leakage if the hook stays mounted.
-          sessionStorage.setItem("prefetchedSettings", JSON.stringify({
-            userId: supabaseUserId,
-            settings: {
-              bunk_calculator_enabled: bunkEnabled,
-              target_percentage: targetPercentage
-            }
-          }));
-
-          // Also update localStorage for persistence across sessions
-          localStorage.setItem(`showBunkCalc_${supabaseUserId}`, bunkValue);
-          localStorage.setItem(`targetPercentage_${supabaseUserId}`, targetValue);
-        } catch (storageError) {
-          // Storage errors are non-critical - log but continue
-          // Storage can fail in private browsing mode or when storage is disabled
-          logger.dev("Failed to write returned settings to storage after login", {
-            context: "LoginForm/handleSubmit",
-            error: storageError instanceof Error ? storageError.message : String(storageError),
-          });
-        }
-      } else {
-        // Fallback: apply default settings when none are returned from save-token
-        // This is expected for brand new users who haven't set up their preferences yet
-        // We apply sensible defaults and let the settings provider create the DB record
-        const defaultSettings = {
-          bunk_calculator_enabled: true,
-          target_percentage: 75,
-        };
-
-        try {
-          // We intentionally do NOT write to sessionStorage.prefetchedSettings here so
-          // that the settings provider will still create a user_settings row in the DB.
-          // Writing prefetchedSettings would cause the provider to skip DB initialization.
-          localStorage.setItem(`showBunkCalc_${supabaseUserId}`, defaultSettings.bunk_calculator_enabled.toString());
-          localStorage.setItem(`targetPercentage_${supabaseUserId}`, defaultSettings.target_percentage.toString());
-        } catch (storageError) {
-          // Storage errors are non-critical - log but continue
-          logger.dev("Failed to write default settings to storage after login", {
-            context: "LoginForm/handleSubmit",
-            error: storageError instanceof Error ? storageError.message : String(storageError),
-          });
-        }
-
-        // For new users, this is expected behavior - log at dev level to reduce monitoring noise
-        // since this is a normal part of the new user onboarding flow
-        logger.dev("No settings returned from /api/auth/save-token; applied default settings for new user.", {
-          context: "LoginForm/handleSubmit",
-        });
-      }
+      // 3. Persist returned user preferences cleanly
+      persistPrefetchedSettings(saveTokenResponse.data, queryClient);
 
       // 4. Success - navigate to dashboard
       router.push("/dashboard");
@@ -362,11 +389,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       let errorMsg = "An unexpected error occurred. Please try again later.";
 
       if (err.config?.url?.includes("save-token")) {
-         // This is a critical failure in OUR backend bridge
          errorMsg = "Secure session setup failed. Please try again later. If the issue persists, contact us via the link in the footer.";
          Sentry.captureException(error, { tags: { type: "auth_bridge_client_error", location: "LoginForm/handleSubmit" } });
       } else if (err.response?.status === 401) {
-         // User error (wrong password) - No Sentry needed
          errorMsg = "Invalid credentials. Please check your password.";
       } else if (err.response?.data?.message) {
          const msg = err.response.data.message;
@@ -374,27 +399,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
            ? "These credentials do not match EzyGo records."
            : msg;
       } else if (err.code === "ERR_NETWORK") {
-         errorMsg = "Network error. Please check your connection.";
+         errorMsg = "Network error. Please check your connection. If this persists even after some time, kindly contact us using the link in the footer.";
+         Sentry.captureException(error, { tags: { type: "network_error", location: "LoginForm/handleSubmit" } });
       }
       setError(errorMsg);
-
-      // Announce error to screen readers
-      if (typeof window !== 'undefined' && document.body) {
-        const announcement = document.createElement('div');
-        announcement.setAttribute('role', 'alert');
-        announcement.setAttribute('aria-live', 'assertive');
-        announcement.className = 'sr-only';
-        announcement.textContent = errorMsg;
-        document.body.appendChild(announcement);
-        setTimeout(() => {
-          // Guard against the body being null or the node already removed
-          // (e.g. during Next.js App Router page transitions or PWA page lifecycle events)
-          // that could cause an unhandled TypeError outside the try/catch scope.
-          if (document.body?.contains(announcement)) {
-            document.body.removeChild(announcement);
-          }
-        }, 5000);
-      }
+      announceToScreenReader(errorMsg);
       logger.error("Login failed:", err);
     }
   };
@@ -421,6 +430,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       transition: { type: "spring", stiffness: 400, damping: 10, duration: 0.6 },
     },
   };
+
+  const currentMethodProps = getLoginMethodProps(loginMethod);
 
   if (showPasswordResetForm) {
     return (
@@ -472,7 +483,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
             <motion.div className="grid gap-2" variants={itemVariants}>
               <div className="flex items-center justify-between">
                 <Label htmlFor="login">
-                  {loginMethodProps[loginMethod].label}
+                  {currentMethodProps.label}
                 </Label>
                 <div className="flex gap-1">
                   {(["username", "email", "phone"] as const).map((method) => (
@@ -487,7 +498,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                         manuallySelectedLoginMethodRef.current =
                           method === "email" || method === "phone" ? method : null;
                       }}
-                      aria-label={method === "username" ? "Login with username" : method === "email" ? "Login with email" : "Login with phone"}
+                      aria-label={getLoginMethodAriaLabel(method)}
                     >
                       {method === "username" && <User className="h-4 w-4" aria-hidden="true" />}
                       {method === "email" && <Mail className="h-4 w-4" aria-hidden="true" />}
@@ -499,12 +510,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
               <div className="relative">
                 <Input
                   id="login"
-                  type={loginMethodProps[loginMethod].type}
+                  type={currentMethodProps.type}
                   value={formData.username}
-                  className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors"
+                  className="custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-primary/50 transition-colors"
                   onChange={handleLoginChange}
-                  placeholder={loginMethodProps[loginMethod].placeholder}
-                  name={loginMethodProps[loginMethod].label.toLowerCase()}
+                  placeholder={currentMethodProps.placeholder}
+                  name={currentMethodProps.label.toLowerCase()}
                   required
                 />
               </div>
@@ -530,7 +541,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   required
                   value={formData.password}
                   className={cn(
-                    "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-purple-500/50 transition-colors",
+                    "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-primary/50 transition-colors",
                     passwordError && "border-red-500/50 focus:border-red-500"
                   )}
                   onChange={handlePasswordChange}
@@ -585,9 +596,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
         {/* Disclaimer Section */}
         <div className="mt-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-700">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 mb-3">
-            <LockIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-            <span className="text-[11px] font-bold tracking-widest uppercase text-purple-600 dark:text-purple-300/80">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
+            <LockIcon className="h-3 w-3 text-primary" />
+            <span className="text-[11px] font-bold tracking-widest uppercase text-primary">
               Ghosts don&apos;t snoop 😁
             </span>
           </div>

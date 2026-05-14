@@ -1,28 +1,31 @@
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import NotificationsPage from '../NotificationsClient';
 
 // Mock all required hooks and dependencies
+const MOCK_NOTIFICATIONS_VAL = {
+  actionNotifications: [],
+  regularNotifications: [],
+  unreadCount: 0,
+  isLoading: false,
+  error: null,
+  markAsRead: vi.fn(),
+  toggleRead: vi.fn(),
+  markAllAsRead: vi.fn(),
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+};
+
 vi.mock('@/hooks/notifications/useNotifications', () => ({
-  useNotifications: vi.fn(() => ({
-    actionNotifications: [],
-    regularNotifications: [],
-    unreadCount: 0,
-    isLoading: false,
-    error: null,
-    markAsRead: vi.fn(),
-    markAllAsRead: vi.fn(),
-    fetchNextPage: vi.fn(),
-    hasNextPage: false,
-    isFetchingNextPage: false,
-  })),
+  useNotifications: vi.fn(() => MOCK_NOTIFICATIONS_VAL),
 }));
 
+const MOCK_USER_DATA = { id: '123', email: 'test@example.com', username: 'testuser' };
+const MOCK_USER_VAL = { data: MOCK_USER_DATA, isLoading: false };
 vi.mock('@/hooks/users/user', () => ({
-  useUser: () => ({
-    data: { id: '123', email: 'test@example.com', username: 'testuser' },
-    isLoading: false,
-  }),
+  useUser: () => MOCK_USER_VAL,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -31,31 +34,24 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
-vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: () => ({
-    getTotalSize: () => 100,
-    getVirtualItems: () => [
-      {
-        key: 0,
-        index: 0,
-        size: 50,
-        start: 0,
-        end: 50,
-        measureElement: vi.fn(),
-      },
-      {
-        key: 1,
-        index: 1,
-        size: 50,
-        start: 50,
-        end: 100,
-        measureElement: vi.fn(),
-      },
-    ],
-    scrollToIndex: vi.fn(),
-    measureElement: vi.fn(),
-    measure: vi.fn(),
-  }),
+const MOCK_MEASURE_EL = vi.fn();
+const MOCK_MEASURE = vi.fn();
+const MOCK_SCROLL = vi.fn();
+
+vi.mock('@/hooks/notifications/use-notification-virtualizer', () => ({
+  useNotificationVirtualizer: vi.fn(({ virtualItems }) => ({
+    getTotalSize: () => virtualItems.length * 100,
+    getVirtualItems: () => virtualItems.map((item: any, index: number) => ({
+      index,
+      start: index * 100,
+      size: 100,
+      key: item.id,
+      measureElement: MOCK_MEASURE_EL,
+    })),
+    measureElement: MOCK_MEASURE_EL,
+    measure: MOCK_MEASURE,
+    scrollToIndex: MOCK_SCROLL,
+  })),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -66,6 +62,8 @@ vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
@@ -74,6 +72,17 @@ vi.mock('@/lib/logger', () => ({
     error: vi.fn(),
     dev: vi.fn(),
   },
+}));
+
+vi.mock('@/hooks/use-sync-on-mount', () => ({
+  useSyncOnMount: vi.fn(() => ({
+    isSyncing: false,
+    syncCompleted: true,
+  })),
+}));
+
+vi.mock('@/components/loading', () => ({
+  Loading: () => <div role="status">Loading...</div>,
 }));
 
 describe('NotificationsClient', () => {
@@ -108,6 +117,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -155,6 +165,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -202,6 +213,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -250,6 +262,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -287,6 +300,7 @@ describe('NotificationsClient', () => {
         isLoading: false,
         error: null,
         markAsRead: vi.fn(),
+        toggleRead: vi.fn(),
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -307,9 +321,9 @@ describe('NotificationsClient', () => {
   });
 
   describe('Notification click and keyboard interaction', () => {
-    it('calls markAsRead when an unread notification is clicked', async () => {
+    it('calls toggleRead when an unread notification is clicked', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -327,7 +341,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -346,12 +361,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.click(card);
-      expect(mockMarkAsRead).toHaveBeenCalledWith(7);
+      expect(mockToggleRead).toHaveBeenCalledWith(7, false);
     });
 
-    it('calls markAsRead on Enter keydown for an unread notification', async () => {
+    it('calls toggleRead on Enter keydown for an unread notification', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -369,7 +384,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -388,12 +404,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.keyDown(card, { key: 'Enter' });
-      expect(mockMarkAsRead).toHaveBeenCalledWith(8);
+      expect(mockToggleRead).toHaveBeenCalledWith(8, false);
     });
 
-    it('calls markAsRead on Space keydown for an unread notification', async () => {
+    it('calls toggleRead on Space keydown for an unread notification', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -411,7 +427,8 @@ describe('NotificationsClient', () => {
         unreadCount: 1,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -430,12 +447,12 @@ describe('NotificationsClient', () => {
       expect(card).toBeInTheDocument();
 
       fireEvent.keyDown(card, { key: ' ' });
-      expect(mockMarkAsRead).toHaveBeenCalledWith(9);
+      expect(mockToggleRead).toHaveBeenCalledWith(9, false);
     });
 
-    it('does not call markAsRead when a read notification is clicked', async () => {
+    it('calls toggleRead when a read notification is clicked', async () => {
       const { useNotifications } = await import('@/hooks/notifications/useNotifications');
-      const mockMarkAsRead = vi.fn();
+      const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -453,7 +470,8 @@ describe('NotificationsClient', () => {
         unreadCount: 0,
         isLoading: false,
         error: null,
-        markAsRead: mockMarkAsRead,
+        markAsRead: vi.fn(),
+        toggleRead: mockToggleRead,
         markAllAsRead: vi.fn(),
         fetchNextPage: vi.fn(),
         hasNextPage: false,
@@ -470,7 +488,83 @@ describe('NotificationsClient', () => {
       const notification = await screen.findByText('Already Read Notification', {}, { timeout: 3000 });
       const card = notification.closest('div[role="button"]') as HTMLElement;
       if (card) fireEvent.click(card);
-      expect(mockMarkAsRead).not.toHaveBeenCalled();
+      expect(mockToggleRead).toHaveBeenCalledWith(10, true);
+    });
+  });
+
+  describe('Sync Callbacks', () => {
+    it('handles partial sync by showing a toast', async () => {
+      const { useSyncOnMount } = await import('@/hooks/use-sync-on-mount');
+      let partialSyncCallback: any;
+      vi.mocked(useSyncOnMount).mockImplementation(({ onPartialSync }: any) => {
+        partialSyncCallback = onPartialSync;
+        return { isSyncing: false, syncCompleted: true };
+      });
+
+      const { toast } = await import('sonner');
+      render(<NotificationsPage />);
+      await partialSyncCallback();
+      expect(toast.warning).toHaveBeenCalledWith("Partial Sync Completed", expect.any(Object));
+    });
+
+    it('handles successful sync with updates by showing a toast', async () => {
+      const { useSyncOnMount } = await import('@/hooks/use-sync-on-mount');
+      let successCallback: any;
+      vi.mocked(useSyncOnMount).mockImplementation(({ onSuccess }: any) => {
+        successCallback = onSuccess;
+        return { isSyncing: false, syncCompleted: true };
+      });
+
+      const { toast } = await import('sonner');
+      render(<NotificationsPage />);
+      await successCallback({ updates: 5 });
+      expect(toast.info).toHaveBeenCalledWith("Notifications Updated", expect.any(Object));
+    });
+  });
+
+  describe('Handle Toggle Read Error', () => {
+    it('logs error and shows toast on failure', async () => {
+      const { useNotifications } = await import('@/hooks/notifications/useNotifications');
+      const mockToggleRead = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      vi.mocked(useNotifications).mockReturnValue({
+        ...MOCK_NOTIFICATIONS_VAL,
+        regularNotifications: [
+          { id: 11, title: 'Error Notification', is_read: false, created_at: new Date().toISOString(), topic: 'sync' }
+        ],
+        toggleRead: mockToggleRead,
+      } as any);
+
+      const { toast } = await import('sonner');
+      const { logger } = await import('@/lib/logger');
+      
+      // Ensure NODE_ENV is development for line 213 coverage
+      vi.stubEnv('NODE_ENV', 'development');
+
+      render(<NotificationsPage />);
+      const notification = await screen.findByText('Error Notification');
+      fireEvent.click(notification);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Could not update notification");
+        expect(logger.error).toHaveBeenCalled();
+      });
+      
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe('Empty State', () => {
+    it('renders empty state when no notifications exist', async () => {
+      const { useNotifications } = await import('@/hooks/notifications/useNotifications');
+      vi.mocked(useNotifications).mockReturnValue({
+        ...MOCK_NOTIFICATIONS_VAL,
+        actionNotifications: [],
+        regularNotifications: [],
+      } as any);
+
+      render(<NotificationsPage />);
+      expect(screen.getByText('All caught up!')).toBeInTheDocument();
     });
   });
 });

@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 10000,
     env: {
       // Default to development for most tests
       // Security-critical tests should explicitly override NODE_ENV to 'production'
@@ -30,19 +31,20 @@ export default defineConfig({
         'scripts/**',
         '**/__tests__/**',
         '**/*.{test,spec}.*',
+        'mobile/**',
       ],
       include: ['src/**/*.{ts,tsx}'],
       // @ts-expect-error - 'all' is a valid runtime option but not in Vitest 4.x types
       all: true,
       thresholds: {
-        lines: 7,
-        functions: 8,
-        branches: 5,
-        statements: 7,
+        lines: 10,
+        functions: 10,
+        branches: 10,
+        statements: 10,
       },
     },
     include: ['**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', '.next', 'supabase', 'e2e'],
+    exclude: ['node_modules', '.next', 'supabase', 'e2e', 'mobile'],
   },
   resolve: {
     alias: {

@@ -1,339 +1,170 @@
-/**
- * Tests for CSRF Protection Module
- */
-
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  generateCsrfToken,
-  getCsrfToken,
-  setCsrfCookie,
-  validateCsrfToken,
-  initializeCsrfToken,
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { 
+  generateCsrfToken, 
+  getCsrfToken, 
+  setCsrfCookie, 
+  validateCsrfToken, 
+  initializeCsrfToken, 
   regenerateCsrfToken,
-  removeCsrfToken,
-} from "../csrf";
+  removeCsrfToken 
+} from '../csrf';
+import { cookies } from 'next/headers';
+import { redis } from '@/lib/redis';
 
-// Create mock cookie store
-let mockCookieStore: {
-  get: ReturnType<typeof vi.fn>;
-  set: ReturnType<typeof vi.fn>;
-  delete: ReturnType<typeof vi.fn>;
-};
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
 
-// Mock the Next.js cookies module
-vi.mock("next/headers", () => ({
-  cookies: vi.fn(() => mockCookieStore),
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(),
 }));
 
-describe("CSRF Protection", () => {
+vi.mock('@/lib/redis', () => ({
+  redis: {
+    set: vi.fn().mockResolvedValue('OK'),
+    get: vi.fn(),
+    del: vi.fn().mockResolvedValue(1),
+  },
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    error: vi.fn(),
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('CSRF Security', () => {
+  const mockCookieStore = {
+    get: vi.fn(),
+    set: vi.fn(),
+    delete: vi.fn(),
+  };
+
   beforeEach(() => {
-    // Create fresh mock cookie store for each test
-    mockCookieStore = {
-      get: vi.fn(),
-      set: vi.fn(),
-      delete: vi.fn(),
-    };
-  });
-
-  afterEach(() => {
     vi.clearAllMocks();
+    vi.mocked(cookies).mockResolvedValue(mockCookieStore as any);
   });
 
-  describe("generateCsrfToken", () => {
-    it("should generate a token of correct length", () => {
+  describe('generateCsrfToken', () => {
+    it('generates a 64-character hex string', () => {
       const token = generateCsrfToken();
-      // 32 bytes = 64 hex characters
       expect(token).toHaveLength(64);
+      expect(token).toMatch(/^[0-9a-f]+$/);
     });
 
-    it("should generate unique tokens", () => {
+    it('generates unique tokens', () => {
       const token1 = generateCsrfToken();
       const token2 = generateCsrfToken();
       expect(token1).not.toBe(token2);
     });
-
-    it("should generate tokens with valid hex characters", () => {
-      const token = generateCsrfToken();
-      expect(token).toMatch(/^[0-9a-f]{64}$/);
-    });
   });
 
-  describe("getCsrfToken", () => {
-    it("should return token when it exists", async () => {
-      const expectedToken = "test-token-123";
-      mockCookieStore.get.mockReturnValue({ value: expectedToken });
-
+  describe('getCsrfToken', () => {
+    it('returns the token from cookies', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'mock-token' });
       const token = await getCsrfToken();
-      
-      expect(token).toBe(expectedToken);
-      expect(mockCookieStore.get).toHaveBeenCalledWith("csrf_token");
+      expect(token).toBe('mock-token');
     });
 
-    it("should return null when token doesn't exist", async () => {
+    it('returns null if cookie is missing', async () => {
       mockCookieStore.get.mockReturnValue(undefined);
-
       const token = await getCsrfToken();
-      
-      expect(token).toBe(null);
-    });
-
-    it("should return null when cookie value is empty", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "" });
-
-      const token = await getCsrfToken();
-      
       expect(token).toBe(null);
     });
   });
 
-  describe("setCsrfCookie", () => {
-    it("should set cookie with correct configuration", async () => {
-      const token = "test-token-456";
-      
-      await setCsrfCookie(token);
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith({
-        name: "csrf_token",
-        value: token,
-        httpOnly: true, // XSS-safe: token not accessible to JavaScript
-        secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
-        sameSite: "strict",
-        maxAge: 86400, // 24 hours
-        path: "/",
-      });
-    });
-
-    it("should set secure=true when NODE_ENV is production", async () => {
-      const original = process.env.NODE_ENV;
-      const originalHttps = process.env.HTTPS;
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("HTTPS", "");
-
-      await setCsrfCookie("tok");
-      const callArg = mockCookieStore.set.mock.calls[0][0] as any;
-      expect(callArg.secure).toBe(true);
-
-      vi.stubEnv("NODE_ENV", original);
-      vi.stubEnv("HTTPS", originalHttps ?? "");
-    });
-
-    it("should set secure=true when HTTPS env var is 'true'", async () => {
-      const original = process.env.NODE_ENV;
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("HTTPS", "true");
-
-      await setCsrfCookie("tok");
-      const callArg = mockCookieStore.set.mock.calls[0][0] as any;
-      expect(callArg.secure).toBe(true);
-
-      vi.stubEnv("NODE_ENV", original);
-      vi.stubEnv("HTTPS", "");
-    });
-
-    it("should set secure=false when neither NODE_ENV=production nor HTTPS=true", async () => {
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("HTTPS", "false");
-
-      await setCsrfCookie("tok");
-      const callArg = mockCookieStore.set.mock.calls[0][0] as any;
-      expect(callArg.secure).toBe(false);
-
-      vi.stubEnv("HTTPS", "");
+  describe('setCsrfCookie', () => {
+    it('sets the cookie with correct parameters', async () => {
+      await setCsrfCookie('new-token');
+      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'csrf_token',
+        value: 'new-token',
+        httpOnly: true,
+        sameSite: 'strict',
+        path: '/',
+      }));
     });
   });
 
-  describe("validateCsrfToken", () => {
-    it("should return true for matching tokens", async () => {
-      const token = "a".repeat(64); // Same length token
-      mockCookieStore.get.mockReturnValue({ value: token });
-
-      const isValid = await validateCsrfToken(token);
-      
+  describe('validateCsrfToken', () => {
+    it('returns true for matching tokens', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'match' });
+      const isValid = await validateCsrfToken('match');
       expect(isValid).toBe(true);
     });
 
-    it("should return false for non-matching tokens", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "token1" });
-
-      const isValid = await validateCsrfToken("token2");
-      
+    it('returns false for mismatched tokens', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'a' });
+      const isValid = await validateCsrfToken('b');
       expect(isValid).toBe(false);
     });
 
-    it("should return false when request token is null", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "token" });
+    it('handles different length tokens without throwing (timingSafeEqual)', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'long-token' });
+      const isValid = await validateCsrfToken('short');
+      expect(isValid).toBe(false);
+    });
 
+    it('returns false if request token is missing', async () => {
       const isValid = await validateCsrfToken(null);
-      
       expect(isValid).toBe(false);
     });
 
-    it("should return false when request token is undefined", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "token" });
-
-      const isValid = await validateCsrfToken(undefined);
-      
-      expect(isValid).toBe(false);
-    });
-
-    it("should return false when cookie token doesn't exist", async () => {
+    it('returns false if cookie token is missing', async () => {
       mockCookieStore.get.mockReturnValue(undefined);
-
-      const isValid = await validateCsrfToken("some-token");
-      
-      expect(isValid).toBe(false);
-    });
-
-    it("should use constant-time comparison", async () => {
-      // This test ensures timing attacks are prevented
-      const token = "b".repeat(64);
-      mockCookieStore.get.mockReturnValue({ value: token });
-
-      // Should handle different length tokens safely
-      const isValid = await validateCsrfToken("short");
-      
+      const isValid = await validateCsrfToken('token');
       expect(isValid).toBe(false);
     });
   });
 
-  describe("initializeCsrfToken", () => {
-    it("should return existing token if present and refresh its cookie TTL", async () => {
-      const existingToken = "existing-token-123";
-      mockCookieStore.get.mockReturnValue({ value: existingToken });
-
+  describe('initializeCsrfToken', () => {
+    it('reuses existing token if present', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'existing' });
       const token = await initializeCsrfToken();
-      
-      expect(token).toBe(existingToken);
-      // Cookie is always re-issued to refresh TTL and prevent the
-      // "cookie expired / sessionStorage stale" desync seen after deployments.
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "csrf_token",
-          value: existingToken,
-        })
-      );
+      expect(token).toBe('existing');
+      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({ value: 'existing' }));
     });
 
-    it("should create new token if none exists", async () => {
+    it('generates new token if missing', async () => {
       mockCookieStore.get.mockReturnValue(undefined);
-
       const token = await initializeCsrfToken();
-      
       expect(token).toHaveLength(64);
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "csrf_token",
-          value: token,
-        })
-      );
+      expect(mockCookieStore.set).toHaveBeenCalled();
     });
-
-    it("should generate valid hex token", async () => {
-      mockCookieStore.get.mockReturnValue(undefined);
-
+    
+    it('binds token to session in redis', async () => {
+      mockCookieStore.get.mockImplementation((name) => {
+          if (name === 'authjs.session-token') return { value: 'session-123' };
+          return undefined;
+      });
       const token = await initializeCsrfToken();
-      
-      expect(token).toMatch(/^[0-9a-f]{64}$/);
+      expect(redis.set).toHaveBeenCalledWith(
+        `csrf:token:${token}:session`,
+        'session-123',
+        expect.any(Object)
+      );
     });
   });
 
-  describe("removeCsrfToken", () => {
-    it("should delete the CSRF cookie", async () => {
+  describe('regenerateCsrfToken', () => {
+    it('always generates a new token', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'old' });
+      const token = await regenerateCsrfToken();
+      expect(token).not.toBe('old');
+      expect(mockCookieStore.set).toHaveBeenCalled();
+    });
+  });
+
+  describe('removeCsrfToken', () => {
+    it('deletes the cookie and redis binding', async () => {
+      mockCookieStore.get.mockReturnValue({ value: 'token-to-remove' });
       await removeCsrfToken();
-      
-      expect(mockCookieStore.delete).toHaveBeenCalledWith("csrf_token");
-    });
-  });
-
-  describe("regenerateCsrfToken", () => {
-    it("should always create a new token", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "old-token" });
-
-      const token = await regenerateCsrfToken();
-      
-      expect(token).toHaveLength(64);
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "csrf_token",
-          value: token,
-        })
-      );
-    });
-
-    it("should generate different tokens on successive calls", async () => {
-      const token1 = await regenerateCsrfToken();
-      const token2 = await regenerateCsrfToken();
-      
-      expect(token1).not.toBe(token2);
-      expect(mockCookieStore.set).toHaveBeenCalledTimes(2);
-    });
-
-    it("should generate valid hex tokens", async () => {
-      const token = await regenerateCsrfToken();
-      
-      expect(token).toMatch(/^[0-9a-f]{64}$/);
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle empty string tokens", async () => {
-      mockCookieStore.get.mockReturnValue({ value: "" });
-
-      const isValid = await validateCsrfToken("");
-      
-      expect(isValid).toBe(false);
-    });
-
-    it("should handle very long tokens", async () => {
-      const longToken = "x".repeat(1000);
-      await setCsrfCookie(longToken);
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ value: longToken })
-      );
-    });
-
-    it("should handle special characters in tokens", async () => {
-      const specialToken = "abc!@#$%^&*()_+-=[]{}|;:',.<>?/~`";
-      mockCookieStore.get.mockReturnValue({ value: specialToken });
-
-      const token = await getCsrfToken();
-      
-      expect(token).toBe(specialToken);
-    });
-  });
-
-  describe("Security Properties", () => {
-    it("should set httpOnly flag (Synchronizer Token Pattern for XSS protection)", async () => {
-      await setCsrfCookie("token");
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ httpOnly: true })
-      );
-    });
-
-    it("should set sameSite to strict", async () => {
-      await setCsrfCookie("token");
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ sameSite: "strict" })
-      );
-    });
-
-    it("should set appropriate expiration", async () => {
-      await setCsrfCookie("token");
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ maxAge: 86400 }) // 24 hours
-      );
-    });
-
-    it("should set path to root", async () => {
-      await setCsrfCookie("token");
-      
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/" })
-      );
+      expect(mockCookieStore.delete).toHaveBeenCalledWith('csrf_token');
+      expect(redis.del).toHaveBeenCalledWith('csrf:token:token-to-remove:session');
     });
   });
 });

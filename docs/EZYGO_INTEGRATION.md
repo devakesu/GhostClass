@@ -548,9 +548,33 @@ The batch fetcher (`src/lib/ezygo-batch-fetcher.ts`) calls `getEgressConfig()` d
 
 ---
 
+## Mobile App Integration
+
+GhostClass Mobile implements the same three-layer protection system as the web application to ensure parity and reliability.
+
+### Implementation Details
+
+| Layer | Web Implementation | Mobile Implementation |
+| :--- | :--- | :--- |
+| **1. Deduplication** | LRU Cache (`lru-cache`) | In-memory map caching & `AsyncValue` (Riverpod) |
+| **2. Rate Limiting** | `MAX_CONCURRENT` Queue | `EzygoBatchFetcher` (3 concurrent max) |
+| **3. Circuit Breaker** | `CircuitBreaker` class | `OutageProvider` + `CircuitBreaker` mixin |
+
+### Security Differences
+
+Unlike the web app which uses `httpOnly` cookies, the mobile app:
+
+1. **Authenticates** with a `MOBILE_API_SECRET` and JWE-encrypted payload.
+2. **Stores tokens** in the hardware-backed **SecureStorage** (Keystore/Keychain).
+3. **Calls EzyGo directly** for attendance data to minimize latency, while using the GhostClass backend for security nonces and session provisioning.
+
+---
+
 For implementation details and code examples, see:
 
 - `src/lib/utils.server.ts` (egress helpers)
 - `src/lib/circuit-breaker.ts`
 - `src/lib/ezygo-batch-fetcher.ts`
 - `src/app/(protected)/dashboard/page.tsx`
+- `mobile/lib/logic/ezygo_batch_fetcher.dart` (Mobile implementation)
+- `mobile/lib/services/api_service.dart` (Mobile JWE proxying)

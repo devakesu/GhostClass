@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
+import { getSupabaseConfig, _customFetch } from "./fetch";
 
 /**
  * Creates a Supabase server client with cookie-based session management.
@@ -23,9 +24,7 @@ import { logger } from "@/lib/logger";
  */
 export async function createClient() {
   const cookieStore = await cookies();
-  
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { url, key } = getSupabaseConfig('client');
 
   if (!url || !key) {
       const error = new Error("Supabase Environment Variables missing in Server Client");
@@ -55,6 +54,7 @@ export async function createClient() {
           }
         },
       },
+      ...(_customFetch ? { global: { fetch: _customFetch } } : {})
     }
   );
 }

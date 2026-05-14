@@ -18,6 +18,8 @@ import { NextRequest } from 'next/server';
 // Must be hoisted before any module imports that transitively import server-only
 vi.mock('server-only', () => ({}));
 
+import { __resetAllowedHostsCache } from '@/lib/security/origin-validation';
+
 // Pre-configure the app domain to an IPv6 address BEFORE importing the route
 // module so that the module-level allowedHosts cache is populated correctly.
 vi.hoisted(() => {
@@ -28,10 +30,24 @@ vi.hoisted(() => {
 
 vi.mock('@/lib/security/auth-cookie', () => ({
   getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
 }));
 
 vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock('@/lib/ratelimit', () => ({
+  proxyRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true, remaining: 10, reset: Date.now() + 1000 }),
+  },
+}));
+
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+  })),
 }));
 
 // Same lightweight pass-through circuit breaker as in route-failover.test.ts.
@@ -72,6 +88,7 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
     // Defensive: restore real timers first (see route-failover.test.ts comment).
     vi.useRealTimers();
     vi.clearAllMocks();
+    __resetAllowedHostsCache();
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
     vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '::1');
@@ -101,6 +118,7 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
       headers: {
         'sec-fetch-site': 'same-origin',
         host: '[::1]:3000',
+        'x-csrf-token': 'mock-csrf-token',
       },
     });
 
@@ -127,6 +145,7 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
       headers: {
         'sec-fetch-site': 'same-origin',
         'x-forwarded-host': '::1',
+        'x-csrf-token': 'mock-csrf-token',
       },
     });
 

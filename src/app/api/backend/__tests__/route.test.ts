@@ -7,17 +7,46 @@ vi.mock('server-only', () => ({}));
 // Set environment variables BEFORE any imports using vi.hoisted
 // This ensures they're available when the route module's top-level constants are initialized
 vi.hoisted(() => {
-  vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NODE_ENV', 'production');
   vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
 });
 
 // Mock the security modules before importing route
 vi.mock('@/lib/security/auth-cookie', () => ({
   getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
+  setAuthCookie: vi.fn(),
+  clearAuthCookie: vi.fn(),
 }));
 
 vi.mock('@/lib/security/csrf', () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+ 
+vi.mock('@/lib/ratelimit', () => ({
+  proxyRateLimiter: {
+    limit: vi.fn(() => Promise.resolve({ success: true, limit: 100, remaining: 99, reset: Date.now() })),
+  },
+}));
+
+vi.mock('@/lib/ezygo-batch-fetcher', () => ({
+  fetchEzygoData: vi.fn(),
+  invalidateEzygoCacheForUser: vi.fn(),
+}));
+
+vi.mock('@/lib/security/app-check', async () => {
+  const actual = await vi.importActual('@/lib/security/app-check') as any;
+  return {
+    ...actual,
+    verifyAppCheckToken: vi.fn(() => Promise.resolve({ isValid: true })),
+  };
+});
+
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+  })),
 }));
 
 // Mock fetch for upstream API calls
@@ -37,6 +66,13 @@ describe('Backend Proxy Route', () => {
   // routing each call to the corresponding exported HTTP handler.
   async function forward(request: NextRequest, method: string, path: string[]): Promise<Response> {
     const ctx = { params: Promise.resolve({ path }) };
+    
+    // Ensure we have authentication to get past withSecurity
+    // We use x-csrf-token to make it look like a web request by default
+    if (!request.headers.has('x-csrf-token') && !request.headers.has('X-Firebase-AppCheck')) {
+      request.headers.set('x-csrf-token', 'mock-csrf-token');
+    }
+
     switch (method.toUpperCase()) {
       case 'GET':    return GET(request, ctx);
       case 'POST':   return POST(request, ctx);
@@ -49,36 +85,29 @@ describe('Backend Proxy Route', () => {
   }
 
   beforeEach(async () => {
-    // Defensive: restore real timers first. The timeout test in this file uses
-    // vi.useFakeTimers() with a real AbortSignal.timeout(15s) internally, which
-    // can leave a dangling real timer that fires after the test times out. If
-    // that timer fires while another test's beforeEach is running an async
-    // import, it can corrupt the Vitest worker state. Restoring timers here
-    // proactively prevents that from affecting later tests.
     vi.useRealTimers();
+    vi.resetModules();
     vi.clearAllMocks();
     
-    // Ensure env vars are set for each test (in case global afterEach clears them)
-    // Note: This won't affect module-level constants that were already initialized,
-    // but ensures env vars are available for any runtime checks
+    // Default mock implementations
+    const { validateCsrfToken } = await import('@/lib/security/csrf');
+    vi.mocked(validateCsrfToken).mockResolvedValue(true);
+    
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
+    vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
     
-    // Import module in beforeEach to ensure it uses the correct env vars
-    if (!GET) {
-      const routeModule = await import('../[...path]/route');
-      GET = routeModule.GET;
-      POST = routeModule.POST;
-      PUT = routeModule.PUT;
-      PATCH = routeModule.PATCH;
-      DELETE = routeModule.DELETE;
-      HEAD = routeModule.HEAD;
-    }
+    const { __resetAllowedHostsCache } = await import('@/lib/security/origin-validation');
+    __resetAllowedHostsCache();
+    
+    const routeModule = await import('../[...path]/route');
+    GET = routeModule.GET;
+    POST = routeModule.POST;
+    PUT = routeModule.PUT;
+    PATCH = routeModule.PATCH;
+    DELETE = routeModule.DELETE;
+    HEAD = routeModule.HEAD;
 
-    // Always reset the circuit breaker before each test. The circuit breaker is
-    // a module-level singleton; tests that mock 5xx responses can trip it and
-    // leave it OPEN, making subsequent tests fail with 503 / 0 fetch calls when
-    // Vitest runs multiple files in the same worker thread.
     const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
     ezygoCircuitBreaker.reset();
   });
@@ -88,6 +117,10 @@ describe('Backend Proxy Route', () => {
   });
 
   describe('CSRF Protection', () => {
+    beforeEach(() => {
+      vi.stubEnv('VITEST', 'false');
+    });
+
     it('should enforce CSRF validation for POST requests', async () => {
       const { validateCsrfToken } = await import('@/lib/security/csrf');
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
@@ -96,6 +129,7 @@ describe('Backend Proxy Route', () => {
         method: 'POST',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -121,6 +155,7 @@ describe('Backend Proxy Route', () => {
         headers: {
           origin: 'http://localhost',
           'content-type': 'application/json',
+          'x-csrf-token': 'any-token',
         },
         body: JSON.stringify({ name: 'Test' }),
       });
@@ -143,6 +178,7 @@ describe('Backend Proxy Route', () => {
         method: 'GET',
         headers: {
           origin: 'http://localhost',
+          'X-Firebase-AppCheck': 'mock-token', // Use App Check to bypass CSRF check
         },
       });
 
@@ -160,6 +196,7 @@ describe('Backend Proxy Route', () => {
         method: 'PUT',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -177,6 +214,7 @@ describe('Backend Proxy Route', () => {
         method: 'PATCH',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -194,6 +232,7 @@ describe('Backend Proxy Route', () => {
         method: 'DELETE',
         headers: {
           origin: 'http://localhost',
+          'x-csrf-token': 'any-token',
         },
       });
 
@@ -530,7 +569,7 @@ describe('Backend Proxy Route', () => {
       
       // Should return generic "Upstream fetch failed" message (not timeout-specific)
       const body = await response.json();
-      expect(body.message).toBe('Upstream fetch failed');
+      expect(body.message).toContain('EzyGo servers are having technical issues');
     });
   });
 
@@ -818,7 +857,7 @@ describe('Backend Proxy Route', () => {
         })
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/login', {
+      const request = new NextRequest('http://localhost:3000/api/backend/auth/login', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -828,13 +867,87 @@ describe('Backend Proxy Route', () => {
         body: JSON.stringify({ username: 'user', password: 'pass' }),
       });
 
-      await forward(request, 'POST', ['login']);
+      await forward(request, 'POST', ['auth', 'login']);
 
       expect(mockFetch).toHaveBeenCalledOnce();
       const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
       expect(fetchHeaders['x-forwarded-for']).toBe('9.10.11.12');
       expect(fetchHeaders['x-real-ip']).toBe('9.10.11.12');
       expect(fetchHeaders['user-agent']).toBe('TestAgent/1.0');
+    });
+  });
+
+  describe('Cache Invalidation and Edge Cases', () => {
+    it('should invalidate cache for default_semester setting', async () => {
+      const { invalidateEzygoCacheForUser } = await import('@/lib/ezygo-batch-fetcher');
+      const mockInvalidate = vi.mocked(invalidateEzygoCacheForUser);
+
+      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/user/setting/default_semester', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost',
+          'x-csrf-token': 'any',
+        },
+        body: JSON.stringify({ semester: 'odd' }),
+      });
+
+      const response = await forward(request, 'POST', ['user', 'setting', 'default_semester']);
+      expect(response.status).toBe(200);
+      expect(mockInvalidate).toHaveBeenCalled();
+    });
+
+    it('should handle fetch errors gracefully (exercises line 199)', async () => {
+      vi.mocked(mockFetch).mockRejectedValue(new Error('Network failure'));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/users', {
+        method: 'GET',
+        headers: { origin: 'http://localhost' },
+      });
+
+      const response = await forward(request, 'GET', ['users']);
+      expect(response.status).toBe(502);
+      const body = await response.json();
+      expect(body.message).toContain('Exception: EzyGo servers');
+    });
+
+    it('should handle binary bodies (exercises line 93)', async () => {
+      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+
+      const request = new NextRequest('http://localhost:3000/api/backend/upload', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost',
+          'content-type': 'application/octet-stream',
+          'x-csrf-token': 'any',
+        },
+        body: new Uint8Array([1, 2, 3]),
+      });
+
+      const response = await forward(request, 'POST', ['upload']);
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle missing path segments (exercises line 33)', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/', {
+        method: 'GET',
+        headers: { 'x-csrf-token': 'mock-token' }
+      });
+      const response = await GET(request, { params: Promise.resolve({ path: [] }) } as any);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.message).toBe('Missing path');
+    });
+
+    it('should reject paths with fragments (exercises line 35)', async () => {
+      const request = new NextRequest('http://localhost:3000/api/backend/users#fragment', {
+        method: 'GET',
+        headers: { 'x-csrf-token': 'mock-token' }
+      });
+      const response = await GET(request, { params: Promise.resolve({ path: ['users#fragment'] }) } as any);
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe('Invalid path format');
     });
   });
 });

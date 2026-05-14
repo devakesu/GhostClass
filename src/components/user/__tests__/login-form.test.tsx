@@ -88,7 +88,21 @@ vi.mock("@sentry/nextjs", () => ({
 vi.mock("@/hooks/use-csrf-token", () => ({
   useCSRFToken: vi.fn(),
 }));
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: vi.fn(() => ({
+    clear: vi.fn(),
+    invalidateQueries: vi.fn(),
+  })),
+}));
 vi.mock("@/lib/axios", () => ({
+  default: {
+    post: mockAxiosPost,
+    create: vi.fn().mockReturnThis(),
+    interceptors: {
+      request: { use: vi.fn(), eject: vi.fn() },
+      response: { use: vi.fn(), eject: vi.fn() },
+    },
+  },
   getCsrfToken: vi.fn().mockReturnValue("test-csrf-token"),
   setCsrfToken: vi.fn(),
 }));

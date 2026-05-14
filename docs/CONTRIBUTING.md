@@ -8,7 +8,7 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 - [Getting Started](#getting-started)
 - [Development Workflow](#development-workflow)
-- [Automatic Version Bumping](#automatic-version-bumping)
+- [Versioning System](#versioning-system)
 - [Pull Request Process](#pull-request-process)
 - [Code Quality & Testing](#code-quality--testing)
 - [Build Performance Tips](#build-performance-tips)
@@ -21,6 +21,8 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 - **Node.js**: 22.12.0+
 - **npm**: 11+
+- **Flutter SDK**: 3.41+ (for mobile development)
+- **Dart SDK**: 3.11.5+ (bundled with Flutter)
 - **Git**: Latest version
 
 **That's it!** External contributors don't need GPG keys, GitHub PAT tokens, or access to secrets.
@@ -38,8 +40,9 @@ npm install --legacy-peer-deps
 # 3. Create feature branch
 git checkout -b feature/your-feature-name
 
-# 4. Start development server
-npm run dev
+# 4. Start development
+npm run dev      # Web development
+cd mobile && flutter run  # Mobile development
 ```
 
 **That's all you need to start developing!** For advanced maintainer setup (GPG, PAT tokens, deployment), see [For Maintainers Only](#for-maintainers-only) at the bottom of this guide.
@@ -47,6 +50,8 @@ npm run dev
 ## Development Workflow
 
 ### Available Commands
+
+#### Web Application
 
 ```bash
 npm run dev              # Development server (HTTP)
@@ -56,6 +61,16 @@ npm run lint             # Run ESLint
 npm run test             # Run unit tests
 npm run test:e2e         # Run end-to-end tests
 npm run test:coverage    # Generate coverage report
+```
+
+#### Mobile Application
+
+```bash
+cd mobile
+flutter pub get          # Install dependencies
+flutter run              # Run on device/emulator
+flutter test             # Run Flutter tests
+flutter build apk        # Build Android APK
 ```
 
 ### Making Changes
@@ -73,67 +88,11 @@ npm run test:coverage    # Generate coverage report
 5. Commit with clear messages (see [Commit Messages](#commit-messages))
 6. Push and create a Pull Request
 
-**Important**: Version bumping is automatic! See [Automatic Version Bumping](#automatic-version-bumping) below.
+**Important**: Centralized version values apply automatically! See [Versioning System](#versioning-system) below.
 
-## Automatic Version Bumping
+## Versioning System
 
-GhostClass uses an automated version bumping system that handles versioning for you.
-
-### For Same-Repository PRs (Contributors with Write Access)
-
-When you create a PR from a branch in the main repository:
-
-1. ✨ Auto-Bump Workflow checks your PR
-2. 📦 Compares your branch version with `main`
-3. 🔄 Auto-increments patch version if needed
-4. 💾 Commits changes to your PR branch
-5. 💬 Leaves confirmation comment
-
-**You don't need to manually bump versions!** 🎉
-
-**Files automatically updated:**
-
-- `package.json` and `package-lock.json`
-- `.example.env` (NEXT_PUBLIC_APP_VERSION)
-- `public/openapi/openapi.yaml`
-
-> **Note for Maintainers**: The auto-bump workflow uses `BOT_PAT` secret to trigger workflows after version bump commits. If you're a repository maintainer, see [Bot PAT Configuration](DEVELOPER_GUIDE.md#bot-pat-configuration) for setup. External contributors don't need this - the workflow will guide you through a simple manual script instead.
-
-### For Fork PRs (External Contributors)
-
-If contributing from a forked repository:
-
-1. Create your PR as normal
-2. The bot will comment with instructions
-3. Run the version bump script locally:
-
-   ```bash
-   CI=true GITHUB_HEAD_REF="$(git rev-parse --abbrev-ref HEAD)" node scripts/bump-version.js
-   ```
-
-4. Commit and push the changes:
-
-   ```bash
-   git add package.json package-lock.json .example.env public/openapi/openapi.yaml
-   git commit -m "chore: bump version"
-   git push
-   ```
-
-### Version Format (Rollover System)
-
-GhostClass uses `X.Y.Z` format where:
-
-- **X** = Major (can exceed 9)
-- **Y** = Minor (0-9, rolls over)
-- **Z** = Patch (0-9, rolls over)
-
-Examples:
-
-```text
-1.6.9 → 1.7.0   (patch rollover)
-1.9.9 → 2.0.0   (minor rollover)
-9.9.9 → 10.0.0  (major version can exceed 9)
-```
+GhostClass derives its build versions dynamically via centralized Infisical runtime and CI configurations (`NEXT_PUBLIC_APP_VERSION`). Contributors do not need to manually compute or inject git semantic rollover tags when proposing features. Maintainers synchronize version thresholds directly in the project dashboard prior to production releases.
 
 ## Pull Request Process
 
@@ -280,7 +239,7 @@ Closes #123
 - **Bug Reports**: Use [bug report template](.github/ISSUE_TEMPLATE)
 - **Feature Requests**: Use [feature request template](.github/ISSUE_TEMPLATE)
 - **Questions**: Open a [Discussion](https://github.com/devakesu/GhostClass/discussions)
-- **Setup Issues**: Check [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+- **Setup Issues**: Check [SECURITY.md](../SECURITY.md) and `.example.env`
 
 ---
 
@@ -289,36 +248,19 @@ Closes #123
 > **⚠️ This section is for repository maintainers with write access only.**  
 > External contributors can skip this section entirely.
 
-### Required Setup (Maintainers)
-
-To enable automated workflows and deployments, maintainers need:
-
-1. **GPG Signing** - For verified commits in automated workflows
-   - See [DEVELOPER_GUIDE.md → GPG Signing Configuration](DEVELOPER_GUIDE.md#gpg-signing-configuration)
-   - Required secrets: `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`, `GPG_COMMITTER_NAME`, `GPG_COMMITTER_EMAIL`
-
-2. **Bot PAT Token** - To trigger workflows after auto-bump commits
-   - See [DEVELOPER_GUIDE.md → Bot PAT Configuration](DEVELOPER_GUIDE.md#bot-pat-configuration)
-   - Required secret: `BOT_PAT`
-
-3. **Deployment Variables & Secrets** - For production builds and releases
-   - See [DEVELOPER_GUIDE.md → GitHub Actions Configuration](DEVELOPER_GUIDE.md#github-actions-configuration)
-   - Non-sensitive build vars (NEXT_PUBLIC_*, etc.) live in the **Variables** tab; sensitive keys in the **Secrets** tab
-
 ### Maintainer Tools
 
-**Sync Script** (`npm run sync-secrets`)
+#### Infisical Secret Orchestration
 
-- Syncs `.env` values to GitHub Actions: non-sensitive build values as **Variables**, sensitive values as **Secrets**
-- Only needed when updating build-time environment values
-- Requires GitHub CLI (`gh`) with authentication
-- External contributors don't need this
+- Centralized management via Infisical Dashboard acts as the single source of truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
+- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations, Coolify production runtime environments inject `/runtime` secrets dynamically into memory at boot time using the Infisical CLI wrapper.
+- Eliminates manual script execution and plaintext storage on disk.
+- External contributors don't need access to Infisical to submit code.
 
 ### Version Management
 
-- Tag creation: Automatic after merge to main
-
-For detailed maintainer workflows, see [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).
+- App Versioning: Controlled directly via `NEXT_PUBLIC_APP_VERSION` injected dynamically at runtime/compile-time.
+- Release Automation: Dynamic multi-arch bundles and attestation manual updates are published synchronously upon successful merges to the primary main trunk.
 
 ---
 

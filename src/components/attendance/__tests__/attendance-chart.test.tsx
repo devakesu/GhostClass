@@ -36,7 +36,8 @@ type TooltipContentFn = (props: { active?: boolean; payload?: TooltipPayload[] }
 let capturedTooltipContent: TooltipContentFn | null = null;
 
 // Mock recharts so it renders minimal DOM without canvas/SVG complexities
-vi.mock('recharts', () => {
+vi.mock('recharts', async () => {
+  const React = await import('react');
   const MockBarChart = ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'bar-chart' }, children);
   const noop = () => null;
@@ -44,13 +45,25 @@ vi.mock('recharts', () => {
     capturedTooltipContent = content ?? null;
     return null;
   };
+  const MockReferenceLine = ({ label }: { label?: (props: { viewBox: { width: number; x: number; y: number } }) => React.ReactNode }) => {
+    if (typeof label === 'function') {
+      return React.createElement('div', { 'data-testid': 'reference-line-label' }, 
+        label({ viewBox: { width: 100, x: 0, y: 0 } })
+      );
+    }
+    return null;
+  };
+  const MockYAxis = ({ tickFormatter }: { tickFormatter?: (v: number) => void }) => {
+    if (tickFormatter) tickFormatter(50);
+    return null;
+  };
   return {
     BarChart: MockBarChart,
     Bar: noop,
     CartesianGrid: noop,
-    ReferenceLine: noop,
+    ReferenceLine: MockReferenceLine,
     XAxis: noop,
-    YAxis: noop,
+    YAxis: MockYAxis,
     Tooltip: MockTooltip,
   };
 });
@@ -135,7 +148,7 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: { studentAttendanceData: {} } as any,
+        attendanceData: { studentAttendanceData: {} } as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
         trackingData: [],
         coursesData: { courses: {} },
       })
@@ -168,9 +181,9 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: sampleAttendanceData as any,
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
         trackingData: [],
-        coursesData: sampleCourses as any,
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
       })
     );
 
@@ -366,9 +379,9 @@ describe('AttendanceChart', () => {
 
     render(
       React.createElement(AttendanceChart, {
-        attendanceData: sampleAttendanceData as any,
-        trackingData: trackingData as any,
-        coursesData: sampleCourses as any,
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
+        trackingData: trackingData as unknown as React.ComponentProps<typeof AttendanceChart>['trackingData'],
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
       })
     );
 
@@ -398,9 +411,9 @@ describe('AttendanceChart', () => {
 
       render(
         React.createElement(AttendanceChart, {
-          attendanceData: sampleAttendanceData as any,
+          attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
           trackingData: [],
-          coursesData: sampleCourses as any,
+          coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
         })
       );
 
@@ -436,7 +449,9 @@ describe('AttendanceChart', () => {
         capturedTooltipContent!({ active: true, payload: [{ payload: lossPayload }] }) as React.ReactElement
       );
 
-      const adjustedLabel = getByText('Adjusted (Loss):');
+      const adjustedLabel = getByText((_content, element) => {
+        return element?.textContent === 'Adjusted (Loss):';
+      });
       const adjustedRow = adjustedLabel.closest('div')!;
       const valueSpan = adjustedRow.querySelector('span.font-mono');
       expect(valueSpan).toHaveClass('text-red-600');
@@ -463,11 +478,49 @@ describe('AttendanceChart', () => {
         capturedTooltipContent!({ active: true, payload: [{ payload: gainPayload }] }) as React.ReactElement
       );
 
-      const adjustedLabel = getByText('Adjusted (Gain):');
+      const adjustedLabel = getByText((_content, element) => {
+        return element?.textContent === 'Adjusted (Gain):';
+      });
       const adjustedRow = adjustedLabel.closest('div')!;
       const valueSpan = adjustedRow.querySelector('span.font-mono');
       expect(valueSpan).toHaveClass('text-green-600');
       expect(valueSpan).not.toHaveClass('text-red-600');
     });
+    it('returns null when tooltip is inactive or has no payload', async () => {
+      await renderChartWithDimensions();
+      expect(capturedTooltipContent).not.toBeNull();
+
+      const content = capturedTooltipContent!({ active: false });
+      expect(content).toBeNull();
+    });
+  });
+
+  it('renders reference line label', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    global.ResizeObserver = class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: ResizeObserverCallback) { resizeCallback = cb; }
+    };
+
+    render(
+      React.createElement(AttendanceChart, {
+        attendanceData: sampleAttendanceData as unknown as React.ComponentProps<typeof AttendanceChart>['attendanceData'],
+        trackingData: [],
+        coursesData: sampleCourses as unknown as React.ComponentProps<typeof AttendanceChart>['coursesData'],
+      })
+    );
+
+    const containerEl = screen.getByRole('img');
+    vi.spyOn(containerEl, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, bottom: 300, right: 400, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    await act(async () => {
+      if (resizeCallback) resizeCallback([], {} as ResizeObserver);
+    });
+
+    expect(screen.getByTestId('reference-line-label')).toBeInTheDocument();
   });
 });

@@ -13,6 +13,7 @@ import { initializeCsrfToken, regenerateCsrfToken } from "@/lib/security/csrf";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export async function GET() {
     // Log minimal error info to avoid leaking sensitive details
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("CSRF token initialization error:", { message: errorMessage });
+    Sentry.captureException(error, { tags: { type: "csrf_init_error", location: "api/csrf" } });
     
     return NextResponse.json(
       { error: "Failed to initialize CSRF token" },
@@ -135,6 +137,7 @@ export async function POST() {
     // Log minimal error info to avoid leaking sensitive details
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("CSRF token refresh error:", { message: errorMessage });
+    Sentry.captureException(error, { tags: { type: "csrf_refresh_error", location: "api/csrf" } });
     
     return NextResponse.json(
       { error: "Failed to refresh CSRF token" },

@@ -31,14 +31,6 @@ Relates to #
 -
 -
 
-## Version Bump
-
-<!-- This section is auto-completed by the workflow -->
-
-- [ ] Version automatically bumped by workflow (same-repo PRs)
-- [ ] Version manually bumped using `node scripts/bump-version.js` (fork PRs)
-- [ ] Version already up-to-date (no bump needed)
-
 ## Testing
 
 <!-- Describe the tests you ran and how to reproduce them -->
@@ -51,10 +43,19 @@ Relates to #
 
 ### Tests Performed
 
+#### Web Application
+
 - [ ] Unit tests pass (`npm run test`)
 - [ ] E2E tests pass (`npm run test:e2e`)
 - [ ] Linting passes (`npm run lint`)
-- [ ] Manual testing completed
+
+#### Mobile Application
+
+- [ ] Flutter tests pass (`flutter test`)
+- [ ] Manual testing on Android (Emulator/Physical)
+- [ ] Manual testing on iOS (Simulator/Physical)
+- [ ] JWE encryption/decryption verified
+- [ ] EzyGo direct access verified (mobile)
 
 ### Test Coverage
 
@@ -90,7 +91,6 @@ Relates to #
 **For maintainers:**
 
 - [ ] PR title follows conventional commit format
-- [ ] Version bump is correct
 - [ ] All checks pass
 - [ ] Documentation is complete
 - [ ] Ready to merge

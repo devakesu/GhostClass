@@ -7,6 +7,8 @@ export interface UserProfile {
   terms_version: string;
   /** Unique user identifier */
   id: number;
+  /** Supabase auth UUID */
+  auth_id?: string | null;
   /** User's first name */
   first_name?: string;
   /** User's last name */
@@ -17,10 +19,35 @@ export interface UserProfile {
   email: string;
   /** Phone/mobile number */
   phone?: string | null;
+  /** Alternate mobile number field used by some restored views */
+  mobile?: string | null;
   /** Gender identity */
   gender?: string | null;
   /** Date of birth (ISO format) */
   birth_date?: string | null;
   /** Avatar image URL */
   avatar_url?: string | null;
+  /** Selected academic semester */
+  current_semester?: string | null;
+  /** Selected academic year */
+  current_year?: string | null;
+  /** Account creation timestamp in GhostClass */
+  created_at?: string | null;
+  /** Account creation timestamp in EzyGo */
+  ezygo_created_at?: string | null;
+  /** Terms acceptance info */
+  terms_accepted_at?: string | null;
+  /** Encrypted EzyGo token for auth bridging */
+  ezygo_token?: string | null;
+  /** User preference settings */
+  settings?: {
+    bunk_calculator_enabled: boolean;
+    target_percentage: number;
+    disabled_courses: Record<string, Record<string, string>>;
+  } | null;
+  /** Optional class relation included by some profile responses */
+  class?: {
+    id?: string | number | null;
+    name?: string | null;
+  } | null;
 }

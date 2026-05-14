@@ -67,6 +67,7 @@ export function useDefaultInstitute() {
 
       return res.data;
     },
+    staleTime: 1000 * 60 * 5,
     retry: retryOnce,
   });
 }
@@ -87,15 +88,15 @@ export function useDefaultInstitutionUser() {
 
       if (defaultInstitutionUser && institutions) {
         const currentDefault = institutions.find(
-          (inst) => inst.id === defaultInstitutionUser
+          (inst) => inst?.id === defaultInstitutionUser
         );
 
         if (
           (!currentDefault ||
-            currentDefault.institution_role.name !== "student") &&
+            currentDefault?.institution_role?.name !== "student") &&
           institutions.length > 0
         ) {
-          const studentInstitution = institutions[0];
+          const studentInstitution = institutions.find(inst => inst?.institution_role?.name === "student");
           if (studentInstitution) {
             await updateDefaultInstitutionUser.mutateAsync(
               studentInstitution.id
@@ -108,6 +109,7 @@ export function useDefaultInstitutionUser() {
       return defaultInstitutionUser;
     },
     enabled: !!institutions,
+    staleTime: 1000 * 60 * 5,
     retry: retryOnce,
   });
 }

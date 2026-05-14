@@ -1,11 +1,10 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axiosInstance from "@/lib/axios";
 import { UserProfile } from "@/types";
 import * as Sentry from "@sentry/nextjs";
 import { retryOnce } from "@/lib/query-utils";
-import { getCsrfToken } from "@/lib/axios";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 
 interface UpdateProfileData {
   first_name: string;
@@ -14,20 +13,15 @@ interface UpdateProfileData {
   birth_date?: string | null;
 }
 
-export const useProfile = (options?: { initialData?: UserProfile }) => {
+export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean }) => {
   return useQuery<UserProfile | null>({
-    queryKey: ["profile"],
+    queryKey: ["profile", options?.sync],
     queryFn: async () => {
-      const res = await fetch("/api/profile");
-      if (!res.ok) {
-        const json = (await res.json()) as { error?: string };
-        const err = new Error(
-          json.error ?? "Failed to load profile data from remote source."
-        );
-        (err as Error & { status: number }).status = res.status;
-        throw err;
-      }
-      return res.json() as Promise<UserProfile>;
+      const res = await axiosInstance.get<UserProfile>("/api/profile", {
+        params: options?.sync ? { sync: "true" } : {},
+        baseURL: "", // Override baseURL to hit top-level /api/profile
+      });
+      return res.data;
     },
     initialData: options?.initialData,
     // Cache for 5 mins to avoid spamming the sync logic
@@ -44,20 +38,10 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async ({ data }: { data: UpdateProfileData }) => {
-      const csrfToken = getCsrfToken();
-      const res = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
-        },
-        body: JSON.stringify(data),
+      const res = await axiosInstance.patch<UpdateProfileData>("/api/profile", data, {
+        baseURL: "", // Override baseURL to hit top-level /api/profile
       });
-      if (!res.ok) {
-        const json = (await res.json()) as { error?: string };
-        throw new Error(json.error ?? "Failed to update profile");
-      }
-      return res.json() as Promise<UpdateProfileData>;
+      return res.data;
     },
     // Optimistic Update: Update UI instantly
     // 1. SNAPSHOT & OPTIMISTIC UPDATE

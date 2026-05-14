@@ -6,48 +6,50 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 3.0.7
+  version: 3.0.8
   description: |
-    **GhostClass API** provides endpoints for managing attendance synchronization with EzyGo.
-    
+    **GhostClass API** provides endpoints for authentication, profile synchronization,
+    attendance integrations with EzyGo, telemetry, and build provenance.
+
     ## Authentication
-    
+
     The API supports two authentication methods:
-    
+
     1. **Bearer Token (CRON_SECRET)**: For automated cron jobs
        - Add `Authorization: Bearer <CRON_SECRET>` header
        - Used by automated sync processes
-    
+
     2. **Session Cookie (SupabaseAuth)**: For authenticated users
        - Automatically included when logged in through the web interface
        - Managed by Supabase Auth
-    
+
     ## Rate Limiting
-    
+
     All endpoints are rate-limited to prevent abuse:
-    
+
     - `/api/auth/save-token` & `/api/cron/sync`: Configurable via environment variables
+    - `/api/backend/*`: Configurable via `PROXY_RATE_LIMIT_REQUESTS` and `PROXY_RATE_LIMIT_WINDOW`
     - Contact Form (Server Action): Configurable via environment variables
-    
+
     Rate limit information is returned in response headers:
     - `X-RateLimit-Limit`: Maximum requests allowed
     - `X-RateLimit-Remaining`: Remaining requests in current window
     - `X-RateLimit-Reset`: Unix timestamp when limit resets
-    
+
     ## Base URLs
-    
+
     - Production: Configured via `NEXT_PUBLIC_APP_URL`
     - Development: `http://localhost:3000`
-    
+
     ## Error Handling
-    
+
     All error responses follow a consistent format with appropriate HTTP status codes and descriptive messages.
 
   contact:
     name: GhostClass Support
-    email: "support${NEXT_PUBLIC_APP_EMAIL}"
+    email: "contact${NEXT_PUBLIC_APP_EMAIL}"
     url: ${NEXT_PUBLIC_GITHUB_URL}
-  
+
   license:
     name: GPL-3.0
     url: ${NEXT_PUBLIC_GITHUB_URL}/blob/main/LICENSE
@@ -63,10 +65,14 @@ servers:
 tags:
   - name: Authentication
     description: Endpoints for managing EzyGo authentication tokens
+  - name: Mobile
+    description: Mobile-first authenticated endpoints and JWE-secured bridge APIs
   - name: Security
     description: Security endpoints for CSRF protection
   - name: Sync
     description: Endpoints for synchronizing attendance data with EzyGo
+  - name: Proxy
+    description: Secure backend proxy and pass-through endpoints for EzyGo APIs
   - name: Health
     description: System health and status endpoints
   - name: Analytics
@@ -75,6 +81,10 @@ tags:
     description: Browser-generated violation and telemetry reports
   - name: Profile
     description: User profile management
+  - name: Keys
+    description: Public key discovery endpoints for JWE/JWKS
+  - name: Documentation
+    description: OpenAPI and API reference endpoints
   - name: Provenance
     description: Build provenance and version metadata
 
@@ -84,40 +94,40 @@ paths:
       tags:
         - Authentication
       summary: Save EzyGo authentication token
-      security: []  # No authentication required for this endpoint
+      security: [] # No authentication required for this endpoint
       description: |
         Saves the EzyGo JWT authentication token and establishes a secure session for the user.
-        
+
         **What it does:**
         - Validates the EzyGo token by verifying with EzyGo API
         - Creates or retrieves a Supabase authentication account (ghost login)
         - Encrypts and stores the token securely in the database
         - Establishes a session cookie for subsequent authenticated requests
-        
+
         **Multi-Device Support:**
         - Uses canonical password pattern for persistent authentication
         - On first login: Generates and encrypts a canonical password for the user
         - On subsequent logins: Retrieves and decrypts the stored password
         - Enables concurrent sessions from multiple devices without invalidation
         - Logout on one device does not affect sessions on other devices
-        
+
         **Authentication:** No authentication required (this endpoint creates authentication)
-        
+
         **Rate Limiting:** Configured via AUTH_RATE_LIMIT_REQUESTS and AUTH_RATE_LIMIT_WINDOW environment variables
-        
+
         **Side Effects:**
         - Creates a new user account in Supabase Auth if not exists
         - Stores encrypted token in the database
         - Stores encrypted canonical password on first login (auth_password, auth_password_iv)
         - Sets session cookies in the response
-        
+
         **Use Cases:**
         - Initial user authentication from EzyGo
         - Token refresh when existing token expires
         - Multi-device login (desktop, mobile, tablet simultaneously)
-      
+
       operationId: saveAuthToken
-      
+
       requestBody:
         required: true
         description: EzyGo authentication token
@@ -140,9 +150,9 @@ paths:
                 description: Example of a valid JWT token from EzyGo
                 value:
                   token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJzdHVkZW50MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-      
+
       responses:
-        '200':
+        "200":
           description: Token successfully saved and session established
           content:
             application/json:
@@ -157,25 +167,25 @@ paths:
                   summary: Successful authentication
                   value:
                     success: true
-        
-        '400':
+
+        "400":
           description: Bad request - Missing or invalid token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ValidationError'
+                $ref: "#/components/schemas/ValidationError"
               examples:
                 missingToken:
                   summary: Token not provided
                   value:
                     message: "Missing credentials"
-        
-        '401':
+
+        "401":
           description: Unauthorized - Token verification failed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 invalidToken:
                   summary: Invalid or expired token
@@ -185,8 +195,8 @@ paths:
                   summary: Could not verify user identity
                   value:
                     message: "Could not verify user identity"
-        
-        '429':
+
+        "429":
           description: Rate limit exceeded
           headers:
             X-RateLimit-Limit:
@@ -207,20 +217,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitError'
+                $ref: "#/components/schemas/RateLimitError"
               examples:
                 tooManyRequests:
                   summary: Rate limit exceeded
                   value:
                     error: "Too many requests. Slow down!"
                     retryAfter: 900
-        
-        '500':
+
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 serverError:
                   summary: Failed to establish session
@@ -232,27 +242,27 @@ paths:
       tags:
         - Security
       summary: Get CSRF token
-      security: []  # No authentication required
+      security: [] # No authentication required
       description: |
         Retrieves a CSRF token for use in subsequent authenticated requests. The token is automatically set as a cookie and returned in the response.
-        
+
         **What it does:**
         - Generates a new CSRF token if one doesn't exist
         - Sets the token as a cookie in the response
         - Returns the token value for client-side use
-        
+
         **Authentication:** None required
-        
+
         **Rate Limiting:** Standard rate limiting applies
-        
+
         **Use Cases:**
         - Initialize CSRF protection before making authenticated requests
         - Retrieve current CSRF token for client-side operations
-      
+
       operationId: getCsrfToken
-      
+
       responses:
-        '200':
+        "200":
           description: CSRF token retrieved successfully
           headers:
             Set-Cookie:
@@ -279,24 +289,24 @@ paths:
                   value:
                     token: "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
                     message: "CSRF token initialized successfully"
-    
+
     post:
       tags:
         - Security
       summary: Regenerate CSRF token
-      security: []  # No authentication required
+      security: [] # No authentication required
       description: |
         Explicitly regenerates the CSRF token, replacing any existing one.
         Useful after privilege escalation or when extra rotation is desired.
-        
+
         **Authentication:** None required
-        
+
         **Rate Limiting:** Configured via AUTH_RATE_LIMIT_REQUESTS / AUTH_RATE_LIMIT_WINDOW
-      
+
       operationId: regenerateCsrfToken
-      
+
       responses:
-        '200':
+        "200":
           description: New CSRF token generated
           headers:
             Set-Cookie:
@@ -320,18 +330,18 @@ paths:
                   value:
                     token: "new123abc456def789..."
                     message: "CSRF token refreshed successfully"
-        '429':
+        "429":
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitError'
-        '500':
+                $ref: "#/components/schemas/RateLimitError"
+        "500":
           description: Unable to determine client IP or internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/logout:
     post:
@@ -342,24 +352,24 @@ paths:
         - SupabaseAuth: []
       description: |
         Clears authentication cookies and ends the user session.
-        
+
         **What it does:**
         - Removes authentication token cookie
         - Removes CSRF token cookie
         - Invalidates the session
-        
+
         **Authentication:** Session cookie (automatically cleared)
-        
+
         **Rate Limiting:** None
-        
+
         **Use Cases:**
         - User logout
         - Session termination
-      
+
       operationId: logout
-      
+
       responses:
-        '200':
+        "200":
           description: Successfully logged out
           content:
             application/json:
@@ -382,55 +392,55 @@ paths:
       summary: Sync attendance data with EzyGo
       description: |
         Synchronizes attendance records from EzyGo with the local database. Supports both automated cron jobs and authenticated user-initiated syncs.
-        
+
         **What it does:**
         - Fetches latest attendance data from EzyGo API
         - Compares with local tracking records
         - Detects and resolves conflicts (course mismatches, attendance discrepancies)
         - Sends email notifications for conflicts
         - Updates sync timestamps
-        
+
         **Authentication:** 
         - **Option 1 (Cron)**: Bearer token with CRON_SECRET in Authorization header
         - **Option 2 (Users)**: Valid session cookie (authenticated users)
-        
+
         **Rate Limiting:** Configured via RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW environment variables
-        
+
         **Side Effects:**
         - Deletes verified/matched attendance records
         - Updates conflicted records with 'correction' status
         - Creates notifications in the database
         - Sends email alerts for attendance conflicts
         - Updates `last_synced_at` timestamp for users
-        
+
         **Use Cases:**
         - Automated daily/hourly sync via cron job
         - Manual sync triggered by users from dashboard
         - Batch sync for multiple users (cron only)
         - Single user sync with optional username filter
-      
+
       operationId: syncAttendance
-      
+
       security:
         - BearerAuth: []
         - SupabaseAuth: []
-      
+
       parameters:
         - name: username
           in: query
           required: false
           description: |
             Filter sync to a specific user by username. Only applicable when using Bearer token authentication (cron mode).
-            
+
             - If provided with cron auth: syncs only the specified user
             - If omitted with cron auth: syncs up to 10 least-recently-synced users
             - Ignored for authenticated user requests (always syncs the current user)
           schema:
             type: string
             example: "student123"
-      
+
       responses:
-        '200':
+        "200":
           description: Sync completed successfully
           content:
             application/json:
@@ -480,20 +490,20 @@ paths:
                     conflicts: 0
                     updates: 0
                     errors: 0
-        
-        '401':
+
+        "401":
           description: Unauthorized - Invalid or missing authentication
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 unauthorized:
                   summary: Not authenticated
                   value:
                     message: "Unauthorized"
-        
-        '429':
+
+        "429":
           description: Rate limit exceeded
           headers:
             X-RateLimit-Reset:
@@ -504,20 +514,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitError'
+                $ref: "#/components/schemas/RateLimitError"
               examples:
                 tooManyRequests:
                   summary: Rate limit exceeded
                   value:
                     error: "Too many requests"
                     retryAfter: 60
-        
-        '500':
+
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 serverError:
                   summary: Configuration error
@@ -534,13 +544,13 @@ paths:
         Proxies GA4 Measurement Protocol events through the server so ad blockers
         do not suppress them. Validates event shapes, sanitises values to GA4 limits,
         and enforces origin and rate-limit guards before forwarding to GA4.
-        
+
         **Authentication:** None required
-        
+
         **Rate Limiting:** Configured via RATE_LIMIT_REQUESTS / RATE_LIMIT_WINDOW
-      
+
       operationId: trackAnalyticsEvent
-      
+
       requestBody:
         required: true
         content:
@@ -582,9 +592,9 @@ paths:
                   description: Optional GA4 user properties (key → string value)
                   additionalProperties:
                     type: string
-      
+
       responses:
-        '200':
+        "200":
           description: Events forwarded to GA4
           content:
             application/json:
@@ -594,30 +604,88 @@ paths:
                   success:
                     type: boolean
                     example: true
-        '400':
+        "400":
           description: Validation error (bad clientId, malformed events, etc.)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '403':
+                $ref: "#/components/schemas/Error"
+        "403":
           description: Forbidden – request origin not allowed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '429':
+                $ref: "#/components/schemas/Error"
+        "429":
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitError'
-        '500':
+                $ref: "#/components/schemas/RateLimitError"
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
+
+  /api/attendance/summary-batch:
+    post:
+      summary: Batch fetch attendance summaries
+      description: |
+        Retrieves attendance summaries for multiple courses in a single request.
+        Optimized for dashboard card views to avoid N+1 network requests.
+
+        Requires Firebase App Check and JWE encryption.
+      tags:
+        - Attendance
+      security:
+        - SupabaseAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - courses
+              properties:
+                courses:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - code
+                    properties:
+                      id:
+                        type: integer
+                      code:
+                        type: string
+                      name:
+                        type: string
+      responses:
+        "200":
+          description: Batch summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/CourseDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
 
   /api/csp-report:
     post:
@@ -631,33 +699,33 @@ paths:
         modern `application/reports+json` (Reporting API v1) payloads.
         Always returns **204 No Content** so the browser does not retry.
         Body is capped at **8 KB** to prevent abuse on this unauthenticated endpoint.
-        
+
         **Authentication:** None required (reports are sent automatically by browsers)
-      
+
       operationId: receiveCspReport
-      
+
       requestBody:
         required: true
         content:
           application/csp-report:
             schema:
               type: object
-              description: 'Legacy CSP report wrapped in a csp-report envelope object'
+              description: "Legacy CSP report wrapped in a csp-report envelope object"
           application/reports+json:
             schema:
               type: array
               description: Reporting API v1 array of report objects
               items:
                 type: object
-      
+
       responses:
-        '204':
+        "204":
           description: Report received and logged (browser should not retry)
-        '400':
+        "400":
           description: Invalid Content-Length header value
-        '413':
+        "413":
           description: Payload too large (exceeds 8 KB limit)
-        '415':
+        "415":
           description: Unsupported content type
 
   /api/health:
@@ -665,28 +733,28 @@ paths:
       tags:
         - Health
       summary: Health check endpoint
-      security: []  # No authentication required for health checks
+      security: [] # No authentication required for health checks
       description: |
         Returns the health status of the API service. Used for monitoring and uptime checks.
-        
+
         **What it does:**
         - Confirms the API is responsive
         - Returns current version information
         - Provides timestamp for monitoring
-        
+
         **Authentication:** None required
-        
+
         **Rate Limiting:** None (health checks should always be available)
-        
+
         **Use Cases:**
         - Monitoring tools and uptime checkers
         - Load balancer health checks
         - Deployment verification
-      
+
       operationId: healthCheck
-      
+
       responses:
-        '200':
+        "200":
           description: Service is healthy and operational
           content:
             application/json:
@@ -726,13 +794,13 @@ paths:
         and rate-limiter state. In **development/test** environments the response
         includes detailed metrics (active requests, queue length, CB state).
         In **production** only `status` and `timestamp` are returned.
-        
+
         Returns HTTP **503** when the circuit breaker is open.
-      
+
       operationId: healthCheckEzygo
-      
+
       responses:
-        '200':
+        "200":
           description: EzyGo integration healthy or degraded
           headers:
             Cache-Control:
@@ -761,7 +829,7 @@ paths:
                   value:
                     status: degraded
                     timestamp: "2026-02-01T12:00:00.000Z"
-        '503':
+        "503":
           description: Circuit breaker open – upstream EzyGo unreachable
           content:
             application/json:
@@ -786,20 +854,22 @@ paths:
         Returns the current user's profile data from the local database, soft-synced
         with EzyGo. PII fields (`phone`, `gender`, `birth_date`) are AES-256-GCM
         encrypted at rest; the server decrypts them before responding.
-        
-        **Fast path:** If a seeded local row exists the response is immediate, with a
-        background job quietly refreshing EzyGo fields for the next call.
-        
-        **Slow path:** First-time after login — EzyGo is called inline to seed the row.
-        
+
+        **Full Bundle:** This endpoint returns an "uber-bundle" containing:
+        - Basic profile info
+        - Academic context (current_semester, current_year)
+        - User settings (bunk calculator, target percentage, disabled courses)
+        - Terms compliance status
+        - Auth bridge token (decrypted ezygo_token)
+
         **Origin validation:** In production, requests must include a matching `Origin`
         header (or `Sec-Fetch-Site: same-origin`). Cross-site requests are rejected
         with 400/403 as defence-in-depth against CSRF on this read path.
-      
+
       operationId: getProfile
-      
+
       responses:
-        '200':
+        "200":
           description: Profile returned successfully
           headers:
             Cache-Control:
@@ -809,26 +879,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
-        '400':
+                $ref: "#/components/schemas/UserProfile"
+        "400":
           description: Origin header missing (and Sec-Fetch-Site is not same-origin)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '403':
+                $ref: "#/components/schemas/Error"
+        "403":
           description: Origin not allowed (cross-site request rejected in production)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '401':
+                $ref: "#/components/schemas/Error"
+        "401":
           description: Not authenticated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-    
+                $ref: "#/components/schemas/Error"
+
     patch:
       tags:
         - Profile
@@ -838,14 +908,14 @@ paths:
       description: |
         Updates user-editable profile fields. PII values (`gender`, `birth_date`) are
         AES-256-GCM encrypted before being written to the database.
-        
+
         **CSRF:** Requires the `x-csrf-token` request header.
-        
+
         **Validation:** `first_name` is required (min 2 chars). All other fields
         are optional; omitting an optional field does **not** clear it.
-      
+
       operationId: updateProfile
-      
+
       requestBody:
         required: true
         content:
@@ -872,9 +942,9 @@ paths:
                   format: date
                   nullable: true
                   example: "2003-08-15"
-      
+
       responses:
-        '200':
+        "200":
           description: Profile updated; returns saved plaintext values
           content:
             application/json:
@@ -892,19 +962,19 @@ paths:
                   birth_date:
                     type: string
                     nullable: true
-        '401':
+        "401":
           description: Not authenticated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '403':
+                $ref: "#/components/schemas/Error"
+        "403":
           description: Invalid CSRF token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '422':
+                $ref: "#/components/schemas/Error"
+        "422":
           description: Validation failed
           content:
             application/json:
@@ -916,12 +986,12 @@ paths:
                     example: "Validation failed"
                   details:
                     type: object
-        '500':
+        "500":
           description: Database update failed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/provenance:
     get:
@@ -932,15 +1002,15 @@ paths:
       description: |
         Returns build provenance metadata: commit SHA, app version, image digest,
         audit and signature status, and build timestamp.
-        
+
         Extended CI metadata (`github_run_id`, `github_run_number`, `github_repo`)
         is included only when the request presents
         `Accept: application/vnd.ghostclass.provenance+json`.
-        
+
         Responses are **never cached** (`Cache-Control: no-store`).
-      
+
       operationId: getProvenance
-      
+
       parameters:
         - name: Accept
           in: header
@@ -950,9 +1020,9 @@ paths:
             CI/build metadata in addition to the base payload.
           schema:
             type: string
-      
+
       responses:
-        '200':
+        "200":
           description: Provenance metadata
           headers:
             Cache-Control:
@@ -998,8 +1068,324 @@ paths:
                     audit_status: "PASSED"
                     signature_status: "SIGNED"
 
+  /api/openapi:
+    get:
+      tags:
+        - Documentation
+      summary: Get resolved OpenAPI YAML
+      security: []
+      description: |
+        Returns the OpenAPI YAML document with `${NEXT_PUBLIC_*}` template tokens
+        resolved at request time.
+      operationId: getOpenApiSpec
+      responses:
+        "200":
+          description: OpenAPI YAML document
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/.well-known/jwks.json:
+    get:
+      tags:
+        - Keys
+      summary: Get JWKS public keys
+      security: []
+      description: |
+        Returns the JSON Web Key Set (JWKS) used by clients to discover
+        active public keys for cryptographic operations.
+      operationId: getJwks
+      responses:
+        "200":
+          description: JSON Web Key Set
+          content:
+            application/jwk-set+json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+        "500":
+          description: Failed to fetch keys
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/sync:
+    post:
+      tags:
+        - Authentication
+        - Mobile
+      summary: Self-heal authentication state
+      description: |
+        Attempts to refresh Supabase session cookies and restore EzyGo auth token
+        from server-side storage after client-side auth/session drift.
+      operationId: syncAuth
+      responses:
+        "200":
+          description: Sync attempt completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  terminal:
+                    type: boolean
+        "401":
+          description: Session expired and cannot be recovered
+          headers:
+            x-terminal-auth:
+              schema:
+                type: string
+              description: Present and set to `true` when re-authentication is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/contact:
+    post:
+      tags:
+        - Mobile
+      summary: Submit contact/support message
+      description: |
+        Submits a contact message through the shared contact service.
+        Supports both authenticated and guest submissions.
+      operationId: submitContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Message accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: string
+        "400":
+          description: Validation or payload error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Contact processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/user/accept-terms:
+    post:
+      tags:
+        - Mobile
+      summary: Accept terms for mobile user
+      description: |
+        Updates `terms_version` and `terms_accepted_at` for authenticated mobile users.
+      operationId: acceptTermsMobile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  type: string
+      responses:
+        "200":
+          description: Terms acceptance stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  version:
+                    type: string
+        "400":
+          description: Missing version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Failed to update terms acceptance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/backend/{path}:
+    description: |
+      Proxies requests to EzyGo backend endpoints.
+
+      **Rate Limiting:** Configured via `PROXY_RATE_LIMIT_REQUESTS` and `PROXY_RATE_LIMIT_WINDOW`.
+    parameters:
+      - name: path
+        in: path
+        required: true
+        description: Forwarded EzyGo backend path segment(s)
+        schema:
+          type: string
+    get:
+      tags:
+        - Proxy
+      summary: Proxy GET request to EzyGo backend
+      operationId: proxyGet
+      responses:
+        "200":
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+    post:
+      tags:
+        - Proxy
+      summary: Proxy POST request to EzyGo backend
+      operationId: proxyPost
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Proxied response
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+    put:
+      tags:
+        - Proxy
+      summary: Proxy PUT request to EzyGo backend
+      operationId: proxyPut
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Proxied response
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+    patch:
+      tags:
+        - Proxy
+      summary: Proxy PATCH request to EzyGo backend
+      operationId: proxyPatch
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Proxied response
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+    delete:
+      tags:
+        - Proxy
+      summary: Proxy DELETE request to EzyGo backend
+      operationId: proxyDelete
+      responses:
+        "200":
+          description: Proxied response
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+    head:
+      tags:
+        - Proxy
+      summary: Proxy HEAD request to EzyGo backend
+      operationId: proxyHead
+      responses:
+        "200":
+          description: Proxied response
+        "4XX":
+          description: Client error from proxy or upstream
+        "5XX":
+          description: Upstream/proxy failure
+
 components:
   schemas:
+    CourseDetail:
+      type: object
+      properties:
+        present:
+          type: integer
+        absent:
+          type: integer
+        total:
+          type: integer
+        percentage:
+          type: number
+        course:
+          type: object
+          properties:
+            id:
+              oneOf:
+                - type: integer
+                - type: string
+            name:
+              type: string
+            code:
+              type: string
+
     UserProfile:
       type: object
       description: Decrypted user profile data (PII fields returned as plaintext)
@@ -1043,7 +1429,29 @@ components:
           type: string
           format: date-time
           nullable: true
-    
+        current_semester:
+          type: string
+          nullable: true
+        current_year:
+          type: string
+          nullable: true
+        ezygo_token:
+          type: string
+          nullable: true
+        settings:
+          type: object
+          properties:
+            bunk_calculator_enabled:
+              type: boolean
+            target_percentage:
+              type: integer
+            disabled_courses:
+              type: object
+              additionalProperties:
+                type: object
+                additionalProperties:
+                  type: string
+
     Error:
       type: object
       properties:
@@ -1055,7 +1463,7 @@ components:
           description: Detailed error message
       example:
         error: "Internal Server Error"
-    
+
     ValidationError:
       type: object
       properties:
@@ -1076,7 +1484,7 @@ components:
                 description: Validation error message for this field
       example:
         message: "Missing credentials"
-    
+
     RateLimitError:
       type: object
       properties:
@@ -1100,9 +1508,9 @@ components:
       description: |
         Bearer token authentication using CRON_SECRET environment variable.
         Used for automated cron jobs.
-        
+
         Example: `Authorization: Bearer <CRON_SECRET>`
-    
+
     SupabaseAuth:
       type: apiKey
       in: cookie

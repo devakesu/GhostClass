@@ -5,7 +5,7 @@ export type SentryCaptureContext = {
 };
 
 export const captureSentryException = (error: unknown, context?: SentryCaptureContext) => {
-  void import("@sentry/nextjs")
+  import("@sentry/nextjs")
     .then(({ captureException }) => captureException(error, context))
     .catch((importError) => {
       console.error("[Sentry] Failed to load SDK for captureException:", importError);
@@ -14,7 +14,7 @@ export const captureSentryException = (error: unknown, context?: SentryCaptureCo
 };
 
 export const captureSentryMessage = (message: string, context?: SentryCaptureContext) => {
-  void import("@sentry/nextjs")
+  import("@sentry/nextjs")
     .then(({ captureMessage }) => captureMessage(message, context))
     .catch((importError) => {
       console.error("[Sentry] Failed to load SDK for captureMessage:", importError);

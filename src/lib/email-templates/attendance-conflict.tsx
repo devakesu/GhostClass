@@ -44,6 +44,7 @@ export const AttendanceConflictEmail = ({
           </Text>
 
           <Section style={emailStyles.conflictBox}>
+            {/* eslint-disable-next-line sonarjs/table-header -- Email table uses label/value format without <th> */}
             <table style={tableStyles.table}>
               <tbody>
                 <tr>

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getOrCreateClientId } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
 
 /**
  * Client component for automatic event tracking via server-side API
@@ -27,7 +28,8 @@ export function AnalyticsTracker() {
     const trackPageView = async () => {
       try {
         const clientId = getOrCreateClientId();
-        const url = `${window.location.origin}${pathname}${searchParams?.toString() ? `?${searchParams}` : ""}`;
+        const queryString = searchParams?.toString();
+        const url = `${window.location.origin}${pathname}${queryString ? "?" + queryString : ""}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -69,9 +71,10 @@ export function AnalyticsTracker() {
         formInteractions.current.clear();
       } catch (error) {
         // Silently fail - don't break app if analytics fails
-        // Note: Using console.warn instead of logger utility as this is a client component
-        // and the logger utility is primarily designed for server-side use
-        console.warn("[Analytics] Failed to track page view:", error);
+        // Ignore AbortError as it's expected during fast navigation/timeouts
+        if (error instanceof Error && error.name === "AbortError") return;
+        
+        logger.warn("[Analytics] Failed to track page view:", error);
       }
     };
 
@@ -123,9 +126,7 @@ export function AnalyticsTracker() {
           url = new URL(link.href, window.location.href);
         } catch (error) {
           // Malformed URL - skip tracking for this click to avoid breaking analytics
-          // Note: Using console.warn instead of logger utility as this is a client component
-          // and the logger utility is primarily designed for server-side use
-          console.warn("[Analytics] Ignoring click with invalid URL:", link.href, error);
+          logger.warn("[Analytics] Ignoring click with invalid URL:", link.href, error);
           return;
         }
         
@@ -251,7 +252,7 @@ export function AnalyticsTracker() {
  */
 export async function trackEvent(
   eventName: string,
-  eventParams?: Record<string, any>
+  eventParams?: Record<string, unknown>
 ) {
   try {
     const clientId = getOrCreateClientId();
@@ -284,8 +285,9 @@ export async function trackEvent(
       clearTimeout(timeoutId);
     }
   } catch (error) {
-    // Note: Using console.warn instead of logger utility as this is a client component
-    // and the logger utility is primarily designed for server-side use
-    console.warn("[Analytics] Failed to track event:", error);
+    // Silently fail if analytics fails
+    if (error instanceof Error && error.name === "AbortError") return;
+
+    logger.warn("[Analytics] Failed to track event:", error);
   }
 }

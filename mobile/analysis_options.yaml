@@ -1,0 +1,26 @@
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  errors:
+    # Treat these critical issues as build-failing errors, not just warnings
+    missing_required_param: error
+    missing_return: error
+    unawaited_futures: error
+
+linter:
+  rules:
+    # Performance & Memory Guardrails
+    cancel_subscriptions: true
+    close_sinks: true
+    unawaited_futures: true
+    avoid_print: true
+
+    # Code Quality & Maintainability
+    always_declare_return_types: true
+    prefer_single_quotes: true
+    avoid_empty_else: true
+    directives_ordering: true
+    require_trailing_commas: true
+    use_key_in_widget_constructors: true
+    public_member_api_docs: false
+    lines_longer_than_80_chars: false

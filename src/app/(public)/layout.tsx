@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useScroll } from "framer-motion";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { cn } from "@/lib/utils";
+import { OutageProvider } from "@/providers/outage-provider";
 
 export default function PublicLayout({
   children,
@@ -77,20 +78,18 @@ export default function PublicLayout({
           // Browser support: Chrome 102+, Safari 15.5+, Firefox 112+ (March 2023+)
           // Graceful degradation: on older browsers the navbar is visually off-screen via
           // the CSS transform but remains keyboard-reachable (acceptable fallback).
-          {...((isHidden &&
-            typeof HTMLElement !== "undefined" &&
-            HTMLElement?.prototype &&
-            "inert" in HTMLElement.prototype
-              ? { inert: true }
-              : {}) as any)}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          {...((isHidden ? { inert: true } : {}) as any)}
         >
           <PublicNavbar />
         </motion.div>
 
         <main className="flex-1 w-full pt-20">
+          <OutageProvider>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
+          </OutageProvider>
         </main>
         
         <Footer />

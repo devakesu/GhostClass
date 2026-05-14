@@ -238,6 +238,28 @@ describe("CSRF API Route", () => {
       expect(data2.token).toBe("token-2");
       expect(regenerateCsrfToken).toHaveBeenCalledTimes(2);
     });
+
+    it("should return 500 when IP cannot be determined", async () => {
+      const { getClientIp } = await import("@/lib/utils.server");
+      const { regenerateCsrfToken } = await import("@/lib/security/csrf");
+
+      vi.mocked(getClientIp).mockReturnValue(null);
+
+      const response = await POST();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Unable to determine client IP for rate limiting");
+      expect(regenerateCsrfToken).not.toHaveBeenCalled();
+    });
+
+    it("should handle unexpected non-Error objects in POST", async () => {
+      const { regenerateCsrfToken } = await import("@/lib/security/csrf");
+      vi.mocked(regenerateCsrfToken).mockRejectedValue("Literal String Error");
+
+      const response = await POST();
+      expect(response.status).toBe(500);
+    });
   });
 
   describe("Integration scenarios", () => {

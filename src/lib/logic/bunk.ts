@@ -1,17 +1,7 @@
 // Calculate attendance statistics
 // src/utils/bunk.ts
 
-// When bunkableExact is in (0, BORDERLINE_THRESHOLD), the user is technically
-// above the target but cannot safely skip even a single class yet.
-//
-// Why 0.9 rather than 1.0 or (1 - PERCENTAGE_EPSILON)?
-// This is a deliberate UX decision: we only surface the "borderline" warning
-// for users who have very little headroom (< 90% of a skip unit). A user who
-// already has 0.9–0.99 of a skip unit is close enough to "almost there" that
-// the borderline label would feel confusing — so we suppress it and let them
-// see canBunk=0 with no additional marker. The 0.9 cutoff gives a 10% dead-zone
-// between "borderline" and "nearly able to skip". Adjust only with a UX review.
-const BORDERLINE_THRESHOLD = 0.9;
+// src/utils/bunk.ts
 
 // Epsilon for floating-point equality: (present/total)*100 is an IEEE 754 double
 // and can diverge from a round target by a tiny amount (e.g. 75.00000000000001).
@@ -50,31 +40,29 @@ export function calculateAttendance(
 
   const currentPercentage = (present / total) * 100;
 
-  if (Math.abs(currentPercentage - safeTarget) < PERCENTAGE_EPSILON) {
-    result.isExact = true;
-    return result;
-  }
-  if (currentPercentage < safeTarget) {
+  if (currentPercentage < safeTarget - PERCENTAGE_EPSILON) {
     if (safeTarget >= 100) {
-      result.requiredToAttend = total - present;
+      result.requiredToAttend = Infinity;
     } else {
       const required = Math.ceil(
         (safeTarget * total - 100 * present) / (100 - safeTarget)
       );
       result.requiredToAttend = Math.max(0, required);
     }
-    return result;
-  } else if (currentPercentage > safeTarget) {
+  } else {
+    // currentPercentage >= safeTarget (within epsilon)
     const bunkableExact = (100 * present - safeTarget * total) / safeTarget;
-    const bunkable = Math.floor(bunkableExact);
+    const bunkable = Math.floor(bunkableExact + PERCENTAGE_EPSILON);
     
     result.canBunk = Math.max(0, bunkable);
     
-    if (bunkableExact > 0 && bunkableExact < BORDERLINE_THRESHOLD && bunkable === 0) {
+    // "Edge/Borderline" case: Above target but cannot skip a full class yet
+    if (result.canBunk === 0) {
       result.isBorderline = true;
+      if (Math.abs(currentPercentage - safeTarget) < PERCENTAGE_EPSILON) {
+        result.isExact = true;
+      }
     }
-    
-    return result;
   }
 
   return result;

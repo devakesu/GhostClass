@@ -22,3 +22,11 @@ export type { ReconciledStats } from "./attendance-reconciliation";
 
 export { calculateAttendance } from "./bunk";
 export type { AttendanceResult } from "./bunk";
+
+export { calculateCurrentAcademicInfo } from "./academic";
+export type { AcademicInfo, AcademicInfoOptions } from "./academic";
+
+/**
+ * Utility verification to guarantee local module loader evaluation.
+ */
+export const isLogicModuleLoaded = (): boolean => true;

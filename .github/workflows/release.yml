@@ -3,187 +3,31 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version_tag:
-        description: 'Version tag (e.g., v1.5.8) - takes precedence over bump_type'
-        required: false
-        type: string
-      bump_type:
-        description: 'Version bump type'
-        required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-        default: 'patch'
       build_arm64:
-        description: 'Build ARM64 architecture (slower, ~5min extra)'
+        description: "Build ARM64 architecture (slower, ~5min extra)"
         required: false
         type: boolean
         default: false
-  repository_dispatch:
-    types: [release_requested]
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-  # Reuse the guard job from pipeline.yml as a prerequisite
+  # Initial repository check guard
   guard:
     name: Build Guard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-  # Calculate the next version based on trigger type
-  calculate-version:
-    name: Calculate Version
-    needs: guard
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      version_tag: ${{ steps.version.outputs.version_tag }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
-
-      - name: Calculate version
-        id: version
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_VERSION_TAG_DISPATCH: ${{ github.event.client_payload.version_tag }}
-          INPUT_VERSION_TAG_MANUAL: ${{ github.event.inputs.version_tag }}
-          INPUT_BUMP_TYPE: ${{ github.event.inputs.bump_type }}
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          # If triggered by repository_dispatch with version_tag
-          if [[ "$EVENT_NAME" == "repository_dispatch" ]] && [[ -n "$INPUT_VERSION_TAG_DISPATCH" ]]; then
-            VERSION_TAG="$INPUT_VERSION_TAG_DISPATCH"
-            VERSION_NUMBER="${VERSION_TAG#v}"
-            echo "version=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
-            echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-            echo "Using repository_dispatch version: ${VERSION_NUMBER}"
-
-            # Validate that the tag exists with retry logic (handle timing issues)
-            max_attempts=3
-            current_attempt=1
-            tag_exists=false
-
-            while [ $current_attempt -le $max_attempts ]; do
-              if git rev-parse "refs/tags/${VERSION_TAG}" >/dev/null 2>&1; then
-                tag_exists=true
-                echo "✓ Tag ${VERSION_TAG} found (attempt ${current_attempt})"
-                break
-              fi
-
-              if [ $current_attempt -lt $max_attempts ]; then
-                echo "Tag ${VERSION_TAG} not found yet, waiting 5s before retry ${current_attempt}/${max_attempts}"
-                sleep 5
-                # Fetch latest tags
-                git fetch --tags origin
-              fi
-
-              current_attempt=$((current_attempt + 1))
-            done
-
-            if [ "$tag_exists" = false ]; then
-              echo "ERROR: Tag ${VERSION_TAG} does not exist in the repository after ${max_attempts} attempts"
-              echo "This usually means:"
-              echo "  1. The tag was not created successfully in the pipeline workflow"
-              echo "  2. There was a race condition and the tag creation failed"
-              echo "  3. The tag name is incorrect"
-              echo "Please check the pipeline workflow logs and verify the tag exists: git ls-remote --tags origin | grep ${VERSION_TAG}"
-              exit 1
-            fi
-
-            # Checkout the tag to ensure we build the correct version
-            echo "Checking out tag ${VERSION_TAG} for build"
-            git checkout "refs/tags/${VERSION_TAG}"
-
-          # If triggered by a tag, use the tag version
-          elif [[ "$REF_TYPE" == "tag" ]]; then
-            VERSION="$REF_NAME"
-            VERSION_TAG="${VERSION}"
-            # Remove 'v' prefix if present for version number
-            VERSION_NUMBER="${VERSION#v}"
-            echo "version=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
-            echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-            echo "Using tag version: ${VERSION_NUMBER}"
-          # If version_tag input is provided, use it
-          elif [[ -n "$INPUT_VERSION_TAG_MANUAL" ]]; then
-            VERSION_TAG="$INPUT_VERSION_TAG_MANUAL"
-            # Remove 'v' prefix if present for version number
-            VERSION_NUMBER="${VERSION_TAG#v}"
-            echo "version=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
-            echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-            echo "Using workflow_dispatch version: ${VERSION_TAG}"
-
-            # Validate that the tag exists
-            if ! git rev-parse "refs/tags/${VERSION_TAG}" >/dev/null 2>&1; then
-              echo "ERROR: Tag ${VERSION_TAG} does not exist in the repository"
-              echo "This usually means:"
-              echo "  1. The tag was not created successfully in the pipeline workflow"
-              echo "  2. There was a race condition and the tag creation failed"
-              echo "  3. The tag name is incorrect"
-              echo "Please check the pipeline workflow logs and verify the tag exists: git ls-remote --tags origin | grep ${VERSION_TAG}"
-              exit 1
-            fi
-
-            # Checkout the tag to ensure we build the correct version
-            echo "Checking out tag ${VERSION_TAG} for build"
-            git checkout "refs/tags/${VERSION_TAG}"
-          else
-            # Manual dispatch: calculate next version from latest tag
-            # Filter to strict semver tags only
-            LATEST_TAG=$(git tag -l 'v*.*.*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
-
-            # Default to v0.0.0 if no valid tags exist
-            if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v0.0.0"
-            fi
-            echo "Latest tag: ${LATEST_TAG}"
-
-            # Remove 'v' prefix
-            LATEST_VERSION="${LATEST_TAG#v}"
-
-            # Parse version components
-            IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_VERSION}"
-
-            # Bump version based on input
-            case "$INPUT_BUMP_TYPE" in
-              major)
-                MAJOR=$((MAJOR + 1))
-                MINOR=0
-                PATCH=0
-                ;;
-              minor)
-                MINOR=$((MINOR + 1))
-                PATCH=0
-                ;;
-              patch)
-                PATCH=$((PATCH + 1))
-                ;;
-            esac
-
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            VERSION_TAG="v${NEW_VERSION}"
-
-            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-            echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-            echo "Calculated new version: ${NEW_VERSION} (${VERSION_TAG})"
-          fi
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
 
   # Build, sign, and push Docker images
   build-and-release:
     name: Build & Release
-    needs: calculate-version
+    needs: guard
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -195,23 +39,26 @@ jobs:
       platforms: ${{ steps.prep.outputs.platforms }}
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          # When version_tag is provided via repository_dispatch, use client_payload
-          # When version_tag is provided via workflow_dispatch, use inputs
-          # For tag pushes, github.ref is the tag
-          # For bump_type-only dispatches, github.ref is the selected branch (typically main)
-          ref: ${{ github.event.client_payload.version_tag || github.event.inputs.version_tag || github.ref }}
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@a0c73a10bb6782f082cd6714666c87911e4fc7d3 # v3.12.0
 
       - name: Login to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        uses: docker/login-action@9f4a8ea54ed9055d5f86c993e1f2ffa674f98344 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch build-time secrets from Infisical
+        uses: infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: "production"
+          secret-path: "/build-time"
+        continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Prepare derived values
         id: prep
@@ -220,16 +67,10 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           # Set APP_DOMAIN with validation; avoid silent localhost fallback for real releases
-          APP_DOMAIN="${{ vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          APP_DOMAIN="${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}"
           if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
-            # For tag-push releases, require NEXT_PUBLIC_APP_DOMAIN to be configured
-            if [ "${{ github.event_name }}" = "push" ]; then
-              echo "::error::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured for this release tag push. Configure vars.NEXT_PUBLIC_APP_DOMAIN to the production domain before releasing."
-              exit 1
-            fi
-
             # For non-push events, allow localhost fallback only with explicit opt-in
-            if [ "${{ vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
+            if [ "${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
               echo "::warning::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured. Falling back to APP_DOMAIN=localhost."
               echo "::warning::To explicitly allow this fallback without warnings, set vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK=true."
             fi
@@ -243,12 +84,12 @@ jobs:
           echo "   Full path: ghcr.io/${REPO_OWNER}/${IMAGE_NAME}"
 
           # Determine build platforms
-          # For tag pushes: Build both AMD64 and ARM64 (full release)
+          # For main pushes: Build both AMD64 and ARM64 (full release)
           # For workflow_dispatch: Respect user's build_arm64 input
           if [ "${{ github.event_name }}" == "push" ]; then
-            # Tag push - always build multi-arch for full releases
+            # Push - always build multi-arch for full releases
             PLATFORMS="linux/amd64,linux/arm64"
-            echo "📦 Tag push detected - building multi-architecture"
+            echo "📦 Main push detected - building multi-architecture"
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.build_arm64 }}" == "true" ]; then
               PLATFORMS="linux/amd64,linux/arm64"
@@ -269,73 +110,64 @@ jobs:
           echo "app_email=@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           echo "legal_email=legal@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           # Use a consistent timestamp for reproducibility
-          # Priority: head_commit (for branch pushes) > repository updated (for tags) > current time
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
           if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" == "null" ]; then
-            # For tag pushes, use the repository updated timestamp
-            TIMESTAMP="${{ github.event.repository.updated_at }}"
-          fi
-          if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" == "null" ]; then
-            # Final fallback: current time (for manual dispatches)
             TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           fi
           echo "created=$TIMESTAMP" >> $GITHUB_OUTPUT
 
           # SOURCE_DATE_EPOCH: use the Unix timestamp of the checked-out commit.
-          # This makes Docker layer timestamps deterministic per commit:
-          # same tag → same epoch → same image digest (reproducible builds).
-          # Using push/build time would produce a different digest on every rebuild
-          # of the same tag, defeating reproducibility.
+          # This makes Docker layer timestamps deterministic per commit.
           SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "🕒 SOURCE_DATE_EPOCH: ${SOURCE_DATE_EPOCH}"
 
       - name: Build & push Docker image
         id: build-push
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@789f68658055d3ca993799b232b5c46dfe3f114d # v6.19.2
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ needs.calculate-version.outputs.version_tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ needs.calculate-version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:latest
           secrets: |
-            sentry_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+            sentry_token=${{ env.SENTRY_AUTH_TOKEN || secrets.SENTRY_AUTH_TOKEN }}
           platforms: ${{ steps.prep.outputs.platforms }}
-
           # Enable layer caching for faster builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             APP_COMMIT_SHA=${{ github.sha }}
             SOURCE_DATE_EPOCH=${{ steps.prep.outputs.source_date_epoch }}
-            NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
-            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
-            NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
-            NEXT_PUBLIC_GITHUB_URL=${{ vars.NEXT_PUBLIC_GITHUB_URL }}
-            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
-            SENTRY_ORG=${{ vars.SENTRY_ORG }}
-            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
-            NEXT_PUBLIC_APP_NAME=${{ vars.NEXT_PUBLIC_APP_NAME }}
-            NEXT_PUBLIC_APP_VERSION=${{ needs.calculate-version.outputs.version }}
-            NEXT_PUBLIC_APP_DOMAIN=${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
-            NEXT_PUBLIC_AUTHOR_NAME=${{ vars.NEXT_PUBLIC_AUTHOR_NAME }}
-            NEXT_PUBLIC_AUTHOR_URL=${{ vars.NEXT_PUBLIC_AUTHOR_URL }}
-            NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE=${{ vars.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE }}
+            NEXT_PUBLIC_BACKEND_URL=${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_DEV_URL=${{ env.NEXT_PUBLIC_SUPABASE_DEV_URL || vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+            NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_CF_PROXY_URL=${{ env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
+            NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${{ env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL }}
+            NEXT_PUBLIC_GITHUB_URL=${{ env.NEXT_PUBLIC_GITHUB_URL || vars.NEXT_PUBLIC_GITHUB_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN || vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_GA_ID=${{ env.NEXT_PUBLIC_GA_ID || vars.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_ANDROID_PACKAGE_NAME=${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME }}
+            SENTRY_ORG=${{ env.SENTRY_ORG || vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ env.SENTRY_PROJECT || vars.SENTRY_PROJECT }}
+            NEXT_PUBLIC_APP_NAME=${{ env.NEXT_PUBLIC_APP_NAME || vars.NEXT_PUBLIC_APP_NAME }}
+            NEXT_PUBLIC_APP_VERSION=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
+            NEXT_PUBLIC_APP_DOMAIN=${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
+            NEXT_PUBLIC_AUTHOR_NAME=${{ env.NEXT_PUBLIC_AUTHOR_NAME || vars.NEXT_PUBLIC_AUTHOR_NAME }}
+            NEXT_PUBLIC_AUTHOR_URL=${{ env.NEXT_PUBLIC_AUTHOR_URL || vars.NEXT_PUBLIC_AUTHOR_URL }}
             NEXT_PUBLIC_APP_URL=${{ steps.prep.outputs.app_url }}
             NEXT_PUBLIC_SITEMAP_URL=${{ steps.prep.outputs.sitemap_url }}
             NEXT_PUBLIC_APP_EMAIL=${{ steps.prep.outputs.app_email }}
             NEXT_PUBLIC_LEGAL_EMAIL=${{ steps.prep.outputs.legal_email }}
-            NEXT_PUBLIC_DONATE_URL=${{ vars.NEXT_PUBLIC_DONATE_URL }}
-            NEXT_PUBLIC_DEFAULT_DOMAIN=${{ vars.NEXT_PUBLIC_DEFAULT_DOMAIN }}
-            NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
-            NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
-            NEXT_PUBLIC_FORCE_STRICT_CSP=${{ vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
+            NEXT_PUBLIC_DONATE_URL=${{ env.NEXT_PUBLIC_DONATE_URL || vars.NEXT_PUBLIC_DONATE_URL }}
+            NEXT_PUBLIC_DEFAULT_DOMAIN=${{ env.NEXT_PUBLIC_DEFAULT_DOMAIN || vars.NEXT_PUBLIC_DEFAULT_DOMAIN }}
+            NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${{ env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN || vars.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN }}
+            NEXT_PUBLIC_SENTRY_REPLAY_RATE=${{ env.NEXT_PUBLIC_SENTRY_REPLAY_RATE || vars.NEXT_PUBLIC_SENTRY_REPLAY_RATE }}
+            NEXT_PUBLIC_FORCE_STRICT_CSP=${{ env.NEXT_PUBLIC_FORCE_STRICT_CSP || vars.NEXT_PUBLIC_FORCE_STRICT_CSP }}
             GITHUB_REPOSITORY=${{ github.repository }}
             GITHUB_RUN_ID=${{ github.run_id }}
             GITHUB_RUN_NUMBER=${{ github.run_number }}
@@ -346,11 +178,11 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.version=${{ needs.calculate-version.outputs.version }}
+            org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
 
       # Attest build provenance
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
@@ -376,8 +208,6 @@ jobs:
             if gh attestation download \
               oci://ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }} \
               --owner ${{ github.repository_owner }}; then
-              # gh attestation download creates a file named after the digest (e.g., sha256:abc123.jsonl or sha256-abc123.jsonl on Windows)
-              # Find and rename it to a consistent name for easier reference, without using ls|head under set -euo pipefail
               shopt -s nullglob
               digest_files=(sha256*.jsonl)
               if [ ${#digest_files[@]} -gt 0 ]; then
@@ -411,27 +241,25 @@ jobs:
 
       # Generate SBOM
       - name: Generate SBOM
-        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11 # v0.23.0
+        uses: anchore/sbom-action@cf54b07f9a24febf56b236893d115bafc5be6a27 # v0.23.0
         with:
           image: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom.json
 
       # Attest SBOM
-      # actions/attest-sbom is deprecated; use actions/attest with predicate-type instead.
-      # https://github.com/actions/attest-sbom?tab=readme-ov-file#deprecation-notice
       - name: Attest SBOM
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@a2d48ba168b9e64b41c8cc6fa3b9a90ee277d34f # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
-          predicate-type: 'https://cyclonedx.org/bom'
+          predicate-type: "https://cyclonedx.org/bom"
           predicate-path: sbom.json
           push-to-registry: true
 
       # Sign image with cosign (keyless signing using OIDC)
       - name: Install cosign
-        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.0.0
 
       - name: Authenticate cosign with registry
         run: |
@@ -446,14 +274,15 @@ jobs:
 
           echo "=== Cosign Image Signing ==="
           echo "Image URI: ${IMAGE_URI}"
-          echo "Version: ${{ needs.calculate-version.outputs.version }}"
+          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          echo "Version: ${VERSION}"
 
           # Sign with timeout
           timeout 300 cosign sign \
             -a "repo=${{ github.repository }}" \
             -a "workflow=${{ github.workflow }}" \
             -a "ref=${{ github.ref }}" \
-            -a "version=${{ needs.calculate-version.outputs.version }}" \
+            -a "version=${VERSION}" \
             "${IMAGE_URI}" || {
               echo "ERROR: Cosign image signing failed or timed out"
               exit 1
@@ -510,7 +339,7 @@ jobs:
 
       # Upload artifacts for the release job
       - name: Upload release artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: release-artifacts
           path: |
@@ -519,77 +348,305 @@ jobs:
             checksums.txt
             provenance.intoto.jsonl
 
+  build-mobile:
+    name: Build Flutter Android
+    needs: guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: ./.github/actions/flutter-action
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch build-time secrets from Infisical
+        uses: infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: "production"
+          secret-path: "/build-time"
+        continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
+
+      - name: Prepare mobile release paths
+        id: mobile-prep
+        run: |
+          set -euo pipefail
+
+          mkdir -p mobile/release-assets
+
+          echo "build_name=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+          BUILD_TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          if [ -z "$BUILD_TIMESTAMP" ] || [ "$BUILD_TIMESTAMP" = "null" ]; then
+            BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          fi
+          echo "build_timestamp=${BUILD_TIMESTAMP}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Prepare Android signing key
+        working-directory: mobile/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 secret is required}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD secret is required}"
+          : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
+          : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
+
+          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          echo "::add-mask::$ANDROID_KEY_ALIAS"
+          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > ghostclass.p12
+
+          cat > key.properties << EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=ghostclass.p12
+          storeType=pkcs12
+          EOF
+
+          chmod 600 key.properties ghostclass.p12
+
+      - name: Generate mobile/lib/config/app_secrets.dart
+        working-directory: mobile
+        env:
+          SUPABASE_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_URL || vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
+          SUPABASE_ANON_KEY_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
+          SUPABASE_CF_PROXY_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
+          SENTRY_DSN: ${{ env.NEXT_PUBLIC_MOBILE_SENTRY_DSN || vars.NEXT_PUBLIC_MOBILE_SENTRY_DSN || env.NEXT_PUBLIC_SENTRY_DSN || vars.NEXT_PUBLIC_SENTRY_DSN }}
+          BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+          APP_DOMAIN: ${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+
+          # Encode all sensitive strings to Base64 for uniform obfuscation
+          ENCODED_SUPABASE_URL_DEV=$(echo -n "$SUPABASE_URL_DEV" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_ANON_KEY_DEV=$(echo -n "$SUPABASE_ANON_KEY_DEV" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$SUPABASE_ANON_KEY_PROD" | base64 | tr -d '\n')
+          ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
+          ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
+          ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
+          ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
+
+          GHOSTCLASS_API_URL="https://${APP_DOMAIN}/api"
+
+          cat > lib/config/app_secrets.dart << EOF
+          import 'package:flutter/foundation.dart';
+
+          class AppSecrets {
+            AppSecrets._();
+
+            static const bool isDev = kDebugMode;
+
+            static const String supabaseUrlDev = '${ENCODED_SUPABASE_URL_DEV}';
+            static const String supabasePublishableKeyDev = '${ENCODED_SUPABASE_ANON_KEY_DEV}';
+
+            static const String supabaseProxyUrlProd = '${ENCODED_SUPABASE_PROXY_URL_PROD}';
+            static const String supabasePublishableKeyProd = '${ENCODED_SUPABASE_ANON_KEY_PROD}';
+
+            static const String sentryDsn = '${ENCODED_SENTRY_DSN}';
+
+            static const String ghostclassApiUrlDev = '';
+
+            static const String ghostclassApiUrlProd = '${GHOSTCLASS_API_URL}';
+
+            static const String ezygoAuthUrl = '${ENCODED_EZYGO_AUTH_URL}';
+            static const String ezygoApiRoot = '${ENCODED_EZYGO_API_ROOT}';
+            static const String ezygoOrigin = '${ENCODED_EZYGO_ORIGIN}';
+          }
+          EOF
+
+      - name: Build Android APK
+        working-directory: mobile
+        env:
+          BUILD_TIMESTAMP: ${{ steps.mobile-prep.outputs.build_timestamp }}
+          SENTRY_AUTH_TOKEN: ${{ env.MOBILE_SENTRY_AUTH_TOKEN || secrets.MOBILE_SENTRY_AUTH_TOKEN || env.SENTRY_AUTH_TOKEN || secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+
+          flutter build apk --release \
+            --obfuscate \
+            --split-debug-info=build/debug-info \
+            --extra-gen-snapshot-options=--save-obfuscation-map=build/app/obfuscation.map.json \
+            --build-name="${{ steps.mobile-prep.outputs.build_name }}" \
+            --build-number="${{ steps.mobile-prep.outputs.build_number }}" \
+            --dart-define=APP_VERSION="${{ steps.mobile-prep.outputs.build_name }}" \
+            --dart-define=APP_COMMIT_SHA=${{ github.sha }} \
+            --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+            --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
+            --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }}
+
+          dart run sentry_dart_plugin
+
+      - name: Generate mobile SBOM
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+
+          npx --yes @cyclonedx/cdxgen -t dart --no-install-deps -o release-assets/mobile-sbom.json .
+
+      - name: Attest mobile APK provenance
+        id: attest-mobile
+        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
+        with:
+          subject-path: mobile/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Assemble mobile release assets
+        working-directory: mobile
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.attest-mobile.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+
+          cp build/app/outputs/flutter-apk/app-release.apk release-assets/mobile-app-release.apk
+          cp "$ATTESTATION_BUNDLE" release-assets/mobile-provenance.intoto.jsonl
+
+          cd release-assets
+          {
+            echo "# Mobile Release Artifact Checksums"
+            echo ""
+            sha256sum mobile-app-release.apk
+            sha256sum mobile-sbom.json
+            sha256sum mobile-provenance.intoto.jsonl
+            echo ""
+            echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          } > mobile-checksums.txt
+
+      - name: Upload mobile release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: mobile-release-artifacts
+          path: |
+            mobile/release-assets/mobile-app-release.apk
+            mobile/release-assets/mobile-sbom.json
+            mobile/release-assets/mobile-provenance.intoto.jsonl
+            mobile/release-assets/mobile-checksums.txt
+
   # Create GitHub Release with artifacts
   create-github-release:
     name: Create GitHub Release
-    needs: [calculate-version, build-and-release]
+    needs: [build-and-release, build-mobile]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
         with:
           fetch-depth: 0
-          # When version_tag is provided via repository_dispatch, use client_payload
-          # When version_tag is provided via workflow_dispatch, use inputs
-          # For tag pushes, github.ref is the tag
-          # For bump_type-only dispatches, github.ref is the selected branch (typically main)
-          ref: ${{ github.event.client_payload.version_tag || github.event.inputs.version_tag || github.ref }}
+
+      - name: Fetch build-time secrets from Infisical
+        uses: infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: "production"
+          secret-path: "/build-time"
+        continue-on-error: true
+
+      - name: Determine release version
+        id: version
+        run: |
+          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          if [[ "${VERSION}" != v* ]]; then
+            VERSION_TAG="v${VERSION}"
+          else
+            VERSION_TAG="${VERSION}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Targeting release tag: ${VERSION_TAG}"
 
       - name: Download artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
         with:
           name: release-artifacts
-          path: ./artifacts
+          path: ./artifacts/web
+
+      - name: Download mobile artifacts
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
+        with:
+          name: mobile-release-artifacts
+          path: ./artifacts/mobile
 
       - name: Verify downloaded artifacts
         run: |
           echo "Downloaded artifacts:"
-          ls -lah ./artifacts/
+          find ./artifacts -maxdepth 2 -type f | sort
           echo ""
           echo "Checksums:"
-          cat ./artifacts/checksums.txt
+          cat ./artifacts/web/checksums.txt
+          echo ""
+          cat ./artifacts/mobile/mobile-checksums.txt
 
       - name: Calculate previous version for changelog
         id: prev_version
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.version_tag }}
         run: |
-          # Get version tags only (strict semantic version pattern: v[0-9]+.[0-9]+.[0-9]+)
-          CURRENT_TAG="${{ needs.calculate-version.outputs.version_tag }}"
-
           # Get the previous semantic version tag (strict pattern matching)
-          PREV_TAG=$(git tag -l 'v*.*.*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${CURRENT_TAG}$" | head -n1 || echo "")
+          PREV_TAG=$(git tag -l 'v*.*.*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${VERSION_TAG}$" | head -n1 || echo "")
 
           if [ -z "$PREV_TAG" ]; then
             echo "No previous version tag found, using initial commit"
             PREV_REF=$(git rev-list --max-parents=0 HEAD)
-            echo "prev_ref=${PREV_REF}" >> $GITHUB_OUTPUT
-            echo "changelog_text=${PREV_REF}...${CURRENT_TAG}" >> $GITHUB_OUTPUT
+            echo "changelog_text=${PREV_REF}...${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           else
             echo "Previous tag: ${PREV_TAG}"
-            echo "prev_ref=${PREV_TAG}" >> $GITHUB_OUTPUT
-            echo "changelog_text=${PREV_TAG}...${CURRENT_TAG}" >> $GITHUB_OUTPUT
+            echo "changelog_text=${PREV_TAG}...${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Generate verification instructions
         env:
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
-          VERSION_TAG: ${{ needs.calculate-version.outputs.version_tag }}
+          VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           DIGEST: ${{ needs.build-and-release.outputs.digest }}
-          VERSION: ${{ needs.calculate-version.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           # Derive image name from repository name
           IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
 
-          # Convert platforms to readable format (same transformation as release notes)
+          # Convert platforms to readable format
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
 
           cat > ./artifacts/VERIFY.md << EOF
           # Release Verification Instructions
 
-          This release includes signed artifacts and attestations for supply chain security.
+          This release includes signed web and mobile artifacts with attestations for supply chain security.
 
           ## Verify Docker Image Signature
 
@@ -632,6 +689,13 @@ jobs:
           sha256sum sbom.json sbom.json.bundle
           \`\`\`
 
+          ## Verify Mobile APK
+
+          \`\`\`bash
+          gh attestation verify mobile-app-release.apk --owner ${REPOSITORY_OWNER}
+          grep -E '^[0-9a-f]{64}  ' mobile-checksums.txt | sha256sum -c
+          \`\`\`
+
           ## Image Information
 
           - **Image**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}\`
@@ -655,7 +719,7 @@ jobs:
       - name: Create GitHub Release
         env:
           DIGEST: ${{ needs.build-and-release.outputs.digest }}
-          VERSION_TAG: ${{ needs.calculate-version.outputs.version_tag }}
+          VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           SERVER_URL: ${{ github.server_url }}
@@ -663,19 +727,9 @@ jobs:
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use IMAGE_NAME from job output with fallback to repo name
-          if [ -z "${IMAGE_NAME}" ]; then
-            # Fallback: extract repo name and convert to lowercase
-            IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
-            echo "⚠️  IMAGE_NAME from job output is empty, using fallback: ${IMAGE_NAME}"
-          else
-            echo "✓ Using IMAGE_NAME from job output: ${IMAGE_NAME}"
-          fi
-
-          # Convert platforms to readable format for release notes
+          IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
 
-          # Determine if multi-platform
           if [[ "${PLATFORMS}" == *","* ]]; then
             PLATFORM_DESC="Multi-platform Docker images (${PLATFORM_LIST})"
           else
@@ -689,6 +743,7 @@ jobs:
 
           This release includes:
           - 🐳 ${PLATFORM_DESC}
+          - 📱 Flutter Android APK with provenance attestation
           - 🔐 Signed images and artifacts using Sigstore cosign
           - 📋 Software Bill of Materials (SBOM) in CycloneDX format
           - ✅ Build provenance attestations
@@ -722,25 +777,23 @@ jobs:
           ---
 
           **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}" \
-            ./artifacts/sbom.json \
-            ./artifacts/sbom.json.bundle \
-            ./artifacts/checksums.txt \
-            ./artifacts/VERIFY.md \
-            ./artifacts/provenance.intoto.jsonl \
+            ./artifacts/web/sbom.json \
+            ./artifacts/web/sbom.json.bundle \
+            ./artifacts/web/checksums.txt \
+            ./artifacts/web/VERIFY.md \
+            ./artifacts/web/provenance.intoto.jsonl \
+            ./artifacts/mobile/mobile-app-release.apk \
+            ./artifacts/mobile/mobile-sbom.json \
+            ./artifacts/mobile/mobile-checksums.txt \
+            ./artifacts/mobile/mobile-provenance.intoto.jsonl \
             --draft=false
 
   # Deploy to production after successful release creation
-  # This ensures deployment only happens after the full release completes successfully
   deploy-to-production:
     name: Deploy to Production
-    needs: [calculate-version, build-and-release, create-github-release]
+    needs: [build-and-release, build-mobile, create-github-release]
     runs-on: ubuntu-latest
-    # Deploy on tag pushes, workflow_dispatch with version_tag, OR repository_dispatch
-    # Manual workflow_dispatch without version_tag (bump_type only) does not auto-deploy
-    if: |
-      (github.event_name == 'push' && github.ref_type == 'tag') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.version_tag != '') ||
-      github.event_name == 'repository_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Trigger Coolify deployment
         env:
@@ -755,8 +808,13 @@ jobs:
           : "${COOLIFY_APP_ID:?COOLIFY_APP_ID secret is required}"
           : "${COOLIFY_API_TOKEN:?COOLIFY_API_TOKEN secret is required}"
 
-          echo "Deploying version ${{ needs.calculate-version.outputs.version_tag }} to Coolify"
-          echo "Note: Ensure Coolify is configured to pull the versioned tag (e.g., ${{ needs.calculate-version.outputs.version_tag }})"
+          echo "::add-mask::$COOLIFY_API_TOKEN"
+          echo "::add-mask::$COOLIFY_BASE_URL"
+          echo "::add-mask::$COOLIFY_APP_ID"
+
+          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          echo "Deploying version ${VERSION} to Coolify"
+          echo "Note: Ensure Coolify is configured to pull the versioned tag (e.g., ${VERSION})"
 
           curl --fail-with-body --silent --show-error \
             "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_APP_ID" \

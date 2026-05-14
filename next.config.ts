@@ -38,19 +38,30 @@ const withSerwist = withSerwistInit({
   cacheOnNavigation: false,
 });
 
-// Resolve the Supabase storage hostname at build time.
-// Throwing here makes missing NEXT_PUBLIC_SUPABASE_URL a hard build failure rather than
-// silently falling back to 'supabase.co', which would permit Next.js Image Optimization
-// to proxy images from *any* Supabase project.
-const supabaseImageHostname = (() => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
+// Resolve the Supabase storage hostnames at build time.
+// Allowing both production and development hostnames ensures images work across environments.
+const allowedImageHostnames = (() => {
+  const hosts = [
+    "lh3.googleusercontent.com",     // Google
+    "avatars.githubusercontent.com", // GitHub
+    "secure.gravatar.com",           // Gravatar
+  ];
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname); } catch { /* ignore */ }
+  }
+  if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
+    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_DEV_URL).hostname); } catch { /* ignore */ }
+  }
+  
+  if (hosts.length === 3 && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    // We only throw if even Supabase is missing, as that's the primary storage
     throw new Error(
-      '[next.config.ts] NEXT_PUBLIC_SUPABASE_URL is required at build time for ' +
-      'images.remotePatterns. Set it in your environment before running next build.'
+      '[next.config.ts] At least one Supabase URL (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_DEV_URL) ' +
+      'is required at build time for images.remotePatterns.'
     );
   }
-  return new URL(url).hostname;
+  // Deduplicate
+  return Array.from(new Set(hosts));
 })();
 
 const nextConfig = {
@@ -219,14 +230,21 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: supabaseImageHostname,
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
+      ...allowedImageHostnames.map((hostname: string) => {
+        const isSupabase = hostname.includes('supabase');
+        return {
+          protocol: 'https' as const,
+          hostname,
+          port: '',
+          // Supabase storage is strictly nested under /storage/v1/object/public/
+          // while OAuth providers (Google, GitHub) serve images from various root paths.
+          pathname: isSupabase ? '/storage/v1/object/public/**' : '/**',
+        };
+      }),
     ],
   },
+  // eslint-disable-next-line sonarjs/no-hardcoded-ip
+  allowedDevOrigins: ['192.168.0.103']
 } satisfies NextConfig;
 
 const sentryCompatibleConfig = withSerwist(nextConfig) as Parameters<typeof withSentryConfig>[0];
@@ -267,7 +285,7 @@ const sentryPluginOptions = {
   },
 
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring",
+  tunnelRoute: "/monitoring"
 } satisfies Parameters<typeof withSentryConfig>[1];
 
 export default withSentryConfig(sentryCompatibleConfig, sentryPluginOptions);

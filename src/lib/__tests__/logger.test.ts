@@ -1,55 +1,56 @@
-/**
- * Tests for logger utility
- */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { logger } from '@/lib/logger'
-
-describe('logger', () => {
-  let consoleLogSpy: any
-  let consoleInfoSpy: any
-  let consoleWarnSpy: any
-  let consoleErrorSpy: any
+describe("logger.ts", () => {
+  const originalEnv = process.env;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-  })
+    vi.resetModules();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "info").mockImplementation(() => {});
+  });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore()
-    consoleInfoSpy.mockRestore()
-    consoleWarnSpy.mockRestore()
-    consoleErrorSpy.mockRestore()
-  })
+    vi.restoreAllMocks();
+    process.env = originalEnv;
+  });
 
-  describe('info', () => {
-    it('should log info messages via console.info', () => {
-      logger.info('test info message')
-      expect(consoleInfoSpy).toHaveBeenCalledWith('test info message')
-    })
+  it("dev() logs in development", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const { logger } = await import("../logger");
+    logger.dev("test");
+    expect(console.log).toHaveBeenCalledWith("test");
+  });
 
-    it('should handle multiple arguments', () => {
-      logger.info('info:', { data: 'test' })
-      expect(consoleInfoSpy).toHaveBeenCalledWith('info:', { data: 'test' })
-    })
-  })
+  it("dev() does not log in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { logger } = await import("../logger");
+    logger.dev("test");
+    expect(console.log).not.toHaveBeenCalled();
+  });
 
-  describe('warn', () => {
-    it('should suppress warnings in test environment (VITEST=true)', () => {
-      // In test mode (detected via process.env.VITEST), warn is suppressed to avoid noisy CI output
-      logger.warn('test warning')
-      expect(consoleWarnSpy).not.toHaveBeenCalled()
-    })
-  })
+  it("info() always logs", async () => {
+    const { logger } = await import("../logger");
+    logger.info("test info");
+    expect(console.info).toHaveBeenCalledWith("test info");
+  });
 
-  describe('error', () => {
-    it('should suppress errors in test environment (VITEST=true)', () => {
-      // In test mode (detected via process.env.VITEST), error is suppressed to avoid noisy CI output
-      logger.error('test error')
-      expect(consoleErrorSpy).not.toHaveBeenCalled()
-    })
-  })
-})
+  it("warn() and error() do not log in test environment", async () => {
+    // process.env.VITEST is true during vitest run
+    const { logger } = await import("../logger");
+    logger.warn("warning");
+    logger.error("error");
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("warn() and error() log when VITEST is not set", async () => {
+    vi.stubEnv("VITEST", "");
+    const { logger } = await import("../logger");
+    logger.warn("warning");
+    logger.error("error");
+    expect(console.warn).toHaveBeenCalledWith("warning");
+    expect(console.error).toHaveBeenCalledWith("error");
+  });
+});

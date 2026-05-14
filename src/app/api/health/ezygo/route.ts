@@ -17,9 +17,12 @@ export async function GET() {
   
   // Return HTTP 503 when circuit is open, 200 otherwise
   // Status payload indicates 'healthy', 'degraded', or 'unhealthy' for monitoring
-  const status = circuitBreakerStatus.isOpen ? 'unhealthy' : 
-                 hasBacklog ? 'degraded' : 
-                 'healthy';
+  let status = 'healthy';
+  if (circuitBreakerStatus.isOpen) {
+    status = 'unhealthy';
+  } else if (hasBacklog) {
+    status = 'degraded';
+  }
   
   // Only expose detailed metrics in non-production environments to avoid information disclosure
   // Default to production-safe behavior if NODE_ENV is not explicitly set to development/test

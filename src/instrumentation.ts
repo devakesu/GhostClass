@@ -11,11 +11,11 @@ export async function register() {
     if (!isBuildPhase) {
       validateEnvironment();
     }
-    await import("../sentry.server.config");
+    await import("./instrumentation-server");
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {
-    await import("../sentry.edge.config");
+    await import("./instrumentation-edge");
   }
 }
 

@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearAuthCookie } from "@/lib/security/auth-cookie";
-import { removeCsrfToken, validateCsrfToken } from "@/lib/security/csrf";
+import { removeCsrfToken } from "@/lib/security/csrf";
 import { clearTermsVersionCookie, clearTermsRedirectCountCookie } from "@/app/actions/user";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
+import { withSecurity } from "@/lib/security/app-check";
 
-export async function POST(req: NextRequest) {
+const handler = async (req: NextRequest) => {
   // Rate limiting — prevents flooding the logout endpoint even with a valid CSRF token
   const ip = getClientIp(req.headers);
   if (!ip) {
@@ -31,19 +32,6 @@ export async function POST(req: NextRequest) {
           "X-RateLimit-Reset": reset.toString(),
         },
       }
-    );
-  }
-
-  // CSRF protection: Prevent unauthorized logout attacks
-  // Without this check, an attacker could log out users by embedding
-  // a POST request to this endpoint on a malicious page
-  const csrfToken = req.headers.get("x-csrf-token");
-  const csrfValid = await validateCsrfToken(csrfToken);
-  
-  if (!csrfValid) {
-    return NextResponse.json(
-      { message: "Invalid CSRF token" },
-      { status: 403 }
     );
   }
 
@@ -89,4 +77,6 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
-}
+};
+
+export const POST = withSecurity(handler);

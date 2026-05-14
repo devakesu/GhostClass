@@ -1,45 +1,48 @@
-// GET /api/profile  – fetch profile, sync with EzyGo, return plaintext PII
-// PATCH /api/profile – update user-editable fields, encrypt PII before storage
-//
-// PII fields (birth_date, gender, phone) are stored as AES-256-GCM ciphertext
-// in the database (PRIV-02).  All encryption/decryption happens here, on the
-// server.  The client never receives ciphertext or IV values.
-
-import { after, NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
-import { validateCsrfToken } from "@/lib/security/csrf";
-import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
-import { redact } from "@/lib/utils";
 import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
+import { withSecurity } from "@/lib/security/app-check";
+import { toTitleCase } from "@/lib/utils";
+import { performProfileSync } from "@/lib/user/sync";
+import { safeResponseJson } from "@/lib/json";
+import { getProfileBundle } from "@/lib/user/profile-bundle";
 
-interface EzygoProfileResponse {
-  user_id: string | number;
+export const dynamic = "force-dynamic";
+
+interface EzygoProfileData {
+  mobile?: string;
+  gender?: string;
+  birth_date?: string;
+  user_id?: string | number;
   username?: string;
   email?: string;
-  mobile?: string;
   first_name?: string;
   last_name?: string;
   full_name?: string;
-  gender?: string;
-  sex?: string;
-  birth_date?: string;
-  dob?: string;
+  created_at?: string;
+  current_semester?: string;
+  current_term?: string;
+  current_year?: string;
+  academic_year?: string;
   user?: {
+    mobile?: string;
     username?: string;
     email?: string;
-    mobile?: string;
   };
 }
 
-/** Prefer the local (user-edited) value; fall back to the remote value. */
+interface EzygoProfileResponse extends EzygoProfileData {
+  data?: EzygoProfileData;
+}
+
 function resolve(
   local: string | null | undefined,
   remote: string | number | null | undefined
@@ -48,553 +51,282 @@ function resolve(
   return remote ? String(remote) : null;
 }
 
-// ---------------------------------------------------------------------------
-// GET – fetch profile
-// ---------------------------------------------------------------------------
+function validateRequestOrigin(req: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV === "development") return null;
+  const allowedHosts = getAllowedHosts();
+  if (!allowedHosts) {
+    logger.error("[profile GET] Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing");
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+  }
+  const origin = req.headers.get("origin");
+  if (!origin) {
+    const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
+    const requestHostname = resolveRequestHostname(req);
+    if (!(secFetchSite === "same-origin" && !!requestHostname && allowedHosts.has(requestHostname))) {
+      return NextResponse.json({ error: "Origin required" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
+  } else {
+    const originHostname = new URL(origin).hostname.toLowerCase();
+    if (!allowedHosts.has(originHostname)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+  }
+  return null;
+}
 
-export async function GET(req: NextRequest) {
-  // 0. Rate limiting — keyed per IP to prevent EzyGo quota exhaustion and crypto DoS
+async function authenticateUser(req: NextRequest, supabaseAdmin: ReturnType<typeof getAdminClient>): Promise<{ id: string } | null> {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    if (!token) return null;
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !authUser) return null;
+    return authUser;
+  }
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser) return null;
+  return authUser;
+}
+
+async function ingestNewProfile(user: { id: string }, supabaseAdmin: ReturnType<typeof getAdminClient>): Promise<NextResponse> {
+  const token = await getAuthTokenServer();
+  if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  let ezygoRes: Response;
+  try {
+    ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
+    if (!ezygoRes.ok) {
+      logger.error("[profile GET] EzyGo profile fetch failed:", ezygoRes.status);
+      Sentry.captureException(
+        new Error(`EzyGo profile fetch failed with status ${ezygoRes.status}`),
+        { tags: { type: "ezygo_api_error", location: "api/profile/get" } },
+      );
+      return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    }
+  } catch (err) {
+    logger.error("[profile GET] EzyGo profile fetch exception:", err);
+    Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "api/profile/get" } });
+    return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
+  const json = await safeResponseJson<EzygoProfileResponse>(ezygoRes);
+  if (!json) {
+    return NextResponse.json({ error: "EzyGo profile returned empty or invalid JSON" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
+  const d: EzygoProfileData = json.data || json;
+  const mobileVal = d.mobile || d.user?.mobile;
+  const encPhone = mobileVal ? encrypt(mobileVal) : null;
+  const encGender = d.gender ? encrypt(d.gender) : null;
+  const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+  const upsertData = { 
+    id: d.user_id, 
+    auth_id: user.id, 
+    username: d.username || d.user?.username || null,
+    email: d.email || d.user?.email || null,
+    first_name: resolve(null, d.first_name || d.full_name?.split(" ")[0]), 
+    last_name: resolve(null, d.last_name || d.full_name?.split(" ").slice(1).join(" ")), 
+    phone: encPhone?.content, 
+    phone_iv: encPhone?.iv,
+    gender: encGender?.content,
+    gender_iv: encGender?.iv,
+    birth_date: encBirthDate?.content,
+    birth_date_iv: encBirthDate?.iv,
+    ezygo_created_at: d.created_at || null,
+    current_semester: d.current_semester || d.current_term || null,
+    current_year: d.current_year || d.academic_year || null,
+  };
+  await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
+  
+  const safeData: Record<string, unknown> = { ...upsertData };
+  delete safeData.phone_iv;
+  delete safeData.gender_iv;
+  delete safeData.birth_date_iv;
+
+  return NextResponse.json({ 
+    ...safeData, 
+    phone: mobileVal || null,
+    gender: d.gender || null,
+    birth_date: d.birth_date || null,
+    created_at: new Date().toISOString()
+  });
+}
+
+async function loadExistingUserBundle(
+  existingUserRaw: { id: string | number; first_name?: string | null; [key: string]: unknown },
+  userId: string,
+  shouldSync: boolean,
+  supabaseAdmin: ReturnType<typeof getAdminClient>
+): Promise<NextResponse> {
+  let existingUser = existingUserRaw;
+  let resolvedToken: string | null = null;
+  let syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null = null;
+  if (shouldSync) {
+    resolvedToken = (await getAuthTokenServer()) ?? null;
+    if (resolvedToken) {
+      try {
+        syncResult = await performProfileSync(resolvedToken, String(existingUser.id), userId);
+        const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", userId).single();
+        if (updatedUser) {
+          existingUser = updatedUser;
+        }
+      } catch (err) { logger.warn("Synchronous profile sync failed", err); }
+    }
+  }
+
+  if (!shouldSync) {
+    after(async () => {
+      const syncToken = resolvedToken ?? await getAuthTokenServer();
+      if (!syncToken) return;
+      try {
+        await performProfileSync(syncToken, String(existingUser.id), userId);
+      } catch (err) { 
+        logger.warn("Profile background sync failed", err); 
+      }
+    });
+  }
+  const bundle = await getProfileBundle(userId, syncResult?.academic);
+  if (!bundle) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+  return NextResponse.json(bundle);
+}
+
+const getHandler = async (req: NextRequest) => {
   const ip = getClientIp(req.headers);
   if (!ip) {
-    logger.warn("GET /api/profile: missing client IP; rejecting request to avoid bypassing rate limiting");
     return NextResponse.json(
-      { error: "Unable to determine client IP address." },
-      { status: 400, headers: { "Cache-Control": "no-store" } }
+      { error: "Could not determine client IP" },
+      { 
+        status: 400,
+        headers: { "Cache-Control": "no-store" }
+      },
     );
   }
-  const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_get_${ip}`);
+
+  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
-          "Cache-Control": "no-store",
-          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
           "X-RateLimit-Limit": limit.toString(),
           "X-RateLimit-Remaining": remaining.toString(),
-          "X-RateLimit-Reset": reset.toString(),
+          "Cache-Control": "no-store",
         },
-      }
+      },
     );
   }
 
-  // 1. Origin validation (defence-in-depth)
-  // Prevents a cross-site top-level navigation from triggering a profile sync
-  // upsert via the slow path. Response is already protected by CORS/SOP, but
-  // Origin validation closes the gap consistently with /api/backend/[...path].
-  // Skipped in development so localhost / tunnels work without extra config.
-  if (process.env.NODE_ENV !== "development") {
-    const allowedHosts = getAllowedHosts();
-    if (!allowedHosts) {
-      logger.error("GET /api/profile: NEXT_PUBLIC_APP_DOMAIN is missing or blank in production");
-      Sentry.captureMessage("Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing for /api/profile", {
-        level: "error",
-      });
-      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
-    }
+  const originErr = validateRequestOrigin(req);
+  if (originErr) return originErr;
 
-    const origin = req.headers.get("origin");
-    if (!origin) {
-      // Some same-origin GET requests omit Origin — allow when Sec-Fetch-Site says
-      // same-origin and the effective request hostname is in the allowlist.
-      const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
-      const requestHostname = resolveRequestHostname(req);
-      const isAllowedSameOriginRead =
-        secFetchSite === "same-origin" &&
-        !!requestHostname &&
-        allowedHosts.has(requestHostname);
-      if (!isAllowedSameOriginRead) {
-        return NextResponse.json({ error: "Origin header required" }, { status: 400 });
-      }
-    } else {
-      try {
-        const originHostname = new URL(origin).hostname.toLowerCase();
-        if (!allowedHosts.has(originHostname)) {
-          return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
-        }
-      } catch {
-        return NextResponse.json({ error: "Invalid origin header" }, { status: 400 });
-      }
-    }
-  }
-
-  const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
+  const user = await authenticateUser(req, supabaseAdmin);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
-  // 1. Auth check
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { data: existingUserRaw } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
+  const searchParams = req.nextUrl.searchParams;
+  const shouldSync = searchParams.get("sync") === "true";
+
+  if (existingUserRaw && existingUserRaw.first_name) {
+    return loadExistingUserBundle(existingUserRaw, user.id, shouldSync, supabaseAdmin);
   }
 
-  // 2. Read existing row from DB (may contain encrypted PII)
-  const { data: existingUser, error: dbError } = await supabaseAdmin
-    .from("users")
-    .select("*")
-    .eq("auth_id", user.id)
-    .maybeSingle();
-
-  if (dbError) {
-    Sentry.captureException(dbError, {
-      tags: {
-        type: "profile_local_fetch_error",
-        location: "GET /api/profile",
-      },
-    });
-  }
-
-  // 3. Decrypt stored PII for soft-sync comparison
-  let decryptedGender: string | null = null;
-  let decryptedBirthDate: string | null = null;
-
-  try {
-    if (existingUser?.gender && existingUser?.gender_iv) {
-      decryptedGender = decrypt(existingUser.gender_iv, existingUser.gender);
-    }
-  } catch (e) {
-    logger.warn("Failed to decrypt gender:", e);
-  }
-
-  try {
-    if (existingUser?.birth_date && existingUser?.birth_date_iv) {
-      decryptedBirthDate = decrypt(
-        existingUser.birth_date_iv,
-        existingUser.birth_date
-      );
-    }
-  } catch (e) {
-    logger.warn("Failed to decrypt birth_date:", e);
-  }
-
-  // Also decrypt phone (needed for the fast-path response)
-  let decryptedPhone: string | null = null;
-  try {
-    if (existingUser?.phone && existingUser?.phone_iv) {
-      decryptedPhone = decrypt(existingUser.phone_iv, existingUser.phone);
-    }
-  } catch (e) {
-    logger.warn("Failed to decrypt phone:", e);
-  }
-
-  // Fast path: DB row exists AND has a first_name (i.e. EzyGo has synced at least
-  // once) → return immediately so the UI renders without blocking on a fresh EzyGo
-  // round-trip. The background after() keeps names/email/phone fresh for subsequent
-  // loads.
-  //
-  // Guard on first_name: save-token only writes id/username/token/auth_id — it never
-  // writes email or first_name. Stub rows (created on first signup before the profile
-  // route has run the slow path) will have first_name = null. Without this guard the
-  // fast path returns all-null fields, React Query caches them for 5 min (staleTime),
-  // and the name never appears on the dashboard until a manual refresh.
-  if (existingUser && typeof existingUser.first_name === "string" && existingUser.first_name.trim().length > 0) {
-    after(async () => {
-      const syncToken = await getAuthTokenServer();
-      if (!syncToken) return;
-
-      let syncEzygoData: EzygoProfileResponse | null = null;
-      try {
-        const ezygoRes = await egressFetch("myprofile", {
-          headers: { Authorization: `Bearer ${syncToken}` },
-          cache: "no-store",
-        });
-        if (ezygoRes.ok) {
-          const json = (await ezygoRes.json()) as
-            | { data?: EzygoProfileResponse }
-            | EzygoProfileResponse;
-          syncEzygoData =
-            (json as { data?: EzygoProfileResponse }).data ??
-            (json as EzygoProfileResponse);
-        } else {
-          logger.warn(
-            "[background] EzyGo profile sync returned non-OK:",
-            ezygoRes.status
-          );
-        }
-      } catch (err) {
-        logger.warn("[background] EzyGo profile sync failed.");
-        Sentry.captureException(err, {
-          tags: {
-            type: "ezygo_profile_sync_fail",
-            location: "GET /api/profile background",
-          },
-        });
-      }
-
-      if (!syncEzygoData) return;
-
-      let syncRemoteFirst = syncEzygoData.first_name;
-      let syncRemoteLast = syncEzygoData.last_name;
-      if (!syncRemoteFirst && syncEzygoData.full_name) {
-        const parts = syncEzygoData.full_name.trim().split(" ");
-        syncRemoteFirst = parts[0];
-        syncRemoteLast = parts.slice(1).join(" ") || "";
-      }
-
-      const syncMergedFirst = resolve(existingUser.first_name, syncRemoteFirst);
-      const syncMergedLast = resolve(existingUser.last_name, syncRemoteLast);
-      const syncMergedPhone =
-        syncEzygoData.mobile ?? syncEzygoData.user?.mobile ?? null;
-      const syncMergedGender = resolve(
-        decryptedGender,
-        syncEzygoData.gender ?? syncEzygoData.sex
-      );
-      const syncMergedBirthDate = resolve(
-        decryptedBirthDate,
-        syncEzygoData.birth_date ?? syncEzygoData.dob
-      );
-
-      const syncEncPhone = syncMergedPhone ? encrypt(syncMergedPhone) : null;
-      const syncEncGender = syncMergedGender
-        ? encrypt(syncMergedGender)
-        : null;
-      const syncEncBirthDate = syncMergedBirthDate
-        ? encrypt(syncMergedBirthDate)
-        : null;
-
-      // Use UPDATE (not upsert) so this background sync can never recreate a row
-      // that was legitimately deleted (e.g. account deletion racing with an in-flight
-      // after() callback). If the row no longer exists the update is a harmless no-op.
-      const { data: bgUpdatedRows, error: bgUpdateError } = await supabaseAdmin
-        .from("users")
-        .update({
-            username:
-              syncEzygoData.username ??
-              syncEzygoData.user?.username ??
-              existingUser.username,
-            email:
-              syncEzygoData.email ??
-              syncEzygoData.user?.email ??
-              existingUser.email,
-            first_name: syncMergedFirst,
-            last_name: syncMergedLast,
-            phone: syncEncPhone?.content ?? null,
-            phone_iv: syncEncPhone?.iv ?? null,
-            gender: syncEncGender?.content ?? null,
-            gender_iv: syncEncGender?.iv ?? null,
-            birth_date: syncEncBirthDate?.content ?? null,
-            birth_date_iv: syncEncBirthDate?.iv ?? null,
-            avatar_url: existingUser.avatar_url ?? null,
-            terms_version: existingUser.terms_version ?? null,
-            terms_accepted_at: existingUser.terms_accepted_at ?? null,
-        })
-        .eq("id", existingUser.id)
-        .eq("auth_id", user.id)
-        .select("id");
-
-      if (bgUpdateError) {
-        logger.error("[background] Profile sync update failed:", bgUpdateError);
-        Sentry.captureException(bgUpdateError, {
-          tags: {
-            type: "profile_update_fail",
-            location: "GET /api/profile background",
-          },
-          extra: { userId: redact("id", String(existingUser.id)) },
-        });
-      } else if (bgUpdatedRows?.length === 0) {
-        // 0 rows matched: the row was deleted between the fast-path read and this
-        // background update (possible race condition with account deletion).
-        logger.warn("[background] Profile sync update matched 0 rows (possible race condition)", {
-          userId: redact("id", String(existingUser.id)),
-        });
-      }
-    });
-
-    return NextResponse.json(
-      {
-        id: existingUser.id,
-        username: existingUser.username,
-        email: existingUser.email,
-        first_name: existingUser.first_name,
-        last_name: existingUser.last_name,
-        phone: decryptedPhone,
-        gender: decryptedGender,
-        birth_date: decryptedBirthDate,
-        avatar_url: existingUser.avatar_url,
-        terms_version: existingUser.terms_version,
-        terms_accepted_at: existingUser.terms_accepted_at,
-      },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
-    );
-  }
-
-  // Slow path: no DB row yet (first login). EzyGo is required to provide the
-  // user_id needed to seed the record — must block here.
-
-  // 4. Fetch fresh profile data from EzyGo
-  const token = await getAuthTokenServer();
-  let ezygoData: EzygoProfileResponse | null = null;
-
-  if (token) {
-    try {
-      const ezygoRes = await egressFetch("myprofile", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-      if (ezygoRes.ok) {
-        const json = (await ezygoRes.json()) as
-          | { data?: EzygoProfileResponse }
-          | EzygoProfileResponse;
-        ezygoData =
-          (json as { data?: EzygoProfileResponse }).data ??
-          (json as EzygoProfileResponse);
-      } else {
-        logger.warn(
-          "EzyGo profile fetch returned non-OK status:",
-          ezygoRes.status
-        );
-      }
-    } catch (err) {
-      logger.warn("EzyGo profile fetch failed.");
-      Sentry.captureException(err, {
-        tags: {
-          type: "ezygo_profile_sync_fail",
-          location: "GET /api/profile",
-        },
-      });
-    }
-  }
-
-  if (!ezygoData) {
-    Sentry.captureMessage(
-      "Failed to load fresh profile data from Ezygo; aborting to avoid serving stale data.",
-      {
-        level: "error",
-        tags: {
-          type: "profile_remote_unavailable",
-          location: "GET /api/profile",
-        },
-      }
-    );
-    return NextResponse.json(
-      { error: "Failed to load profile data from remote source." },
-      { status: 502 }
-    );
-  }
-
-  // 5. Merge local and remote data (soft sync)
-  let remoteFirst = ezygoData.first_name;
-  let remoteLast = ezygoData.last_name;
-  if (!remoteFirst && ezygoData.full_name) {
-    const parts = ezygoData.full_name.trim().split(" ");
-    remoteFirst = parts[0];
-    remoteLast = parts.slice(1).join(" ") || "";
-  }
-
-  const mergedFirst = resolve(existingUser?.first_name, remoteFirst);
-  const mergedLast = resolve(existingUser?.last_name, remoteLast);
-  // Phone is hard-synced (always take the EzyGo value)
-  const mergedPhone =
-    ezygoData.mobile ?? ezygoData.user?.mobile ?? null;
-  // gender / birth_date are soft-synced (preserve local edits)
-  const mergedGender = resolve(
-    decryptedGender,
-    ezygoData.gender ?? ezygoData.sex
-  );
-  const mergedBirthDate = resolve(
-    decryptedBirthDate,
-    ezygoData.birth_date ?? ezygoData.dob
-  );
-
-  // 6. Encrypt PII before storing
-  const encPhone = mergedPhone ? encrypt(mergedPhone) : null;
-  const encGender = mergedGender ? encrypt(mergedGender) : null;
-  const encBirthDate = mergedBirthDate ? encrypt(mergedBirthDate) : null;
-
-  // 7. Upsert merged row to DB
-  const upsertData = {
-    id: ezygoData.user_id,
-    auth_id: user.id,
-    username: ezygoData.username ?? ezygoData.user?.username,
-    email: ezygoData.email ?? ezygoData.user?.email,
-    first_name: mergedFirst,
-    last_name: mergedLast,
-    phone: encPhone?.content ?? null,
-    phone_iv: encPhone?.iv ?? null,
-    gender: encGender?.content ?? null,
-    gender_iv: encGender?.iv ?? null,
-    birth_date: encBirthDate?.content ?? null,
-    birth_date_iv: encBirthDate?.iv ?? null,
-    avatar_url: existingUser?.avatar_url ?? null,
-    terms_version: existingUser?.terms_version ?? null,
-    terms_accepted_at: existingUser?.terms_accepted_at ?? null,
-  };
-
-  const { error: upsertError } = await supabaseAdmin
-    .from("users")
-    .upsert(upsertData, { onConflict: "id" });
-
-  if (upsertError) {
-    logger.error("Profile sync upsert failed:", upsertError);
-    Sentry.captureException(upsertError, {
-      tags: { type: "profile_upsert_fail", location: "GET /api/profile" },
-      extra: { userId: redact("id", String(upsertData.id)) },
-    });
-  }
-
-  // 8. Return plaintext data — never expose ciphertext or IVs to the client
-  return NextResponse.json(
-    {
-      id: upsertData.id,
-      username: upsertData.username,
-      email: upsertData.email,
-      first_name: mergedFirst,
-      last_name: mergedLast,
-      phone: mergedPhone,
-      gender: mergedGender,
-      birth_date: mergedBirthDate,
-      avatar_url: upsertData.avatar_url,
-      terms_version: upsertData.terms_version,
-      terms_accepted_at: upsertData.terms_accepted_at,
-    },
-    {
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-      },
-    }
-  );
-}
-
-// ---------------------------------------------------------------------------
-// PATCH – update user-editable profile fields
-// ---------------------------------------------------------------------------
+  return ingestNewProfile(user, supabaseAdmin);
+};
 
 const patchSchema = z.object({
   first_name: z.string().min(2),
   last_name: z.string().optional().nullable(),
   gender: z.enum(["male", "female", "other"]).optional().nullable(),
-  birth_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (expected YYYY-MM-DD)")
-    .optional()
-    .nullable(),
+  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
-export async function PATCH(req: NextRequest) {
-  // 0. Rate limiting — keyed per IP to prevent crypto DoS on AES encrypt/decrypt
+function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
+  const { first_name, last_name, gender, birth_date } = parsedData;
+  const sanitizedFirstName = toTitleCase(first_name);
+  const sanitizedLastName = last_name ? toTitleCase(last_name) : null;
+  
+  const up: Record<string, unknown> = { first_name: sanitizedFirstName, last_name: sanitizedLastName };
+  if (gender !== undefined) {
+    if (gender === null) {
+      up.gender = null;
+      up.gender_iv = null;
+    } else {
+      const enc = encrypt(gender);
+      up.gender = enc.content;
+      up.gender_iv = enc.iv;
+    }
+  }
+  if (birth_date !== undefined) {
+    if (birth_date === null) {
+      up.birth_date = null;
+      up.birth_date_iv = null;
+    } else {
+      const enc = encrypt(birth_date);
+      up.birth_date = enc.content;
+      up.birth_date_iv = enc.iv;
+    }
+  }
+  return { up, sanitizedFirstName, sanitizedLastName, gender, birth_date };
+}
+
+const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) => {
   const ip = getClientIp(req.headers);
   if (!ip) {
-    logger.warn("PATCH /api/profile: missing client IP; rejecting request to avoid bypassing rate limiting");
     return NextResponse.json(
-      { error: "Unable to determine client IP. Please try again later." },
-      { status: 400, headers: { "Cache-Control": "no-store" } }
+      { error: "Could not determine client IP" },
+      { 
+        status: 400,
+        headers: { "Cache-Control": "no-store" }
+      },
     );
   }
-  const { success, reset, limit, remaining } = await authRateLimiter.limit(`profile_patch_${ip}`);
+
+  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
-          "Cache-Control": "no-store",
-          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000)).toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
           "X-RateLimit-Limit": limit.toString(),
           "X-RateLimit-Remaining": remaining.toString(),
-          "X-RateLimit-Reset": reset.toString(),
+          "Cache-Control": "no-store",
         },
-      }
+      },
     );
   }
 
-  // 1. CSRF validation
-  const csrfToken = req.headers.get(CSRF_HEADER);
-  const csrfValid = await validateCsrfToken(csrfToken);
-  if (!csrfValid) {
-    return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
-  }
-
-  // 2. Auth check
-  const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
+  const user = await authenticateUser(req, supabaseAdmin);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let body = decryptedBody;
+  if (!body) { 
+    try {
+      body = await req.json(); 
+    } catch {
+      return NextResponse.json({ error: "Invalid or empty JSON body" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
   }
-
-  // 3. Validate request body
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
-
   const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
-      { status: 422 }
-    );
-  }
+  if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
 
-  const { first_name, last_name, gender, birth_date } = parsed.data;
+  const { up, sanitizedFirstName, sanitizedLastName, gender, birth_date } = buildUpdatePayload(parsed.data);
 
-  // 4. Build update payload; only include PII fields that are explicitly provided
-  // so that omitting an optional field doesn't silently clear it in the DB.
-  const updatePayload: Record<string, unknown> = {
-    first_name,
-    last_name: last_name ?? null,
-  };
-
-  if (typeof gender !== "undefined") {
-    const encGender = gender ? encrypt(gender) : null;
-    updatePayload.gender = encGender?.content ?? null;
-    updatePayload.gender_iv = encGender?.iv ?? null;
-  }
-
-  if (typeof birth_date !== "undefined") {
-    const encBirthDate = birth_date ? encrypt(birth_date) : null;
-    updatePayload.birth_date = encBirthDate?.content ?? null;
-    updatePayload.birth_date_iv = encBirthDate?.iv ?? null;
-  }
-
-  // 5. Update the DB row (identified by authenticated user's auth_id)
-  const { error } = await supabaseAdmin
-    .from("users")
-    .update(updatePayload)
-    .eq("auth_id", user.id);
-
-  if (error) {
-    logger.error("Profile update failed:", error);
-    Sentry.captureException(error, {
-      tags: { type: "profile_update_fail", location: "PATCH /api/profile" },
-      extra: { userId: redact("id", user.id) },
+  const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
+  if (updateError) {
+    logger.error("[profile PATCH] Database update failed:", updateError);
+    Sentry.captureException(updateError, {
+      tags: { type: "db_update_error", location: "api/profile/patch" },
     });
-    return NextResponse.json(
-      { error: "Failed to update profile" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
+  return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
+};
 
-  // Structured audit log: record which fields were mutated (field names only, never values).
-  // PII field values (gender, birth_date) are NOT included here to avoid leaking
-  // plaintext into stdout / Sentry payloads — the encrypted values are already in the DB.
-  const changedFields = [
-    "first_name",
-    ...(typeof last_name !== "undefined" ? ["last_name"] : []),
-    ...(typeof gender !== "undefined" ? ["gender"] : []),
-    ...(typeof birth_date !== "undefined" ? ["birth_date"] : []),
-  ];
-  logger.info("[audit] profile.update", {
-    action: "profile.update",
-    auth_user_id: redact("id", user.id),
-    changed_fields: changedFields,
-  });
-  Sentry.addBreadcrumb({
-    category: "audit",
-    message: "profile.update",
-    level: "info",
-    data: { changed_fields: changedFields },
-  });
-
-  // Return the plaintext values that were saved
-  return NextResponse.json({ first_name, last_name, gender, birth_date });
-}
+export const GET = withSecurity(getHandler);
+export const PATCH = withSecurity(patchHandler);

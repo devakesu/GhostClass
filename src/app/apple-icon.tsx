@@ -22,7 +22,15 @@ export default function AppleIcon() {
           justifyContent: 'center',
         }}
       >
-        {iconSrc && <img src={iconSrc} width={160} height={160} />}
+        {iconSrc && (
+          <img
+            src={iconSrc}
+            alt="GhostClass app icon"
+            title="GhostClass app icon"
+            width={160}
+            height={160}
+          />
+        )}
       </div>
     ),
     { ...size }

@@ -43,13 +43,15 @@ function isValidCommitSha(sha: string | undefined): sha is string {
 }
 
 function getBuildMeta(): BuildMeta {
-  const commitSha = process.env.APP_COMMIT_SHA ?? "dev";
+  const commitSha = process.env.APP_COMMIT_SHA || "dev";
   const githubRepo =
     process.env.GITHUB_REPOSITORY ??
-    (process.env.NEXT_PUBLIC_GITHUB_URL?.replace("https://github.com/", "") ?? "");
+    (process.env.NEXT_PUBLIC_GITHUB_URL?.replace("https://github.com/", "") ??
+      "");
   const githubRunId = process.env.GITHUB_RUN_ID ?? "";
   const githubRunNumber = process.env.GITHUB_RUN_NUMBER ?? "";
-  const buildTimestamp = process.env.BUILD_TIMESTAMP ?? new Date().toISOString();
+  const buildTimestamp =
+    process.env.BUILD_TIMESTAMP ?? new Date().toISOString();
   const auditStatus = process.env.AUDIT_STATUS ?? "UNKNOWN";
   const signatureStatus = process.env.SIGNATURE_STATUS ?? "UNSIGNED";
   const imageDigest = process.env.IMAGE_DIGEST ?? commitSha;
@@ -70,12 +72,140 @@ function getBuildMeta(): BuildMeta {
   };
 }
 
+const BuildVersion = ({ version }: { version: string }) => (
+  <div>
+    <span className="text-cyan-400">{">"} VERSION:</span>{" "}
+    <span className="text-green-400 font-semibold">v{version}</span>
+  </div>
+);
+
+const BuildLink = ({
+  validRunId,
+  validRepo,
+  meta,
+}: {
+  validRunId: boolean;
+  validRepo: boolean;
+  meta: BuildMeta;
+}) => {
+  const buildTag = `#${meta.github_run_number || meta.build_id}`;
+  const commitShort = meta.commit_sha?.substring(0, 7) || "unknown";
+
+  return (
+    <div>
+      <span className="text-cyan-400">{">"} BUILD_ID:</span>{" "}
+      {validRunId && validRepo ? (
+        <a
+          href={`https://github.com/${meta.github_repo}/actions/runs/${meta.github_run_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-green-400 hover:text-green-300 hover:underline"
+        >
+          {buildTag}
+        </a>
+      ) : (
+        <span className="text-green-400">{buildTag}</span>
+      )}{" "}
+      <span className="text-neutral-400">
+        (
+        {isValidCommitSha(meta.commit_sha) && validRepo ? (
+          <a
+            href={`https://github.com/${meta.github_repo}/commit/${meta.commit_sha}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-cyan-400 hover:underline"
+          >
+            {commitShort}
+          </a>
+        ) : (
+          commitShort
+        )}
+        )
+      </span>
+    </div>
+  );
+};
+
+const DeploymentDate = ({ timestamp }: { timestamp: string }) => {
+  if (!timestamp) {
+    return (
+      <div>
+        <span className="text-cyan-400">{">"} DEPLOYED:</span>{" "}
+        <span className="text-neutral-400">Local Mode</span>
+      </div>
+    );
+  }
+
+  const [date, time] = timestamp.split("T");
+  return (
+    <div>
+      <span className="text-cyan-400">{">"} DEPLOYED:</span> {date}{" "}
+      <span className="text-neutral-400">{time?.replace("Z", " UTC")}</span>
+    </div>
+  );
+};
+
+const SecurityStatus = ({ auditStatus }: { auditStatus: string }) => {
+  let textColor = "text-red-400";
+  if (auditStatus.includes("PASSED")) textColor = "text-green-400";
+  else if (auditStatus === "SKIPPED") textColor = "text-yellow-400";
+
+  return (
+    <div>
+      <span className="text-cyan-400">{">"} SECURITY:</span>{" "}
+      <span className={textColor}>{auditStatus || "UNKNOWN"}</span>
+    </div>
+  );
+};
+
+const ProvenanceStatus = ({
+  meta,
+  validRepo,
+}: {
+  meta: BuildMeta;
+  validRepo: boolean;
+}) => {
+  const isGenerated = meta.signature_status === "SLSA_PROVENANCE_GENERATED";
+  const isUnsigned = meta.signature_status === "UNSIGNED";
+
+  let statusClass = "text-neutral-400 border-neutral-400";
+  if (isGenerated) {
+    statusClass = "text-blue-400 border-blue-400";
+  } else if (isUnsigned) {
+    statusClass = "text-yellow-400 border-yellow-400";
+  }
+
+  return (
+    <div>
+      <span className="text-cyan-400">{">"} PROVENANCE:</span>{" "}
+      {isGenerated && validRepo ? (
+        <a
+          href={`https://github.com/${meta.github_repo}/attestations`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border-b border-dashed text-blue-400 border-blue-400 hover:text-blue-300 hover:border-blue-300"
+          title="SLSA Level 3 Verified - Click to view attestations"
+        >
+          {meta.signature_status}
+        </a>
+      ) : (
+        <span
+          className={`border-b border-dashed cursor-help ${statusClass}`}
+          title={isGenerated ? "SLSA Level 3 Verified" : "Development Mode"}
+        >
+          {meta.signature_status || "UNKNOWN"}
+        </span>
+      )}{" "}
+      {isGenerated && <span className="text-green-400">✔ Verified</span>}
+    </div>
+  );
+};
+
 export default function BuildInfoPage() {
   const meta = getBuildMeta();
   const metaJson = JSON.stringify(meta, null, 2);
-  const validRepo = meta.github_repo && isValidGitHubRepo(meta.github_repo);
+  const validRepo = !!meta.github_repo && isValidGitHubRepo(meta.github_repo);
   const validRunId = isValidRunId(meta.github_run_id);
-  const validCommitSha = isValidCommitSha(meta.commit_sha);
 
   return (
     <div className="bg-background text-foreground">
@@ -117,67 +247,24 @@ export default function BuildInfoPage() {
                   provenance.json
                 </span>
               </div>
-              <CopyButton text={metaJson} label="Copy JSON" className="h-6 text-xs" />
+              <CopyButton
+                text={metaJson}
+                label="Copy JSON"
+                className="h-6 text-xs"
+              />
             </div>
 
             <div className="p-6 font-mono text-sm space-y-3 bg-neutral-950 text-neutral-100">
-              <div>
-                <span className="text-cyan-400">&gt; VERSION:</span>{" "}
-                <span className="text-green-400 font-semibold">
-                  v{meta.app_version}
-                </span>
-              </div>
+              <BuildVersion version={meta.app_version} />
+              <BuildLink
+                validRunId={validRunId}
+                validRepo={validRepo}
+                meta={meta}
+              />
+              <DeploymentDate timestamp={meta.timestamp} />
 
               <div>
-                <span className="text-cyan-400">&gt; BUILD_ID:</span>{" "}
-                {validRunId && validRepo ? (
-                  <a
-                    href={`https://github.com/${meta.github_repo}/actions/runs/${meta.github_run_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-green-400 hover:text-green-300 hover:underline"
-                  >
-                    #{meta.github_run_number || meta.build_id}
-                  </a>
-                ) : (
-                  <span className="text-green-400">
-                    #{meta.github_run_number || meta.build_id}
-                  </span>
-                )}{" "}
-                <span className="text-neutral-400">
-                  (
-                  {validCommitSha && validRepo ? (
-                    <a
-                      href={`https://github.com/${meta.github_repo}/commit/${meta.commit_sha}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-cyan-400 hover:underline"
-                    >
-                      {meta.commit_sha.substring(0, 7)}
-                    </a>
-                  ) : (
-                    meta.commit_sha?.substring(0, 7) || "unknown"
-                  )}
-                  )
-                </span>
-              </div>
-
-              <div>
-                <span className="text-cyan-400">&gt; DEPLOYED:</span>{" "}
-                {meta.timestamp ? (
-                  <>
-                    {meta.timestamp.split("T")[0]}{" "}
-                    <span className="text-neutral-400">
-                      {meta.timestamp.split("T")[1]?.replace("Z", " UTC")}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-neutral-400">Local Mode</span>
-                )}
-              </div>
-
-              <div>
-                <span className="text-cyan-400">&gt; ENVIRONMENT:</span>{" "}
+                <span className="text-cyan-400">{">"} ENVIRONMENT:</span>{" "}
                 <span
                   className={
                     meta.node_env === "production"
@@ -192,59 +279,12 @@ export default function BuildInfoPage() {
                 )}
               </div>
 
-              <div>
-                <span className="text-cyan-400">&gt; SECURITY:</span>{" "}
-                <span
-                  className={
-                    meta.audit_status?.includes("PASSED")
-                      ? "text-green-400"
-                      : meta.audit_status === "SKIPPED"
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                  }
-                >
-                  {meta.audit_status || "UNKNOWN"}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-cyan-400">&gt; PROVENANCE:</span>{" "}
-                {meta.signature_status === "SLSA_PROVENANCE_GENERATED" && validRepo ? (
-                  <a
-                    href={`https://github.com/${meta.github_repo}/attestations`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="border-b border-dashed text-blue-400 border-blue-400 hover:text-blue-300 hover:border-blue-300"
-                    title="SLSA Level 3 Verified - Click to view attestations"
-                  >
-                    {meta.signature_status}
-                  </a>
-                ) : (
-                  <span
-                    className={`border-b border-dashed cursor-help ${
-                      meta.signature_status === "SLSA_PROVENANCE_GENERATED"
-                        ? "text-blue-400 border-blue-400"
-                        : meta.signature_status === "UNSIGNED"
-                          ? "text-yellow-400 border-yellow-400"
-                          : "text-neutral-400 border-neutral-400"
-                    }`}
-                    title={
-                      meta.signature_status === "SLSA_PROVENANCE_GENERATED"
-                        ? "SLSA Level 3 Verified"
-                        : "Development Mode"
-                    }
-                  >
-                    {meta.signature_status || "UNKNOWN"}
-                  </span>
-                )}{" "}
-                {meta.signature_status === "SLSA_PROVENANCE_GENERATED" && (
-                  <span className="text-green-400">✔ Verified</span>
-                )}
-              </div>
+              <SecurityStatus auditStatus={meta.audit_status} />
+              <ProvenanceStatus meta={meta} validRepo={validRepo} />
 
               {meta.image_digest && meta.image_digest !== "dev" && (
                 <div>
-                  <span className="text-cyan-400">&gt; IMAGE_DIGEST:</span>{" "}
+                  <span className="text-cyan-400">{">"} IMAGE_DIGEST:</span>{" "}
                   <span className="text-neutral-400 text-xs break-all">
                     {meta.image_digest}
                   </span>
@@ -254,9 +294,57 @@ export default function BuildInfoPage() {
             </div>
           </Card>
 
-          {/* Info Cards Grid */}
+          {/* Security & Provenance Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Audit Status
+              </span>
+              <span
+                className={`text-sm font-black ${
+                  meta.audit_status?.includes("PASSED")
+                    ? "text-green-500"
+                    : "text-yellow-500"
+                }`}
+              >
+                {meta.audit_status}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Provenance
+              </span>
+              <span
+                className={`text-sm font-black ${
+                  meta.signature_status === "SLSA_PROVENANCE_GENERATED"
+                    ? "text-blue-500"
+                    : "text-yellow-500"
+                }`}
+              >
+                {meta.signature_status === "SLSA_PROVENANCE_GENERATED"
+                  ? "VERIFIED (SLSA L3)"
+                  : "DEVELOPMENT"}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Environment
+              </span>
+              <span className="text-sm font-black text-sky-500">
+                {meta.node_env?.toUpperCase()}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl border bg-card/50 flex flex-col gap-1 transition-all hover:border-primary/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Platform
+              </span>
+              <span className="text-sm font-black text-purple-500">
+                {meta.container ? "CONTAINER" : "NODE.JS"}
+              </span>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Source Code */}
             {validRepo && (
               <Card className="p-6 hover:border-primary/50 transition-colors">
                 <h3 className="font-semibold mb-2 flex items-center gap-2">
@@ -273,7 +361,11 @@ export default function BuildInfoPage() {
                   View the source code and contribution history
                 </p>
                 <Button variant="outline" size="sm" className="w-full" asChild>
-                  <a href={`https://github.com/${meta.github_repo}`} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={`https://github.com/${meta.github_repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     View on GitHub
                     <ExternalLink className="w-3 h-3 ml-2" />
                   </a>
@@ -281,7 +373,6 @@ export default function BuildInfoPage() {
               </Card>
             )}
 
-            {/* Build Logs */}
             {validRunId && validRepo && (
               <Card className="p-6 hover:border-primary/50 transition-colors">
                 <h3 className="font-semibold mb-2">Build Logs</h3>
@@ -301,27 +392,31 @@ export default function BuildInfoPage() {
               </Card>
             )}
 
-            {/* Attestations */}
-            {meta.signature_status === "SLSA_PROVENANCE_GENERATED" && validRepo && (
-              <Card className="p-6 hover:border-primary/50 transition-colors">
-                <h3 className="font-semibold mb-2">Attestations</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  SLSA Level 3 cryptographic proofs and signatures
-                </p>
-                <Button variant="outline" size="sm" className="w-full" asChild>
-                  <a
-                    href={`https://github.com/${meta.github_repo}/attestations`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+            {meta.signature_status === "SLSA_PROVENANCE_GENERATED" &&
+              validRepo && (
+                <Card className="p-6 hover:border-primary/50 transition-colors">
+                  <h3 className="font-semibold mb-2">Attestations</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    SLSA Level 3 cryptographic proofs and signatures
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    asChild
                   >
-                    View Attestations
-                    <ExternalLink className="w-3 h-3 ml-2" />
-                  </a>
-                </Button>
-              </Card>
-            )}
+                    <a
+                      href={`https://github.com/${meta.github_repo}/attestations`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View Attestations
+                      <ExternalLink className="w-3 h-3 ml-2" />
+                    </a>
+                  </Button>
+                </Card>
+              )}
 
-            {/* Security Scorecard */}
             {validRepo && (
               <Card className="p-6 hover:border-primary/50 transition-colors">
                 <h3 className="font-semibold mb-2">Security Scorecard</h3>
@@ -342,30 +437,29 @@ export default function BuildInfoPage() {
             )}
           </div>
 
-          {/* What is this? */}
           <Card className="p-6 bg-muted/30">
             <h3 className="font-semibold mb-3">What is Build Provenance?</h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Build provenance provides transparency about how this application was
-                built and deployed. It includes:
+                Build provenance provides transparency about how this
+                application was built and deployed. It includes:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-2">
                 <li>
-                  <strong>Source Code Verification:</strong> Links to exact commit and
-                  build logs
+                  <strong>Source Code Verification:</strong> Links to exact
+                  commit and build logs
                 </li>
                 <li>
-                  <strong>SLSA Level 3 Compliance:</strong> Cryptographic attestations
-                  proving build integrity
+                  <strong>SLSA Level 3 Compliance:</strong> Cryptographic
+                  attestations proving build integrity
                 </li>
                 <li>
-                  <strong>Security Audits:</strong> Automated vulnerability scanning
-                  results
+                  <strong>Security Audits:</strong> Automated vulnerability
+                  scanning results
                 </li>
                 <li>
-                  <strong>Reproducible Builds:</strong> Anyone can verify the build
-                  matches the source
+                  <strong>Reproducible Builds:</strong> Anyone can verify the
+                  build matches the source
                 </li>
               </ul>
               <p className="pt-2">

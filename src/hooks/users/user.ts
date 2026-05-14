@@ -32,6 +32,7 @@ export const useUser = () => {
       const res = await axiosInstance.get("/user");
       if (!res) {
         handleLogout();
+        return null;
       }
       return res.data;
     },

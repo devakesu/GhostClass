@@ -126,6 +126,35 @@ describe('useBackToExit', () => {
     expect(pushStateSpy).not.toHaveBeenCalled();
   });
 
+  it('resets exit state when navigating back to a dashboard route', () => {
+    mockToast.mockReturnValueOnce('toast-dash');
+    renderHook(() => useBackToExit());
+
+    // 1. Trigger exit toast on a non-dashboard route
+    act(() => {
+      setPath('/tracking');
+      fireMidAppPopState();
+      setPath('/tracking');
+      fireMidAppPopState();
+    });
+    expect(mockToast).toHaveBeenCalledWith('Press back again to exit', expect.any(Object));
+
+    // 2. Navigate back to dashboard — should reset state and dismiss toast
+    act(() => {
+      setPath('/dashboard/main');
+      fireMidAppPopState();
+    });
+    
+    expect(mockDismiss).toHaveBeenCalledWith('toast-dash');
+    
+    // 3. Further back press should NOT close the app (state was reset)
+    act(() => {
+      setPath('/dashboard/main');
+      fireMidAppPopState();
+    });
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
   it('does not show toast on a popstate with null state', () => {
     renderHook(() => useBackToExit());
 

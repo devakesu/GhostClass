@@ -9,6 +9,8 @@ import { PropsWithChildren } from "react";
 import { AttendanceSettingsProvider } from "./attendance-settings";
 import { UserSettingsProvider } from "./user-settings";
 
+import { retryTwice } from "@/lib/query-utils";
+
 /**
  * React Query provider with pre-configured defaults for the application.
  * Wraps the app with QueryClientProvider and AttendanceSettingsProvider.
@@ -40,7 +42,7 @@ export default function ReactQueryProvider({ children }: PropsWithChildren) {
           queries: {
             staleTime: 3 * 60 * 1000,
             gcTime: 10 * 60 * 1000,
-            retry: 2,
+            retry: retryTwice,
             // Disable global window focus refetch to avoid performance issues.
             // Enable per-query for data that needs cross-device sync.
             refetchOnWindowFocus: false,

@@ -3,7 +3,6 @@
  *
  * These tests verify that:
  * - Rate limiting (429) is enforced before any other logic
- * - CSRF validation (403) is enforced before clearing session cookies
  * - A valid request clears all session cookies and returns 200
  */
 
@@ -51,6 +50,7 @@ const mockCookieSet = vi.fn();
 const mockCookieGetAll = vi.fn().mockReturnValue([]);
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({
+    get: vi.fn(),
     set: mockCookieSet,
     getAll: mockCookieGetAll,
   }),
@@ -105,7 +105,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -123,8 +123,7 @@ describe("POST /api/logout", () => {
         remaining: 0,
       });
       const { POST } = await import("../route");
-      await POST(makePostReq());
-      expect(mockValidateCsrf).not.toHaveBeenCalled();
+      await POST(makePostReq(), { params: {} });
       expect(mockClearAuthCookie).not.toHaveBeenCalled();
     });
 
@@ -132,37 +131,17 @@ describe("POST /api/logout", () => {
       const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
-      expect(mockValidateCsrf).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("CSRF protection", () => {
-    it("returns 403 when CSRF token is invalid", async () => {
-      mockValidateCsrf.mockResolvedValueOnce(false);
-      const { POST } = await import("../route");
-      const res = await POST(makePostReq("bad-token"));
-      expect(res.status).toBe(403);
-      const body = await res.json() as { message: string };
-      expect(body.message).toMatch(/invalid csrf/i);
-    });
-
-    it("does not clear cookies when CSRF check fails", async () => {
-      mockValidateCsrf.mockResolvedValueOnce(false);
-      const { POST } = await import("../route");
-      await POST(makePostReq("bad-token"));
-      expect(mockClearAuthCookie).not.toHaveBeenCalled();
-      expect(mockRemoveCsrfToken).not.toHaveBeenCalled();
     });
   });
 
   describe("successful logout", () => {
-    it("returns 200 ok when rate limit and CSRF both pass", async () => {
+    it("returns 200 ok when rate limit passes", async () => {
       const { POST } = await import("../route");
-      const res = await POST(makePostReq());
+      const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(200);
       const body = await res.json() as { ok: boolean };
       expect(body.ok).toBe(true);
@@ -170,11 +149,55 @@ describe("POST /api/logout", () => {
 
     it("clears auth cookie, CSRF token, and terms cookies on success", async () => {
       const { POST } = await import("../route");
-      await POST(makePostReq());
+      await POST(makePostReq(), { params: {} });
       expect(mockClearAuthCookie).toHaveBeenCalledOnce();
       expect(mockRemoveCsrfToken).toHaveBeenCalledOnce();
       expect(mockClearTermsVersionCookie).toHaveBeenCalledOnce();
       expect(mockClearTermsRedirectCountCookie).toHaveBeenCalledOnce();
+    });
+
+    it("clears chunked Supabase cookies on success", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+      mockCookieGetAll.mockReturnValueOnce([
+        { name: "sb-project-auth-token.0" },
+        { name: "sb-project-auth-token.1" },
+        { name: "other-cookie" },
+      ]);
+      
+      const { POST } = await import("../route");
+      await POST(makePostReq(), { params: {} });
+      
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        "sb-project-auth-token.0",
+        "",
+        expect.any(Object)
+      );
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        "sb-project-auth-token.1",
+        "",
+        expect.any(Object)
+      );
+    });
+
+    it("sets secure cookie flag when HTTPS is enabled", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+      vi.stubEnv("HTTPS", "true");
+      
+      const { POST } = await import("../route");
+      await POST(makePostReq(), { params: {} });
+      
+      expect(mockCookieSet).toHaveBeenCalledWith(
+        expect.any(String),
+        "",
+        expect.objectContaining({ secure: true })
+      );
+    });
+
+    it("handles Supabase URL parsing failure gracefully", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "invalid-url-no-protocol");
+      const { POST } = await import("../route");
+      const res = await POST(makePostReq(), { params: {} });
+      expect(res.status).toBe(200); // Should still succeed even if cookie cleanup fails
     });
   });
 });

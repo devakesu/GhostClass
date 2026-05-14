@@ -61,12 +61,14 @@ export async function uploadUserAvatar(file: File) {
       // 2. Validate MIME type against whitelist — derive extension and content-type
       // from the map, never from user-controlled file.name or file.type.
       const validatedContentType = file.type;
-      const fileExt = ALLOWED_AVATAR_MIME_TO_EXT[validatedContentType];
-      if (!fileExt) {
+      const hasMime = Object.prototype.hasOwnProperty.call(ALLOWED_AVATAR_MIME_TO_EXT, validatedContentType);
+      
+      if (!hasMime) {
         throw new Error(
           `Unsupported file type: "${validatedContentType}". Only JPEG, PNG, and WebP images are allowed.`
         );
       }
+      const fileExt = Reflect.get(ALLOWED_AVATAR_MIME_TO_EXT, validatedContentType);
 
       // 3. Prepare File Path using the whitelisted extension
       const fileName = `${Date.now()}.${fileExt}`;

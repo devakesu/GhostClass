@@ -44,7 +44,18 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const EZYGO_API_URL  = (process.env.EZYGO_API_URL  ?? "").trim().replace(/\/+$/, "");
+/**
+ * Strips all trailing slashes from a string without using regex backtracking.
+ */
+function stripTrailingSlashes(str) {
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
+const EZYGO_API_URL  = stripTrailingSlashes(process.env.EZYGO_API_URL  ?? "");
 // Trim to guard against accidental whitespace in environment configuration.
 const PROXY_SECRET   = (process.env.PROXY_SECRET   ?? "").trim();
 
@@ -69,9 +80,12 @@ const STRIP_REQUEST_HEADERS = new Set([
   "x-amz-security-token", // Should never be present; strip defensively
   "via",                   // Hop-by-hop proxy trail
   "connection",            // HTTP/1.1 connection management
+  // Request framing/encoding can become stale when API Gateway delivers
+  // base64-decoded payloads to Lambda. Let undici compute these correctly.
+  "content-length",
+  "content-encoding",
 ]);
 
-// Hop-by-hop headers that must not be forwarded in the response.
 const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -81,32 +95,35 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "trailers",
   "transfer-encoding",
   "upgrade",
+  // Node.js fetch auto-decompresses the response body before response.text()
+  // is called, so the body Lambda returns to API Gateway is already plain text.
+  // Forwarding content-encoding: gzip would cause the client to try to
+  // decompress again -> garbled JSON.
+  // content-length is also stale after decompression, so strip it too.
+  "content-encoding",
+  "content-length",
 ]);
 
-export const handler = async (event) => {
-  // ── 1. Authenticate ───────────────────────────────────────────────────────
-  // Both inputs are HMAC-SHA-256 digested with a key derived from PROXY_SECRET so
-  // the comparison always operates on fixed-length 32-byte buffers, avoiding
-  // timing side-channels based on value or length differences.
-  const incomingSecret = (event.headers?.["x-proxy-secret"] ?? "").trim();
+function authenticateRequest(eventHeaders) {
+  const incomingSecret = (eventHeaders?.["x-proxy-secret"] ?? "").trim();
   const actualDigest   = AUTH_KEY ? createHmac("sha256", AUTH_KEY).update(incomingSecret).digest() : null;
   if (!PROXY_SECRET || !EXPECTED_AUTH_DIGEST || !actualDigest || !timingSafeEqual(EXPECTED_AUTH_DIGEST, actualDigest)) {
     return { statusCode: 403, body: "Forbidden" };
   }
+  return null;
+}
 
-  // ── 2. Build target URL ───────────────────────────────────────────────────
-  const rawPath        = event.rawPath        ?? "/";
-  const rawQueryString = event.rawQueryString ?  `?${event.rawQueryString}` : "";
+function buildTargetUrl(rawPath, rawQueryString) {
   if (!EZYGO_API_URL) {
-    return { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is empty or only whitespace" };
+    return { error: { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is empty or only whitespace" } };
   }
   let upstreamBase;
   try {
     upstreamBase = new URL(EZYGO_API_URL);
   } catch {
-    return { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is not a valid URL" };
+    return { error: { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is not a valid URL" } };
   }
-  const basePath       = upstreamBase.pathname.replace(/\/+$/, "");
+  const basePath       = stripTrailingSlashes(upstreamBase.pathname);
   const incomingPath   = rawPath;
 
   // Path-join strategy (supports both caller styles):
@@ -124,7 +141,66 @@ export const handler = async (event) => {
   const target = new URL(upstreamBase.origin);
   target.pathname = resolvedPathname;
   target.search = rawQueryString;
-  const targetUrl = target.toString();
+  return { targetUrl: target.toString() };
+}
+
+async function prepareLambdaResponse(response) {
+  // ── 6. Read response body ─────────────────────────────────────────────────
+  // Use text() for text/JSON responses (all EzyGo API calls).
+  // Use arrayBuffer() + base64 for binary content as a safety fallback
+  // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
+  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  const isTextResponse =
+    responseContentType === "" ||
+    responseContentType.startsWith("text/") ||
+    responseContentType.startsWith("application/json") ||
+    responseContentType.startsWith("application/xml");
+
+  let responseBody;
+  let isBase64Encoded;
+  if (isTextResponse) {
+    responseBody = await response.text();
+    isBase64Encoded = false;
+  } else {
+    const buffer = await response.arrayBuffer();
+    responseBody = Buffer.from(buffer).toString("base64");
+    isBase64Encoded = true;
+  }
+
+  // ── 7. Filter and forward response headers ────────────────────────────────
+  const responseHeaders = {};
+  for (const [key, val] of response.headers.entries()) {
+    if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
+      responseHeaders[key.toLowerCase()] = val;
+    }
+  }
+
+  return {
+    statusCode: response.status,
+    headers:    responseHeaders,
+    body:       responseBody,
+    isBase64Encoded,
+  };
+}
+
+export const handler = async (event) => {
+  // ── 1. Authenticate ───────────────────────────────────────────────────────
+  // Both inputs are HMAC-SHA-256 digested with a key derived from PROXY_SECRET so
+  // the comparison always operates on fixed-length 32-byte buffers, avoiding
+  // timing side-channels based on value or length differences.
+  const authError = authenticateRequest(event.headers);
+  if (authError) {
+    return authError;
+  }
+
+  // ── 2. Build target URL ───────────────────────────────────────────────────
+  const rawPath        = event.rawPath        ?? "/";
+  const rawQueryString = event.rawQueryString ?  `?${event.rawQueryString}` : "";
+  const urlResult = buildTargetUrl(rawPath, rawQueryString);
+  if (urlResult.error) {
+    return urlResult.error;
+  }
+  const targetUrl = urlResult.targetUrl;
 
   // ── 3. Build outbound headers ─────────────────────────────────────────────
   const outHeaders = {};
@@ -159,23 +235,5 @@ export const handler = async (event) => {
     redirect: "follow",
   });
 
-  // ── 6. Read response body ─────────────────────────────────────────────────
-  // Lambda has a 6 MB response payload limit; this aligns with the app-level
-  // 3 MB MAX_RESPONSE_BYTES guard applied on the Next.js side.
-  const responseBody = await response.text();
-
-  // ── 7. Filter and forward response headers ────────────────────────────────
-  const responseHeaders = {};
-  response.headers.forEach((val, key) => {
-    if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
-      responseHeaders[key] = val;
-    }
-  });
-
-  return {
-    statusCode: response.status,
-    headers:    responseHeaders,
-    body:       responseBody,
-    isBase64Encoded: false,
-  };
+  return prepareLambdaResponse(response);
 };

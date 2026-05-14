@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
@@ -26,6 +27,7 @@ interface DialogUser {
 
 export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Transform user object to match AddAttendanceDialog's expected interface
   const dialogUser: DialogUser = {
@@ -34,10 +36,15 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
       ? (user as User & { auth_id?: string | null }).auth_id ?? undefined
       : undefined,
   };
+
+  const { data: selectedSemester } = useFetchSemester();
+  const { data: selectedYear } = useFetchAcademicYear();
   
-  const { data: attendanceData, refetch: refetchAttendance } = useAttendanceReport({ 
-    enabled: isOpen 
-  });
+  const { data: attendanceData, refetch: refetchAttendance } = useAttendanceReport(
+    selectedSemester ?? undefined,
+    selectedYear ?? undefined,
+    { enabled: isOpen },
+  );
   
   const { data: trackingData, refetch: refetchTracking } = useTrackingData(user, { 
     enabled: isOpen 
@@ -46,12 +53,14 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   const { data: coursesData } = useFetchCourses({ 
     enabled: isOpen 
   });
-  
-  const { data: selectedSemester } = useFetchSemester();
-  const { data: selectedYear } = useFetchAcademicYear();
 
   // Handle local success, then bubble up
   const handleSuccess = async () => {
+    // Invalidate all attendance-related queries to refresh dashboard immediately
+    queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+    queryClient.invalidateQueries({ queryKey: ["track_data"] });
+    
     await Promise.all([refetchAttendance(), refetchTracking()]);
     await onSuccess();
   };
@@ -62,7 +71,7 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
       <Button
         onClick={() => setIsOpen(true)}
         className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm font-semibold gap-2 border-0 cursor-pointer"
-        aria-label="Add new attendance record (Press Enter to open)"
+        aria-label="Add new record"
         title="Add new attendance record"
       >
         <Plus className="h-4 w-4" aria-hidden="true" />

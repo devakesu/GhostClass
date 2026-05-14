@@ -8,7 +8,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
 
 type Theme = "light" | "dark";
 
@@ -20,20 +19,22 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const STORAGE_KEY = "ghostclass-theme";
+
 /**
  * Reads the persisted theme from localStorage.
- * Falls back to "dark" when no stored preference exists.
+ * Falls back to "light" when no stored preference exists.
  */
 function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // localStorage may be blocked (e.g. tracking prevention)
   }
-  // No stored preference → always default to dark
-  return "dark";
+  // No stored preference → always default to light
+  return "light";
 }
 
 function applyTheme(theme: Theme) {
@@ -52,17 +53,44 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Apply theme on mount & when it changes
   useEffect(() => {
     applyTheme(theme);
+  }, [theme]);
+
+  const saveTheme = useCallback((t: Theme) => {
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(STORAGE_KEY, t);
     } catch {
       // localStorage may be blocked
     }
-  }, [theme]);
+  }, []);
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
+  // Listen for system preference changes
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => {
+      // Only follow system preference if there's no explicit user choice
+      try {
+        if (!localStorage.getItem(STORAGE_KEY)) {
+          setThemeState(e.matches ? "dark" : "light");
+        }
+      } catch {
+        setThemeState(e.matches ? "dark" : "light");
+      }
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    saveTheme(t);
+  }, [saveTheme]);
   const toggleTheme = useCallback(
-    () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),
-    []
+    () => setThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      saveTheme(next);
+      return next;
+    }),
+    [saveTheme]
   );
 
   const value = useMemo(

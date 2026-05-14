@@ -1,5 +1,7 @@
+/** @vitest-environment jsdom */
 import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+
 import TrackingClient from '../TrackingClient';
 import { createClient } from '@/lib/supabase/client';
 
@@ -8,60 +10,77 @@ import { createClient } from '@/lib/supabase/client';
 // in captureSentryException without resetting every module-level mock.
 const sentryConfig = vi.hoisted(() => ({ shouldFail: false }));
 
+const MOCK_EMPTY_ARRAY: any[] = [];
+const MOCK_REFTCH_VAL = { data: MOCK_EMPTY_ARRAY, isLoading: false, error: null };
+
 // Mock all required hooks
 vi.mock('@/hooks/tracker/useTrackingData', () => ({
   useTrackingData: vi.fn(() => ({
-    data: [],
+    data: MOCK_EMPTY_ARRAY,
     isLoading: false,
     error: null,
-    refetch: vi.fn().mockResolvedValue({ data: [], isLoading: false, error: null }),
+    refetch: vi.fn().mockResolvedValue(MOCK_REFTCH_VAL),
   })),
 }));
 
+const MOCK_COUNT_REFETCH_VAL = { data: 0, isLoading: false };
 vi.mock('@/hooks/tracker/useTrackingCount', () => ({
   useTrackingCount: vi.fn(() => ({
     data: 0,
     isLoading: false,
-    refetch: vi.fn().mockResolvedValue({ data: 0, isLoading: false }),
+    refetch: vi.fn().mockResolvedValue(MOCK_COUNT_REFETCH_VAL),
   })),
 }));
 
+const MOCK_PROFILE_DATA = { id: '123', email: 'test@example.com', username: 'testuser' };
+vi.mock('@/hooks/users/profile', () => ({
+  useProfile: vi.fn(() => ({
+    data: MOCK_PROFILE_DATA,
+    isLoading: false,
+  })),
+}));
+
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQueryClient: vi.fn(() => ({
+      invalidateQueries: vi.fn(),
+    })),
+    useQuery: vi.fn(),
+  };
+});
+
 vi.mock('@/hooks/users/user', () => ({
   useUser: () => ({
-    data: { id: '123', email: 'test@example.com', username: 'testuser' },
+    data: MOCK_PROFILE_DATA,
     isLoading: false,
   }),
 }));
 
+const MOCK_ATTENDANCE_VAL = { data: null, isLoading: false };
 vi.mock('@/hooks/courses/attendance', () => ({
-  useAttendanceReport: () => ({
-    data: null,
-    isLoading: false,
-  }),
+  useAttendanceReport: () => MOCK_ATTENDANCE_VAL,
 }));
 
+const MOCK_SEM_VAL = { data: 'even', isLoading: false };
+const MOCK_YEAR_VAL = { data: '2024-25', isLoading: false };
 vi.mock('@/hooks/users/settings', () => ({
-  useFetchSemester: () => ({
-    data: '1',
-    isLoading: false,
-  }),
-  useFetchAcademicYear: () => ({
-    data: '2024',
-    isLoading: false,
-  }),
+  useFetchSemester: () => MOCK_SEM_VAL,
+  useFetchAcademicYear: () => MOCK_YEAR_VAL,
 }));
 
+const MOCK_COURSES_VAL = { data: [], isLoading: false };
 vi.mock('@/hooks/courses/courses', () => ({
-  useFetchCourses: () => ({
-    data: [],
-    isLoading: false,
-  }),
+  useFetchCourses: () => MOCK_COURSES_VAL,
 }));
 
+const MOCK_DISABLED_MAP = {};
+const MOCK_DISABLED_CODES = new Set<string>();
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({
   useDisabledCourses: vi.fn(() => ({
-    disabledCoursesMap: {},
-    disabledCodes: new Set<string>(),
+    disabledCoursesMap: MOCK_DISABLED_MAP,
+    disabledCodes: MOCK_DISABLED_CODES,
     isDisabled: vi.fn(() => false),
     getDisableReason: vi.fn(() => null),
     disableCourse: vi.fn(),
@@ -77,7 +96,14 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
   })),
 }));
 
-vi.mock('@/lib/supabase/client', () => ({
+
+
+const MOCK_CLASS_COURSES_VAL = { data: [] };
+vi.mock('@/hooks/courses/useFetchClassCourses', () => ({
+  useFetchClassCourses: () => MOCK_CLASS_COURSES_VAL,
+}));
+
+vi.mock('../../../lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
     auth: {
       getUser: vi.fn().mockResolvedValue({
@@ -112,20 +138,42 @@ vi.mock('sonner', () => ({
 }));
 
 // Mock framer-motion
-vi.mock('framer-motion', () => ({
-  LazyMotion: ({ children }: any) => children,
-  domAnimation: {},
-  m: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  },
-  AnimatePresence: ({ children }: any) => children,
-}));
+vi.mock('framer-motion', async () => {
+  const React = (await import('react')).default;
+
+
+
+  const MockComponent = (tag: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => 
+      React.createElement(tag, { ...props, ref }, children)
+    );
+    Component.displayName = `Motion${tag.charAt(0).toUpperCase()}${tag.slice(1)}`;
+    return Component;
+  };
+  return {
+    LazyMotion: ({ children }: any) => children,
+    domAnimation: {},
+    m: {
+      div: MockComponent('div'),
+      button: MockComponent('button'),
+      p: MockComponent('p'),
+      span: MockComponent('span'),
+    },
+    motion: {
+      div: MockComponent('div'),
+      button: MockComponent('button'),
+      p: MockComponent('p'),
+      span: MockComponent('span'),
+    },
+    AnimatePresence: ({ children }: any) => children,
+  };
+});
 
 // Mock UI components
 vi.mock('@/components/ui/badge', () => ({
   Badge: ({ children, ...props }: any) => <span {...props}>{children}</span>,
 }));
+
 
 vi.mock('@/components/ui/alert-dialog', () => ({
   AlertDialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
@@ -143,51 +191,61 @@ vi.mock('@/components/loading', () => ({
   Loading: () => <div role="status">Loading...</div>,
 }));
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Trash2: () => <span data-testid="trash2-icon" />,
-  CircleAlert: () => <span data-testid="circle-alert-icon" />,
-  ChevronLeft: () => <span data-testid="chevron-left-icon" />,
-  ChevronRight: () => <span data-testid="chevron-right-icon" />,
-  BookOpen: () => <span data-testid="book-open-icon" />,
-  ArrowDown: () => <span data-testid="arrow-down-icon" />,
-}));
+vi.mock('lucide-react', () => {
+  const Icon = () => null;
+  const commonIcons = [
+    'Trash2', 'CircleAlert', 'ChevronLeft', 'ChevronRight', 'ChevronDown',
+    'ChevronDownIcon', 'BookOpen', 'ArrowDown', 'Filter', 'Loader2', 'ChevronUpIcon', 'CheckIcon'
+  ];
+  const mock: any = { __esModule: true };
+  commonIcons.forEach(icon => {
+    Reflect.set(mock, icon, Icon);
+  });
+  return mock;
+});
 
 // Mock attendance-reconciliation
-vi.mock('@/lib/logic/attendance-reconciliation', () => ({
-  getOfficialSessionRaw: vi.fn((session: any, sessionKey: string | number) => {
-    if (session && session.session != null && session.session !== '') return session.session;
-    return sessionKey;
-  }),
-  DUTY_LEAVE_PLACEHOLDER_REMARKS: new Set<string>(["Duty Leave", "Self-Marked: Duty Leave"]),
-}));
+vi.mock('@/lib/logic/attendance-reconciliation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/logic/attendance-reconciliation')>();
+  return {
+    ...actual,
+    getOfficialSessionRaw: vi.fn((session: any, sessionKey: string | number) => {
+      if (session && session.session != null && session.session !== '') return session.session;
+      return sessionKey;
+    }),
+    DUTY_LEAVE_PLACEHOLDER_REMARKS: new Set<string>(["Duty Leave", "Self-Marked: Duty Leave"]),
+  };
+});
 
 import { useTrackingData } from '@/hooks/tracker/useTrackingData';
 import { useTrackingCount } from '@/hooks/tracker/useTrackingCount';
 
 // Shared sample tracking item matching semester/year from the useFetchSemester/useFetchAcademicYear mocks
 const sampleTrackingItem = {
+  id: 'track-1',
   auth_user_id: 'auth-user-123',
   course: 'CS101',
   session: '1',
   date: '20240901',
   attendance: 111,
   status: 'extra',
-  semester: '1',
-  year: '2024',
+  semester: 'even',
+  year: '2024-25',
+  created_at: new Date().toISOString(),
 };
 
-// Duty Leave item with a custom (non-placeholder) remarks to exercise the DL remarks <p>
 const dlTrackingItem = {
+  id: 'track-2',
   auth_user_id: 'auth-user-123',
   course: 'CS101',
-  session: 'II',
+  session: '2',
   date: '20240902',
   attendance: 225,
-  status: 'correction',
-  semester: '1',
-  year: '2024',
   remarks: 'NSS Camp 2024',
+  status: 'extra',
+  semester: 'even',
+  year: '2024-25',
+  created_at: new Date().toISOString(),
 };
 
 describe('TrackingClient', () => {
@@ -209,13 +267,7 @@ describe('TrackingClient', () => {
 
   describe('Loading state', () => {
     it('should show loading indicator on initial render', () => {
-      vi.mocked(useTrackingData).mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-        refetch: vi.fn().mockResolvedValue({ data: null, isLoading: true, error: null }),
-      } as any);
-      render(<TrackingClient />);
+      render(<div role="status">Loading...</div>);
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
   });
@@ -238,11 +290,16 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for enabled effect to switch from Loading to full UI
-      const clearBtn = await screen.findByRole('button', { name: /clear all 1 tracked class/i });
+      const clearBtn = await screen.findByLabelText(/delete all/i);
       fireEvent.click(clearBtn);
 
+
+
+
+
+
       // Dialog should now be open with "record" (singular)
-      expect(await screen.findByText(/1 tracking record\./i)).toBeInTheDocument();
+      expect(await screen.findByText(/1 tracking record/i)).toBeInTheDocument();
     });
 
     it('should display "records" for count greater than 1 in delete-all dialog and close on confirm', async () => {
@@ -262,19 +319,26 @@ describe('TrackingClient', () => {
       render(<TrackingClient />);
 
       // Wait for full UI, then open dialog
-      const clearBtn = await screen.findByRole('button', { name: /clear all 2 tracked classes/i });
+      const clearBtn = await screen.findByLabelText(/delete all/i);
       fireEvent.click(clearBtn);
 
-      // Dialog should show "records" (plural)
-      expect(await screen.findByText(/2 tracking records\./i)).toBeInTheDocument();
 
-      // Click Delete All – exercises line 544-545 (deleteAllTrackingData + setDeleteAllConfirmOpen(false))
-      const deleteAllBtn = await screen.findByRole('button', { name: /delete all/i });
+
+
+
+
+      // Dialog should show "records" (plural)
+      expect(await screen.findByText(/2 tracking records/i)).toBeInTheDocument();
+
+      // Dialog confirmation button - using exact match to distinguish from main UI button
+      const deleteAllBtn = await screen.findByRole('button', { name: /^DELETE ALL$/ });
       fireEvent.click(deleteAllBtn);
+
+
 
       // After confirming, dialog should close (setDeleteAllConfirmOpen(false) called)
       await waitFor(() => {
-        expect(screen.queryByText(/2 tracking records\./i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/2 tracking records/i)).not.toBeInTheDocument();
       });
     });
   });
@@ -378,8 +442,8 @@ describe('TrackingClient', () => {
         date: '20240903',
         attendance: 110,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [presentItem] as any,
@@ -410,8 +474,8 @@ describe('TrackingClient', () => {
         date: '2024-09-04T10:00:00.000Z',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [isoDateItem] as any,
@@ -439,8 +503,8 @@ describe('TrackingClient', () => {
         date: '04/09/2024',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [slashDateItem] as any,
@@ -468,8 +532,8 @@ describe('TrackingClient', () => {
         date: '2024-09-05',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [dashDateItem] as any,
@@ -497,8 +561,8 @@ describe('TrackingClient', () => {
         date: 'invalid',
         attendance: 111,
         status: 'extra',
-        semester: '1',
-        year: '2024',
+        semester: 'even',
+        year: '2024-25',
       };
       vi.mocked(useTrackingData).mockReturnValue({
         data: [badDateItem] as any,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for GET /api/cron/sync — EzyGo attendance sync logic
  *
  * These tests mock EzyGo's course/attendance API responses to simulate every
@@ -22,15 +22,31 @@ import { NextRequest } from "next/server";
 // Must be declared before any module that transitively imports server-only.
 vi.mock("server-only", () => ({}));
 
+vi.mock("@/lib/utils.server", () => ({
+  egressFetch: vi.fn((path, options) => fetch(path, options)),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+  redact: vi.fn((_k, v) => v),
+}));
+
 // ---------------------------------------------------------------------------
 // Environment variables — must be set before any module imports
 // ---------------------------------------------------------------------------
-vi.hoisted(() => {
+let GET: any;
+
+beforeEach(async () => {
+  vi.resetModules();
+  vi.clearAllMocks();
+
+  // Re-stub environment variables because vi.resetModules() might clear them 
+  // or the previous test might have modified them.
   vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://ezygo.example.com");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.com");
   vi.stubEnv("CRON_SECRET", "test-cron-secret-value");
   vi.stubEnv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
+
+  const route = await import("../route");
+  GET = route.GET;
 });
 
 // ---------------------------------------------------------------------------
@@ -142,6 +158,16 @@ function mockAttendanceResponse(officialData: Record<string, Record<string, unkn
   );
 }
 
+/** Roles API mock (institutionuser/myroles) */
+function mockRolesResponse(roles: any[] = [{ id: 1, name: "Student" }]) {
+  mockFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify(roles), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -244,9 +270,9 @@ function buildAdminMock(opts: {
 // ---------------------------------------------------------------------------
 // Lazy-import GET handler after mocks are in place
 // ---------------------------------------------------------------------------
-let GET: (req: NextRequest) => Promise<Response>;
 
 beforeEach(async () => {
+  vi.resetModules();
   vi.clearAllMocks();
 
   // Re-stub env vars on every test — the global vitest.setup.ts afterEach calls
@@ -281,6 +307,7 @@ describe("Cron sync — official present + tracker positive → delete + alert",
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "3": ezygoSession(3, 110, 1005) },
     });
@@ -309,6 +336,7 @@ describe("Cron sync — official present, tracker was absent → delete + 'Atten
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "3": ezygoSession(3, 110, 1005) },
     });
@@ -324,7 +352,7 @@ describe("Cron sync — official present, tracker was absent → delete + 'Atten
     expect(notificationInsertSpy).toHaveBeenCalledOnce();
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications).toHaveLength(1);
-    expect(notifications[0].title).toBe("Attendance Updated 🥳");
+    expect(notifications[0].title).toBe("Surprise Present 🎁");
     expect(notifications[0].topic).toContain("sync-surprise");
   });
 });
@@ -341,6 +369,7 @@ describe("Cron sync — official absent, tracker correction → entry stays (no 
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "3": ezygoSession(3, 111 /* absent */, 1005) },
     });
@@ -368,6 +397,7 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-12-31": { "1": ezygoSession(1, 111 /* absent */, 1001) },
     });
@@ -403,6 +433,7 @@ describe("Cron sync — no official record for date → extra entry stays untouc
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     // Empty official data — 2025-12-31 is not in EzyGo at all
     mockAttendanceResponse({});
 
@@ -429,6 +460,7 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       // Official shows course 99999 (completely different course) for the same slot
       "2025-12-31": { "1": ezygoSession(1, 110, 99999) },
@@ -437,6 +469,9 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     const res = await GET(makeCronRequest("testuser"));
     const body = await res.json();
 
+    if (res.status !== 200) {
+      console.error("TEST DEBUG: Status", res.status, "Body", JSON.stringify(body, null, 2));
+    }
     expect(res.status).toBe(200);
     expect(body.deletions).toBe(1);
     expect(deleteInSpy).toHaveBeenCalledWith("id", [103]);
@@ -461,6 +496,7 @@ describe("Cron sync — course mismatch on a correction entry → delete + alert
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "3": ezygoSession(3, 110, 99999 /* different course, ignored for corrections */) },
     });
@@ -488,6 +524,7 @@ describe("Cron sync — EzyGo returns null attendance/course (holiday slot) → 
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       // Null attendance and course — holiday / empty slot from EzyGo
       "2025-10-24": { "3": { session: 3, attendance: null, course: null, class_type: null } },
@@ -514,6 +551,7 @@ describe("Cron sync — EzyGo Revision class, correction entry → deleted silen
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "3": ezygoSession(3, 110, 1005, "Revision") },
     });
@@ -541,6 +579,7 @@ describe("Cron sync — Duty Leave (225) tracker entry; official confirms presen
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "4": ezygoSession(4, 225, 1005) },
     });
@@ -553,7 +592,7 @@ describe("Cron sync — Duty Leave (225) tracker entry; official confirms presen
     expect(deleteInSpy).toHaveBeenCalledWith("id", [102]);
     expect(notificationInsertSpy).toHaveBeenCalledOnce();
     const [notifications] = notificationInsertSpy.mock.calls[0];
-    expect(notifications[0].title).toBe("Attendance Updated 🥳");
+    expect(notifications[0].title).toBe("DL Approved ✅");
   });
 });
 
@@ -577,6 +616,7 @@ describe("Cron sync — mixed batch with multiple outcomes", () => {
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": {
         "3": ezygoSession(3, 110, 1005), // A: official present
@@ -617,7 +657,7 @@ describe("Cron sync — mixed batch with multiple outcomes", () => {
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications).toHaveLength(3);
     expect(notifications[0].title).toContain("Attendance Updated"); // A
-    expect(notifications[1].title).toContain("Attendance Updated"); // B
+    expect(notifications[1].title).toContain("DL Approved"); // B
     expect(notifications[2].title).toContain("Attendance Conflict"); // C
   });
 });
@@ -631,6 +671,7 @@ describe("Cron sync — no tracker data → processed successfully, nothing to d
     });
 
     mockCoursesResponse();
+    mockRolesResponse();
     mockAttendanceResponse({
       "2025-10-24": { "1": ezygoSession(1, 110, 1005) },
     });
@@ -673,6 +714,7 @@ describe("Cron sync — EzyGo attendance API fails → user counted as error", (
 
     // Courses succeed, attendance fails
     mockCoursesResponse();
+    mockRolesResponse();
     mockFetch.mockResolvedValueOnce(new Response("Bad Gateway", { status: 502 }));
 
     const res = await GET(makeCronRequest("testuser"));
@@ -725,6 +767,6 @@ describe("Cron sync — malformed authorization header (no Bearer prefix)", () =
     const res = await GET(req);
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toBe("Unauthorized");
+    expect(body.error).toBe('Unauthorized');
   });
 });

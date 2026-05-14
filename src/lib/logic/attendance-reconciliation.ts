@@ -1,34 +1,24 @@
 import { TrackAttendance } from "@/types";
 import { generateSlotKey } from "../utils";
 
-// Minimal type covering only what getOfficialSessionRaw actually accesses.
-// The index signature is intentionally absent — any access of an undeclared
-// property is a type error, which is the desired safety property.
 interface RawSessionData {
   session?: string | number | null;
 }
 
-export const ATTENDANCE_STATUS = {
-  PRESENT: 110,
-  ABSENT: 111,
-  DUTY_LEAVE: 225,
-  OTHER_LEAVE: 112,
+import { 
+  ATTENDANCE_STATUS, 
+  isPositiveStatus as isPositive, 
+  isAbsentStatus as isAbsent,
+  DUTY_LEAVE_PLACEHOLDER_REMARKS 
+} from "../constants/ezygo";
+
+export const isLegacyRemark = (remark: string | null | undefined): boolean => {
+  if (!remark) return true;
+  const trimmed = remark.trim();
+  return DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed) || trimmed.startsWith("Self-Marked:");
 };
 
-/**
- * Default/placeholder remarks stored when a DL reason is not provided.
- * These should not be surfaced in the UI as user-entered reasons.
- */
-export const DUTY_LEAVE_PLACEHOLDER_REMARKS = new Set<string>([
-  "Duty Leave",
-  "Self-Marked: Duty Leave",
-]);
-
-export const isPositive = (code: number) => code === ATTENDANCE_STATUS.PRESENT || code === ATTENDANCE_STATUS.DUTY_LEAVE;
-// code === 0 is NOT treated as Absent: 0 is either an uninitialised value or an unknown
-// API response, not a documented EzyGo attendance state. Treating it as Absent would
-// incorrectly inflate the savedAbsents counter for null-coerced DB records.
-export const isAbsent = (code: number) => code === ATTENDANCE_STATUS.ABSENT;
+export { isPositive, isAbsent, ATTENDANCE_STATUS };
 
 export const getOfficialSessionRaw = (
   session: RawSessionData | null | undefined, 
@@ -40,7 +30,6 @@ export const getOfficialSessionRaw = (
   return sessionKey;
 };
 
-// --- CORE LOGIC ---
 export interface ReconciledStats {
   realPresent: number;
   realTotal: number;
@@ -64,7 +53,6 @@ export interface ReconciledStats {
   finalPercentage: number;
 }
 
-// Define this at the top
 interface OfficialSession {
   course: string | number;
   date: string;
@@ -73,105 +61,138 @@ interface OfficialSession {
   class_type?: string;
 }
 
-// Update function signature
+interface ReconciliationAccumulator {
+  realPresent: number;
+  realTotal: number;
+  realAbsent: number;
+  realDL: number;
+  realOther: number;
+  correctionPresent: number;
+  savedAbsent: number;
+  correctionDL: number;
+  extraPresent: number;
+  extraAbsent: number;
+  extraDL: number;
+  finalPresent: number;
+  finalTotal: number;
+  extrasCount: number;
+}
+
+function processOfficialSessions(
+  courseId: string,
+  officialSessions: OfficialSession[],
+  officialMap: Map<string, number>,
+  stats: ReconciliationAccumulator
+) {
+  for (const session of officialSessions) {
+    if (!session || session.class_type === "Revision") continue;
+    if (String(session.course) !== String(courseId)) continue;
+
+    const key = generateSlotKey(courseId, session.date, session.session);
+    const status = Number(session.attendance);
+    officialMap.set(key, status);
+
+    stats.realTotal++;
+    if (isPositive(status)) {
+      stats.realPresent++;
+    } else {
+      stats.realAbsent++;
+    }
+    if (status === ATTENDANCE_STATUS.DUTY_LEAVE) {
+      stats.realDL++;
+    }
+    if (status === ATTENDANCE_STATUS.OTHER_LEAVE) {
+      stats.realOther++;
+    }
+  }
+}
+
+function handleExtraTrack(
+  trackPos: boolean,
+  trackDL: boolean,
+  stats: ReconciliationAccumulator
+) {
+  stats.extrasCount++;
+  if (trackPos) {
+    stats.extraPresent++;
+  } else {
+    stats.extraAbsent++;
+  }
+  if (trackDL) {
+    stats.extraDL++;
+  }
+}
+
+function handleCorrectionTrack(
+  trackPos: boolean,
+  trackDL: boolean,
+  offPos: boolean,
+  offDL: boolean,
+  stats: ReconciliationAccumulator
+) {
+  if (!offPos && trackPos) {
+    stats.correctionPresent++;
+    stats.savedAbsent++;
+  }
+  if (!offDL && trackDL) {
+    stats.correctionDL++;
+  }
+}
+
+function processCourseTracks(
+  courseId: string,
+  courseTracks: TrackAttendance[],
+  officialMap: Map<string, number>,
+  stats: ReconciliationAccumulator
+) {
+  for (const item of courseTracks) {
+    if (!item) continue;
+    const trackStatus = Number(item.attendance);
+    if (!Number.isFinite(trackStatus)) continue;
+
+    const key = generateSlotKey(courseId, item.date, item.session);
+    const officialStatus = officialMap.get(key);
+
+    const trackPos = isPositive(trackStatus);
+    const trackDL = trackStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
+
+    if (item.status === "extra" && officialStatus === undefined) {
+      handleExtraTrack(trackPos, trackDL, stats);
+    } else if (officialStatus !== undefined) {
+      const offPos = isPositive(officialStatus);
+      const offDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
+      handleCorrectionTrack(trackPos, trackDL, offPos, offDL, stats);
+    }
+  }
+}
+
 export function getReconciledStats(
   courseId: string,
   officialAggregate: { present: number; absent: number; total: number },
   officialSessions: OfficialSession[] | undefined,
-  trackingData: TrackAttendance[] | undefined
+  courseTracks: TrackAttendance[] | undefined
 ): ReconciledStats {
-  
-  const stats = {
+  const stats: ReconciliationAccumulator = {
     realPresent: 0, realTotal: 0, realAbsent: 0, realDL: 0, realOther: 0,
     correctionPresent: 0, savedAbsent: 0, correctionDL: 0,
     extraPresent: 0, extraAbsent: 0, extraDL: 0,
     finalPresent: 0, finalTotal: 0, extrasCount: 0
   };
 
-  // 1. Build Official Map
   const officialMap = new Map<string, number>();
 
   if (officialSessions && officialSessions.length > 0) {
-    officialSessions.forEach(session => {
-        if (session.class_type === "Revision") return;
-        
-        // Ensure we only process this course's sessions
-        if (String(session.course) !== String(courseId)) return;
-
-        const key = generateSlotKey(courseId, session.date, session.session);
-        const status = Number(session.attendance);
-        
-        officialMap.set(key, status);
-
-        stats.realTotal++;
-        if (isPositive(status)) stats.realPresent++; else stats.realAbsent++;
-        if (status === ATTENDANCE_STATUS.DUTY_LEAVE) stats.realDL++;
-        if (status === ATTENDANCE_STATUS.OTHER_LEAVE) stats.realOther++;
-    });
+    processOfficialSessions(courseId, officialSessions, officialMap, stats);
   } else {
-    // Fallback if calendar is empty
     stats.realPresent = officialAggregate.present;
     stats.realTotal = officialAggregate.total;
     stats.realAbsent = officialAggregate.absent;
   }
 
-  // 2. Process Tracker
-  if (trackingData) {
-    const courseTracks = trackingData.filter(t => String(t.course) === String(courseId));
-
-    courseTracks.forEach(item => {
-      const key = generateSlotKey(courseId, item.date, item.session);
-      const officialStatus = officialMap.get(key);
-      
-      // Use Number() so string-typed attendance codes from Supabase are coerced correctly.
-      // Skip the record entirely if the value is not a finite number rather than silently
-      // defaulting to PRESENT, which would inflate attendance stats.
-      const trackStatus = Number(item.attendance);
-      if (!Number.isFinite(trackStatus)) return;
-      const trackPos = isPositive(trackStatus);
-      const trackDL = trackStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
-      
-      const offPos = officialStatus !== undefined ? isPositive(officialStatus) : false;
-      const offDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
-
-      // CORE LOGIC: If status='extra' AND no official record exists -> TRUE EXTRA
-      const isTrulyExtra = item.status === "extra" && officialStatus === undefined;
-
-      if (isTrulyExtra) {
-          stats.extrasCount++;
-          // finalTotal and finalPresent are computed from component counters in step 3.
-          // Do NOT mutate them here to keep that step's formula unambiguous.
-
-          if (trackPos) {
-             stats.extraPresent++;
-          } else {
-             stats.extraAbsent++;
-          }
-          if (trackDL) stats.extraDL++;
-
-      } else if (officialStatus !== undefined) {
-          
-          if (offPos) return; // Official Present -> Ignore Tracker
-
-          if (!offPos && trackPos) {
-             stats.correctionPresent++;
-             stats.savedAbsent++;
-             // finalPresent is computed from component counters in step 3 — do NOT mutate here.
-          }
-          if (!offDL && trackDL) stats.correctionDL++;
-      }
-    });
+  if (courseTracks && courseTracks.length > 0) {
+    processCourseTracks(courseId, courseTracks, officialMap, stats);
   }
 
-  // 3. Finalize Totals
-  //
-  // Invariant: realPresent, correctionPresent, and extraPresent cover disjoint slots:
-  //   - realPresent:       slots the official calendar marks as Present (or DL)
-  //   - correctionPresent: official ABSENT slots overridden to Present by the tracker
-  //   - extraPresent:      tracker-only slots (no official record) marked Present
-  // Because the three sets never overlap, simple addition is always correct —
-  // regardless of whether officialSessions is populated or came from the aggregate
-  // fallback.
   stats.finalPresent = stats.realPresent + stats.correctionPresent + stats.extraPresent;
   stats.finalTotal   = stats.realTotal   + stats.extrasCount;
 

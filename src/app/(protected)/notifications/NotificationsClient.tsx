@@ -1,19 +1,29 @@
 // src/app/(protected)/notifications/NotificationsClient.tsx
 "use client";
-
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useNotifications, Notification } from "@/hooks/notifications/useNotifications";
 import { useUser } from "@/hooks/users/user";
 import { useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { useNotificationVirtualizer, VirtualItem } from "@/hooks/notifications/use-notification-virtualizer";
 import { captureSentryException } from "@/lib/sentry-lazy";
 import { Button } from "@/components/ui/button";
 import { 
   CheckCheck, BellOff, Loader2, RefreshCcw, 
   AlertTriangle, Info, CalendarClock, AlertCircle 
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { cn, redact } from "@/lib/utils";
 import { Loading } from "@/components/loading";
@@ -32,20 +42,20 @@ const NotificationCard = ({
   isReading 
 }: { 
   n: Notification; 
-  onMarkRead: (id: number) => void; 
+  onMarkRead: (id: number, currentStatus: boolean) => void; 
   isReading: boolean;
 }) => {
   const { icon: Icon, color, bg } = getNotificationIcon(n.topic);
 
   return (
     <div
-      onClick={() => !n.is_read && onMarkRead(n.id)}
-      onKeyDown={(e) => !n.is_read && (e.key === 'Enter' || e.key === ' ') && onMarkRead(n.id)}
+      onClick={() => onMarkRead(n.id, n.is_read)}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onMarkRead(n.id, n.is_read)}
       role="button"
-      tabIndex={!n.is_read ? 0 : -1}
+      tabIndex={0}
       className={cn(
-        "group relative flex gap-4 p-4 rounded-2xl border transition-all duration-200 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary mb-2",
-        !n.is_read ? "bg-card border-border/60 shadow-sm hover:shadow-md cursor-pointer" : "bg-transparent border-transparent opacity-70"
+        "group relative flex gap-4 p-4 rounded-2xl border transition-all duration-200 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary mb-2 cursor-pointer",
+        !n.is_read ? "bg-card border-border/60 shadow-sm hover:shadow-md" : "bg-transparent border-transparent opacity-70 hover:opacity-100 hover:bg-secondary/5"
       )}
     >
       {!n.is_read && <div className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-primary" />}
@@ -68,19 +78,15 @@ const NotificationCard = ({
         </p>
       </div>
       
-      {!n.is_read && isReading && (
+      {isReading && (
          <div className="absolute right-4 top-1/2 -translate-y-1/2">
-            <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label="Loading" />
+            <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label="Updating status..." />
          </div>
       )}
     </div>
   );
 };
 
-// Virtual item type to include headers
-type VirtualItem = 
-  | { type: 'header'; id: string; label: string }
-  | { type: 'notification'; id: number; data: Notification };
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -88,20 +94,6 @@ export default function NotificationsPage() {
   const parentRef = useRef<HTMLDivElement>(null);
   
   // Use mountId-based sync logic (now managed inside useSyncOnMount)
-
-  const { 
-    actionNotifications, 
-    regularNotifications, 
-    unreadCount,
-    isLoading, 
-    markAsRead, 
-    markAllAsRead,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage
-  } = useNotifications(true);
-
-  const [readingId, setReadingId] = useState<number | null>(null);
 
   // Sync attendance data on mount; deduplication handled by the hook.
   const { isSyncing, syncCompleted } = useSyncOnMount({
@@ -123,22 +115,47 @@ export default function NotificationsPage() {
     },
   });
 
-  // BUILD VIRTUAL LIST WITH HEADERS
+  const { 
+    actionNotifications, 
+    regularNotifications, 
+    unreadCount,
+    isLoading, 
+    toggleRead,
+    markAllAsRead,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useNotifications(syncCompleted);
+
+  const [readingId, setReadingId] = useState<number | null>(null);
+
+  // BUILD VIRTUAL LIST WITH HEADERS (Matches Mobile: Action Required -> Unread -> Earlier)
   const virtualItems = useMemo<VirtualItem[]>(() => {
     const items: VirtualItem[] = [];
 
-    // Add Action Required section
-    if (actionNotifications.length > 0) {
+    // 1. ACTION REQUIRED (Unread Conflicts)
+    const unreadActions = actionNotifications.filter(n => !n.is_read);
+    if (unreadActions.length > 0) {
       items.push({ type: 'header', id: 'action-header', label: 'ACTION REQUIRED' });
-      actionNotifications.forEach(n => {
+      unreadActions.forEach(n => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
 
-    // Add Recent Activity section
-    if (regularNotifications.length > 0) {
-      items.push({ type: 'header', id: 'recent-header', label: 'RECENT ACTIVITY' });
-      regularNotifications.forEach(n => {
+    // 2. UNREAD (Unread Regular)
+    const unreadRegular = regularNotifications.filter(n => !n.is_read);
+    if (unreadRegular.length > 0) {
+      items.push({ type: 'header', id: 'unread-header', label: 'UNREAD' });
+      unreadRegular.forEach(n => {
+        items.push({ type: 'notification', id: n.id, data: n });
+      });
+    }
+
+    // 3. EARLIER (All Read Notifications)
+    const readNotifications = regularNotifications.filter(n => n.is_read);
+    if (readNotifications.length > 0) {
+      items.push({ type: 'header', id: 'earlier-header', label: 'EARLIER' });
+      readNotifications.forEach(n => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
@@ -146,71 +163,50 @@ export default function NotificationsPage() {
     return items;
   }, [actionNotifications, regularNotifications]);
 
-  // VIRTUALIZER WITH DYNAMIC HEIGHT ESTIMATION
-  const rowVirtualizer = useVirtualizer({
-    count: virtualItems.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (index) => {
-    const item = virtualItems[index];
-
-    if (item.type === "header") {
-      return 57; // pt-6 (24px) + pb-3 (12px) + content (~21px)
-    }
-
-      // Notification card height
-      const notification = item.data;
-      const description = notification.description ?? "";
-
-      // More accurate base heights based on actual card layout
-      const baseHeightShort = 80;  // Single-line description
-      const baseHeightMedium = 95; // 2-line description
-      
-      // Calculate approximate extra height for longer descriptions
-      const extraPer100Chars = 12;
-      const maxExtra = 60;
-      const extraHeight = description.length > 80
-        ? Math.min(maxExtra, Math.ceil((description.length - 80) / 100) * extraPer100Chars)
-        : 0;
-
-      const baseHeight = description.length > 80 ? baseHeightMedium : baseHeightShort;
-      const marginBottom = 8; // mb-2 (2 * 4px)
-
-      return baseHeight + extraHeight + marginBottom;
-    },
-    // Use actual DOM measurements when available to correct the estimates.
-    measureElement: (el) => el.getBoundingClientRect().height,
-    // Use a larger overscan to reduce visible layout shifts when estimates are adjusted
-    overscan: 10,
+  // ─── VIRTUALIZER ───────────────────────────────────────────────────────────
+  
+  const rowVirtualizer = useNotificationVirtualizer({
+    virtualItems,
+    parentRef,
   });
 
-  // INFINITE SCROLL
-  useEffect(() => {
-    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
+  // SCROLL HANDLER FOR INFINITE SCROLL
+  const handleScroll = useCallback(() => {
+    // Check both container and window scroll
+    const container = parentRef.current;
+    if (!container) return;
 
-    if (!lastItem) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const windowScrollTop = window.scrollY;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
 
-    if (
-      lastItem.index >= virtualItems.length - 1 &&
-      hasNextPage &&
-      !isFetchingNextPage
-    ) {
-      fetchNextPage();
+    // Use whichever scroll position is greater (container vs window)
+    const isNearBottom = 
+      (scrollHeight - scrollTop - clientHeight < 400) || 
+      (documentHeight - windowScrollTop - windowHeight < 400);
+    
+    if (isNearBottom) {
+      if (hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
     }
-  }, [
-    hasNextPage,
-    fetchNextPage,
-    virtualItems.length,
-    isFetchingNextPage,
-    rowVirtualizer,
-  ]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // MARK READ HANDLER
-  const handleMarkRead = useCallback(async (id: number) => {
+  // ATTACH GLOBAL SCROLL LISTENER
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
+
+  // TOGGLE READ HANDLER
+  const handleToggleRead = useCallback(async (id: number, currentStatus: boolean) => {
       if (readingId === id) return;
       
       setReadingId(id);
       try { 
-          await markAsRead(id);
+          await toggleRead(id, currentStatus);
+          toast.success(currentStatus ? "Marked as unread" : "Marked as read");
           
           // Force immediate remeasure by scrolling to current position
           // This prevents glitches when items move between sections
@@ -223,17 +219,17 @@ export default function NotificationsPage() {
           });
       } catch (error) { 
           if (process.env.NODE_ENV === 'development') {
-            logger.error("Failed to mark notification read", error);
+            logger.error("Failed to toggle notification status", error);
           }
           toast.error("Could not update notification");
           captureSentryException(error, {
-              tags: { type: "mark_notification_read", location: "NotificationsClient/handleMarkRead" },
-              extra: { notification_id: id, action: "mark_read", userId: redact("id", String(user?.id)) }
+              tags: { type: "toggle_notification_read", location: "NotificationsClient/handleToggleRead" },
+              extra: { notification_id: id, action: "toggle_read", userId: redact("id", String(user?.id)) }
           });
       } finally { 
           setReadingId(null); 
       }
-  }, [markAsRead, readingId, rowVirtualizer, user?.id]);
+  }, [toggleRead, readingId, rowVirtualizer, user?.id]);
 
   // Block rendering until user is available, data has loaded, and initial sync has completed.
   if (!user?.id || isLoading || isSyncing || !syncCompleted) return <Loading />;
@@ -241,23 +237,60 @@ export default function NotificationsPage() {
   const isEmpty = virtualItems.length === 0;
 
   return (
-    <div ref={parentRef} className="bg-background relative overflow-auto flex flex-col">
+    <div 
+      ref={parentRef} 
+      onScroll={() => handleScroll()}
+      className="bg-background relative overflow-auto flex flex-col h-full"
+    >
       <header className="sticky top-0 z-20 w-full backdrop-blur-xl bg-background/80 border-b border-border/40">
-        <div className="container mx-auto max-w-2xl px-4 pt-6 pb-4 flex items-center justify-between">
+        <div className="container mx-auto max-w-2xl px-4 md:px-6 pt-4 md:pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight">Notifications 
-              {unreadCount > 0 && <span className="ml-2 bg-primary/10 text-primary text-[11px] font-bold px-1.5 py-0.5 rounded-full" aria-label={`${unreadCount} unread notifications`}>{unreadCount}</span>}
+            <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+              Notifications 
+              {unreadCount > 0 && <span className="bg-primary/10 text-primary text-[11px] font-bold px-1.5 py-0.5 rounded-full" aria-label={`${unreadCount} unread notifications`}>{unreadCount}</span>}
+              {isSyncing && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-600 dark:text-blue-400 animate-pulse">
+                  <Loader2 size={10} className="animate-spin" />
+                  <span>Syncing</span>
+                </div>
+              )}
             </h1>
           </div>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => markAllAsRead()} className="text-xs text-muted-foreground hover:text-primary">
-              <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Mark all read
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs text-muted-foreground hover:text-primary"
+                  aria-label="Mark all as read"
+                >
+                  <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Mark all read
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Mark all as read?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will mark all current notifications as read. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    markAllAsRead();
+                    toast.success("Marked all as read");
+                  }}>
+                    Mark all read
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </header>
 
-      <main className="container mx-auto max-w-2xl flex-1 flex flex-col">
+      <main className="container mx-auto max-w-2xl flex-1 flex flex-col px-4 md:px-6 pt-4 md:pt-6">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
             <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
@@ -277,6 +310,15 @@ export default function NotificationsPage() {
           >
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
               const item = virtualItems[virtualRow.index];
+              let headerToneClass = 'text-muted-foreground';
+
+              if (item.type === 'header') {
+                if (item.label === 'ACTION REQUIRED') {
+                  headerToneClass = 'text-amber-500';
+                } else if (item.label === 'UNREAD') {
+                  headerToneClass = 'text-blue-500';
+                }
+              }
 
               return (
                 <div
@@ -293,33 +335,41 @@ export default function NotificationsPage() {
                   className="px-4"
                 >
                   {item.type === 'header' ? (
-                  // SECTION HEADER
-                  <div className={cn(
-                    "flex items-center gap-2 px-1",
-                    item.label === 'ACTION REQUIRED' ? "text-amber-500 pt-6 pb-3" : "text-muted-foreground pt-6 pb-3"
-                  )}>
-                    {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-4 w-4" aria-hidden="true" />}
-                    <h3 className="text-xs font-bold uppercase tracking-wider">{item.label}</h3>
-                  </div>
-                ) : (
-                  // NOTIFICATION CARD
-                  <NotificationCard
-                    n={item.data}
-                    onMarkRead={handleMarkRead}
-                    isReading={readingId === item.id}
-                  />
-                )}
+                    <div className={cn(
+                      "flex items-center gap-2 px-1 pt-6 pb-3",
+                      headerToneClass
+                    )}>
+                      {item.label === 'ACTION REQUIRED' && <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <h3 className="text-[11px] font-black uppercase tracking-widest">{item.label}</h3>
+                    </div>
+                  ) : (
+                    <NotificationCard
+                      n={item.data}
+                      onMarkRead={handleToggleRead}
+                      isReading={readingId === item.id}
+                    />
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
+        {/* LOADING INDICATOR AT BOTTOM */}
         {isFetchingNextPage && (
-          <div className="py-4 flex justify-center w-full">
+          <div className="h-10 flex items-center justify-center py-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs animate-pulse">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading more...
             </div>
+          </div>
+        )}
+
+        {!hasNextPage && !isEmpty && !isLoading && (
+          <div className="py-8 flex flex-col items-center justify-center text-center opacity-50">
+            <div className="h-px w-12 bg-border mb-4" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              End of notifications
+            </p>
           </div>
         )}
       </main>

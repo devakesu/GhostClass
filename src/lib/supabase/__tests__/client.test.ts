@@ -16,10 +16,20 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildSupabaseTieredFetch } from "@/lib/supabase/client";
+
+// Must be mocked for tests to run in jsdom/node
+vi.mock('server-only', () => ({}));
+
+import { buildSupabaseTieredFetch } from "@/lib/supabase/fetch";
 
 // Ensure vi.stubGlobal() calls in any suite don't leak into subsequent suites.
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  vi.stubEnv("NODE_ENV", "production");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers

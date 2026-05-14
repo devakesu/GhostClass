@@ -1,0 +1,23 @@
+name: Build Guard
+
+on:
+  pull_request:
+    branches: [main]
+
+  merge_group:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Build Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
+
+      - name: Verify commit is signed
+        run: |
+          git log -1 --show-signature

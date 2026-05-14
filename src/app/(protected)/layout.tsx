@@ -12,7 +12,9 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { createClient } from "@/lib/supabase/client";
 import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 import { useCSRFToken } from "@/hooks/use-csrf-token";
+import { OutageProvider } from "@/providers/outage-provider";
 
 export default function ProtectedLayout({
   children,
@@ -79,14 +81,12 @@ export default function ProtectedLayout({
       try {
         const { data: { user }, error } = await supabaseRef.current.auth.getUser();
         // Handle auth session missing errors — force full logout to clear cookies/storage
-        if (error) {
-          if (isAuthSessionMissingError(error)) {
-            active = false;
-            await handleLogout();
-            return;
-          }
-          throw error;
+        if (error && isAuthSessionMissingError(error)) {
+          active = false;
+          await handleLogout();
+          return;
         }
+        if (error) throw error;
 
         // No Supabase user means the session is gone — force full logout so httpOnly
         // cookies (ezygo_access_token, CSRF) and client storage are properly cleared
@@ -97,21 +97,19 @@ export default function ProtectedLayout({
         }
 
         // At this point, Supabase has confirmed a valid user session.
-        // The EzyGo access token cookie (ezygo_access_token) is HttpOnly and cannot be validated
-        // from client-side JavaScript; it's automatically sent with API requests and validated
-        // server-side. Any additional validation should occur on the server (e.g., via a server
-        // action or API endpoint).
       } catch (err) {
-        if (active) {
-          // Log the error for debugging, then attempt logout
-          logger.error("Auth check failed:", err instanceof Error ? err.message : String(err));
-          try {
-            await handleLogout();
-          } catch (logoutErr) {
-            // If logout also fails, force navigation to login page
-            logger.error("Logout failed after auth check error:", logoutErr instanceof Error ? logoutErr.message : String(logoutErr));
-            router.replace("/");
-          }
+        if (!active) return;
+        // Log the error for debugging, then attempt logout
+        logger.error("Auth check failed:", err instanceof Error ? err.message : String(err));
+        Sentry.captureException(err, {
+          tags: { type: "client_auth_check_failure", location: "protected/layout" },
+        });
+        try {
+          await handleLogout();
+        } catch (logoutErr) {
+          // If logout also fails, force navigation to login page
+          logger.error("Logout failed after auth check error:", logoutErr instanceof Error ? logoutErr.message : String(logoutErr));
+          router.replace("/");
         }
       }
     };
@@ -152,16 +150,18 @@ export default function ProtectedLayout({
                 HTMLElement?.prototype &&
                 "inert" in HTMLElement.prototype
                   ? { inert: true }
-                  : {}) as any)}
+                  : {}) as unknown as { inert?: boolean })}
             >
               <Navbar />
             </motion.div>
             </LazyMotion>
             
             <main className="flex-1 w-full bg-background pt-20">
+              <OutageProvider>
               <ErrorBoundary>
                 {children}
               </ErrorBoundary>
+              </OutageProvider>
             </main>
             
             <Footer />

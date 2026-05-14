@@ -13,4 +13,6 @@ export interface User {
   mobile: string;
   /** Timestamp of account creation (ISO format) */
   created_at: string;
+  /** Supabase Auth UUID */
+  auth_id?: string;
 }

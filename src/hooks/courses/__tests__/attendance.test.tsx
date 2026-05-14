@@ -1,337 +1,236 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { type ReactNode } from 'react'
-import { useAttendanceReport, useCourseDetails, useAllCourseDetails } from '@/hooks/courses/attendance'
-import { type AttendanceReport } from '@/types'
-import axiosInstance from '@/lib/axios'
+import { renderHook, waitFor } from "@testing-library/react";
+vi.unmock('@/hooks/courses/attendance')
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useAttendanceReport, useCourseDetails, useAllCourseDetails, _resetModuleState } from "../attendance";
+import axios from "@/lib/axios";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   default: {
-    post: vi.fn(),
     get: vi.fn(),
+    post: vi.fn(),
   },
-}))
+}));
 
-vi.mock('@/lib/query-utils', () => ({
-  retryOnce: () => false,
-  retryTwice: () => false,
-}))
+vi.mock("@/lib/query-utils", () => ({
+  retryOnce: false,
+  retryTwice: false,
+}));
 
-describe('useAttendanceReport', () => {
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  const QueryClientWrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  QueryClientWrapper.displayName = "QueryClientWrapper";
+  return QueryClientWrapper;
+};
+
+describe("attendance hooks", () => {
   beforeEach(() => {
-    // Clear all mocks before each test to prevent state pollution
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+    _resetModuleState();
+  });
 
-  const createWrapper = () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { 
-          retry: false,
-          // Disable background refetching for tests
-          refetchOnWindowFocus: false,
-          refetchOnReconnect: false,
-          refetchInterval: false,
-        },
-      },
-    })
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'QueryClientWrapper'
-    return Wrapper
-  }
+  describe("useAttendanceReport", () => {
+    it("should fetch attendance report", async () => {
+      const mockData = { report: "test" };
+      (axios.post as any).mockResolvedValueOnce({ data: mockData });
 
-  it('should fetch attendance report data successfully', async () => {
-    const mockAttendanceReport: AttendanceReport = {
-      courses: {},
-      sessions: {},
-      attendanceTypes: {},
-      studentAttendanceData: {},
-      attendanceDatesArray: {},
-    }
-
-    vi.mocked(axiosInstance.post).mockResolvedValueOnce({
-      data: mockAttendanceReport,
-    })
-
-    const { result } = renderHook(() => useAttendanceReport(), {
-      wrapper: createWrapper(),
-    })
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true)
-    })
-
-    expect(result.current.data).toEqual(mockAttendanceReport)
-  })
-
-  it('should handle error state', async () => {
-    vi.mocked(axiosInstance.post).mockRejectedValueOnce(new Error('Network error'))
-
-    const { result } = renderHook(() => useAttendanceReport(), {
-      wrapper: createWrapper(),
-    })
-
-    await waitFor(
-      () => {
-        expect(result.current.isError).toBe(true)
-      },
-      { timeout: 3000 }
-    )
-  })
-
-  it('should respect enabled option', () => {
-    const { result } = renderHook(() => useAttendanceReport({ enabled: false }), {
-      wrapper: createWrapper(),
-    })
-
-    expect(result.current.status).toBe('pending')
-    expect(result.current.fetchStatus).toBe('idle')
-  })
-
-  it('should fetch data when initialData is undefined', async () => {
-    const mockAttendanceReport: AttendanceReport = {
-      courses: {},
-      sessions: {},
-      attendanceTypes: {},
-      studentAttendanceData: {},
-      attendanceDatesArray: {},
-    }
-
-    vi.mocked(axiosInstance.post).mockResolvedValueOnce({
-      data: mockAttendanceReport,
-    })
-
-    // Pass undefined (simulating null from SSR being normalized)
-    const { result } = renderHook(
-      () => useAttendanceReport({ initialData: undefined }),
-      {
+      const { result } = renderHook(() => useAttendanceReport("1", "2023"), {
         wrapper: createWrapper(),
-      }
-    )
+      });
 
-    // The query should fetch immediately when initialData is undefined
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true)
-    })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(mockData);
+      expect(axios.post).toHaveBeenCalledWith("/attendancereports/student/detailed", {
+        semester: "1",
+        year: "2023",
+      });
+    });
 
-    expect(result.current.data).toEqual(mockAttendanceReport)
-    expect(axiosInstance.post).toHaveBeenCalledWith('/attendancereports/student/detailed')
-  })
+    it("should handle fetch error", async () => {
+      (axios.post as any).mockRejectedValueOnce(new Error("Fetch failed"));
 
-  it('should use initialData when provided and not trigger immediate fetch', () => {
-    const mockInitialData: AttendanceReport = {
-      courses: {},
-      sessions: {},
-      attendanceTypes: {},
-      studentAttendanceData: {},
-      attendanceDatesArray: {},
-    }
-
-    const { result } = renderHook(
-      () => useAttendanceReport({ initialData: mockInitialData }),
-      {
+      const { result } = renderHook(() => useAttendanceReport("1", "2023"), {
         wrapper: createWrapper(),
-      }
-    )
+      });
 
-    // Should immediately have the initial data
-    expect(result.current.data).toEqual(mockInitialData)
-    expect(result.current.isSuccess).toBe(true)
-    
-    // Should not have called the API yet (using initialData)
-    expect(axiosInstance.post).not.toHaveBeenCalled()
-  })
-})
+      await waitFor(() => expect(result.current.isError).toBe(true));
+    });
 
-describe('useCourseDetails', () => {
-  const createWrapper = () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnWindowFocus: false,
-          refetchOnReconnect: false,
-          refetchInterval: false,
-        },
-      },
-    })
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'QueryClientWrapper'
-    return Wrapper
-  }
+    it("should throw if response is null", async () => {
+      (axios.post as any).mockResolvedValueOnce(null);
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+      const { result } = renderHook(() => useAttendanceReport("1", "2023"), {
+        wrapper: createWrapper(),
+      });
 
-  it('returns normalised data (totel → total, persantage → percentage)', async () => {
-    const rawData = { present: 15, absent: 5, totel: 20, persantage: 75 }
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+      await waitFor(() => expect(result.current.isError).toBe(true));
+    });
+  });
 
-    const { result } = renderHook(() => useCourseDetails('999'), {
-      wrapper: createWrapper(),
-    })
+  describe("useCourseDetails", () => {
+    it("should fetch course details with normalization (typo handling)", async () => {
+      const mockRawData = {
+        totel: 10,
+        persantage: 80,
+        other: "data",
+      };
+      (axios.get as any).mockResolvedValueOnce({ data: mockRawData });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data?.total).toBe(20)
-    expect(result.current.data?.percentage).toBe(75)
-    expect((result.current.data as any)?.totel).toBeUndefined()
-    expect((result.current.data as any)?.persantage).toBeUndefined()
-  })
+      const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+        wrapper: createWrapper(),
+      });
 
-  it('prefers existing total/percentage fields over typo fields', async () => {
-    const rawData = {
-      present: 10,
-      absent: 5,
-      total: 15,
-      percentage: 66,
-      totel: 99,
-      persantage: 99,
-    }
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual({
+        total: 10,
+        percentage: 80,
+        other: "data",
+      });
+    });
 
-    const { result } = renderHook(() => useCourseDetails('888'), {
-      wrapper: createWrapper(),
-    })
+    it("should handle alternative misspelled keys (total/percentage)", async () => {
+      const mockRawData = {
+        total: 15,
+        persentage: 75,
+      };
+      (axios.get as any).mockResolvedValueOnce({ data: mockRawData });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data?.total).toBe(15)
-    expect(result.current.data?.percentage).toBe(66)
-  })
+      const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+        wrapper: createWrapper(),
+      });
 
-  it('does not fetch when courseId is empty string', () => {
-    const { result } = renderHook(() => useCourseDetails(''), {
-      wrapper: createWrapper(),
-    })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.total).toBe(15);
+      expect(result.current.data?.percentage).toBe(75);
+    });
 
-    expect(result.current.fetchStatus).toBe('idle')
-    expect(axiosInstance.get).not.toHaveBeenCalled()
-  })
+    it("should handle default keys (total/percentage) if misspelled missing", async () => {
+      const mockRawData = {
+        total: 20,
+        percentage: 85,
+      };
+      (axios.get as any).mockResolvedValueOnce({ data: mockRawData });
 
-  it('throws when axios.get returns falsy', async () => {
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce(null)
+      const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+        wrapper: createWrapper(),
+      });
 
-    const { result } = renderHook(() => useCourseDetails('777'), {
-      wrapper: createWrapper(),
-    })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.total).toBe(20);
+      expect(result.current.data?.percentage).toBe(85);
+    });
 
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toBeInstanceOf(Error)
-  })
+    it("should handle missing totel/total/percentage entirely", async () => {
+       (axios.get as any).mockResolvedValueOnce({ data: {} });
+       const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+         wrapper: createWrapper(),
+       });
+       await waitFor(() => expect(result.current.isSuccess).toBe(true));
+       expect(result.current.data?.total).toBeUndefined();
+    });
 
-  it('calls correct EzyGo course URL', async () => {
-    const rawData = { present: 5, absent: 2, total: 7, percentage: 71 }
-    vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: rawData })
+    it("should throw if course detail fetch returns null", async () => {
+      (axios.get as any).mockResolvedValueOnce(null);
+      const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+    });
 
-    const { result } = renderHook(() => useCourseDetails('123'), {
-      wrapper: createWrapper(),
-    })
+    it("should handle custom courses (ezygoId 0)", async () => {
+      const { result } = renderHook(() => useCourseDetails("CUSTOM", 0, "Custom Course"), {
+        wrapper: createWrapper(),
+      });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(axiosInstance.get).toHaveBeenCalledWith(
-      '/attendancereports/institutionuser/courses/123/summery'
-    )
-  })
-})
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.course.name).toBe("Custom Course");
+      expect(axios.get).not.toHaveBeenCalled();
+    });
 
-describe('useAllCourseDetails', () => {
-  const createWrapper = () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnWindowFocus: false,
-          refetchOnReconnect: false,
-          refetchInterval: false,
-        },
-      },
-    })
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'QueryClientWrapper'
-    return { Wrapper, queryClient }
-  }
+    it("should use default name for custom courses if not provided", async () => {
+      const { result } = renderHook(() => useCourseDetails("CUSTOM", 0), {
+        wrapper: createWrapper(),
+      });
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.course.name).toBe("Course");
+    });
 
-  it('does not fetch when courseIds array is empty', () => {
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useAllCourseDetails([]), {
-      wrapper: Wrapper,
-    })
+    it("should retry with correct endpoint on fallback", async () => {
+      // First call fails, second call succeeds
+      (axios.get as any)
+        .mockRejectedValueOnce(new Error("404 on /summery"))
+        .mockResolvedValueOnce({ data: { total: 5, percentage: 100 } });
 
-    expect(result.current.fetchStatus).toBe('idle')
-    expect(axiosInstance.get).not.toHaveBeenCalled()
-  })
+      const { result } = renderHook(() => useCourseDetails("CS102", 456), {
+        wrapper: createWrapper(),
+      });
 
-  it('fetches all course summaries in parallel and returns a map', async () => {
-    const raw101 = { present: 10, absent: 2, total: 12, percentage: 83 }
-    const raw202 = { present: 5, absent: 5, totel: 10, persantage: 50 }
-    vi.mocked(axiosInstance.get)
-      .mockResolvedValueOnce({ data: raw101 })
-      .mockResolvedValueOnce({ data: raw202 })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith("/attendancereports/institutionuser/courses/456/summery");
+      expect(axios.get).toHaveBeenCalledWith("/attendancereports/institutionuser/courses/456/summary");
+    });
+  });
 
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useAllCourseDetails(['101', '202']), {
-      wrapper: Wrapper,
-    })
+  describe("useAllCourseDetails", () => {
+    it("should batch fetch all course details and update cache", async () => {
+      const courses = [
+        { code: "CS101", id: 123, name: "Intro" },
+        { code: "CS102", id: 456, name: "Advanced" },
+      ];
+      const mockBatchData = {
+        CS101: { totel: 10, persantage: 90 },
+        CS102: { total: 20, percentage: 80 },
+      };
+      (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+      const queryClient = new QueryClient();
+      const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
 
-    expect(result.current.data?.['101']).toMatchObject({ present: 10, absent: 2, total: 12 })
-    expect(result.current.data?.['202']).toMatchObject({ present: 5, absent: 5, total: 10, percentage: 50 })
-    expect((result.current.data?.['202'] as any)?.totel).toBeUndefined()
-  })
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
 
-  it('seeds per-course TanStack Query cache entries', async () => {
-    const raw = { present: 8, absent: 2, total: 10, percentage: 80 }
-    vi.mocked(axiosInstance.get).mockResolvedValue({ data: raw })
+      const { result } = renderHook(() => useAllCourseDetails(courses), {
+        wrapper,
+      });
 
-    const { Wrapper, queryClient } = createWrapper()
-    renderHook(() => useAllCourseDetails(['55', '66']), { wrapper: Wrapper })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.CS101.percentage).toBe(90);
+      expect(result.current.data?.CS102.total).toBe(20);
 
-    await waitFor(() =>
-      expect(queryClient.getQueryData(['attendance-report', '55'])).toBeDefined()
-    )
-    expect(queryClient.getQueryData(['attendance-report', '66'])).toBeDefined()
-  })
+      // Check if individual cache was updated
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101"], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102"], expect.any(Object));
+    });
 
-  it('calls the correct EzyGo summery URL for each course', async () => {
-    const raw = { present: 3, absent: 1, total: 4, percentage: 75 }
-    vi.mocked(axiosInstance.get).mockResolvedValue({ data: raw })
+    it("should handle missing course in batch courses list", async () => {
+       const mockBatchData = {
+         UNKNOWN: { total: 10, percentage: 90 },
+       };
+       (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
+       const { result } = renderHook(() => useAllCourseDetails([{ code: "CS101", id: 1, name: "N" }]), {
+         wrapper: createWrapper(),
+       });
+       await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    });
 
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useAllCourseDetails(['111', '222']), {
-      wrapper: Wrapper,
-    })
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-    expect(axiosInstance.get).toHaveBeenCalledWith(
-      '/attendancereports/institutionuser/courses/111/summery'
-    )
-    expect(axiosInstance.get).toHaveBeenCalledWith(
-      '/attendancereports/institutionuser/courses/222/summery'
-    )
-  })
-
-  it('enters error state when a fetch fails', async () => {
-    vi.mocked(axiosInstance.get).mockRejectedValueOnce(new Error('Network error'))
-
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useAllCourseDetails(['99']), {
-      wrapper: Wrapper,
-    })
-
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toBeInstanceOf(Error)
-  })
-})
+    it("should throw if batch response is empty", async () => {
+       (axios.post as any).mockResolvedValueOnce({ data: null });
+       const { result } = renderHook(() => useAllCourseDetails([{ code: "X", id: 1, name: "X" }]), {
+         wrapper: createWrapper(),
+       });
+       await waitFor(() => expect(result.current.isError).toBe(true));
+    });
+  });
+});

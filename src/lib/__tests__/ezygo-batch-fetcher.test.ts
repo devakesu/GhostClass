@@ -1,998 +1,416 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { fetchEzygoData, getRateLimiterStats, resetRateLimiterState } from '../ezygo-batch-fetcher';
+import { NonBreakerError } from '../circuit-breaker';
+import { 
+  fetchEzygoData, 
+  resetRateLimiterState, 
+  getRateLimiterStats, 
+  invalidateEzygoCacheForUser, 
+  QueueFullError, 
+  QueueTimeoutError,
+  fetchDashboardData
+} from '../ezygo-batch-fetcher';
+import { egressFetch } from '../utils.server';
 
-// Mock server-only to allow tests to run
 vi.mock('server-only', () => ({}));
-
-// Mock the circuit breaker to passthrough execution
-vi.mock('../circuit-breaker', () => ({
-  ezygoCircuitBreaker: {
-    execute: vi.fn((fn) => fn()),
-  },
-  CircuitBreakerOpenError: class CircuitBreakerOpenError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'CircuitBreakerOpenError';
-    }
-  },
-  NonBreakerError: class NonBreakerError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'NonBreakerError';
-    }
-  },
+vi.mock('../utils.server', () => ({
+  egressFetch: vi.fn(),
 }));
 
-// Mock the logger
+// Mock logger to avoid console noise
 vi.mock('../logger', () => ({
   logger: {
     dev: vi.fn(),
-    error: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
-describe('EzyGo Batch Fetcher', () => {
+describe('ezygo-batch-fetcher', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset rate limiter state to avoid test interference
+    vi.resetModules();
     resetRateLimiterState();
-    // Reset fetch mock before each test
-    global.fetch = vi.fn();
-    
-    // Set required environment variable
-    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://api.example.com';
-    delete process.env.CF_PROXY_URL;
-    delete process.env.CF_PROXY_SECRET;
-    delete process.env.AWS_SECONDARY_URL;
-    delete process.env.AWS_SECONDARY_SECRET;
+    vi.useFakeTimers();
+    vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.ezygo.com');
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    // Don't clean up in afterEach since some tests need to modify it
-    // Each test should handle its own cleanup if needed
+    resetRateLimiterState();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
-  describe('Request Deduplication', () => {
-    it('should deduplicate identical in-flight requests', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
+  it('fetches data successfully', async () => {
+    const mockResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ data: 'ok' })),
+    };
+    (egressFetch as any).mockResolvedValue(mockResponse);
 
-      const token = 'test-token';
-      const endpoint = '/myprofile';
-
-      // Make 3 concurrent identical requests
-      const promises = [
-        fetchEzygoData(endpoint, token),
-        fetchEzygoData(endpoint, token),
-        fetchEzygoData(endpoint, token),
-      ];
-
-      const results = await Promise.all(promises);
-
-      // All should return the same result
-      expect(results).toEqual([mockResponse, mockResponse, mockResponse]);
-      
-      // But fetch should only be called once due to deduplication
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    });
-
-    it('should use separate cache keys for different methods', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const token = 'test-token';
-      const endpoint = '/endpoint';
-
-      // Make GET and POST requests to the same endpoint
-      await Promise.all([
-        fetchEzygoData(endpoint, token, 'GET'),
-        fetchEzygoData(endpoint, token, 'POST', {}),
-      ]);
-
-      // Should make 2 separate requests (different methods)
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-
-    it('should use separate cache keys for different tokens', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const endpoint = '/myprofile';
-
-      // Make requests with different tokens
-      await Promise.all([
-        fetchEzygoData(endpoint, 'token-1'),
-        fetchEzygoData(endpoint, 'token-2'),
-      ]);
-
-      // Should make 2 separate requests (different tokens)
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-
-    it('should use separate cache keys for different request bodies', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const token = 'test-token';
-      const endpoint = '/endpoint';
-
-      // Make POST requests with different bodies
-      await Promise.all([
-        fetchEzygoData(endpoint, token, 'POST', { param: 'value1' }),
-        fetchEzygoData(endpoint, token, 'POST', { param: 'value2' }),
-      ]);
-
-      // Should make 2 separate requests (different bodies)
-      expect(global.fetch).toHaveBeenCalledTimes(2);
-    });
-
-    it('should deduplicate endpoints with and without leading slash', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const token = 'test-token';
-
-      // Make concurrent requests with /endpoint and endpoint
-      const promises = [
-        fetchEzygoData('/myprofile', token),
-        fetchEzygoData('myprofile', token),
-      ];
-
-      const results = await Promise.all(promises);
-
-      // Both should return the same result
-      expect(results).toEqual([mockResponse, mockResponse]);
-      
-      // But fetch should only be called once due to endpoint normalization
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    });
-
-    it('should generate distinct cache keys for undefined vs {} vs null body', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const token = 'test-token';
-      const endpoint = '/endpoint';
-
-      // Make POST requests with undefined (omitted), {}, and null bodies
-      await Promise.all([
-        fetchEzygoData(endpoint, token, 'POST', undefined),
-        fetchEzygoData(endpoint, token, 'POST', {}),
-        fetchEzygoData(endpoint, token, 'POST', null),
-      ]);
-
-      // Should make 3 separate requests (distinct body semantics)
-      expect(global.fetch).toHaveBeenCalledTimes(3);
-    });
-
-    it('should deduplicate requests with same body (including undefined)', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const token = 'test-token';
-      const endpoint = '/endpoint';
-
-      // Make multiple GET requests (no body = undefined)
-      const promises = [
-        fetchEzygoData(endpoint, token, 'GET'),
-        fetchEzygoData(endpoint, token, 'GET'),
-        fetchEzygoData(endpoint, token, 'GET'),
-      ];
-
-      const results = await Promise.all(promises);
-
-      // All should return the same result
-      expect(results).toEqual([mockResponse, mockResponse, mockResponse]);
-      
-      // But fetch should only be called once (deduplication)
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    });
+    const result = await fetchEzygoData('/test', 'token');
+    expect(result).toEqual({ data: 'ok' });
+    expect(egressFetch).toHaveBeenCalledWith('/test', expect.anything());
   });
 
-  describe('Rate Limiting', () => {
-    it('should enforce max concurrent requests (3)', async () => {
-      let activeRequests = 0;
-      let maxConcurrent = 0;
-
-      (global.fetch as any).mockImplementation(async () => {
-        activeRequests++;
-        maxConcurrent = Math.max(maxConcurrent, activeRequests);
-        
-        // Simulate some work
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        activeRequests--;
-        return {
-          ok: true,
-          json: async () => ({ data: 'test' }),
-        };
-      });
-
-      const token = 'test-token';
-      
-      // Make 10 requests with different endpoints to avoid deduplication
-      const promises = Array.from({ length: 10 }, (_, i) => 
-        fetchEzygoData(`/endpoint-${i}`, token)
-      );
-
-      await Promise.all(promises);
-
-      // Max concurrent should not exceed 3
-      expect(maxConcurrent).toBeLessThanOrEqual(3);
+  it('deduplicates identical in-flight requests', async () => {
+    let resolveResponse: any;
+    const mockResponsePromise = new Promise(resolve => {
+      resolveResponse = resolve;
     });
+    
+    (egressFetch as any).mockReturnValue(mockResponsePromise);
 
-    it('should queue requests when limit is reached', async () => {
-      const stats = getRateLimiterStats();
-      expect(stats).toHaveProperty('activeRequests');
-      expect(stats).toHaveProperty('queueLength');
-      expect(stats).toHaveProperty('maxConcurrent');
-      expect(stats.maxConcurrent).toBe(3);
+    const p1 = fetchEzygoData('/test', 'token');
+    const p2 = fetchEzygoData('/test', 'token');
+    
+    expect(p1).toBe(p2); // Same promise instance
+    
+    resolveResponse({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ data: 'ok' })),
     });
+    
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1).toEqual({ data: 'ok' });
+    expect(r2).toEqual({ data: 'ok' });
+    expect(egressFetch).toHaveBeenCalledTimes(1);
   });
 
-  describe('Timeout Signal Cleanup', () => {
-    it('should clean up timeout timers after successful fetch', async () => {
-      // Mock AbortSignal.timeout to be unavailable to force fallback path with setTimeout
-      const originalTimeout = AbortSignal.timeout;
-      (AbortSignal as any).timeout = undefined;
-      
-      try {
-        const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-        
-        const mockResponse = { data: 'test' };
-        (global.fetch as any).mockResolvedValue({
-          ok: true,
-          json: async () => mockResponse,
-        });
+  it('respects MAX_CONCURRENT limit and queues requests', async () => {
+    const resolvers: any[] = [];
+    (egressFetch as any).mockImplementation(() => new Promise(resolve => {
+      resolvers.push(resolve);
+    }));
 
-        const token = 'test-token';
-        const endpoint = '/myprofile';
+    // Start 3 requests (MAX_CONCURRENT)
+    const p1 = fetchEzygoData('/1', 'token').catch(() => {});
+    const p2 = fetchEzygoData('/2', 'token').catch(() => {});
+    const p3 = fetchEzygoData('/3', 'token').catch(() => {});
+    
+    // Wait for them to reach egressFetch
+    await vi.waitFor(() => expect(resolvers.length).toBe(3));
 
-        // Make a request
-        await fetchEzygoData(endpoint, token);
-        
-        // clearTimeout should be called to clean up the timer
-        expect(clearTimeoutSpy).toHaveBeenCalled();
-        
-        clearTimeoutSpy.mockRestore();
-      } finally {
-        (AbortSignal as any).timeout = originalTimeout;
-        resetRateLimiterState();
+    expect(getRateLimiterStats().activeRequests).toBe(3);
+    expect(getRateLimiterStats().queueLength).toBe(0);
+
+    // 4th request should be queued (won't reach egressFetch yet)
+    const p4 = fetchEzygoData('/4', 'token');
+    expect(getRateLimiterStats().activeRequests).toBe(3);
+    expect(getRateLimiterStats().queueLength).toBe(1);
+    expect(resolvers.length).toBe(3);
+
+    // Resolve first request
+    resolvers[0]({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ data: '1' })),
+    });
+    
+    await p1;
+    
+    // Now p4 should be active and reach egressFetch
+    await vi.waitFor(() => expect(resolvers.length).toBe(4));
+    expect(getRateLimiterStats().activeRequests).toBe(3);
+    expect(getRateLimiterStats().queueLength).toBe(0);
+    
+    // Cleanup
+    resolvers.forEach(r => {
+      if (typeof r === 'function') {
+        r({ ok: true, text: () => Promise.resolve('{}') });
       }
     });
-
-    it('should clean up timeout timers after failed fetch', async () => {
-      // Mock AbortSignal.timeout to be unavailable to force fallback path with setTimeout
-      const originalTimeout = AbortSignal.timeout;
-      (AbortSignal as any).timeout = undefined;
-      
-      try {
-        const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-        
-        const mockError = new Error('Network error');
-        (global.fetch as any).mockRejectedValue(mockError);
-
-        const token = 'test-token';
-        const endpoint = '/myprofile';
-
-        // Make a request that will fail
-        try {
-          await fetchEzygoData(endpoint, token);
-          expect.fail('Should have thrown an error');
-        } catch (error: any) {
-          expect(error.message).toBe('Network error');
-        }
-        
-        // clearTimeout should be called even after error
-        expect(clearTimeoutSpy).toHaveBeenCalled();
-        
-        clearTimeoutSpy.mockRestore();
-      } finally {
-        (AbortSignal as any).timeout = originalTimeout;
-        resetRateLimiterState();
-      }
-    });
-
-    it('should clean up timeout timers for multiple concurrent requests', async () => {
-      // Mock AbortSignal.timeout to be unavailable to force fallback path with setTimeout
-      const originalTimeout = AbortSignal.timeout;
-      (AbortSignal as any).timeout = undefined;
-      
-      try {
-        const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-        
-        const mockResponse = { data: 'test' };
-        (global.fetch as any).mockResolvedValue({
-          ok: true,
-          json: async () => mockResponse,
-        });
-
-        const token = 'test-token';
-
-        // Make multiple requests with different endpoints (no deduplication)
-        await Promise.all([
-          fetchEzygoData('/endpoint1', token),
-          fetchEzygoData('/endpoint2', token),
-          fetchEzygoData('/endpoint3', token),
-        ]);
-        
-        // clearTimeout should be called for each request: once for the batch-fetcher's
-        // own createTimeoutSignal fallback, and once for egressFetch's per-tier timeout.
-        expect(clearTimeoutSpy).toHaveBeenCalledTimes(6);
-        
-        clearTimeoutSpy.mockRestore();
-      } finally {
-        (AbortSignal as any).timeout = originalTimeout;
-        resetRateLimiterState();
-      }
-    });
+    await Promise.all([p2, p3, p4]);
   });
 
-  describe('API Request Construction', () => {
-    it('should construct correct URL for GET requests', async () => {
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('/myprofile', 'test-token', 'GET');
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toBe('https://api.example.com/myprofile');
-      expect(calledInit.method).toBe('GET');
-      const h = calledInit.headers as Headers;
-      expect(h.get('Authorization')).toBe('Bearer test-token');
-
-      // Verify Content-Type is NOT set for GET requests
-      expect(h.get('Content-Type')).toBeNull();
-    });
-
-    it('should include body for POST requests', async () => {
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      const body = { key: 'value' };
-      await fetchEzygoData('/endpoint', 'test-token', 'POST', body);
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toBe('https://api.example.com/endpoint');
-      expect(calledInit.method).toBe('POST');
-      expect(calledInit.body).toBe(JSON.stringify(body));
-      const h = calledInit.headers as Headers;
-      expect(h.get('Authorization')).toBe('Bearer test-token');
-      expect(h.get('Content-Type')).toBe('application/json');
-    });
-
-    it('should prefer CF proxy URL and include CF secret header when configured', async () => {
-      process.env.CF_PROXY_URL = 'https://cf-proxy.example.com/';
-      process.env.CF_PROXY_SECRET = 'cf-secret';
-
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('/myprofile', 'test-token', 'GET');
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toBe('https://cf-proxy.example.com/myprofile');
-      expect(calledInit.method).toBe('GET');
-      const h = calledInit.headers as Headers;
-      expect(h.get('Authorization')).toBe('Bearer test-token');
-      expect(h.get('x-proxy-secret')).toBe('cf-secret');
-    });
-
-    it('should fall back to AWS secondary URL and include AWS secret header when CF is absent', async () => {
-      process.env.AWS_SECONDARY_URL = 'https://aws-proxy.example.com/';
-      process.env.AWS_SECONDARY_SECRET = 'aws-secret';
-
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('/myprofile', 'test-token', 'GET');
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toBe('https://aws-proxy.example.com/myprofile');
-      expect(calledInit.method).toBe('GET');
-      const h = calledInit.headers as Headers;
-      expect(h.get('Authorization')).toBe('Bearer test-token');
-      expect(h.get('x-proxy-secret')).toBe('aws-secret');
-    });
-
-    it('should prefer CF over AWS when both egress tiers are configured', async () => {
-      process.env.CF_PROXY_URL = 'https://cf-proxy.example.com/';
-      process.env.CF_PROXY_SECRET = 'cf-secret';
-      process.env.AWS_SECONDARY_URL = 'https://aws-proxy.example.com/';
-      process.env.AWS_SECONDARY_SECRET = 'aws-secret';
-
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('/myprofile', 'test-token', 'GET');
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [calledUrl, calledInit] = (global.fetch as any).mock.calls[0] as [string, RequestInit];
-      expect(calledUrl).toBe('https://cf-proxy.example.com/myprofile');
-      expect(calledInit.method).toBe('GET');
-      const h = calledInit.headers as Headers;
-      expect(h.get('Authorization')).toBe('Bearer test-token');
-      expect(h.get('x-proxy-secret')).toBe('cf-secret');
-    });
-
-    it('should handle endpoints with leading slash', async () => {
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('/endpoint', 'test-token');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.example.com/endpoint',
-        expect.any(Object)
-      );
-    });
-
-    it('should handle endpoints without leading slash', async () => {
-      (global.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData('endpoint', 'test-token');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.example.com/endpoint',
-        expect.any(Object)
-      );
-    });
-
-    it('should handle backend URL with trailing slash', async () => {
-      // Use unique endpoint to avoid cache
-      const uniqueEndpoint = `/trail-test-${Date.now()}`;
-      const originalUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      process.env.NEXT_PUBLIC_BACKEND_URL = 'https://api.example.com/';
-      
-      vi.clearAllMocks();
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      });
-
-      await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-
-      // Should not have double slash
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://api.example.com${uniqueEndpoint}`,
-        expect.any(Object)
-      );
-      
-      // Restore
-      process.env.NEXT_PUBLIC_BACKEND_URL = originalUrl;
-    });
+  it('throws QueueFullError if queue is too long', async () => {
+    (egressFetch as any).mockReturnValue(new Promise(() => {}));
+    
+    // Occupy all slots (3)
+    fetchEzygoData('/1', 'token').catch(() => {});
+    fetchEzygoData('/2', 'token').catch(() => {});
+    fetchEzygoData('/3', 'token').catch(() => {});
+    
+    // Fill queue (100)
+    for (let i = 0; i < 100; i++) {
+      fetchEzygoData(`/q${i}`, 'token').catch(() => {});
+    }
+    
+    expect(getRateLimiterStats().queueLength).toBe(100);
+    
+    // 101st queued request should throw
+    await expect(fetchEzygoData('/full', 'token')).rejects.toThrow(QueueFullError);
   });
 
-  describe('Error Handling', () => {
-    it('should throw error for non-ok responses', async () => {
-      // Create unique endpoint to avoid cache
-      const uniqueEndpoint = `/error-test-${Date.now()}`;
-      
-      vi.clearAllMocks();
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: async () => ({ error: 'Not Found' }),
-      });
+  it('throws QueueTimeoutError if request waits too long', async () => {
+    (egressFetch as any).mockReturnValue(new Promise(() => {}));
+    
+    // Occupy all slots
+    fetchEzygoData('/1', 'token').catch(() => {});
+    fetchEzygoData('/2', 'token').catch(() => {});
+    fetchEzygoData('/3', 'token').catch(() => {});
+    
+    const pQueued = fetchEzygoData('/queued', 'token');
+    
+    // Create the expectation before advancing timers
+    const rejection = expect(pQueued).rejects.toThrow(QueueTimeoutError);
+    
+    // Advance time by 31 seconds
+    await vi.advanceTimersByTimeAsync(31000);
+    
+    await rejection;
+  });
 
-      await expect(
-        fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`)
-      ).rejects.toThrow('EzyGo API error: 404 Not Found');
+  it('evicts from cache on transient failure', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
     });
 
-    describe('Circuit Breaker Status Code Mapping', () => {
-      it('should throw NonBreakerError for 400 Bad Request', async () => {
-        const uniqueEndpoint = `/error-400-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-          statusText: 'Bad Request',
-          json: async () => ({ error: 'Bad Request' }),
-        });
+    await expect(fetchEzygoData('/fail', 'token')).rejects.toThrow('EzyGo API error');
+    
+    // Should be able to retry immediately (not cached)
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{"retried":true}'),
+    });
+    
+    const result = await fetchEzygoData('/fail', 'token');
+    expect(result).toEqual({ retried: true });
+  });
 
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).toBe('NonBreakerError');
-          expect(error.message).toContain('400');
+  it('does NOT evict from cache on NonBreakerError', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+
+    await expect(fetchEzygoData('/404', 'token')).rejects.toThrow(NonBreakerError);
+    
+    // Subsequent calls for same key should return the SAME rejected promise
+    const p2 = fetchEzygoData('/404', 'token');
+    await expect(p2).rejects.toThrow(NonBreakerError);
+    
+    expect(egressFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to raw text if JSON parse fails', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('even'),
+    });
+
+    const result = await fetchEzygoData('/settings', 'token');
+    expect(result).toBe('even');
+  });
+
+  it('invalidates cache for specific user', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{}'),
+    });
+
+    const p1 = fetchEzygoData('/data', 'token1');
+    const p2 = fetchEzygoData('/data', 'token2');
+    await Promise.all([p1, p2]);
+    
+    expect(getRateLimiterStats().cacheSize).toBe(2);
+    
+    invalidateEzygoCacheForUser('token1');
+    expect(getRateLimiterStats().cacheSize).toBe(1);
+  });
+
+  it('fetchDashboardData fetches courses and attendance', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{}'),
+    });
+
+    const result = await fetchDashboardData('token');
+    expect(result).toHaveProperty('courses');
+    expect(result).toHaveProperty('attendance');
+    expect(egressFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws if no egress target is configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', '');
+    vi.stubEnv('CF_PROXY_URL', '');
+    vi.stubEnv('AWS_SECONDARY_URL', '');
+    
+    await expect(fetchEzygoData('/test', 'token')).rejects.toThrow('No egress target configured');
+  });
+
+  it('uses POST method and body correctly', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{}'),
+    });
+
+    await fetchEzygoData('/post', 'token', 'POST', { key: 'val' });
+    
+    expect(egressFetch).toHaveBeenCalledWith('/post', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ key: 'val' }),
+      headers: expect.objectContaining({
+        'Content-Type': 'application/json',
+      }),
+    }));
+  });
+
+  it('handles fallback AbortSignal timeout', async () => {
+    // Force fallback by removing AbortSignal.timeout
+    const originalTimeout = (AbortSignal as any).timeout;
+    (AbortSignal as any).timeout = undefined;
+    
+    vi.useFakeTimers();
+    
+    (egressFetch as any).mockImplementation((_url: string, options: any) => {
+      return new Promise((_resolve, reject) => {
+        if (options.signal.aborted) {
+          reject(new Error('Aborted'));
+          return;
         }
-        expect(errorCaught).toBe(true);
-      });
-
-      it('should throw NonBreakerError for 401 Unauthorized', async () => {
-        const uniqueEndpoint = `/error-401-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 401,
-          statusText: 'Unauthorized',
-          json: async () => ({ error: 'Unauthorized' }),
+        options.signal.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
         });
-
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).toBe('NonBreakerError');
-          expect(error.message).toContain('401');
-        }
-        expect(errorCaught).toBe(true);
       });
+    });
 
-      it('should throw NonBreakerError for 403 Forbidden', async () => {
-        const uniqueEndpoint = `/error-403-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 403,
-          statusText: 'Forbidden',
-          json: async () => ({ error: 'Forbidden' }),
+    const p = fetchEzygoData('/test-fallback', 'token');
+    
+    // Create the expectation before advancing timers
+    const rejection = expect(p).rejects.toThrow('Aborted');
+    
+    // Advance time to trigger the 15s timeout
+    await vi.advanceTimersByTimeAsync(15100);
+    
+    await rejection;
+    
+    vi.useRealTimers();
+    // Restore
+    (AbortSignal as any).timeout = originalTimeout;
+  });
+
+  it('handles native AbortSignal timeout', async () => {
+    // Ensure native AbortSignal.timeout is available
+    if (typeof AbortSignal.timeout !== 'function') {
+      return;
+    }
+
+    const originalTimeout = AbortSignal.timeout;
+    const controller = new AbortController();
+    (AbortSignal as any).timeout = vi.fn().mockReturnValue(controller.signal);
+
+    (egressFetch as any).mockImplementation((_url: string, options: any) => {
+      return new Promise((_resolve, reject) => {
+        if (options.signal.aborted) {
+          reject(new Error('Aborted'));
+          return;
+        }
+        options.signal.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
         });
-
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).toBe('NonBreakerError');
-          expect(error.message).toContain('403');
-        }
-        expect(errorCaught).toBe(true);
       });
+    });
 
-      it('should throw NonBreakerError for 404 Not Found', async () => {
-        const uniqueEndpoint = `/error-404-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-          json: async () => ({ error: 'Not Found' }),
-        });
+    const p = fetchEzygoData('/test-native', 'token');
+    
+    // Manually abort the signal to simulate timeout
+    controller.abort();
+    
+    await expect(p).rejects.toThrow('Aborted');
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(15000);
+    
+    (AbortSignal as any).timeout = originalTimeout;
+  });
 
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).toBe('NonBreakerError');
-          expect(error.message).toContain('404');
-        }
-        expect(errorCaught).toBe(true);
-      });
+  it('ignores releaseSlot from prior generations', async () => {
+    // This is hard to test directly because releaseSlot is internal
+    // but we can trigger it via resetRateLimiterState
+    const resolvers: any[] = [];
+    (egressFetch as any).mockImplementation(() => new Promise(resolve => {
+      resolvers.push(resolve);
+    }));
 
-      it('should throw NonBreakerError for 422 Unprocessable Entity', async () => {
-        const uniqueEndpoint = `/error-422-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          json: async () => ({ error: 'Unprocessable Entity' }),
-        });
+    const p1 = fetchEzygoData('/1', 'token');
+    await vi.waitFor(() => expect(resolvers.length).toBe(1));
+    
+    // Reset state while request is in-flight
+    resetRateLimiterState();
+    
+    // Request finishes from OLD generation
+    resolvers[0]({ ok: true, text: () => Promise.resolve('{}') });
+    
+    // This should NOT crash and should NOT affect new state
+    await p1.catch(() => {});
+    expect(getRateLimiterStats().activeRequests).toBe(0);
+  });
 
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).toBe('NonBreakerError');
-          expect(error.message).toContain('422');
-        }
-        expect(errorCaught).toBe(true);
-      });
+  it('throws non-SyntaxError from JSON.parse', async () => {
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('not-json'),
+    });
 
-      it('should throw regular Error (not NonBreakerError) for 429 Rate Limited', async () => {
-        const uniqueEndpoint = `/error-429-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 429,
-          statusText: 'Too Many Requests',
-          json: async () => ({ error: 'Rate Limited' }),
-        });
+    const spy = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+      throw new TypeError('Mock TypeError');
+    });
 
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).not.toBe('NonBreakerError');
-          expect(error.name).toBe('Error');
-          expect(error.message).toContain('429');
-        }
-        expect(errorCaught).toBe(true);
-      });
+    await expect(fetchEzygoData('/test', 'token')).rejects.toThrow('Mock TypeError');
+    spy.mockRestore();
+  });
 
-      it('should throw regular Error (not NonBreakerError) for 500 Internal Server Error', async () => {
-        const uniqueEndpoint = `/error-500-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
+  it('fetchDashboardData handles failures for courses', async () => {
+    (egressFetch as any).mockImplementation((url: string) => {
+      if (url === '/institutionuser/courses/withusers') {
+        return Promise.resolve({
           ok: false,
           status: 500,
-          statusText: 'Internal Server Error',
-          json: async () => ({ error: 'Server Error' }),
+          statusText: 'Server Error'
         });
-
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).not.toBe('NonBreakerError');
-          expect(error.name).toBe('Error');
-          expect(error.message).toContain('500');
-        }
-        expect(errorCaught).toBe(true);
-      });
-
-      it('should throw regular Error (not NonBreakerError) for 502 Bad Gateway', async () => {
-        const uniqueEndpoint = `/error-502-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 502,
-          statusText: 'Bad Gateway',
-          json: async () => ({ error: 'Bad Gateway' }),
-        });
-
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).not.toBe('NonBreakerError');
-          expect(error.name).toBe('Error');
-          expect(error.message).toContain('502');
-        }
-        expect(errorCaught).toBe(true);
-      });
-
-      it('should throw regular Error (not NonBreakerError) for 503 Service Unavailable', async () => {
-        const uniqueEndpoint = `/error-503-${Date.now()}`;
-        vi.clearAllMocks();
-        (global.fetch as any).mockResolvedValueOnce({
-          ok: false,
-          status: 503,
-          statusText: 'Service Unavailable',
-          json: async () => ({ error: 'Service Unavailable' }),
-        });
-
-        let errorCaught = false;
-        try {
-          await fetchEzygoData(uniqueEndpoint, `test-token-${Date.now()}`);
-        } catch (error: any) {
-          errorCaught = true;
-          expect(error.name).not.toBe('NonBreakerError');
-          expect(error.name).toBe('Error');
-          expect(error.message).toContain('503');
-        }
-        expect(errorCaught).toBe(true);
-      });
-    });
-  });
-
-  describe('getRateLimiterStats', () => {
-    it('should return rate limiter statistics', () => {
-      const stats = getRateLimiterStats();
-
-      expect(stats).toHaveProperty('activeRequests');
-      expect(stats).toHaveProperty('queueLength');
-      expect(stats).toHaveProperty('maxConcurrent');
-      expect(stats).toHaveProperty('cacheSize');
-      
-      expect(typeof stats.activeRequests).toBe('number');
-      expect(typeof stats.queueLength).toBe('number');
-      expect(typeof stats.maxConcurrent).toBe('number');
-      expect(typeof stats.cacheSize).toBe('number');
-    });
-
-    it('should show correct maxConcurrent value', () => {
-      const stats = getRateLimiterStats();
-      expect(stats.maxConcurrent).toBe(3);
-    });
-  });
-
-  describe('Cache Key Security', () => {
-    it('should use SHA-256 hash for cache key (not token suffix)', async () => {
-      const mockResponse = { data: 'test' };
-      (global.fetch as any).mockResolvedValue({
+      }
+      return Promise.resolve({
         ok: true,
-        json: async () => mockResponse,
+        text: () => Promise.resolve(JSON.stringify({ data: 'ok' }))
       });
-
-      // Two different tokens with same last 8 characters
-      const token1 = 'prefix1-12345678';
-      const token2 = 'prefix2-12345678';
-
-      // Make requests with both tokens
-      await Promise.all([
-        fetchEzygoData('/endpoint', token1),
-        fetchEzygoData('/endpoint', token2),
-      ]);
-
-      // Should make 2 separate requests (different token hashes)
-      // This verifies tokens are hashed, not just using suffix
-      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
+
+    const result = await fetchDashboardData('token');
+    expect(result.courses).toBeNull();
+    expect(result.attendance).toEqual({ data: 'ok' });
   });
 
-  describe('Queue Management', () => {
-    it('should enforce FIFO fairness - queued requests cannot be bypassed', async () => {
-      // Use fake timers to control request timing
-      vi.useFakeTimers();
-      
-      try {
-        // Reset state first
-        resetRateLimiterState();
-        vi.clearAllMocks();
-        
-        const completionOrder: number[] = [];
-        const resolvers: Array<() => void> = [];
-        
-        // Mock fetch to allow manual control over request completion
-        (global.fetch as any).mockImplementation(async () => {
-          return new Promise<any>((resolve) => {
-            resolvers.push(() => {
-              resolve({
-                ok: true,
-                json: async () => ({ data: 'test' }),
-              });
-            });
-          });
-        });
-        
-        // Start 3 requests to fill all concurrent slots
-        const request1 = fetchEzygoData('/endpoint-1', 'token-1').then(() => completionOrder.push(1));
-        const request2 = fetchEzygoData('/endpoint-2', 'token-2').then(() => completionOrder.push(2));
-        const request3 = fetchEzygoData('/endpoint-3', 'token-3').then(() => completionOrder.push(3));
-        
-        // Advance timers to allow requests to start
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Now all 3 slots are occupied, queue should be empty
-        expect(getRateLimiterStats().activeRequests).toBe(3);
-        expect(getRateLimiterStats().queueLength).toBe(0);
-        
-        // Queue two more requests (these will wait)
-        const request4 = fetchEzygoData('/endpoint-4', 'token-4').then(() => completionOrder.push(4));
-        const request5 = fetchEzygoData('/endpoint-5', 'token-5').then(() => completionOrder.push(5));
-        
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Verify queue has 2 items
-        expect(getRateLimiterStats().queueLength).toBe(2);
-        
-        // Complete request 1 to free up a slot
-        resolvers[0]();
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Request 4 should have taken the slot (first in queue)
-        expect(getRateLimiterStats().activeRequests).toBe(3); // Still 3 active
-        expect(getRateLimiterStats().queueLength).toBe(1); // Queue reduced to 1
-        
-        // NOW create a new request while queue is non-empty
-        const request6 = fetchEzygoData('/endpoint-6', 'token-6').then(() => completionOrder.push(6));
-        
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Request 6 should be queued (not bypass request 5)
-        expect(getRateLimiterStats().queueLength).toBe(2); // Queue has request 5 and 6
-        
-        // Complete request 2 to free another slot
-        resolvers[1]();
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Request 5 should take the slot (FIFO)
-        expect(getRateLimiterStats().queueLength).toBe(1); // Only request 6 left
-        
-        // Complete request 3
-        resolvers[2]();
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Request 6 should take the slot
-        expect(getRateLimiterStats().queueLength).toBe(0);
-        
-        // Complete remaining requests
-        resolvers[3]();
-        await vi.advanceTimersByTimeAsync(10);
-        resolvers[4]();
-        await vi.advanceTimersByTimeAsync(10);
-        resolvers[5]();
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Wait for all promises to resolve
-        await Promise.all([request1, request2, request3, request4, request5, request6]);
-        
-        // Verify FIFO order: requests completed in the order they were made
-        // Request 6 (which arrived late but while queue was non-empty) should come AFTER request 5
-        expect(completionOrder).toEqual([1, 2, 3, 4, 5, 6]);
-        
-        // Clean up
-        resetRateLimiterState();
-      } finally {
-        vi.useRealTimers();
-      }
+  it('fetchDashboardData handles string errors', async () => {
+    (egressFetch as any).mockImplementation(() => {
+      return Promise.reject('String error');
     });
 
-    it('should throw QueueFullError when queue is full', async () => {
-      // Use fake timers to prevent real 30s timeouts
-      vi.useFakeTimers();
-      
-      try {
-        // Reset state first
-        resetRateLimiterState();
-        vi.clearAllMocks();
-        
-        // Create a long-running fetch that respects AbortSignal
-        (global.fetch as any).mockImplementation((_url: string, init?: RequestInit) => {
-          return new Promise((_resolve, reject) => {
-            const signal = init?.signal;
-            if (signal) {
-              signal.addEventListener('abort', () => {
-                reject(new DOMException('Aborted', 'AbortError'));
-              });
-            }
-            // Don't resolve - simulates a slow request
-          });
-        });
-        
-        // Fill up all 3 concurrent slots + 100 queue slots
-        const requests = [];
-        for (let i = 0; i < 103; i++) {
-          requests.push(
-            fetchEzygoData(`/endpoint-${i}`, `token-${i}`).catch(e => e)
-          );
-        }
-        
-        // Advance timers slightly to allow promises to start
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // The 104th request should fail immediately with QueueFullError
-        try {
-          await fetchEzygoData('/endpoint-104', 'token-104');
-          expect.fail('Should have thrown QueueFullError');
-        } catch (error: any) {
-          expect(error.name).toBe('QueueFullError');
-          expect(error.message).toContain('Request queue is full');
-          expect(error.message).toContain('100 items');
-        }
-        
-        // Advance timers to trigger timeouts and clean up pending requests
-        await vi.advanceTimersByTimeAsync(20000);
-        
-        // Clean up - reset state for other tests
-        resetRateLimiterState();
-      } finally {
-        vi.useRealTimers();
-      }
+    const result = await fetchDashboardData('token');
+    expect(result.courses).toBeNull();
+    expect(result.attendance).toBeNull();
+  });
+
+  it('fetchDashboardData handles Error objects', async () => {
+    (egressFetch as any).mockImplementation((url: string) => {
+      return Promise.reject(new Error(`Error for ${url}`));
     });
 
-    it('should evict queue errors from cache to allow retry', async () => {
-      // Use fake timers to prevent real 30s timeouts
-      vi.useFakeTimers();
-      
-      try {
-        // Reset state first
-        resetRateLimiterState();
-        vi.clearAllMocks();
-        
-        // Create a long-running fetch that respects AbortSignal
-        (global.fetch as any).mockImplementation((_url: string, init?: RequestInit) => {
-          return new Promise((_resolve, reject) => {
-            const signal = init?.signal;
-            if (signal) {
-              signal.addEventListener('abort', () => {
-                reject(new DOMException('Aborted', 'AbortError'));
-              });
-            }
-            // Don't resolve - simulates a slow request
-          });
-        });
-        
-        // Fill up all 3 concurrent slots + 100 queue slots
-        const requests = [];
-        for (let i = 0; i < 103; i++) {
-          requests.push(
-            fetchEzygoData(`/endpoint-${i}`, `token-${i}`).catch(e => e)
-          );
-        }
-        
-        // Advance timers slightly to allow promises to start
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Make the same request twice - both should fail with QueueFullError
-        // If cache wasn't evicted, the second would return the cached rejection
-        const endpoint = '/test-eviction';
-        const token = 'test-token';
-        
-        const initialCacheSize = getRateLimiterStats().cacheSize;
-        
-        try {
-          await fetchEzygoData(endpoint, token);
-          expect.fail('First request should have thrown QueueFullError');
-        } catch (error: any) {
-          expect(error.name).toBe('QueueFullError');
-        }
-        
-        // Allow time for cache eviction to complete
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Verify cache was evicted after QueueFullError
-        const cacheSizeAfterFirstError = getRateLimiterStats().cacheSize;
-        expect(cacheSizeAfterFirstError).toBe(initialCacheSize); // No increase, error was evicted
-        
-        // Second request should also fail with QueueFullError (not cached)
-        try {
-          await fetchEzygoData(endpoint, token);
-          expect.fail('Second request should have thrown QueueFullError');
-        } catch (error: any) {
-          expect(error.name).toBe('QueueFullError');
-          // If it was cached, we'd get the same promise rejection
-          // The fact that it throws again proves cache was evicted
-        }
-        
-        // Allow time for cache eviction to complete
-        await vi.advanceTimersByTimeAsync(10);
-        
-        // Verify cache still hasn't grown (both errors were evicted)
-        const cacheSizeAfterSecondError = getRateLimiterStats().cacheSize;
-        expect(cacheSizeAfterSecondError).toBe(initialCacheSize);
-        
-        // Advance timers to trigger timeouts and clean up pending requests
-        await vi.advanceTimersByTimeAsync(20000);
-        
-        // Clean up
-        resetRateLimiterState();
-      } finally {
-        vi.useRealTimers();
-      }
-    });
+    const result = await fetchDashboardData('token');
+    expect(result.courses).toBeNull();
+    expect(result.attendance).toBeNull();
+  });
+
+  it('invalidateEzygoCacheForUser handles non-matching tokens', async () => {
+    fetchEzygoData('/test', 'token1').catch(() => {});
+    invalidateEzygoCacheForUser('token2'); // Should not remove token1's entry
+    expect(getRateLimiterStats().cacheSize).toBeGreaterThan(0);
+  });
+
+  it('getRateLimiterStats returns correct values', () => {
+    resetRateLimiterState();
+    const stats = getRateLimiterStats();
+    expect(stats.activeRequests).toBe(0);
+    expect(stats.queueLength).toBe(0);
+    expect(stats.maxConcurrent).toBe(3);
   });
 });

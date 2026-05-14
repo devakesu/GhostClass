@@ -64,6 +64,15 @@ vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: mockValidateCsrf,
 }));
 
+vi.mock("@/lib/security/app-check", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/security/app-check")>("@/lib/security/app-check");
+  return {
+    ...actual,
+    withSecurity: vi.fn((handler) => handler),
+    isMobileRequest: vi.fn(() => false),
+  };
+});
+
 // --- Mock auth cookie ---
 const mockGetAuthToken = vi.fn();
 vi.mock("@/lib/security/auth-cookie", () => ({
@@ -82,6 +91,12 @@ vi.mock("@/lib/utils.server", () => ({
 const mockRateLimiterLimit = vi.fn();
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: { limit: mockRateLimiterLimit },
+}));
+
+// --- Mock sync logic ---
+const mockPerformProfileSync = vi.fn();
+vi.mock("@/lib/user/sync", () => ({
+  performProfileSync: mockPerformProfileSync,
 }));
 
 // ---------------------------------------------------------------------------
@@ -120,15 +135,28 @@ function makeEzygoFetchFail() {
 // Tests
 // ---------------------------------------------------------------------------
 
+// Helper: build a NextRequest that passes Origin validation.
+// Tests run with NODE_ENV=test and NEXT_PUBLIC_APP_DOMAIN=localhost (vitest.setup.ts).
+const makeGetReq = (overrideHeaders?: Record<string, string>) =>
+  new NextRequest("http://localhost/api/profile", {
+    headers: { origin: "http://localhost", ...overrideHeaders },
+  });
+
+function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csrf") {
+  return new NextRequest("http://localhost:3000/api/profile", {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "x-csrf-token": csrfHeader,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("GET /api/profile", () => {
-  // Helper: build a NextRequest that passes Origin validation.
-  // Tests run with NODE_ENV=test and NEXT_PUBLIC_APP_DOMAIN=localhost (vitest.setup.ts).
-  const makeGetReq = (overrideHeaders?: Record<string, string>) =>
-    new NextRequest("http://localhost/api/profile", {
-      headers: { origin: "http://localhost", ...overrideHeaders },
-    });
 
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
@@ -169,7 +197,7 @@ describe("GET /api/profile", () => {
     const req = new NextRequest("http://localhost/api/profile", {
       headers: { origin: "http://localhost" },
     });
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Server misconfiguration");
@@ -181,7 +209,7 @@ describe("GET /api/profile", () => {
     const req = new NextRequest("http://localhost/api/profile", {
       headers: { origin: "https://evil.example.com" },
     });
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(403);
   });
 
@@ -189,14 +217,14 @@ describe("GET /api/profile", () => {
     vi.stubEnv("NODE_ENV", "production");
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile");
-    const res = await GET(req);
+    const res = await GET(req, { params: {} });
     expect(res.status).toBe(400);
   });
 
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(401);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Unauthorized");
@@ -205,16 +233,16 @@ describe("GET /api/profile", () => {
   it("returns 502 when EzyGo is unavailable", async () => {
     makeEzygoFetchFail();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(502);
     const body = await res.json() as { error: string };
-    expect(body.error).toContain("remote source");
+    expect(body.error.toLowerCase()).toContain("failed");
   });
 
   it("returns plaintext PII fields (not ciphertext) on success", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
 
@@ -228,7 +256,7 @@ describe("GET /api/profile", () => {
   it("never exposes IV columns in the response", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as Record<string, unknown>;
 
     expect(body).not.toHaveProperty("phone_iv");
@@ -239,7 +267,7 @@ describe("GET /api/profile", () => {
   it("writes encrypted PII (not plaintext) to the database", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    await GET(makeGetReq());
+    await GET(makeGetReq(), { params: {} });
 
     expect(mockAdminUpsert).toHaveBeenCalledOnce();
     const [upsertPayload] = mockAdminUpsert.mock.calls[0] as [Record<string, unknown>];
@@ -265,6 +293,7 @@ describe("GET /api/profile", () => {
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
           data: {
+            first_name: "Test",
             gender: encGender,
             gender_iv: genderIv,
             birth_date: encBirthDate,
@@ -278,7 +307,7 @@ describe("GET /api/profile", () => {
     makeEzygoFetchOk(); // EzyGo returns gender:"male", birth_date:"2000-01-15"
 
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as { gender: string; birth_date: string };
 
     // Local user-edited values must take precedence
@@ -289,7 +318,7 @@ describe("GET /api/profile", () => {
   it("falls back to EzyGo value when no local DB value exists", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    const res = await GET(makeGetReq());
+    const res = await GET(makeGetReq(), { params: {} });
     const body = await res.json() as { gender: string; birth_date: string };
 
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
@@ -305,7 +334,7 @@ describe("GET /api/profile", () => {
         remaining: 0,
       });
       const { GET } = await import("../route");
-      const res = await GET(makeGetReq());
+      const res = await GET(makeGetReq(), { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -322,7 +351,7 @@ describe("GET /api/profile", () => {
         remaining: 0,
       });
       const { GET } = await import("../route");
-      await GET(makeGetReq());
+      await GET(makeGetReq(), { params: {} });
       expect(mockGetUser).not.toHaveBeenCalled();
       expect(mockEgressFetch).not.toHaveBeenCalled();
     });
@@ -331,7 +360,7 @@ describe("GET /api/profile", () => {
       const { getClientIp } = await import("@/lib/utils.server");
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { GET } = await import("../route");
-      const res = await GET(makeGetReq());
+      const res = await GET(makeGetReq(), { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
@@ -342,6 +371,7 @@ describe("GET /api/profile", () => {
 describe("PATCH /api/profile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
     __resetCachedKey();
@@ -363,30 +393,11 @@ describe("PATCH /api/profile", () => {
     vi.restoreAllMocks();
   });
 
-  function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csrf") {
-    return new NextRequest("http://localhost:3000/api/profile", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        "x-csrf-token": csrfHeader,
-      },
-      body: JSON.stringify(body),
-    });
-  }
-
-  it("returns 403 when CSRF token is invalid", async () => {
-    mockValidateCsrf.mockResolvedValueOnce(false);
-    const { PATCH } = await import("../route");
-    const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-    const res = await PATCH(req);
-    expect(res.status).toBe(403);
-  });
-
   it("returns 401 when user is not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: null });
     const { PATCH } = await import("../route");
     const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(401);
   });
 
@@ -394,7 +405,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // first_name too short
     const req = makePatchRequest({ first_name: "A", gender: "male" });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(422);
   });
 
@@ -406,7 +417,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.first_name).toBe("Alice");
@@ -421,7 +432,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    const res = await PATCH(req);
+    const res = await PATCH(req, { params: {} });
     const body = await res.json() as Record<string, unknown>;
     expect(body).not.toHaveProperty("gender_iv");
     expect(body).not.toHaveProperty("birth_date_iv");
@@ -440,7 +451,7 @@ describe("PATCH /api/profile", () => {
       gender: "female",
       birth_date: "1995-06-20",
     });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     // Ciphertext must differ from plaintext
     expect(capturedUpdate.gender).not.toBe("female");
@@ -461,7 +472,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // gender and birth_date omitted – they should not appear in the update payload
     const req = makePatchRequest({ first_name: "Alice" });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     expect(capturedUpdate).not.toHaveProperty("gender");
     expect(capturedUpdate).not.toHaveProperty("gender_iv");
@@ -479,7 +490,7 @@ describe("PATCH /api/profile", () => {
     const { PATCH } = await import("../route");
     // gender and birth_date explicitly set to null – should be stored as NULL
     const req = makePatchRequest({ first_name: "Alice", gender: null, birth_date: null });
-    await PATCH(req);
+    await PATCH(req, { params: {} });
 
     expect(capturedUpdate.gender).toBeNull();
     expect(capturedUpdate.gender_iv).toBeNull();
@@ -497,7 +508,7 @@ describe("PATCH /api/profile", () => {
       });
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      const res = await PATCH(req);
+      const res = await PATCH(req, { params: {} });
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
@@ -515,7 +526,7 @@ describe("PATCH /api/profile", () => {
       });
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      await PATCH(req);
+      await PATCH(req, { params: {} });
       expect(mockValidateCsrf).not.toHaveBeenCalled();
       expect(mockGetUser).not.toHaveBeenCalled();
     });
@@ -525,10 +536,135 @@ describe("PATCH /api/profile", () => {
       vi.mocked(getClientIp).mockReturnValueOnce(null);
       const { PATCH } = await import("../route");
       const req = makePatchRequest({ first_name: "Alice", gender: "female" });
-      const res = await PATCH(req);
+      const res = await PATCH(req, { params: {} });
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(mockRateLimiterLimit).not.toHaveBeenCalled();
     });
   });
 });
+
+describe("Edge Case & Branch Coverage", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockAdminSelect.mockReset();
+    mockAdminUpsert.mockReset();
+    mockAdminUpdate.mockReset();
+    mockPerformProfileSync.mockReset();
+    mockGetAuthToken.mockReset();
+    mockRateLimiterLimit.mockReset();
+    mockGetUser.mockReset();
+    mockEgressFetch.mockReset();
+
+    process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
+    __resetCachedKey();
+    __resetAllowedHostsCache();
+
+    mockGetUser.mockResolvedValue({
+      data: { user: MOCK_USER },
+      error: null,
+    });
+    mockGetAuthToken.mockResolvedValue("ezygo-session-token");
+    mockAdminSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        }),
+      }),
+    });
+    mockAdminUpsert.mockResolvedValue({ error: null });
+    mockAdminUpdate.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
+  });
+
+  it("handles shouldSync=true when getAuthTokenServer returns null", async () => {
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: 1, first_name: "Alice", auth_id: MOCK_USER.id },
+          error: null,
+        }),
+      }),
+    }));
+    mockGetAuthToken.mockResolvedValue(null);
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    expect(mockPerformProfileSync).not.toHaveBeenCalled();
+  });
+
+  it("handles profile sync failure gracefully (logged but success response)", async () => {
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: 1, first_name: "Alice", auth_id: MOCK_USER.id },
+          error: null,
+        }),
+      }),
+    }));
+    mockPerformProfileSync.mockRejectedValue(new Error("Sync failed"));
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    // Even if sync fails, we return the existing DB data
+    const body = await res.json();
+    expect(body.first_name).toBe("Alice");
+  });
+
+  it("returns 502 when EzyGo returns error status", async () => {
+    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ error: "EzyGo error" }), { status: 500 }));
+    
+    const { GET } = await import("../route");
+    const res = await GET(makeGetReq(), { params: {} });
+    
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.error).toContain("Failed to reach EzyGo profile service");
+  });
+
+  it("handles EzyGo response without .data wrapper", async () => {
+    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ user_id: 123, username: "direct" }), { status: 200 }));
+    
+    const { GET } = await import("../route");
+    const res = await GET(makeGetReq(), { params: {} });
+    
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.username).toBe("direct");
+  });
+
+  it("returns 400 for malformed JSON body in PATCH", async () => {
+    const { PATCH } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile", {
+      method: "PATCH",
+      body: "not-json",
+      headers: { "content-type": "application/json" }
+    });
+    const res = await PATCH(req, { params: {} });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid or empty JSON body" });
+  });
+
+  it("returns 500 when database update fails in PATCH", async () => {
+    mockAdminUpdate.mockImplementation(() => ({
+      eq: vi.fn().mockResolvedValue({ error: { message: "DB Error" } }),
+    }));
+    
+    const { PATCH } = await import("../route");
+    const req = makePatchRequest({ first_name: "Alice" });
+    const res = await PATCH(req, { params: {} });
+    
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to update profile" });
+  });
+  });

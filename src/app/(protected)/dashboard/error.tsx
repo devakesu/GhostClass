@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
 export default function DashboardError({
@@ -12,10 +13,11 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry with dashboard context
+    logger.error("[dashboard] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "dashboard",
+        digest: error.digest,
       },
     });
   }, [error]);

@@ -252,7 +252,7 @@ describe("proxy – auth.getUser throws an error", () => {
   });
 
   it("clears session cookies and redirects when getUser throws an unrecognised error", async () => {
-    mockGetUser.mockRejectedValueOnce(new Error("Network error"));
+    mockGetUser.mockRejectedValueOnce(new Error("Unrecognised error"));
 
     const request = new NextRequest("http://localhost/dashboard");
     const response = await proxy(request);

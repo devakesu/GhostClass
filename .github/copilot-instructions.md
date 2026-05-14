@@ -1,84 +1,137 @@
 # Copilot Instructions for GhostClass
 
-GhostClass is a Next.js 16 + React 19 + TypeScript web application that helps students track their attendance using data from the EzyGo attendance API. It features a bunk calculator, attendance calendar, tracking for disputed absences, and push notifications.
+GhostClass is a full-stack monorepo with two first-class clients sharing the same backend/security model:
+
+- Web app: Next.js 16 + React 19 + TypeScript
+- Mobile app: Flutter + Dart (Android/iOS)
+
+The product helps students manage attendance using EzyGo data, with bunk calculation, calendar/history, disputed-absence tracking, scores, leave status, and notifications.
 
 ---
 
 ## Repository Layout
 
-```
-src/
-  app/           # Next.js App Router pages and API routes
-  components/    # Reusable React components (UI, attendance, layout, legal)
-  hooks/         # Custom React hooks (data-fetching via TanStack Query)
-  lib/           # Core library: logic, security, Supabase, Axios, Redis, crypto, logger
-  providers/     # React context providers (React Query, theme, user settings)
-  types/         # TypeScript type definitions
-  assets/        # Static images/icons
-supabase/
-  migrations/    # PostgreSQL schema (tables, RLS policies, triggers)
-e2e/             # Playwright end-to-end tests
-scripts/         # Node.js scripts for versioning and secret sync
-docs/            # DEVELOPER_GUIDE.md, CONTRIBUTING.md, EZYGO_INTEGRATION.md
-public/
-  api-docs/      # OpenAPI 3.1 spec (openapi.yaml)
+```text
+src/                 # Next.js web app source
+  app/               # App Router pages and API routes
+  components/        # Reusable React components
+  hooks/             # Custom hooks (TanStack Query, utilities)
+  lib/               # Core logic/security/supabase/axios/crypto/logger
+  providers/         # React context providers
+  types/             # TS type definitions
+  assets/            # Static assets
+mobile/              # Flutter mobile application
+  lib/               # Dart app code (screens/services/providers/router)
+  android/           # Android host app
+  ios/               # iOS host app
+  packages/          # Vendored Flutter packages (Play Integrity wrapper)
+  test/              # Flutter tests
+supabase/            # DB config + SQL migrations
+workers/             # CF Worker + AWS Lambda proxy services
+e2e/                 # Playwright E2E tests (web)
+scripts/             # Node scripts (versioning/secrets)
+docs/                # Developer documentation
+public/openapi/      # OpenAPI 3.1 source (`openapi.yaml`)
 ```
 
-Key config files at root: `next.config.ts`, `vitest.config.ts`, `vitest.setup.ts`, `playwright.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `tsconfig.json`.
+Key web config at root: `next.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `tsconfig.json`.
+
+Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `android/build.gradle.kts`, `ios/Runner.xcodeproj`.
 
 ---
 
 ## Tech Stack
 
+### Web
+
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16 (App Router), React 19, TypeScript 5 (strict) |
-| Styling | Tailwind CSS v4, Radix UI primitives, Shadcn UI, Framer Motion, Lucide Icons |
-| Data / State | TanStack Query v5, React Hook Form + Zod v4, Recharts v3 |
+| Framework | Next.js 16.1.x (App Router), React 19.2.x, TypeScript 6 (strict) |
+| UI | Tailwind CSS v4, Radix UI, Shadcn UI, Framer Motion, Lucide |
+| Data / Forms | TanStack Query v5, React Hook Form, Zod v4 |
+| Charts | Recharts v3 |
 | Auth / DB | Supabase (PostgreSQL + RLS), `@supabase/ssr` |
-| Security | AES-256-GCM encryption (`src/lib/crypto.ts`), CSRF tokens, Upstash Redis rate limiting, Cloudflare Turnstile, CSP Level 3 |
-| HTTP | Axios v1 with interceptors, LRU Cache v11 |
-| Error tracking | Sentry (`sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`) |
-| PWA | Serwist (service worker in `src/sw.ts`) |
-| Testing | Vitest (unit/component), Playwright (E2E) |
-| API Docs | OpenAPI 3.1 + Scalar viewer at `/api-docs` |
+| Security | AES-256-GCM, CSRF, Upstash Redis rate limiting, Cloudflare Turnstile, CSP |
+| HTTP | Axios v1 + interceptors, LRU Cache v11 |
+| Monitoring | Sentry (`sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation.ts`) |
+| PWA | Serwist (`src/sw.ts`) |
+| Testing | Vitest + Playwright |
+
+### Mobile
+
+| Layer | Technology |
+|---|---|
+| Framework | Flutter 3.27+, Dart ^3.11.4 |
+| State | Riverpod 3 (`flutter_riverpod`, `riverpod_annotation`, generator) |
+| HTTP / Backend | Dio, Supabase Flutter |
+| Routing | GoRouter |
+| Security | Firebase App Check, Play Integrity (Android), DeviceCheck (iOS), JWE (`jose` + `pointycastle`), `flutter_secure_storage` |
+| UI / Charts | Material 3, `google_fonts`, `flutter_animate`, `fl_chart`, `lucide_icons` |
+| Monitoring | `sentry_flutter`, `sentry_dio` |
 
 ---
 
 ## Development Commands
 
+### Web (repo root)
+
 ```bash
-npm install          # Install dependencies (requires Node 22.12+)
-npm run dev          # Development server on http://localhost:3000 (uses --webpack for Serwist)
-npm run build        # Production build
-npm run lint         # ESLint
-npm run test         # Vitest unit/component tests (watch mode by default)
-npm run test:coverage # Coverage report (lcov, html, json)
-npm run test:e2e     # Playwright E2E tests (all configured projects; CI uses --project=chromium)
+npm install
+npm run dev                 # default: next dev --webpack
+npm run dev:turbopack
+npm run build
+npm run lint
+npm run test
+npm run test:coverage
+npm run test:e2e            # CI runs chromium project
 ```
 
-### Environment Setup
+### Mobile (`mobile/`)
 
-Copy `.example.env` to `.env` and populate. Key variables:
-
-- `ENCRYPTION_KEY` – 64 hex chars (AES-256-GCM key). Generate: `openssl rand -hex 32`
-- `REQUEST_SIGNING_SECRET` – 64 hex chars. Generate: `openssl rand -hex 32`. Must be **distinct** from `ENCRYPTION_KEY` (key-separation; required)
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (use test keys `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` locally)
-- `NEXT_PUBLIC_BACKEND_URL` – EzyGo API base URL (do not change)
-- `CF_PROXY_URL` / `CF_PROXY_SECRET` – Optional Cloudflare Worker egress proxy (Tier 1)
-- `AWS_SECONDARY_URL` / `AWS_SECONDARY_SECRET` – Optional AWS Lambda egress proxy (Tier 2)
-- `NEXT_PUBLIC_SUPABASE_CF_PROXY_URL` – Optional CF Worker for browser→Supabase (ISP bypass Tier 1; `src/lib/supabase/client.ts` auto-fails-over CF→AWS→direct)
-- `NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL` – Optional Lambda for browser→Supabase (ISP bypass Tier 2 fallback)
-
-`NEXT_PUBLIC_*` variables are client-safe. All others are server-only runtime secrets.
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter test --coverage
+flutter run
+flutter build apk --debug
+flutter build appbundle --release
+flutter build ios --release   # macOS + Xcode required
+```
 
 ---
 
-## TypeScript Path Alias
+## Environment and Secrets
 
-`@/` resolves to `src/` (configured in `tsconfig.json` and `vitest.config.ts`).
+### Web env
+
+GhostClass utilizes **Infisical** as the single source of truth, organized into 3 folders: `/build-time`, `/runtime`, and `/ci`.
+Instruct developers to authenticate via `infisical login` and run services using `infisical run -- npm run dev`.
+
+Critical upstream dashboard variables mapped include:
+
+- `ENCRYPTION_KEY` (64 hex chars, AES-256-GCM - stored as masked secret)
+- `REQUEST_SIGNING_SECRET` (64 hex chars; stored as masked secret)
+- `NEXT_PUBLIC_SUPABASE_URL` (synced automatically as GitHub Actions Variable)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (synced automatically as GitHub Actions Variable)
+- `SUPABASE_SECRET_KEY` (server-only secret)
+- `NEXT_PUBLIC_BACKEND_URL`
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`
+- `CF_PROXY_URL` / `CF_PROXY_SECRET` and optional AWS failover proxy vars
+
+### Mobile secrets
+
+`mobile/lib/config/app_secrets.dart` is gitignored and must be created locally.
+
+- Never commit `app_secrets.dart`
+- Never hardcode production secrets in source
+- Keep Firebase config files and App Check credentials environment-specific
+
+---
+
+## Path Alias
+
+Web alias: `@/` resolves to `src/`.
 
 ```typescript
 import { calculateAttendance } from '@/lib/logic/bunk';
@@ -87,146 +140,141 @@ import { createClient } from '@/lib/supabase/client';
 
 ---
 
-## Testing
+## Testing Guidance
 
-### Vitest (unit / component)
+### Web tests
 
-- Config: `vitest.config.ts` – environment is `jsdom`, globals enabled
-- Setup: `vitest.setup.ts` – stubs env vars, mocks Next.js router, Next.js Image, and Supabase client before each test; cleans up after each test
-- Test files: `**/*.{test,spec}.{ts,tsx}` anywhere under `src/`, excludes `e2e/`
-- Coverage thresholds: lines 7%, functions 8%, branches 5%, statements 7%
-- Tests follow **Arrange-Act-Assert** pattern
-- Use `it.todo()` (not `it.skip()`) for tests that are deferred
+- Vitest uses `jsdom`, globals, and setup from `vitest.setup.ts`
+- Test files: `**/*.{test,spec}.{ts,tsx}` under `src/` (excluding `e2e/`)
+- Coverage thresholds: lines 7, functions 8, branches 5, statements 7
+- Prefer Arrange-Act-Assert
+- Use `it.todo()` for deferred coverage
 
-**Important mock patterns:**
-- Third-party spinner libs (`ldrs/react`, `Ring2`) must be mocked as simple `<div>` elements
-- `@tanstack/react-query` mocks must include both `useQuery` (with `refetch: vi.fn().mockResolvedValue()`) and `useQueryClient`
-- Framer Motion mocks must include `AnimatePresence`, `LazyMotion`, `domAnimation`, and `motion.div`
-- Virtualizer mocks (`@tanstack/react-virtual`) must include `measureElement` and `measure` APIs
-- Supabase mock includes both `auth.getUser` and `auth.getSession`
-- Use `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync()` for timing-sensitive tests; use `fireEvent` (not `userEvent`) when fake timers are active
+Important mocking patterns:
 
-### Playwright (E2E)
+- Mock spinner libs (`ldrs/react`, `Ring2`) as simple divs
+- React Query mocks must include `useQuery` and `useQueryClient`
+- Framer Motion mocks should include `AnimatePresence`, `LazyMotion`, `domAnimation`, `motion.div`
+- Virtualizer mocks should include `measureElement` and `measure`
+- Supabase auth mocks should include `auth.getUser` and `auth.getSession`
+- With fake timers, prefer `fireEvent` over `userEvent`
 
-- Config: `playwright.config.ts`
-- Test files: `e2e/*.spec.ts`
-- CI runs Chromium only: `npm run test:e2e -- --project=chromium`
+### Mobile tests
 
----
-
-## Security Patterns
-
-- **Never use `window.open()`** for link navigation. For links inside `<label>` elements, call `preventDefault()` + `stopPropagation()`, then programmatically create an anchor with `rel="noopener noreferrer"` and click it.
-- All external links with `target="_blank"` must have `rel="noopener noreferrer"` (prevents reverse-tabnabbing).
-- Always check `res.ok` before calling `res.json()` on fetch responses.
-- Input validation uses Zod schemas.
-- CSRF tokens managed via `src/lib/security/` and `src/hooks/use-csrf-token.ts`.
-- `SUPABASE_SERVICE_ROLE_KEY` must never be used client-side.
-- Sensitive tokens are AES-256-GCM encrypted at rest (`src/lib/crypto.ts`).
-- **Server-side EzyGo calls** must use `egressFetch()` or `egressAxios` from `src/lib/utils.server.ts` — never call EzyGo URLs directly. These helpers resolve the CF → AWS → Direct egress tier automatically and inject `x-proxy-secret` headers.
+- Run `flutter analyze` before opening PRs touching Dart code
+- Run `flutter test` for logic/provider/widget changes
+- Keep provider/business logic testable and separated from widget concerns
 
 ---
 
-## Code Style
+## Security Rules
 
-- **TypeScript strict mode** – no `any` unless absolutely necessary
-- Follow existing file patterns; Shadcn UI components live in `src/components/ui/`
-- Conventional commit format: `<type>(<scope>): <description>` (types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`)
-- Keep components small and focused; separate data-fetching logic into custom hooks under `src/hooks/`
-- Tailwind CSS v4 PostCSS config uses object plugin format: `{ '@tailwindcss/postcss': {} }` — not imported module array format
+### Shared
 
----
+- Validate all untrusted input
+- Do not leak secrets to client-visible code
+- Keep cryptographic responsibilities in dedicated security modules
 
-## Versioning & CI/CD
+### Web-specific
 
-### Automatic Version Bumping
+- Do not use `window.open()` for link navigation
+- For links inside labels: `preventDefault()` + `stopPropagation()`, then create/click anchor with `rel="noopener noreferrer"`
+- External `target="_blank"` links must include `rel="noopener noreferrer"`
+- Check `res.ok` before `res.json()` on fetch
+- Server-side EzyGo calls must go through `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`
 
-GhostClass uses an automated version bump workflow (`.github/workflows/auto-version-bump.yml`):
+### Mobile-specific
 
-- **Same-repo PRs**: Version is auto-bumped by the workflow when a PR is opened/updated. No manual action needed.
-- **Fork PRs**: Run `CI=true GITHUB_HEAD_REF="$(git rev-parse --abbrev-ref HEAD)" node scripts/bump-version.js`, then commit `package.json`, `package-lock.json`, `.example.env`, `public/openapi/openapi.yaml`.
-- Version format is `X.Y.Z` with rollover (e.g., `1.9.9 → 2.0.0`).
-
-**Files that must be updated together when bumping version:**
-`package.json`, `package-lock.json`, `.example.env` (NEXT_PUBLIC_APP_VERSION), `public/openapi/openapi.yaml`.
-
-### CI Workflows
-
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `test.yml` | PR / push to main | Vitest coverage + Playwright E2E |
-| `pipeline.yml` | PR / push / merge_group to main | Guard + auto-tag on merge |
-| `auto-version-bump.yml` | PR opened/updated | Auto-bump version, comment on PR |
-| `release.yml` | `repository_dispatch: release_requested` | Build multi-arch Docker, sign, attest, deploy |
-| `deploy-egress-proxies.yml` | After Release / manual | Deploy CF Worker + AWS Lambda egress proxies |
-| `deploy-supabase.yaml` | Manual | Push Supabase migrations |
-| `provenance.yml` | Release / artifact publication | Generate and publish build provenance attestations |
-| `scorecard.yml` | Scheduled / on push to main | Run OpenSSF Scorecard security checks |
-
-**Dependabot PRs** do not have access to repository secrets (`GPG_PRIVATE_KEY`, etc.); workflows check `if: github.actor != 'dependabot[bot]'` to skip secret-dependent steps.
+- Keep EzyGo/Supabase/session material in `flutter_secure_storage`, not plain preferences
+- Maintain App Check and integrity validation paths (Play Integrity / DeviceCheck)
+- Preserve JWE request wrapping in networking layer (`api_service`, `jwe_interceptor`, `jwe_service`)
+- Maintain Android anti-tapjacking/secure-screen protections in `MainActivity`
 
 ---
 
-## Attendance Calculation (`src/lib/logic/bunk.ts`)
+## App-Specific Architecture Notes
 
-Core algorithm used by `src/components/attendance/course-card.tsx`:
-
-- `calculateAttendance(present, total, targetPercentage)` returns `{ canBunk, requiredToAttend, targetPercentage, isExact }`
-- Manual tracking modifiers: `extraPresent`, `extraAbsent` (add to total), `correctionPresent` (status swap, no total change)
-- Attendance code `225` = Duty Leave; limited to **5 per course per semester** (enforced by DB trigger `check_225_attendance_limit()`)
-
----
-
-## Disable Courses
-
-Courses can be disabled per-semester via `useDisabledCourses` hook (`src/hooks/courses/useDisabledCourses.ts`). Disabled courses are excluded from dashboard aggregate stats, stat cards, active course count, and the attendance chart, but still appear in course cards (with reduced opacity and a red "Disabled" toggle) and on the calendar (with a "Disabled" badge). On the tracking and scores pages, disabled courses are sorted to the end with a "Disabled" badge.
-
-- **Storage**: `user_settings.disabled_courses` JSONB column, keyed `{ "year-semester": { "CODE": "reason" } }`
-- **Hook API**: `isDisabled(code)`, `getDisableReason(code)`, `disableCourse(code, reason)`, `enableCourse(code)`, `disabledCodes` (Set)
-- **UI**: Course card header shows a green/red dot toggle; disable dialog has reason selection ("Challenge passed" / "Other"), enable dialog shows stored reason
-- **Context**: `useUserSettings` is a **Context-based provider** (`src/providers/user-settings.tsx`), not a bare hook. Wraps children as `<UserSettingsProvider>` inside `react-query.tsx`.
-- **Sign-out cleanup**: `SIGNED_OUT` handler clears `disabledCourses_`, `showBunkCalc_`, and `targetPercentage_` from localStorage
-- **Migration**: `supabase/migrations/20260304000000_disabled_courses.sql`
+- Attendance calculation remains centered on `calculateAttendance` in web `src/lib/logic/bunk.ts` and mirrored logic in mobile `mobile/lib/logic/bunk.dart`
+- Attendance code `225` (Duty Leave) is capped at 5/course/semester by DB trigger `check_225_attendance_limit()`
+- Disabled courses are stored in `user_settings.disabled_courses` JSONB keyed by academic period
+- EzyGo `/summery` typo fields are normalized by data hooks/types
+- Cron sync normalizes date keys (`YYYYMMDD` and `YYYY-MM-DD`) before reconciliation
 
 ---
 
-## Pre-hydration Loader
+## Code Style and Conventions
 
-A non-React DOM overlay (`#prehyd-loader`) is injected via an inline `<script>` in `layout.tsx` to bridge the gap between initial HTML paint and React hydration. The script creates the element imperatively (not JSX) to avoid corrupting React's fiber tree. `GlobalInit` (`src/lib/global-init.ts`) removes the element on mount via `document.getElementById("prehyd-loader")?.remove()`. CSS auto-hides it after 12s as a fallback if JS fails to mount (`globals.css`).
+### Web
+
+- Strict TypeScript; avoid `any` unless unavoidable
+- Keep UI components focused; move data-fetching/logic into hooks and `lib/`
+- Keep Shadcn UI components under `src/components/ui/`
+- Tailwind v4 PostCSS uses object plugin form: `{ '@tailwindcss/postcss': {} }`
+
+### Mobile
+
+- Follow `analysis_options.yaml` rules and keep analyzer clean
+- Keep state in Riverpod providers, keep screens mostly compositional
+- Keep service layer boundaries explicit (`services/` for API/security/storage)
+- Prefer typed models and exceptions over dynamic maps in UI code
+
+### Commits
+
+- Conventional commits: `<type>(<scope>): <description>`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`
 
 ---
 
-## EzyGo API Field Normalization
+## CI/CD and Versioning
 
-The EzyGo `/summery` endpoint returns fields with typos (`totel` instead of `total`, `persantage` instead of `percentage`). The `useCourseDetails` hook normalizes these on fetch. The TypeScript types in `src/types/attendance.d.ts` document both the misspelled and correct field names.
+### Version bumping
+
+Automated via `.github/workflows/auto-version-bump.yml`.
+
+- Same-repo PRs: workflow handles bump
+- Fork PRs: run bump script manually, then commit versioned artifacts
+
+Files that must stay in sync for version bumps:
+
+- `package.json`
+- `package-lock.json`
+- `.example.env` (`NEXT_PUBLIC_APP_VERSION`)
+- `public/openapi/openapi.yaml`
+
+### Main workflows
+
+| Workflow | Purpose |
+|---|---|
+| `test.yml` | Web unit coverage + web Playwright E2E |
+| `pipeline.yml` | Guard + auto-tag on merge to main |
+| `auto-version-bump.yml` | PR version bump automation |
+| `release.yml` | Signed release build + deploy pipeline |
+| `deploy-egress-proxies.yml` | Deploy CF/AWS proxies |
+| `deploy-supabase.yaml` | Supabase migration deployment |
+| `provenance.yml` | Build provenance attestations |
+| `scorecard.yml` | OpenSSF scorecard checks |
+
+Dependabot PRs do not have repository secrets; secret-dependent jobs must stay guarded.
 
 ---
 
-## Cron Sync (`src/app/api/cron/sync/route.ts`)
+## Known Gotchas
 
-- Date keys from EzyGo may arrive as `YYYYMMDD` or `YYYY-MM-DD`; the cron normalizes both to `YYYYMMDD` before comparison with tracker records.
-- Session IDs fall back: `session.session` → numeric session key (if < 20) → 1-based index (for opaque EzyGo slot IDs).
-
----
-
-## Key Known Errors & Workarounds
-
-- **Service worker in standalone mode**: `@serwist/next` doesn't generate the SW with Next.js `output: "standalone"`. The Dockerfile uses `npx esbuild src/sw.ts` to compile it manually during Docker build.
-- **Dev server uses `--webpack`**: Required for Serwist PWA compatibility (`npm run dev` includes `--webpack` flag).
-- **ECC GPG key error in CI** ("Inappropriate ioctl for device"): Use RSA 4096-bit GPG keys, not ECC/EdDSA.
-- **Dependabot workflow failures** ("Input required and not supplied: gpg_private_key"): Guard secret-dependent steps with `if: github.actor != 'dependabot[bot]'`.
-- **`userEvent` with fake timers**: `userEvent` has built-in delays that conflict with `vi.useFakeTimers()`. Use `fireEvent` instead when fake timers are active.
-- **`recharts` `ResponsiveContainer` warnings in tests**: Import chart dimension components directly; measure dimensions directly instead of using `ResponsiveContainer`.
+- Serwist + `output: "standalone"` needs explicit SW build step in Docker
+- `npm run dev` uses webpack by default for PWA compatibility
+- Use RSA 4096 GPG keys for CI signing (avoid ECC key issues in CI)
+- Fake timers + `userEvent` can conflict in Vitest; use `fireEvent`
+- Recharts `ResponsiveContainer` can be noisy in tests; prefer direct dimension control
 
 ---
 
 ## Database
 
-Schema lives in `supabase/migrations/`. Push with:
+Supabase schema/migrations are under `supabase/migrations/`.
 
 ```bash
 npx supabase link --project-ref <your-project-id>
 npx supabase db push
 ```
 
-Key tables managed by Row Level Security (RLS). The `tracker` table has a trigger enforcing the 5 duty-leave limit per course/semester.
+RLS policies are required for user-scoped data access; preserve policy intent when editing migrations.

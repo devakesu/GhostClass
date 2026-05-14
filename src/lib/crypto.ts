@@ -4,8 +4,14 @@
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/nextjs';
-
-const ALGORITHM = 'aes-256-gcm';
+import { 
+  ENCRYPTION_ALGORITHM,
+  ENCRYPTION_KEY_PATTERN,
+  ENCRYPTION_IV_LENGTH_BYTES,
+  ENCRYPTION_AUTH_TAG_LENGTH_BYTES,
+  ENCRYPTION_MAX_INPUT_SIZE,
+  ENCRYPTION_IV_PATTERN,
+} from '@/lib/constants/crypto';
 
 /**
  * Represents the ciphertext produced by encrypt().
@@ -45,7 +51,7 @@ function getEncryptionKey(): Buffer {
   if (!ENCRYPTION_KEY) {
     throw new Error("ENCRYPTION_KEY is not defined");
   }
-  if (!/^[a-f0-9]{64}$/i.test(ENCRYPTION_KEY)) {
+  if (!ENCRYPTION_KEY_PATTERN.test(ENCRYPTION_KEY)) {
     throw new Error("ENCRYPTION_KEY must be 64 hex characters (32 bytes)");
   }
   
@@ -58,13 +64,13 @@ export const encrypt = (text: string): EncryptedData => {
   if (!text || typeof text !== 'string') {
     throw new Error("Invalid input: text must be a non-empty string");
   }
-  if (text.length > 100000) {
+  if (text.length > ENCRYPTION_MAX_INPUT_SIZE) {
     throw new Error("Input text too long (max 100KB)");
   }
 
   const KEY = getEncryptionKey();
-  const iv = crypto.randomBytes(12); // NIST SP 800-38D §8.2.1 — 96-bit IV is the recommended length for AES-GCM
-  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
+  const iv = crypto.randomBytes(ENCRYPTION_IV_LENGTH_BYTES); // NIST SP 800-38D §8.2.1 — 96-bit IV
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, KEY, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag().toString('hex');
@@ -91,13 +97,16 @@ export function decrypt(data: EncryptedData): string;
 /** @deprecated Prefer `decrypt(encryptedData)` to prevent iv/content swap. */
 export function decrypt(ivHex: string, content: string): string;
 export function decrypt(ivHexOrData: string | EncryptedData, contentArg?: string): string {
+  if (!ivHexOrData) {
+    throw new Error("Invalid input: IV and content are required");
+  }
   const ivHex = typeof ivHexOrData === 'string' ? ivHexOrData : ivHexOrData.iv;
   const content = typeof ivHexOrData === 'string' ? contentArg! : ivHexOrData.content;
 
   if (!ivHex || !content) {
     throw new Error("Invalid input: IV and content are required");
   }
-  if (!/^[a-f0-9]{24}$/i.test(ivHex)) {
+  if (!ENCRYPTION_IV_PATTERN.test(ivHex)) {
     throw new Error("Invalid IV format (must be 24 hex chars)");
   }
   if (!content.includes(':')) {
@@ -114,15 +123,15 @@ export function decrypt(ivHexOrData: string | EncryptedData, contentArg?: string
     throw new Error("Invalid content format (non-hex characters)");
   }
 
-  // AES-128-GCM auth tag must be exactly 16 bytes = 32 hex chars.
+  // AES-GCM auth tag must be exactly 16 bytes = 32 hex chars (ENCRYPTION_AUTH_TAG_LENGTH_BYTES * 2).
   // A shorter tag silently weakens authentication without failing until decipher.final().
-  if (authTagHex.length !== 32) {
+  if (authTagHex.length !== ENCRYPTION_AUTH_TAG_LENGTH_BYTES * 2) {
     throw new Error("Invalid auth tag length (must be 32 hex chars)");
   }
 
   const KEY = getEncryptionKey();
   try {
-    const decipher = crypto.createDecipheriv(ALGORITHM, KEY, Buffer.from(ivHex, 'hex'));
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, KEY, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

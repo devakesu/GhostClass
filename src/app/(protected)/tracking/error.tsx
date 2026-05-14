@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/lib/logger";
 import { ErrorFallback } from "@/components/error-fallback";
 
 export default function TrackingError({
@@ -12,10 +13,11 @@ export default function TrackingError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to Sentry with tracking context
+    logger.error("[tracking] Render error:", error.message, error.digest);
     Sentry.captureException(error, {
       tags: {
         location: "tracking",
+        digest: error.digest,
       },
     });
   }, [error]);

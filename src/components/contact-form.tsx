@@ -127,6 +127,12 @@ export function ContactForm({ userDetails }: ContactFormProps) {
     }
   };
 
+  const getSubmitButtonText = () => {
+    if (captchaError) return "Security Check Failed";
+    if (!token) return "Waiting for Verification...";
+    return "Send Message";
+  };
+
   return (
     <form 
       ref={formRef} 
@@ -236,10 +242,7 @@ export function ContactForm({ userDetails }: ContactFormProps) {
         ) : (
           <>
             <Send className="mr-2 h-4 w-4" aria-label="Send message" />
-            {captchaError 
-              ? "Security Check Failed" 
-              : (!token ? "Waiting for Verification..." : "Send Message")
-            }
+            {getSubmitButtonText()}
           </>
         )}
       </Button>

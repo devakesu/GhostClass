@@ -12,7 +12,6 @@ import { reloadWithUpdate, tryAutoUpdate } from "@/lib/sw-reload";
  */
 export default function GlobalError({
   error,
-  reset: _reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -48,13 +47,47 @@ export default function GlobalError({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Error - GhostClass</title>
+        <style dangerouslySetInnerHTML={{ __html: `
+          :root {
+            --ge-bg: linear-gradient(135deg, #f5f5f5 0%, #e5e5e5 100%);
+            --ge-text: #171717;
+            --ge-card-bg: #ffffff;
+            --ge-card-border: #e5e7eb;
+            --ge-muted: #6b7280;
+            --ge-outline-border: #d1d5db;
+            --ge-shadow: rgba(0, 0, 0, 0.1);
+            --ge-error-code: #b91c1c;
+          }
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --ge-bg: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+              --ge-text: #fafafa;
+              --ge-card-bg: #18181b;
+              --ge-card-border: #27272a;
+              --ge-muted: #a1a1aa;
+              --ge-outline-border: #3f3f46;
+              --ge-shadow: rgba(0, 0, 0, 0.3);
+              --ge-error-code: #fca5a5;
+            }
+          }
+          html.dark {
+            --ge-bg: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            --ge-text: #fafafa;
+            --ge-card-bg: #18181b;
+            --ge-card-border: #27272a;
+            --ge-muted: #a1a1aa;
+            --ge-outline-border: #3f3f46;
+            --ge-shadow: rgba(0, 0, 0, 0.3);
+            --ge-error-code: #fca5a5;
+          }
+        ` }} />
       </head>
       <body style={{
         margin: 0,
         padding: '1rem',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
-        color: '#fafafa',
+        background: 'var(--ge-bg)',
+        color: 'var(--ge-text)',
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
@@ -66,10 +99,10 @@ export default function GlobalError({
           width: '100%',
           textAlign: 'center',
           padding: '2.5rem',
-          background: '#18181b',
+          background: 'var(--ge-card-bg)',
           borderRadius: '1rem',
-          border: '1px solid #27272a',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+          border: '1px solid var(--ge-card-border)',
+          boxShadow: '0 20px 25px -5px var(--ge-shadow)',
           boxSizing: 'border-box',
         }}>
           <div style={{
@@ -97,7 +130,7 @@ export default function GlobalError({
             Critical Error
           </h1>
 
-          <p style={{ color: '#a1a1aa', margin: '0 0 2rem', lineHeight: 1.6 }}>
+          <p style={{ color: 'var(--ge-muted)', margin: '0 0 2rem', lineHeight: 1.6 }}>
             We encountered a critical error. This has been automatically reported to our team.
             You can try refreshing the page or return to the homepage.
           </p>
@@ -123,7 +156,7 @@ export default function GlobalError({
               <pre style={{
                 fontSize: '0.75rem',
                 fontFamily: 'monospace',
-                color: '#fca5a5',
+                color: 'var(--ge-error-code)',
                 overflowX: 'auto',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
@@ -177,8 +210,8 @@ export default function GlobalError({
                 borderRadius: '0.5rem',
                 cursor: 'pointer',
                 background: 'transparent',
-                border: '1px solid #3f3f46',
-                color: '#fafafa',
+                border: '1px solid var(--ge-outline-border)',
+                color: 'var(--ge-text)',
                 minWidth: '140px',
               }}
             >

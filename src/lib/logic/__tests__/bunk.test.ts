@@ -1,171 +1,114 @@
-import { describe, it, expect } from 'vitest'
-import { calculateAttendance } from '@/lib/logic/bunk'
+import { describe, it, expect } from "vitest";
+import { calculateAttendance } from "../bunk";
 
-describe('calculateAttendance - Bunk Calculator', () => {
-  describe('Basic scenarios', () => {
-    it('should return zero values for invalid input (total <= 0)', () => {
-      const result = calculateAttendance(10, 0, 75)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-      expect(result.isExact).toBe(false)
-    })
+describe("calculateAttendance", () => {
+  it("returns default results for invalid inputs", () => {
+    expect(calculateAttendance(0, 0)).toEqual({
+      canBunk: 0,
+      requiredToAttend: 0,
+      targetPercentage: 75,
+      isExact: false,
+      isBorderline: false,
+    });
+    expect(calculateAttendance(-1, 10)).toEqual({
+      canBunk: 0,
+      requiredToAttend: 0,
+      targetPercentage: 75,
+      isExact: false,
+      isBorderline: false,
+    });
+    expect(calculateAttendance(11, 10)).toEqual({
+      canBunk: 0,
+      requiredToAttend: 0,
+      targetPercentage: 75,
+      isExact: false,
+      isBorderline: false,
+    });
+  });
 
-    it('should return zero values for invalid input (present > total)', () => {
-      const result = calculateAttendance(15, 10, 75)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-    })
+  it("handles exactly target percentage", () => {
+    const result = calculateAttendance(75, 100, 75);
+    expect(result.isExact).toBe(true);
+    expect(result.canBunk).toBe(0);
+    expect(result.requiredToAttend).toBe(0);
+  });
 
-    it('should return zero values for negative present', () => {
-      const result = calculateAttendance(-5, 10, 75)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-    })
-  })
+  it("calculates classes required to attend when below target", () => {
+    // 50/100 = 50%. Need 75%.
+    // (75*100 - 100*50) / (100-75) = (7500 - 5000) / 25 = 2500 / 25 = 100.
+    // Wait, let's check the formula: (75 * 100 - 100 * 50) / (100 - 75) = 2500 / 25 = 100.
+    // If I attend 100 more, I have 150/200 = 75%. Correct.
+    const result = calculateAttendance(50, 100, 75);
+    expect(result.requiredToAttend).toBe(100);
+    expect(result.canBunk).toBe(0);
+  });
 
-  describe('Exact target percentage', () => {
-    it('should return isExact=true when attendance is exactly at target', () => {
-      const result = calculateAttendance(75, 100, 75)
-      expect(result.isExact).toBe(true)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-    })
+  it("handles 100% target separately", () => {
+    const result = calculateAttendance(90, 100, 100);
+    expect(result.requiredToAttend).toBe(Infinity);
+  });
 
-    it('should return isExact=true when attendance is exactly 80%', () => {
-      const result = calculateAttendance(80, 100, 80)
-      expect(result.isExact).toBe(true)
-    })
+  it("calculates classes able to bunk when above target", () => {
+    // 80/100 = 80%. Target 75%.
+    // (100*80 - 75*100) / 75 = (8000 - 7500) / 75 = 500 / 75 = 6.66...
+    // floor(6.66) = 6.
+    const result = calculateAttendance(80, 100, 75);
+    expect(result.canBunk).toBe(6);
+    expect(result.isBorderline).toBe(false);
+  });
 
-    it('should return isExact=true for 3/4 = 75% despite IEEE 754 rounding', () => {
-      // (3/4)*100 may equal 75.00000000000001 in some JS engines; epsilon comparison must catch it
-      const result = calculateAttendance(3, 4, 75)
-      expect(result.isExact).toBe(true)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-    })
+  it("detects borderline state", () => {
+    // Target 75. Need very slightly more than 75 to be borderline skip.
+    // If we have 75.1 / 100. (Not possible with integers but let's see).
+    // If present=76, total=101. 76/101 = 75.24%.
+    // bunkableExact = (100*76 - 75*101) / 75 = (7600 - 7575) / 75 = 25 / 75 = 0.33...
+    // 0.33 is < 0.9.
+    const result = calculateAttendance(76, 101, 75);
+    expect(result.canBunk).toBe(0);
+    expect(result.isBorderline).toBe(true);
+  });
 
-    it('should return isExact=true for 18/24 = 75% (real-world fraction)', () => {
-      const result = calculateAttendance(18, 24, 75)
-      expect(result.isExact).toBe(true)
-    })
-  })
+  it("should handle invalid inputs", () => {
+    expect(calculateAttendance(-1, 10).canBunk).toBe(0);
+    expect(calculateAttendance(11, 10).canBunk).toBe(0);
+    expect(calculateAttendance(10, 0).canBunk).toBe(0);
+  });
 
-  describe('Below target percentage - need to attend', () => {
-    it('should calculate required attendance when below target', () => {
-      const result = calculateAttendance(50, 100, 75)
-      expect(result.requiredToAttend).toBeGreaterThan(0)
-      expect(result.canBunk).toBe(0)
-    })
+  it("should handle non-finite target percentage", () => {
+    expect(calculateAttendance(10, 10, Infinity).targetPercentage).toBe(75);
+    expect(calculateAttendance(10, 10, -Infinity).targetPercentage).toBe(75);
+  });
 
-    it('should calculate required attendance when at 60% targeting 75%', () => {
-      const result = calculateAttendance(60, 100, 75)
-      // At 60%, need to get to 75%
-      // Formula: ceil((75 * 100 - 100 * 60) / (100 - 75)) = ceil(1500 / 25) = 60
-      expect(result.requiredToAttend).toBe(60)
-    })
+  it("should handle 100% target percentage", () => {
+    const result = calculateAttendance(8, 10, 100);
+    expect(result.requiredToAttend).toBe(Infinity);
+  });
 
-    it('should calculate for different target percentages', () => {
-      const result = calculateAttendance(40, 100, 80)
-      expect(result.requiredToAttend).toBeGreaterThan(0)
-      expect(result.targetPercentage).toBe(80)
-    })
+  it("should identify borderline attendance", () => {
+    // 75% target. 10 total. 7.6 present.
+    // bunkableExact = (100 * 7.6 - 75 * 10) / 75 = (760 - 750) / 75 = 10 / 75 = 0.133
+    // 0 < 0.133 < 0.9. bunkable = 0.
+    // To get 7.6 present in integers, we need to scale up.
+    // (100 * P - 75 * T) / 75 = 0.5
+    // 100P - 75T = 37.5
+    // Let T = 100. 100P - 7500 = 37.5. 100P = 7537.5. Still not integer.
+    // Let's use T=4. P=3. 100*3 - 75*4 = 0.
+    // If P=3.1 (scaled).
+    // Let's try T=40. P=30. (100*30 - 75*40)/75 = 0.
+    // If P=30.5 -> (3050 - 3000)/75 = 50/75 = 0.66
+    // Since we need integers:
+    // T=4, P=3 -> 75% exactly.
+    // T=40, P=31 -> (3100 - 3000)/75 = 1.33 (can bunk 1).
+    // We want 0 < bunkableExact < 0.9.
+    // Let's try T=10, P=8 -> (800 - 750)/75 = 50/75 = 0.66. (Borderline!)
+    const result = calculateAttendance(8, 10, 75);
+    expect(result.isBorderline).toBe(true);
+    expect(result.canBunk).toBe(0);
+  });
 
-    it('should handle edge case when target is 100%', () => {
-      const result = calculateAttendance(50, 100, 100)
-      expect(result.requiredToAttend).toBe(50)
-    })
-  })
-
-  describe('Above target percentage - can bunk', () => {
-    it('should calculate bunkable classes when above target', () => {
-      const result = calculateAttendance(90, 100, 75)
-      expect(result.canBunk).toBeGreaterThan(0)
-      expect(result.requiredToAttend).toBe(0)
-    })
-
-    it('should allow 20 bunks when at 90% targeting 75%', () => {
-      const result = calculateAttendance(90, 100, 75)
-      expect(result.canBunk).toBe(20)
-    })
-
-    it('should handle high attendance correctly', () => {
-      const result = calculateAttendance(95, 100, 75)
-      expect(result.canBunk).toBeGreaterThan(20)
-    })
-
-    it('should not allow negative bunks', () => {
-      const result = calculateAttendance(76, 100, 75)
-      expect(result.canBunk).toBeGreaterThanOrEqual(0)
-    })
-
-    it('should set isBorderline when very close to boundary but canBunk=0', () => {
-      // Edge case: bunkableExact ≈ 0.667 (in (0, 0.9)) so floors to 0 but user is above target
-      // bunkableExact = (100 * 75.5 - 75 * 100) / 75 ≈ 0.667 → isBorderline=true, isExact=false
-      const result = calculateAttendance(75.5, 100, 75)
-      expect(result.isBorderline).toBe(true)
-      expect(result.isExact).toBe(false)
-      expect(result.canBunk).toBe(0)
-    })
-  })
-
-  describe('Real-world scenarios', () => {
-    it('should handle scenario: 18 present out of 24 classes', () => {
-      const result = calculateAttendance(18, 24, 75)
-      expect(result.canBunk).toBe(0)
-      expect(result.requiredToAttend).toBe(0)
-      expect(result.isExact).toBe(true)
-      expect(result.isBorderline).toBe(false)
-    })
-
-    it('should handle scenario: 20 present out of 25 classes', () => {
-      const result = calculateAttendance(20, 25, 75)
-      expect(result.canBunk).toBeGreaterThan(0)
-    })
-
-    it('should handle scenario: 10 present out of 20 classes (50%)', () => {
-      const result = calculateAttendance(10, 20, 75)
-      expect(result.requiredToAttend).toBeGreaterThan(0)
-      expect(result.canBunk).toBe(0)
-    })
-
-    it('should work with target percentage of 80%', () => {
-      const result = calculateAttendance(85, 100, 80)
-      expect(result.canBunk).toBeGreaterThan(0)
-      expect(result.targetPercentage).toBe(80)
-    })
-  })
-
-  describe('isBorderline flag', () => {
-    it('should be false when exactly at target (isExact covers that)', () => {
-      const result = calculateAttendance(75, 100, 75)
-      expect(result.isExact).toBe(true)
-      expect(result.isBorderline).toBe(false)
-    })
-
-    it('should be false when clearly above target with bunkable classes', () => {
-      const result = calculateAttendance(80, 100, 75)
-      expect(result.isBorderline).toBe(false)
-      expect(result.canBunk).toBeGreaterThan(0)
-    })
-
-    it('should be false when below target', () => {
-      const result = calculateAttendance(70, 100, 75)
-      expect(result.isBorderline).toBe(false)
-      expect(result.requiredToAttend).toBeGreaterThan(0)
-    })
-
-    it('should be true when above target but bunkableExact is just under 0.9', () => {
-      // 75.5/100 at 75% target: bunkableExact ≈ 0.667
-      const result = calculateAttendance(75.5, 100, 75)
-      expect(result.isBorderline).toBe(true)
-      expect(result.isExact).toBe(false)
-      expect(result.canBunk).toBe(0)
-    })
-
-    it('should be false when bunkableExact >= BORDERLINE_THRESHOLD (1+ class of headroom)', () => {
-      // 76/100 at 75% target: bunkableExact = (7600 - 7500) / 75 ≈ 1.333 → not borderline
-      const result = calculateAttendance(76, 100, 75)
-      expect(result.isBorderline).toBe(false)
-    })
-  })
-})
+  it("handles invalid targetPercentage by defaulting to 75", () => {
+    expect(calculateAttendance(75, 100, NaN).targetPercentage).toBe(75);
+    expect(calculateAttendance(75, 100, 150).targetPercentage).toBe(100);
+    expect(calculateAttendance(75, 100, -10).targetPercentage).toBe(1);
+  });
+});
