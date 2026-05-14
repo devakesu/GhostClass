@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class LoadingOverlay extends StatelessWidget {
-
   const LoadingOverlay({
     super.key,
     this.message = 'Waiting on Ezygo to stop ghosting us 👻',
@@ -23,7 +22,7 @@ class LoadingOverlay extends StatelessWidget {
     final theme = Theme.of(context);
     final ghostColors = theme.extension<GhostColors>()!;
     final primary = ghostColors.brandPrimary ?? const Color(0xFF7C3AED);
-    
+
     final content = SizedBox.expand(
       child: Stack(
         alignment: Alignment.center,
@@ -39,16 +38,16 @@ class LoadingOverlay extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: primary.withValues(alpha: 0.1),
                       ),
-                      child: showLogo 
-                        ? Image.asset(
-                            'assets/images/logo.png',
-                            height: 60,
-                          )
-                        : Icon(
-                            LucideIcons.ghost,
-                            size: 60,
-                            color: primary,
-                          ),
+                      child: showLogo
+                          ? Image.asset(
+                              'assets/images/logo.png',
+                              height: 60,
+                            )
+                          : Icon(
+                              LucideIcons.ghost,
+                              size: 60,
+                              color: primary,
+                            ),
                     )
                     .animate(onPlay: (c) => c.repeat())
                     .shimmer(
@@ -75,7 +74,7 @@ class LoadingOverlay extends StatelessWidget {
                       message,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.manrope(
-                        color: isFullScreen 
+                        color: isFullScreen
                             ? Colors.white.withValues(alpha: 0.9)
                             : theme.colorScheme.onSurface,
                         letterSpacing: 0.5,
@@ -106,15 +105,15 @@ class LoadingOverlay extends StatelessWidget {
           Positioned(
             bottom: 120,
             child: SizedBox(
-                  width: 40,
-                  height: 2,
-                  child: LinearProgressIndicator(
-                    backgroundColor: (isFullScreen ? Colors.white : theme.colorScheme.onSurface).withValues(alpha: 0.1),
-                    valueColor: AlwaysStoppedAnimation(primary),
-                  ),
-                )
-                .animate(onPlay: (c) => c.repeat())
-                .shimmer(duration: 2000.ms),
+              width: 40,
+              height: 2,
+              child: LinearProgressIndicator(
+                backgroundColor:
+                    (isFullScreen ? Colors.white : theme.colorScheme.onSurface)
+                        .withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation(primary),
+              ),
+            ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2000.ms),
           ),
 
           // EzyGo Disclaimer at Bottom
@@ -136,7 +135,6 @@ class LoadingOverlay extends StatelessWidget {
         ],
       ),
     );
-
 
     if (isFullScreen) {
       return PopScope(
@@ -173,10 +171,10 @@ class LoadingOverlay extends StatelessWidget {
       barrierColor: Colors.transparent,
       builder: (_) => LoadingOverlay(message: message),
     ).then((_) => _currentRoute = null);
-    
+
     // We don't get the route object directly from showDialog easily,
     // so we use a flag to indicate visibility.
-    _currentRoute = true; 
+    _currentRoute = true;
   }
 
   static void hide(BuildContext context) {
@@ -187,7 +185,7 @@ class LoadingOverlay extends StatelessWidget {
 
   static void hideWithNavigator(NavigatorState navigator) {
     if (_currentRoute == null) return;
-    
+
     if (navigator.canPop()) {
       _currentRoute = null;
       navigator.pop();

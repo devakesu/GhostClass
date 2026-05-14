@@ -5,9 +5,10 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrendChartSection extends StatefulWidget {
-
   const TrendChartSection({
-    required this.stats, required this.targetPercentage, super.key,
+    required this.stats,
+    required this.targetPercentage,
+    super.key,
     this.disabledCodes = const {},
   });
   final DashboardStats stats;
@@ -96,7 +97,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
   @override
   void didUpdateWidget(TrendChartSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.stats != widget.stats || oldWidget.disabledCodes != widget.disabledCodes) {
+    if (oldWidget.stats != widget.stats ||
+        oldWidget.disabledCodes != widget.disabledCodes) {
       _updateCourses();
     }
   }
@@ -106,13 +108,11 @@ class _TrendChartSectionState extends State<TrendChartSection> {
       final isTracked = s.finalTotal > 0;
       final isDisabled = widget.disabledCodes.contains(s.code);
       return isTracked && !isDisabled;
-    }).toList()
-      ..sort((a, b) => a.percentage.compareTo(b.percentage));
+    }).toList()..sort((a, b) => a.percentage.compareTo(b.percentage));
   }
 
   @override
   Widget build(BuildContext context) {
-
     if (_courses.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
@@ -143,221 +143,245 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Attendance Overview',
-                      style: GoogleFonts.manrope(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "See where you've been keeping up!",
-                      style: GoogleFonts.manrope(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: BarChart(
-                  key: _chartKey,
-                  duration: Duration.zero, // Prevent blinking on state changes
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: maxY,
-                    minY: yMin.clamp(0, 95),
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipItem: (_, _, _, _) =>
-                            null, // Disable built-in tooltip
-                        getTooltipColor: (_) => Colors.transparent,
-                      ),
-                      touchCallback: _onTouch,
-                    ),
-                    titlesData: FlTitlesData(
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 80,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.toInt();
-                            if (index < 0 || index >= _courses.length) {
-                              return const SizedBox.shrink();
-                            }
-                            final code = _courses[index].code;
-                            final display = code.length > 10
-                                ? '${code.substring(0, 8)}..'
-                                : code;
-                            return SideTitleWidget(
-                              meta: meta,
-                              space: 12,
-                              child: RotatedBox(
-                                quarterTurns: 3,
-                                child: Text(
-                                  display,
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.75),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 32,
-                          interval: 5,
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            meta: meta,
-                            space: 4,
-                            child: Text(
-                              '${value.toInt()}',
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Attendance Overview',
                               style: GoogleFonts.manrope(
-                                fontSize: 10,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "See where you've been keeping up!",
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(
                                   context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.8),
+                                ).colorScheme.onSurface.withValues(alpha: 0.4),
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: BarChart(
+                          key: _chartKey,
+                          duration: Duration
+                              .zero, // Prevent blinking on state changes
+                          BarChartData(
+                            alignment: BarChartAlignment.spaceAround,
+                            maxY: maxY,
+                            minY: yMin.clamp(0, 95),
+                            barTouchData: BarTouchData(
+                              enabled: true,
+                              touchTooltipData: BarTouchTooltipData(
+                                getTooltipItem: (_, _, _, _) =>
+                                    null, // Disable built-in tooltip
+                                getTooltipColor: (_) => Colors.transparent,
+                              ),
+                              touchCallback: _onTouch,
+                            ),
+                            titlesData: FlTitlesData(
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 80,
+                                  getTitlesWidget: (value, meta) {
+                                    final index = value.toInt();
+                                    if (index < 0 || index >= _courses.length) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final code = _courses[index].code;
+                                    final display = code.length > 10
+                                        ? '${code.substring(0, 8)}..'
+                                        : code;
+                                    return SideTitleWidget(
+                                      meta: meta,
+                                      space: 12,
+                                      child: RotatedBox(
+                                        quarterTurns: 3,
+                                        child: Text(
+                                          display,
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.75),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 32,
+                                  interval: 5,
+                                  getTitlesWidget: (value, meta) =>
+                                      SideTitleWidget(
+                                        meta: meta,
+                                        space: 4,
+                                        child: Text(
+                                          '${value.toInt()}',
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color:
+                                                Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface
+                                                    .withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                      ),
+                                ),
+                              ),
+                              topTitles: const AxisTitles(),
+                              rightTitles: const AxisTitles(),
+                            ),
+                            gridData: FlGridData(
+                              drawVerticalLine: false,
+                              horizontalInterval: 5,
+                              getDrawingHorizontalLine: (_) => FlLine(
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                strokeWidth: 1,
+                              ),
+                            ),
+                            borderData: FlBorderData(show: false),
+                            extraLinesData: ExtraLinesData(
+                              horizontalLines: [
+                                HorizontalLine(
+                                  y: widget.targetPercentage,
+                                  color: Colors.amber.shade700,
+                                  dashArray: [5, 5],
+                                  label: HorizontalLineLabel(
+                                    show: true,
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 40),
+                                    style: GoogleFonts.manrope(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      background: Paint()
+                                        ..color = Colors.amber.shade700
+                                        ..strokeWidth = 30
+                                        ..strokeCap = StrokeCap.round
+                                        ..style = PaintingStyle.fill,
+                                    ),
+                                    labelResolver: (line) =>
+                                        '\u00A0\u00A0\u00A0\u00A0Target: ${widget.targetPercentage.toInt()}%\u00A0\u00A0\u00A0\u00A0',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            barGroups: _courses.asMap().entries.map((entry) {
+                              final i = entry.key;
+                              final s = entry.value;
+                              final isSafe =
+                                  s.percentage >= widget.targetPercentage;
+                              final isLoss =
+                                  s.percentage < s.officialPercentage;
+                              final displayedBase = isLoss
+                                  ? s.percentage
+                                  : s.officialPercentage;
+                              final displayedExtra =
+                                  (s.percentage - s.officialPercentage).abs();
+                              final totalVal = displayedBase + displayedExtra;
+
+                              final ghostColors = Theme.of(
+                                context,
+                              ).extension<GhostColors>();
+
+                              final baseColor = isSafe
+                                  ? (ghostColors?.successGreen ??
+                                        const Color(0xFF10B981))
+                                  : (ghostColors?.dangerRed ??
+                                        const Color(0xFFEF4444));
+
+                              final extraIsDanger = isLoss || !isSafe;
+                              final extraColor = extraIsDanger
+                                  ? (ghostColors?.dangerRed ??
+                                        const Color(0xFFEF4444))
+                                  : (ghostColors?.successGreen ??
+                                        const Color(0xFF10B981));
+
+                              final brightLine = extraColor.withValues(
+                                alpha: 0.75,
+                              );
+                              final faintGap = extraColor.withValues(
+                                alpha: 0.15,
+                              );
+
+                              // Pre-calculate stops to avoid recreating them in the loop
+                              final hatchColors = <Color>[];
+                              final hatchStops = <double>[];
+                              const n = 16; // Optimized frequency
+                              for (var j = 0; j < n; j++) {
+                                final s0 = j / n;
+                                final mid = (j + 0.25) / n;
+                                final s1 = (j + 1) / n;
+                                hatchColors.addAll([
+                                  brightLine,
+                                  brightLine,
+                                  faintGap,
+                                  faintGap,
+                                ]);
+                                hatchStops.addAll([s0, mid, mid, s1]);
+                              }
+
+                              return BarChartGroupData(
+                                x: i,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: totalVal,
+                                    width: 18,
+                                    color: Colors.transparent,
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(3),
+                                      bottom: Radius.circular(1),
+                                    ),
+                                    rodStackItems: [
+                                      BarChartRodStackItem(
+                                        0,
+                                        displayedBase,
+                                        baseColor,
+                                      ),
+                                    ],
+                                    backDrawRodData: BackgroundBarChartRodData(
+                                      show: totalVal > 0,
+                                      toY: totalVal,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.bottomLeft,
+                                        end: Alignment.topRight,
+                                        colors: hatchColors,
+                                        stops: hatchStops,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),
-                      topTitles: const AxisTitles(
-                        
-                      ),
-                      rightTitles: const AxisTitles(
-                        
-                      ),
-                    ),
-                    gridData: FlGridData(
-                      drawVerticalLine: false,
-                      horizontalInterval: 5,
-                      getDrawingHorizontalLine: (_) => FlLine(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outlineVariant.withValues(alpha: 0.2),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    extraLinesData: ExtraLinesData(
-                      horizontalLines: [
-                        HorizontalLine(
-                          y: widget.targetPercentage,
-                          color: Colors.amber.shade700,
-                          dashArray: [5, 5],
-                          label: HorizontalLineLabel(
-                            show: true,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 40),
-                            style: GoogleFonts.manrope(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              background: Paint()
-                                ..color = Colors.amber.shade700
-                                ..strokeWidth = 30
-                                ..strokeCap = StrokeCap.round
-                                ..style = PaintingStyle.fill,
-                            ),
-                            labelResolver: (line) =>
-                                '\u00A0\u00A0\u00A0\u00A0Target: ${widget.targetPercentage.toInt()}%\u00A0\u00A0\u00A0\u00A0',
-                          ),
-                        ),
-                      ],
-                    ),
-                    barGroups: _courses.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final s = entry.value;
-                      final isSafe = s.percentage >= widget.targetPercentage;
-                      final isLoss = s.percentage < s.officialPercentage;
-                      final displayedBase = isLoss ? s.percentage : s.officialPercentage;
-                      final displayedExtra = (s.percentage - s.officialPercentage).abs();
-                      final totalVal = displayedBase + displayedExtra;
-
-                      final ghostColors = Theme.of(
-                        context,
-                      ).extension<GhostColors>();
-                      
-                      final baseColor = isSafe
-                          ? (ghostColors?.successGreen ?? const Color(0xFF10B981))
-                          : (ghostColors?.dangerRed ?? const Color(0xFFEF4444));
-                      
-                      final extraIsDanger = isLoss || !isSafe;
-                      final extraColor = extraIsDanger
-                          ? (ghostColors?.dangerRed ?? const Color(0xFFEF4444))
-                          : (ghostColors?.successGreen ?? const Color(0xFF10B981));
-
-                      final brightLine = extraColor.withValues(alpha: 0.75);
-                      final faintGap = extraColor.withValues(alpha: 0.15);
-                      
-                      // Pre-calculate stops to avoid recreating them in the loop
-                      final hatchColors = <Color>[];
-                      final hatchStops = <double>[];
-                      const n = 16; // Optimized frequency
-                      for (var j = 0; j < n; j++) {
-                        final s0 = j / n;
-                        final mid = (j + 0.25) / n;
-                        final s1 = (j + 1) / n;
-                        hatchColors.addAll([brightLine, brightLine, faintGap, faintGap]);
-                        hatchStops.addAll([s0, mid, mid, s1]);
-                      }
-
-                      return BarChartGroupData(
-                        x: i,
-                        barRods: [
-                          BarChartRodData(
-                            toY: totalVal,
-                            width: 18,
-                            color: Colors.transparent,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(3),
-                              bottom: Radius.circular(1),
-                            ),
-                            rodStackItems: [
-                              BarChartRodStackItem(0, displayedBase, baseColor),
-                            ],
-                            backDrawRodData: BackgroundBarChartRodData(
-                              show: totalVal > 0,
-                              toY: totalVal,
-                              gradient: LinearGradient(
-                                begin: Alignment.bottomLeft,
-                                end: Alignment.topRight,
-                                colors: hatchColors,
-                                stops: hatchStops,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
                     ],
                   ),
                 ),
@@ -379,7 +403,6 @@ class _TrendChartSectionState extends State<TrendChartSection> {
 }
 
 class _LocalChartTooltip extends StatelessWidget {
-
   const _LocalChartTooltip({
     required this.stat,
     required this.targetPercentage,
@@ -394,8 +417,8 @@ class _LocalChartTooltip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double w = 220;
-    const double h = 85; 
-    
+    const double h = 85;
+
     // The touch position in card coordinates
     final centerX = chartOriginInCard.dx + chartOffset.dx;
     final barTopY = chartOriginInCard.dy + chartOffset.dy;
@@ -422,11 +445,11 @@ class _LocalChartTooltip extends StatelessWidget {
     final dangerColor = ghostColors?.dangerRed ?? const Color(0xFFEF4444);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tooltipBg = isDark 
-        ? Colors.white 
+    final tooltipBg = isDark
+        ? Colors.white
         : Theme.of(context).colorScheme.surfaceContainerHigh;
-    final onTooltipSurface = isDark 
-        ? const Color(0xFF1A1A2E) 
+    final onTooltipSurface = isDark
+        ? const Color(0xFF1A1A2E)
         : Theme.of(context).colorScheme.onSurface;
 
     return Positioned(
@@ -481,7 +504,8 @@ class _LocalChartTooltip extends StatelessWidget {
                         ),
                       ),
                       TextSpan(
-                        text: ' (${stat.officialPresent}/${stat.officialTotal})',
+                        text:
+                            ' (${stat.officialPresent}/${stat.officialTotal})',
                         style: TextStyle(color: onTooltipSurface),
                       ),
                     ],
@@ -504,15 +528,18 @@ class _LocalChartTooltip extends StatelessWidget {
                         TextSpan(
                           text: stat.percentage > stat.officialPercentage + 0.01
                               ? 'Gain'
-                              : (stat.percentage < stat.officialPercentage - 0.01
-                                  ? 'Loss'
-                                  : 'Neutral'),
+                              : (stat.percentage <
+                                        stat.officialPercentage - 0.01
+                                    ? 'Loss'
+                                    : 'Neutral'),
                           style: TextStyle(
-                            color: stat.percentage > stat.officialPercentage + 0.01
+                            color:
+                                stat.percentage > stat.officialPercentage + 0.01
                                 ? successColor
-                                : (stat.percentage < stat.officialPercentage - 0.01
-                                    ? dangerColor
-                                    : onTooltipSurface),
+                                : (stat.percentage <
+                                          stat.officialPercentage - 0.01
+                                      ? dangerColor
+                                      : onTooltipSurface),
                           ),
                         ),
                         TextSpan(

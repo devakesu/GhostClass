@@ -9,7 +9,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ServiceErrorView extends ConsumerWidget {
-
   const ServiceErrorView({
     super.key,
     this.title = 'Connection Error',
@@ -113,8 +112,10 @@ class ServiceErrorView extends ConsumerWidget {
                           ),
                           shape: const StadiumBorder(),
                           backgroundColor:
-                              Theme.of(context).extension<GhostColors>()?.accentBlue ??
-                                  Colors.blue,
+                              Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.accentBlue ??
+                              Colors.blue,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -135,7 +136,8 @@ class ServiceErrorView extends ConsumerWidget {
                       onPressed: () => SupportHelper.openContactPage(
                         context,
                         subject: title,
-                        message: 'I am experiencing an issue with the Ezygo API.\n\n'
+                        message:
+                            'I am experiencing an issue with the Ezygo API.\n\n'
                             'Context: ${error?.toString() ?? "Unknown Error"}',
                       ),
                       style: FilledButton.styleFrom(
@@ -145,8 +147,10 @@ class ServiceErrorView extends ConsumerWidget {
                         ),
                         shape: const StadiumBorder(),
                         backgroundColor:
-                            Theme.of(context).extension<GhostColors>()?.brandPurple ??
-                                Colors.purple,
+                            Theme.of(
+                              context,
+                            ).extension<GhostColors>()?.brandPurple ??
+                            Colors.purple,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

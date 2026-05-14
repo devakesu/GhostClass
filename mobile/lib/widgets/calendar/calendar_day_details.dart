@@ -4,9 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class SelectedDayHeader extends StatelessWidget {
-
   const SelectedDayHeader({
-    required this.selectedDay, required this.eventCount, super.key,
+    required this.selectedDay,
+    required this.eventCount,
+    super.key,
   });
   final DateTime selectedDay;
   final int eventCount;
@@ -32,7 +33,9 @@ class SelectedDayHeader extends StatelessWidget {
               style: GoogleFonts.manrope(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
           ],
@@ -54,7 +57,9 @@ class EmptySessionsView extends StatelessWidget {
           Icon(
             LucideIcons.calendarX,
             size: 48,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.1),
           ),
           const SizedBox(height: 16),
           Text(
@@ -62,7 +67,9 @@ class EmptySessionsView extends StatelessWidget {
             style: GoogleFonts.manrope(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
           ),
         ],

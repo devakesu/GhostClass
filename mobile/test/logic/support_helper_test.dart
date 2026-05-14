@@ -11,9 +11,15 @@ void main() {
       );
     });
 
-    test('contactViaEmail constructs email uri and catches missing plugin exception gracefully', () async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      await SupportHelper.contactViaEmail(subject: 'Test Subject', customBody: 'Test Body');
-    });
+    test(
+      'contactViaEmail constructs email uri and catches missing plugin exception gracefully',
+      () async {
+        TestWidgetsFlutterBinding.ensureInitialized();
+        await SupportHelper.contactViaEmail(
+          subject: 'Test Subject',
+          customBody: 'Test Body',
+        );
+      },
+    );
   });
 }

@@ -25,12 +25,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Initializes Firebase Cloud Messaging (FCM), requests native permissions,
 /// manages foreground/background dispatchers, and synchronises device tokens
 /// with the secure GhostClass backend app-check guarded routes.
-final firebaseMessagingProvider = Provider<FirebaseMessaging>((ref) => FirebaseMessaging.instance);
+final firebaseMessagingProvider = Provider<FirebaseMessaging>(
+  (ref) => FirebaseMessaging.instance,
+);
 
 class PushNotificationService {
-
   PushNotificationService(this._ref)
-      : _messaging = _ref.read(firebaseMessagingProvider);
+    : _messaging = _ref.read(firebaseMessagingProvider);
   final Ref _ref;
   final FirebaseMessaging _messaging;
   StreamSubscription<String>? _tokenSub;
@@ -43,22 +44,25 @@ class PushNotificationService {
   Future<void> initialize({bool registerHandlers = true}) async {
     try {
       // Request permissions natively on iOS and Android targets
-      final settings = await _messaging.requestPermission(
-        
-      );
+      final settings = await _messaging.requestPermission();
 
-      AppLogger.i('PushNotificationService: Authorization status: ${settings.authorizationStatus}');
+      AppLogger.i(
+        'PushNotificationService: Authorization status: ${settings.authorizationStatus}',
+      );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        
         if (registerHandlers) {
           // Register top-level isolate background event handler
-          FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+          FirebaseMessaging.onBackgroundMessage(
+            _firebaseMessagingBackgroundHandler,
+          );
 
           // Listen for active app foreground message streams
           FirebaseMessaging.onMessage.listen((message) {
-            AppLogger.d('Received foreground message: ${message.notification?.title}');
+            AppLogger.d(
+              'Received foreground message: ${message.notification?.title}',
+            );
           });
         }
 
@@ -75,7 +79,11 @@ class PushNotificationService {
         });
       }
     } on Object catch (e, st) {
-      AppLogger.e('PushNotificationService: Initialization sequence failed', e, st);
+      AppLogger.e(
+        'PushNotificationService: Initialization sequence failed',
+        e,
+        st,
+      );
     }
   }
 
@@ -83,7 +91,10 @@ class PushNotificationService {
   Future<void> _syncTokenWithBackend(String token) async {
     try {
       final cachedToken = await _storage.getFcmToken();
-      final currentSession = _ref.read(supabaseClientProvider).auth.currentSession;
+      final currentSession = _ref
+          .read(supabaseClientProvider)
+          .auth
+          .currentSession;
 
       // Avoid repeating network handshakes if token remains unchanged or session is inactive
       if (cachedToken == token || currentSession == null) {
@@ -107,7 +118,9 @@ class PushNotificationService {
         AppLogger.i('FCM push token securely registered with backend services');
         await _storage.saveFcmToken(token);
       } else {
-        AppLogger.w('Backend token registration returned non-success code: ${response.statusCode}');
+        AppLogger.w(
+          'Backend token registration returned non-success code: ${response.statusCode}',
+        );
       }
     } on Object catch (e) {
       AppLogger.w('FCM backend token attestation/handshake failure', e);
@@ -119,4 +132,6 @@ class PushNotificationService {
   }
 }
 
-final pushNotificationServiceProvider = Provider<PushNotificationService>(PushNotificationService.new);
+final pushNotificationServiceProvider = Provider<PushNotificationService>(
+  PushNotificationService.new,
+);

@@ -13,13 +13,12 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// Orchestrates data fetching from the EzyGo portal, utilizing batching
 /// and deduplication to optimize performance and reduce backend load.
 class EzygoService {
-
   EzygoService(this._ref) {
     _fetcher = EzygoBatchFetcher(
       _ref.read(dioServiceProvider).dio,
       getOutage: () => _ref.read(outageProvider),
       setOutage: (v) => _ref.read(outageProvider.notifier).update(v),
-      isBackendUnauthorized: () => false, 
+      isBackendUnauthorized: () => false,
     );
   }
   final Ref _ref;
@@ -35,14 +34,19 @@ class EzygoService {
     return _fetcher.fetch(path: path, token: token);
   }
 
-  Future<Response<dynamic>> fetchAttendanceReportDetailed(SecureStorageService storage) async {
+  Future<Response<dynamic>> fetchAttendanceReportDetailed(
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
     final path = '$_ezygoApiRoot/attendancereports/student/detailed';
     if (token == null) {
-      return _ref.read(dioServiceProvider).dio.post(
-        path,
-        data: <String, dynamic>{},
-      );
+      return _ref
+          .read(dioServiceProvider)
+          .dio
+          .post(
+            path,
+            data: <String, dynamic>{},
+          );
     }
     return _fetcher.fetch(
       path: path,
@@ -52,50 +56,70 @@ class EzygoService {
     );
   }
 
-  Future<Response<dynamic>> getInstitutions(SecureStorageService storage) async {
+  Future<Response<dynamic>> getInstitutions(
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
     final path = '$_ezygoApiRoot/institutionusers/myinstitutions';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
   }
 
-  Future<Response<dynamic>> updateDefaultInstitution(int institutionUserId, SecureStorageService storage) async {
+  Future<Response<dynamic>> updateDefaultInstitution(
+    int institutionUserId,
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
-    return _ref.read(dioServiceProvider).dio.post(
-      '$_ezygoApiRoot/user/setting/default_institutionUser',
-      data: {'default_institutionUser': institutionUserId},
-      options: Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-        extra: {'useLimitedToken': true},
-        validateStatus: (s) => s != null && s < 600,
-      ),
-    );
+    return _ref
+        .read(dioServiceProvider)
+        .dio
+        .post(
+          '$_ezygoApiRoot/user/setting/default_institutionUser',
+          data: {'default_institutionUser': institutionUserId},
+          options: Options(
+            headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+            extra: {'useLimitedToken': true},
+            validateStatus: (s) => s != null && s < 600,
+          ),
+        );
   }
 
-  Future<Response<dynamic>> updateSemester(String semester, SecureStorageService storage) async {
+  Future<Response<dynamic>> updateSemester(
+    String semester,
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
-    return _ref.read(dioServiceProvider).dio.post(
-      '$_ezygoApiRoot/user/setting/default_semester',
-      data: {'default_semester': semester},
-      options: Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-        extra: {'useLimitedToken': true},
-        validateStatus: (s) => s != null && s < 600,
-      ),
-    );
+    return _ref
+        .read(dioServiceProvider)
+        .dio
+        .post(
+          '$_ezygoApiRoot/user/setting/default_semester',
+          data: {'default_semester': semester},
+          options: Options(
+            headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+            extra: {'useLimitedToken': true},
+            validateStatus: (s) => s != null && s < 600,
+          ),
+        );
   }
 
-  Future<Response<dynamic>> updateAcademicYear(String year, SecureStorageService storage) async {
+  Future<Response<dynamic>> updateAcademicYear(
+    String year,
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
-    return _ref.read(dioServiceProvider).dio.post(
-      '$_ezygoApiRoot/user/setting/default_academic_year',
-      data: {'default_academic_year': year},
-      options: Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-        extra: {'useLimitedToken': true},
-        validateStatus: (s) => s != null && s < 600,
-      ),
-    );
+    return _ref
+        .read(dioServiceProvider)
+        .dio
+        .post(
+          '$_ezygoApiRoot/user/setting/default_academic_year',
+          data: {'default_academic_year': year},
+          options: Options(
+            headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+            extra: {'useLimitedToken': true},
+            validateStatus: (s) => s != null && s < 600,
+          ),
+        );
   }
 
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
@@ -105,7 +129,9 @@ class EzygoService {
     return _fetcher.fetch(path: path, token: token);
   }
 
-  Future<Response<dynamic>> fetchAcademicYear(SecureStorageService storage) async {
+  Future<Response<dynamic>> fetchAcademicYear(
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_academic_year';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
@@ -144,7 +170,9 @@ class EzygoService {
       final summary = failedRequests
           .map((r) => '${r.requestOptions.path} -> ${r.statusCode}')
           .join(', ');
-      AppLogger.e('EzygoService.fetchLeaveData: Partial failure — [$summary]. Aborting.');
+      AppLogger.e(
+        'EzygoService.fetchLeaveData: Partial failure — [$summary]. Aborting.',
+      );
       throw const AppException(
         message: 'Failed to fetch complete leave data. Please try again.',
         type: AppExceptionType.network,
@@ -176,14 +204,21 @@ class EzygoService {
     return _fetcher.fetch(path: path, token: token);
   }
 
-  Future<Response<dynamic>> fetchExamQuestions(int examId, SecureStorageService storage) async {
+  Future<Response<dynamic>> fetchExamQuestions(
+    int examId,
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
-    final path = '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
+    final path =
+        '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
   }
 
-  Future<Response<dynamic>> fetchExamAnswers(int examId, SecureStorageService storage) async {
+  Future<Response<dynamic>> fetchExamAnswers(
+    int examId,
+    SecureStorageService storage,
+  ) async {
     final token = await storage.getEzygoToken();
     final path = '$_ezygoApiRoot/exams/$examId/institutionuser/examanswers';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);

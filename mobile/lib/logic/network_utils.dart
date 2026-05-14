@@ -21,7 +21,7 @@ class NetworkUtils {
     String host,
     int port,
   ) {
-    // In production, always return false to let the system's standard 
+    // In production, always return false to let the system's standard
     // verification handle everything (CA-signed certs).
     if (!kDebugMode) {
       return false;

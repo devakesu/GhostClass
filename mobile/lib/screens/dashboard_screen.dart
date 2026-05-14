@@ -25,7 +25,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(dashboardProvider);
     final data = dashboardState.value;
-    final isSyncing = ref.watch(authProvider.select((v) => v.value?.isSyncing ?? false));
+    final isSyncing = ref.watch(
+      authProvider.select((v) => v.value?.isSyncing ?? false),
+    );
 
     if (dashboardState.isLoading || isSyncing) {
       return Scaffold(
@@ -67,7 +69,9 @@ class _DashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userSettings = ref.watch(authProvider.select((v) => v.value?.settings));
+    final userSettings = ref.watch(
+      authProvider.select((v) => v.value?.settings),
+    );
     final bunkEnabled = userSettings?.bunkCalculatorEnabled ?? true;
     final targetValue = (userSettings?.targetPercentage ?? 75).toDouble();
 

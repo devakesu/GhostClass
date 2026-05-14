@@ -20,11 +20,11 @@ double? _toDouble(dynamic value) {
 }
 
 class Exam {
-
   Exam({
     required this.id,
     required this.name,
-    required this.activityType, this.summary,
+    required this.activityType,
+    this.summary,
     this.startsAt,
     this.endsAt,
     this.maximumMark,
@@ -36,7 +36,8 @@ class Exam {
     final participants = json['participants'] as List? ?? [];
     double? pivotScore;
     if (participants.isNotEmpty) {
-      final firstParticipant = participants.first as Map<String, dynamic>? ?? {};
+      final firstParticipant =
+          participants.first as Map<String, dynamic>? ?? {};
       final pivot = firstParticipant['pivot'] as Map<String, dynamic>?;
       pivotScore = _toDouble(pivot?['score']);
     }
@@ -53,9 +54,15 @@ class Exam {
       // Prefer historical EzyGo typo key first, fallback to corrected spelling.
       summary: _firstNonEmptyString(json, const ['summery', 'summary']),
       activityType: json['activity_type'] as String? ?? 'assessment',
-      startsAt: json['starts_at'] != null ? DateTime.tryParse(json['starts_at'] as String) : null,
-      endsAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'] as String) : null,
-      maximumMark: _toDouble(json['maximum_mark']) ?? _toDouble(settingsMap['questionPaperMaximumMark']),
+      startsAt: json['starts_at'] != null
+          ? DateTime.tryParse(json['starts_at'] as String)
+          : null,
+      endsAt: json['end_at'] != null
+          ? DateTime.tryParse(json['end_at'] as String)
+          : null,
+      maximumMark:
+          _toDouble(json['maximum_mark']) ??
+          _toDouble(settingsMap['questionPaperMaximumMark']),
       apiScore: pivotScore,
       courses: coursesList,
     );
@@ -80,8 +87,13 @@ class Exam {
 }
 
 class Course {
-
-  Course({required this.id, required this.name, this.code, this.academicYear, this.academicSemester});
+  Course({
+    required this.id,
+    required this.name,
+    this.code,
+    this.academicYear,
+    this.academicSemester,
+  });
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -100,7 +112,6 @@ class Course {
 }
 
 class ExamQuestion {
-
   ExamQuestion({
     required this.id,
     required this.questionNo,
@@ -126,7 +137,6 @@ class ExamQuestion {
 }
 
 class ExamAnswer {
-
   ExamAnswer({
     required this.id,
     required this.examQuestionId,
@@ -146,7 +156,6 @@ class ExamAnswer {
 }
 
 class ResolvedScore {
-
   ResolvedScore({
     required this.score,
     required this.maxMark,
@@ -158,7 +167,8 @@ class ResolvedScore {
   final bool isMarked;
   final bool isMaxUnresolvable;
 
-  double get percentage => (isMaxUnresolvable || maxMark <= 0) ? 0 : (score / maxMark) * 100;
+  double get percentage =>
+      (isMaxUnresolvable || maxMark <= 0) ? 0 : (score / maxMark) * 100;
 
   Color get color {
     if (!isMarked) return Colors.grey;

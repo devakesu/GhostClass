@@ -1,11 +1,7 @@
-
-
 import 'package:flutter/foundation.dart';
 
 @immutable
 class UserProfile {
-
-
   const UserProfile({
     this.firstName,
     this.lastName,
@@ -22,14 +18,15 @@ class UserProfile {
     this.classField,
   });
 
-
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     String? createdAt;
     final rawCreated = json['created_at'];
     if (rawCreated is String) {
       createdAt = rawCreated;
     } else if (rawCreated is num) {
-      final ms = rawCreated < 100000000000 ? (rawCreated * 1000).toInt() : rawCreated.toInt();
+      final ms = rawCreated < 100000000000
+          ? (rawCreated * 1000).toInt()
+          : rawCreated.toInt();
       createdAt = DateTime.fromMillisecondsSinceEpoch(ms).toIso8601String();
     }
 
@@ -54,8 +51,8 @@ class UserProfile {
       ezygoCreatedAt: ezygoCreatedAt,
       classField: json['class'] != null
           ? (json['class'] is Map<dynamic, dynamic>
-              ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
-              : UserClass(id: '', name: json['class'].toString()))
+                ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
+                : UserClass(id: '', name: json['class'].toString()))
           : null,
     );
   }
@@ -72,7 +69,6 @@ class UserProfile {
   final String? createdAt;
   final String? ezygoCreatedAt;
   final UserClass? classField;
-
 
   String? get fullName {
     if (firstName == null && lastName == null) return null;
@@ -146,45 +142,41 @@ class UserProfile {
       ezygoCreatedAt.hashCode ^
       classField.hashCode;
 
-
   Map<String, dynamic> toJson() => {
-        'first_name': firstName,
-        'last_name': lastName,
-        'avatar_url': avatarUrl,
-        'email': email,
-        'phone': phone,
-        'birth_date': birthDate,
-        'gender': gender,
-        'last_synced_at': lastSyncedAt,
-        'current_semester': currentSemester,
-        'current_year': currentYear,
-        'created_at': createdAt,
-        'ezygo_created_at': ezygoCreatedAt,
-        'class': classField?.toJson(),
-      };
-
+    'first_name': firstName,
+    'last_name': lastName,
+    'avatar_url': avatarUrl,
+    'email': email,
+    'phone': phone,
+    'birth_date': birthDate,
+    'gender': gender,
+    'last_synced_at': lastSyncedAt,
+    'current_semester': currentSemester,
+    'current_year': currentYear,
+    'created_at': createdAt,
+    'ezygo_created_at': ezygoCreatedAt,
+    'class': classField?.toJson(),
+  };
 }
 
 class UserClass {
-
   UserClass({required this.id, required this.name});
 
   factory UserClass.fromJson(Map<String, dynamic> json) => UserClass(
-        id: json['id'] as String? ?? '',
-        name: json['name'] as String? ?? 'Unknown Class',
-      );
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? 'Unknown Class',
+  );
   final String id;
   final String name;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-      };
+    'id': id,
+    'name': name,
+  };
 }
 
 @immutable
 class UserSettings {
-
   const UserSettings({
     required this.bunkCalculatorEnabled,
     required this.targetPercentage,
@@ -194,10 +186,10 @@ class UserSettings {
   });
 
   factory UserSettings.defaults() => const UserSettings(
-        bunkCalculatorEnabled: true,
-        targetPercentage: 75,
-        disabledCourses: {},
-      );
+    bunkCalculatorEnabled: true,
+    targetPercentage: 75,
+    disabledCourses: {},
+  );
 
   factory UserSettings.fromJson(Map<String, dynamic> json) {
     // Parse nested map safely
@@ -221,7 +213,7 @@ class UserSettings {
     );
   }
   final bool bunkCalculatorEnabled;
-   final int targetPercentage;
+  final int targetPercentage;
   final String? semester;
   final String? academicYear;
   final Map<String, Map<String, String>> disabledCourses;
@@ -259,12 +251,12 @@ class UserSettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'bunk_calculator_enabled': bunkCalculatorEnabled,
-        'target_percentage': targetPercentage,
-        'semester': semester,
-        'academic_year': academicYear,
-        'disabled_courses': disabledCourses,
-      };
+    'bunk_calculator_enabled': bunkCalculatorEnabled,
+    'target_percentage': targetPercentage,
+    'semester': semester,
+    'academic_year': academicYear,
+    'disabled_courses': disabledCourses,
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -290,8 +282,13 @@ class UserSettings {
     for (final key in m1.keys) {
       if (!m2.containsKey(key) || m1[key] != m2[key]) {
         // Nested map check for disabledCourses
-        if (m1[key] is Map<dynamic, dynamic> && m2[key] is Map<dynamic, dynamic>) {
-          if (!_mapsEqual(m1[key] as Map<dynamic, dynamic>, m2[key] as Map<dynamic, dynamic>)) return false;
+        if (m1[key] is Map<dynamic, dynamic> &&
+            m2[key] is Map<dynamic, dynamic>) {
+          if (!_mapsEqual(
+            m1[key] as Map<dynamic, dynamic>,
+            m2[key] as Map<dynamic, dynamic>,
+          ))
+            return false;
         } else {
           return false;
         }
@@ -301,7 +298,8 @@ class UserSettings {
   }
 }
 
-class StealthInfo { // Formatted for header
+class StealthInfo {
+  // Formatted for header
 
   StealthInfo({
     required this.browserName,
@@ -311,20 +309,20 @@ class StealthInfo { // Formatted for header
   });
 
   factory StealthInfo.fromJson(Map<String, dynamic> json) => StealthInfo(
-        browserName: json['browserName'] as String,
-        browserVersion: json['browserVersion'] as String,
-        userAgent: json['userAgent'] as String,
-        secChUa: json['secChUa'] as String,
-      );
+    browserName: json['browserName'] as String,
+    browserVersion: json['browserVersion'] as String,
+    userAgent: json['userAgent'] as String,
+    secChUa: json['secChUa'] as String,
+  );
   final String browserName; // e.g., "Chrome", "Edge"
   final String browserVersion; // e.g., "148.0.0.0"
   final String userAgent; // FULL Generated UA
   final String secChUa;
 
   Map<String, dynamic> toJson() => {
-        'browserName': browserName,
-        'browserVersion': browserVersion,
-        'userAgent': userAgent,
-        'secChUa': secChUa,
-      };
+    'browserName': browserName,
+    'browserVersion': browserVersion,
+    'userAgent': userAgent,
+    'secChUa': secChUa,
+  };
 }

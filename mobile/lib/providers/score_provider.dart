@@ -14,7 +14,6 @@ final scoreProvider = AsyncNotifierProvider<ScoreNotifier, ScoreState>(
 );
 
 class ScoreState {
-
   ScoreState({
     required this.rawExams,
     required this.groupedExams,
@@ -270,60 +269,67 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
 
     questionsMap[exam.id] = uniqueQuestions;
     answersMap[exam.id] = uniqueAnswers;
-    
+
     double? finalScore;
-    final hasAnyGrade = uniqueAnswers.isNotEmpty && uniqueAnswers.any((a) => a.score != null);
+    final hasAnyGrade =
+        uniqueAnswers.isNotEmpty && uniqueAnswers.any((a) => a.score != null);
 
     if (hasAnyGrade) {
-      finalScore = uniqueAnswers.fold<double>(0, (sum, a) => sum + (a.score ?? 0.0));
+      finalScore = uniqueAnswers.fold<double>(
+        0,
+        (sum, a) => sum + (a.score ?? 0.0),
+      );
     } else {
       finalScore = exam.apiScore;
     }
 
     // --- Robust Max Mark Calculation (matches web app) ---
     var finalMax = exam.maximumMark;
-    
+
     if (finalMax == null || finalMax == 0) {
       if (uniqueQuestions.isNotEmpty) {
-        
         // Identify parent IDs
         final parentIds = uniqueQuestions
             .map((q) => q.subquestionParentId)
             .where((id) => id != null)
             .toSet();
-            
+
         // Leaves are questions that are not parents
-        final leaves = uniqueQuestions.where((q) => !parentIds.contains(q.id)).toList();
-        
+        final leaves = uniqueQuestions
+            .where((q) => !parentIds.contains(q.id))
+            .toList();
+
         // Identify graded question IDs
         final gradedQuestionIds = uniqueAnswers
             .where((a) => a.score != null)
             .map((a) => a.examQuestionId)
             .toSet();
-            
+
         // If some leaves were graded, only count those (handles optional papers)
-        final gradedLeaves = leaves.where((q) => gradedQuestionIds.contains(q.id)).toList();
+        final gradedLeaves = leaves
+            .where((q) => gradedQuestionIds.contains(q.id))
+            .toList();
         final targetSet = gradedLeaves.isNotEmpty ? gradedLeaves : leaves;
-        
+
         // Handle OR-groups
         final orGroups = <int, double>{};
         var total = 0.0;
-        
+
         for (final q in targetSet) {
           if (q.orQuestionGroupId != null) {
             final groupId = q.orQuestionGroupId!;
-            orGroups[groupId] = (orGroups[groupId] ?? 0.0) > q.maximumMark 
-                ? orGroups[groupId]! 
+            orGroups[groupId] = (orGroups[groupId] ?? 0.0) > q.maximumMark
+                ? orGroups[groupId]!
                 : q.maximumMark;
           } else {
             total += q.maximumMark;
           }
         }
-        
+
         for (final groupMark in orGroups.values) {
           total += groupMark;
         }
-        
+
         finalMax = total;
       }
     }

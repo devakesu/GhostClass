@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class GhostClassSettingsCard extends StatelessWidget {
-
   const GhostClassSettingsCard({
-    required this.icon, required this.label, required this.value, required this.color, required this.onTap, super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onTap,
+    super.key,
     this.isActive = true,
     this.isFullWidth = false,
     this.showToggle = false,
@@ -45,16 +49,24 @@ class GhostClassSettingsCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isActive ? color : surface,
                 borderRadius: BorderRadius.circular(20),
-                border: isDark && !isActive ? Border.all(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                ) : null,
-                boxShadow: isDark ? null : [
-                  BoxShadow(
-                    color: (isActive ? color : Colors.black).withValues(alpha: isActive ? 0.2 : 0.02),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  )
-                ],
+                border: isDark && !isActive
+                    ? Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      )
+                    : null,
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: (isActive ? color : Colors.black).withValues(
+                            alpha: isActive ? 0.2 : 0.02,
+                          ),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
               ),
               child: isFullWidth
                   ? Row(
@@ -62,10 +74,16 @@ class GhostClassSettingsCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: (isActive ? Colors.white : color).withValues(alpha: 0.15),
+                            color: (isActive ? Colors.white : color).withValues(
+                              alpha: 0.15,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Icon(icon, size: 20, color: isActive ? Colors.white : color),
+                          child: Icon(
+                            icon,
+                            size: 20,
+                            color: isActive ? Colors.white : color,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -77,7 +95,9 @@ class GhostClassSettingsCard extends StatelessWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w900,
-                                  color: isActive ? Colors.white.withValues(alpha: 0.6) : color,
+                                  color: isActive
+                                      ? Colors.white.withValues(alpha: 0.6)
+                                      : color,
                                   letterSpacing: 1.2,
                                 ),
                               ),
@@ -86,7 +106,9 @@ class GhostClassSettingsCard extends StatelessWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w900,
-                                  color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                  color: isActive
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                             ],
@@ -95,7 +117,11 @@ class GhostClassSettingsCard extends StatelessWidget {
                         Icon(
                           Icons.chevron_right_rounded,
                           size: 20,
-                          color: isActive ? Colors.white.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: isActive
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.2),
                         ),
                       ],
                     )
@@ -109,10 +135,15 @@ class GhostClassSettingsCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: (isActive ? Colors.white : color).withValues(alpha: 0.15),
+                                color: (isActive ? Colors.white : color)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(icon, size: 18, color: isActive ? Colors.white : color),
+                              child: Icon(
+                                icon,
+                                size: 18,
+                                color: isActive ? Colors.white : color,
+                              ),
                             ),
                             if (showToggle)
                               RotatedBox(
@@ -126,9 +157,11 @@ class GhostClassSettingsCard extends StatelessWidget {
                                       value: toggleValue ?? false,
                                       onChanged: onToggle,
                                       activeThumbColor: Colors.white,
-                                      activeTrackColor: Colors.white.withValues(alpha: 0.3),
-                                      inactiveTrackColor: isDark 
-                                          ? Colors.white.withValues(alpha: 0.05) 
+                                      activeTrackColor: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      inactiveTrackColor: isDark
+                                          ? Colors.white.withValues(alpha: 0.05)
                                           : Colors.black.withValues(alpha: 0.1),
                                     ),
                                   ),
@@ -144,7 +177,9 @@ class GhostClassSettingsCard extends StatelessWidget {
                               style: GoogleFonts.manrope(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
-                                color: isActive ? Colors.white.withValues(alpha: 0.6) : color,
+                                color: isActive
+                                    ? Colors.white.withValues(alpha: 0.6)
+                                    : color,
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -156,7 +191,9 @@ class GhostClassSettingsCard extends StatelessWidget {
                               style: GoogleFonts.manrope(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                color: isActive
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ],

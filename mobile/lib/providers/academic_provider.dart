@@ -15,7 +15,6 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// Provides utility methods to derive start and end dates for filtering logs.
 @immutable
 class AcademicState {
-
   const AcademicState({required this.semester, required this.year});
   final String semester;
   final String year;
@@ -121,22 +120,22 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     state = await AsyncValue.guard(() async {
       final api = ref.read(apiServiceProvider);
       final storage = ref.read(secureStorageProvider);
-      
+
       final results = await Future.wait<Response<dynamic>>([
         api.fetchSemester(storage),
         api.fetchAcademicYear(storage),
       ]);
-      
+
       final semRes = results[0];
       final yearRes = results[1];
-      
+
       String? extract(dynamic raw, String key) {
         if (raw == null) return null;
         if (raw is! Map) return raw.toString();
-        
+
         final map = raw;
         if (map[key] != null) return map[key].toString();
-        
+
         final keysToTry = ['data', 'value'];
         for (final k in keysToTry) {
           final val = map[k];
@@ -147,16 +146,16 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
         }
         return null;
       }
-      
+
       final semester = extract(semRes.data, 'default_semester');
       final year = extract(yearRes.data, 'default_academic_year');
-      
+
       if (semester != null && year != null) {
         final next = AcademicState(semester: semester, year: year);
         await storage.saveAcademicState(next);
         return next;
       }
-      
+
       final cached = await storage.getAcademicState();
       return cached ?? state.value;
     });
@@ -166,10 +165,10 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final current = state.value;
     final nextYear =
         current?.year ?? calculateCurrentAcademicInfo()['current_year']!;
-    
+
     // 1. Show loading immediately in the state
     state = const AsyncValue.loading();
-    
+
     // 2. Perform the heavy lifting on the server
     await ref
         .read(authProvider.notifier)
@@ -181,10 +180,10 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final nextSemester =
         current?.semester ??
         calculateCurrentAcademicInfo()['current_semester']!;
-    
+
     // 1. Show loading immediately
     state = const AsyncValue.loading();
-    
+
     // 2. Update server
     await ref
         .read(authProvider.notifier)

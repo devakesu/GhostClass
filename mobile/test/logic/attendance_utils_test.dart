@@ -30,7 +30,10 @@ void main() {
       expect(info['current_semester'], 'odd');
       expect(info['current_year'], '2023-24');
 
-      final evenInfo = calculateCurrentAcademicInfo(semester: 'Even', year: '2024-25');
+      final evenInfo = calculateCurrentAcademicInfo(
+        semester: 'Even',
+        year: '2024-25',
+      );
       expect(evenInfo['current_semester'], 'even');
       expect(evenInfo['current_year'], '2024-25');
     });
@@ -75,7 +78,7 @@ void main() {
     test('returns empty string for invalid dates', () {
       expect(normalizeDate('invalid'), '');
       expect(normalizeDate(null), '');
-      expect(normalizeDate('99-99-9999'), ''); 
+      expect(normalizeDate('99-99-9999'), '');
       expect(normalizeDate('31-02-2024'), ''); // Invalid day for Feb
     });
   });
@@ -139,7 +142,11 @@ void main() {
   });
 
   group('Attendance Utils - resolveCourseDisplayName', () {
-    const courseDetails = CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
+    const courseDetails = CourseDetails(
+      id: 101,
+      name: 'Advanced Java',
+      code: 'JAVA101',
+    );
     const officialReport = AttendanceReportDetailed(
       courses: {
         'C1': AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
@@ -179,14 +186,22 @@ void main() {
       // Test mergedCourse with id == 0 absolute fallback
       final nameZero = resolveCourseDisplayName(
         courseKey: 'UNKNOWN',
-        mergedCourse: const CourseDetails(id: 0, name: 'FallbackName', code: 'FB'),
+        mergedCourse: const CourseDetails(
+          id: 0,
+          name: 'FallbackName',
+          code: 'FB',
+        ),
       );
       expect(nameZero, 'FallbackName');
     });
   });
 
   group('Attendance Utils - resolveCourseDisplayCode', () {
-    const courseDetails = CourseDetails(id: 101, name: 'Advanced Java', code: 'JAVA101');
+    const courseDetails = CourseDetails(
+      id: 101,
+      name: 'Advanced Java',
+      code: 'JAVA101',
+    );
     const officialReport = AttendanceReportDetailed(
       courses: {
         'C1': AttendanceCourse(id: 1, name: 'Computer Science', code: 'CS01'),
@@ -239,7 +254,10 @@ void main() {
 
     test('calculateAttendance delegates to bunk', () {
       final result = calculateAttendance(10, 10);
-      expect(result.canBunk, 3); // (10 - 0.75 * 10) / 0.75 = 2.5 / 0.75 = 3.33 -> 3
+      expect(
+        result.canBunk,
+        3,
+      ); // (10 - 0.75 * 10) / 0.75 = 2.5 / 0.75 = 3.33 -> 3
       expect(result.requiredToAttend, 0);
     });
   });

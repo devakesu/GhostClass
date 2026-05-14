@@ -4,7 +4,6 @@ import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/services/logger.dart';
 
 class DashboardStats {
-
   DashboardStats({
     required this.percentage,
     required this.rawPercentage,
@@ -97,8 +96,7 @@ class DashboardStats {
           final cid = resolveSafeId(rawCid);
 
           final status = _parseStatus(session.attendance);
-          final rawCourseCode =
-              attendanceData.courses[rawCid]?.code ?? rawCid;
+          final rawCourseCode = attendanceData.courses[rawCid]?.code ?? rawCid;
           final stdCourseCode = standardize(rawCourseCode);
           final courseDisabled = disabledCourseCodes.contains(
             stdCourseCode,
@@ -174,12 +172,13 @@ class DashboardStats {
       );
       final courseDisabled = disabledCourseCodes.contains(courseCode);
 
-      final isTrulyExtra =
-          item.status == 'extra' && officialStatus == null;
+      final isTrulyExtra = item.status == 'extra' && officialStatus == null;
       final trackerPositive = _isPositive(trackerStatus);
       final trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
-      final officialPositive = officialStatus != null && _isPositive(officialStatus);
-      final officialDLStatus = officialStatus == AttendanceStatus.dutyLeave.code;
+      final officialPositive =
+          officialStatus != null && _isPositive(officialStatus);
+      final officialDLStatus =
+          officialStatus == AttendanceStatus.dutyLeave.code;
 
       final course = courseStats[cid];
       if (course != null) {
@@ -326,6 +325,7 @@ class DashboardStats {
     if (val is int) return val;
     return int.tryParse(val.toString()) ?? 0;
   }
+
   static bool _isPositive(int status) {
     return AttendanceStatus.fromCode(status).isPositive;
   }
@@ -338,7 +338,6 @@ class DashboardStats {
 }
 
 class CourseStat {
-
   CourseStat({
     required this.id,
     required this.code,

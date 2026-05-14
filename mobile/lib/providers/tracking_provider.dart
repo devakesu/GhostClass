@@ -16,10 +16,12 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 // ─── Tracking State ──────────────────────────────────────────────────────────
 
 class TrackingState {
-
   TrackingState({
     required this.groupedByCourse,
-    required this.totalCount, required this.isSyncing, required this.syncCompleted, this.officialReport,
+    required this.totalCount,
+    required this.isSyncing,
+    required this.syncCompleted,
+    this.officialReport,
   });
   final Map<String, List<TrackingRecord>> groupedByCourse;
   final AttendanceReportDetailed? officialReport;
@@ -185,14 +187,14 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     if (report == null) return input;
     final stdInput = utils.standardizeCourseCode(input);
     if (report.courses.containsKey(input)) return input;
-    
+
     // Search courses by standardized code
     for (final c in report.courses.values) {
       if (c.code != null && utils.standardizeCourseCode(c.code!) == stdInput) {
         return c.id.toString();
       }
     }
-    
+
     // Fallback: Check if input is a numeric ID
     final n = int.tryParse(input);
     if (n != null) {
@@ -211,7 +213,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
-    final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    final supabaseToken =
+        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
     // Only trigger a sync when the caller explicitly requests it.
     // DashboardNotifier.refresh() already fires triggerSync before calling us.
     if (forceSync && user != null && supabaseToken != null) {
@@ -220,7 +223,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
     final academic = academicAsync.value;
     if (academic == null) return;
-    
+
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
       () => _fetchAndProcess(
@@ -367,7 +370,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           .eq('year', academic.year);
 
       if (courseId != null) {
-        // ID-CODE Mismatch Safety: 
+        // ID-CODE Mismatch Safety:
         // We aggregate both the numeric ID and the Alphanumeric Code to ensure
         // all variants stored in the DB (via Web vs Mobile) are cleared.
         final keys = <String>{courseId, utils.standardizeCourseCode(courseId)};
@@ -376,7 +379,10 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           for (final c in officialReport.courses.values) {
             final cId = c.id.toString();
             final cCode = c.code;
-            if (cId == courseId || (cCode != null && utils.standardizeCourseCode(cCode) == utils.standardizeCourseCode(courseId))) {
+            if (cId == courseId ||
+                (cCode != null &&
+                    utils.standardizeCourseCode(cCode) ==
+                        utils.standardizeCourseCode(courseId))) {
               keys.add(cId);
               if (cCode != null) keys.add(utils.standardizeCourseCode(cCode));
               break;

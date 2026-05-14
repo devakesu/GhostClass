@@ -11,9 +11,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 /// A custom, high-fidelity refresh indicator that provides smooth visual feedback
 /// and ensures reliable sync state across different platforms.
 class AestheticRefreshIndicator extends StatefulWidget {
-
   const AestheticRefreshIndicator({
-    required this.child, required this.onRefresh, super.key,
+    required this.child,
+    required this.onRefresh,
+    super.key,
     this.loadingMessage,
     this.useOverlay = true,
   });
@@ -100,8 +101,6 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
 
         final metrics = notification.metrics;
 
-
-
         if (notification is ScrollUpdateNotification && !_isRefreshing) {
           if (metrics.pixels < 0) {
             final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
@@ -121,14 +120,15 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
           if (metrics.pixels < 0) {
             final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
             _safeSetState(() => _pullDistance = distance);
-            
+
             if (notification.dragDetails == null && distance >= 0.8) {
               final _ = _handleRefresh();
             }
           }
         }
 
-        if (notification is UserScrollNotification && notification.direction == ScrollDirection.idle) {
+        if (notification is UserScrollNotification &&
+            notification.direction == ScrollDirection.idle) {
           if (!_isRefreshing) {
             _safeSetState(() => _pullDistance = 0.0);
           }
@@ -167,7 +167,6 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
 /// ---------------
 /// Visual representation of the refresh pull action.
 class RefreshGlowIcon extends StatelessWidget {
-
   const RefreshGlowIcon({required this.pullDistance, super.key});
   final double pullDistance;
 

@@ -98,18 +98,24 @@ String normalizeDate(dynamic date) {
       final a = parts[0].trim();
       final b = parts[1].trim();
       final c = parts[2].trim();
-      
-      if (RegExp(r'^\d+$').hasMatch(a) && 
-          RegExp(r'^\d+$').hasMatch(b) && 
+
+      if (RegExp(r'^\d+$').hasMatch(a) &&
+          RegExp(r'^\d+$').hasMatch(b) &&
           RegExp(r'^\d+$').hasMatch(c)) {
         final year = (a.length == 4) ? int.parse(a) : int.parse(c);
         final month = int.parse(b);
         final day = (a.length == 4) ? int.parse(c) : int.parse(a);
-        
+
         if (month < 1 || month > 12 || day < 1 || day > 31) return '';
 
-        final parsed = DateTime.tryParse("${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}");
-        if (parsed == null || parsed.year != year || parsed.month != month || parsed.day != day) return '';
+        final parsed = DateTime.tryParse(
+          "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
+        );
+        if (parsed == null ||
+            parsed.year != year ||
+            parsed.month != month ||
+            parsed.day != day)
+          return '';
 
         if (a.length == 4) {
           // YYYY-MM-DD
@@ -130,8 +136,8 @@ String normalizeDate(dynamic date) {
       final b = parts[1].trim();
       final c = parts[2].trim();
 
-      if (RegExp(r'^\d+$').hasMatch(a) && 
-          RegExp(r'^\d+$').hasMatch(b) && 
+      if (RegExp(r'^\d+$').hasMatch(a) &&
+          RegExp(r'^\d+$').hasMatch(b) &&
           RegExp(r'^\d+$').hasMatch(c)) {
         final year = (a.length == 4) ? int.parse(a) : int.parse(c);
         final month = int.parse(b);
@@ -139,8 +145,14 @@ String normalizeDate(dynamic date) {
 
         if (month < 1 || month > 12 || day < 1 || day > 31) return '';
 
-        final parsed = DateTime.tryParse("${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}");
-        if (parsed == null || parsed.year != year || parsed.month != month || parsed.day != day) return '';
+        final parsed = DateTime.tryParse(
+          "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
+        );
+        if (parsed == null ||
+            parsed.year != year ||
+            parsed.month != month ||
+            parsed.day != day)
+          return '';
 
         if (a.length == 4) {
           // YYYY/MM/DD
@@ -166,9 +178,7 @@ String normalizeSession(dynamic session) {
   var s = session.toString().toLowerCase().trim();
 
   // 1. Remove common noise
-  s = s
-      .replaceAll(RegExp('session|lecture|lec|lab|hour|hr|period'), '')
-      .trim();
+  s = s.replaceAll(RegExp('session|lecture|lec|lab|hour|hr|period'), '').trim();
   s = s.replaceAll(RegExp(r'(st|nd|rd|th)$'), '').trim(); // Remove ordinals
 
   // Collapse internal multi-spaces and take only the first word

@@ -5,9 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CalendarHeader extends StatelessWidget {
-
   const CalendarHeader({
-    required this.focusedDay, required this.canMovePrev, required this.canMoveNext, required this.onPrevious, required this.onNext, required this.onToday, required this.onDateSelect, super.key,
+    required this.focusedDay,
+    required this.canMovePrev,
+    required this.canMoveNext,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onToday,
+    required this.onDateSelect,
+    super.key,
   });
   final DateTime focusedDay;
   final bool canMovePrev;
@@ -20,7 +26,8 @@ class CalendarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -33,7 +40,8 @@ class CalendarHeader extends StatelessWidget {
               children: [
                 Semantics(
                   button: true,
-                  label: 'Select Month, currently ${DateFormat('MMMM yyyy').format(focusedDay)}',
+                  label:
+                      'Select Month, currently ${DateFormat('MMMM yyyy').format(focusedDay)}',
                   child: GestureDetector(
                     onTap: onDateSelect,
                     child: Row(
@@ -100,7 +108,6 @@ class CalendarHeader extends StatelessWidget {
 }
 
 class _HeaderNavButton extends StatelessWidget {
-
   const _HeaderNavButton({
     required this.icon,
     required this.onTap,

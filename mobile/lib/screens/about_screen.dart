@@ -43,8 +43,10 @@ class AboutScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
-    final accent = ghostColors?.brandAccent ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final accent =
+        ghostColors?.brandAccent ?? Theme.of(context).colorScheme.primary;
     final bg = Theme.of(context).scaffoldBackgroundColor;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final muted = Theme.of(context).colorScheme.onSecondary;
@@ -88,7 +90,9 @@ class AboutScreen extends ConsumerWidget {
                         _PillButton(
                           icon: LucideIcons.github,
                           label: 'Repo',
-                          onTap: () { final _ = _launchUrl(AppConfig.githubUrl); },
+                          onTap: () {
+                            final _ = _launchUrl(AppConfig.githubUrl);
+                          },
                         ),
                       ],
                     ),
@@ -103,25 +107,31 @@ class AboutScreen extends ConsumerWidget {
                         const TransparencyBadge(expanded: true),
                         const SizedBox(height: 20),
                         Text(
-                          'Release receipts, in-app.',
-                          style: GoogleFonts.manrope(
-                            fontSize: 34,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                            color: onSurface,
-                            letterSpacing: -1.1,
-                          ),
-                        ).animate().fadeIn(duration: 260.ms).slideY(begin: 0.10),
+                              'Release receipts, in-app.',
+                              style: GoogleFonts.manrope(
+                                fontSize: 34,
+                                height: 1,
+                                fontWeight: FontWeight.w900,
+                                color: onSurface,
+                                letterSpacing: -1.1,
+                              ),
+                            )
+                            .animate()
+                            .fadeIn(duration: 260.ms)
+                            .slideY(begin: 0.10),
                         const SizedBox(height: 12),
                         Text(
-                          'This screen shows the exact release build details injected by CI so users can verify what binary they are running without leaving the app.',
-                          style: GoogleFonts.manrope(
-                            fontSize: 14,
-                            height: 1.55,
-                            fontWeight: FontWeight.w500,
-                            color: muted.withValues(alpha: 0.95),
-                          ),
-                        ).animate().fadeIn(delay: 80.ms, duration: 260.ms).slideY(begin: 0.08),
+                              'This screen shows the exact release build details injected by CI so users can verify what binary they are running without leaving the app.',
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                height: 1.55,
+                                fontWeight: FontWeight.w500,
+                                color: muted.withValues(alpha: 0.95),
+                              ),
+                            )
+                            .animate()
+                            .fadeIn(delay: 80.ms, duration: 260.ms)
+                            .slideY(begin: 0.08),
                         const SizedBox(height: 20),
                         _StatusBanner(
                           title: releaseState,
@@ -137,12 +147,13 @@ class AboutScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 1.18,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 1.18,
+                        ),
                     delegate: SliverChildListDelegate([
                       MetricCard(
                         icon: LucideIcons.tag,
@@ -150,42 +161,76 @@ class AboutScreen extends ConsumerWidget {
                         value: AppConfig.appVersion,
                         accent: primary,
                         onTap: AppConfig.isReleaseBuild
-                            ? () { final _ = _launchUrl(AppConfig.playStoreUrl); }
+                            ? () {
+                                final _ = _launchUrl(AppConfig.playStoreUrl);
+                              }
                             : null,
-                        onLongPress: () { final _ = _copy(context, AppConfig.appVersion, 'Version'); },
+                        onLongPress: () {
+                          final _ = _copy(
+                            context,
+                            AppConfig.appVersion,
+                            'Version',
+                          );
+                        },
                       ),
                       MetricCard(
                         icon: LucideIcons.fileDigit,
                         label: 'Commit',
                         value: _shortSha(AppConfig.appCommitSha),
                         accent: accent,
-                        onTap: (AppConfig.appCommitSha != 'local' &&
+                        onTap:
+                            (AppConfig.appCommitSha != 'local' &&
                                 AppConfig.appCommitSha.isNotEmpty)
-                            ? () { final _ = _launchUrl(
-                                '${AppConfig.githubUrl}/commit/${AppConfig.appCommitSha}',
-                              ); }
+                            ? () {
+                                final _ = _launchUrl(
+                                  '${AppConfig.githubUrl}/commit/${AppConfig.appCommitSha}',
+                                );
+                              }
                             : null,
-                        onLongPress: () { final _ = _copy(context, AppConfig.appCommitSha, 'Commit SHA'); },
+                        onLongPress: () {
+                          final _ = _copy(
+                            context,
+                            AppConfig.appCommitSha,
+                            'Commit SHA',
+                          );
+                        },
                       ),
                       MetricCard(
                         icon: LucideIcons.clock3,
                         label: 'Built',
                         value: AppConfig.buildTimestamp,
                         accent: const Color(0xFF0EA5E9),
-                        onTap: () { final _ = _copy(context, AppConfig.buildTimestamp, 'Build timestamp'); },
+                        onTap: () {
+                          final _ = _copy(
+                            context,
+                            AppConfig.buildTimestamp,
+                            'Build timestamp',
+                          );
+                        },
                       ),
                       MetricCard(
                         icon: LucideIcons.hash,
                         label: 'Run',
                         value: AppConfig.githubRunNumber,
-                        accent: ghostColors?.successGreen ?? const Color(0xFF10B981),
-                        onTap: (AppConfig.githubRunId != 'local' &&
+                        accent:
+                            ghostColors?.successGreen ??
+                            const Color(0xFF10B981),
+                        onTap:
+                            (AppConfig.githubRunId != 'local' &&
                                 AppConfig.githubRunId.isNotEmpty)
-                            ? () { final _ = _launchUrl(
-                                '${AppConfig.githubUrl}/actions/runs/${AppConfig.githubRunId}',
-                              ); }
+                            ? () {
+                                final _ = _launchUrl(
+                                  '${AppConfig.githubUrl}/actions/runs/${AppConfig.githubRunId}',
+                                );
+                              }
                             : null,
-                        onLongPress: () { final _ = _copy(context, AppConfig.githubRunId, 'Workflow run'); },
+                        onLongPress: () {
+                          final _ = _copy(
+                            context,
+                            AppConfig.githubRunId,
+                            'Workflow run',
+                          );
+                        },
                       ),
                     ]),
                   ),
@@ -201,17 +246,20 @@ class AboutScreen extends ConsumerWidget {
                         const ProofRow(
                           icon: LucideIcons.shieldCheck,
                           label: 'Signed APK',
-                          value: 'Release keystore injected from secrets and used in CI.',
+                          value:
+                              'Release keystore injected from secrets and used in CI.',
                         ),
                         const ProofRow(
                           icon: LucideIcons.packageSearch,
                           label: 'SBOM',
-                          value: 'CycloneDX output generated from the Flutter dependency graph.',
+                          value:
+                              'CycloneDX output generated from the Flutter dependency graph.',
                         ),
                         const ProofRow(
                           icon: LucideIcons.fileLock2,
                           label: 'Provenance',
-                          value: 'GitHub attestation attached to the APK artifact.',
+                          value:
+                              'GitHub attestation attached to the APK artifact.',
                         ),
                         ProofRow(
                           icon: LucideIcons.monitorSmartphone,
@@ -226,8 +274,12 @@ class AboutScreen extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
                     child: AttestationSection(
-                      onLaunch: (url) async { final _ = _launchUrl(url); },
-                      onCopy: (ctx, val, lbl) async { final _ = _copy(ctx, val, lbl); },
+                      onLaunch: (url) async {
+                        final _ = _launchUrl(url);
+                      },
+                      onCopy: (ctx, val, lbl) async {
+                        final _ = _copy(ctx, val, lbl);
+                      },
                     ),
                   ),
                 ),
@@ -243,25 +295,37 @@ class AboutScreen extends ConsumerWidget {
                           icon: LucideIcons.playCircle,
                           title: 'Google Play Store',
                           value: AppConfig.playStoreUrl,
-                          onTap: () { final _ = _launchUrl(AppConfig.playStoreUrl); },
+                          onTap: () {
+                            final _ = _launchUrl(AppConfig.playStoreUrl);
+                          },
                         ),
                         LinkRow(
                           icon: LucideIcons.github,
                           title: 'GitHub repository',
                           value: AppConfig.githubUrl,
-                          onTap: () { final _ = _launchUrl(AppConfig.githubUrl); },
+                          onTap: () {
+                            final _ = _launchUrl(AppConfig.githubUrl);
+                          },
                         ),
                         LinkRow(
                           icon: LucideIcons.globe,
                           title: 'Web app',
                           value: AppConfig.webUrl,
-                          onTap: () { final _ = _launchUrl(AppConfig.webUrl); },
+                          onTap: () {
+                            final _ = _launchUrl(AppConfig.webUrl);
+                          },
                         ),
                         LinkRow(
                           icon: LucideIcons.mail,
                           title: 'Legal contact',
                           value: AppConfig.legalEmail,
-                          onTap: () { final _ = _copy(context, AppConfig.legalEmail, 'Legal email'); },
+                          onTap: () {
+                            final _ = _copy(
+                              context,
+                              AppConfig.legalEmail,
+                              'Legal email',
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -278,7 +342,6 @@ class AboutScreen extends ConsumerWidget {
 }
 
 class _StatusBanner extends StatelessWidget {
-
   const _StatusBanner({
     required this.title,
     required this.subtitle,
@@ -338,7 +401,6 @@ class _StatusBanner extends StatelessWidget {
 }
 
 class _PillButton extends StatelessWidget {
-
   const _PillButton({
     required this.icon,
     required this.label,
@@ -361,7 +423,9 @@ class _PillButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: theme.colorScheme.onSurface.withValues(alpha: 0.05)),
+            border: Border.all(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -385,7 +449,6 @@ class _PillButton extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-
   const _GlowBlob({required this.color, required this.size});
   final Color color;
   final double size;

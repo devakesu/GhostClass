@@ -7,12 +7,11 @@ import 'package:ghostclass/services/logger.dart';
 
 /// Wraps a sensitive string value with in-memory encryption.
 ///
-/// The value is encrypted with a session-ephemeral key that is reconstructed 
-/// on-demand using XOR-masked entropy. This prevents a single static key from 
+/// The value is encrypted with a session-ephemeral key that is reconstructed
+/// on-demand using XOR-masked entropy. This prevents a single static key from
 /// being easily identifiable in RAM dumps.
 @immutable
 class EncryptedValue {
-
   const EncryptedValue._(this._encryptedBase64);
 
   @visibleForTesting
@@ -24,7 +23,7 @@ class EncryptedValue {
 
     final key = _reconstructKey();
     final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
-    
+
     // Generate a fresh random IV for each encryption (prevents GCM nonce-reuse)
     final iv = IV.fromSecureRandom(16);
     final encrypted = encrypter.encrypt(plaintext, iv: iv);
@@ -43,7 +42,9 @@ class EncryptedValue {
 
   static Uint8List _generateRandomBytes(int length) {
     final random = Random.secure();
-    return Uint8List.fromList(List.generate(length, (_) => random.nextInt(256)));
+    return Uint8List.fromList(
+      List.generate(length, (_) => random.nextInt(256)),
+    );
   }
 
   /// Reconstructs the 32-byte AES key from masked entropy.
@@ -59,7 +60,7 @@ class EncryptedValue {
   /// Decrypts and returns the plaintext value.
   String get value {
     if (_encryptedBase64.isEmpty) return '';
-    
+
     try {
       final key = _reconstructKey();
       final encrypter = Encrypter(AES(key, mode: AESMode.gcm));

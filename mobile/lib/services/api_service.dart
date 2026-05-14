@@ -18,7 +18,6 @@ import 'package:ghostclass/services/security_service.dart';
 /// A centralized facade for accessing specialized API services (Auth, EzyGo, Security).
 /// This service acts as the primary entry point for network-related logic in the app.
 class ApiService {
-
   ApiService(this._ref);
   final Ref _ref;
 
@@ -28,7 +27,8 @@ class ApiService {
   DioService get _dioService => _ref.read(dioServiceProvider);
 
   Stream<void> get onUnauthorized => _dioService.onUnauthorized;
-  Stream<Map<String, String>> get onSecurityLockdown => _dioService.onSecurityLockdown;
+  Stream<Map<String, String>> get onSecurityLockdown =>
+      _dioService.onSecurityLockdown;
   bool get suppress401 => _dioService.suppress401;
   set suppress401(bool v) => _dioService.suppress401 = v;
 
@@ -46,8 +46,10 @@ class ApiService {
   }
 
   // --- Authentication ---
-  Future<Response<dynamic>> loginAndProvision({required String username, required String password}) =>
-      _auth.loginAndProvision(username: username, password: password);
+  Future<Response<dynamic>> loginAndProvision({
+    required String username,
+    required String password,
+  }) => _auth.loginAndProvision(username: username, password: password);
 
   Future<Response<dynamic>> loginEzygo(String username, String password) =>
       _auth.loginEzygo(username, password);
@@ -55,14 +57,18 @@ class ApiService {
   Future<Response<dynamic>> provisionGhostClassSession(String ezygoToken) =>
       _auth.provisionGhostClassSession(ezygoToken);
 
-  Future<Response<dynamic>> refreshProfile(String supabaseToken, {bool sync = false}) =>
-      _auth.refreshProfile(supabaseToken, sync: sync);
+  Future<Response<dynamic>> refreshProfile(
+    String supabaseToken, {
+    bool sync = false,
+  }) => _auth.refreshProfile(supabaseToken, sync: sync);
 
   Future<Response<dynamic>> syncMobileAuth(String supabaseToken) =>
       _auth.syncMobileAuth(supabaseToken);
 
-  Future<Response<dynamic>> updateProfile(String supabaseToken, Map<String, dynamic> data) =>
-      _auth.updateProfile(supabaseToken, data);
+  Future<Response<dynamic>> updateProfile(
+    String supabaseToken,
+    Map<String, dynamic> data,
+  ) => _auth.updateProfile(supabaseToken, data);
 
   Future<Response<dynamic>> acceptTerms(String supabaseToken, String version) =>
       _auth.acceptTerms(supabaseToken, version);
@@ -73,35 +79,64 @@ class ApiService {
     required String subject,
     required String message,
     String? supabaseToken,
-  }) =>
-      _auth.submitContact(name: name, email: email, subject: subject, message: message, supabaseToken: supabaseToken);
+  }) => _auth.submitContact(
+    name: name,
+    email: email,
+    subject: subject,
+    message: message,
+    supabaseToken: supabaseToken,
+  );
 
-  Future<Response<dynamic>> getUser(SecureStorageService storage) => _auth.getUser(storage);
+  Future<Response<dynamic>> getUser(SecureStorageService storage) =>
+      _auth.getUser(storage);
 
   // --- Academic Data (EzyGo) ---
-  Future<Response<dynamic>> fetchCourses(SecureStorageService storage) => _ezygo.fetchCourses(storage);
-  Future<Response<dynamic>> fetchAttendanceReportDetailed(SecureStorageService storage) =>
-      _ezygo.fetchAttendanceReportDetailed(storage);
-  Future<Response<dynamic>> getInstitutions(SecureStorageService storage) => _ezygo.getInstitutions(storage);
-  Future<Response<dynamic>> updateDefaultInstitution(int institutionUserId, SecureStorageService storage) =>
-      _ezygo.updateDefaultInstitution(institutionUserId, storage);
-  Future<Response<dynamic>> updateSemester(String semester, SecureStorageService storage) =>
-      _ezygo.updateSemester(semester, storage);
-  Future<Response<dynamic>> updateAcademicYear(String year, SecureStorageService storage) =>
-      _ezygo.updateAcademicYear(year, storage);
-  Future<Response<dynamic>> fetchSemester(SecureStorageService storage) => _ezygo.fetchSemester(storage);
-  Future<Response<dynamic>> fetchAcademicYear(SecureStorageService storage) => _ezygo.fetchAcademicYear(storage);
-  Future<Response<dynamic>> fetchLeaveData(SecureStorageService storage) => _ezygo.fetchLeaveData(storage);
-  Future<Response<dynamic>> fetchExams(SecureStorageService storage) => _ezygo.fetchExams(storage);
-  Future<Response<dynamic>> fetchExamQuestions(int examId, SecureStorageService storage) => _ezygo.fetchExamQuestions(examId, storage);
-  Future<Response<dynamic>> fetchExamAnswers(int examId, SecureStorageService storage) => _ezygo.fetchExamAnswers(examId, storage);
+  Future<Response<dynamic>> fetchCourses(SecureStorageService storage) =>
+      _ezygo.fetchCourses(storage);
+  Future<Response<dynamic>> fetchAttendanceReportDetailed(
+    SecureStorageService storage,
+  ) => _ezygo.fetchAttendanceReportDetailed(storage);
+  Future<Response<dynamic>> getInstitutions(SecureStorageService storage) =>
+      _ezygo.getInstitutions(storage);
+  Future<Response<dynamic>> updateDefaultInstitution(
+    int institutionUserId,
+    SecureStorageService storage,
+  ) => _ezygo.updateDefaultInstitution(institutionUserId, storage);
+  Future<Response<dynamic>> updateSemester(
+    String semester,
+    SecureStorageService storage,
+  ) => _ezygo.updateSemester(semester, storage);
+  Future<Response<dynamic>> updateAcademicYear(
+    String year,
+    SecureStorageService storage,
+  ) => _ezygo.updateAcademicYear(year, storage);
+  Future<Response<dynamic>> fetchSemester(SecureStorageService storage) =>
+      _ezygo.fetchSemester(storage);
+  Future<Response<dynamic>> fetchAcademicYear(SecureStorageService storage) =>
+      _ezygo.fetchAcademicYear(storage);
+  Future<Response<dynamic>> fetchLeaveData(SecureStorageService storage) =>
+      _ezygo.fetchLeaveData(storage);
+  Future<Response<dynamic>> fetchExams(SecureStorageService storage) =>
+      _ezygo.fetchExams(storage);
+  Future<Response<dynamic>> fetchExamQuestions(
+    int examId,
+    SecureStorageService storage,
+  ) => _ezygo.fetchExamQuestions(examId, storage);
+  Future<Response<dynamic>> fetchExamAnswers(
+    int examId,
+    SecureStorageService storage,
+  ) => _ezygo.fetchExamAnswers(examId, storage);
 
   // --- Device & Network Security ---
   Future<void> verifyIntegrity() => _security.verifyIntegrity();
-  Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) => _security.fetchAttestationDetails(supabaseToken);
+  Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) =>
+      _security.fetchAttestationDetails(supabaseToken);
 
   // --- Data Synchronization ---
-  Future<Response<dynamic>> triggerSync(String supabaseToken, {bool force = false}) async {
+  Future<Response<dynamic>> triggerSync(
+    String supabaseToken, {
+    bool force = false,
+  }) async {
     // 1. Deduplication
     if (_syncInFlight != null) return _syncInFlight!;
 
@@ -118,7 +153,9 @@ class ApiService {
 
     // 3. Throttling
     final now = DateTime.now();
-    if (!force && _lastSyncTime != null && now.difference(_lastSyncTime!) < _syncCooldown) {
+    if (!force &&
+        _lastSyncTime != null &&
+        now.difference(_lastSyncTime!) < _syncCooldown) {
       AppLogger.d('ApiService: Sync throttled.');
       return Response<dynamic>(
         requestOptions: RequestOptions(path: 'sync'),

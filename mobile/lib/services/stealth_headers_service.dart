@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class StealthHeadersService {
-
   StealthHeadersService(this.storage);
   // Chrome major version used in spoofed User-Agent and Sec-Ch-Ua headers.
   //
@@ -17,8 +16,10 @@ class StealthHeadersService {
   static const String _chromeVersion = '141';
 
   final SecureStorageService storage;
-  String _deviceUA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
-  String _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
+  String _deviceUA =
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
+  String _secChUa =
+      '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
   String _secChUaPlatform = '"Android"';
   Future<void>? _initFuture;
 
@@ -26,29 +27,36 @@ class StealthHeadersService {
     return _initFuture ??= () async {
       try {
         final deviceInfo = DeviceInfoPlugin();
-        
+
         if (Platform.isAndroid) {
           final androidInfo = await deviceInfo.androidInfo;
           // Generate a Chrome-on-Android style UA
-          _deviceUA = 'Mozilla/5.0 (Linux; Android ${androidInfo.version.release}; ${androidInfo.model} Build/${androidInfo.id}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
-          _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
+          _deviceUA =
+              'Mozilla/5.0 (Linux; Android ${androidInfo.version.release}; ${androidInfo.model} Build/${androidInfo.id}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
+          _secChUa =
+              '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
           _secChUaPlatform = '"Android"';
         } else if (Platform.isIOS) {
           final iosInfo = await deviceInfo.iosInfo;
           // Generate a Safari-on-iOS style UA
           final version = iosInfo.systemVersion.replaceAll('.', '_');
-          _deviceUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS $version like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${iosInfo.systemVersion} Mobile/15E148 Safari/604.1';
+          _deviceUA =
+              'Mozilla/5.0 (iPhone; CPU iPhone OS $version like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${iosInfo.systemVersion} Mobile/15E148 Safari/604.1';
           _secChUa = ''; // iOS Safari doesn't typically send Sec-Ch-Ua
           _secChUaPlatform = '"iOS"';
         } else {
-          _deviceUA = 'Mozilla/5.0 (${Platform.operatingSystem} ${Platform.operatingSystemVersion}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Safari/537.36';
-          _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
+          _deviceUA =
+              'Mozilla/5.0 (${Platform.operatingSystem} ${Platform.operatingSystemVersion}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Safari/537.36';
+          _secChUa =
+              '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
           _secChUaPlatform = '"${Platform.operatingSystem}"';
         }
       } on Object {
         // Fallback
-        _deviceUA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
-        _secChUa = '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
+        _deviceUA =
+            'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$_chromeVersion.0.0.0 Mobile Safari/537.36';
+        _secChUa =
+            '"Not A(Brand";v="99", "Google Chrome";v="$_chromeVersion", "Chromium";v="$_chromeVersion"';
         _secChUaPlatform = '"Android"';
       }
     }();
@@ -57,7 +65,7 @@ class StealthHeadersService {
   Future<Map<String, String>> getHeaders({required String url}) async {
     final info = await storage.getStealthInfo();
     await _initDeviceInfo();
-    
+
     final headers = <String, String>{
       'X-Requested-With': 'XMLHttpRequest',
       'Accept': 'application/json, text/plain, */*',
@@ -85,7 +93,9 @@ class StealthHeadersService {
       if (_secChUa.isNotEmpty) {
         headers['Sec-Ch-Ua'] = _secChUa;
       }
-      headers['Sec-Ch-Ua-Mobile'] = (Platform.isAndroid || Platform.isIOS) ? '?1' : '?0';
+      headers['Sec-Ch-Ua-Mobile'] = (Platform.isAndroid || Platform.isIOS)
+          ? '?1'
+          : '?0';
       headers['Sec-Ch-Ua-Platform'] = _secChUaPlatform;
     }
 

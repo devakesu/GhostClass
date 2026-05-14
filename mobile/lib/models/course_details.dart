@@ -1,5 +1,4 @@
 class CourseDetails {
-
   const CourseDetails({
     required this.id,
     required this.name,
@@ -20,7 +19,8 @@ class CourseDetails {
       }
     }
 
-    final rawInstitutionUsers = json['institution_users'] as List<dynamic>? ?? const [];
+    final rawInstitutionUsers =
+        json['institution_users'] as List<dynamic>? ?? const [];
 
     return CourseDetails(
       id: _toInt(json['id']) ?? 0,
@@ -60,9 +60,9 @@ class CourseDetails {
 }
 
 class CourseInstitutionUser {
-
   const CourseInstitutionUser({
-    required this.pivot, this.firstName,
+    required this.pivot,
+    this.firstName,
     this.lastName,
   });
 
@@ -82,7 +82,6 @@ class CourseInstitutionUser {
 }
 
 class CourseInstitutionUserPivot {
-
   const CourseInstitutionUserPivot({required this.courseroleId});
 
   factory CourseInstitutionUserPivot.fromJson(Map<String, dynamic> json) {

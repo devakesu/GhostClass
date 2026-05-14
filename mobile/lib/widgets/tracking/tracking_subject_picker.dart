@@ -8,9 +8,12 @@ import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrackingSubjectPicker extends ConsumerWidget {
-
   const TrackingSubjectPicker({
-    required this.selectedCourse, required this.courseKeys, required this.groupedByCourse, required this.onSelected, super.key,
+    required this.selectedCourse,
+    required this.courseKeys,
+    required this.groupedByCourse,
+    required this.onSelected,
+    super.key,
     this.officialReport,
     this.allCourses,
   });
@@ -135,7 +138,6 @@ class TrackingSubjectPicker extends ConsumerWidget {
 }
 
 class _PickerChip extends StatelessWidget {
-
   const _PickerChip({
     required this.label,
     required this.count,

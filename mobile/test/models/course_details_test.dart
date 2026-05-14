@@ -44,7 +44,10 @@ void main() {
 
     test('safeId fallback logic works', () {
       expect(const CourseDetails(id: 12, name: 'Test').safeId, '12');
-      expect(const CourseDetails(id: 12, name: 'Test', code: '  ').safeId, '12');
+      expect(
+        const CourseDetails(id: 12, name: 'Test', code: '  ').safeId,
+        '12',
+      );
     });
 
     test('fromJson handles int, double, and string ids gracefully', () {

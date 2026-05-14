@@ -47,7 +47,9 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -59,9 +61,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (Theme.of(context).extension<GhostColors>()?.accentBlue ??
-                        Colors.blue)
-                    .withValues(alpha: 0.05),
+                color:
+                    (Theme.of(context).extension<GhostColors>()?.accentBlue ??
+                            Colors.blue)
+                        .withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -72,7 +75,9 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               await scoreNotifier.refresh();
             },
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               slivers: [
                 // --- Header ---
                 SliverToBoxAdapter(
@@ -95,7 +100,8 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                   child: scoreState.when(
                     data: (data) => _ChipFilterBar(
                       selectedType: data.filterType,
-                      onChanged: (type) => ref.read(scoreProvider.notifier).setFilter(type),
+                      onChanged: (type) =>
+                          ref.read(scoreProvider.notifier).setFilter(type),
                     ),
                     loading: () => const SizedBox.shrink(),
                     error: (_, _) => const SizedBox.shrink(),
@@ -109,11 +115,35 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                       padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                       child: Row(
                         children: [
-                          _StatCard(label: 'TOTAL', value: data.totalExams.toString(), color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary),
+                          _StatCard(
+                            label: 'TOTAL',
+                            value: data.totalExams.toString(),
+                            color:
+                                Theme.of(
+                                  context,
+                                ).extension<GhostColors>()?.brandPrimary ??
+                                Theme.of(context).colorScheme.primary,
+                          ),
                           const SizedBox(width: 12),
-                          _StatCard(label: 'SCORED', value: data.scoredCount.toString(), color: Theme.of(context).extension<GhostColors>()?.successGreen ?? Colors.green),
+                          _StatCard(
+                            label: 'SCORED',
+                            value: data.scoredCount.toString(),
+                            color:
+                                Theme.of(
+                                  context,
+                                ).extension<GhostColors>()?.successGreen ??
+                                Colors.green,
+                          ),
                           const SizedBox(width: 12),
-                          _StatCard(label: 'PENDING', value: data.pendingCount.toString(), color: Theme.of(context).extension<GhostColors>()?.dangerRed ?? Theme.of(context).colorScheme.error),
+                          _StatCard(
+                            label: 'PENDING',
+                            value: data.pendingCount.toString(),
+                            color:
+                                Theme.of(
+                                  context,
+                                ).extension<GhostColors>()?.dangerRed ??
+                                Theme.of(context).colorScheme.error,
+                          ),
                         ],
                       ),
                     ),
@@ -144,7 +174,8 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                             ),
                           ),
                         ),
-                  loading: () => const SliverFillRemaining(child: SizedBox.shrink()),
+                  loading: () =>
+                      const SliverFillRemaining(child: SizedBox.shrink()),
                   error: (err, _) => const SliverFillRemaining(
                     child: Center(
                       child: Text(
@@ -155,7 +186,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                     ),
                   ),
                 ),
-                
+
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
             ),
@@ -167,7 +198,6 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
 }
 
 class _ChipFilterBar extends StatelessWidget {
-
   const _ChipFilterBar({required this.selectedType, required this.onChanged});
   final String selectedType;
   final void Function(String) onChanged;
@@ -198,28 +228,56 @@ class _ChipFilterBar extends StatelessWidget {
                 onTap: () => onChanged(filter['key']!),
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                    border: isDark ? Border.all(
-                      color: isSelected ? (Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.2) : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
-                    ) : null,
-                    boxShadow: !isDark && isSelected ? [
-                      BoxShadow(
-                        color: (Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      )
-                    ] : null,
+                    color: isSelected
+                        ? (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.brandPrimary ??
+                              Theme.of(context).colorScheme.primary)
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.1),
+                    border: isDark
+                        ? Border.all(
+                            color: isSelected
+                                ? (Theme.of(context)
+                                              .extension<GhostColors>()
+                                              ?.brandPrimary ??
+                                          Theme.of(context).colorScheme.primary)
+                                      .withValues(alpha: 0.2)
+                                : Theme.of(context).colorScheme.outlineVariant
+                                      .withValues(alpha: 0.1),
+                          )
+                        : null,
+                    boxShadow: !isDark && isSelected
+                        ? [
+                            BoxShadow(
+                              color:
+                                  (Theme.of(context)
+                                              .extension<GhostColors>()
+                                              ?.brandPrimary ??
+                                          Theme.of(context).colorScheme.primary)
+                                      .withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Text(
                     filter['label']!,
                     style: GoogleFonts.manrope(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: isSelected 
-                        ? Colors.white 
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: isSelected
+                          ? Colors.white
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -233,7 +291,6 @@ class _ChipFilterBar extends StatelessWidget {
 }
 
 class _CourseGroupWidget extends ConsumerWidget {
-
   const _CourseGroupWidget({
     required this.group,
     required this.resolvedScores,
@@ -260,7 +317,11 @@ class _CourseGroupWidget extends ConsumerWidget {
                 width: 3,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary,
+                  color:
+                      Theme.of(
+                        context,
+                      ).extension<GhostColors>()?.brandPrimary ??
+                      Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -279,25 +340,37 @@ class _CourseGroupWidget extends ConsumerWidget {
               const SizedBox(width: 12),
               Text(
                 '${group.exams.length} items',
-                style: GoogleFonts.manrope(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                style: GoogleFonts.manrope(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
               ),
             ],
           ),
         ),
-        ...group.exams.map((exam) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _ScoreCard(
-            exam: exam,
-            resolved: resolvedScores[exam.id],
-            onTap: () => _showDetailSheet(context, ref, exam),
-            formatDate: formatDate,
+        ...group.exams.map(
+          (exam) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ScoreCard(
+              exam: exam,
+              resolved: resolvedScores[exam.id],
+              onTap: () => _showDetailSheet(context, ref, exam),
+              formatDate: formatDate,
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
 
-  Future<void> _showDetailSheet(BuildContext context, WidgetRef ref, Exam exam) async {
+  Future<void> _showDetailSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Exam exam,
+  ) async {
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
     await showModalBottomSheet<void>(
       context: context,
@@ -320,8 +393,11 @@ class _CourseGroupWidget extends ConsumerWidget {
 }
 
 class _StatCard extends StatelessWidget {
-
-  const _StatCard({required this.label, required this.value, required this.color});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final String label;
   final String value;
   final Color color;
@@ -333,27 +409,48 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08) : Theme.of(context).colorScheme.surface,
+          color: isDark
+              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: isDark ? Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.05)) : null,
-          boxShadow: isDark ? null : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
+          border: isDark
+              ? Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.05),
+                )
+              : null,
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Column(
           children: [
             Text(
               label,
-              style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), letterSpacing: 1),
+              style: GoogleFonts.manrope(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                letterSpacing: 1,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               value,
-              style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.w900, color: color),
+              style: GoogleFonts.manrope(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -363,7 +460,6 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ScoreCard extends StatelessWidget {
-
   const _ScoreCard({
     required this.exam,
     required this.resolved,
@@ -379,7 +475,9 @@ class _ScoreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAssessment = exam.activityType == 'assessment';
-    final scoreColor = resolved?.color ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1);
+    final scoreColor =
+        resolved?.color ??
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1);
 
     return InkWell(
       onTap: onTap,
@@ -387,16 +485,26 @@ class _ScoreCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05) : Theme.of(context).colorScheme.surface,
+          color: isDark
+              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(28),
-          border: isDark ? Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.05)) : null,
-          boxShadow: isDark ? null : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            )
-          ],
+          border: isDark
+              ? Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.05),
+                )
+              : null,
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,19 +514,49 @@ class _ScoreCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     exam.name,
-                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface, height: 1.3),
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.3,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
-                    color: (isAssessment ? (Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue) : (Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange)).withValues(alpha: isDark ? 0.15 : 0.1),
+                    color:
+                        (isAssessment
+                                ? (Theme.of(
+                                        context,
+                                      ).extension<GhostColors>()?.accentBlue ??
+                                      Colors.blue)
+                                : (Theme.of(context)
+                                          .extension<GhostColors>()
+                                          ?.accentOrange ??
+                                      Colors.orange))
+                            .withValues(alpha: isDark ? 0.15 : 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     exam.activityType.toUpperCase(),
-                    style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w900, color: isAssessment ? (Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue) : (Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange)),
+                    style: GoogleFonts.manrope(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: isAssessment
+                          ? (Theme.of(
+                                  context,
+                                ).extension<GhostColors>()?.accentBlue ??
+                                Colors.blue)
+                          : (Theme.of(
+                                  context,
+                                ).extension<GhostColors>()?.accentOrange ??
+                                Colors.orange),
+                    ),
                   ),
                 ),
               ],
@@ -433,15 +571,25 @@ class _ScoreCard extends StatelessWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        resolved!.score.toStringAsFixed(resolved!.score % 1 == 0 ? 0 : 1),
-                        style: GoogleFonts.manrope(fontSize: 32, fontWeight: FontWeight.w900, color: scoreColor),
+                        resolved!.score.toStringAsFixed(
+                          resolved!.score % 1 == 0 ? 0 : 1,
+                        ),
+                        style: GoogleFonts.manrope(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: scoreColor,
+                        ),
                       ),
                       Text(
-                        resolved!.isMaxUnresolvable ? ' (max unknown)' : ' / ${resolved!.maxMark.toStringAsFixed(0)}',
+                        resolved!.isMaxUnresolvable
+                            ? ' (max unknown)'
+                            : ' / ${resolved!.maxMark.toStringAsFixed(0)}',
                         style: GoogleFonts.manrope(
-                          fontSize: resolved!.isMaxUnresolvable ? 12 : 16, 
-                          fontWeight: FontWeight.w700, 
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                          fontSize: resolved!.isMaxUnresolvable ? 12 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -452,32 +600,61 @@ class _ScoreCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (Theme.of(context).extension<GhostColors>()?.dangerRed ?? Theme.of(context).colorScheme.error).withValues(alpha: 0.1),
+                          color:
+                              (Theme.of(
+                                        context,
+                                      ).extension<GhostColors>()?.dangerRed ??
+                                      Theme.of(context).colorScheme.error)
+                                  .withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(LucideIcons.clock, size: 16, color: Theme.of(context).extension<GhostColors>()?.dangerRed ?? Theme.of(context).colorScheme.error),
+                        child: Icon(
+                          LucideIcons.clock,
+                          size: 16,
+                          color:
+                              Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.dangerRed ??
+                              Theme.of(context).colorScheme.error,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'Pending Marks',
-                        style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
+                        style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.45),
+                        ),
                       ),
                     ],
                   ),
                 if (exam.date != null)
                   Text(
                     formatDate(exam.date!),
-                    style: GoogleFonts.manrope(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontWeight: FontWeight.w800),
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
               ],
             ),
-            if (resolved != null && resolved!.isMarked && !resolved!.isMaxUnresolvable) ...[
+            if (resolved != null &&
+                resolved!.isMarked &&
+                !resolved!.isMaxUnresolvable) ...[
               const SizedBox(height: 16),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: resolved!.percentage / 100,
-                  backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.15),
                   color: scoreColor,
                   minHeight: 4,
                 ),
@@ -491,7 +668,6 @@ class _ScoreCard extends StatelessWidget {
 }
 
 class _ExamDetailSheet extends StatefulWidget {
-
   const _ExamDetailSheet({
     required this.exam,
     required this.questions,
@@ -532,10 +708,17 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(32, 32, 32, 120), // Increased bottom padding
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      padding: const EdgeInsets.fromLTRB(
+        32,
+        32,
+        32,
+        120,
+      ), // Increased bottom padding
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,18 +727,49 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: (widget.exam.activityType == 'assessment' ? (Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue) : (Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange)).withValues(alpha: 0.1),
+                  color:
+                      (widget.exam.activityType == 'assessment'
+                              ? (Theme.of(
+                                      context,
+                                    ).extension<GhostColors>()?.accentBlue ??
+                                    Colors.blue)
+                              : (Theme.of(
+                                      context,
+                                    ).extension<GhostColors>()?.accentOrange ??
+                                    Colors.orange))
+                          .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   widget.exam.activityType.toUpperCase(),
-                  style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w800, color: widget.exam.activityType == 'assessment' ? (Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue) : (Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange)),
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: widget.exam.activityType == 'assessment'
+                        ? (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.accentBlue ??
+                              Colors.blue)
+                        : (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.accentOrange ??
+                              Colors.orange),
+                  ),
                 ),
               ),
               IconButton(
-                icon: Icon(LucideIcons.x, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
+                icon: Icon(
+                  LucideIcons.x,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  size: 20,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -563,16 +777,33 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
           const SizedBox(height: 16),
           Text(
             widget.exam.name,
-            style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface),
+            style: GoogleFonts.manrope(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           Text(
             widget.exam.courseName,
-            style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+            style: GoogleFonts.manrope(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
           ),
           const SizedBox(height: 32),
           Text(
             'QUESTION BREAKDOWN',
-            style: GoogleFonts.manrope(fontSize: 10, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), letterSpacing: 1),
+            style: GoogleFonts.manrope(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.7),
+              letterSpacing: 1,
+            ),
           ),
           const SizedBox(height: 16),
           Flexible(
@@ -595,12 +826,19 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
                   controller: _scrollController,
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 60, right: 24), // Increased padding
+                  padding: const EdgeInsets.only(
+                    bottom: 60,
+                    right: 24,
+                  ), // Increased padding
                   itemCount: widget.questions.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final q = widget.questions[index];
-                    final a = widget.answers.firstWhere((ans) => ans.examQuestionId == q.id, orElse: () => ExamAnswer(id: 0, examQuestionId: 0));
+                    final a = widget.answers.firstWhere(
+                      (ans) => ans.examQuestionId == q.id,
+                      orElse: () => ExamAnswer(id: 0, examQuestionId: 0),
+                    );
                     return _QuestionRow(question: q, answer: a);
                   },
                 ),
@@ -613,18 +851,35 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(LucideIcons.chevronDown, size: 14, color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary)
+                  Icon(
+                        LucideIcons.chevronDown,
+                        size: 14,
+                        color:
+                            Theme.of(
+                              context,
+                            ).extension<GhostColors>()?.brandPrimary ??
+                            Theme.of(context).colorScheme.primary,
+                      )
                       .animate(onPlay: (controller) => controller.repeat())
-                      .moveY(begin: -2, end: 2, duration: 600.ms, curve: Curves.easeInOut)
+                      .moveY(
+                        begin: -2,
+                        end: 2,
+                        duration: 600.ms,
+                        curve: Curves.easeInOut,
+                      )
                       .fadeIn(),
                   const SizedBox(width: 6),
                   Text(
                     'SCROLL FOR MORE',
                     style: GoogleFonts.manrope(
-                      fontSize: 9, 
-                      fontWeight: FontWeight.w900, 
-                      color: Theme.of(context).extension<GhostColors>()?.brandPrimary ?? Theme.of(context).colorScheme.primary, 
-                      letterSpacing: 1
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color:
+                          Theme.of(
+                            context,
+                          ).extension<GhostColors>()?.brandPrimary ??
+                          Theme.of(context).colorScheme.primary,
+                      letterSpacing: 1,
                     ),
                   ).animate().fadeIn(),
                 ],
@@ -635,35 +890,67 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: isDark ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08) : Theme.of(context).colorScheme.surface,
+                color: isDark
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.08)
+                    : Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: isDark ? null : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-                border: isDark ? Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.05)) : null,
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                border: isDark
+                    ? Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.05),
+                      )
+                    : null,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total Score', style: GoogleFonts.manrope(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+                  Text(
+                    'Total Score',
+                    style: GoogleFonts.manrope(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        widget.resolved!.score.toStringAsFixed(widget.resolved!.score % 1 == 0 ? 0 : 1),
-                        style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.w900, color: widget.resolved!.color),
+                        widget.resolved!.score.toStringAsFixed(
+                          widget.resolved!.score % 1 == 0 ? 0 : 1,
+                        ),
+                        style: GoogleFonts.manrope(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: widget.resolved!.color,
+                        ),
                       ),
                       Text(
-                        widget.resolved!.isMaxUnresolvable ? ' (max unknown)' : ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
+                        widget.resolved!.isMaxUnresolvable
+                            ? ' (max unknown)'
+                            : ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
                         style: GoogleFonts.manrope(
-                          fontSize: widget.resolved!.isMaxUnresolvable ? 11 : 14, 
-                          fontWeight: FontWeight.w700, 
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                          fontSize: widget.resolved!.isMaxUnresolvable
+                              ? 11
+                              : 14,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -679,7 +966,6 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
 }
 
 class _QuestionRow extends StatelessWidget {
-
   const _QuestionRow({required this.question, required this.answer});
   final ExamQuestion question;
   final ExamAnswer answer;
@@ -687,8 +973,10 @@ class _QuestionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scored = answer.score != null;
-    final color = scored 
-        ? (answer.score! >= question.maximumMark ? Colors.green : (answer.score! == 0 ? Colors.red : Colors.orange))
+    final color = scored
+        ? (answer.score! >= question.maximumMark
+              ? Colors.green
+              : (answer.score! == 0 ? Colors.red : Colors.orange))
         : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1);
 
     return Row(
@@ -698,10 +986,21 @@ class _QuestionRow extends StatelessWidget {
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text('Q${question.questionNo}', style: GoogleFonts.manrope(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8))),
+          child: Text(
+            'Q${question.questionNo}',
+            style: GoogleFonts.manrope(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -709,7 +1008,9 @@ class _QuestionRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
               value: scored ? (answer.score! / question.maximumMark) : 0,
-              backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.15),
               color: color.withValues(alpha: 0.6),
               minHeight: 2,
             ),
@@ -723,12 +1024,27 @@ class _QuestionRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            scored ? answer.score!.toStringAsFixed(answer.score! % 1 == 0 ? 0 : 1) : '—',
-            style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w800, color: color),
+            scored
+                ? answer.score!.toStringAsFixed(answer.score! % 1 == 0 ? 0 : 1)
+                : '—',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ),
         const SizedBox(width: 4),
-        Text('/${question.maximumMark.toStringAsFixed(0)}', style: GoogleFonts.manrope(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+        Text(
+          '/${question.maximumMark.toStringAsFixed(0)}',
+          style: GoogleFonts.manrope(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
       ],
     );
   }
@@ -742,9 +1058,24 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(LucideIcons.graduationCap, size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
+          Icon(
+            LucideIcons.graduationCap,
+            size: 48,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.2),
+          ),
           const SizedBox(height: 16),
-          Text('No marks found', style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+          Text(
+            'No marks found',
+            style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
         ],
       ),
     );

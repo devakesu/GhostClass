@@ -1,7 +1,6 @@
 import 'package:ghostclass/logic/type_utils.dart';
 
 class AttendanceCourse {
-
   const AttendanceCourse({required this.id, required this.name, this.code});
 
   factory AttendanceCourse.fromJson(Map<String, dynamic> json) {
@@ -19,7 +18,6 @@ class AttendanceCourse {
 }
 
 class AttendanceSession {
-
   const AttendanceSession({
     this.course,
     this.attendance,
@@ -42,7 +40,6 @@ class AttendanceSession {
 }
 
 class AttendanceReportDetailed {
-
   const AttendanceReportDetailed({
     required this.courses,
     required this.studentAttendanceData,
@@ -57,15 +54,15 @@ class AttendanceReportDetailed {
     final rawAttendance = (json['studentAttendanceData'] is Map)
         ? Map<String, dynamic>.from(json['studentAttendanceData'] as Map)
         : (json['student_attendance_data'] is Map)
-            ? Map<String, dynamic>.from(
-                json['student_attendance_data'] as Map,
-              )
-            : const <String, dynamic>{};
+        ? Map<String, dynamic>.from(
+            json['student_attendance_data'] as Map,
+          )
+        : const <String, dynamic>{};
     final rawDates = (json['attendanceDates'] is Map)
         ? Map<String, dynamic>.from(json['attendanceDates'] as Map)
         : (json['attendance_dates'] is Map)
-            ? Map<String, dynamic>.from(json['attendance_dates'] as Map)
-            : const <String, dynamic>{};
+        ? Map<String, dynamic>.from(json['attendance_dates'] as Map)
+        : const <String, dynamic>{};
     final rawSessions = (json['sessions'] is Map)
         ? Map<String, dynamic>.from(json['sessions'] as Map)
         : const <String, dynamic>{};
@@ -138,9 +135,13 @@ class AttendanceReportDetailed {
 }
 
 class TrackingRecord {
-
   const TrackingRecord({
-    required this.course, required this.date, required this.session, required this.status, required this.attendance, this.id = 0,
+    required this.course,
+    required this.date,
+    required this.session,
+    required this.status,
+    required this.attendance,
+    this.id = 0,
     this.semester,
     this.year,
     this.remarks,
@@ -186,7 +187,8 @@ enum AttendanceStatus {
   present(110),
   absent(111),
   otherLeave(112),
-  dutyLeave(225);
+  dutyLeave(225)
+  ;
 
   const AttendanceStatus(this.code);
   final int code;

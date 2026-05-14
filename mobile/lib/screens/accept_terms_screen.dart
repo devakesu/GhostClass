@@ -109,7 +109,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                         style: GoogleFonts.manrope(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -125,10 +127,14 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.35),
                     ),
                   ),
                   child: SingleChildScrollView(
@@ -150,7 +156,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                           TextSpan(
                             style: GoogleFonts.manrope(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.85),
                               height: 1.6,
                             ),
                             children: const [
@@ -159,14 +167,16 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               TextSpan(
-                                text: 'GhostClass is an independent attendance calculation tool designed to help students manage their time.\n\n',
+                                text:
+                                    'GhostClass is an independent attendance calculation tool designed to help students manage their time.\n\n',
                               ),
                               TextSpan(
                                 text: 'No Liability: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               TextSpan(
-                                text: 'You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• EzyGo may impose rate limits, security checks, suspensions, or account restrictions at its sole discretion; GhostClass is not responsible for those actions.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\n',
+                                text:
+                                    'You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• EzyGo may impose rate limits, security checks, suspensions, or account restrictions at its sole discretion; GhostClass is not responsible for those actions.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\n',
                               ),
                               TextSpan(
                                 text: 'Use at Your Own Risk: ',
@@ -176,11 +186,13 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                                 text: 'The creators are ',
                               ),
                               TextSpan(
-                                text: 'not affiliated with, endorsed by, or connected to EzyGo',
+                                text:
+                                    'not affiliated with, endorsed by, or connected to EzyGo',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               TextSpan(
-                                text: '. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions or access loss imposed by EzyGo.',
+                                text:
+                                    '. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions or access loss imposed by EzyGo.',
                               ),
                             ],
                           ),
@@ -195,14 +207,20 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
 
               // Full Policy Link (Moved outside)
               GestureDetector(
-                onTap: () { final _ = context.push('/legal'); },
+                onTap: () {
+                  final _ = context.push('/legal');
+                },
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.08),
                     ),
                   ),
                   child: Row(
@@ -226,14 +244,18 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                           style: GoogleFonts.manrope(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
                       Icon(
                         LucideIcons.chevronRight,
                         size: 16,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ],
                   ),
@@ -250,12 +272,16 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                   decoration: BoxDecoration(
                     color: _accepted
                         ? primary.withValues(alpha: 0.05)
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.02),
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.02),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _accepted
                           ? primary.withValues(alpha: 0.2)
-                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.08),
                     ),
                   ),
                   child: Row(
@@ -267,7 +293,10 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                           color: _accepted ? primary : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: _accepted ? primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                            color: _accepted
+                                ? primary
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.45),
                             width: 2,
                           ),
                         ),
@@ -285,7 +314,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                           'I have read and accept the above Disclaimer and all Policies.',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.7),
                             height: 1.4,
                           ),
                         ),
@@ -301,14 +332,23 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (_accepted && !_isLoading) ? () { final _ = _handleAccept(); } : null,
+                  onPressed: (_accepted && !_isLoading)
+                      ? () {
+                          final _ = _handleAccept();
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(
-                      alpha: 0.05,
-                    ),
-                    disabledForegroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25),
+                    disabledBackgroundColor: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(
+                          alpha: 0.05,
+                        ),
+                    disabledForegroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.25),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

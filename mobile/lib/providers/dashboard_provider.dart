@@ -16,9 +16,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
-
 class DashboardData {
-
   DashboardData({
     required this.courses,
     required this.attendance,
@@ -70,7 +68,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // BLOCKER: Do not fire queries until Cron Sync is finished
     if (user.isSyncing) {
       if (_cachedCourses != null && _cachedAttendance != null) {
-         return _processData(_cachedCourses!, _cachedAttendance!, [], academic, _cachedInstructors ?? []);
+        return _processData(
+          _cachedCourses!,
+          _cachedAttendance!,
+          [],
+          academic,
+          _cachedInstructors ?? [],
+        );
       }
       // Return a future that will be replaced once isSyncing changes
       return Completer<DashboardData>().future;
@@ -95,21 +99,31 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
     // 2. Wait for tracking data
     final tracking = await ref.watch(trackingProvider.future);
-    
+
     // Proactively update official report cache if tracking has a fresher one (e.g. from a sync)
     if (tracking.officialReport != null) {
       _cachedAttendance = tracking.officialReport;
     }
-    
-    final trackingList = tracking.groupedByCourse.values.expand((e) => e).toList();
+
+    final trackingList = tracking.groupedByCourse.values
+        .expand((e) => e)
+        .toList();
 
     // 2.5 Logic moved to NavigationShell for centralized app-startup sync.
 
     // 3. Fast Path: If we have cached official data AND the term hasn't changed
-    if (_cachedCourses != null && _cachedAttendance != null && _lastAcademic == academic) {
-      return _processData(_cachedCourses!, _cachedAttendance!, trackingList, academic, _cachedInstructors ?? []);
+    if (_cachedCourses != null &&
+        _cachedAttendance != null &&
+        _lastAcademic == academic) {
+      return _processData(
+        _cachedCourses!,
+        _cachedAttendance!,
+        trackingList,
+        academic,
+        _cachedInstructors ?? [],
+      );
     }
-    
+
     return _fetchAndProcess(trackingList, academic, tracking.officialReport);
   }
 
@@ -123,7 +137,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final storage = ref.read(secureStorageProvider);
 
       final coursesResponse = await api.fetchCourses(storage);
-      final attendance = trackedAttendance ??
+      final attendance =
+          trackedAttendance ??
           await _fetchAttendanceOnce(api: api, storage: storage);
 
       // 2. Fetch Shared Resources (Class Courses & Instructors)
@@ -133,7 +148,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final classId = ref.read(authProvider).value?.profile?.classField?.id;
       if (classId != null) {
         final client = supabase.Supabase.instance.client;
-        
+
         // Fetch Class Courses
         final coursesRes = await client
             .from('class_courses')
@@ -141,18 +156,18 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             .eq('class_id', classId)
             .eq('academic_year', academic.year)
             .eq('semester', academic.semester);
-        
+
         if (coursesRes.isNotEmpty) {
-           sharedCourses = (coursesRes as List).map((raw) {
-             final c = raw as Map<String, dynamic>;
-             return CourseDetails(
-               id: 0, // Mark as shared/custom
-               name: c['course_name'] as String? ?? 'Unnamed Course',
-               code: c['course_code'] as String?,
-               academicYear: academic.year,
-               academicSemester: academic.semester,
-             );
-           }).toList();
+          sharedCourses = (coursesRes as List).map((raw) {
+            final c = raw as Map<String, dynamic>;
+            return CourseDetails(
+              id: 0, // Mark as shared/custom
+              name: c['course_name'] as String? ?? 'Unnamed Course',
+              code: c['course_code'] as String?,
+              academicYear: academic.year,
+              academicSemester: academic.semester,
+            );
+          }).toList();
         }
 
         // Fetch Instructor Mappings
@@ -162,10 +177,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             .eq('class_id', classId)
             .eq('semester', academic.semester)
             .eq('academic_year', academic.year);
-        
+
         if (instructorsRes.isNotEmpty) {
           sharedInstructors = (instructorsRes as List)
-              .map((json) => CourseInstructor.fromJson(json as Map<String, dynamic>))
+              .map(
+                (json) =>
+                    CourseInstructor.fromJson(json as Map<String, dynamic>),
+              )
               .toList();
         }
       }
@@ -175,7 +193,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
 
       if (coursesResponse.statusCode != 200 || coursesResponse.data is! List) {
-        throw Exception(formatApiError(coursesResponse.data, 'Dashboard.Courses'));
+        throw Exception(
+          formatApiError(coursesResponse.data, 'Dashboard.Courses'),
+        );
       }
 
       final officialCourses = (coursesResponse.data as List)
@@ -199,7 +219,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = _mergeAttendanceCourses(attendance, sharedCourses);
       _cachedInstructors = sharedInstructors;
 
-      return _processData(_cachedCourses!, _cachedAttendance!, tracking, academic, sharedInstructors);
+      return _processData(
+        _cachedCourses!,
+        _cachedAttendance!,
+        tracking,
+        academic,
+        sharedInstructors,
+      );
     } catch (e) {
       AppLogger.e('DashboardNotifier: Server fetch failed', e);
       rethrow;
@@ -207,7 +233,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   }
 
   AttendanceReportDetailed _mergeAttendanceCourses(
-      AttendanceReportDetailed attendance, List<CourseDetails> shared) {
+    AttendanceReportDetailed attendance,
+    List<CourseDetails> shared,
+  ) {
     final mergedMap = Map<String, AttendanceCourse>.from(attendance.courses);
     for (final c in shared) {
       final stdCode = utils.standardizeCourseCode(c.code ?? '');
@@ -249,8 +277,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final auth = ref.read(authProvider).value;
     final disabledMap = auth?.settings.disabledCourses ?? {};
     final semKey = '${academic.year}-${academic.semester}';
-    final disabledCodes = (disabledMap[semKey] as Map?)
-            ?.keys
+    final disabledCodes =
+        (disabledMap[semKey] as Map?)?.keys
             .map((c) => DashboardStats.standardize(c.toString()))
             .toSet() ??
         <String>{};
@@ -268,13 +296,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // We prioritize the explicit class name from the user's profile.
     // If not available, we fall back to deriving it from the courses' userGroupName.
     final profileClassName = auth?.profile?.classField?.name;
-    var finalClassName = (profileClassName != null && profileClassName.trim().isNotEmpty) ? profileClassName : null;
+    var finalClassName =
+        (profileClassName != null && profileClassName.trim().isNotEmpty)
+        ? profileClassName
+        : null;
 
     if (finalClassName == null) {
       final groupCounts = <String, int>{};
       for (final c in courses) {
         if (c.userGroupName != null && c.userGroupName!.isNotEmpty) {
-          groupCounts[c.userGroupName!] = (groupCounts[c.userGroupName!] ?? 0) + 1;
+          groupCounts[c.userGroupName!] =
+              (groupCounts[c.userGroupName!] ?? 0) + 1;
         }
       }
       if (groupCounts.isNotEmpty) {
@@ -287,60 +319,79 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // --- SORTING LOGIC (WEBSITE PARITY) ---
     // Pre-calculate sorting criteria to avoid redundant math during sort
     final target = (auth?.settings.targetPercentage ?? 75).toDouble();
-    
+
     int getTier(CourseStat? s, {required bool disabled}) {
       if (disabled) return 2; // Absolute bottom
       if (s == null || s.finalTotal == 0) return 1;
       return 0;
     }
 
-    final metaMap = <String, ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})>{
-      for (final c in courses)
-        c.safeId: (() {
-          final s = stats.courseStats[c.safeId];
-          final disabled = disabledCodes.contains(utils.standardizeCourseCode(c.code ?? ''));
-          final tier = getTier(s, disabled: disabled);
-          
-          if (s == null) {
-            return (tier: tier, canBunk: 0, safeCanBunk: 0, requiredToAttend: 0);
-          }
+    final metaMap =
+        <
+          String,
+          ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})
+        >{
+          for (final c in courses)
+            c.safeId: (() {
+              final s = stats.courseStats[c.safeId];
+              final disabled = disabledCodes.contains(
+                utils.standardizeCourseCode(c.code ?? ''),
+              );
+              final tier = getTier(s, disabled: disabled);
 
-          final bunkRes = utils.calculateAttendance(s.finalPresent, s.finalTotal, targetPercentage: target);
-          final safeRes = utils.calculateAttendance(s.officialPresent, s.officialTotal, targetPercentage: target);
+              if (s == null) {
+                return (
+                  tier: tier,
+                  canBunk: 0,
+                  safeCanBunk: 0,
+                  requiredToAttend: 0,
+                );
+              }
 
-          return (
-            tier: tier,
-            canBunk: bunkRes.canBunk,
-            safeCanBunk: safeRes.canBunk,
-            requiredToAttend: bunkRes.requiredToAttend,
-          );
-        })()
-    };
+              final bunkRes = utils.calculateAttendance(
+                s.finalPresent,
+                s.finalTotal,
+                targetPercentage: target,
+              );
+              final safeRes = utils.calculateAttendance(
+                s.officialPresent,
+                s.officialTotal,
+                targetPercentage: target,
+              );
+
+              return (
+                tier: tier,
+                canBunk: bunkRes.canBunk,
+                safeCanBunk: safeRes.canBunk,
+                requiredToAttend: bunkRes.requiredToAttend,
+              );
+            })(),
+        };
 
     final sortedCourses = List<CourseDetails>.from(courses)
       ..sort((a, b) {
-      final metaA = metaMap[a.safeId]!;
-      final metaB = metaMap[b.safeId]!;
+        final metaA = metaMap[a.safeId]!;
+        final metaB = metaMap[b.safeId]!;
 
-      if (metaA.tier != metaB.tier) return metaA.tier.compareTo(metaB.tier);
+        if (metaA.tier != metaB.tier) return metaA.tier.compareTo(metaB.tier);
 
-      if (metaA.tier == 0) {
-        // 1. Safety Sort: Bunkable (Descending)
-        var cmp = metaB.canBunk.compareTo(metaA.canBunk);
-        if (cmp != 0) return cmp;
+        if (metaA.tier == 0) {
+          // 1. Safety Sort: Bunkable (Descending)
+          var cmp = metaB.canBunk.compareTo(metaA.canBunk);
+          if (cmp != 0) return cmp;
 
-        // 2. Tie-breaker: Safe Bunkable (Official Only)
-        cmp = metaB.safeCanBunk.compareTo(metaA.safeCanBunk);
-        if (cmp != 0) return cmp;
-        
-        // 3. Safety Sort: Required to Attend (Ascending)
-        cmp = metaA.requiredToAttend.compareTo(metaB.requiredToAttend);
-        if (cmp != 0) return cmp;
-      }
-      
-      // Fallback: Alpha Sort by Name
-      return a.name.compareTo(b.name);
-    });
+          // 2. Tie-breaker: Safe Bunkable (Official Only)
+          cmp = metaB.safeCanBunk.compareTo(metaA.safeCanBunk);
+          if (cmp != 0) return cmp;
+
+          // 3. Safety Sort: Required to Attend (Ascending)
+          cmp = metaA.requiredToAttend.compareTo(metaB.requiredToAttend);
+          if (cmp != 0) return cmp;
+        }
+
+        // Fallback: Alpha Sort by Name
+        return a.name.compareTo(b.name);
+      });
 
     return DashboardData(
       courses: sortedCourses,
@@ -354,12 +405,14 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       disabledCodes: disabledCodes,
     );
   }
+
   Future<void> refresh() async {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
     final api = ref.read(apiServiceProvider);
-    final supabaseToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
-    
+    final supabaseToken =
+        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+
     // 0. Set local loading state
     state = const AsyncValue.loading();
 
@@ -367,9 +420,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       // 1. Trigger the server-side sync (this updates the database)
       // We await this to ensure the server has latest data before we fetch it back
       await api.triggerSync(supabaseToken, force: true);
-      
+
       // 2. Fetch the fresh profile from the server
-      await ref.read(authProvider.notifier).refreshProfile(force: true, sync: true);
+      await ref
+          .read(authProvider.notifier)
+          .refreshProfile(force: true, sync: true);
     }
 
     // 3. Refresh Tracking (Official Report + Tracker Records)
@@ -382,14 +437,16 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     _cachedAttendance = null;
     _cachedInstructors = null;
     _lastAcademic = null;
-    
+
     state = await AsyncValue.guard(() async {
       final academicAsync = ref.read(academicProvider);
       final academic = academicAsync.value;
       if (academic == null) throw Exception('No academic context');
-      
+
       final trackingState = await ref.read(trackingProvider.future);
-      final tracking = trackingState.groupedByCourse.values.expand((e) => e).toList();
+      final tracking = trackingState.groupedByCourse.values
+          .expand((e) => e)
+          .toList();
       return _fetchAndProcess(tracking, academic, trackingState.officialReport);
     });
   }
@@ -403,4 +460,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   }
 }
 
-final dashboardProvider = AsyncNotifierProvider<DashboardNotifier, DashboardData>(DashboardNotifier.new);
+final dashboardProvider =
+    AsyncNotifierProvider<DashboardNotifier, DashboardData>(
+      DashboardNotifier.new,
+    );

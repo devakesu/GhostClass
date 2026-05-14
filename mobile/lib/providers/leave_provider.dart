@@ -9,7 +9,6 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class LeaveState {
-
   LeaveState({required this.leaves, required this.sessions});
 
   factory LeaveState.empty() => LeaveState(leaves: [], sessions: {});
@@ -42,14 +41,17 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final data = res.data as Map<String, dynamic>? ?? {};
     final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
     final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
-    final rawSessions = studentLeaves['student_leave_sessions'] as Map<dynamic, dynamic>? ?? {};
+    final rawSessions =
+        studentLeaves['student_leave_sessions'] as Map<dynamic, dynamic>? ?? {};
 
     final leaves = rawLeaves
         .whereType<Map<dynamic, dynamic>>()
         .map((l) => Leave.fromJson(l.cast<String, dynamic>()))
-        .where((l) =>
-            l.userSubgroup?.academicSemester == academic.semester &&
-            l.userSubgroup?.academicYear == academic.year)
+        .where(
+          (l) =>
+              l.userSubgroup?.academicSemester == academic.semester &&
+              l.userSubgroup?.academicYear == academic.year,
+        )
         .toList();
 
     final sessions = <int, List<LeaveSession>>{};

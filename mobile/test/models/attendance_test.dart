@@ -62,24 +62,30 @@ void main() {
 
       final report = AttendanceReportDetailed.fromJson(json);
       expect(report.courses.length, 1);
-      expect(report.studentAttendanceData['2026-05-10']?['S1']?.classType, 'Theory');
+      expect(
+        report.studentAttendanceData['2026-05-10']?['S1']?.classType,
+        'Theory',
+      );
       expect(report.toJson(), json);
     });
 
-    test('fromJson handles fallback snake_case keys and empty/malformed structures', () {
-      final json = {
-        'courses': 'invalid',
-        'student_attendance_data': {
-          '2026-05-11': 'malformed_session_list',
-        },
-        'attendance_dates': {'2026-05-11': true},
-      };
+    test(
+      'fromJson handles fallback snake_case keys and empty/malformed structures',
+      () {
+        final json = {
+          'courses': 'invalid',
+          'student_attendance_data': {
+            '2026-05-11': 'malformed_session_list',
+          },
+          'attendance_dates': {'2026-05-11': true},
+        };
 
-      final report = AttendanceReportDetailed.fromJson(json);
-      expect(report.courses, isEmpty);
-      expect(report.studentAttendanceData['2026-05-11'], isEmpty);
-      expect(report.attendanceDates.isNotEmpty, true);
-    });
+        final report = AttendanceReportDetailed.fromJson(json);
+        expect(report.courses, isEmpty);
+        expect(report.studentAttendanceData['2026-05-11'], isEmpty);
+        expect(report.attendanceDates.isNotEmpty, true);
+      },
+    );
 
     test('fromJson handles nested sessions map structures safely', () {
       final json = {
@@ -120,7 +126,10 @@ void main() {
       expect(AttendanceStatus.fromCode(111), AttendanceStatus.absent);
       expect(AttendanceStatus.fromCode(112), AttendanceStatus.otherLeave);
       expect(AttendanceStatus.fromCode(225), AttendanceStatus.dutyLeave);
-      expect(AttendanceStatus.fromCode(999), AttendanceStatus.present); // default
+      expect(
+        AttendanceStatus.fromCode(999),
+        AttendanceStatus.present,
+      ); // default
     });
 
     test('positive and negative getters work', () {

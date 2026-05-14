@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final securityFailureProvider = NotifierProvider<SecurityFailureNotifier, SecurityFailureState?>(
-  SecurityFailureNotifier.new,
-);
+final securityFailureProvider =
+    NotifierProvider<SecurityFailureNotifier, SecurityFailureState?>(
+      SecurityFailureNotifier.new,
+    );
 
 class SecurityFailureState {
-
   const SecurityFailureState({
     required this.message,
     this.criticalRisk = false,

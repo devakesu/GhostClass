@@ -55,9 +55,15 @@ class CourseLineupHeader extends StatelessWidget {
 }
 
 class CourseListSection extends StatelessWidget {
-
   const CourseListSection({
-    required this.courses, required this.stats, required this.selectedSemester, required this.selectedYear, required this.bunkEnabled, required this.targetPercentage, required this.instructors, super.key,
+    required this.courses,
+    required this.stats,
+    required this.selectedSemester,
+    required this.selectedYear,
+    required this.bunkEnabled,
+    required this.targetPercentage,
+    required this.instructors,
+    super.key,
     this.className,
   });
   final List<CourseDetails> courses;
@@ -86,8 +92,12 @@ class CourseListSection extends StatelessWidget {
             }
 
             final course = courses[index];
-            final stat = stats.courseStats[course.safeId] ??
-                CourseStat(id: course.safeId, code: course.code ?? course.safeId);
+            final stat =
+                stats.courseStats[course.safeId] ??
+                CourseStat(
+                  id: course.safeId,
+                  code: course.code ?? course.safeId,
+                );
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: DisableAwareCourseCard(
@@ -114,7 +124,6 @@ class CourseListSection extends StatelessWidget {
 }
 
 class _AddCourseCard extends StatelessWidget {
-
   const _AddCourseCard({
     required this.semester,
     required this.academicYear,
@@ -147,7 +156,9 @@ class _AddCourseCard extends StatelessWidget {
                 ],
               ),
               border: Border.all(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.15),
                 width: 1.5,
               ),
             ),
@@ -164,8 +175,12 @@ class _AddCourseCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0),
+                          Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.08),
+                          Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -184,7 +199,9 @@ class _AddCourseCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -217,7 +234,9 @@ class _AddCourseCard extends StatelessWidget {
                               style: GoogleFonts.manrope(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.5),
                                 height: 1.3,
                               ),
                             ),
@@ -227,7 +246,9 @@ class _AddCourseCard extends StatelessWidget {
                       Icon(
                         LucideIcons.chevronRight,
                         size: 20,
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                     ],
                   ),

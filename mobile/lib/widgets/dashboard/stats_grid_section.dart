@@ -4,9 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class StatsGridSection extends StatelessWidget {
-
   const StatsGridSection({
-    required this.stats, required this.activeCount, super.key,
+    required this.stats,
+    required this.activeCount,
+    super.key,
   });
   final DashboardStats stats;
   final int activeCount;
@@ -34,7 +35,10 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.green,
                 corrections: [
                   if (stats.corrPresent > 0)
-                    _Correction(value: stats.corrPresent, color: const Color(0xFFF97316)),
+                    _Correction(
+                      value: stats.corrPresent,
+                      color: const Color(0xFFF97316),
+                    ),
                   if (stats.extraPresent > 0)
                     _Correction(value: stats.extraPresent, color: Colors.blue),
                 ],
@@ -46,7 +50,11 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.red,
                 corrections: [
                   if (stats.savedAbsent > 0)
-                    _Correction(value: stats.savedAbsent, color: const Color(0xFFF97316), isNegative: true),
+                    _Correction(
+                      value: stats.savedAbsent,
+                      color: const Color(0xFFF97316),
+                      isNegative: true,
+                    ),
                   if (stats.extraAbsent > 0)
                     _Correction(value: stats.extraAbsent, color: Colors.blue),
                 ],
@@ -58,7 +66,10 @@ class StatsGridSection extends StatelessWidget {
                 color: Colors.amber,
                 corrections: [
                   if (stats.corrDL > 0)
-                    _Correction(value: stats.corrDL, color: const Color(0xFFF97316)),
+                    _Correction(
+                      value: stats.corrDL,
+                      color: const Color(0xFFF97316),
+                    ),
                   if (stats.extraDL > 0)
                     _Correction(value: stats.extraDL, color: Colors.blue),
                 ],
@@ -88,11 +99,12 @@ class StatsGridSection extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-
   const _StatCard({
     required this.title,
     required this.value,
-    required this.color, required this.icon, this.subtitle,
+    required this.color,
+    required this.icon,
+    this.subtitle,
     this.corrections = const [],
     this.isFullWidth = false,
   });
@@ -168,10 +180,9 @@ class _StatCard extends StatelessWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.7),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -195,24 +206,25 @@ class _StatCard extends StatelessWidget {
                               style: GoogleFonts.manrope(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.4),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.4),
                               ),
                             ),
                           ],
-                          ...corrections.map((c) => Padding(
-                                padding: const EdgeInsets.only(left: 4),
-                                child: Text(
-                                  '${c.isNegative ? "-" : "+"}${c.value}',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                    color: c.color,
-                                  ),
+                          ...corrections.map(
+                            (c) => Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Text(
+                                '${c.isNegative ? "-" : "+"}${c.value}',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: c.color,
                                 ),
-                              )),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -228,7 +240,6 @@ class _StatCard extends StatelessWidget {
 }
 
 class _Correction {
-
   _Correction({
     required this.value,
     required this.color,

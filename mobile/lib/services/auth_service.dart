@@ -10,7 +10,6 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// Handles authentication logic, including EzyGo login, session provisioning
 /// with the GhostClass backend, and user profile management.
 class AuthService {
-
   AuthService(this._ref);
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
@@ -49,7 +48,9 @@ class AuthService {
     );
   }
 
-  Future<Response<dynamic>> provisionGhostClassSession(String ezygoToken) async {
+  Future<Response<dynamic>> provisionGhostClassSession(
+    String ezygoToken,
+  ) async {
     return _dio.post(
       '$_ghostclassBaseUrl/auth/save-token',
       data: {'token': ezygoToken.trim()},
@@ -60,7 +61,10 @@ class AuthService {
     );
   }
 
-  Future<Response<dynamic>> refreshProfile(String supabaseToken, {bool sync = false}) async {
+  Future<Response<dynamic>> refreshProfile(
+    String supabaseToken, {
+    bool sync = false,
+  }) async {
     return _dio.get(
       '$_ghostclassBaseUrl/profile',
       queryParameters: sync ? {'sync': 'true'} : null,
@@ -83,7 +87,10 @@ class AuthService {
     );
   }
 
-  Future<Response<dynamic>> updateProfile(String supabaseToken, Map<String, dynamic> data) async {
+  Future<Response<dynamic>> updateProfile(
+    String supabaseToken,
+    Map<String, dynamic> data,
+  ) async {
     return _dio.patch(
       '$_ghostclassBaseUrl/profile',
       data: data,
@@ -94,7 +101,10 @@ class AuthService {
     );
   }
 
-  Future<Response<dynamic>> acceptTerms(String supabaseToken, String version) async {
+  Future<Response<dynamic>> acceptTerms(
+    String supabaseToken,
+    String version,
+  ) async {
     return _dio.post(
       '$_ghostclassBaseUrl/user/accept-terms',
       data: {'version': version},
@@ -121,7 +131,9 @@ class AuthService {
         'message': message,
       },
       options: Options(
-        headers: {if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken'},
+        headers: {
+          if (supabaseToken != null) 'Authorization': 'Bearer $supabaseToken',
+        },
         validateStatus: (s) => s != null && s < 600,
       ),
     );

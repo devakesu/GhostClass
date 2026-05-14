@@ -10,12 +10,19 @@ import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MockFirebaseMessaging extends Mock implements FirebaseMessaging {}
+
 class MockNotificationSettings extends Mock implements NotificationSettings {}
+
 class MockDioService extends Mock implements DioService {}
+
 class MockSecureStorageService extends Mock implements SecureStorageService {}
+
 class MockDio extends Mock implements Dio {}
+
 class MockSupabaseClient extends Mock implements SupabaseClient {}
+
 class MockGoTrueClient extends Mock implements GoTrueClient {}
+
 class MockSession extends Mock implements Session {}
 
 void main() {
@@ -57,39 +64,58 @@ void main() {
     );
   });
 
-  test('initialize requests permission and syncs token if authorized', () async {
-    when(() => mockSettings.authorizationStatus).thenReturn(AuthorizationStatus.authorized);
-    when(() => mockMessaging.requestPermission(
-      alert: any(named: 'alert'),
-      badge: any(named: 'badge'),
-      sound: any(named: 'sound'),
-    )).thenAnswer((_) async => mockSettings);
+  test(
+    'initialize requests permission and syncs token if authorized',
+    () async {
+      when(
+        () => mockSettings.authorizationStatus,
+      ).thenReturn(AuthorizationStatus.authorized);
+      when(
+        () => mockMessaging.requestPermission(
+          alert: any(named: 'alert'),
+          badge: any(named: 'badge'),
+          sound: any(named: 'sound'),
+        ),
+      ).thenAnswer((_) async => mockSettings);
 
-    when(() => mockMessaging.getToken()).thenAnswer((_) async => 'new-fcm-token');
-    when(() => mockMessaging.onTokenRefresh).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockMessaging.getToken(),
+      ).thenAnswer((_) async => 'new-fcm-token');
+      when(
+        () => mockMessaging.onTokenRefresh,
+      ).thenAnswer((_) => const Stream.empty());
 
-    when(() => mockDio.post<dynamic>(
-      any(),
-      data: any(named: 'data'),
-      options: any(named: 'options'),
-    )).thenAnswer((_) async => Response<dynamic>(
-      requestOptions: RequestOptions(),
-      statusCode: 200,
-    ));
+      when(
+        () => mockDio.post<dynamic>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(),
+          statusCode: 200,
+        ),
+      );
 
-    final service = container.read(pushNotificationServiceProvider);
-    await service.initialize(registerHandlers: false);
+      final service = container.read(pushNotificationServiceProvider);
+      await service.initialize(registerHandlers: false);
 
-    verify(() => mockStorage.saveFcmToken('new-fcm-token')).called(1);
-  });
+      verify(() => mockStorage.saveFcmToken('new-fcm-token')).called(1);
+    },
+  );
 
   test('initialize skips sync if token is null or unauthorized', () async {
-    when(() => mockSettings.authorizationStatus).thenReturn(AuthorizationStatus.denied);
-    when(() => mockMessaging.requestPermission(
-      alert: any(named: 'alert'),
-      badge: any(named: 'badge'),
-      sound: any(named: 'sound'),
-    )).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.denied);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
 
     final service = container.read(pushNotificationServiceProvider);
     await service.initialize(registerHandlers: false);

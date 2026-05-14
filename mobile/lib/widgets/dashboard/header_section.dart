@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class HeaderSection extends ConsumerWidget {
-
   const HeaderSection({required this.data, super.key});
   final DashboardData data;
 
@@ -194,7 +193,6 @@ class HeaderSection extends ConsumerWidget {
 }
 
 class _SelectorButton extends StatelessWidget {
-
   const _SelectorButton({
     required this.label,
     required this.icon,
@@ -253,7 +251,6 @@ class _SelectorButton extends StatelessWidget {
 }
 
 class _PickerSheet extends StatelessWidget {
-
   const _PickerSheet({
     required this.title,
     required this.options,

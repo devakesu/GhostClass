@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 
 class SecurityErrorDialog extends StatelessWidget {
-
   const SecurityErrorDialog({
-    required this.title, required this.message, super.key,
+    required this.title,
+    required this.message,
+    super.key,
     this.onRetry,
     this.onContactSupport,
     this.closeLabel,

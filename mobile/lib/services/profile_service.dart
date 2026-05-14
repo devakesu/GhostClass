@@ -9,14 +9,17 @@ class ProfileService {
   }
 
   Future<void> updateAvatar(String userId, String publicUrl) async {
-    await _client.from('users').update({
-      'avatar_url': publicUrl,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('auth_id', userId);
+    await _client
+        .from('users')
+        .update({
+          'avatar_url': publicUrl,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('auth_id', userId);
   }
 
   Future<void> deleteAccount(String userId) async {
-    // In GhostClass, account deletion is handled by a database function 
+    // In GhostClass, account deletion is handled by a database function
     // to ensure all related data (tracking, settings, etc.) is purged.
     await _client.rpc<dynamic>('delete_user_account');
   }

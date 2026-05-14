@@ -19,7 +19,10 @@ void main() {
     });
 
     test('handles string responses', () {
-      expect(formatApiError('Custom Server Error', 'saving'), 'Custom Server Error');
+      expect(
+        formatApiError('Custom Server Error', 'saving'),
+        'Custom Server Error',
+      );
     });
 
     test('handles PostgrestException', () {
@@ -37,7 +40,10 @@ void main() {
         "You don't have permission to perform this action.",
       );
 
-      const peUnique = PostgrestException(message: 'Duplicate key', code: '23505');
+      const peUnique = PostgrestException(
+        message: 'Duplicate key',
+        code: '23505',
+      );
       expect(
         formatApiError(peUnique, 'attendance'),
         'A record already exists for this date and session.',

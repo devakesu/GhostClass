@@ -211,7 +211,9 @@ void main() {
       ).thenAnswer((invocation) async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
         return Response<dynamic>(
-          requestOptions: RequestOptions(path: invocation.positionalArguments[0] as String),
+          requestOptions: RequestOptions(
+            path: invocation.positionalArguments[0] as String,
+          ),
           statusCode: 200,
         );
       });

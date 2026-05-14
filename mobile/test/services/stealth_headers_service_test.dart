@@ -15,21 +15,24 @@ void main() {
     service = StealthHeadersService(mockStorage);
   });
 
-  test('getHeaders returns correct stealth headers concurrently without race condition', () async {
-    when(() => mockStorage.getStealthInfo()).thenAnswer((_) async => null);
+  test(
+    'getHeaders returns correct stealth headers concurrently without race condition',
+    () async {
+      when(() => mockStorage.getStealthInfo()).thenAnswer((_) async => null);
 
-    // Run concurrent requests to reproduce race condition
-    final results = await Future.wait([
-      service.getHeaders(url: 'https://edu.ezygo.app/test1'),
-      service.getHeaders(url: 'https://edu.ezygo.app/test2'),
-    ]);
+      // Run concurrent requests to reproduce race condition
+      final results = await Future.wait([
+        service.getHeaders(url: 'https://edu.ezygo.app/test1'),
+        service.getHeaders(url: 'https://edu.ezygo.app/test2'),
+      ]);
 
-    expect(results.length, 2);
-    for (final headers in results) {
-      expect(headers['User-Agent'], isNotEmpty);
-      expect(headers['Origin'], 'https://edu.ezygo.app');
-    }
-  });
+      expect(results.length, 2);
+      for (final headers in results) {
+        expect(headers['User-Agent'], isNotEmpty);
+        expect(headers['Origin'], 'https://edu.ezygo.app');
+      }
+    },
+  );
 
   test('getHeaders uses custom info from storage when available', () async {
     when(() => mockStorage.getStealthInfo()).thenAnswer(

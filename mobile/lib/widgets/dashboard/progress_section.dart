@@ -3,9 +3,10 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class OverallProgressSection extends StatelessWidget {
-
   const OverallProgressSection({
-    required this.stats, required this.targetValue, super.key,
+    required this.stats,
+    required this.targetValue,
+    super.key,
   });
   final DashboardStats stats;
   final double targetValue;
@@ -15,12 +16,11 @@ class OverallProgressSection extends StatelessWidget {
     final isBelowTarget = stats.rawPercentage < targetValue;
     final showChange = stats.rawOfficialPercentage != stats.rawPercentage;
     final isGain = stats.rawPercentage >= stats.rawOfficialPercentage;
-    final diffPercentage =
-        (stats.rawPercentage - stats.rawOfficialPercentage).abs();
+    final diffPercentage = (stats.rawPercentage - stats.rawOfficialPercentage)
+        .abs();
 
     final diffPresent = stats.finalPresent - stats.officialPresent;
     final diffTotal = stats.finalTotal - stats.officialTotal;
-
 
     return SliverToBoxAdapter(
       child: Semantics(
@@ -118,7 +118,8 @@ class OverallProgressSection extends StatelessWidget {
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
                                   children: [
                                     if (showChange) ...[
@@ -130,7 +131,8 @@ class OverallProgressSection extends StatelessWidget {
                                           color: Colors.white.withValues(
                                             alpha: 0.3,
                                           ),
-                                          decoration: TextDecoration.lineThrough,
+                                          decoration:
+                                              TextDecoration.lineThrough,
                                           decorationColor: Colors.white
                                               .withValues(alpha: 0.3),
                                         ),
@@ -177,8 +179,7 @@ class OverallProgressSection extends StatelessWidget {
                         builder: (context, constraints) {
                           final totalWidth = constraints.maxWidth;
                           final officialWidth =
-                              totalWidth *
-                              (stats.rawOfficialPercentage / 100);
+                              totalWidth * (stats.rawOfficialPercentage / 100);
                           final currentWidth =
                               totalWidth * (stats.rawPercentage / 100);
 
@@ -197,10 +198,9 @@ class OverallProgressSection extends StatelessWidget {
                                             Color(0xFF9333EA), // Purple 600
                                           ],
                                         ),
-                                        borderRadius:
-                                            BorderRadius.horizontal(
-                                              left: Radius.circular(9),
-                                            ),
+                                        borderRadius: BorderRadius.horizontal(
+                                          left: Radius.circular(9),
+                                        ),
                                       ),
                                     ),
                                     Align(
@@ -224,8 +224,7 @@ class OverallProgressSection extends StatelessWidget {
                                         .clamp(0.0, totalWidth),
                                 child: SizedBox(
                                   width:
-                                      (diffPercentage / 100 * totalWidth +
-                                              1.0)
+                                      (diffPercentage / 100 * totalWidth + 1.0)
                                           .clamp(
                                             0.0,
                                             totalWidth -
@@ -235,20 +234,18 @@ class OverallProgressSection extends StatelessWidget {
                                           ),
                                   height: 14,
                                   child: ClipRRect(
-                                    borderRadius:
-                                        const BorderRadius.horizontal(
-                                          right: Radius.circular(9),
-                                        ),
+                                    borderRadius: const BorderRadius.horizontal(
+                                      right: Radius.circular(9),
+                                    ),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color:
-                                            isGain
-                                                ? const Color(
-                                                  0xFF22C55E,
-                                                ) // Green 500
-                                                : const Color(
-                                                  0xFFB91C1C,
-                                                ), // Red 700
+                                        color: isGain
+                                            ? const Color(
+                                                0xFF22C55E,
+                                              ) // Green 500
+                                            : const Color(
+                                                0xFFB91C1C,
+                                              ), // Red 700
                                         borderRadius:
                                             const BorderRadius.horizontal(
                                               right: Radius.circular(9),
@@ -300,7 +297,6 @@ class OverallProgressSection extends StatelessWidget {
 }
 
 class _CountBadge extends StatelessWidget {
-
   const _CountBadge({
     required this.value,
     required this.label,

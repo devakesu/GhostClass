@@ -8,9 +8,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class AddCourseDialog extends ConsumerStatefulWidget {
-
   const AddCourseDialog({
-    required this.semester, required this.academicYear, super.key,
+    required this.semester,
+    required this.academicYear,
+    super.key,
     this.className,
   });
   final String semester;

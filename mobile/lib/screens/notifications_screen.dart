@@ -13,7 +13,9 @@ import 'package:permission_handler/permission_handler.dart';
 // The exact Riverpod 3.x auto-dispose future provider type is an internal
 // generic that cannot be named explicitly in consumer code.
 // ignore: specify_nonobvious_property_types
-final notificationPermissionProvider = FutureProvider.autoDispose<bool>((ref) async {
+final notificationPermissionProvider = FutureProvider.autoDispose<bool>((
+  ref,
+) async {
   try {
     final settings = await FirebaseMessaging.instance.getNotificationSettings();
     return settings.authorizationStatus == AuthorizationStatus.denied;
@@ -26,7 +28,8 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
@@ -56,10 +59,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       final notifier = ref.read(notificationsProvider.notifier);
       final state = ref.read(notificationsProvider).value;
-      if (state != null && state.hasNextPage && !ref.read(notificationsProvider).isLoading) {
+      if (state != null &&
+          state.hasNextPage &&
+          !ref.read(notificationsProvider).isLoading) {
         final _ = notifier.fetchNextPage();
       }
     }
@@ -90,37 +96,50 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
               child: _DeniedBellButton(),
             ),
           notificationsAsync.whenData((data) {
-            if (data.unreadCount > 0) {
-              return IconButton(
-                icon: const Icon(LucideIcons.checkCheck),
-                onPressed: () {
-                  final _ = showDialog<void>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Mark all as read?', style: GoogleFonts.manrope(fontWeight: FontWeight.w800)),
-                      content: const Text('This will mark all current notifications as read.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
+                if (data.unreadCount > 0) {
+                  return IconButton(
+                    icon: const Icon(LucideIcons.checkCheck),
+                    onPressed: () {
+                      final _ = showDialog<void>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(
+                            'Mark all as read?',
+                            style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          content: const Text(
+                            'This will mark all current notifications as read.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final _ = ref
+                                    .read(notificationsProvider.notifier)
+                                    .markAllAsRead();
+                                Navigator.pop(context);
+                                ServiceToast.show(
+                                  context,
+                                  'All notifications marked as read',
+                                );
+                              },
+                              child: const Text('Mark all read'),
+                            ),
+                          ],
                         ),
-                        TextButton(
-                          onPressed: () {
-                            final _ = ref.read(notificationsProvider.notifier).markAllAsRead();
-                            Navigator.pop(context);
-                            ServiceToast.show(context, 'All notifications marked as read');
-                          },
-                          child: const Text('Mark all read'),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
+                    tooltip: 'Mark all as read',
                   );
-                },
-                tooltip: 'Mark all as read',
-              );
-            }
-            return const SizedBox.shrink();
-          }).value ?? const SizedBox.shrink(),
+                }
+                return const SizedBox.shrink();
+              }).value ??
+              const SizedBox.shrink(),
         ],
       ),
       body: Column(
@@ -141,7 +160,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     );
   }
 
-  Widget _buildList(BuildContext context, WidgetRef ref, NotificationsState data) {
+  Widget _buildList(
+    BuildContext context,
+    WidgetRef ref,
+    NotificationsState data,
+  ) {
     if (data.allNotifications.isEmpty) {
       return ListView(
         controller: _scrollController,
@@ -151,10 +174,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
           Center(
             child: Column(
               children: [
-                Icon(LucideIcons.bellOff, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
+                Icon(
+                  LucideIcons.bellOff,
+                  size: 64,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.2),
+                ),
                 const SizedBox(height: 16),
                 const Text('All caught up!'),
-                Text('You have no new notifications.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+                Text(
+                  'You have no new notifications.',
+                  style: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
               ],
             ),
           ),
@@ -162,9 +198,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       );
     }
 
-    final unreadConflicts = data.actionNotifications.where((n) => !n.isRead).toList();
-    final unreadRegular = data.regularNotifications.where((n) => !n.isRead).toList();
-    final readNotifications = data.allNotifications.where((n) => n.isRead).toList();
+    final unreadConflicts = data.actionNotifications
+        .where((n) => !n.isRead)
+        .toList();
+    final unreadRegular = data.regularNotifications
+        .where((n) => !n.isRead)
+        .toList();
+    final readNotifications = data.allNotifications
+        .where((n) => n.isRead)
+        .toList();
 
     // Sorting: Newest first within each group
     int compareNotifications(AppNotification a, AppNotification b) {
@@ -182,19 +224,34 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         if (unreadConflicts.isNotEmpty) ...[
           _buildSectionHeader(context, 'ACTION REQUIRED', Colors.amber),
           const SizedBox(height: 12),
-          ...unreadConflicts.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
+          ...unreadConflicts.map(
+            (n) => _NotificationCard(
+              notification: n,
+              key: ValueKey('notif_${n.id}_${n.isRead}'),
+            ),
+          ),
           const SizedBox(height: 24),
         ],
         if (unreadRegular.isNotEmpty) ...[
           _buildSectionHeader(context, 'UNREAD', Colors.blue),
           const SizedBox(height: 12),
-          ...unreadRegular.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
+          ...unreadRegular.map(
+            (n) => _NotificationCard(
+              notification: n,
+              key: ValueKey('notif_${n.id}_${n.isRead}'),
+            ),
+          ),
           const SizedBox(height: 24),
         ],
         if (readNotifications.isNotEmpty) ...[
           _buildSectionHeader(context, 'EARLIER', Colors.grey),
           const SizedBox(height: 12),
-          ...readNotifications.map((n) => _NotificationCard(notification: n, key: ValueKey('notif_${n.id}_${n.isRead}'))),
+          ...readNotifications.map(
+            (n) => _NotificationCard(
+              notification: n,
+              key: ValueKey('notif_${n.id}_${n.isRead}'),
+            ),
+          ),
         ],
         if (data.hasNextPage)
           const Padding(
@@ -315,7 +372,6 @@ class _PermissionBanner extends StatelessWidget {
 }
 
 class _NotificationCard extends ConsumerWidget {
-
   const _NotificationCard({required this.notification, super.key});
   final AppNotification notification;
 
@@ -323,7 +379,7 @@ class _NotificationCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isRead = notification.isRead;
     final topic = notification.topic?.toLowerCase() ?? '';
-    
+
     var icon = LucideIcons.info;
     var iconColor = Theme.of(context).colorScheme.primary;
     if (topic.contains('sync')) {
@@ -339,9 +395,11 @@ class _NotificationCard extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final _ = ref.read(notificationsProvider.notifier).toggleRead(notification.id, wasRead: isRead);
+        final _ = ref
+            .read(notificationsProvider.notifier)
+            .toggleRead(notification.id, wasRead: isRead);
         ServiceToast.show(
-          context, 
+          context,
           isRead ? 'Marked as unread' : 'Marked as read',
           duration: const Duration(seconds: 2),
         );
@@ -351,20 +409,26 @@ class _NotificationCard extends ConsumerWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead ? Colors.transparent : Theme.of(context).colorScheme.surface,
+          color: isRead
+              ? Colors.transparent
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isRead 
-              ? Colors.transparent 
-              : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
+            color: isRead
+                ? Colors.transparent
+                : Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.1),
           ),
-          boxShadow: isRead ? null : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: isRead
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,8 +464,11 @@ class _NotificationCard extends ConsumerWidget {
                           notification.title,
                           style: GoogleFonts.manrope(
                             fontSize: 14,
-                            fontWeight: isRead ? FontWeight.w600 : FontWeight.w800,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isRead ? 0.6 : 1.0),
+                            fontWeight: isRead
+                                ? FontWeight.w600
+                                : FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(alpha: isRead ? 0.6 : 1.0),
                           ),
                         ),
                       ),
@@ -410,7 +477,9 @@ class _NotificationCard extends ConsumerWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.4),
                         ),
                       ),
                     ],
@@ -420,7 +489,9 @@ class _NotificationCard extends ConsumerWidget {
                     notification.description,
                     style: GoogleFonts.manrope(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isRead ? 0.4 : 0.6),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(
+                        alpha: isRead ? 0.4 : 0.6,
+                      ),
                       height: 1.4,
                     ),
                   ),

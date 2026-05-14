@@ -27,19 +27,34 @@ void main() {
 
   group('AppException', () {
     test('isAuthError returns true for unauthorized/forbidden', () {
-      const e1 = AppException(message: 'Unauthorized', type: AppExceptionType.unauthorized);
+      const e1 = AppException(
+        message: 'Unauthorized',
+        type: AppExceptionType.unauthorized,
+      );
       expect(e1.isAuthError, true);
 
-      const e2 = AppException(message: 'Forbidden', type: AppExceptionType.forbidden);
+      const e2 = AppException(
+        message: 'Forbidden',
+        type: AppExceptionType.forbidden,
+      );
       expect(e2.isAuthError, true);
 
-      const e3 = AppException(message: 'Network', type: AppExceptionType.network);
+      const e3 = AppException(
+        message: 'Network',
+        type: AppExceptionType.network,
+      );
       expect(e3.isAuthError, false);
     });
 
     test('toString includes type and message', () {
-      const e = AppException(message: 'Server Error', type: AppExceptionType.server);
-      expect(e.toString(), 'AppException(AppExceptionType.server): Server Error');
+      const e = AppException(
+        message: 'Server Error',
+        type: AppExceptionType.server,
+      );
+      expect(
+        e.toString(),
+        'AppException(AppExceptionType.server): Server Error',
+      );
     });
   });
 }

@@ -1,8 +1,9 @@
 class Leave {
-
   Leave({
     required this.id,
-    required this.createdAt, required this.approvers, this.leaveReason,
+    required this.createdAt,
+    required this.approvers,
+    this.leaveReason,
     this.attendanceType,
     this.event,
     this.userSubgroup,
@@ -15,9 +16,13 @@ class Leave {
       leaveReason: json['leave_reason'] as String?,
       createdAt: json['created_at'] as String,
       attendanceType: json['attendancetype'] != null
-          ? AttendanceType.fromJson(json['attendancetype'] as Map<String, dynamic>)
+          ? AttendanceType.fromJson(
+              json['attendancetype'] as Map<String, dynamic>,
+            )
           : null,
-      event: json['event'] != null ? Event.fromJson(json['event'] as Map<String, dynamic>) : null,
+      event: json['event'] != null
+          ? Event.fromJson(json['event'] as Map<String, dynamic>)
+          : null,
       approvers: List<LeaveApprover>.from(
         (json['approvers'] as List? ?? []).map(
           (a) => LeaveApprover.fromJson(a as Map<String, dynamic>),
@@ -46,7 +51,6 @@ class Leave {
 }
 
 class LeaveFile {
-
   LeaveFile({required this.id, required this.fileName, required this.sizeByte});
 
   factory LeaveFile.fromJson(Map<String, dynamic> json) {
@@ -62,7 +66,6 @@ class LeaveFile {
 }
 
 class AttendanceType {
-
   AttendanceType({required this.id, required this.name});
 
   factory AttendanceType.fromJson(Map<String, dynamic> json) {
@@ -76,7 +79,6 @@ class AttendanceType {
 }
 
 class Event {
-
   Event({required this.id, required this.name});
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -90,10 +92,10 @@ class Event {
 }
 
 class LeaveApprover {
-
   LeaveApprover({
     required this.id,
-    required this.updatedAt, this.actionType,
+    required this.updatedAt,
+    this.actionType,
     this.actionAt,
     this.actionByUser,
   });
@@ -105,7 +107,9 @@ class LeaveApprover {
       actionAt: json['action_at'] as String?,
       updatedAt: json['updated_at'] as String? ?? '',
       actionByUser: json['action_by_user'] != null
-          ? ApproverUser.fromJson(json['action_by_user'] as Map<String, dynamic>)
+          ? ApproverUser.fromJson(
+              json['action_by_user'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -117,7 +121,6 @@ class LeaveApprover {
 }
 
 class ApproverUser {
-
   ApproverUser({required this.firstName, required this.lastName});
 
   factory ApproverUser.fromJson(Map<String, dynamic> json) {
@@ -131,7 +134,6 @@ class ApproverUser {
 }
 
 class UserSubgroup {
-
   UserSubgroup({required this.academicSemester, required this.academicYear});
 
   factory UserSubgroup.fromJson(Map<String, dynamic> json) {
@@ -145,15 +147,23 @@ class UserSubgroup {
 }
 
 class LeaveSession {
-
-  LeaveSession({required this.id, required this.date, this.session, this.course});
+  LeaveSession({
+    required this.id,
+    required this.date,
+    this.session,
+    this.course,
+  });
 
   factory LeaveSession.fromJson(Map<String, dynamic> json) {
     return LeaveSession(
       id: int.parse(json['id'].toString()),
       date: json['date'] as String,
-      session: json['session'] != null ? Session.fromJson(json['session'] as Map<String, dynamic>) : null,
-      course: json['course'] != null ? Course.fromJson(json['course'] as Map<String, dynamic>) : null,
+      session: json['session'] != null
+          ? Session.fromJson(json['session'] as Map<String, dynamic>)
+          : null,
+      course: json['course'] != null
+          ? Course.fromJson(json['course'] as Map<String, dynamic>)
+          : null,
     );
   }
   final int id;

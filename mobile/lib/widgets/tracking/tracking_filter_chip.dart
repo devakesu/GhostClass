@@ -7,9 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingFilterChip extends StatelessWidget {
-
   const TrackingFilterChip({
-    required this.selectedCourse, required this.onTap, required this.onClear, super.key,
+    required this.selectedCourse,
+    required this.onTap,
+    required this.onClear,
+    super.key,
     this.officialReport,
     this.allCourses,
   });
@@ -38,7 +40,8 @@ class TrackingFilterChip extends StatelessWidget {
     }
 
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
     return Semantics(
       button: true,

@@ -7,9 +7,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingRecordCard extends StatelessWidget {
-
   const TrackingRecordCard({
-    required this.record, required this.onDelete, super.key,
+    required this.record,
+    required this.onDelete,
+    super.key,
     this.officialReport,
   });
   final TrackingRecord record;
@@ -209,9 +210,12 @@ class TrackingRecordCard extends StatelessWidget {
   Color _getStatusColor(BuildContext context, dynamic attendance) {
     final status = AttendanceStatus.fromCode(attendance);
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    if (status == AttendanceStatus.dutyLeave) return ghostColors?.accentOrange ?? Colors.orange;
-    if (status == AttendanceStatus.absent) return ghostColors?.dangerRed ?? Colors.red;
-    if (status == AttendanceStatus.otherLeave) return ghostColors?.accentBlue ?? Colors.blue;
+    if (status == AttendanceStatus.dutyLeave)
+      return ghostColors?.accentOrange ?? Colors.orange;
+    if (status == AttendanceStatus.absent)
+      return ghostColors?.dangerRed ?? Colors.red;
+    if (status == AttendanceStatus.otherLeave)
+      return ghostColors?.accentBlue ?? Colors.blue;
     return ghostColors?.successGreen ?? Colors.green;
   }
 

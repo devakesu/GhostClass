@@ -4,7 +4,10 @@ import 'package:ghostclass/providers/dashboard_provider.dart';
 
 /// Provider for a specific course's instructor information.
 // ignore: specify_nonobvious_property_types
-final instructorProvider = Provider.family<CourseInstructor?, String>((ref, courseId) {
+final instructorProvider = Provider.family<CourseInstructor?, String>((
+  ref,
+  courseId,
+) {
   final dashboardAsync = ref.watch(dashboardProvider);
   return dashboardAsync.when(
     data: (data) {

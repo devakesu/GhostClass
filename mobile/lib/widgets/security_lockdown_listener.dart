@@ -10,7 +10,6 @@ import 'package:ghostclass/providers/security_provider.dart';
 /// A widget that listens for critical security failure states and
 /// displays a non-dismissible lockdown dialog to protect user data.
 class SecurityLockdownListener extends ConsumerWidget {
-
   const SecurityLockdownListener({required this.child, super.key});
   final Widget child;
 

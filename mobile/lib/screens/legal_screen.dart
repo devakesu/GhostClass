@@ -12,9 +12,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LegalScreen extends StatefulWidget {
-
   const LegalScreen({
-    required this.title, required this.body, super.key,
+    required this.title,
+    required this.body,
+    super.key,
   });
   final String title;
   final String body;
@@ -43,7 +44,11 @@ class _LegalScreenState extends State<LegalScreen> {
     }
   }
 
-  Future<void> _copyToClipboard(BuildContext context, String text, String label) async {
+  Future<void> _copyToClipboard(
+    BuildContext context,
+    String text,
+    String label,
+  ) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -59,8 +64,10 @@ class _LegalScreenState extends State<LegalScreen> {
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
-    final accent = ghostColors?.brandAccent ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final accent =
+        ghostColors?.brandAccent ?? Theme.of(context).colorScheme.primary;
     final bg = Theme.of(context).scaffoldBackgroundColor;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
@@ -111,7 +118,11 @@ class _LegalScreenState extends State<LegalScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(LucideIcons.shield, size: 14, color: primary),
+                              Icon(
+                                LucideIcons.shield,
+                                size: 14,
+                                color: primary,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Legal Compliance',
@@ -222,8 +233,9 @@ class _LegalScreenState extends State<LegalScreen> {
                                   fontStyle: FontStyle.italic,
                                 ),
                                 code: GoogleFonts.firaCode(
-                                  backgroundColor:
-                                      onSurface.withValues(alpha: 0.08),
+                                  backgroundColor: onSurface.withValues(
+                                    alpha: 0.08,
+                                  ),
                                   fontSize: 13,
                                   color: primary,
                                 ),
@@ -250,7 +262,9 @@ class _LegalScreenState extends State<LegalScreen> {
                           : const Center(
                               child: Padding(
                                 padding: EdgeInsets.symmetric(vertical: 40),
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
                     ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.05),
@@ -277,7 +291,8 @@ class _LegalScreenState extends State<LegalScreen> {
                         _ActionCard(
                           icon: LucideIcons.shieldCheck,
                           title: 'Build Transparency',
-                          subtitle: 'Verify app integrity and audit our lineage',
+                          subtitle:
+                              'Verify app integrity and audit our lineage',
                           onTap: () => context.push('/about'),
                         ),
                       ],
@@ -294,7 +309,6 @@ class _LegalScreenState extends State<LegalScreen> {
 }
 
 class _ActionCard extends StatelessWidget {
-
   const _ActionCard({
     required this.icon,
     required this.title,
@@ -372,7 +386,6 @@ class _ActionCard extends StatelessWidget {
 }
 
 class _PillButton extends StatelessWidget {
-
   const _PillButton({
     required this.icon,
     required this.label,
@@ -421,7 +434,6 @@ class _PillButton extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-
   const _GlowBlob({required this.color, required this.size});
   final Color color;
   final double size;

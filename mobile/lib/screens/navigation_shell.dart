@@ -27,7 +27,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class NavigationShell extends ConsumerStatefulWidget {
-
   const NavigationShell({required this.child, super.key});
   final Widget child;
 
@@ -66,7 +65,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   @override
   void initState() {
     super.initState();
-
 
     ref
       ..listenManual<AsyncValue<AcademicState?>>(academicProvider, (
@@ -237,16 +235,23 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surface.withValues(alpha: 0.8),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Icon(
                                 LucideIcons.bell,
                                 size: 18,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.85),
                               ),
                             ),
                             if (unreadCount > 0)
@@ -254,18 +259,30 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                 top: -2,
                                 right: -2,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 2,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
-                                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                    unreadCount > 9
+                                        ? '9+'
+                                        : unreadCount.toString(),
                                     style: GoogleFonts.manrope(
                                       fontSize: 8,
                                       fontWeight: FontWeight.w900,
-                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
                                     ),
                                   ),
                                 ),
@@ -288,13 +305,18 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                             color: surface.withValues(alpha: 0.8),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withValues(alpha: 0.1),
                             ),
                           ),
                           child: Icon(
                             LucideIcons.listTodo,
                             size: 18,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.85),
                           ),
                         ),
                       ),
@@ -304,56 +326,78 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     Semantics(
                       button: true,
                       label: 'Profile',
-                      child: GestureDetector(
-                        onTap: () => context.go('/ghostclass'),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: SweepGradient(
-                              colors: [
-                                Theme.of(context).colorScheme.primary,
-                                Theme.of(context).extension<GhostColors>()?.accentBlue ?? Colors.blue,
-                                Theme.of(context).extension<GhostColors>()?.accentOrange ?? Colors.orange,
-                                Theme.of(context).colorScheme.primary,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                            ),
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                              backgroundImage: user?.profile?.avatarUrl != null
-                                  ? NetworkImage(
-                                      user!.profile!.avatarUrl!,
-                                      headers: {
-                                        'Origin': AppConfig.supabaseOrigin,
-                                      },
-                                    )
-                                  : null,
-                              child: user?.profile?.avatarUrl == null
-                                  ? Icon(
-                                      LucideIcons.user,
-                                      size: 20,
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ).animate().fadeIn(duration: 600.ms, delay: 200.ms).scale(begin: const Offset(0.8, 0.8)),
+                      child:
+                          GestureDetector(
+                                onTap: () => context.go('/ghostclass'),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: SweepGradient(
+                                      colors: [
+                                        Theme.of(context).colorScheme.primary,
+                                        Theme.of(context)
+                                                .extension<GhostColors>()
+                                                ?.accentBlue ??
+                                            Colors.blue,
+                                        Theme.of(context)
+                                                .extension<GhostColors>()
+                                                ?.accentOrange ??
+                                            Colors.orange,
+                                        Theme.of(context).colorScheme.primary,
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.15),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Theme.of(
+                                        context,
+                                      ).scaffoldBackgroundColor,
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainer,
+                                      backgroundImage:
+                                          user?.profile?.avatarUrl != null
+                                          ? NetworkImage(
+                                              user!.profile!.avatarUrl!,
+                                              headers: {
+                                                'Origin':
+                                                    AppConfig.supabaseOrigin,
+                                              },
+                                            )
+                                          : null,
+                                      child: user?.profile?.avatarUrl == null
+                                          ? Icon(
+                                              LucideIcons.user,
+                                              size: 20,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.65),
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .animate()
+                              .fadeIn(duration: 600.ms, delay: 200.ms)
+                              .scale(begin: const Offset(0.8, 0.8)),
                     ),
                   ],
                 ).animate().fade().slideX(begin: 0.2),
@@ -441,10 +485,18 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         Positioned(
           bottom: 75 + bottomPadding, // Account for bottom safe area/notch
           child: IgnorePointer(
-            ignoring: isModalOpen || (selectedIndex > 1) || showOutageBarrier || showSecurityBarrier,
+            ignoring:
+                isModalOpen ||
+                (selectedIndex > 1) ||
+                showOutageBarrier ||
+                showSecurityBarrier,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
-              opacity: (isModalOpen || (selectedIndex > 1) || showOutageBarrier || showSecurityBarrier)
+              opacity:
+                  (isModalOpen ||
+                      (selectedIndex > 1) ||
+                      showOutageBarrier ||
+                      showSecurityBarrier)
                   ? 0
                   : 1,
               child: GestureDetector(
@@ -521,19 +573,29 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                      ),
-                      child: const Icon(
-                        LucideIcons.shieldAlert,
-                        size: 48,
-                        color: Colors.red,
-                      ),
-                    ).animate(onPlay: (controller) => controller.repeat(reverse: true))
-                     .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), duration: 1000.ms),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Icon(
+                            LucideIcons.shieldAlert,
+                            size: 48,
+                            color: Colors.red,
+                          ),
+                        )
+                        .animate(
+                          onPlay: (controller) =>
+                              controller.repeat(reverse: true),
+                        )
+                        .scale(
+                          begin: const Offset(1, 1),
+                          end: const Offset(1.1, 1.1),
+                          duration: 1000.ms,
+                        ),
                     const SizedBox(height: 32),
                     Text(
                       'Security Verification Failed',
@@ -562,25 +624,35 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () async {
-                           if (isCriticalSecurityFailure) {
-                             exit(0);
-                           }
+                          if (isCriticalSecurityFailure) {
+                            exit(0);
+                          }
 
-                           // Clear lock and retry
-                           ref.read(apiServiceProvider).clearCaches();
-                           ref.read(securityFailureProvider.notifier).clearFailure();
-                           try {
-                             await ref.read(authProvider.notifier).refreshProfile(force: true);
-                           } on Object {
-                             // The 401 interceptor will catch it again if it still fails
-                           }
+                          // Clear lock and retry
+                          ref.read(apiServiceProvider).clearCaches();
+                          ref
+                              .read(securityFailureProvider.notifier)
+                              .clearFailure();
+                          try {
+                            await ref
+                                .read(authProvider.notifier)
+                                .refreshProfile(force: true);
+                          } on Object {
+                            // The 401 interceptor will catch it again if it still fails
+                          }
                         },
                         child: Text(
-                          isCriticalSecurityFailure ? 'Close App' : 'Restart App',
-                          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                          isCriticalSecurityFailure
+                              ? 'Close App'
+                              : 'Restart App',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -590,13 +662,19 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.3),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () => SupportHelper.contactViaEmail(
-                          subject: 'Security Failure Report [v${AppConfig.appVersion}]',
-                          customBody: 'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+                          subject:
+                              'Security Failure Report [v${AppConfig.appVersion}]',
+                          customBody:
+                              'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
                               '-- SUMMARY --\n'
                               'Message: $securityMessage\n\n'
                               '-- PERSISTENCE --\n'
@@ -605,14 +683,17 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         icon: const Icon(LucideIcons.mail, size: 18),
                         label: Text(
                           'Contact Support',
-                          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                     if (!isCriticalSecurityFailure) ...[
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () => ref.read(authProvider.notifier).logout(),
+                        onPressed: () =>
+                            ref.read(authProvider.notifier).logout(),
                         child: Text(
                           'Logout of GhostClass',
                           style: GoogleFonts.manrope(
@@ -627,14 +708,12 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
               ),
             ),
           ).animate().fadeIn(duration: 400.ms),
-
       ],
     );
   }
 }
 
 class _NavButton extends StatelessWidget {
-
   const _NavButton({
     required this.icon,
     required this.label,
@@ -680,7 +759,10 @@ class _NavButton extends StatelessWidget {
                           ).colorScheme.onSurface.withValues(alpha: 0.45),
                   )
                   .animate(target: isSelected ? 1 : 0)
-                  .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1)),
+                  .scale(
+                    begin: const Offset(1, 1),
+                    end: const Offset(1.1, 1.1),
+                  ),
               const SizedBox(height: 2),
               if (isSelected)
                 Text(

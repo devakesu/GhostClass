@@ -27,15 +27,16 @@ abstract final class _Keys {
 /// All values are encrypted at rest via AES on Android (Keystore) and
 /// Keychain on iOS/macOS — no plaintext is ever written to disk.
 class SecureStorageService {
-
   SecureStorageService([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage(
-          iOptions: IOSOptions(
-            accessibility: KeychainAccessibility.first_unlock,
-          ),
-        );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+            ),
+          );
   final FlutterSecureStorage _storage;
-  
+
   @visibleForTesting
   FlutterSecureStorage get storage => _storage;
 
@@ -44,19 +45,16 @@ class SecureStorageService {
   Future<void> saveEzygoToken(String token) =>
       _storage.write(key: _Keys.ezygoToken, value: token);
 
-  Future<String?> getEzygoToken() =>
-      _storage.read(key: _Keys.ezygoToken);
+  Future<String?> getEzygoToken() => _storage.read(key: _Keys.ezygoToken);
 
-  Future<void> clearEzygoToken() =>
-      _storage.delete(key: _Keys.ezygoToken);
+  Future<void> clearEzygoToken() => _storage.delete(key: _Keys.ezygoToken);
 
   // ─── FCM Token ───────────────────────────────────────────────────────────
 
   Future<void> saveFcmToken(String token) =>
       _storage.write(key: _Keys.fcmToken, value: token);
 
-  Future<String?> getFcmToken() =>
-      _storage.read(key: _Keys.fcmToken);
+  Future<String?> getFcmToken() => _storage.read(key: _Keys.fcmToken);
 
   // ─── Supabase User ID ────────────────────────────────────────────────────
 
@@ -71,14 +69,12 @@ class SecureStorageService {
   Future<void> saveEzygoUserId(String id) =>
       _storage.write(key: _Keys.ezygoUserId, value: id);
 
-  Future<String?> getEzygoUserId() =>
-      _storage.read(key: _Keys.ezygoUserId);
+  Future<String?> getEzygoUserId() => _storage.read(key: _Keys.ezygoUserId);
 
   Future<void> saveUsername(String username) =>
       _storage.write(key: _Keys.username, value: username);
 
-  Future<String?> getUsername() =>
-      _storage.read(key: _Keys.username);
+  Future<String?> getUsername() => _storage.read(key: _Keys.username);
 
   // ─── User Profile ────────────────────────────────────────────────────────
 
@@ -90,7 +86,7 @@ class SecureStorageService {
     if (raw == null) return null;
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
-      // Backwards compatibility for old profile structure if needed, 
+      // Backwards compatibility for old profile structure if needed,
       // but here we just rely on fromJson
       return UserProfile.fromJson(data);
     } on Object catch (e) {
@@ -122,8 +118,7 @@ class SecureStorageService {
   Future<void> saveTermsVersion(String version) =>
       _storage.write(key: _Keys.termsVersion, value: version);
 
-  Future<String?> getTermsVersion() =>
-      _storage.read(key: _Keys.termsVersion);
+  Future<String?> getTermsVersion() => _storage.read(key: _Keys.termsVersion);
 
   // ─── Browser Stealth Info ───────────────────────────────────────────────
 
@@ -144,7 +139,11 @@ class SecureStorageService {
   // ─── Generic TTL Cache ──────────────────────────────────────────────────
 
   /// Persists any JSON-serializable data with a TTL.
-  Future<void> saveCachedData(String key, dynamic data, {Duration ttl = const Duration(hours: 24)}) async {
+  Future<void> saveCachedData(
+    String key,
+    dynamic data, {
+    Duration ttl = const Duration(hours: 24),
+  }) async {
     final expiry = DateTime.now().add(ttl).millisecondsSinceEpoch;
     final payload = {
       'data': data,
@@ -172,9 +171,11 @@ class SecureStorageService {
   }
 
   // ─── Academic State ───────────────────────────────────────────────────────
-  
-  Future<void> saveAcademicState(AcademicState state) =>
-      _storage.write(key: _Keys.academicState, value: jsonEncode({'semester': state.semester, 'year': state.year}));
+
+  Future<void> saveAcademicState(AcademicState state) => _storage.write(
+    key: _Keys.academicState,
+    value: jsonEncode({'semester': state.semester, 'year': state.year}),
+  );
 
   Future<AcademicState?> getAcademicState() async {
     final raw = await _storage.read(key: _Keys.academicState);
@@ -197,4 +198,6 @@ class SecureStorageService {
   Future<void> clearAll() => _storage.deleteAll();
 }
 
-final secureStorageProvider = Provider<SecureStorageService>((ref) => SecureStorageService());
+final secureStorageProvider = Provider<SecureStorageService>(
+  (ref) => SecureStorageService(),
+);

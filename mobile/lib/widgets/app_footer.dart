@@ -147,7 +147,6 @@ class AppFooter extends StatelessWidget {
 }
 
 class _CompactActionTile extends StatelessWidget {
-
   const _CompactActionTile({
     required this.icon,
     required this.label,
@@ -219,7 +218,9 @@ class _CompactActionTile extends StatelessWidget {
                         height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 6), // Increased space between title and text
+                    const SizedBox(
+                      height: 6,
+                    ), // Increased space between title and text
                     Text(
                       subtitle,
                       style: GoogleFonts.manrope(
@@ -241,7 +242,6 @@ class _CompactActionTile extends StatelessWidget {
 }
 
 class _FooterTextButton extends StatelessWidget {
-
   const _FooterTextButton({
     required this.icon,
     required this.label,
@@ -282,7 +282,6 @@ class _FooterTextButton extends StatelessWidget {
 }
 
 class _CoffeeButton extends StatelessWidget {
-
   const _CoffeeButton({required this.onTap});
   final VoidCallback onTap;
 

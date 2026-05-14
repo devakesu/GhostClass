@@ -19,12 +19,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// ----------
 /// Handles Bi-directional End-to-End Encryption (E2EE) for GhostClass.
 class JweService {
-
   JweService._internal() {
     const networkTimeout = kDebugMode
         ? Duration(seconds: 40)
         : Duration(seconds: 20);
-    
+
     _dio = Dio(
       BaseOptions(
         connectTimeout: networkTimeout,
@@ -80,7 +79,7 @@ class JweService {
   Future<void> _performFetch() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 3. Persistent cache check
       final cachedJson = prefs.getString(_jwksCacheKey);
       final cachedTimeStr = prefs.getString(_jwksTimeKey);
@@ -108,11 +107,11 @@ class JweService {
         final data = response.data;
         _cachedJwks = JsonWebKeySet.fromJson(data as Map<String, dynamic>);
         _lastFetch = DateTime.now();
-        
+
         // Update persistent cache
         await prefs.setString(_jwksCacheKey, json.encode(data));
         await prefs.setString(_jwksTimeKey, _lastFetch!.toIso8601String());
-        
+
         AppLogger.i('JweService: Fetched server JWKS successfully.');
       } else {
         throw Exception('Failed to fetch JWKS: ${response.statusCode}');

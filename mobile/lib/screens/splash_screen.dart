@@ -95,7 +95,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         if (!mounted) return;
 
         final appCheckError = e.details?['appCheckError'];
-        
+
         // Use backend-provided strings directly for the main message
         final dialogMessage = '$reason\n\n$action';
 
@@ -107,7 +107,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           message: dialogMessage,
           technicalDetails: sanitizeTechnicalDetails(
             '$e\n\n'
-            '${appCheckError != null ? "Local Error: $appCheckError" : ""}'
+            '${appCheckError != null ? "Local Error: $appCheckError" : ""}',
           ),
           retryLabel: criticalRisk ? 'Close App' : 'Restart App',
           onRetry: () => exit(0),
@@ -133,7 +133,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         isDismissible: false,
         onContactSupport: () => SupportHelper.contactViaEmail(
           subject: 'App Connectivity Issue [v${AppConfig.appVersion}]',
-          customBody: 'Hello GhostClass Support Team,\n\n'
+          customBody:
+              'Hello GhostClass Support Team,\n\n'
               'I encountered a connectivity issue during app startup.\n\n'
               '-- SUMMARY --\n'
               'Error: ${messages.first}\n'

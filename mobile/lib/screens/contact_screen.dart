@@ -9,8 +9,11 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContactScreen extends ConsumerStatefulWidget {
-
-  const ContactScreen({this.prefilledSubject, this.prefilledMessage, super.key});
+  const ContactScreen({
+    this.prefilledSubject,
+    this.prefilledMessage,
+    super.key,
+  });
   final String? prefilledSubject;
   final String? prefilledMessage;
 
@@ -31,10 +34,8 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
     // Initialize controllers with pre-filled values from constructor
     _nameController = TextEditingController();
     _emailController = TextEditingController();
-    _subjectController =
-        TextEditingController(text: widget.prefilledSubject);
-    _messageController =
-        TextEditingController(text: widget.prefilledMessage);
+    _subjectController = TextEditingController(text: widget.prefilledSubject);
+    _messageController = TextEditingController(text: widget.prefilledMessage);
 
     // Pre-fill name/email if logged in using our custom authProvider
     final authAsync = ref.read(authProvider);
@@ -72,7 +73,13 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(20),
-            border: Theme.of(context).brightness == Brightness.dark ? Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)) : null,
+            border: Theme.of(context).brightness == Brightness.dark
+                ? Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.1),
+                  )
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.5),
@@ -114,7 +121,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.85),
                   height: 1.5,
                 ),
               ),
@@ -193,7 +202,8 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
         email: email,
         subject: subject,
         message: message,
-        supabaseToken: Supabase.instance.client.auth.currentSession?.accessToken,
+        supabaseToken:
+            Supabase.instance.client.auth.currentSession?.accessToken,
       );
 
       if (!mounted) return;
@@ -266,7 +276,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.85),
           ),
         ),
         const SizedBox(height: 8),
@@ -276,12 +288,17 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           textInputAction: action,
           maxLines: maxLines,
           autofillHints: autofillHints,
-          style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: 16,
@@ -290,21 +307,30 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.1),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.1),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 1.5,
+              ),
             ),
             filled: true,
-            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.04),
           ),
         ),
         const SizedBox(height: 16),
@@ -340,7 +366,10 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [primary.withValues(alpha: 0.12), Colors.transparent],
+                      colors: [
+                        primary.withValues(alpha: 0.12),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
                   padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
@@ -384,7 +413,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                     "Our team is happy to help. Fill in the form below and we'll get back to you within 24–48 hours.",
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.85),
                       height: 1.5,
                     ),
                   ),
@@ -419,23 +450,29 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _sending ? null : () { final _ = _handleSend(); },
+                      onPressed: _sending
+                          ? null
+                          : () {
+                              final _ = _handleSend();
+                            },
                       icon: _sending
-                        ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : const Icon(LucideIcons.send, size: 15),
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(LucideIcons.send, size: 15),
                       label: Text(_sending ? 'Sending...' : 'Send Message'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primary,
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                        disabledForegroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        disabledForegroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

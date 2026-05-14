@@ -26,7 +26,8 @@ class GhostClassScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final authState = ref.watch(authProvider);
     final themeMode = ref.watch(themeProvider);
 
@@ -51,7 +52,9 @@ class GhostClassScreen extends ConsumerWidget {
                   delegate: SliverChildListDelegate([
                     GhostClassSectionTitle(
                       title: 'APP SETTINGS',
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: 16),
                   ]),
@@ -76,7 +79,9 @@ class GhostClassScreen extends ConsumerWidget {
                       value: '${user.settings.targetPercentage}%',
                       color: primary,
                       isDisabled: user.isUpdatingSettings,
-                      onTap: () { final _ = _showTargetPicker(context, ref, user); },
+                      onTap: () {
+                        final _ = _showTargetPicker(context, ref, user);
+                      },
                     ),
                     // Bunk Calculator Switch
                     GhostClassSettingsCard(
@@ -89,12 +94,16 @@ class GhostClassScreen extends ConsumerWidget {
                       toggleValue: user.settings.bunkCalculatorEnabled,
                       isDisabled: user.isUpdatingSettings,
                       onToggle: (val) {
-                        final _ = ref.read(authProvider.notifier).updateSettings(bunkEnabled: val);
+                        final _ = ref
+                            .read(authProvider.notifier)
+                            .updateSettings(bunkEnabled: val);
                       },
                       onTap: () {
-                        final _ = ref.read(authProvider.notifier).updateSettings(
-                          bunkEnabled: !user.settings.bunkCalculatorEnabled,
-                        );
+                        final _ = ref
+                            .read(authProvider.notifier)
+                            .updateSettings(
+                              bunkEnabled: !user.settings.bunkCalculatorEnabled,
+                            );
                       },
                     ),
                     // Theme Switcher
@@ -104,7 +113,8 @@ class GhostClassScreen extends ConsumerWidget {
                           : LucideIcons.sun,
                       label: 'Theme',
                       value: themeMode == ThemeMode.dark ? 'DARK' : 'LIGHT',
-                      color: ghostColors?.successGreen ?? const Color(0xFF10B981),
+                      color:
+                          ghostColors?.successGreen ?? const Color(0xFF10B981),
                       isActive: themeMode == ThemeMode.dark,
                       showToggle: true,
                       toggleValue: themeMode == ThemeMode.dark,
@@ -129,16 +139,18 @@ class GhostClassScreen extends ConsumerWidget {
                     label: 'Institution',
                     isFullWidth: true,
                     isDisabled: user.isUpdatingSettings,
-                    value: ref.watch(institutionsProvider).when(
+                    value: ref
+                        .watch(institutionsProvider)
+                        .when(
                           data: (insts) {
                             if (insts.isEmpty) return 'SWITCH';
-                            
+
                             // Try to match based on the user's ezygoId, or default to the first one.
                             final match = insts.cast<Institution?>().firstWhere(
                               (i) => i?.id.toString() == user.ezygoId,
                               orElse: () => null,
                             );
-                            
+
                             return match?.name ?? insts.first.name;
                           },
                           loading: () => '...',
@@ -152,7 +164,10 @@ class GhostClassScreen extends ConsumerWidget {
 
               // Bottom Menu Tiles (Profile, Help, etc.)
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
+                ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 8),
@@ -160,35 +175,48 @@ class GhostClassScreen extends ConsumerWidget {
                       icon: LucideIcons.userCircle,
                       title: 'Profile',
                       subtitle: 'Personal details',
-                      onTap: () { final _ = context.push('/profile'); },
-                      color: ghostColors?.accentOrange ?? const Color(0xFFFACC15),
+                      onTap: () {
+                        final _ = context.push('/profile');
+                      },
+                      color:
+                          ghostColors?.accentOrange ?? const Color(0xFFFACC15),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.helpCircle,
                       title: 'Help Center',
                       subtitle: 'FAQs and support',
-                      onTap: () { final _ = context.push('/help'); },
+                      onTap: () {
+                        final _ = context.push('/help');
+                      },
                       color: ghostColors?.accentBlue ?? const Color(0xFF6366F1),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.mail,
                       title: 'Contact Us',
                       subtitle: 'Get in touch with our team',
-                      onTap: () { final _ = context.push('/contact'); },
-                      color: ghostColors?.accentOrange ?? const Color(0xFFF59E0B),
+                      onTap: () {
+                        final _ = context.push('/contact');
+                      },
+                      color:
+                          ghostColors?.accentOrange ?? const Color(0xFFF59E0B),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.shieldCheck,
                       title: 'Legal',
                       subtitle: 'Terms, Privacy & Licenses',
-                      onTap: () { final _ = context.push('/legal'); },
-                      color: ghostColors?.successGreen ?? const Color(0xFF10B981),
+                      onTap: () {
+                        final _ = context.push('/legal');
+                      },
+                      color:
+                          ghostColors?.successGreen ?? const Color(0xFF10B981),
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.database,
                       title: 'Account Dump',
                       subtitle: 'Detailed account information',
-                      onTap: () { final _ = context.push('/profile-dump'); },
+                      onTap: () {
+                        final _ = context.push('/profile-dump');
+                      },
                       color: primary,
                     ),
                     const SizedBox(height: 40),
@@ -203,7 +231,9 @@ class GhostClassScreen extends ConsumerWidget {
                       subtitle: 'Sign out of GhostClass',
                       color: primary,
                       isDanger: true,
-                      onTap: () { final _ = _handleLogout(context, ref); },
+                      onTap: () {
+                        final _ = _handleLogout(context, ref);
+                      },
                     ),
                     GhostClassMenuTile(
                       icon: LucideIcons.trash2,
@@ -211,7 +241,9 @@ class GhostClassScreen extends ConsumerWidget {
                       subtitle: 'Permanently remove all data',
                       color: primary,
                       isDanger: true,
-                      onTap: () { final _ = _handleDeleteAccount(context, ref); },
+                      onTap: () {
+                        final _ = _handleDeleteAccount(context, ref);
+                      },
                     ),
                     const SizedBox(height: 8),
                   ]),
@@ -223,7 +255,8 @@ class GhostClassScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const LoadingOverlay(isFullScreen: false, showLogo: false),
+        loading: () =>
+            const LoadingOverlay(isFullScreen: false, showLogo: false),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -256,7 +289,10 @@ class GhostClassScreen extends ConsumerWidget {
         content: Text(
           'Are you sure you want to log out?',
           style: GoogleFonts.manrope(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85)),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.85),
+          ),
         ),
         actions: [
           TextButton(
@@ -264,7 +300,10 @@ class GhostClassScreen extends ConsumerWidget {
             child: Text(
               'Cancel',
               style: GoogleFonts.manrope(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
             ),
           ),
           TextButton(
@@ -293,10 +332,16 @@ class GhostClassScreen extends ConsumerWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: Row(
             children: [
-              const Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 22),
+              const Icon(
+                LucideIcons.alertTriangle,
+                color: Colors.redAccent,
+                size: 22,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -316,7 +361,9 @@ class GhostClassScreen extends ConsumerWidget {
               RichText(
                 text: TextSpan(
                   style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.85),
                     fontSize: 13,
                     height: 1.5,
                     fontWeight: FontWeight.w500,
@@ -331,13 +378,17 @@ class GhostClassScreen extends ConsumerWidget {
                       ),
                     ),
                     const TextSpan(
-                        text:
-                            ' account, including all attendance logs and personal settings.\n\n'),
+                      text:
+                          ' account, including all attendance logs and personal settings.\n\n',
+                    ),
                     TextSpan(
-                      text: 'Note: Your official EzyGo account remains unaffected.',
+                      text:
+                          'Note: Your official EzyGo account remains unaffected.',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -347,7 +398,9 @@ class GhostClassScreen extends ConsumerWidget {
               RichText(
                 text: TextSpan(
                   style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -370,18 +423,27 @@ class GhostClassScreen extends ConsumerWidget {
                 autofocus: true,
                 onChanged: (val) => setState(() {}),
                 style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.bold),
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: InputDecoration(
                   hintText: 'DELETE',
                   hintStyle: GoogleFonts.manrope(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.1),
+                  ),
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -397,8 +459,11 @@ class GhostClassScreen extends ConsumerWidget {
               child: Text(
                 'Cancel',
                 style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Padding(
@@ -410,8 +475,12 @@ class GhostClassScreen extends ConsumerWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.redAccent.withValues(alpha: 0.1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  disabledBackgroundColor: Colors.redAccent.withValues(
+                    alpha: 0.1,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: Text(
                   'Permanently Delete',
@@ -450,7 +519,8 @@ class GhostClassScreen extends ConsumerWidget {
     AuthenticatedUser user,
   ) async {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
     await showModalBottomSheet<void>(
@@ -473,7 +543,9 @@ class GhostClassScreen extends ConsumerWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -511,8 +583,14 @@ class GhostClassScreen extends ConsumerWidget {
                         '$val%',
                         style: GoogleFonts.manrope(
                           fontSize: 11,
-                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                          color: isSelected ? primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontWeight: isSelected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: isSelected
+                              ? primary
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.6),
                           letterSpacing: 1,
                         ),
                       );
@@ -522,7 +600,9 @@ class GhostClassScreen extends ConsumerWidget {
                 SliderTheme(
                   data: SliderThemeData(
                     showValueIndicator: ShowValueIndicator.onDrag,
-                    tickMarkShape: const _CustomSliderTickMarkShape(tickMarkRadius: 2.5),
+                    tickMarkShape: const _CustomSliderTickMarkShape(
+                      tickMarkRadius: 2.5,
+                    ),
                     activeTickMarkColor: Colors.white.withValues(alpha: 0.4),
                     inactiveTickMarkColor: primary.withValues(alpha: 0.4),
                     activeTrackColor: primary,
@@ -540,7 +620,8 @@ class GhostClassScreen extends ConsumerWidget {
                     min: 75,
                     max: 95,
                     divisions: 4,
-                    onChanged: (val) => setModalState(() => localTarget = val.toInt()),
+                    onChanged: (val) =>
+                        setModalState(() => localTarget = val.toInt()),
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -548,16 +629,23 @@ class GhostClassScreen extends ConsumerWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      final _ = ref.read(authProvider.notifier).updateSettings(targetPercentage: localTarget);
+                      final _ = ref
+                          .read(authProvider.notifier)
+                          .updateSettings(targetPercentage: localTarget);
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
-                    child: Text('Done', style: GoogleFonts.manrope(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'Done',
+                      style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -621,7 +709,11 @@ class GhostClassScreen extends ConsumerWidget {
                         color: primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(LucideIcons.building, color: primary, size: 24),
+                      child: Icon(
+                        LucideIcons.building,
+                        color: primary,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Text(
@@ -648,43 +740,41 @@ class GhostClassScreen extends ConsumerWidget {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: insts.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final inst = insts[index];
                         final isSelected = inst.id.toString() == user.ezygoId;
                         return InkWell(
-                          onTap:
-                              isSelected
-                                  ? null
-                                  : () async {
-                                    await ref
-                                        .read(authProvider.notifier)
-                                        .updateDefaultInstitution(inst.id);
-                                    if (context.mounted) Navigator.pop(context);
-                                  },
+                          onTap: isSelected
+                              ? null
+                              : () async {
+                                  await ref
+                                      .read(authProvider.notifier)
+                                      .updateDefaultInstitution(inst.id);
+                                  if (context.mounted) Navigator.pop(context);
+                                },
                           borderRadius: BorderRadius.circular(16),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color:
-                                  isSelected
-                                      ? primary.withValues(alpha: 0.1)
-                                      : Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(
-                                        alpha: 0.05,
-                                      ),
+                              color: isSelected
+                                  ? primary.withValues(alpha: 0.1)
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withValues(
+                                      alpha: 0.05,
+                                    ),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color:
-                                    isSelected
-                                        ? primary.withValues(alpha: 0.3)
-                                        : Theme.of(
-                                          context,
-                                        ).colorScheme.outlineVariant.withValues(
-                                          alpha: 0.1,
-                                        ),
+                                color: isSelected
+                                    ? primary.withValues(alpha: 0.3)
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.outlineVariant.withValues(
+                                        alpha: 0.1,
+                                      ),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -692,17 +782,17 @@ class GhostClassScreen extends ConsumerWidget {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         inst.name,
                                         style: GoogleFonts.manrope(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w800,
-                                          color:
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -711,11 +801,10 @@ class GhostClassScreen extends ConsumerWidget {
                                         style: GoogleFonts.manrope(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w700,
-                                          color:
-                                              Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.4),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.4),
                                           letterSpacing: 0.5,
                                         ),
                                       ),
@@ -723,7 +812,10 @@ class GhostClassScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 if (isSelected)
-                                  Icon(LucideIcons.checkCircle2, color: primary),
+                                  Icon(
+                                    LucideIcons.checkCircle2,
+                                    color: primary,
+                                  ),
                               ],
                             ),
                           ),
@@ -762,11 +854,11 @@ class _CustomSliderTickMarkShape extends SliderTickMarkShape {
     required bool isEnabled,
   }) {
     final canvas = context.canvas;
-    
+
     final isBeforeThumb = center.dx < thumbCenter.dx;
-    
+
     final paint = Paint()
-      ..color = isBeforeThumb 
+      ..color = isBeforeThumb
           ? Colors.white.withValues(alpha: 0.4)
           : (sliderTheme.inactiveTickMarkColor ?? Colors.grey);
 

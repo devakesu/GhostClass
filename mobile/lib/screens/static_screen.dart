@@ -3,9 +3,9 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class StaticPageScreen extends StatelessWidget {
-
   const StaticPageScreen({
-    required this.title, super.key,
+    required this.title,
+    super.key,
     this.body = 'Coming soon',
   });
   final String title;
@@ -29,7 +29,9 @@ class StaticPageScreen extends StatelessWidget {
           p: GoogleFonts.manrope(
             fontSize: 15,
             height: 1.6,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.8),
           ),
           h1: GoogleFonts.manrope(
             fontSize: 24,
@@ -42,7 +44,9 @@ class StaticPageScreen extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurface,
           ),
           code: GoogleFonts.firaCode(
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             fontSize: 13,
           ),
           blockquote: GoogleFonts.manrope(

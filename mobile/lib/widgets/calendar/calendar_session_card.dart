@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CalendarEvent {
-
   const CalendarEvent({
     required this.courseName,
     required this.displaySessionName,
@@ -38,9 +37,9 @@ class CalendarEvent {
 }
 
 class CalendarSessionCard extends StatelessWidget {
-
   const CalendarSessionCard({
-    required this.event, super.key,
+    required this.event,
+    super.key,
     this.onMarkPresent,
     this.onMarkDl,
     this.onDelete,
@@ -54,46 +53,49 @@ class CalendarSessionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accentColor = event.color;
-    final disabledAccent =
-        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
+    final disabledAccent = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.2);
 
     final accentBackground = isDark
         ? (event.isDisabled
-            ? disabledAccent.withValues(alpha: 0.1)
-            : accentColor.withValues(alpha: 0.12))
+              ? disabledAccent.withValues(alpha: 0.1)
+              : accentColor.withValues(alpha: 0.12))
         : (event.isDisabled
-            ? disabledAccent.withValues(alpha: 0.08)
-            : accentColor.withValues(alpha: 0.08));
+              ? disabledAccent.withValues(alpha: 0.08)
+              : accentColor.withValues(alpha: 0.08));
 
     final accentBorder = isDark
         ? (event.isDisabled
-            ? disabledAccent.withValues(alpha: 0.45)
-            : accentColor.withValues(alpha: 0.45))
+              ? disabledAccent.withValues(alpha: 0.45)
+              : accentColor.withValues(alpha: 0.45))
         : (event.isDisabled
-            ? disabledAccent.withValues(alpha: 0.7)
-            : accentColor.withValues(alpha: 0.7));
+              ? disabledAccent.withValues(alpha: 0.7)
+              : accentColor.withValues(alpha: 0.7));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? accentBackground : Theme.of(context).colorScheme.surface,
+        color: isDark
+            ? accentBackground
+            : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: accentBorder, width: 1.5),
         boxShadow:
             (event.isDisabled ||
-                    event.status == 'Absent' ||
-                    event.status == 'Duty Leave' ||
-                    event.status == 'Other Leave' ||
-                    event.status == 'Present')
-                ? [
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : null,
+                event.status == 'Absent' ||
+                event.status == 'Duty Leave' ||
+                event.status == 'Other Leave' ||
+                event.status == 'Present')
+            ? [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,8 +113,8 @@ class CalendarSessionCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         color: event.isDisabled
                             ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.4)
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.4)
                             : event.color,
                         letterSpacing: 0.5,
                       ),
@@ -123,9 +125,10 @@ class CalendarSessionCard extends StatelessWidget {
                       style: GoogleFonts.manrope(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(
-                          alpha: event.isDisabled ? 0.4 : 1.0,
-                        ),
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(
+                              alpha: event.isDisabled ? 0.4 : 1.0,
+                            ),
                       ),
                     ),
                     if (event.courseCode != null)
@@ -195,8 +198,7 @@ class CalendarSessionCard extends StatelessWidget {
               ),
             ],
           ),
-          if (event.remarks != null &&
-              event.remarks!.isNotEmpty) ...[
+          if (event.remarks != null && event.remarks!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -262,11 +264,11 @@ class CalendarSessionCard extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-
   const _ActionButton({
     required this.icon,
     required this.label,
-    required this.color, this.onTap,
+    required this.color,
+    this.onTap,
     this.isFullWidth = false,
   });
   final IconData icon;

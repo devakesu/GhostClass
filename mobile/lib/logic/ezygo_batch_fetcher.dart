@@ -6,21 +6,21 @@ import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/logger.dart';
 
 /// A utility to deduplicate and cache EzyGo API requests locally in the Flutter app.
-/// 
+///
 /// This prevents redundant network calls during dashboard hydration and improves
 /// performance by serving recently fetched data from a short-lived LRU cache.
-/// 
+///
 /// Note: This is implemented locally to preserve the user's local IP address,
 /// which helps avoid triggering EzyGo's server-side rate limits that might
 /// occur if all requests were proxied through the GhostClass backend.
 class EzygoBatchFetcher {
-
-  EzygoBatchFetcher(this._dio, {
+  EzygoBatchFetcher(
+    this._dio, {
     required bool Function() getOutage,
     // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
     required void Function(bool) setOutage,
     required bool Function() isBackendUnauthorized,
-  }) : _getOutage = getOutage, 
+  }) : _getOutage = getOutage,
        _setOutage = setOutage,
        _isBackendUnauthorized = isBackendUnauthorized;
   final Dio _dio;
@@ -28,26 +28,26 @@ class EzygoBatchFetcher {
   // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
   final void Function(bool) _setOutage;
   final bool Function() _isBackendUnauthorized;
-  
+
   // Cache for 60 seconds (parity with Next.js implementation)
   static const Duration _cacheTtl = Duration(seconds: 60);
-  
+
   // In-flight request map for deduplication
   static final Map<String, Future<Response<dynamic>>> _inFlight = {};
-  
+
   // Rate limiting (parity with Next.js MAX_CONCURRENT = 3)
   static const int _maxConcurrent = 3;
   static int _activeRequests = 0;
   static final List<Completer<void>> _queue = [];
-  
+
   // Local result cache
   static final Map<String, _CacheEntry> _cache = {};
-  
+
   // Tracker for log throttling
   static DateTime? _lastCircuitBreakerLog;
 
   /// Executes an authenticated request with deduplication and caching.
-  /// 
+  ///
   /// [path] The full URL or relative path.
   /// [token] The EzyGo Bearer token.
   /// [method] The HTTP method (GET or POST).
@@ -82,15 +82,20 @@ class EzygoBatchFetcher {
     if (_getOutage()) {
       // Ensure the UI state is definitely true if we are blocking
       _setOutage(true);
-      
+
       // Throttle the warning log to once per minute to avoid console flooding
       const logThrottle = Duration(minutes: 1);
       final now = DateTime.now();
-      if (_lastCircuitBreakerLog == null || now.difference(_lastCircuitBreakerLog!) > logThrottle) {
+      if (_lastCircuitBreakerLog == null ||
+          now.difference(_lastCircuitBreakerLog!) > logThrottle) {
         _lastCircuitBreakerLog = now;
-        AppLogger.w('EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path');
+        AppLogger.w(
+          'EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path',
+        );
       } else {
-        AppLogger.d('EzygoBatchFetcher: CIRCUIT BREAKER THROTTLED. Blocking $path');
+        AppLogger.d(
+          'EzygoBatchFetcher: CIRCUIT BREAKER THROTTLED. Blocking $path',
+        );
       }
 
       throw DioException(
@@ -109,7 +114,9 @@ class EzygoBatchFetcher {
     final cached = _cache[cacheKey];
     if (cached != null) {
       if (DateTime.now().isBefore(cached.expiry)) {
-        AppLogger.d('EzygoBatchFetcher: CACHE HIT for $path ${cached.response.statusCode != 200 ? "(NEGATIVE)" : ""}');
+        AppLogger.d(
+          'EzygoBatchFetcher: CACHE HIT for $path ${cached.response.statusCode != 200 ? "(NEGATIVE)" : ""}',
+        );
         return cached.response;
       } else {
         // Purge expired entry
@@ -120,7 +127,9 @@ class EzygoBatchFetcher {
     // 2. Check in-flight requests (Deduplication)
     final inFlight = _inFlight[cacheKey];
     if (inFlight != null) {
-      AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request for $path');
+      AppLogger.d(
+        'EzygoBatchFetcher: DEDUPLICATING in-flight request for $path',
+      );
       return inFlight;
     }
 
@@ -137,7 +146,9 @@ class EzygoBatchFetcher {
       // another request with the same key might have already started.
       final postSlotInFlight = _inFlight[cacheKey];
       if (postSlotInFlight != null) {
-        AppLogger.d('EzygoBatchFetcher: DEDUPLICATING in-flight request (POST-SLOT) for $path');
+        AppLogger.d(
+          'EzygoBatchFetcher: DEDUPLICATING in-flight request (POST-SLOT) for $path',
+        );
         _releaseSlot(); // Immediate release as we will await the existing future
         slotAcquired = false;
         return postSlotInFlight;
@@ -156,7 +167,7 @@ class EzygoBatchFetcher {
 
       try {
         final response = await requestFuture;
-        
+
         // 5. Cache the result
         if (response.statusCode == 200) {
           // Success cache (Longer)
@@ -165,7 +176,7 @@ class EzygoBatchFetcher {
             expiry: DateTime.now().add(_cacheTtl),
           );
         } else if (response.statusCode != null && response.statusCode! >= 500) {
-          // NEGATIVE CACHE (Circuit Breaker): 
+          // NEGATIVE CACHE (Circuit Breaker):
           // Remember 5xx failures briefly to prevent Request Storms.
           _setOutage(true);
           _cache[cacheKey] = _CacheEntry(
@@ -173,7 +184,7 @@ class EzygoBatchFetcher {
             expiry: DateTime.now().add(const Duration(seconds: 15)),
           );
         }
-        
+
         return response;
       } on DioException catch (e) {
         // Treat timeouts and connection errors as outages to trigger the UI barrier
@@ -219,7 +230,6 @@ class EzygoBatchFetcher {
     }
   }
 
-
   Future<Response<dynamic>> _executeRequest({
     required String path,
     required String token,
@@ -227,10 +237,12 @@ class EzygoBatchFetcher {
     dynamic data,
   }) {
     if (token.isEmpty) {
-      return Future.error(const AppException(
-        message: 'No EzyGo credentials found. Please log in.',
-        type: AppExceptionType.unauthorized,
-      ));
+      return Future.error(
+        const AppException(
+          message: 'No EzyGo credentials found. Please log in.',
+          type: AppExceptionType.unauthorized,
+        ),
+      );
     }
     return _dio.request<dynamic>(
       path,
@@ -254,7 +266,6 @@ class EzygoBatchFetcher {
 }
 
 class _CacheEntry {
-
   _CacheEntry({required this.response, required this.expiry});
   final Response<dynamic> response;
   final DateTime expiry;

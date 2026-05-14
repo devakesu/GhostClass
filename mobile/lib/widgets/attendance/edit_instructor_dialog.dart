@@ -11,7 +11,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class EditInstructorDialog extends ConsumerStatefulWidget {
-
   const EditInstructorDialog({
     required this.courseCode,
     required this.courseName,
@@ -106,7 +105,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
         ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surface;
 
-    final hasChanged = _controller.text.trim() != (widget.initialName ?? '').trim();
+    final hasChanged =
+        _controller.text.trim() != (widget.initialName ?? '').trim();
 
     return Dialog(
       backgroundColor: surface,
@@ -254,65 +254,69 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           TextFormField(
-                          controller: _controller,
-                          maxLength: 60,
-                          autofocus: true,
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w700,
-                          ),
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          decoration: InputDecoration(
-                            labelText: 'Instructor Name',
-                            hintText: 'e.g. Dr. Jane Smith',
-                            counterText: '',
-                            prefixIcon: Icon(
-                              LucideIcons.user,
-                              size: 20,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.6),
+                            controller: _controller,
+                            maxLength: 60,
+                            autofocus: true,
+                            style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w700,
                             ),
-                            labelStyle: GoogleFonts.manrope(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.4),
-                            ),
-                            floatingLabelStyle: GoogleFonts.manrope(
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            decoration: InputDecoration(
+                              labelText: 'Instructor Name',
+                              hintText: 'e.g. Dr. Jane Smith',
+                              counterText: '',
+                              prefixIcon: Icon(
+                                LucideIcons.user,
+                                size: 20,
                                 color: Theme.of(
                                   context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.1),
+                                ).colorScheme.primary.withValues(alpha: 0.6),
                               ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
+                              labelStyle: GoogleFonts.manrope(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.4),
+                              ),
+                              floatingLabelStyle: GoogleFonts.manrope(
+                                fontWeight: FontWeight.w800,
                                 color: Theme.of(context).colorScheme.primary,
-                                width: 2,
                               ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.02),
                             ),
-                            filled: true,
-                            fillColor: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.02),
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
-                              return 'Required';
-                            }
-                            if (!RegExp(
-                              r'^[a-zA-Z\s.]+$',
-                            ).hasMatch(val.trim())) {
-                              return 'Letters, spaces, and dots only';
-                            }
-                            return null;
-                          },
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              if (!RegExp(
+                                r'^[a-zA-Z\s.]+$',
+                              ).hasMatch(val.trim())) {
+                                return 'Letters, spaces, and dots only';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 32),
                           Row(
@@ -323,7 +327,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                       ? null
                                       : () => Navigator.pop(context),
                                   style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -332,9 +338,12 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                     'CANCEL',
                                     style: GoogleFonts.manrope(
                                       fontWeight: FontWeight.w800,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface.withValues(
+                                            alpha: 0.4,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -346,7 +355,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                   onPressed: (_isSaving || !hasChanged)
                                       ? null
                                       : () {
-                                          if (_formKey.currentState?.validate() ?? false) {
+                                          if (_formKey.currentState
+                                                  ?.validate() ??
+                                              false) {
                                             final _ = _handleSave();
                                           }
                                         },

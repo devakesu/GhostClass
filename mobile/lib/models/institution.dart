@@ -1,5 +1,4 @@
 class Institution {
-
   const Institution({required this.id, required this.name, required this.role});
 
   factory Institution.fromJson(Map<String, dynamic> json) {

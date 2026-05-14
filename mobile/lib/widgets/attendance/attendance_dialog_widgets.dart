@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AttendanceDialogLabel extends StatelessWidget {
-
   const AttendanceDialogLabel({required this.text, super.key});
   final String text;
 
@@ -24,9 +23,12 @@ class AttendanceDialogLabel extends StatelessWidget {
 }
 
 class AttendanceStatusToggleButton extends StatelessWidget {
-
   const AttendanceStatusToggleButton({
-    required this.value, required this.isSelected, required this.color, required this.onTap, super.key,
+    required this.value,
+    required this.isSelected,
+    required this.color,
+    required this.onTap,
+    super.key,
     this.label,
   });
   final String value;
@@ -43,12 +45,16 @@ class AttendanceStatusToggleButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+            color: isSelected
+                ? color.withValues(alpha: 0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected
                   ? color
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.1),
               width: 1.5,
             ),
           ),
@@ -58,7 +64,11 @@ class AttendanceStatusToggleButton extends StatelessWidget {
               style: GoogleFonts.manrope(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: isSelected ? color : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: isSelected
+                    ? color
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
           ),

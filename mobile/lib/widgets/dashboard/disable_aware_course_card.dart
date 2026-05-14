@@ -12,9 +12,16 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DisableAwareCourseCard extends ConsumerStatefulWidget {
-
   const DisableAwareCourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.selectedSemester, required this.selectedYear, required this.instructors, this.className, super.key,
+    required this.course,
+    required this.stat,
+    required this.bunkResult,
+    required this.bunkEnabled,
+    required this.selectedSemester,
+    required this.selectedYear,
+    required this.instructors,
+    this.className,
+    super.key,
   });
   final CourseDetails course;
   final CourseStat stat;
@@ -48,7 +55,9 @@ class _DisableAwareCourseCardState
     final disabled =
         ref.read(authProvider).value?.settings.disabledCourses[semKey] ?? {};
     final stdCode = DashboardStats.standardize(code);
-    return disabled.keys.any((key) => DashboardStats.standardize(key) == stdCode);
+    return disabled.keys.any(
+      (key) => DashboardStats.standardize(key) == stdCode,
+    );
   }
 
   String? get _disableReason {
@@ -293,9 +302,12 @@ class _DisableAwareCourseCardState
 }
 
 class DisableDialogContent extends StatefulWidget {
-
   const DisableDialogContent({
-    required this.courseCode, required this.semesterKey, required this.reasons, required this.onDisable, super.key,
+    required this.courseCode,
+    required this.semesterKey,
+    required this.reasons,
+    required this.onDisable,
+    super.key,
   });
   final String courseCode;
   final String? semesterKey;

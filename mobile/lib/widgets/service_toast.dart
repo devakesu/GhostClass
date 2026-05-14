@@ -28,7 +28,6 @@ class ServiceToast {
 }
 
 class _ToastWidget extends StatefulWidget {
-
   const _ToastWidget({
     required this.message,
     required this.isError,
@@ -44,7 +43,8 @@ class _ToastWidget extends StatefulWidget {
   State<_ToastWidget> createState() => _ToastWidgetState();
 }
 
-class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderStateMixin {
+class _ToastWidgetState extends State<_ToastWidget>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacity;
   late Animation<Offset> _offset;
@@ -81,14 +81,18 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Inverted theme logic
-    final bgColor = isDark 
-      ? Colors.white.withValues(alpha: 0.9) // Dark mode -> Light toast
-      : const Color(0xFF1A1C1E).withValues(alpha: 0.95); // Light mode -> Dark toast
-    
+    final bgColor = isDark
+        ? Colors.white.withValues(alpha: 0.9) // Dark mode -> Light toast
+        : const Color(
+            0xFF1A1C1E,
+          ).withValues(alpha: 0.95); // Light mode -> Dark toast
+
     final textColor = isDark ? Colors.black : Colors.white;
-    final iconColor = widget.isError ? Colors.redAccent : (isDark ? Colors.blue : Colors.blueAccent);
+    final iconColor = widget.isError
+        ? Colors.redAccent
+        : (isDark ? Colors.blue : Colors.blueAccent);
 
     return SafeArea(
       child: Align(
@@ -102,7 +106,10 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(16),
@@ -121,7 +128,9 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        widget.isError ? LucideIcons.alertCircle : LucideIcons.checkCircle2,
+                        widget.isError
+                            ? LucideIcons.alertCircle
+                            : LucideIcons.checkCircle2,
                         color: iconColor,
                         size: 18,
                       ),

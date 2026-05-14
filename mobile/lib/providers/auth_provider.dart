@@ -34,7 +34,9 @@ class LoginException implements Exception {
 final Provider<StealthHeadersService> stealthHeadersServiceProvider = Provider(
   (ref) => StealthHeadersService(ref.watch(secureStorageProvider)),
 );
-final Provider<ProfileService> profileServiceProvider = Provider((ref) => ProfileService());
+final Provider<ProfileService> profileServiceProvider = Provider(
+  (ref) => ProfileService(),
+);
 final Provider<SettingsService> settingsServiceProvider = Provider(
   (ref) => SettingsService(ref.watch(secureStorageProvider)),
 );
@@ -57,7 +59,6 @@ final institutionsProvider = FutureProvider<List<Institution>>((ref) async {
 
 @immutable
 class AuthenticatedUser {
-
   const AuthenticatedUser({
     required this.supabaseUserId,
     required this.ezygoToken,
@@ -164,7 +165,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final _ = _handleUnauthorized();
     });
 
-    final lockdownSub = apiService.onSecurityLockdown.listen(_handleSecurityLockdown);
+    final lockdownSub = apiService.onSecurityLockdown.listen(
+      _handleSecurityLockdown,
+    );
 
     ref.onDispose(() {
       WidgetsBinding.instance.removeObserver(this);
@@ -257,17 +260,25 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         _consecutiveHealFailures = 0;
       } else {
         _consecutiveHealFailures++;
-        AppLogger.w('AuthNotifier: Self-healing did not produce a new token. Failures: $_consecutiveHealFailures');
-        
+        AppLogger.w(
+          'AuthNotifier: Self-healing did not produce a new token. Failures: $_consecutiveHealFailures',
+        );
+
         if (_consecutiveHealFailures >= 3) {
           final lastError = state.error;
-          final isSecurityError = lastError is AppException && lastError.details?['type'] == 'security';
-          
+          final isSecurityError =
+              lastError is AppException &&
+              lastError.details?['type'] == 'security';
+
           if (isSecurityError) {
-             AppLogger.w('AuthNotifier: Terminal security block. Not logging out.');
-             _consecutiveHealFailures = 0; // Reset to allow more attempts later
+            AppLogger.w(
+              'AuthNotifier: Terminal security block. Not logging out.',
+            );
+            _consecutiveHealFailures = 0; // Reset to allow more attempts later
           } else {
-            AppLogger.e('AuthNotifier: Terminal 401 loop detected. Logging out to protect state.');
+            AppLogger.e(
+              'AuthNotifier: Terminal 401 loop detected. Logging out to protect state.',
+            );
             await logout();
           }
         }
@@ -279,7 +290,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         final isCritical = e.details?['criticalRisk'] == true;
 
         if (isSecurityError && !isCritical) {
-          AppLogger.w('AuthNotifier: Non-critical security block. Skipping logout.');
+          AppLogger.w(
+            'AuthNotifier: Non-critical security block. Skipping logout.',
+          );
         } else {
           if (isCritical) {
             AppLogger.e('AuthNotifier: CRITICAL SECURITY RISK. Logging out.');
@@ -297,15 +310,17 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
   Future<void> _handleSecurityLockdown(Map<String, String> data) async {
     AppLogger.e('AuthNotifier: SECURITY LOCKDOWN TRIGGERED');
-    
+
     // 1. Set failure state immediately to block UI
-    ref.read(securityFailureProvider.notifier).setFailure(
-      data['title'],
-      criticalRisk: true,
-      reason: data['reason'],
-      action: data['action'],
-      source: data['technicalDetails'],
-    );
+    ref
+        .read(securityFailureProvider.notifier)
+        .setFailure(
+          data['title'],
+          criticalRisk: true,
+          reason: data['reason'],
+          action: data['action'],
+          source: data['technicalDetails'],
+        );
 
     // 2. Perform forced logout and data wipe
     await logout(force: true);
@@ -334,14 +349,20 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         return;
       }
 
-      await _fetchAndApplyServerProfile(currentUser, supabaseToken: token, sync: sync);
+      await _fetchAndApplyServerProfile(
+        currentUser,
+        supabaseToken: token,
+        sync: sync,
+      );
     } on Object catch (e) {
       if (e is AppException && e.isAuthError) {
         final isSecurityError = e.details?['type'] == 'security';
         final isCritical = e.details?['criticalRisk'] == true;
 
         if (isSecurityError && !isCritical) {
-          AppLogger.w('AuthNotifier: Non-critical security block. Skipping logout.');
+          AppLogger.w(
+            'AuthNotifier: Non-critical security block. Skipping logout.',
+          );
         } else {
           if (isCritical) {
             AppLogger.e('AuthNotifier: CRITICAL SECURITY RISK. Logging out.');
@@ -410,23 +431,25 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
       // Step 5: Mark as syncing and kick off cron sync in background
       final syncingUser = updatedUser.copyWith(isSyncing: true);
-      unawaited(Future.microtask(() async {
-        try {
-          // Pre-fetch institutions so they are ready in settings
-          unawaited(ref.read(institutionsProvider.future));
-          
-          await api.triggerSync(token, force: true);
-          // Refresh profile after cron so class name, etc. are accurate
-          await refreshProfile(force: true);
-        } on Object catch (e) {
-          AppLogger.w('AuthNotifier: Background startup tasks failed', e);
-        } finally {
-          final finalUser = state.value;
-          if (finalUser != null) {
-            state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+      unawaited(
+        Future.microtask(() async {
+          try {
+            // Pre-fetch institutions so they are ready in settings
+            unawaited(ref.read(institutionsProvider.future));
+
+            await api.triggerSync(token, force: true);
+            // Refresh profile after cron so class name, etc. are accurate
+            await refreshProfile(force: true);
+          } on Object catch (e) {
+            AppLogger.w('AuthNotifier: Background startup tasks failed', e);
+          } finally {
+            final finalUser = state.value;
+            if (finalUser != null) {
+              state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+            }
           }
-        }
-      }));
+        }),
+      );
 
       return syncingUser;
     } on Object catch (e) {
@@ -434,7 +457,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         await logout();
         return null;
       }
-      
+
       // Network / server errors: return cached user so app is usable offline.
       AppLogger.w('AuthNotifier: Startup sync failed. Using cached data.', e);
       return user;
@@ -469,13 +492,20 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           return s.isEmpty ? null : s;
         }
         final map = raw;
-        if (map[key] != null) return map[key].toString().trim().isEmpty ? null : map[key].toString().trim();
+        if (map[key] != null)
+          return map[key].toString().trim().isEmpty
+              ? null
+              : map[key].toString().trim();
         for (final k in ['data', 'value']) {
           final val = map[k];
           if (val == null) continue;
-          if (val is! Map<dynamic, dynamic>) return val.toString().trim().isEmpty ? null : val.toString().trim();
+          if (val is! Map<dynamic, dynamic>)
+            return val.toString().trim().isEmpty ? null : val.toString().trim();
           final nested = val;
-          if (nested[key] != null) return nested[key].toString().trim().isEmpty ? null : nested[key].toString().trim();
+          if (nested[key] != null)
+            return nested[key].toString().trim().isEmpty
+                ? null
+                : nested[key].toString().trim();
         }
         return null;
       }
@@ -483,7 +513,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       var semester = extract(semRes.data, 'default_semester');
       var year = extract(yearRes.data, 'default_academic_year');
 
-      AppLogger.i('AuthNotifier: EzyGo academic context — semester=$semester year=$year');
+      AppLogger.i(
+        'AuthNotifier: EzyGo academic context — semester=$semester year=$year',
+      );
 
       // If EzyGo returned null/empty, calculate from date and POST back
       if (semester == null || year == null) {
@@ -491,7 +523,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         semester ??= fallback['current_semester']!;
         year ??= fallback['current_year']!;
 
-        AppLogger.i('AuthNotifier: EzyGo academic context missing — using fallback ($semester, $year) and posting back');
+        AppLogger.i(
+          'AuthNotifier: EzyGo academic context missing — using fallback ($semester, $year) and posting back',
+        );
 
         // Best-effort POST — do not throw if this fails
         try {
@@ -500,7 +534,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             api.updateAcademicYear(year, storage),
           ]);
         } on Object catch (e) {
-          AppLogger.w('AuthNotifier: Could not POST fallback academic context to EzyGo', e);
+          AppLogger.w(
+            'AuthNotifier: Could not POST fallback academic context to EzyGo',
+            e,
+          );
         }
       }
 
@@ -509,7 +546,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       AppLogger.i('AuthNotifier: Academic context saved — $semester / $year');
     } on Object catch (e) {
       // EzyGo is down: calculate fallback and persist it so the app still works
-      AppLogger.w('AuthNotifier: Failed to fetch academic context from EzyGo. Using date-based fallback.', e);
+      AppLogger.w(
+        'AuthNotifier: Failed to fetch academic context from EzyGo. Using date-based fallback.',
+        e,
+      );
       final fallback = calculateCurrentAcademicInfo();
       final academicState = AcademicState(
         semester: fallback['current_semester']!,
@@ -531,7 +571,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         password: password,
       );
 
-      if (bridgeResponse.statusCode != 200 && bridgeResponse.statusCode != 201) {
+      if (bridgeResponse.statusCode != 200 &&
+          bridgeResponse.statusCode != 201) {
         final data = bridgeResponse.data as Map<String, dynamic>?;
         final errorMsg = formatApiError(data, 'Secure Session');
         throw AppException(
@@ -551,8 +592,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       final sessionData =
-          (bridgeData['session'] ?? bridgeData)
-              as Map<String, dynamic>?;
+          (bridgeData['session'] ?? bridgeData) as Map<String, dynamic>?;
       final refreshToken = sessionData?['refresh_token'] as String?;
       if (refreshToken == null) {
         throw const AppException(
@@ -580,17 +620,17 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             )
           : UserSettings.defaults();
 
-      final ezygoId =
-          (bridgeData['id'] ?? bridgeData['user_id'])
-              ?.toString();
+      final ezygoId = (bridgeData['id'] ?? bridgeData['user_id'])?.toString();
       final termsVersion = _extractTermsVersion(
         bridgeData,
       );
       final ezygoToken = (bridgeData['ezygo_token'] as String?) ?? '';
 
       // Extract initial academic context from bridge response
-      final initialSem = bridgeData['current_semester'] ?? bridgeData['semester'];
-      final initialYear = bridgeData['current_year'] ?? bridgeData['academic_year'];
+      final initialSem =
+          bridgeData['current_semester'] ?? bridgeData['semester'];
+      final initialYear =
+          bridgeData['current_year'] ?? bridgeData['academic_year'];
 
       final settingsWithAcademic = settingsFallback.copyWith(
         semester: initialSem?.toString(),
@@ -635,22 +675,26 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
         final syncingUser = profiledUser.copyWith(isSyncing: true);
         state = AsyncValue.data(syncingUser);
-        unawaited(Future.microtask(() async {
-          try {
-            // Pre-fetch institutions so they are ready in settings
-            unawaited(ref.read(institutionsProvider.future));
-            
-            await ref.read(apiServiceProvider).triggerSync(token, force: true);
-            await refreshProfile(force: true);
-          } on Object catch (e) {
-            AppLogger.w('AuthNotifier: Post-login cron sync failed', e);
-          } finally {
-            final finalUser = state.value;
-            if (finalUser != null) {
-              state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+        unawaited(
+          Future.microtask(() async {
+            try {
+              // Pre-fetch institutions so they are ready in settings
+              unawaited(ref.read(institutionsProvider.future));
+
+              await ref
+                  .read(apiServiceProvider)
+                  .triggerSync(token, force: true);
+              await refreshProfile(force: true);
+            } on Object catch (e) {
+              AppLogger.w('AuthNotifier: Post-login cron sync failed', e);
+            } finally {
+              final finalUser = state.value;
+              if (finalUser != null) {
+                state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+              }
             }
-          }
-        }));
+          }),
+        );
       } else {
         await _fetchAndApplyServerProfile(cachedUser);
       }
@@ -669,7 +713,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
     ref.read(apiServiceProvider).clearCaches();
     ref.invalidate(institutionsProvider);
-    
+
     state = const AsyncValue.data(null);
     try {
       await Future.wait([
@@ -732,11 +776,13 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       targetPercentage: targetPercentage ?? user.settings.targetPercentage,
       disabledCourses: disabledCourses ?? user.settings.disabledCourses,
     );
-    
-    state = AsyncValue.data(user.copyWith(
-      settings: updatedSettings,
-      isUpdatingSettings: true,
-    ));
+
+    state = AsyncValue.data(
+      user.copyWith(
+        settings: updatedSettings,
+        isUpdatingSettings: true,
+      ),
+    );
 
     // 2. Persist
     final service = ref.read(settingsServiceProvider);
@@ -749,18 +795,25 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         disabledCourses: disabledCourses,
       );
     } catch (e) {
-      AppLogger.w('AuthNotifier: Settings persistence failed, rolling back.', e);
+      AppLogger.w(
+        'AuthNotifier: Settings persistence failed, rolling back.',
+        e,
+      );
       // Rollback to previous settings
-      state = AsyncValue.data(user.copyWith(
-        settings: previousSettings,
-        isUpdatingSettings: false,
-      ));
+      state = AsyncValue.data(
+        user.copyWith(
+          settings: previousSettings,
+          isUpdatingSettings: false,
+        ),
+      );
       rethrow;
     } finally {
       // Clear updating flag if not already cleared by rollback
       final currentUser = state.value;
       if (currentUser != null && currentUser.isUpdatingSettings) {
-        state = AsyncValue.data(currentUser.copyWith(isUpdatingSettings: false));
+        state = AsyncValue.data(
+          currentUser.copyWith(isUpdatingSettings: false),
+        );
       }
     }
   }
@@ -793,8 +846,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       if (sem != null || year != null) {
         final currentAcademic = await storage.getAcademicState();
         final nextAcademic = AcademicState(
-          semester: sem ?? currentAcademic?.semester ?? calculateCurrentAcademicInfo()['current_semester']!,
-          year: year ?? currentAcademic?.year ?? calculateCurrentAcademicInfo()['current_year']!,
+          semester:
+              sem ??
+              currentAcademic?.semester ??
+              calculateCurrentAcademicInfo()['current_semester']!,
+          year:
+              year ??
+              currentAcademic?.year ??
+              calculateCurrentAcademicInfo()['current_year']!,
         );
         await storage.saveAcademicState(nextAcademic);
       }
@@ -804,10 +863,12 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       // We set isSyncing=true here because refreshProfile(sync: true) kicks off cron sync.
       // Changing the state here will also trigger academicProvider to rebuild because it watches authProvider.
       state = AsyncValue.data(user.copyWith(isSyncing: true));
-      
+
       await refreshProfile(force: true, sync: true);
-      
-      AppLogger.i('AuthNotifier: Academic context updated successfully ($sem, $year)');
+
+      AppLogger.i(
+        'AuthNotifier: Academic context updated successfully ($sem, $year)',
+      );
     } catch (e) {
       AppLogger.e('AuthNotifier: Failed to update academic context', e);
       rethrow;
@@ -933,7 +994,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     final updatedUser = await _applyProfileResponseData(
       currentUser: user,
       data: response.data as Map<String, dynamic>,
-      updateState: false, 
+      updateState: false,
     );
 
     if (updateState) {
@@ -941,20 +1002,22 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
 
     if (sync) {
-      unawaited(Future.microtask(() async {
-        try {
-          api.clearCaches();
-          await api.triggerSync(token, force: true);
-          await refreshProfile(force: true);
-        } on Object catch (e) {
-          AppLogger.w('AuthNotifier: Profile-triggered cron sync failed', e);
-        } finally {
-          final finalUser = state.value;
-          if (finalUser != null) {
-            state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+      unawaited(
+        Future.microtask(() async {
+          try {
+            api.clearCaches();
+            await api.triggerSync(token, force: true);
+            await refreshProfile(force: true);
+          } on Object catch (e) {
+            AppLogger.w('AuthNotifier: Profile-triggered cron sync failed', e);
+          } finally {
+            final finalUser = state.value;
+            if (finalUser != null) {
+              state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+            }
           }
-        }
-      }));
+        }),
+      );
     }
 
     return updatedUser;
@@ -973,14 +1036,16 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     final settings = baseSettings;
 
-    final rawProfile = data.containsKey('profile') 
-        ? Map<String, dynamic>.from(data['profile'] as Map<dynamic, dynamic>) 
+    final rawProfile = data.containsKey('profile')
+        ? Map<String, dynamic>.from(data['profile'] as Map<dynamic, dynamic>)
         : Map<String, dynamic>.from(data);
-        
+
     // Ensure current_semester/year are explicitly included in the map passed to fromJson
-    rawProfile['current_semester'] = data['current_semester'] ?? rawProfile['current_semester'];
-    rawProfile['current_year'] = data['current_year'] ?? rawProfile['current_year'];
-    
+    rawProfile['current_semester'] =
+        data['current_semester'] ?? rawProfile['current_semester'];
+    rawProfile['current_year'] =
+        data['current_year'] ?? rawProfile['current_year'];
+
     final profile = UserProfile.fromJson(rawProfile);
 
     final mergedUser = currentUser.copyWith(
@@ -989,7 +1054,13 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ezygoToken: EncryptedValue.fromPlaintext(
         (data['ezygo_token'] as String?) ?? currentUser.ezygoToken.value,
       ),
-      ezygoId: (data['id'] ?? data['user_id'] ?? data['ezygo_user_id'] ?? data['ezygo_id'])?.toString() ?? currentUser.ezygoId,
+      ezygoId:
+          (data['id'] ??
+                  data['user_id'] ??
+                  data['ezygo_user_id'] ??
+                  data['ezygo_id'])
+              ?.toString() ??
+          currentUser.ezygoId,
       termsVersion: _extractTermsVersion(data) ?? currentUser.termsVersion,
       username: data['username'] as String? ?? currentUser.username,
     );
@@ -1028,19 +1099,23 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       // User Request (Verification): Match proxy.ts logic from web app
       // Only return null (which triggers logout) if the session is definitively dead.
       // Codes like 'refresh_token_not_found' or 400 with 'Invalid Refresh Token' are terminal.
-      final isTerminal = e.statusCode == '400' || 
-                         e.message.contains('refresh_token_not_found') || 
-                         e.message.contains('Invalid Refresh Token') ||
-                         e.message.contains('not found');
+      final isTerminal =
+          e.statusCode == '400' ||
+          e.message.contains('refresh_token_not_found') ||
+          e.message.contains('Invalid Refresh Token') ||
+          e.message.contains('not found');
 
       if (isTerminal) {
         AppLogger.w('AuthNotifier: Supabase session terminal failure', e);
         return null;
       }
 
-      // For other AuthExceptions (e.g. 500s, rate limits), treat as transient 
+      // For other AuthExceptions (e.g. 500s, rate limits), treat as transient
       // network errors to avoid logging out the user prematurely.
-      AppLogger.w('AuthNotifier: Supabase transient auth error. Preventing logout.', e);
+      AppLogger.w(
+        'AuthNotifier: Supabase transient auth error. Preventing logout.',
+        e,
+      );
       throw AppException(
         message: 'Supabase service issues: ${e.message}',
         type: AppExceptionType.network,

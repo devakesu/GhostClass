@@ -23,8 +23,8 @@ final trackingSortedKeysProvider = Provider<List<String>>((ref) {
   final courseKeys = uniqueKeys.toList();
   final disabledMap = auth?.settings.disabledCourses ?? {};
   final semKey = '${dashboard?.selectedYear}-${dashboard?.selectedSemester}';
-  final disabledCodes = (disabledMap[semKey] as Map?)
-          ?.keys
+  final disabledCodes =
+      (disabledMap[semKey] as Map?)?.keys
           .map((c) => c.toString().toUpperCase())
           .toSet() ??
       <String>{};

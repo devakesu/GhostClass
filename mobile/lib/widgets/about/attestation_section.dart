@@ -8,9 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class AttestationSection extends ConsumerStatefulWidget {
-
   const AttestationSection({
-    required this.onLaunch, required this.onCopy, super.key,
+    required this.onLaunch,
+    required this.onCopy,
+    super.key,
   });
   final Future<void> Function(String) onLaunch;
   final Future<void> Function(BuildContext, String, String) onCopy;
@@ -100,7 +101,9 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
               final provider = details['provider']?.toString() ?? 'Unknown';
               final issuer = details['issuer']?.toString() ?? '';
               final isDebug = provider == 'debug' || issuer.contains('debug');
-              final statusStr = _data!['verified'] == true ? (isDebug ? 'DEBUG' : 'GENUINE') : 'FAILED';
+              final statusStr = _data!['verified'] == true
+                  ? (isDebug ? 'DEBUG' : 'GENUINE')
+                  : 'FAILED';
 
               return _StatusItem(
                 label: 'Hardware Attestation',
@@ -357,7 +360,6 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
 }
 
 class _StatusItem extends StatelessWidget {
-
   const _StatusItem({
     required this.label,
     required this.status,

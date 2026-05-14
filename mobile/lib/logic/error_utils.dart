@@ -31,13 +31,16 @@ String formatApiError(dynamic response, String context) {
     final data = response.response?.data;
     if (data is Map) {
       code = (data['code'] ?? '').toString();
-      message = (data['message'] ?? data['error'] ?? data['detail'] ?? '').toString();
+      message = (data['message'] ?? data['error'] ?? data['detail'] ?? '')
+          .toString();
     } else {
       message = response.message ?? '';
     }
   } else if (response is Map) {
     code = (response['code'] ?? '').toString();
-    message = (response['message'] ?? response['error'] ?? response['detail'] ?? '').toString();
+    message =
+        (response['message'] ?? response['error'] ?? response['detail'] ?? '')
+            .toString();
     status = response['status'] as int?;
   } else if (response is AppException) {
     message = response.message;
@@ -79,7 +82,9 @@ String formatApiError(dynamic response, String context) {
   }
 
   // Network / timeout
-  if (lower.contains('fetch') || lower.contains('network') || code == 'ERR_NETWORK') {
+  if (lower.contains('fetch') ||
+      lower.contains('network') ||
+      code == 'ERR_NETWORK') {
     return 'Connection failed. Please check your internet and try again.';
   }
 
@@ -100,20 +105,28 @@ String formatApiError(dynamic response, String context) {
 String sanitizeTechnicalDetails(String error) {
   // Remove IP addresses (v4)
   var sanitized = error.replaceAll(
-      RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'), '[REDACTED_IP]');
+    RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'),
+    '[REDACTED_IP]',
+  );
 
   // Remove Port numbers in common formats
-  sanitized = sanitized.replaceAll(RegExp(r'port\s*[:=]\s*\d+'), 'port = [REDACTED]');
+  sanitized = sanitized.replaceAll(
+    RegExp(r'port\s*[:=]\s*\d+'),
+    'port = [REDACTED]',
+  );
   sanitized = sanitized.replaceAll(RegExp(r':\d{4,5}'), ':[REDACTED_PORT]');
 
   // Remove absolute Unix-like paths (keeping it safe for common startup logs)
   sanitized = sanitized.replaceAll(
-      RegExp(r'\/[a-zA-Z0-9._\-\/]+\/[a-zA-Z0-9._\-]+'), '[REDACTED_PATH]');
+    RegExp(r'\/[a-zA-Z0-9._\-\/]+\/[a-zA-Z0-9._\-]+'),
+    '[REDACTED_PATH]',
+  );
 
   // Remove potential auth tokens in URLs or headers
   sanitized = sanitized.replaceAllMapped(
-      RegExp(r'(Bearer|token|key|secret)[^, \n]+', caseSensitive: false),
-      (match) => '${match.group(1)} [REDACTED]');
+    RegExp(r'(Bearer|token|key|secret)[^, \n]+', caseSensitive: false),
+    (match) => '${match.group(1)} [REDACTED]',
+  );
 
   return sanitized;
 }

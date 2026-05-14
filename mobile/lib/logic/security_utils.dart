@@ -11,7 +11,8 @@ import 'package:ghostclass/widgets/security_error_dialog.dart';
 /// Provides UI utilities for displaying security-related failures and
 /// gathering device information for support reports.
 class SecurityUtils {
-  static Future<void> showSecurityFailureDialog(BuildContext context, {
+  static Future<void> showSecurityFailureDialog(
+    BuildContext context, {
     required String title,
     required String message,
     required String technicalDetails,
@@ -26,10 +27,12 @@ class SecurityUtils {
     try {
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
-        deviceDetails = 'Android ${androidInfo.version.release} (SDK ${androidInfo.version.sdkInt}), ${androidInfo.manufacturer} ${androidInfo.model}, Brand: ${androidInfo.brand}';
+        deviceDetails =
+            'Android ${androidInfo.version.release} (SDK ${androidInfo.version.sdkInt}), ${androidInfo.manufacturer} ${androidInfo.model}, Brand: ${androidInfo.brand}';
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
-        deviceDetails = 'iOS ${iosInfo.systemVersion}, ${iosInfo.name}, Model: ${iosInfo.model}';
+        deviceDetails =
+            'iOS ${iosInfo.systemVersion}, ${iosInfo.name}, Model: ${iosInfo.model}';
       }
     } on Object {
       // Ignore device info retrieval failures gracefully.
@@ -55,7 +58,8 @@ class SecurityUtils {
             isDismissible: isDismissible,
             onContactSupport: () => SupportHelper.contactViaEmail(
               subject: 'Security Failure Report [v${AppConfig.appVersion}]',
-              customBody: 'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+              customBody:
+                  'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
                   '-- SUMMARY --\n'
                   'Title: $title\n'
                   'Message: $message\n\n'

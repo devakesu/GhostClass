@@ -4,9 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ProfileHeader extends StatelessWidget {
-
   const ProfileHeader({
-    required this.avatarUrl, required this.fullName, required this.username, required this.primary, required this.isUploadingAvatar, required this.onAvatarTap, super.key,
+    required this.avatarUrl,
+    required this.fullName,
+    required this.username,
+    required this.primary,
+    required this.isUploadingAvatar,
+    required this.onAvatarTap,
+    super.key,
   });
   final String? avatarUrl;
   final String fullName;
@@ -34,7 +39,10 @@ class ProfileHeader extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: surface,
-                    border: Border.all(color: primary.withValues(alpha: 0.2), width: 4),
+                    border: Border.all(
+                      color: primary.withValues(alpha: 0.2),
+                      width: 4,
+                    ),
                     image: avatarUrl != null
                         ? DecorationImage(
                             image: NetworkImage(
@@ -48,7 +56,11 @@ class ProfileHeader extends StatelessWidget {
                         : null,
                   ),
                   child: avatarUrl == null
-                      ? Icon(LucideIcons.user, size: 32, color: onSurface.withValues(alpha: 0.15))
+                      ? Icon(
+                          LucideIcons.user,
+                          size: 32,
+                          color: onSurface.withValues(alpha: 0.15),
+                        )
                       : null,
                 ),
               ),
@@ -60,7 +72,10 @@ class ProfileHeader extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(30),
-                    child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               Positioned(
@@ -73,7 +88,10 @@ class ProfileHeader extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: primary,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
+                      border: Border.all(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        width: 3,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.2),
@@ -82,7 +100,11 @@ class ProfileHeader extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(LucideIcons.camera, size: 14, color: Colors.white),
+                    child: const Icon(
+                      LucideIcons.camera,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -113,9 +135,12 @@ class ProfileHeader extends StatelessWidget {
 }
 
 class ProfileAccountItem extends StatelessWidget {
-
   const ProfileAccountItem({
-    required this.icon, required this.label, required this.value, required this.primary, super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.primary,
+    super.key,
   });
   final IconData icon;
   final String label;
@@ -170,9 +195,11 @@ class ProfileAccountItem extends StatelessWidget {
 }
 
 class ProfileField extends StatelessWidget {
-
   const ProfileField({
-    required this.label, required this.controller, required this.enabled, super.key,
+    required this.label,
+    required this.controller,
+    required this.enabled,
+    super.key,
     this.maxLength,
     this.validator,
   });
@@ -202,27 +229,50 @@ class ProfileField extends StatelessWidget {
           enabled: enabled,
           validator: validator,
           maxLength: maxLength,
-          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-          style: GoogleFonts.manrope(color: theme.colorScheme.onSurface, fontSize: 14),
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
+          style: GoogleFonts.manrope(
+            color: theme.colorScheme.onSurface,
+            fontSize: 14,
+          ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: enabled ? theme.colorScheme.onSurface.withValues(alpha: 0.08) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: enabled
+                ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1)),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1)),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.05)),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.05),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary,
+                width: 1.5,
+              ),
             ),
           ),
         ),

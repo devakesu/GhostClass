@@ -4,7 +4,10 @@ import 'package:ghostclass/models/user.dart';
 void main() {
   group('UserProfile & UserClass Models', () {
     test('UserProfile.fullName computes correctly', () {
-      expect(const UserProfile(firstName: 'Jane', lastName: 'Smith').fullName, 'Jane Smith');
+      expect(
+        const UserProfile(firstName: 'Jane', lastName: 'Smith').fullName,
+        'Jane Smith',
+      );
       expect(const UserProfile(firstName: 'Jane').fullName, 'Jane');
       expect(const UserProfile(lastName: 'Smith').fullName, 'Smith');
       expect(const UserProfile().fullName, isNull);
@@ -23,27 +26,30 @@ void main() {
       expect(p1.hashCode, isNotNull);
     });
 
-    test('UserProfile.fromJson parses standard structures and numerical timestamps', () {
-      final jsonSecs = {
-        'first_name': 'A',
-        'last_name': 'B',
-        'created_at': 1600000000, // seconds
-        'ezygo_created_at': '2026-05-11',
-        'class': {'id': 'cls1', 'name': 'Class A'},
-      };
-      final pSecs = UserProfile.fromJson(jsonSecs);
-      expect(pSecs.createdAt, isNotNull);
-      expect(pSecs.classField?.name, 'Class A');
+    test(
+      'UserProfile.fromJson parses standard structures and numerical timestamps',
+      () {
+        final jsonSecs = {
+          'first_name': 'A',
+          'last_name': 'B',
+          'created_at': 1600000000, // seconds
+          'ezygo_created_at': '2026-05-11',
+          'class': {'id': 'cls1', 'name': 'Class A'},
+        };
+        final pSecs = UserProfile.fromJson(jsonSecs);
+        expect(pSecs.createdAt, isNotNull);
+        expect(pSecs.classField?.name, 'Class A');
 
-      final jsonMs = {
-        'created_at': 1600000000000, // milliseconds
-        'class': 'StringClass',
-      };
-      final pMs = UserProfile.fromJson(jsonMs);
-      expect(pMs.createdAt, isNotNull);
-      expect(pMs.classField?.name, 'StringClass');
-      expect(pMs.toJson(), isMap);
-    });
+        final jsonMs = {
+          'created_at': 1600000000000, // milliseconds
+          'class': 'StringClass',
+        };
+        final pMs = UserProfile.fromJson(jsonMs);
+        expect(pMs.createdAt, isNotNull);
+        expect(pMs.classField?.name, 'StringClass');
+        expect(pMs.toJson(), isMap);
+      },
+    );
   });
 
   group('UserSettings Model', () {

@@ -98,7 +98,11 @@ class AppLogger {
   static void i(String message) {
     _addToBuffer('INFO', message);
     if (kDebugMode) debugPrint('[INFO] $message');
-    unawaited(Sentry.addBreadcrumb(Breadcrumb(message: message, level: SentryLevel.info)));
+    unawaited(
+      Sentry.addBreadcrumb(
+        Breadcrumb(message: message, level: SentryLevel.info),
+      ),
+    );
   }
 
   /// Logs a warning message.

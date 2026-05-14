@@ -79,7 +79,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final sortedCourseKeys = ref.watch(trackingSortedKeysProvider);
 
     // Auto-revert filter if subject no longer has records
-    if (_selectedCourse != 'all' && !sortedCourseKeys.contains(_selectedCourse)) {
+    if (_selectedCourse != 'all' &&
+        !sortedCourseKeys.contains(_selectedCourse)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _selectedCourse != 'all') {
           setState(() => _selectedCourse = 'all');
@@ -90,10 +91,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final auth = ref.watch(authProvider).value;
     final disabledMap = auth?.settings.disabledCourses ?? {};
     final semKey = '${dashboard?.selectedYear}-${dashboard?.selectedSemester}';
-    final disabledCodes = (disabledMap[semKey] as Map?)
-        ?.keys
-        .map((c) => c.toString().toUpperCase())
-        .toSet() ?? {};
+    final disabledCodes =
+        (disabledMap[semKey] as Map?)?.keys
+            .map((c) => c.toString().toUpperCase())
+            .toSet() ??
+        {};
 
     final filteredCourseKeys = _selectedCourse == 'all'
         ? sortedCourseKeys.where((k) {
@@ -358,119 +360,120 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       showDialog<void>(
         context: context,
         builder: (context) {
-        var isDeleting = false;
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            title: Text(
-              title,
-              style: GoogleFonts.manrope(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
+          var isDeleting = false;
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
               ),
-            ),
-            content: Text(
-              'This will permanently delete all tracking data for $scopeLabel. This cannot be undone.',
-              style: GoogleFonts.manrope(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-            actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
-            actions: [
-              TextButton(
-                onPressed: isDeleting ? null : () => Navigator.pop(context),
-                child: Text(
-                  'CANCEL',
-                  style: GoogleFonts.manrope(
-                    color: isDeleting
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.1)
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.4),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                  ),
+              title: Text(
+                title,
+                style: GoogleFonts.manrope(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: isDeleting
-                    ? null
-                    : () async {
-                        setDialogState(() => isDeleting = true);
-                        try {
-                          await ref
-                              .read(trackingProvider.notifier)
-                              .clearRecords(
-                                courseId: isFiltered ? _selectedCourse : null,
+              content: Text(
+                'This will permanently delete all tracking data for $scopeLabel. This cannot be undone.',
+                style: GoogleFonts.manrope(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'CANCEL',
+                    style: GoogleFonts.manrope(
+                      color: isDeleting
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.1)
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await ref
+                                .read(trackingProvider.notifier)
+                                .clearRecords(
+                                  courseId: isFiltered ? _selectedCourse : null,
+                                );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              setState(() => _selectedCourse = 'all');
+                              ServiceToast.show(
+                                context,
+                                'Records deleted successfully',
                               );
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            setState(() => _selectedCourse = 'all');
-                            ServiceToast.show(
-                              context,
-                              'Records deleted successfully',
+                            }
+                          } on Object catch (e, st) {
+                            AppLogger.e(
+                              'TrackingScreen: Clear records failed',
+                              e,
+                              st,
                             );
+                            if (context.mounted) {
+                              setDialogState(() => isDeleting = false);
+                              ServiceToast.show(
+                                context,
+                                'We encountered an error while deleting records. Please try again later. If the issue persists, please contact us.',
+                                isError: true,
+                              );
+                            }
                           }
-                        } on Object catch (e, st) {
-                          AppLogger.e(
-                            'TrackingScreen: Clear records failed',
-                            e,
-                            st,
-                          );
-                          if (context.mounted) {
-                            setDialogState(() => isDeleting = false);
-                            ServiceToast.show(
-                              context,
-                              'We encountered an error while deleting records. Please try again later. If the issue persists, please contact us.',
-                              isError: true,
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          buttonText,
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            letterSpacing: 1,
+                          ),
+                        ),
                 ),
-                child: isDeleting
-                    ? const SizedBox(
-                        height: 14,
-                        width: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        buttonText,
-                        style: GoogleFonts.manrope(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          letterSpacing: 1,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    ));
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showDeleteRecordConfirm(int id) {
@@ -478,122 +481,122 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       showDialog<void>(
         context: context,
         builder: (context) {
-        var isDeleting = false;
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            title: Text(
-              'Delete Record',
-              style: GoogleFonts.manrope(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
+          var isDeleting = false;
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
               ),
-            ),
-            content: Text(
-              'Are you sure you want to delete this tracking record? This cannot be undone.',
-              style: GoogleFonts.manrope(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
-            ),
-            actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
-            actions: [
-              TextButton(
-                onPressed: isDeleting ? null : () => Navigator.pop(context),
-                child: Text(
-                  'CANCEL',
-                  style: GoogleFonts.manrope(
-                    color: isDeleting
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.1)
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.4),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                  ),
+              title: Text(
+                'Delete Record',
+                style: GoogleFonts.manrope(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: isDeleting
-                    ? null
-                    : () async {
-                        setDialogState(() => isDeleting = true);
-                        try {
-                          await ref
-                              .read(trackingProvider.notifier)
-                              .deleteRecord(id);
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ServiceToast.show(
+              content: Text(
+                'Are you sure you want to delete this tracking record? This cannot be undone.',
+                style: GoogleFonts.manrope(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 14,
+                ),
+              ),
+              actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'CANCEL',
+                    style: GoogleFonts.manrope(
+                      color: isDeleting
+                          ? Theme.of(
                               context,
-                              'Record deleted successfully',
-                            );
-                          }
-                        } on Object catch (e, st) {
-                          AppLogger.e(
-                            'TrackingScreen: Delete record failed',
-                            e,
-                            st,
-                          );
-                          if (context.mounted) {
-                            setDialogState(() => isDeleting = false);
-                            ServiceToast.show(
+                            ).colorScheme.onSurface.withValues(alpha: 0.1)
+                          : Theme.of(
                               context,
-                              'We encountered an error while deleting this record. Please try again later. If the issue persists, please contact us.',
-                              isError: true,
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
+                            ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
-                child: isDeleting
-                    ? const SizedBox(
-                        height: 14,
-                        width: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await ref
+                                .read(trackingProvider.notifier)
+                                .deleteRecord(id);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ServiceToast.show(
+                                context,
+                                'Record deleted successfully',
+                              );
+                            }
+                          } on Object catch (e, st) {
+                            AppLogger.e(
+                              'TrackingScreen: Delete record failed',
+                              e,
+                              st,
+                            );
+                            if (context.mounted) {
+                              setDialogState(() => isDeleting = false);
+                              ServiceToast.show(
+                                context,
+                                'We encountered an error while deleting this record. Please try again later. If the issue persists, please contact us.',
+                                isError: true,
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'DELETE',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            letterSpacing: 1,
+                          ),
                         ),
-                      )
-                    : Text(
-                        'DELETE',
-                        style: GoogleFonts.manrope(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          letterSpacing: 1,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    ));
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
 class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
-
   _ModalHeaderDelegate({required this.onClose});
   final VoidCallback onClose;
 

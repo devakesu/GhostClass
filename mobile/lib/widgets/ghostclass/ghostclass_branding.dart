@@ -141,7 +141,6 @@ class GhostClassBranding extends StatelessWidget {
 }
 
 class _FooterActionButton extends StatelessWidget {
-
   const _FooterActionButton({
     required this.icon,
     required this.label,
@@ -187,7 +186,6 @@ class _FooterActionButton extends StatelessWidget {
 }
 
 class _SecondaryLink extends StatelessWidget {
-
   const _SecondaryLink({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
@@ -211,7 +209,6 @@ class _SecondaryLink extends StatelessWidget {
 }
 
 class GhostClassSectionTitle extends StatelessWidget {
-
   const GhostClassSectionTitle({required this.title, super.key, this.color});
   final String title;
   final Color? color;

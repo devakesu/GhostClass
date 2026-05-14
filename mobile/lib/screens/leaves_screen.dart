@@ -46,7 +46,9 @@ class LeavesScreen extends ConsumerWidget {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -58,9 +60,10 @@ class LeavesScreen extends ConsumerWidget {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (Theme.of(context).extension<GhostColors>()?.accentBlue ??
-                        Colors.blue)
-                    .withValues(alpha: 0.05),
+                color:
+                    (Theme.of(context).extension<GhostColors>()?.accentBlue ??
+                            Colors.blue)
+                        .withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -117,16 +120,16 @@ class LeavesScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.onSurface.withValues(
-                        alpha: 0.03,
-                      ),
+                    alpha: 0.03,
+                  ),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   LucideIcons.fileX,
                   size: 64,
                   color: Theme.of(context).colorScheme.onSurface.withValues(
-                        alpha: 0.1,
-                      ),
+                    alpha: 0.1,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -136,8 +139,8 @@ class LeavesScreen extends ConsumerWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: Theme.of(context).colorScheme.onSurface.withValues(
-                        alpha: 0.4,
-                      ),
+                    alpha: 0.4,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -146,8 +149,8 @@ class LeavesScreen extends ConsumerWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 13,
                   color: Theme.of(context).colorScheme.onSurface.withValues(
-                        alpha: 0.25,
-                      ),
+                    alpha: 0.25,
+                  ),
                 ),
               ),
             ],
@@ -250,10 +253,9 @@ class LeavesScreen extends ConsumerWidget {
                     style: GoogleFonts.manrope(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -275,7 +277,11 @@ class LeavesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLeaveCard(BuildContext context, Leave leave, List<LeaveSession> sessions) {
+  Widget _buildLeaveCard(
+    BuildContext context,
+    Leave leave,
+    List<LeaveSession> sessions,
+  ) {
     final status = _getLeaveStatus(leave.approvers);
 
     // Unique dates
@@ -283,26 +289,28 @@ class LeavesScreen extends ConsumerWidget {
     final dateRangeStr = uniqueDates.isEmpty
         ? 'N/A'
         : uniqueDates.length == 1
-            ? _formatDate(uniqueDates.first)
-            : '${_formatDate(uniqueDates.first)} - ${_formatDate(uniqueDates.last)}';
+        ? _formatDate(uniqueDates.first)
+        : '${_formatDate(uniqueDates.first)} - ${_formatDate(uniqueDates.last)}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
             ? (Theme.of(context).extension<GhostColors>()?.surfaceLighter ??
-                Theme.of(context).colorScheme.surface)
+                  Theme.of(context).colorScheme.surface)
             : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: Theme.of(context).colorScheme.outlineVariant.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark ? 0.12 : 0.1,
-              ),
+            alpha: Theme.of(context).brightness == Brightness.dark ? 0.12 : 0.1,
+          ),
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04,
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.2
+                  : 0.04,
             ),
             blurRadius: 20,
             offset: const Offset(0, 10),
@@ -322,7 +330,10 @@ class LeavesScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: status.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -352,7 +363,9 @@ class LeavesScreen extends ConsumerWidget {
                       style: GoogleFonts.manrope(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
                         letterSpacing: 1,
                       ),
                     ),
@@ -383,10 +396,20 @@ class LeavesScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildMetaInfo(context, 'Applied On', _formatDate(leave.createdAt), LucideIcons.calendar),
+                      child: _buildMetaInfo(
+                        context,
+                        'Applied On',
+                        _formatDate(leave.createdAt),
+                        LucideIcons.calendar,
+                      ),
                     ),
                     Expanded(
-                      child: _buildMetaInfo(context, 'Leave Dates', dateRangeStr, LucideIcons.clock),
+                      child: _buildMetaInfo(
+                        context,
+                        'Leave Dates',
+                        dateRangeStr,
+                        LucideIcons.clock,
+                      ),
                     ),
                   ],
                 ),
@@ -397,7 +420,9 @@ class LeavesScreen extends ConsumerWidget {
                     style: GoogleFonts.manrope(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -409,27 +434,44 @@ class LeavesScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant,
+                                  ),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   'S: ${s.session?.name ?? "?"}',
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  s.course?.name ?? s.course?.code ?? 'Unknown Course',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  s.course?.name ??
+                                      s.course?.code ??
+                                      'Unknown Course',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -448,7 +490,9 @@ class LeavesScreen extends ConsumerWidget {
                     style: GoogleFonts.manrope(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -458,21 +502,34 @@ class LeavesScreen extends ConsumerWidget {
                     runSpacing: 8,
                     children: leave.files!.map((file) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.indigo.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.indigo.withValues(alpha: 0.1)),
+                          border: Border.all(
+                            color: Colors.indigo.withValues(alpha: 0.1),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(LucideIcons.fileText, size: 14, color: Colors.indigo),
+                            const Icon(
+                              LucideIcons.fileText,
+                              size: 14,
+                              color: Colors.indigo,
+                            ),
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
                                 file.fileName,
-                                style: GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.indigo),
+                                style: GoogleFonts.manrope(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.indigo,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -480,7 +537,12 @@ class LeavesScreen extends ConsumerWidget {
                             const SizedBox(width: 6),
                             Text(
                               '(${_formatBytes(file.sizeByte)})',
-                              style: GoogleFonts.manrope(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
+                              style: GoogleFonts.manrope(
+                                fontSize: 11,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.55),
+                              ),
                             ),
                           ],
                         ),
@@ -490,14 +552,20 @@ class LeavesScreen extends ConsumerWidget {
                 ],
                 if (leave.approvers.any((a) => a.actionByUser != null)) ...[
                   const SizedBox(height: 24),
-                  Divider(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.1)),
+                  Divider(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'WORKFLOW HISTORY',
                     style: GoogleFonts.manrope(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -506,22 +574,44 @@ class LeavesScreen extends ConsumerWidget {
                     final filteredApprovers = <LeaveApprover>[];
                     for (final a in leave.approvers) {
                       if (a.actionByUser == null) continue;
-                      final isDuplicate = filteredApprovers.any((item) =>
-                          item.actionByUser?.firstName == a.actionByUser?.firstName &&
-                          item.actionByUser?.lastName == a.actionByUser?.lastName &&
-                          item.actionType == a.actionType &&
-                          item.actionAt == a.actionAt);
+                      final isDuplicate = filteredApprovers.any(
+                        (item) =>
+                            item.actionByUser?.firstName ==
+                                a.actionByUser?.firstName &&
+                            item.actionByUser?.lastName ==
+                                a.actionByUser?.lastName &&
+                            item.actionType == a.actionType &&
+                            item.actionAt == a.actionAt,
+                      );
                       if (!isDuplicate) filteredApprovers.add(a);
                     }
-                    filteredApprovers.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                    filteredApprovers.sort(
+                      (a, b) => b.updatedAt.compareTo(a.updatedAt),
+                    );
 
                     return filteredApprovers.map((approver) {
                       final isApproved = approver.actionType == 'approve';
                       final isRejected = approver.actionType == 'reject';
                       final isForwarded = approver.actionType == 'forward';
                       final isRecommended = approver.actionType == 'recommend';
-                      final color = isApproved ? const Color(0xFF10B981) : isRejected ? Colors.red : isForwarded ? Colors.indigo : isRecommended ? Colors.blue : Colors.grey;
-                      final label = isApproved ? 'Approved' : isForwarded ? 'Forwarded' : isRecommended ? 'Recommended' : isRejected ? 'Rejected' : (approver.actionType ?? 'Action');
+                      final color = isApproved
+                          ? const Color(0xFF10B981)
+                          : isRejected
+                          ? Colors.red
+                          : isForwarded
+                          ? Colors.indigo
+                          : isRecommended
+                          ? Colors.blue
+                          : Colors.grey;
+                      final label = isApproved
+                          ? 'Approved'
+                          : isForwarded
+                          ? 'Forwarded'
+                          : isRecommended
+                          ? 'Recommended'
+                          : isRejected
+                          ? 'Rejected'
+                          : (approver.actionType ?? 'Action');
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -529,25 +619,58 @@ class LeavesScreen extends ConsumerWidget {
                           children: [
                             Container(
                               padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-                              child: Icon(LucideIcons.user, size: 12, color: color),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                LucideIcons.user,
+                                size: 12,
+                                color: color,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 '${approver.actionByUser!.firstName} ${approver.actionByUser!.lastName}',
-                                style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+                                style: GoogleFonts.manrope(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                              child: Text(label.toUpperCase(), style: GoogleFonts.manrope(fontSize: 9, fontWeight: FontWeight.w900, color: color)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                label.toUpperCase(),
+                                style: GoogleFonts.manrope(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  color: color,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _formatDate(approver.actionAt ?? approver.updatedAt),
-                              style: GoogleFonts.manrope(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                              _formatDate(
+                                approver.actionAt ?? approver.updatedAt,
+                              ),
+                              style: GoogleFonts.manrope(
+                                fontSize: 11,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.4),
+                              ),
                             ),
                           ],
                         ),
@@ -588,8 +711,8 @@ class LeavesScreen extends ConsumerWidget {
             fontSize: 10,
             fontWeight: FontWeight.w900,
             color: Theme.of(context).colorScheme.onSurface.withValues(
-                  alpha: 0.55,
-                ),
+              alpha: 0.55,
+            ),
             letterSpacing: 0.7,
           ),
         ),
@@ -599,8 +722,9 @@ class LeavesScreen extends ConsumerWidget {
             Icon(
               icon,
               size: 14,
-              color:
-                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -609,8 +733,9 @@ class LeavesScreen extends ConsumerWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -627,10 +752,11 @@ class LeavesScreen extends ConsumerWidget {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
     }
 
-    final actedApprovers = approvers
-        .where((a) => a.actionType != null || a.actionAt != null)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final actedApprovers =
+        approvers
+            .where((a) => a.actionType != null || a.actionAt != null)
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
     if (actedApprovers.isEmpty) {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
@@ -660,7 +786,6 @@ class LeavesScreen extends ConsumerWidget {
 }
 
 class _LeaveStatus {
-
   _LeaveStatus(this.label, this.color, this.icon);
   final String label;
   final Color color;

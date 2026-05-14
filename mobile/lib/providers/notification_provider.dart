@@ -4,7 +4,6 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppNotification {
-
   const AppNotification({
     required this.id,
     required this.title,
@@ -33,7 +32,6 @@ class AppNotification {
 }
 
 class NotificationsState {
-
   const NotificationsState({
     required this.actionNotifications,
     required this.regularNotifications,
@@ -42,23 +40,25 @@ class NotificationsState {
   });
 
   factory NotificationsState.empty() => const NotificationsState(
-        actionNotifications: [],
-        regularNotifications: [],
-        unreadCount: 0,
-      );
+    actionNotifications: [],
+    regularNotifications: [],
+    unreadCount: 0,
+  );
   final List<AppNotification> actionNotifications;
   final List<AppNotification> regularNotifications;
   final int unreadCount;
   final bool hasNextPage;
 
-  List<AppNotification> get allNotifications =>
-      [...actionNotifications, ...regularNotifications];
+  List<AppNotification> get allNotifications => [
+    ...actionNotifications,
+    ...regularNotifications,
+  ];
 }
 
 final notificationsProvider =
     AsyncNotifierProvider<NotificationsNotifier, NotificationsState>(
-  NotificationsNotifier.new,
-);
+      NotificationsNotifier.new,
+    );
 
 class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   int _currentPage = 0;
@@ -68,7 +68,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   Future<NotificationsState> build() async {
     final user = ref.watch(authProvider).value;
     if (user == null) return NotificationsState.empty();
-    
+
     // BLOCKER: Do not fire queries until Cron Sync is finished
     if (user.isSyncing) return NotificationsState.empty();
 
@@ -108,7 +108,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final actionNotifications = allUnread
         .where((n) => n.topic?.toLowerCase().contains('conflict') ?? false)
         .toList();
-    
+
     final unreadRegular = allUnread
         .where((n) => !(n.topic?.toLowerCase().contains('conflict') ?? false))
         .toList();
@@ -117,11 +117,14 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     // Exclude conflict-topic items from the regular feed even if they've been read,
     // to prevent them reappearing in the wrong section after a data refresh.
     final unreadIds = allUnread.map((n) => n.id).toSet();
-    final readFromFeed = feedItems.where((n) =>
-      !unreadIds.contains(n.id) &&
-      !(n.topic?.toLowerCase().contains('conflict') ?? false)
-    ).toList();
-    
+    final readFromFeed = feedItems
+        .where(
+          (n) =>
+              !unreadIds.contains(n.id) &&
+              !(n.topic?.toLowerCase().contains('conflict') ?? false),
+        )
+        .toList();
+
     final regularNotifications = [...unreadRegular, ...readFromFeed];
 
     _currentPage = 0;
@@ -161,11 +164,13 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final actionIds = current.actionNotifications.map((n) => n.id).toSet();
 
     // Filter out actions and existing regular items
-    final existingRegularIds =
-        current.regularNotifications.map((n) => n.id).toSet();
+    final existingRegularIds = current.regularNotifications
+        .map((n) => n.id)
+        .toSet();
     final filteredNewItems = newFeedItems
         .where(
-          (n) => !actionIds.contains(n.id) && !existingRegularIds.contains(n.id),
+          (n) =>
+              !actionIds.contains(n.id) && !existingRegularIds.contains(n.id),
         )
         .toList();
 
@@ -173,7 +178,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
       actionNotifications: current.actionNotifications,
       regularNotifications: [
         ...current.regularNotifications,
-        ...filteredNewItems
+        ...filteredNewItems,
       ],
       unreadCount: current.unreadCount,
       hasNextPage: newFeedItems.length == _pageSize,
@@ -242,7 +247,8 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         );
 
         // If a conflict is marked as UNREAD, it must move back to actionNotifications
-        if (!newIsRead && (n.topic?.toLowerCase().contains('conflict') ?? false)) {
+        if (!newIsRead &&
+            (n.topic?.toLowerCase().contains('conflict') ?? false)) {
           movedToAction = updated;
         } else {
           updatedRegular.add(updated);
@@ -266,18 +272,21 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     }
 
     final unreadChange = wasRead ? 1 : -1;
-    state = AsyncValue.data(NotificationsState(
-      actionNotifications: updatedActions,
-      regularNotifications: updatedRegular,
-      unreadCount: previousState.unreadCount + unreadChange,
-      hasNextPage: previousState.hasNextPage,
-    ));
+    state = AsyncValue.data(
+      NotificationsState(
+        actionNotifications: updatedActions,
+        regularNotifications: updatedRegular,
+        unreadCount: previousState.unreadCount + unreadChange,
+        hasNextPage: previousState.hasNextPage,
+      ),
+    );
 
     try {
       final supabase = Supabase.instance.client;
       await supabase
           .from('notification')
-          .update({'is_read': newIsRead}).eq('id', id);
+          .update({'is_read': newIsRead})
+          .eq('id', id);
     } catch (e) {
       state = AsyncValue.data(previousState);
       rethrow;
@@ -290,36 +299,42 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
     // Move all unread actions to regular notifications as read
     final readActions = previousState.actionNotifications
-        .map((n) => AppNotification(
-              id: n.id,
-              title: n.title,
-              description: n.description,
-              createdAt: n.createdAt,
-              topic: n.topic,
-              isRead: true,
-            ))
+        .map(
+          (n) => AppNotification(
+            id: n.id,
+            title: n.title,
+            description: n.description,
+            createdAt: n.createdAt,
+            topic: n.topic,
+            isRead: true,
+          ),
+        )
         .toList();
 
     final readRegular = previousState.regularNotifications
-        .map((n) => AppNotification(
-              id: n.id,
-              title: n.title,
-              description: n.description,
-              createdAt: n.createdAt,
-              topic: n.topic,
-              isRead: true,
-            ))
+        .map(
+          (n) => AppNotification(
+            id: n.id,
+            title: n.title,
+            description: n.description,
+            createdAt: n.createdAt,
+            topic: n.topic,
+            isRead: true,
+          ),
+        )
         .toList();
 
     final allReadRegular = [...readActions, ...readRegular]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    state = AsyncValue.data(NotificationsState(
-      actionNotifications: [],
-      regularNotifications: allReadRegular,
-      unreadCount: 0,
-      hasNextPage: previousState.hasNextPage,
-    ));
+    state = AsyncValue.data(
+      NotificationsState(
+        actionNotifications: [],
+        regularNotifications: allReadRegular,
+        unreadCount: 0,
+        hasNextPage: previousState.hasNextPage,
+      ),
+    );
 
     try {
       final supabase = Supabase.instance.client;

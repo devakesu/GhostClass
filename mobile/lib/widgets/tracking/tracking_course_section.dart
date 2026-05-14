@@ -8,9 +8,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TrackingCourseSection extends StatelessWidget {
-
   const TrackingCourseSection({
-    required this.courseKey, required this.records, required this.onDelete, super.key,
+    required this.courseKey,
+    required this.records,
+    required this.onDelete,
+    super.key,
     this.officialReport,
     this.allCourses,
   });
@@ -170,7 +172,6 @@ class TrackingCourseSection extends StatelessWidget {
 }
 
 class _StatusSubHeader extends StatelessWidget {
-
   const _StatusSubHeader({required this.status, required this.count});
   final String status;
   final int count;
@@ -229,7 +230,6 @@ class _StatusSubHeader extends StatelessWidget {
 }
 
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-
   _StickyHeaderDelegate({required this.height, required this.child});
   final double height;
   final Widget child;

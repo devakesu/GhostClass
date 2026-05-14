@@ -86,18 +86,25 @@ class _ProfileDumpContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final primary = ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
+    final primary =
+        ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
     final bg = Theme.of(context).scaffoldBackgroundColor;
 
     final institutionsAsync = ref.watch(institutionsProvider);
     final institutionName = institutionsAsync.when(
       data: (insts) {
-        if (user.ezygoId == null) return insts.isNotEmpty ? insts.first.name : '—';
+        if (user.ezygoId == null)
+          return insts.isNotEmpty ? insts.first.name : '—';
         try {
           final searchId = user.ezygoId!.trim();
-          return insts.firstWhere((i) => i.id.toString().trim() == searchId).name;
+          return insts
+              .firstWhere((i) => i.id.toString().trim() == searchId)
+              .name;
         } on Object catch (e) {
-          AppLogger.w('ProfileDumpScreen: Failed to resolve institution by id', e);
+          AppLogger.w(
+            'ProfileDumpScreen: Failed to resolve institution by id',
+            e,
+          );
           // Fallback to first available for UI consistency, similar to GhostClassScreen
           return insts.isNotEmpty ? insts.first.name : 'Unknown';
         }
@@ -112,7 +119,12 @@ class _ProfileDumpContent extends ConsumerWidget {
         backgroundColor: bg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(LucideIcons.chevronLeft, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+          icon: Icon(
+            LucideIcons.chevronLeft,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -148,7 +160,9 @@ class _ProfileDumpContent extends ConsumerWidget {
                     'Detailed account and session metadata',
                     style: GoogleFonts.manrope(
                       fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -278,7 +292,8 @@ class _ProfileDumpContent extends ConsumerWidget {
                       ),
                       _InfoRow(
                         label: 'Semester',
-                        value: (user.profile?.currentSemester ?? '').toUpperCase(),
+                        value: (user.profile?.currentSemester ?? '')
+                            .toUpperCase(),
                         valueColor: const Color(0xFF34D399),
                       ),
                     ],
@@ -310,14 +325,21 @@ class _ProfileDumpContent extends ConsumerWidget {
                     iconColor: const Color(0xFFF59E0B),
                     delay: 250,
                     rows: insts.isEmpty
-                        ? [const _InfoRow(label: 'Status', value: 'No institutions found')]
+                        ? [
+                            const _InfoRow(
+                              label: 'Status',
+                              value: 'No institutions found',
+                            ),
+                          ]
                         : insts
-                            .map((i) => _InfoRow(
+                              .map(
+                                (i) => _InfoRow(
                                   label: i.name,
                                   value: 'ID: ${i.id}',
                                   copyable: true,
-                                ))
-                            .toList(),
+                                ),
+                              )
+                              .toList(),
                   ),
                   loading: () => const _InfoCard(
                     icon: LucideIcons.building,
@@ -344,7 +366,9 @@ class _ProfileDumpContent extends ConsumerWidget {
                     _InfoRow(
                       label: 'Terms Version',
                       value: user.termsVersion ?? 'Not accepted',
-                      valueColor: user.termsVersion != null ? Colors.green : Colors.redAccent,
+                      valueColor: user.termsVersion != null
+                          ? Colors.green
+                          : Colors.redAccent,
                       copyable: true,
                     ),
                     const _InfoRow(
@@ -364,8 +388,12 @@ class _ProfileDumpContent extends ConsumerWidget {
                   rows: [
                     _InfoRow(
                       label: 'Bunk Calculator',
-                      value: user.settings.bunkCalculatorEnabled ? 'Enabled' : 'Disabled',
-                      valueColor: user.settings.bunkCalculatorEnabled ? Colors.green : Colors.redAccent,
+                      value: user.settings.bunkCalculatorEnabled
+                          ? 'Enabled'
+                          : 'Disabled',
+                      valueColor: user.settings.bunkCalculatorEnabled
+                          ? Colors.green
+                          : Colors.redAccent,
                     ),
                     _InfoRow(
                       label: 'Target Attendance',
@@ -374,10 +402,23 @@ class _ProfileDumpContent extends ConsumerWidget {
                     ),
                     _InfoRow(
                       label: 'Disabled Courses',
-                      value: user.settings.disabledCount == 0 ? 'None' : '${user.settings.disabledCount} courses',
-                      valueColor: user.settings.disabledCount == 0 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3) : Colors.orangeAccent,
-                      onTap: user.settings.disabledCount > 0 ? () => _showDisabledCoursesBottomSheet(context, user.settings) : null,
-                      trailingIcon: user.settings.disabledCount > 0 ? LucideIcons.chevronRight : null,
+                      value: user.settings.disabledCount == 0
+                          ? 'None'
+                          : '${user.settings.disabledCount} courses',
+                      valueColor: user.settings.disabledCount == 0
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.3)
+                          : Colors.orangeAccent,
+                      onTap: user.settings.disabledCount > 0
+                          ? () => _showDisabledCoursesBottomSheet(
+                              context,
+                              user.settings,
+                            )
+                          : null,
+                      trailingIcon: user.settings.disabledCount > 0
+                          ? LucideIcons.chevronRight
+                          : null,
                     ),
                   ],
                 ),
@@ -391,7 +432,10 @@ class _ProfileDumpContent extends ConsumerWidget {
     );
   }
 
-  void _showDisabledCoursesBottomSheet(BuildContext context, UserSettings settings) {
+  void _showDisabledCoursesBottomSheet(
+    BuildContext context,
+    UserSettings settings,
+  ) {
     final _ = showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).cardColor,
@@ -409,7 +453,9 @@ class _ProfileDumpContent extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -417,7 +463,11 @@ class _ProfileDumpContent extends ConsumerWidget {
             const SizedBox(height: 24),
             Row(
               children: [
-                const Icon(LucideIcons.ban, color: Colors.orangeAccent, size: 20),
+                const Icon(
+                  LucideIcons.ban,
+                  color: Colors.orangeAccent,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Text(
                   'Disabled Courses',
@@ -437,20 +487,28 @@ class _ProfileDumpContent extends ConsumerWidget {
                 separatorBuilder: (context, index) => Divider(
                   height: 32,
                   thickness: 1,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.05),
                 ),
                 itemBuilder: (context, index) {
-                  final semesterEntry =
-                      settings.disabledCourses.entries.elementAt(index);
+                  final semesterEntry = settings.disabledCourses.entries
+                      .elementAt(index);
                   final semesterKey = semesterEntry.key;
                   final courses = semesterEntry.value.entries.toList()
-                    ..sort((a, b) => a.key.toUpperCase().compareTo(b.key.toUpperCase()));
+                    ..sort(
+                      (a, b) =>
+                          a.key.toUpperCase().compareTo(b.key.toUpperCase()),
+                    );
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orangeAccent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
@@ -477,36 +535,46 @@ class _ProfileDumpContent extends ConsumerWidget {
                           padding: const EdgeInsets.only(bottom: 18),
                           child: Row(
                             children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      courseCode,
-                                      style: GoogleFonts.manrope(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                        letterSpacing: 0.2,
-                                      ),
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  courseCode,
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.7),
+                                    letterSpacing: 0.2,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      courseEntry.value.isEmpty
-                                          ? 'No reason provided'
-                                          : courseEntry.value,
-                                      style: GoogleFonts.manrope(
-                                        fontSize: 13,
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  courseEntry.value.isEmpty
+                                      ? 'No reason provided'
+                                      : courseEntry.value,
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 13,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         );
                       }),
                     ],
@@ -523,7 +591,6 @@ class _ProfileDumpContent extends ConsumerWidget {
 }
 
 class _InfoCard extends StatelessWidget {
-
   const _InfoCard({
     required this.icon,
     required this.title,
@@ -544,7 +611,11 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07)),
+        border: Border.all(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.07),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,7 +645,13 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 24, thickness: 1, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+          Divider(
+            height: 24,
+            thickness: 1,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.05),
+          ),
           ...rows.map((row) => row._buildRow(context)),
           const SizedBox(height: 4),
         ],
@@ -584,7 +661,6 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _InfoRow {
-
   const _InfoRow({
     required this.label,
     required this.value,
@@ -602,19 +678,26 @@ class _InfoRow {
 
   Widget _buildRow(BuildContext context) {
     return GestureDetector(
-      onTap: onTap ?? (copyable
-          ? () {
-              final _ = Clipboard.setData(ClipboardData(text: value));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$label copied', style: const TextStyle(fontSize: 13)),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            }
-          : null),
+      onTap:
+          onTap ??
+          (copyable
+              ? () {
+                  final _ = Clipboard.setData(ClipboardData(text: value));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '$label copied',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  );
+                }
+              : null),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
@@ -625,7 +708,9 @@ class _InfoRow {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -642,7 +727,9 @@ class _InfoRow {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+                        color:
+                            valueColor ??
+                            Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -651,7 +738,9 @@ class _InfoRow {
                     Icon(
                       trailingIcon ?? LucideIcons.copy,
                       size: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
                   ],
                 ],

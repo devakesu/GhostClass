@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class TransparencyBadge extends StatelessWidget {
-
   const TransparencyBadge({super.key, this.onTap, this.expanded = false});
   final VoidCallback? onTap;
   final bool expanded;

@@ -9,9 +9,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class CourseCard extends StatelessWidget {
-
   const CourseCard({
-    required this.course, required this.stat, required this.bunkResult, required this.bunkEnabled, required this.instructors, this.className, super.key,
+    required this.course,
+    required this.stat,
+    required this.bunkResult,
+    required this.bunkEnabled,
+    required this.instructors,
+    this.className,
+    super.key,
     this.isEnabled = true,
     this.onToggleTap,
   });
@@ -84,7 +89,9 @@ class CourseCard extends StatelessWidget {
     // Status Color for the tag
     final Color statusColor;
     if (isCardInactive) {
-      statusColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3);
+      statusColor = Theme.of(
+        context,
+      ).colorScheme.onSurface.withValues(alpha: 0.3);
     } else {
       if (bunkResult.requiredToAttend > 0) {
         statusColor = ghostColors.dangerRed ?? Colors.red;
@@ -106,509 +113,560 @@ class CourseCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           child: Container(
             decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: isDark
-            ? Border.all(
-                color: isEnabled && !noDataAtAll
-                    ? statusColor.withValues(alpha: 0.3)
-                    : Theme.of(
-                        context,
-                      ).colorScheme.outlineVariant.withValues(alpha: 0.05),
-              )
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Container with Solid Tint
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-            decoration: BoxDecoration(
-              color: isEnabled && !noDataAtAll
-                  ? colors.first.withValues(alpha: isDark ? 0.45 : 0.12)
-                  : Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: isDark ? 0.8 : 0.4),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(28),
               border: isDark
-                  ? Border(
-                      bottom: BorderSide(
-                        color: isEnabled && !noDataAtAll
-                            ? statusColor.withValues(alpha: 0.3)
-                            : Theme.of(context).colorScheme.outlineVariant
-                                  .withValues(alpha: 0.1),
-                      ),
+                  ? Border.all(
+                      color: isEnabled && !noDataAtAll
+                          ? statusColor.withValues(alpha: 0.3)
+                          : Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withValues(
+                              alpha: 0.05,
+                            ),
                     )
                   : null,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Semantics(
-                        label: 'Course: ${course.name}',
-                        child: Text(
-                          course.name,
-                          style: GoogleFonts.manrope(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
+                // Header Container with Solid Tint
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                  decoration: BoxDecoration(
+                    color: isEnabled && !noDataAtAll
+                        ? colors.first.withValues(alpha: isDark ? 0.45 : 0.12)
+                        : Theme.of(context).colorScheme.surfaceContainerHighest
+                              .withValues(alpha: isDark ? 0.8 : 0.4),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (course.id == 0) ...[
-                                const IgnorePointer(
-                                  child: Icon(
-                                    LucideIcons.user2,
-                                    size: 10,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                course.code ?? 'COURSE',
+                    border: isDark
+                        ? Border(
+                            bottom: BorderSide(
+                              color: isEnabled && !noDataAtAll
+                                  ? statusColor.withValues(alpha: 0.3)
+                                  : Theme.of(context).colorScheme.outlineVariant
+                                        .withValues(alpha: 0.1),
+                            ),
+                          )
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Semantics(
+                              label: 'Course: ${course.name}',
+                              child: Text(
+                                course.name,
                                 style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (course.id == 0) ...[
+                                      const IgnorePointer(
+                                        child: Icon(
+                                          LucideIcons.user2,
+                                          size: 10,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      course.code ?? 'COURSE',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Semantics(
+                                button: true,
+                                label: 'Toggle tracking for ${course.name}',
+                                child: CourseToggleBadge(
+                                  isEnabled: isEnabled,
+                                  noData: noDataAtAll,
+                                  isTracking: isTrackingOnly,
+                                  onTap: onToggleTap,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Semantics(
-                          button: true,
-                          label: 'Toggle tracking for ${course.name}',
-                          child: CourseToggleBadge(
-                            isEnabled: isEnabled,
-                            noData: noDataAtAll,
-                            isTracking: isTrackingOnly,
-                            onTap: onToggleTap,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Builder(
-                  builder: (context) {
-                    final instructor = instructors
-                        .where(
-                          (i) =>
-                              utils.standardizeCourseCode(i.courseCode) ==
-                              utils.standardizeCourseCode(course.code ?? ''),
-                        )
-                        .lastOrNull;
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final instructor = instructors
+                              .where(
+                                (i) =>
+                                    utils.standardizeCourseCode(i.courseCode) ==
+                                    utils.standardizeCourseCode(
+                                      course.code ?? '',
+                                    ),
+                              )
+                              .lastOrNull;
 
-                    final String displayName;
-                    if (instructor != null) {
-                      displayName = instructor.instructorName;
-                    } else {
-                      final official = course.institutionUsers
-                          .where((u) => u.pivot.courseroleId == 1)
-                          .firstOrNull;
-                      if (official != null) {
-                        displayName =
-                            '${official.firstName} ${official.lastName}';
-                      } else {
-                        displayName = 'No instructor assigned';
-                      }
-                    }
+                          final String displayName;
+                          if (instructor != null) {
+                            displayName = instructor.instructorName;
+                          } else {
+                            final official = course.institutionUsers
+                                .where((u) => u.pivot.courseroleId == 1)
+                                .firstOrNull;
+                            if (official != null) {
+                              displayName =
+                                  '${official.firstName} ${official.lastName}';
+                            } else {
+                              displayName = 'No instructor assigned';
+                            }
+                          }
 
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Opacity(
-                            opacity: 0.6,
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    displayName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Opacity(
+                                  opacity: 0.6,
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          displayName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                      if (instructor != null) ...[
+                                        const SizedBox(width: 4),
+                                        IgnorePointer(
+                                          child: Icon(
+                                            LucideIcons.userCog,
+                                            size: 12,
+                                            color: accent,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Semantics(
+                                button: true,
+                                label: 'Edit instructor for ${course.name}',
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      final _ = showDialog<void>(
+                                        context: context,
+                                        builder: (context) =>
+                                            EditInstructorDialog(
+                                              courseCode: course.code ?? '',
+                                              courseName: course.name,
+                                              initialName:
+                                                  instructor?.instructorName,
+                                              className: className,
+                                            ),
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Icon(
+                                        LucideIcons.edit3,
+                                        size: 14,
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                                  if (instructor != null) ...[
-                                    const SizedBox(width: 4),
-                                    IgnorePointer(
-                                      child: Icon(
-                                        LucideIcons.userCog,
-                                        size: 12,
-                                        color: accent,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    noDataAtAll ? 16 : 28,
+                  ),
+                  child: noDataAtAll
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      LucideIcons.alertCircle,
+                                      size: 14,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.amber.shade400
+                                          : Colors.amber.shade700,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'No attendance data',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.amber.shade400
+                                            : Colors.amber.shade700,
                                       ),
                                     ),
                                   ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'No attendance records yet',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                        ),
-                        Semantics(
-                          button: true,
-                          label: 'Edit instructor for ${course.name}',
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                final _ = showDialog<void>(
-                                  context: context,
-                                  builder: (context) => EditInstructorDialog(
-                                    courseCode: course.code ?? '',
-                                    courseName: course.name,
-                                    initialName: instructor?.instructorName,
-                                    className: className,
-                                  ),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  LucideIcons.edit3,
-                                  size: 14,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.4),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            padding: EdgeInsets.fromLTRB(20, 16, 20, noDataAtAll ? 16 : 28),
-            child: noDataAtAll
-                ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              LucideIcons.alertCircle,
-                              size: 14,
-                              color:
-                                  Theme.of(context).brightness == Brightness.dark
-                                      ? Colors.amber.shade400
-                                      : Colors.amber.shade700,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'No attendance data',
-                              style: GoogleFonts.manrope(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color:
-                                    Theme.of(context).brightness == Brightness.dark
-                                        ? Colors.amber.shade400
-                                        : Colors.amber.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'No attendance records yet',
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.onSurface
-                                .withValues(alpha: 0.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Stats Grid (3 Columns)
-                    Row(
-                      children: [
-                        StatBox(
-                          label: 'Present',
-                          base: stat.officialPresent,
-                          correction: stat.corrPresent,
-                          extra: stat.extraPresent,
-                          color: primaryGreen,
-                        ),
-                        const SizedBox(width: 10),
-                        StatBox(
-                          label: 'Absent',
-                          base: stat.officialAbsent,
-                          correction: -stat.corrPresent,
-                          extra: stat.extraAbsent,
-                          color: primaryRed,
-                        ),
-                        const SizedBox(width: 10),
-                        StatBox(
-                          label: 'Total',
-                          base: stat.officialTotal,
-                          extra: stat.manualTotalGain,
-                          color: primary,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Dual Progress Bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Stack(
-                        children: [
-                          Container(
-                            height: 10,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          if (isGain) ...[
-                            // Solid Extra Gain Bar
-                            FractionallySizedBox(
-                              widthFactor: (stat.percentage / 100).clamp(
-                                0.0,
-                                1.0,
-                              ),
-                              child: Container(
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: primaryGreen,
-                                  borderRadius: const BorderRadius.horizontal(
-                                    right: Radius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Solid Official Bar
-                            FractionallySizedBox(
-                              widthFactor: (stat.officialPercentage / 100).clamp(
-                                0.0,
-                                1.0,
-                              ),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    height: 10,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF0EA5E9),
-                                    ),
-                                  ),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Container(
-                                      width: 1.5,
-                                      height: 10,
-                                      color: Colors.white.withValues(alpha: 0.25),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            // Solid Official Loss Bar
-                            FractionallySizedBox(
-                              widthFactor: (stat.officialPercentage / 100).clamp(
-                                0.0,
-                                1.0,
-                              ),
-                              child: Container(
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: primaryRed.withValues(alpha: 0.95),
-                                  borderRadius: const BorderRadius.horizontal(
-                                    right: Radius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Solid Final Bar
-                            FractionallySizedBox(
-                              widthFactor: (stat.percentage / 100).clamp(
-                                0.0,
-                                1.0,
-                              ),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    height: 10,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF0EA5E9),
-                                    ),
-                                  ),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Container(
-                                      width: 1.5,
-                                      height: 10,
-                                      color: Colors.white.withValues(alpha: 0.25),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Attendance Text Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Column(
+                        )
+                      : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Attendance',
-                              style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface
-                                    .withValues(alpha: 0.4),
+                            // Stats Grid (3 Columns)
+                            Row(
+                              children: [
+                                StatBox(
+                                  label: 'Present',
+                                  base: stat.officialPresent,
+                                  correction: stat.corrPresent,
+                                  extra: stat.extraPresent,
+                                  color: primaryGreen,
+                                ),
+                                const SizedBox(width: 10),
+                                StatBox(
+                                  label: 'Absent',
+                                  base: stat.officialAbsent,
+                                  correction: -stat.corrPresent,
+                                  extra: stat.extraAbsent,
+                                  color: primaryRed,
+                                ),
+                                const SizedBox(width: 10),
+                                StatBox(
+                                  label: 'Total',
+                                  base: stat.officialTotal,
+                                  extra: stat.manualTotalGain,
+                                  color: primary,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            // Dual Progress Bar
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 10,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface.withValues(
+                                            alpha: 0.05,
+                                          ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  if (isGain) ...[
+                                    // Solid Extra Gain Bar
+                                    FractionallySizedBox(
+                                      widthFactor: (stat.percentage / 100)
+                                          .clamp(
+                                            0.0,
+                                            1.0,
+                                          ),
+                                      child: Container(
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: primaryGreen,
+                                          borderRadius:
+                                              const BorderRadius.horizontal(
+                                                right: Radius.circular(10),
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Solid Official Bar
+                                    FractionallySizedBox(
+                                      widthFactor:
+                                          (stat.officialPercentage / 100).clamp(
+                                            0.0,
+                                            1.0,
+                                          ),
+                                      child: Stack(
+                                        children: [
+                                          Container(
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF0EA5E9),
+                                            ),
+                                          ),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Container(
+                                              width: 1.5,
+                                              height: 10,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.25,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    // Solid Official Loss Bar
+                                    FractionallySizedBox(
+                                      widthFactor:
+                                          (stat.officialPercentage / 100).clamp(
+                                            0.0,
+                                            1.0,
+                                          ),
+                                      child: Container(
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: primaryRed.withValues(
+                                            alpha: 0.95,
+                                          ),
+                                          borderRadius:
+                                              const BorderRadius.horizontal(
+                                                right: Radius.circular(10),
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Solid Final Bar
+                                    FractionallySizedBox(
+                                      widthFactor: (stat.percentage / 100)
+                                          .clamp(
+                                            0.0,
+                                            1.0,
+                                          ),
+                                      child: Stack(
+                                        children: [
+                                          Container(
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF0EA5E9),
+                                            ),
+                                          ),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Container(
+                                              width: 1.5,
+                                              height: 10,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.25,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
+
+                            const SizedBox(height: 12),
+
+                            // Attendance Text Row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                if (hasModifications &&
-                                    stat.officialPercentage != stat.percentage) ...[
-                                  Text(
-                                    '${stat.officialPercentage.toStringAsFixed(2)}%',
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 12,
-                                      color: Theme.of(context).colorScheme.onSurface
-                                          .withValues(alpha: 0.3),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Attendance',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.4),
+                                      ),
                                     ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                    ),
-                                    child: Icon(
-                                      LucideIcons.arrowRight,
-                                      size: 10,
-                                      color: Theme.of(context).colorScheme.onSurface
-                                          .withValues(alpha: 0.1),
-                                    ),
-                                  ),
-                                ],
-                                Semantics(
-                                  label:
-                                      'Attendance percentage: ${stat.percentage.toStringAsFixed(2)}%',
-                                  child: Text(
-                                    '${stat.percentage.toStringAsFixed(2)}%',
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: hasModifications
-                                          ? (isGain
-                                              ? primary
-                                              : primaryRed.withValues(alpha: 0.8))
-                                          : Theme.of(context).colorScheme.onSurface,
+                                  ],
+                                ),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        if (hasModifications &&
+                                            stat.officialPercentage !=
+                                                stat.percentage) ...[
+                                          Text(
+                                            '${stat.officialPercentage.toStringAsFixed(2)}%',
+                                            style: GoogleFonts.manrope(
+                                              fontSize: 12,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                            ),
+                                            child: Icon(
+                                              LucideIcons.arrowRight,
+                                              size: 10,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.1),
+                                            ),
+                                          ),
+                                        ],
+                                        Semantics(
+                                          label:
+                                              'Attendance percentage: ${stat.percentage.toStringAsFixed(2)}%',
+                                          child: Text(
+                                            '${stat.percentage.toStringAsFixed(2)}%',
+                                            style: GoogleFonts.manrope(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: hasModifications
+                                                  ? (isGain
+                                                        ? primary
+                                                        : primaryRed.withValues(
+                                                            alpha: 0.8,
+                                                          ))
+                                                  : Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
 
-                    const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                    // Bottom Bunk Panels
-                    if (bunkEnabled && stat.finalTotal > 0)
-                      if (!hasModifications)
-                        SimpleBunkPanel(result: safeMetrics)
-                      else if (noOfficialData)
-                        SimpleBunkPanel(result: bunkResult)
-                      else if (!trackingIsBetter)
-                        SimpleBunkPanel(result: bunkResult)
-                      else
-                        Row(
-                          children: [
-                            Expanded(child: SafeBunkPanel(result: safeMetrics)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TrackingBunkPanel(result: bunkResult),
-                            ),
+                            // Bottom Bunk Panels
+                            if (bunkEnabled && stat.finalTotal > 0)
+                              if (!hasModifications)
+                                SimpleBunkPanel(result: safeMetrics)
+                              else if (noOfficialData)
+                                SimpleBunkPanel(result: bunkResult)
+                              else if (!trackingIsBetter)
+                                SimpleBunkPanel(result: bunkResult)
+                              else
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: SafeBunkPanel(result: safeMetrics),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: TrackingBunkPanel(
+                                        result: bunkResult,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            const SizedBox(height: 8),
                           ],
                         ),
-                    const SizedBox(height: 8),
-                  ],
                 ),
-              ),
               ],
             ),
           ),
@@ -652,9 +710,11 @@ class CourseCard extends StatelessWidget {
 }
 
 class StatBox extends StatelessWidget {
-
   const StatBox({
-    required this.label, required this.base, required this.color, super.key,
+    required this.label,
+    required this.base,
+    required this.color,
+    super.key,
     this.correction,
     this.extra,
   });
@@ -765,8 +825,7 @@ class SimpleBunkPanel extends StatelessWidget {
     final color = result.canBunk > 0
         ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
               Colors.green)
-        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-              Colors.red);
+        : (Theme.of(context).extension<GhostColors>()?.dangerRed ?? Colors.red);
 
     return Container(
       width: double.infinity,
@@ -859,10 +918,14 @@ class SafeBunkPanel extends StatelessWidget {
                       : '💀',
                   style: TextStyle(
                     color: result.canBunk > 0
-                        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
-                            Colors.green)
-                        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-                            Colors.red),
+                        ? (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.successGreen ??
+                              Colors.green)
+                        : (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.dangerRed ??
+                              Colors.red),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -876,7 +939,11 @@ class SafeBunkPanel extends StatelessWidget {
 }
 
 class TrackingBunkPanel extends StatelessWidget {
-  const TrackingBunkPanel({required this.result, super.key, this.isSolo = false});
+  const TrackingBunkPanel({
+    required this.result,
+    super.key,
+    this.isSolo = false,
+  });
   final utils.AttendanceResult result;
   final bool isSolo;
 
@@ -936,10 +1003,14 @@ class TrackingBunkPanel extends StatelessWidget {
                       : '💀',
                   style: TextStyle(
                     color: result.canBunk > 0
-                        ? (Theme.of(context).extension<GhostColors>()?.successGreen ??
-                            Colors.green)
-                        : (Theme.of(context).extension<GhostColors>()?.dangerRed ??
-                            Colors.red),
+                        ? (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.successGreen ??
+                              Colors.green)
+                        : (Theme.of(
+                                context,
+                              ).extension<GhostColors>()?.dangerRed ??
+                              Colors.red),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -952,11 +1023,10 @@ class TrackingBunkPanel extends StatelessWidget {
   }
 }
 
-
 class CourseToggleBadge extends StatelessWidget {
-
   const CourseToggleBadge({
-    required this.isEnabled, super.key,
+    required this.isEnabled,
+    super.key,
     this.noData = false,
     this.isTracking = false,
     this.onTap,

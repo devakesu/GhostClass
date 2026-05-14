@@ -7,9 +7,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 class AttendanceCalendarWidget extends StatelessWidget {
-
   const AttendanceCalendarWidget({
-    required this.focusedDay, required this.selectedDay, required this.onDaySelected, required this.dashboard, required this.tracking, required this.disabledCodes, super.key,
+    required this.focusedDay,
+    required this.selectedDay,
+    required this.onDaySelected,
+    required this.dashboard,
+    required this.tracking,
+    required this.disabledCodes,
+    super.key,
   });
   final DateTime focusedDay;
   final DateTime selectedDay;
@@ -90,7 +95,8 @@ class AttendanceCalendarWidget extends StatelessWidget {
                 onTap: () => onDaySelected(date),
                 child: Center(
                   child: Semantics(
-                    label: '${DateFormat('MMMM d').format(date)}${status != null ? ", $status" : ""}',
+                    label:
+                        '${DateFormat('MMMM d').format(date)}${status != null ? ", $status" : ""}',
                     selected: isSelected,
                     button: true,
                     child: AnimatedContainer(
@@ -104,49 +110,58 @@ class AttendanceCalendarWidget extends StatelessWidget {
                                   ).extension<GhostColors>()?.brandPrimary ??
                                   Theme.of(context).colorScheme.primary)
                             : isToday
-                                ? (Theme.of(
+                            ? (Theme.of(
                                             context,
-                                          ).extension<GhostColors>()?.brandPrimary ??
-                                          Theme.of(context).colorScheme.primary)
-                                      .withValues(alpha: 0.2)
-                                : _getStatusBg(status, context),
+                                          )
+                                          .extension<GhostColors>()
+                                          ?.brandPrimary ??
+                                      Theme.of(context).colorScheme.primary)
+                                  .withValues(alpha: 0.2)
+                            : _getStatusBg(status, context),
                         shape: BoxShape.circle,
                         border: isToday && !isSelected
                             ? Border.all(
-                                color: (Theme.of(
-                                          context,
-                                        ).extension<GhostColors>()?.brandPrimary ??
-                                        Theme.of(context).colorScheme.primary)
-                                    .withValues(alpha: 0.4),
+                                color:
+                                    (Theme.of(
+                                                  context,
+                                                )
+                                                .extension<GhostColors>()
+                                                ?.brandPrimary ??
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary)
+                                        .withValues(alpha: 0.4),
                                 width: 1.5,
                               )
                             : status != null && !isSelected
-                                ? Border.all(
-                                    color: _getStatusBorder(status, context),
-                                    width: 1.2,
-                                  )
-                                : null,
+                            ? Border.all(
+                                color: _getStatusBorder(status, context),
+                                width: 1.2,
+                              )
+                            : null,
                       ),
                       child: Center(
                         child: Text(
                           day.toString(),
                           style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight:
-                                  isSelected || isToday ? FontWeight.w900 : FontWeight.w700,
-                              color: isSelected
-                                  ? Colors.white
-                                  : isToday
-                                      ? (Theme.of(
-                                                  context,
-                                                ).extension<GhostColors>()?.brandPrimary ??
-                                            Theme.of(context).colorScheme.primary)
-                                      : status != null
-                                          ? _getStatusColor(status, context)
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.85)),
+                            fontSize: 14,
+                            fontWeight: isSelected || isToday
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                            color: isSelected
+                                ? Colors.white
+                                : isToday
+                                ? (Theme.of(
+                                            context,
+                                          )
+                                          .extension<GhostColors>()
+                                          ?.brandPrimary ??
+                                      Theme.of(context).colorScheme.primary)
+                                : status != null
+                                ? _getStatusColor(status, context)
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.85),
+                          ),
                         ),
                       ),
                     ),
@@ -253,10 +268,14 @@ class AttendanceCalendarWidget extends StatelessWidget {
 
   Color _getStatusColor(String? status, BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    if (status == 'absent') return ghostColors?.dangerRed ?? const Color(0xFFEF4444);
-    if (status == 'dutyLeave') return ghostColors?.accentOrange ?? const Color(0xFFF59E0B);
-    if (status == 'otherLeave') return ghostColors?.accentBlue ?? const Color(0xFF3B82F6);
-    if (status == 'present') return ghostColors?.successGreen ?? const Color(0xFF10B981);
+    if (status == 'absent')
+      return ghostColors?.dangerRed ?? const Color(0xFFEF4444);
+    if (status == 'dutyLeave')
+      return ghostColors?.accentOrange ?? const Color(0xFFF59E0B);
+    if (status == 'otherLeave')
+      return ghostColors?.accentBlue ?? const Color(0xFF3B82F6);
+    if (status == 'present')
+      return ghostColors?.successGreen ?? const Color(0xFF10B981);
     return Theme.of(context).colorScheme.onSurface;
   }
 }
@@ -298,7 +317,6 @@ class CalendarLegend extends StatelessWidget {
 }
 
 class _LegendItem extends StatelessWidget {
-
   const _LegendItem({
     required this.label,
     required this.color,

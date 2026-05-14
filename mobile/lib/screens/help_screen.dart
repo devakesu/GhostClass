@@ -406,7 +406,6 @@ class HelpScreen extends StatelessWidget {
 }
 
 class _SectionHeading extends StatelessWidget {
-
   const _SectionHeading({required this.icon, required this.title});
   final IconData icon;
   final String title;
@@ -431,7 +430,6 @@ class _SectionHeading extends StatelessWidget {
 }
 
 class _LegendBox extends StatelessWidget {
-
   const _LegendBox({required this.title, required this.items, this.footer});
   final String title;
   final List<_LegendItem> items;
@@ -484,7 +482,6 @@ class _LegendBox extends StatelessWidget {
 }
 
 class _LegendItem extends StatelessWidget {
-
   const _LegendItem({
     required this.color,
     required this.label,
@@ -570,7 +567,6 @@ class _LegendItem extends StatelessWidget {
 }
 
 class _DiffCard extends StatelessWidget {
-
   const _DiffCard({
     required this.title,
     required this.color,
@@ -760,7 +756,11 @@ class _MockCourseCard extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              const _CountText(value: '32', color: Colors.green, label: 'present'),
+              const _CountText(
+                value: '32',
+                color: Colors.green,
+                label: 'present',
+              ),
               const SizedBox(width: 4),
               Text(
                 '+2',
@@ -1060,7 +1060,6 @@ class _MockAttendanceChart extends StatelessWidget {
 }
 
 class _MockBar extends StatelessWidget {
-
   const _MockBar({
     required this.code,
     required this.official,
@@ -1076,9 +1075,7 @@ class _MockBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final overlayHeight = adjusted != null
-        ? (adjusted! - official).abs()
-        : 0.0;
+    final overlayHeight = adjusted != null ? (adjusted! - official).abs() : 0.0;
     final totalHeight = adjusted != null
         ? (isGain ? adjusted! : official)
         : official;

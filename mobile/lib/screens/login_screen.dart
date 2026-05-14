@@ -23,7 +23,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with ErrorHandlerMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -53,22 +54,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
-    
+
     if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
-       const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
-       try {
-         final isDebuggerAttached = await channel.invokeMethod<bool>('isDebuggerAttached') ?? false;
+      const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
+      try {
+        final isDebuggerAttached =
+            await channel.invokeMethod<bool>('isDebuggerAttached') ?? false;
         if (isDebuggerAttached) {
           await _securityGuard.wipeAndExit();
           return;
         }
 
-        final isWindowObscured = await channel.invokeMethod<bool>('isWindowObscured') ?? false;
+        final isWindowObscured =
+            await channel.invokeMethod<bool>('isWindowObscured') ?? false;
         if (isWindowObscured) {
           if (mounted) {
             await handleError(
               'An active overlay was detected. Please close any floating apps before logging in.',
-              title: 'Security Alert'
+              title: 'Security Alert',
             );
           }
           return;
@@ -164,7 +167,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   child: AutofillGroup(
                     child: Form(
                       key: _formKey,
@@ -176,19 +182,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                             child: Hero(
                               tag: 'app_logo',
                               child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 300),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 300,
+                                ),
                                 child: Image.asset(
                                   'assets/images/logo.png',
-                                  width: MediaQuery.of(context).size.width * 0.7,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.7,
                                   fit: BoxFit.contain,
                                   semanticLabel: 'GhostClass Logo',
                                 ),
                               ),
                             ),
                           ).animate().fade().scale(
-                                duration: 600.ms,
-                                curve: Curves.easeOutBack,
-                              ),
+                            duration: 600.ms,
+                            curve: Curves.easeOutBack,
+                          ),
                           const SizedBox(height: 8),
 
                           Text(
@@ -197,7 +206,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                             style: GoogleFonts.manrope(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: theme.colorScheme.onSecondary.withValues(alpha: 0.85),
+                              color: theme.colorScheme.onSecondary.withValues(
+                                alpha: 0.85,
+                              ),
                               letterSpacing: -0.3,
                               height: 1.3,
                             ),
@@ -208,7 +219,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                           // Username Field
                           const _FieldLabel(
                             label: 'Username, Email, or Phone',
-                            icons: [LucideIcons.user, LucideIcons.mail, LucideIcons.phone],
+                            icons: [
+                              LucideIcons.user,
+                              LucideIcons.mail,
+                              LucideIcons.phone,
+                            ],
                           ),
                           TextFormField(
                             controller: _usernameController,
@@ -216,16 +231,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                               hintText: 'cooked_fr@attendance.edu',
                               hintStyle: TextStyle(
                                 fontSize: 13,
-                                color: theme.colorScheme.onSecondary.withValues(alpha: 0.5),
+                                color: theme.colorScheme.onSecondary.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                               filled: true,
-                              fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+                              fillColor: theme.colorScheme.surface.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                             keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
-                            autofillHints: const [AutofillHints.username, AutofillHints.email],
+                            autofillHints: const [
+                              AutofillHints.username,
+                              AutofillHints.email,
+                            ],
                           ),
                           const SizedBox(height: 16),
 
@@ -235,12 +262,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                             trailing: Semantics(
                               button: true,
                               label: 'Forgot password',
-                              hint: 'Opens EzyGo website to reset your password',
+                              hint:
+                                  'Opens EzyGo website to reset your password',
                               child: GestureDetector(
                                 onTap: () async {
                                   final url = Uri.parse(AppConfig.ezygoOrigin);
                                   if (await canLaunchUrl(url)) {
-                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    await launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    );
                                   }
                                 },
                                 child: Text(
@@ -261,19 +292,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
                               hintText: '*************',
                               hintStyle: TextStyle(
                                 fontSize: 12,
-                                color: theme.colorScheme.onSecondary.withValues(alpha: 0.5),
+                                color: theme.colorScheme.onSecondary.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                               filled: true,
-                              fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+                              fillColor: theme.colorScheme.surface.withValues(
+                                alpha: 0.5,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                                  _obscurePassword
+                                      ? LucideIcons.eye
+                                      : LucideIcons.eyeOff,
                                   color: theme.colorScheme.onSecondary,
                                   size: 20,
                                 ),
-                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
                               ),
                             ),
                             textInputAction: TextInputAction.done,
@@ -284,42 +328,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 
                           // Login Button with Pink-Amber Gradient
                           Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: LinearGradient(
-                                colors: [primaryColor, amber],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withValues(alpha: 0.35),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              onPressed: _isLoading ? null : _handleLogin,
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 22,
-                                      width: 22,
-                                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                                    )
-                                  : const Text(
-                                      'Login',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: LinearGradient(
+                                    colors: [primaryColor, amber],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: primaryColor.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 8),
                                     ),
-                            ),
-                          ).animate().fade(delay: 200.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 22,
+                                          width: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Login',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                ),
+                              )
+                              .animate()
+                              .fade(delay: 200.ms)
+                              .slideY(begin: 0.1, curve: Curves.easeOutQuad),
 
                           const SizedBox(height: 16),
                           const AppFooter(),
@@ -338,12 +398,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ErrorHandlerMixi
 }
 
 class _FieldLabel extends StatelessWidget {
-
   const _FieldLabel({required this.label, this.icons, this.trailing})
-      : assert(
-          icons == null || trailing == null,
-          'Cannot provide both icons and trailing widget',
-        );
+    : assert(
+        icons == null || trailing == null,
+        'Cannot provide both icons and trailing widget',
+      );
   final String label;
   final List<IconData>? icons;
   final Widget? trailing;
@@ -360,23 +419,26 @@ class _FieldLabel extends StatelessWidget {
             style: GoogleFonts.manrope(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
           if (icons case final i?)
             Row(
               children: i
-                  .map((icon) => Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          icon,
-                          size: 14,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.4),
-                        ),
-                      ))
+                  .map(
+                    (icon) => Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Icon(
+                        icon,
+                        size: 14,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
           ...[trailing].nonNulls,
@@ -387,7 +449,6 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _GlowBlob extends StatelessWidget {
-
   const _GlowBlob({required this.color, required this.size});
   final Color color;
   final double size;

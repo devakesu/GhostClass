@@ -1,7 +1,8 @@
 class CourseInstructor {
-
   const CourseInstructor({
-    required this.courseCode, required this.instructorName, this.id,
+    required this.courseCode,
+    required this.instructorName,
+    this.id,
     this.courseName,
   });
 

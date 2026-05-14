@@ -3,7 +3,6 @@
 /// Custom exception class for handling application-specific errors with
 /// structured types and technical details.
 class AppException implements Exception {
-
   const AppException({
     required this.message,
     required this.type,

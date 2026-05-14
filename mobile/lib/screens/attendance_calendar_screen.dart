@@ -146,7 +146,9 @@ class _AttendanceCalendarScreenState
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -158,9 +160,10 @@ class _AttendanceCalendarScreenState
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (Theme.of(context).extension<GhostColors>()?.accentBlue ??
-                        Colors.blue)
-                    .withValues(alpha: 0.05),
+                color:
+                    (Theme.of(context).extension<GhostColors>()?.accentBlue ??
+                            Colors.blue)
+                        .withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -193,7 +196,10 @@ class _AttendanceCalendarScreenState
                   ),
                 );
               } else {
-                ServiceToast.show(context, 'Today is outside the academic range');
+                ServiceToast.show(
+                  context,
+                  'Today is outside the academic range',
+                );
               }
             },
           ),
@@ -238,7 +244,6 @@ class _AttendanceCalendarScreenState
 }
 
 class _CalendarContent extends ConsumerWidget {
-
   const _CalendarContent({
     required this.dashboard,
     required this.tracking,
@@ -380,11 +385,10 @@ class _CalendarContent extends ConsumerWidget {
                         event: event,
                         initialStatus: 'present',
                       ),
-                      onDelete:
-                          event.trackingId == null
-                              ? null
-                              : () =>
-                                  _deleteRecord(context, ref, event.trackingId!),
+                      onDelete: event.trackingId == null
+                          ? null
+                          : () =>
+                                _deleteRecord(context, ref, event.trackingId!),
                     );
                   },
                   childCount: events.length,
@@ -405,10 +409,9 @@ class _CalendarContent extends ConsumerWidget {
   }) {
     final controller = TextEditingController();
     final attendance = initialStatus == 'dutyLeave' ? 225 : 1;
-    final hint =
-        attendance == 225
-            ? 'Enter reason for Duty Leave...'
-            : 'Enter reason for being Present...';
+    final hint = attendance == 225
+        ? 'Enter reason for Duty Leave...'
+        : 'Enter reason for being Present...';
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
     final _ = showModalBottomSheet<void>(
@@ -512,12 +515,11 @@ class _CalendarContent extends ConsumerWidget {
                         return ElevatedButton(
                           onPressed: () async {
                             final remark = controller.text.trim();
-                            final finalRemark =
-                                remark.isEmpty
-                                    ? (attendance == 225
-                                        ? 'Duty Leave'
-                                        : 'Self-Marked: Present')
-                                    : remark;
+                            final finalRemark = remark.isEmpty
+                                ? (attendance == 225
+                                      ? 'Duty Leave'
+                                      : 'Self-Marked: Present')
+                                : remark;
 
                             try {
                               await ref
@@ -548,10 +550,9 @@ class _CalendarContent extends ConsumerWidget {
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                attendance == 225
-                                    ? const Color(0xFFF59E0B)
-                                    : const Color(0xFF10B981),
+                            backgroundColor: attendance == 225
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF10B981),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -621,33 +622,32 @@ class _CalendarContent extends ConsumerWidget {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed:
-                      isDeleting
-                          ? null
-                          : () async {
-                              setDialogState(() => isDeleting = true);
-                              try {
-                                await ref
-                                    .read(trackingProvider.notifier)
-                                    .deleteRecord(id);
-                                if (context.mounted) {
-                                  Navigator.pop(context);
-                                  ServiceToast.show(
-                                    context,
-                                    'Record deleted successfully',
-                                  );
-                                }
-                              } on Object {
-                                if (context.mounted) {
-                                  setDialogState(() => isDeleting = false);
-                                  ServiceToast.show(
-                                    context,
-                                    'Failed to delete record',
-                                    isError: true,
-                                  );
-                                }
-                              }
-                            },
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await ref
+                                .read(trackingProvider.notifier)
+                                .deleteRecord(id);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ServiceToast.show(
+                                context,
+                                'Record deleted successfully',
+                              );
+                            }
+                          } on Object {
+                            if (context.mounted) {
+                              setDialogState(() => isDeleting = false);
+                              ServiceToast.show(
+                                context,
+                                'Failed to delete record',
+                                isError: true,
+                              );
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
@@ -656,17 +656,16 @@ class _CalendarContent extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child:
-                      isDeleting
-                          ? const SizedBox(
-                            height: 14,
-                            width: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                          : const Text('DELETE'),
+                  child: isDeleting
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('DELETE'),
                 ),
               ],
             );
@@ -719,7 +718,7 @@ class _CalendarContent extends ConsumerWidget {
         final rawId = data.course.toString();
         final safeId = _resolveSafeId(rawId);
         final normSafeId = safeId.trim().toUpperCase();
-        
+
         final courseDetails = dashboard.courses.firstWhere(
           (c) =>
               c.safeId.trim().toUpperCase() == normSafeId ||
@@ -763,8 +762,7 @@ class _CalendarContent extends ConsumerWidget {
         };
         final trackingRecords = tracking.groupedByCourse.entries
             .where(
-              (entry) =>
-                  trackingKeys.contains(entry.key.trim().toUpperCase()),
+              (entry) => trackingKeys.contains(entry.key.trim().toUpperCase()),
             )
             .expand((entry) => entry.value)
             .toList();
@@ -785,7 +783,9 @@ class _CalendarContent extends ConsumerWidget {
             override != null && override.status == 'correction';
         final isSelfMarked = override != null && override.status == 'extra';
 
-        final currentStatus = isCorrection ? AttendanceStatus.fromCode(override.attendance) : status;
+        final currentStatus = isCorrection
+            ? AttendanceStatus.fromCode(override.attendance)
+            : status;
 
         events.add(
           CalendarEvent(
@@ -836,8 +836,10 @@ class _CalendarContent extends ConsumerWidget {
               courseKey: safeId,
               mergedCourse: dashboard.courses.firstWhere(
                 (c) =>
-                    c.safeId.trim().toUpperCase() == safeId.trim().toUpperCase() ||
-                    (c.code ?? '').trim().toUpperCase() == safeId.trim().toUpperCase(),
+                    c.safeId.trim().toUpperCase() ==
+                        safeId.trim().toUpperCase() ||
+                    (c.code ?? '').trim().toUpperCase() ==
+                        safeId.trim().toUpperCase(),
                 orElse: () => CourseDetails(id: 0, name: safeId),
               ),
               officialReport: dashboard.attendance,

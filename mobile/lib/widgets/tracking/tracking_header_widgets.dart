@@ -40,14 +40,19 @@ class HeaderBadge extends StatelessWidget {
 }
 
 class DeleteAllButton extends StatelessWidget {
-  const DeleteAllButton({required this.label, required this.onPressed, super.key});
+  const DeleteAllButton({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
   final String label;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final ghostColors = Theme.of(context).extension<GhostColors>();
-    final danger = ghostColors?.dangerRed ?? Theme.of(context).colorScheme.error;
+    final danger =
+        ghostColors?.dangerRed ?? Theme.of(context).colorScheme.error;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(

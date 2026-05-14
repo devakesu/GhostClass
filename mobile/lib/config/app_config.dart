@@ -34,9 +34,9 @@ class AppConfig {
 
   /// The app domain (no scheme), used to derive emails and web URL.
   static String get _appDomain => const String.fromEnvironment(
-        'APP_DOMAIN',
-        defaultValue: 'ghostclass.devakesu.com',
-      );
+    'APP_DOMAIN',
+    defaultValue: 'ghostclass.devakesu.com',
+  );
 
   /// The official GhostClass web application URL.
   static String get webUrl => 'https://$_appDomain';
@@ -94,39 +94,38 @@ class AppConfig {
   /// Whether this binary was produced as a release build.
   static bool get isReleaseBuild => kReleaseMode;
 
-
   /// Author branding.
   static String get authorName => const String.fromEnvironment(
-        'AUTHOR_NAME',
-        defaultValue: '@deva.kesu',
-      );
+    'AUTHOR_NAME',
+    defaultValue: '@deva.kesu',
+  );
 
   /// Author portfolio URL.
   static String get authorUrl => const String.fromEnvironment(
-        'AUTHOR_URL',
-        defaultValue: 'https://devakesu.com',
-      );
+    'AUTHOR_URL',
+    defaultValue: 'https://devakesu.com',
+  );
 
   /// Project source URL.
   static String get githubUrl => const String.fromEnvironment(
-        'GITHUB_URL',
-        defaultValue: 'https://github.com/devakesu/GhostClass',
-      );
+    'GITHUB_URL',
+    defaultValue: 'https://github.com/devakesu/GhostClass',
+  );
 
   /// Original project credits URL.
   static String get creditsUrl => 'https://github.com/ABHAY-100/Bunkr';
 
   /// Optional donation URL.
   static String get donateUrl => const String.fromEnvironment(
-        'DONATE_URL',
-        defaultValue: 'https://pages.razorpay.com/devakesu',
-      );
+    'DONATE_URL',
+    defaultValue: 'https://pages.razorpay.com/devakesu',
+  );
 
   /// Display name of the application.
   static String get appName => const String.fromEnvironment(
-        'APP_NAME',
-        defaultValue: 'GhostClass',
-      );
+    'APP_NAME',
+    defaultValue: 'GhostClass',
+  );
 
   /// The Play Store URL for the application.
   static String get playStoreUrl {
