@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   guard:
+    name: Build Guard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
