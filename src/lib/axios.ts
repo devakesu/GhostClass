@@ -211,6 +211,26 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+async function encryptRequestPayload(config: JweAxiosConfig, method: string) {
+  if (["post", "put", "patch"].includes(method) && config.data) {
+    if (!(typeof config.data === "string" && config.data.split(".").length === 5)) {
+      try {
+        const { jwe, cek } = await encryptRequest(config.data);
+        config.data = jwe;
+        config._jweCek = cek;
+        config.headers.set("Content-Type", "application/jose");
+      } catch (error) {
+        logger.error("[axios] JWE request encryption failed", error);
+        throw error;
+      }
+    }
+  } else if (method === "get") {
+    const { jwe, cek } = await encryptHeader();
+    config.headers.set("X-JWE-Key", jwe);
+    config._jweCek = cek;
+  }
+}
+
 axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
   if (isOutageDetected) return Promise.reject(new Error("Active service outage"));
   if (typeof window === "undefined") return config;
@@ -223,19 +243,7 @@ axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
   const isPublic = url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
 
   if (isInternal && !isPublic) {
-    const method = config.method?.toLowerCase() || "";
-    if (["post", "put", "patch"].includes(method) && config.data) {
-      if (!(typeof config.data === "string" && config.data.split(".").length === 5)) {
-        const { jwe, cek } = await encryptRequest(config.data);
-        config.data = jwe;
-        config._jweCek = cek;
-        config.headers.set("Content-Type", "application/jose");
-      }
-    } else if (method === "get") {
-      const { jwe, cek } = await encryptHeader();
-      config.headers.set("X-JWE-Key", jwe);
-      config._jweCek = cek;
-    }
+    await encryptRequestPayload(config, config.method?.toLowerCase() || "");
     config.headers.set("Accept", "application/jose, application/json");
   }
   return config;

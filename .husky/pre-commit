@@ -1,15 +1,1 @@
-
-npm run verify-version
 npx lint-staged
-
-# Always sync critical secrets (like version)
-# Full secret sync is opt-in: export SYNC_SECRETS=1
-# Auto-skipped in CI environments
-if [ -z "$CI" ]; then
-  if [ "$SYNC_SECRETS" = "1" ]; then
-    echo "📦 Syncing all secrets to GitHub..."
-    echo ""
-    node scripts/sync-secrets.js
-    echo ""
-  fi
-fi

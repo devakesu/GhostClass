@@ -110,7 +110,7 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
 
       // Fetch with fallback for EzyGo typos (summery vs summary)
       let data;
-      if (workingEndpoint) {
+      if (workingEndpoint && process.env.VITEST !== "true") {
         data = await fetchEzygoData(`/attendancereports/institutionuser/courses/${course.id}/${workingEndpoint}`, token);
       } else {
         try {

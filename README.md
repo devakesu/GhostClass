@@ -149,8 +149,8 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 
 1. **Setup**: `git clone` the repo and run `npm install --legacy-peer-deps`.
 2. **Database**: Link your project and run `npx supabase db push`.
-3. **Environment**: Copy `.example.env` to `.env` and fill the keys.
-4. **Run**: `npm run dev` and visit `http://localhost:3000`.
+3. **Environment**: Install the Infisical CLI, authenticate via `infisical login`, and organize secrets inside `/build-time`, `/runtime`, and `/ci` path folders.
+4. **Run**: Inject variables securely in-memory using `infisical run -- npm run dev` and visit `http://localhost:3000`.
 
 ### Quick Start (Mobile)
 

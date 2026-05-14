@@ -64,8 +64,9 @@ class AppConfig {
 
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
-  /// Current application version.
-  static String get appVersion => '3.0.8';
+  /// Current application version (derived from Infisical compilation injection).
+  static String get appVersion =>
+      const String.fromEnvironment('APP_VERSION', defaultValue: '3.0.8');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
