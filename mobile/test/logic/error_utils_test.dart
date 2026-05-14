@@ -48,6 +48,12 @@ void main() {
         formatApiError(peUnique, 'attendance'),
         'A record already exists for this date and session.',
       );
+
+      expect(
+        formatApiError(peUnique, 'adding course'),
+        'This course already exists in your class lineup for this semester.',
+      );
+      expect(formatApiError(peUnique, 'other'), 'This record already exists.');
     });
 
     test('handles DioException', () {
@@ -77,6 +83,28 @@ void main() {
         formatApiError(dioStringErr, 'fetching'),
         'Plain error message',
       );
+
+      final dioNetworkErr = DioException(
+        requestOptions: RequestOptions(path: '/test'),
+        message: 'Network unreachable',
+      );
+      expect(
+        formatApiError(dioNetworkErr, 'loading'),
+        'Connection failed. Please check your internet and try again.',
+      );
+
+      final dioMapErr = DioException(
+        requestOptions: RequestOptions(path: '/test'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 400,
+          data: {'code': 'ERR_NETWORK', 'message': 'No connection'},
+        ),
+      );
+      expect(
+        formatApiError(dioMapErr, 'loading'),
+        'Connection failed. Please check your internet and try again.',
+      );
     });
 
     test('handles Map response', () {
@@ -84,6 +112,15 @@ void main() {
       expect(
         formatApiError(mapErr, 'login'),
         'Too many requests. Please wait a few moments and try again.',
+      );
+
+      expect(
+        formatApiError({'message': 'technical issues detected'}, 'login'),
+        'EzyGo servers are currently down. Please try again later.',
+      );
+      expect(
+        formatApiError({'code': '42501', 'message': 'row-level security'}, 'attendance'),
+        'Permission denied. You can only modify your own attendance records.',
       );
     });
 
@@ -94,6 +131,13 @@ void main() {
         statusCode: 403,
       );
       expect(formatApiError(appErr, 'sync'), 'Forbidden action');
+
+      const emptyAppErr = AppException(
+        message: '',
+        type: AppExceptionType.unknown,
+        statusCode: 500,
+      );
+      expect(formatApiError(emptyAppErr, 'sync'), 'Failed to complete sync');
     });
 
     test('handles various specific error codes and messages', () {
@@ -108,6 +152,10 @@ void main() {
       expect(
         formatApiError({'message': 'Network error occurred'}, 'action'),
         'Connection failed. Please check your internet and try again.',
+      );
+      expect(
+        formatApiError({'message': 'Too many requests at once'}, 'action'),
+        'Too many requests. Please wait a few moments and try again.',
       );
     });
   });
@@ -142,6 +190,10 @@ void main() {
       expect(
         sanitizeTechnicalDetails('URL parameter token=abcde12345 expired'),
         'URL parameter token [REDACTED] expired',
+      );
+      expect(
+        sanitizeTechnicalDetails('BearerXYZ and SecretABC and Key123'),
+        'Bearer [REDACTED] and Secret [REDACTED] and Key [REDACTED]',
       );
     });
   });

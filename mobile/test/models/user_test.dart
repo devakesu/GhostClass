@@ -13,6 +13,20 @@ void main() {
       expect(const UserProfile().fullName, isNull);
     });
 
+    test('UserProfile.fromJson handles class strings and missing timestamps', () {
+      final profile = UserProfile.fromJson({
+        'first_name': 'Alex',
+        'class': 'Evening Cohort',
+      });
+
+      expect(profile.firstName, 'Alex');
+      expect(profile.classField?.id, '');
+      expect(profile.classField?.name, 'Evening Cohort');
+      expect(profile.createdAt, isNull);
+      expect(profile.ezygoCreatedAt, isNull);
+      expect(profile.toJson()['class'], isNotNull);
+    });
+
     test('UserProfile copyWith, equals, and hashCode work', () {
       final p1 = UserProfile(
         firstName: 'John',
@@ -120,6 +134,14 @@ void main() {
       final info = StealthInfo.fromJson(json);
       expect(info.browserName, 'Chrome');
       expect(info.toJson(), json);
+    });
+
+    test('UserClass fromJson applies defaults', () {
+      final classInfo = UserClass.fromJson({});
+
+      expect(classInfo.id, '');
+      expect(classInfo.name, 'Unknown Class');
+      expect(classInfo.toJson(), {'id': '', 'name': 'Unknown Class'});
     });
   });
 }

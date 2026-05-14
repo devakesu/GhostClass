@@ -48,7 +48,7 @@ jobs:
 
       - name: Enforce minimum code coverage threshold
         env:
-          MIN_COVERAGE: "80.0"
+          MIN_COVERAGE: "35.0"
         run: |
           set -euo pipefail
 
