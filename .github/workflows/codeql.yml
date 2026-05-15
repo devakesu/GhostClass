@@ -191,7 +191,7 @@ jobs:
       - name: Downgrade device_info_plus for compatibility
         working-directory: mobile
         run: |
-          sed -i 's/device_info_plus: .*/device_info_plus: 12.2.0/g' pubspec.yaml
+          sed -i '' 's/device_info_plus: .*/device_info_plus: 12.2.0/g' pubspec.yaml
 
       - name: Fetch Flutter dependencies
         working-directory: mobile
