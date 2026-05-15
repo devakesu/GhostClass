@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/logic/network_utils.dart';
+import 'package:ghostclass/logic/security_initializer.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
@@ -89,6 +89,24 @@ Future<void> _handleSecurityFailure(Object error) async {
   );
 }
 
+Future<void> _initializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) {
+    AppLogger.i('🛡️ [FIREBASE SHIELD] Reusing existing Firebase app');
+    return;
+  }
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (error) {
+    if (error.code != 'duplicate-app') rethrow;
+
+    AppLogger.i('🛡️ [FIREBASE SHIELD] Reusing native Firebase app');
+    Firebase.app();
+  }
+}
+
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
 
@@ -96,22 +114,10 @@ void main() async {
 
   // Initialize Firebase & App Check
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await _initializeFirebase();
 
     AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
-
-    if (kDebugMode) {
-      await FirebaseAppCheck.instance.activate(
-        providerAndroid: const AndroidDebugProvider(),
-        providerApple: const AppleDebugProvider(),
-      );
-    } else {
-      await FirebaseAppCheck.instance.activate(
-        providerApple: const AppleAppAttestProvider(),
-      );
-    }
+    await SecurityInitializer.initialize();
   } on Object catch (e) {
     AppLogger.e('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE', e);
     await _handleSecurityFailure(e);

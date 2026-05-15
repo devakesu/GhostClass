@@ -16,10 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231 # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Fetch CI secrets from Infisical
-        uses: infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
+        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -28,9 +29,9 @@ jobs:
           secret-path: "/ci"
         continue-on-error: true
 
-      - uses: supabase/setup-cli@0abc813ee30fc6710a975fb92db02aa8a6b14501 # v1.6.0
+      - uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333
         with:
-          version: 2.76.10
+          version: 2.98.2
 
       - name: Link Project
         env:

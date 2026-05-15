@@ -247,7 +247,7 @@ WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
-    apk add --no-cache wget tar && \
+    apk add --no-cache curl wget tar && \
     wget -qO- https://github.com/Infisical/cli/releases/download/v0.43.84/cli_0.43.84_linux_amd64.tar.gz | tar -xz -C /usr/local/bin infisical
 
 # Core Next.js output
@@ -278,5 +278,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # In Coolify, configure two environment variables:
 # 1. INFISICAL_TOKEN (your Machine Identity token)
 # 2. INFISICAL_PROJECT_ID (your target Infisical Project ID)
-# The Infisical CLI automatically detects both variables and injects secrets directly into Node.js without disk storage.
-CMD ["infisical", "run", "--path", "/runtime", "--env", "production", "--", "node", "server.js"]
+# The entrypoint explicitly passes the project ID context flag to support strict scoped authentication workflows.
+CMD ["sh", "-c", "exec infisical run --projectId \"${INFISICAL_PROJECT_ID}\" --path /runtime --env production -- node server.js"]
