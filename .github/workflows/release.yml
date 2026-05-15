@@ -28,9 +28,6 @@ jobs:
     name: Build & Release
     needs: guard
     runs-on: ubuntu-latest
-    env:
-      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
-      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     permissions:
       contents: read
       packages: write
@@ -54,8 +51,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != '' }}
+        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -355,9 +355,6 @@ jobs:
     name: Build Flutter Android
     needs: guard
     runs-on: ubuntu-latest
-    env:
-      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
-      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     permissions:
       contents: read
       id-token: write
@@ -379,8 +376,11 @@ jobs:
           cache: true
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != '' }}
+        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -670,9 +670,6 @@ jobs:
     name: Create GitHub Release
     needs: [build-and-release, build-mobile]
     runs-on: ubuntu-latest
-    env:
-      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
-      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     permissions:
       contents: write
       actions: read
@@ -683,8 +680,11 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != '' }}
+        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
