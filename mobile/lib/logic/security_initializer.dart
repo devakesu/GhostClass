@@ -22,6 +22,10 @@ typedef ActivateFn =
 class SecurityInitializer {
   SecurityInitializer._();
 
+  // Exposed for tests to exercise the private constructor and improve
+  // coverage. Kept minimal and intended only for test use.
+  static void invokePrivateConstructorForTest() => SecurityInitializer._();
+
   /// Initializes and activates App Check based on the current build mode.
   ///
   /// [appCheck] can be provided for testing purposes. If null, the default
@@ -30,8 +34,14 @@ class SecurityInitializer {
     FirebaseAppCheck? appCheck,
     bool isDebug = kDebugMode,
     ActivateFn? activateOverride,
+
+    /// Optional resolver for the `FirebaseAppCheck` instance. Tests can
+    /// provide this to avoid referencing the static `FirebaseAppCheck.instance`.
+    FirebaseAppCheck Function()? instanceResolver,
   }) async {
     final instanceIfProvided = appCheck;
+    final resolveInstance =
+        instanceResolver ?? (() => FirebaseAppCheck.instance);
 
     AppLogger.i('🛡️ [SECURITY] Initializing App Check (isDebug: $isDebug)...');
 
@@ -42,7 +52,7 @@ class SecurityInitializer {
           providerApple: const AppleDebugProvider(),
         );
       } else {
-        final instance = instanceIfProvided ?? FirebaseAppCheck.instance;
+        final instance = instanceIfProvided ?? resolveInstance();
         await instance.activate(
           providerAndroid: const AndroidDebugProvider(),
           providerApple: const AppleDebugProvider(),
@@ -56,7 +66,7 @@ class SecurityInitializer {
           providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
         );
       } else {
-        final instance = instanceIfProvided ?? FirebaseAppCheck.instance;
+        final instance = instanceIfProvided ?? resolveInstance();
         await instance.activate(
           providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
         );
