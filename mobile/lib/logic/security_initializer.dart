@@ -7,6 +7,18 @@ import 'package:ghostclass/services/logger.dart';
 /// Handles the initialization and activation of application security layers,
 /// primarily Firebase App Check. This class is designed to be testable by
 /// allowing dependency injection of the [FirebaseAppCheck] instance.
+
+typedef ActivateFn =
+    Future<void> Function({
+      Object? providerAndroid,
+      Object? providerApple,
+    });
+
+/// SecurityInitializer
+/// -------------------
+/// Handles the initialization and activation of application security layers,
+/// primarily Firebase App Check. This class is designed to be testable by
+/// allowing dependency injection of the [FirebaseAppCheck] instance.
 class SecurityInitializer {
   SecurityInitializer._();
 
@@ -17,22 +29,38 @@ class SecurityInitializer {
   static Future<void> initialize({
     FirebaseAppCheck? appCheck,
     bool isDebug = kDebugMode,
+    ActivateFn? activateOverride,
   }) async {
-    final instance = appCheck ?? FirebaseAppCheck.instance;
+    final instanceIfProvided = appCheck;
 
     AppLogger.i('🛡️ [SECURITY] Initializing App Check (isDebug: $isDebug)...');
 
     if (isDebug) {
-      await instance.activate(
-        providerAndroid: const AndroidDebugProvider(),
-        providerApple: const AppleDebugProvider(),
-      );
+      if (activateOverride != null) {
+        await activateOverride(
+          providerAndroid: const AndroidDebugProvider(),
+          providerApple: const AppleDebugProvider(),
+        );
+      } else {
+        final instance = instanceIfProvided ?? FirebaseAppCheck.instance;
+        await instance.activate(
+          providerAndroid: const AndroidDebugProvider(),
+          providerApple: const AppleDebugProvider(),
+        );
+      }
     } else {
       // In production, we use the default Play Integrity provider for Android.
       // For iOS, we use App Attest with a fallback to DeviceCheck to support iOS 13.
-      await instance.activate(
-        providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
-      );
+      if (activateOverride != null) {
+        await activateOverride(
+          providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
+        );
+      } else {
+        final instance = instanceIfProvided ?? FirebaseAppCheck.instance;
+        await instance.activate(
+          providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
+        );
+      }
     }
   }
 }
