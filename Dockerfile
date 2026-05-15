@@ -279,4 +279,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # 1. INFISICAL_TOKEN (your Machine Identity token)
 # 2. INFISICAL_PROJECT_ID (your target Infisical Project ID)
 # The entrypoint explicitly passes the project ID context flag to support strict scoped authentication workflows.
-CMD ["sh", "-c", "exec infisical run --projectId \"${INFISICAL_PROJECT_ID}\" --path /runtime --env production -- node server.js"]
+CMD ["sh", "-c", "exec infisical run --projectId \"${INFISICAL_PROJECT_ID}\" --path /runtime --env prod -- node server.js"]
