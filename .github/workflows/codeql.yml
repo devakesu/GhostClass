@@ -48,6 +48,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Flutter
+        uses: ./.github/actions/flutter-action
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
       - name: Install Android SDK (basic)
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
         with:
@@ -61,6 +71,8 @@ jobs:
 
       - name: Run Gradle assemble to provide build info
         working-directory: mobile/android
+        env:
+          FLUTTER_SDK: ${{ env.FLUTTER_HOME }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon -Pci
