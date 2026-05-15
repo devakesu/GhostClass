@@ -37,6 +37,7 @@ jobs:
       id-token: write
       attestations: write
     outputs:
+      digest: ${{ steps.build-push.outputs.digest }}
       platforms: ${{ steps.prep.outputs.platforms }}
     steps:
       - name: Checkout
@@ -707,25 +708,7 @@ jobs:
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "Targeting release tag: ${VERSION_TAG}"
 
-      - name: Resolve image digest
-        id: digest
-        env:
-          VERSION_TAG: ${{ steps.version.outputs.version_tag }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          IMAGE_NAME=$(echo "${REPOSITORY}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
-          DIGEST=$(docker buildx imagetools inspect "ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}" --format '{{.Manifest.Digest}}')
-
-          if [ -z "$DIGEST" ]; then
-            echo "ERROR: Could not resolve image digest for ${VERSION_TAG}"
-            exit 1
-          fi
-
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Resolved digest: ${DIGEST}"
+      
 
       - name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -776,7 +759,7 @@ jobs:
         env:
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
-          DIGEST: ${{ steps.digest.outputs.digest }}
+          DIGEST: ${{ needs.build-and-release.outputs.digest }}
           VERSION: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -862,7 +845,7 @@ jobs:
 
       - name: Create GitHub Release
         env:
-          DIGEST: ${{ steps.digest.outputs.digest }}
+          DIGEST: ${{ needs.build-and-release.outputs.digest }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
