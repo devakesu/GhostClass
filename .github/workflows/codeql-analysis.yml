@@ -57,7 +57,7 @@ jobs:
       - name: Initialize CodeQL (Java + Kotlin)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         with:
-          languages: [java,kotlin]
+          languages: java-kotlin
 
       - name: Run Gradle assemble to provide build info
         working-directory: mobile/android
