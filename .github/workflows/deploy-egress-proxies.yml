@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'workers/**'
+      - "workers/**"
   # Allow manual deployment/testing
   workflow_dispatch:
 
@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: '22.12.0'
+          node-version: "22.12.0"
 
       - name: Validate Cloudflare deploy secrets
         id: validate
@@ -107,7 +107,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.validate.outputs.skip != 'true'
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
+        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -172,7 +172,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: '22.12.0'
+          node-version: "22.12.0"
 
       - name: Validate Cloudflare deploy secrets
         id: validate
@@ -245,7 +245,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.validate.outputs.skip != 'true'
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
+        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
