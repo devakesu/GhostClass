@@ -79,6 +79,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Flutter
+        uses: ./.github/actions/flutter-action
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
       - name: Initialize CodeQL (Swift)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         with:
