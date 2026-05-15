@@ -8,12 +8,14 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   codeql-js:
     name: CodeQL JavaScript/TypeScript
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -36,6 +38,9 @@ jobs:
   codeql-android:
     name: CodeQL Android (Java/Kotlin)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -159,6 +164,9 @@ jobs:
   codeql-ios:
     name: CodeQL iOS (Swift)
     runs-on: macos-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd

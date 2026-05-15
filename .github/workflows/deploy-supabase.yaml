@@ -1,7 +1,6 @@
 name: Deploy Supabase
 
-permissions:
-  contents: read
+permissions: {}
 
 on:
   workflow_dispatch: # Allows manual triggering if GitHub path filtering skips a commit
@@ -14,6 +13,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID || '' }}
       INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET || '' }}
