@@ -88,12 +88,11 @@ jobs:
           echo "   Full path: ghcr.io/${REPO_OWNER}/${IMAGE_NAME}"
 
           # Determine build platforms
-          # For main pushes: Build both AMD64 and ARM64 (full release)
-          # For workflow_dispatch: Respect user's build_arm64 input
+          # Default to amd64 for faster, more reliable release builds.
+          # ARM64 remains available as an explicit manual opt-in.
           if [ "${{ github.event_name }}" == "push" ]; then
-            # Push - always build multi-arch for full releases
-            PLATFORMS="linux/amd64,linux/arm64"
-            echo "📦 Main push detected - building multi-architecture"
+            PLATFORMS="linux/amd64"
+            echo "📦 Main push detected - building amd64 only"
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.build_arm64 }}" == "true" ]; then
               PLATFORMS="linux/amd64,linux/arm64"
