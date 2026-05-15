@@ -58,6 +58,77 @@ jobs:
         working-directory: mobile
         run: cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
 
+      - name: Create CI Firebase Android stub
+        working-directory: mobile
+        run: |
+          cat > android/app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "424804867878",
+              "project_id": "devakesu-ghostclass",
+              "storage_bucket": "devakesu-ghostclass.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:424804867878:android:df401041d564c22b21abe7",
+                  "android_client_info": {
+                    "package_name": "com.devakesu.apps.ghostclass"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDUMMY"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+      - name: Create CI Firebase iOS stub
+        working-directory: mobile
+        run: |
+          cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>API_KEY</key>
+            <string>AIzaSyDUMMY</string>
+            <key>BUNDLE_ID</key>
+            <string>com.devakesu.apps.ghostclass</string>
+            <key>GCM_SENDER_ID</key>
+            <string>424804867878</string>
+            <key>GOOGLE_APP_ID</key>
+            <string>1:424804867878:ios:d132bb8be987f52d21abe7</string>
+            <key>IS_ADS_ENABLED</key>
+            <false/>
+            <key>IS_ANALYTICS_ENABLED</key>
+            <false/>
+            <key>IS_APPINVITE_ENABLED</key>
+            <false/>
+            <key>IS_GCM_ENABLED</key>
+            <true/>
+            <key>IS_SIGNIN_ENABLED</key>
+            <false/>
+            <key>PLIST_VERSION</key>
+            <string>1</string>
+            <key>PROJECT_ID</key>
+            <string>devakesu-ghostclass</string>
+            <key>STORAGE_BUCKET</key>
+            <string>devakesu-ghostclass.appspot.com</string>
+          </dict>
+          </plist>
+          EOF
+
       - name: Fetch Flutter dependencies
         working-directory: mobile
         run: flutter pub get
