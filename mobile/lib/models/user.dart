@@ -193,7 +193,10 @@ class UserSettings {
 
   factory UserSettings.fromJson(Map<String, dynamic> json) {
     // Parse nested map safely
-    final rawDisabled = json['disabled_courses'] as Map<String, dynamic>? ?? {};
+    final rawDisabledSource = json['disabled_courses'];
+    final rawDisabled = rawDisabledSource is Map
+        ? Map<String, dynamic>.from(rawDisabledSource)
+        : <String, dynamic>{};
     final disabled = <String, Map<String, String>>{};
 
     rawDisabled.forEach((semester, courses) {

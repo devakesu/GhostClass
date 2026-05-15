@@ -5,6 +5,7 @@ import { TERMS_VERSION } from "./app/config/legal";
 import { logger } from "./lib/logger";
 import { isAuthSessionMissingError } from "./lib/security/auth";
 import { decrypt } from "./lib/crypto";
+import { redact } from "./lib/utils.server";
 
 /**
  * Clears all session-related cookies on a redirect response.
@@ -93,7 +94,7 @@ async function selfHealEzygoCookie(
         path: "/",
         maxAge: 31 * 24 * 60 * 60, // 31 days
       });
-      logger.info("EzyGo session cookie self-healed in middleware", { userId });
+      logger.info("EzyGo session cookie self-healed in middleware", { userId: redact("id", userId) });
     }
   } catch (err) {
     logger.warn("Non-critical: EzyGo self-healing failed in middleware", err);

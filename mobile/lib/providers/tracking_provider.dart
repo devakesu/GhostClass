@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
@@ -8,6 +7,7 @@ import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -300,6 +300,13 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
             totalCount: current.totalCount + 1,
           ),
         );
+        // Analytics: attendance added
+        try {
+          await AnalyticsService.instance.logAttendanceMarked(
+            courseId: canonicalCourseId,
+            count: 1,
+          );
+        } on Object catch (_) {}
       }
     } catch (e) {
       AppLogger.e('TrackingNotifier: Failed to insert record', e);
@@ -323,6 +330,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         );
 
         var removed = false;
+        String? removedCid;
         for (final cid in newGrouped.keys.toList()) {
           final list = List<TrackingRecord>.from(newGrouped[cid]!);
           final idx = list.indexWhere((r) => r.id == recordId);
@@ -334,6 +342,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
               newGrouped[cid] = list;
             }
             removed = true;
+            removedCid = cid;
             break;
           }
         }
@@ -345,6 +354,13 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
               totalCount: current.totalCount - 1,
             ),
           );
+          // Analytics: attendance deleted
+          try {
+            await AnalyticsService.instance.logAttendanceDeleted(
+              courseId: removedCid ?? '',
+              count: 1,
+            );
+          } on Object catch (_) {}
         }
       }
     } catch (e) {

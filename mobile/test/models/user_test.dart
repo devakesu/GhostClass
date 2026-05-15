@@ -152,5 +152,42 @@ void main() {
       expect(classInfo.name, 'Unknown Class');
       expect(classInfo.toJson(), {'id': '', 'name': 'Unknown Class'});
     });
+
+    test('UserProfile.fromJson handles edge case timestamps', () {
+      // Test with timestamp as 0
+      final profile0 = UserProfile.fromJson(const {'created_at': 0});
+      expect(profile0.createdAt, isNotNull);
+
+      // Test with very large milliseconds timestamp
+      final profileLarge = UserProfile.fromJson(const {
+        'created_at': 9999999999999,
+      });
+      expect(profileLarge.createdAt, isNotNull);
+
+      // Test with null ezygo_created_at
+      final profileNoEzygo = UserProfile.fromJson(const {
+        'ezygo_created_at': null,
+      });
+      expect(profileNoEzygo.ezygoCreatedAt, isNull);
+    });
+
+    test('UserSettings with empty disabled courses', () {
+      const settings = UserSettings(
+        bunkCalculatorEnabled: true,
+        targetPercentage: 75,
+        disabledCourses: {},
+      );
+      expect(settings.disabledCount, 0);
+      expect(settings.flatDisabledCourses, isEmpty);
+    });
+
+    test('UserProfile with all fields null', () {
+      const profile = UserProfile();
+      expect(profile.fullName, isNull);
+      expect(profile.firstName, isNull);
+      expect(profile.lastName, isNull);
+      expect(profile.email, isNull);
+      expect(profile.classField, isNull);
+    });
   });
 }

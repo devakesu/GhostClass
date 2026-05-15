@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { normalizeSession, toRoman } from "@/lib/utils";
-import { egressFetch } from "@/lib/utils.server";
+import { egressFetch, redact } from "@/lib/utils.server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -320,9 +320,9 @@ async function executeSyncMutations(
 
   dbResults.forEach((res, idx) => {
     if (res.status === "rejected") {
-      logger.error(`DB error for ${user.username}:`, res.reason);
+      logger.error(`DB error for ${redact("username", user.username)}:`, res.reason);
     } else if (res.value && typeof res.value === "object" && "error" in res.value && (res.value as Record<string, unknown>).error) {
-      logger.error(`Supabase error for ${user.username}:`, (res.value as Record<string, unknown>).error);
+      logger.error(`Supabase error for ${redact("username", user.username)}:`, (res.value as Record<string, unknown>).error);
     } else if (idx === notifIndex) {
       notificationsInserted = true;
     }
@@ -386,7 +386,7 @@ async function syncUser(
     stats.updates = toUpdateStatus.length;
     return stats;
   } catch (err) {
-    logger.error(`Sync failed for ${user.username}`, err);
+    logger.error(`Sync failed for ${redact("username", user.username)} (${redact("id", user.auth_id)})`, err);
     stats.errors = 1;
     return stats;
   } finally {

@@ -1,0 +1,14 @@
+{
+  "playwright": {
+    "url": "https://registry.npmjs.org/playwright/-/playwright-1.60.0.tgz",
+    "shasum": "89710863a51f21112633ef8b6b182594d3bfd7b5"
+  },
+  "firebase": {
+    "url": "https://registry.npmjs.org/firebase-tools/-/firebase-tools-15.18.0.tgz",
+    "shasum": "179b592d2cbdae7b7b8d5844477e81844c6ef5a5"
+  },
+  "supabase": {
+    "url": "https://github.com/supabase/cli/releases/download/v2.98.2/supabase_linux_amd64.tar.gz",
+    "sha256": "0f59df9e6837e876f309e0b4f47005133c51296e85a02727b2927f33ed9adb2d"
+  }
+}

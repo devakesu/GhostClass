@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
+import { redact } from "@/lib/utils.server";
 
 export const dynamic = "force-dynamic";
 
@@ -68,14 +69,14 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { 
     logger.error("API /user/accept-terms: Database update failed:", error);
     Sentry.captureException(error, {
       tags: { type: "db_update_error", location: "api/user/accept-terms" },
-      extra: { userId: authUser.id, version: versionResult.data },
+      extra: { userId: redact("id", authUser.id), version: versionResult.data },
     });
     return NextResponse.json({ error: "Failed to update terms acceptance" }, {
       status: 500,
     });
   }
 
-  logger.info("API /user/accept-terms: Success", { userId: authUser.id, version });
+  logger.info("API /user/accept-terms: Success", { userId: redact("id", authUser.id), version });
 
   return NextResponse.json({ success: true, version });
 };

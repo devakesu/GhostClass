@@ -1,6 +1,7 @@
 // src/lib/security/auth-lock.ts
 import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
+import { redact } from "@/lib/utils.server";
 
 /**
  * Distributed lock for institutional login synchronization.
@@ -31,13 +32,13 @@ export async function getAuthLock(
 
     if (acquired === "OK") {
       if (process.env.NODE_ENV === "development") {
-        logger.dev(`[Auth-Lock] Acquired for ${userId}`);
+        logger.dev(`[Auth-Lock] Acquired for ${redact("id", userId)}`);
       }
       return lockValue;
     }
     return null;
   } catch (err) {
-    logger.error(`[Auth-Lock] Failed to acquire for ${userId}:`, err);
+    logger.error(`[Auth-Lock] Failed to acquire for ${redact("id", userId)}:`, err);
     return null;
   }
 }
@@ -71,13 +72,13 @@ export async function releaseAuthLock(
 
     if (result === 1) {
       if (process.env.NODE_ENV === "development") {
-        logger.dev(`[Auth-Lock] Released for ${userId}`);
+        logger.dev(`[Auth-Lock] Released for ${redact("id", userId)}`);
       }
       return true;
     }
     return false;
   } catch (err) {
-    logger.error(`[Auth-Lock] Failed to release for ${userId}:`, err);
+    logger.error(`[Auth-Lock] Failed to release for ${redact("id", userId)}:`, err);
     return false;
   }
 }

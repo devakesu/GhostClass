@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -41,7 +42,11 @@ class PushNotificationService {
 
   /// Initializes FCM listeners, requests push permissions, sets up isolates,
   /// and synchronises the active device push token.
-  Future<void> initialize({bool registerHandlers = true}) async {
+  Future<void> initialize({
+    bool registerHandlers = true,
+    Stream<RemoteMessage>? onMessageStream,
+    Stream<RemoteMessage>? onMessageOpenedAppStream,
+  }) async {
     try {
       // Request permissions natively on iOS and Android targets
       final settings = await _messaging.requestPermission();
@@ -57,19 +62,54 @@ class PushNotificationService {
           FirebaseMessaging.onBackgroundMessage(
             _firebaseMessagingBackgroundHandler,
           );
-
-          // Listen for active app foreground message streams
-          FirebaseMessaging.onMessage.listen((message) {
-            AppLogger.d(
-              'Received foreground message: ${message.notification?.title}',
-            );
-          });
         }
+
+        // Listen for active app foreground message streams
+        (onMessageStream ?? FirebaseMessaging.onMessage).listen((message) {
+          AppLogger.d(
+            'Received foreground message: ${message.notification?.title}',
+          );
+          try {
+            unawaited(
+              AnalyticsService.instance.logCustom(
+                'fcm_foreground_received',
+                {
+                  'title': message.notification?.title ?? '',
+                  'has_data': message.data.isNotEmpty,
+                },
+              ),
+            );
+          } on Object catch (_) {}
+        });
+
+        // Track when user taps a notification to open the app
+        (onMessageOpenedAppStream ?? FirebaseMessaging.onMessageOpenedApp)
+            .listen((message) {
+              AppLogger.i('User opened app from notification');
+              try {
+                unawaited(
+                  AnalyticsService.instance.logCustom(
+                    'fcm_opened',
+                    {
+                      'title': message.notification?.title ?? '',
+                      'has_data': message.data.isNotEmpty,
+                    },
+                  ),
+                );
+              } on Object catch (_) {}
+            });
 
         // Retrieve token and execute initial synchronization
         final token = await _messaging.getToken();
         if (token != null) {
           await _syncTokenWithBackend(token);
+          try {
+            unawaited(
+              AnalyticsService.instance.logCustom('fcm_token_retrieved', {
+                'length': token.length,
+              }),
+            );
+          } on Object catch (_) {}
         }
 
         // Establish ongoing refresh listener for security token rotations
@@ -117,13 +157,36 @@ class PushNotificationService {
       if (response.statusCode == 200) {
         AppLogger.i('FCM push token securely registered with backend services');
         await _storage.saveFcmToken(token);
+        try {
+          unawaited(
+            AnalyticsService.instance.logCustom('fcm_registered', {
+              'registered': true,
+            }),
+          );
+        } on Object catch (_) {}
       } else {
         AppLogger.w(
           'Backend token registration returned non-success code: ${response.statusCode}',
         );
+        try {
+          unawaited(
+            AnalyticsService.instance.logCustom('fcm_registered', {
+              'registered': false,
+              'status': response.statusCode,
+            }),
+          );
+        } on Object catch (_) {}
       }
     } on Object catch (e) {
       AppLogger.w('FCM backend token attestation/handshake failure', e);
+      try {
+        unawaited(
+          AnalyticsService.instance.logCustom('fcm_registered', {
+            'registered': false,
+            'error': e.toString(),
+          }),
+        );
+      } on Object catch (_) {}
     }
   }
 
