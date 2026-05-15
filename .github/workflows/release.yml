@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
   # Build, sign, and push Docker images
   build-and-release:
@@ -42,13 +42,13 @@ jobs:
       platforms: ${{ steps.prep.outputs.platforms }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@a0c73a10bb6782f082cd6714666c87911e4fc7d3 # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Login to GHCR
-        uses: docker/login-action@9f4a8ea54ed9055d5f86c993e1f2ffa674f98344 # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -56,7 +56,7 @@ jobs:
 
       - name: Fetch build-time secrets from Infisical
         if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
-        uses: infisical/secrets-action@a663da471d227f42617f09f0744e803c51631032 # v1.0.12
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -129,7 +129,7 @@ jobs:
 
       - name: Build & push Docker image
         id: build-push
-        uses: docker/build-push-action@bcafcac0480951a80d4036f019f20e408ec228c2 # v7.1.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           push: true
@@ -187,7 +187,7 @@ jobs:
 
       # Attest build provenance
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
@@ -246,7 +246,7 @@ jobs:
 
       # Generate SBOM
       - name: Generate SBOM
-        uses: anchore/sbom-action@cf54b07f9a24febf56b236893d115bafc5be6a27 # v0.23.0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
           format: cyclonedx-json
@@ -254,7 +254,7 @@ jobs:
 
       # Attest SBOM
       - name: Attest SBOM
-        uses: actions/attest@a2d48ba168b9e64b41c8cc6fa3b9a90ee277d34f # v4.1.0
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
@@ -264,7 +264,7 @@ jobs:
 
       # Sign image with cosign (keyless signing using OIDC)
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.0.0
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Authenticate cosign with registry
         run: |
@@ -344,7 +344,7 @@ jobs:
 
       # Upload artifacts for the release job
       - name: Upload release artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-artifacts
           path: |
@@ -363,7 +363,7 @@ jobs:
       attestations: write
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Java
         uses: actions/setup-java@be666c2d1b1f630560a61214041b655f46328637 # v5.2.0
@@ -379,7 +379,7 @@ jobs:
 
       - name: Fetch build-time secrets from Infisical
         if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
-        uses: infisical/secrets-action@a663da471d227f42617f09f0744e803c51631032 # v1.0.12
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -568,13 +568,13 @@ jobs:
 
       - name: Attest mobile APK provenance
         id: attest-mobile
-        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: mobile/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Attest mobile AAB provenance
         id: attest-mobile-aab
-        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275 # v4.1.0
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: mobile/build/app/outputs/bundle/release/app-release.aab
 
@@ -600,13 +600,13 @@ jobs:
           } > mobile-checksums.txt
 
       - name: Upload mobile APK artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mobile-app-apk
           path: mobile/release-assets/mobile-app-release.apk
 
       - name: Upload mobile security metadata artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mobile-security-metadata
           path: |
@@ -674,13 +674,13 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Fetch build-time secrets from Infisical
         if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
-        uses: infisical/secrets-action@a663da471d227f42617f09f0744e803c51631032 # v1.0.12
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
@@ -704,19 +704,19 @@ jobs:
           echo "Targeting release tag: ${VERSION_TAG}"
 
       - name: Download artifacts
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-artifacts
           path: ./artifacts/web
 
       - name: Download mobile APK artifact
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: mobile-app-apk
           path: ./artifacts/mobile
 
       - name: Download mobile security metadata artifacts
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: mobile-security-metadata
           path: ./artifacts/mobile
