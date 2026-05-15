@@ -58,7 +58,7 @@ function getSecret(): string {
 /**
  * Redacts sensitive data (email, ID) for safe server-side logging using HMAC-SHA256.
  */
-export const redact = (type: "email" | "id", value: string): string =>
+export const redact = (type: "email" | "id" | "username", value: string): string =>
   crypto
     .createHmac("sha256", getSecret())
     .update(`${type}:${value}`)

@@ -3,6 +3,9 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04@sha256:81380e4c9c14e8a629
 
 USER root
 
+# Copy pinned artifacts so they can be used as defaults when build-args are not provided
+COPY .devcontainer/pinned-artifacts.json /tmp/pinned-artifacts.json
+
 # 1. System Dependencies, Java 17, and SSH Setup
 RUN apt-get update && apt-get install -y \
     openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https \
@@ -19,29 +22,59 @@ RUN mkdir -p /etc/apt/keyrings \
     && apt-get update && apt-get install -y nodejs
 
 # 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
-RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
-    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && apt-get update && apt-get install -y \
-       docker-ce-cli \
-       docker-buildx-plugin \
-       docker-compose-plugin \
-       gh \
-    && ARCH=$(dpkg --print-architecture) \
-    && echo "Downloading latest Supabase CLI for ${ARCH}..." \
-    && curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${ARCH}.tar.gz" -o supabase.tar.gz \
-    && tar -xzf supabase.tar.gz \
-    && mv supabase /usr/local/bin/ \
-    && chmod +x /usr/local/bin/supabase \
-    && rm supabase.tar.gz \
-    && npm install -g playwright@1.44.0 \
-    && npx playwright install-deps \
-    && npm install -g firebase-tools@13.10.0
+ARG PLAYWRIGHT_TARBALL_URL
+ARG PLAYWRIGHT_SHASUM
+ARG FIREBASE_TARBALL_URL
+ARG FIREBASE_SHASUM
+ARG SUPABASE_TARBALL_URL
+ARG SUPABASE_SHA256
+
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
+     && install -m 0755 -d /etc/apt/keyrings \
+     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+     && chmod a+r /etc/apt/keyrings/docker.gpg \
+     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+     && apt-get update && apt-get install -y \
+         docker-ce-cli \
+         docker-buildx-plugin \
+         docker-compose-plugin \
+         gh \
+        && if [ -f /tmp/pinned-artifacts.json ]; then \
+            PLAYWRIGHT_TARBALL_URL=${PLAYWRIGHT_TARBALL_URL:-$(jq -r '.playwright.url' /tmp/pinned-artifacts.json)}; \
+            PLAYWRIGHT_SHASUM=${PLAYWRIGHT_SHASUM:-$(jq -r '.playwright.shasum' /tmp/pinned-artifacts.json)}; \
+            FIREBASE_TARBALL_URL=${FIREBASE_TARBALL_URL:-$(jq -r '.firebase.url' /tmp/pinned-artifacts.json)}; \
+            FIREBASE_SHASUM=${FIREBASE_SHASUM:-$(jq -r '.firebase.shasum' /tmp/pinned-artifacts.json)}; \
+            SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url' /tmp/pinned-artifacts.json)}; \
+            SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256' /tmp/pinned-artifacts.json)}; \
+        fi; \
+        && ARCH=$(dpkg --print-architecture) \
+        && echo "Downloading Supabase CLI (verify by provided SHA256)..." \
+        && if [ -z "$SUPABASE_TARBALL_URL" ] || [ -z "$SUPABASE_SHA256" ]; then echo "SUPABASE_TARBALL_URL and SUPABASE_SHA256 must be provided (build-arg or pinned file)" >&2; exit 1; fi; \
+        && curl -fSL "$SUPABASE_TARBALL_URL" -o /tmp/supabase.tar.gz \
+        && echo "$SUPABASE_SHA256  /tmp/supabase.tar.gz" | sha256sum -c - \
+        && tar -xzf /tmp/supabase.tar.gz -C /tmp \
+        && mv /tmp/supabase /usr/local/bin/ \
+        && chmod +x /usr/local/bin/supabase \
+        && rm -f /tmp/supabase.tar.gz \
+        && set -eux; \
+        # Install npm global packages from provided tarball URLs and verify hashes
+        for NAME in "playwright" "firebase-tools"; do \
+            case "$NAME" in \
+                playwright) URL="$PLAYWRIGHT_TARBALL_URL"; SUM="$PLAYWRIGHT_SHASUM";; \
+                firebase-tools) URL="$FIREBASE_TARBALL_URL"; SUM="$FIREBASE_SHASUM";; \
+            esac; \
+            if [ -z "$URL" ] || [ -z "$SUM" ]; then echo "Missing URL or SHASUM for $NAME" >&2; exit 1; fi; \
+            echo "Downloading $NAME tarball from $URL"; curl -fSL "$URL" -o /tmp/$NAME.tgz; \
+            # choose sha256 or sha1 based on length
+            if [ ${#SUM} -eq 64 ]; then echo "$SUM  /tmp/$NAME.tgz" | sha256sum -c -; else echo "$SUM  /tmp/$NAME.tgz" | sha1sum -c -; fi; \
+            npm install -g /tmp/$NAME.tgz; \
+            rm -f /tmp/$NAME.tgz; \
+        done; \
+        # Install Playwright OS dependencies using the installed package
+        npx playwright install-deps
 
 # Switch to vscode user for user-space SDKs
 USER vscode

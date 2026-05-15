@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { performProfileSync } from '../sync';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { egressFetch } from '@/lib/utils.server';
+import { egressFetch, redact } from '@/lib/utils.server';
 import { calculateCurrentAcademicInfo } from '@/lib/logic/academic';
 import { safeResponseJson } from '@/lib/json';
 import { logger } from '@/lib/logger';
@@ -518,5 +518,41 @@ describe('performProfileSync', () => {
     const result = await performProfileSync(mockToken, '123', mockAuthId);
     expect(result.courses['C1']).toBeDefined();
     // No ID-based key should exist
+  });
+
+  it('redacts authId and ezygoId in Sentry on sync error', async () => {
+    const { captureException } = await import('@sentry/nextjs');
+    
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      return createMockResponse('{}');
+    });
+    vi.mocked(safeResponseJson).mockResolvedValue({ user_id: '12345' });
+
+    // Mock upsert to fail
+    mockSupabase.upsert.mockResolvedValue({ error: new Error('Upsert failed') });
+
+    const testEzygoId = 'sensitive-ezygo-id';
+    const testAuthId = 'sensitive-auth-id';
+
+    // Mock redact to return a hash-like format
+    vi.mocked(redact).mockImplementation((_type: string, value: string) => {
+      return `h-${Buffer.from(value).toString('base64').slice(0, 8)}`;
+    });
+
+    await expect(performProfileSync(mockToken, testEzygoId, testAuthId)).rejects.toThrow('Upsert failed');
+
+    // Verify Sentry was called with redacted IDs
+    expect(vi.mocked(captureException)).toHaveBeenCalledOnce();
+    const captureCall = vi.mocked(captureException).mock.calls[0];
+    const opts = captureCall[1] as any;
+    
+    expect(opts.tags).toEqual({ type: 'sync_failed', component: 'sync_service' });
+    expect(opts.extra.ezygoId).toMatch(/^h-/); // Should be redacted
+    expect(opts.extra.authId).toMatch(/^h-/);  // Should be redacted
+    
+    // Verify the redacted values are NOT the original secrets
+    expect(opts.extra.ezygoId).not.toBe(testEzygoId);
+    expect(opts.extra.authId).not.toBe(testAuthId);
   });
 });

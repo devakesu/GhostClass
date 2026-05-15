@@ -489,7 +489,7 @@ export async function performProfileSync(
     logger.error(`Sync error for ${redact("id", authId)}:`, err);
     Sentry.captureException(err, {
       tags: { type: "sync_failed", component: "sync_service" },
-      extra: { ezygoId, authId },
+      extra: { ezygoId: redact("id", ezygoId), authId: redact("id", authId) },
     });
     throw err;
   }

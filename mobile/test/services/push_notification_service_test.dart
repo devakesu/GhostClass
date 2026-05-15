@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -25,6 +29,8 @@ class MockGoTrueClient extends Mock implements GoTrueClient {}
 
 class MockSession extends Mock implements Session {}
 
+class MockFirebaseAnalytics extends Mock implements FirebaseAnalytics {}
+
 void main() {
   late MockFirebaseMessaging mockMessaging;
   late MockNotificationSettings mockSettings;
@@ -34,9 +40,13 @@ void main() {
   late MockSupabaseClient mockSupabase;
   late MockGoTrueClient mockAuth;
   late MockSession mockSession;
+  late MockFirebaseAnalytics mockAnalytics;
   late ProviderContainer container;
 
-  setUp(() {
+  setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
+
+  setUp(() async {
+    AnalyticsService.resetForTest();
     mockMessaging = MockFirebaseMessaging();
     mockSettings = MockNotificationSettings();
     mockDioService = MockDioService();
@@ -45,14 +55,34 @@ void main() {
     mockSupabase = MockSupabaseClient();
     mockAuth = MockGoTrueClient();
     mockSession = MockSession();
+    mockAnalytics = MockFirebaseAnalytics();
 
     when(() => mockDioService.dio).thenReturn(mockDio);
     when(() => mockSupabase.auth).thenReturn(mockAuth);
     when(() => mockAuth.currentSession).thenReturn(mockSession);
     when(() => mockSession.accessToken).thenReturn('mock-jwt-token');
+    when(() => mockSession.isExpired).thenReturn(false);
 
     when(() => mockStorage.getFcmToken()).thenAnswer((_) async => null);
     when(() => mockStorage.saveFcmToken(any())).thenAnswer((_) async => true);
+
+    when(
+      () => mockAnalytics.setUserProperty(
+        name: any(named: 'name'),
+        value: any(named: 'value'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockAnalytics.logAppOpen(parameters: any(named: 'parameters')),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockAnalytics.logEvent(
+        name: any(named: 'name'),
+        parameters: any(named: 'parameters'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
 
     container = ProviderContainer(
       overrides: [
@@ -62,11 +92,16 @@ void main() {
         supabaseClientProvider.overrideWithValue(mockSupabase),
       ],
     );
+
+    addTearDown(container.dispose);
   });
 
   test(
     'initialize requests permission and syncs token if authorized',
     () async {
+      final foregroundMessages = StreamController<RemoteMessage>();
+      final openedMessages = StreamController<RemoteMessage>();
+
       when(
         () => mockSettings.authorizationStatus,
       ).thenReturn(AuthorizationStatus.authorized);
@@ -99,9 +134,51 @@ void main() {
       );
 
       final service = container.read(pushNotificationServiceProvider);
-      await service.initialize(registerHandlers: false);
+      await service.initialize(
+        registerHandlers: false,
+        onMessageStream: foregroundMessages.stream,
+        onMessageOpenedAppStream: openedMessages.stream,
+      );
+      foregroundMessages.add(
+        const RemoteMessage(
+          notification: RemoteNotification(title: 'Foreground title'),
+          data: {'kind': 'foreground'},
+        ),
+      );
+      openedMessages.add(
+        const RemoteMessage(
+          notification: RemoteNotification(title: 'Opened title'),
+          data: {'kind': 'opened'},
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => mockStorage.saveFcmToken('new-fcm-token')).called(1);
+
+      final foregroundVerification = verify(
+        () => mockAnalytics.logEvent(
+          name: 'fcm_foreground_received',
+          parameters: captureAny(named: 'parameters'),
+        ),
+      );
+      final foregroundParams =
+          foregroundVerification.captured.single as Map<String, Object?>;
+      expect(foregroundParams['env'], anyOf('development', 'production'));
+      expect(foregroundParams['has_data'], true);
+
+      final openedVerification = verify(
+        () => mockAnalytics.logEvent(
+          name: 'fcm_opened',
+          parameters: captureAny(named: 'parameters'),
+        ),
+      );
+      final openedParams =
+          openedVerification.captured.single as Map<String, Object?>;
+      expect(openedParams['env'], anyOf('development', 'production'));
+      expect(openedParams['has_data'], true);
+
+      await foregroundMessages.close();
+      await openedMessages.close();
     },
   );
 

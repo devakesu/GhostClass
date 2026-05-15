@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 
 /// ErrorHandlerMixin
@@ -36,6 +37,14 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
           dialogMessage += '\n\n$action';
         }
 
+        try {
+          await AnalyticsService.instance.logCustom('security_failure', {
+            'reason': reason,
+            'action': action,
+            'critical': isCritical,
+          });
+        } on Object catch (_) {}
+        if (!mounted) return;
         await SecurityUtils.showSecurityFailureDialog(
           context,
           title: 'Security Attestation Failed',
@@ -58,6 +67,7 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
 
         if (isSecurityFailure) {
           // Fallback errors are treated as non-critical (temp glitch)
+          if (!mounted) return;
           await SecurityUtils.showSecurityFailureDialog(
             context,
             title: 'Security Attestation Failed',
@@ -85,6 +95,11 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
       }
     }
 
+    try {
+      await AnalyticsService.instance.logError(message, stack: details);
+    } on Object catch (_) {}
+
+    if (!mounted) return;
     await ServiceErrorDialog.show(context, title, [message], details: details);
   }
 }

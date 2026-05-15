@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +12,7 @@ import 'package:ghostclass/models/institution.dart';
 import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
@@ -390,7 +390,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       await api.acceptTerms(token, version);
       await storage.saveTermsVersion(version);
       state = AsyncValue.data(user.copyWith(termsVersion: version));
-    } catch (e) {
+      try {
+        await AnalyticsService.instance.logAcceptTerms(version);
+      } on Object catch (_) {}
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: Terms acceptance failed', e);
       rethrow;
     }
@@ -591,7 +594,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final bridgeData = bridgeResponse.data as Map<String, dynamic>;
 
       if (kDebugMode) {
-        AppLogger.d('AuthNotifier: Bridge response data: $bridgeData');
+        AppLogger.d(
+          'AuthNotifier: Bridge response received with ${bridgeData.length} top-level fields',
+        );
       }
 
       final sessionData =
@@ -662,6 +667,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       if (profileService.hasRenderableLocalProfile(cachedUser.profile)) {
         state = AsyncValue.data(cachedUser);
         unawaited(Future.microtask(() => refreshProfile(force: true)));
+        try {
+          await AnalyticsService.instance.logLogin(method: 'ezygo');
+        } on Object catch (_) {}
         return;
       }
 
@@ -698,8 +706,15 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             }
           }),
         );
+
+        try {
+          await AnalyticsService.instance.logLogin(method: 'ezygo');
+        } on Object catch (_) {}
       } else {
         await _fetchAndApplyServerProfile(cachedUser);
+        try {
+          await AnalyticsService.instance.logLogin(method: 'ezygo');
+        } on Object catch (_) {}
       }
     } catch (e, st) {
       AppLogger.e('AuthNotifier: LOGIN ERROR', e);
@@ -727,6 +742,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     } on Object catch (e) {
       AppLogger.e('AuthNotifier: LOGOUT CLEANUP ERROR', e);
     }
+    try {
+      await AnalyticsService.instance.logLogout();
+    } on Object catch (_) {}
   }
 
   Future<void> _clearSharedPrefs() async {
@@ -757,7 +775,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     try {
       await ref.read(profileServiceProvider).deleteAccount(user.supabaseUserId);
       await logout();
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: Account deletion failed', e);
       rethrow;
     }
@@ -797,7 +815,23 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         targetPercentage: targetPercentage,
         disabledCourses: disabledCourses,
       );
-    } catch (e) {
+      // Analytics: settings updated
+      try {
+        final changes = <String, dynamic>{};
+        if (bunkEnabled != null) {
+          changes['bunkCalculatorEnabled'] = bunkEnabled;
+        }
+        if (targetPercentage != null) {
+          changes['targetPercentage'] = targetPercentage;
+        }
+        if (disabledCourses != null) {
+          changes['disabledCoursesCount'] = disabledCourses.length;
+        }
+        if (changes.isNotEmpty) {
+          await AnalyticsService.instance.logSettingsUpdated(changes);
+        }
+      } on Object catch (_) {}
+    } on Object catch (e) {
       AppLogger.w(
         'AuthNotifier: Settings persistence failed, rolling back.',
         e,

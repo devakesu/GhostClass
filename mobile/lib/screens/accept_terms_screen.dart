@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +30,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
         context.go('/dashboard');
       }
     });
+    try {
+      unawaited(AnalyticsService.instance.logScreenView('accept_terms'));
+    } on Object catch (_) {}
   }
 
   Future<void> _handleAccept() async {
@@ -37,6 +42,13 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
     LoadingOverlay.show(context, message: 'Entering GhostClass...');
 
     try {
+      try {
+        unawaited(
+          AnalyticsService.instance.logCustom('accept_terms_tap', {
+            'version': _termsVersion,
+          }),
+        );
+      } on Object catch (_) {}
       await ref.read(authProvider.notifier).acceptTerms();
       if (mounted) {
         LoadingOverlay.hide(context);

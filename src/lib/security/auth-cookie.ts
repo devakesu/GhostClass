@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
+import { redact } from "@/lib/utils.server";
 
 export async function setAuthCookie(token: string, days = 31) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -47,7 +48,7 @@ export async function getAuthTokenWithFallback() {
       const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
       // Attempt to restore the cookie for future requests
       await setAuthCookie(token);
-      logger.info("[auth-cookie] EzyGo token healed from database fallback", { userId: user.id });
+      logger.info("[auth-cookie] EzyGo token healed from database fallback", { userId: redact("id", user.id) });
       return token;
     }
   } catch (err) {
