@@ -125,4 +125,77 @@ void main() {
     expect(params['critical'], true);
     expect(params['env'], anyOf('development', 'production'));
   });
+
+  testWidgets('handles analytics exceptions gracefully in security failures', (
+    tester,
+  ) async {
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    // Mock analytics to throw exception
+    when(
+      () => mockAnalytics.logEvent(
+        name: any(named: 'name'),
+        parameters: any(named: 'parameters'),
+      ),
+    ).thenThrow(Exception('Analytics error'));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: _ErrorHarness(
+          error: AppException(
+            message: 'Security blocked',
+            type: AppExceptionType.forbidden,
+            details: {
+              'type': 'security',
+              'reason': 'Integrity check failed',
+              'action': 'Restart the app',
+              'criticalRisk': true,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Trigger'));
+    // Should not throw, exception should be caught
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+  });
+
+  testWidgets('handles non-critical security failures correctly', (
+    tester,
+  ) async {
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: _ErrorHarness(
+          error: AppException(
+            message: 'Security blocked',
+            type: AppExceptionType.forbidden,
+            details: {
+              'type': 'security',
+              'reason': 'Rate limit exceeded',
+              'action': 'Please wait',
+              'criticalRisk': false,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Trigger'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+
+    final verification = verify(
+      () => mockAnalytics.logEvent(
+        name: 'security_failure',
+        parameters: captureAny(named: 'parameters'),
+      ),
+    );
+    final params = verification.captured.single as Map<String, Object?>;
+    expect(params['reason'], 'Rate limit exceeded');
+    expect(params['critical'], false);
+  });
 }

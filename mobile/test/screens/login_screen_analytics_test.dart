@@ -90,4 +90,67 @@ void main() {
     expect(loginFailedParams['reason'], 'Invalid credentials');
     expect(loginFailedParams['env'], anyOf('development', 'production'));
   });
+
+  testWidgets('logs successful login', (tester) async {
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    final fakeNotifier = FakeLoginAuthNotifier((username, password) async {
+      // Simulate successful login
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authProvider.overrideWith(() => fakeNotifier)],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'student');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password');
+    await tester.tap(find.text('Login'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+
+    final loginAttemptVerification = verify(
+      () => mockAnalytics.logEvent(
+        name: 'login_attempt',
+        parameters: captureAny(named: 'parameters'),
+      ),
+    );
+    final loginAttemptParams =
+        loginAttemptVerification.captured.single as Map<String, Object?>;
+    expect(loginAttemptParams['username_length'], 'student'.length);
+  });
+
+  testWidgets('handles long username in login attempt', (tester) async {
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    final longUsername = 'a' * 100;
+    final fakeNotifier = FakeLoginAuthNotifier((username, password) async {
+      throw LoginException('Invalid credentials');
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [authProvider.overrideWith(() => fakeNotifier)],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextFormField).at(0), longUsername);
+    await tester.enterText(find.byType(TextFormField).at(1), 'password');
+    await tester.tap(find.text('Login'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+
+    final loginAttemptVerification = verify(
+      () => mockAnalytics.logEvent(
+        name: 'login_attempt',
+        parameters: captureAny(named: 'parameters'),
+      ),
+    );
+    final loginAttemptParams =
+        loginAttemptVerification.captured.single as Map<String, Object?>;
+    expect(loginAttemptParams['username_length'], 100);
+  });
 }

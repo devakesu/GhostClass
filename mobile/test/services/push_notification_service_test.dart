@@ -204,4 +204,100 @@ void main() {
     final service = container.read(pushNotificationServiceProvider);
     expect(service.dispose, returnsNormally);
   });
+
+  test('handles analytics exceptions gracefully in FCM listeners', () async {
+    final foregroundMessages = StreamController<RemoteMessage>();
+    final openedMessages = StreamController<RemoteMessage>();
+
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'new-fcm-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      ),
+    );
+
+    // Mock analytics to throw exception
+    when(
+      () => mockAnalytics.logEvent(
+        name: any(named: 'name'),
+        parameters: any(named: 'parameters'),
+      ),
+    ).thenThrow(Exception('Analytics error'));
+
+    final service = container.read(pushNotificationServiceProvider);
+    await service.initialize(
+      registerHandlers: false,
+      onMessageStream: foregroundMessages.stream,
+      onMessageOpenedAppStream: openedMessages.stream,
+    );
+
+    // These should not throw even though analytics fails
+    foregroundMessages.add(
+      const RemoteMessage(
+        notification: RemoteNotification(title: 'Foreground title'),
+        data: {'kind': 'foreground'},
+      ),
+    );
+    openedMessages.add(
+      const RemoteMessage(
+        notification: RemoteNotification(title: 'Opened title'),
+        data: {'kind': 'opened'},
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await foregroundMessages.close();
+    await openedMessages.close();
+  });
+
+  test('handles token sync errors gracefully', () async {
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+
+    when(
+      () => mockMessaging.getToken(),
+    ).thenThrow(Exception('Failed to get token'));
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
+    final service = container.read(pushNotificationServiceProvider);
+    // Should complete without throwing even if token retrieval fails
+    await expectLater(
+      service.initialize(registerHandlers: false),
+      completes,
+    );
+  });
 }

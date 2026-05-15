@@ -164,4 +164,96 @@ void main() {
     expect(customParams['foo'], 'bar');
     expect(customParams['env'], anyOf('development', 'production'));
   });
+
+  test('handles Firebase exceptions gracefully in all methods', () async {
+    await initService();
+
+    // Mock all methods to throw exceptions
+    when(
+      () => mockAnalytics.setUserProperty(
+        name: any(named: 'name'),
+        value: any(named: 'value'),
+      ),
+    ).thenThrow(Exception('Firebase error'));
+
+    when(
+      () => mockAnalytics.logScreenView(
+        screenName: any(named: 'screenName'),
+        screenClass: any(named: 'screenClass'),
+        parameters: any(named: 'parameters'),
+      ),
+    ).thenThrow(Exception('Firebase error'));
+
+    when(
+      () => mockAnalytics.logEvent(
+        name: any(named: 'name'),
+        parameters: any(named: 'parameters'),
+      ),
+    ).thenThrow(Exception('Firebase error'));
+
+    when(
+      () => mockAnalytics.logAppOpen(parameters: any(named: 'parameters')),
+    ).thenThrow(Exception('Firebase error'));
+
+    // These should not throw, exceptions should be caught
+    await expectLater(
+      AnalyticsService.instance.logScreenView('test_screen'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logLogin(method: 'test'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logLogout(),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logSignUp(method: 'test'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logAttendanceMarked(courseId: '1', count: 1),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logLeaveRequested(courseId: '1', type: 'test'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logError('test error', stack: 'trace'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logAttendanceDeleted(courseId: '1', count: 1),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logSettingsUpdated({'key': 'value'}),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logAcceptTerms('v1'),
+      completes,
+    );
+    await expectLater(
+      AnalyticsService.instance.logCustom('test', {'key': 'value'}),
+      completes,
+    );
+  });
+
+  test('getObserver returns FirebaseAnalyticsObserver instance', () async {
+    await initService();
+    final observer = AnalyticsService.instance.observer;
+    expect(observer, isA<FirebaseAnalyticsObserver>());
+  });
+
+  test('resetForTest clears analytics instance', () {
+    AnalyticsService.resetForTest();
+    // Verify that accessing analytics after reset throws
+    expect(
+      () => AnalyticsService.instance.analytics,
+      throwsA(isA<StateError>()),
+    );
+  });
 }

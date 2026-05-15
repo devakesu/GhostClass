@@ -325,4 +325,50 @@ void main() {
     final params = verification.captured.single as Map<String, Object?>;
     expect(params['env'], anyOf('development', 'production'));
   });
+
+  test('login handles bridge response with multiple fields', () async {
+    // This test verifies bridge response handling for the debug logging path
+    await initAnalytics();
+
+    when(
+      () => mockApi.loginAndProvision(
+        username: any(named: 'username'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(path: '/auth'),
+        statusCode: 200,
+        data: {
+          'session': {'refresh_token': 'refresh-token'},
+          'settings': {
+            'bunk_calculator_enabled': true,
+            'target_percentage': 75,
+            'disabled_courses': <String, String>{},
+          },
+          'id': 'ezygo-id',
+          'ezygo_token': 'ezygo-token',
+          'current_semester': 'Odd',
+          'current_year': '2025-2026',
+          'field1': 'value1',
+          'field2': 'value2',
+          'field3': 'value3',
+        },
+      ),
+    );
+
+    final container = buildContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(authProvider.notifier);
+
+    currentSession = mockSession;
+
+    // This exercises the bridge response handling code path
+    await notifier.login('student', 'password');
+    await Future<void>.delayed(Duration.zero);
+
+    // Verify the state was updated correctly
+    final state = container.read(authProvider);
+    expect(state.isLoading, isFalse);
+  });
 }
