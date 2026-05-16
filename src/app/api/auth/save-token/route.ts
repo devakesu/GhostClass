@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import crypto from "crypto";
 import { z } from "zod";
@@ -265,6 +265,7 @@ const handler = async (
   { decryptedBody, authType }: { decryptedBody?: unknown; authType?: string }
 ) => {
   const headerList = await headers();
+  const cookieStore = await cookies();
   const headerErr = await validateRequestHeaders(headerList, authType === "app-check");
   if (headerErr) return headerErr;
 
@@ -306,7 +307,7 @@ const handler = async (
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
       {
         cookies: {
-          getAll: () => headerList as unknown as { name: string; value: string }[],
+          getAll: () => cookieStore.getAll(),
           setAll: () => {},
         },
       }
