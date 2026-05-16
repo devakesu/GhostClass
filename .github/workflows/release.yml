@@ -424,6 +424,23 @@ jobs:
           fi
           echo "build_timestamp=${BUILD_TIMESTAMP}" >> "$GITHUB_OUTPUT"
 
+          # Derive APP_DOMAIN and BACKEND_URL (duplicated from build-and-release for job isolation)
+          APP_DOMAIN="${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
+            APP_DOMAIN="localhost"
+          fi
+          echo "APP_DOMAIN=${APP_DOMAIN}" >> $GITHUB_ENV
+
+          BACKEND_URL="${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" = "null" ]; then
+             if [ "$APP_DOMAIN" = "localhost" ]; then
+               BACKEND_URL="http://localhost:3000"
+             else
+               BACKEND_URL="https://${APP_DOMAIN}"
+             fi
+          fi
+          echo "BACKEND_URL=${BACKEND_URL}" >> $GITHUB_ENV
+
       - name: Fetch Flutter dependencies
         working-directory: mobile
         run: flutter pub get
@@ -729,8 +746,6 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "Targeting release tag: ${VERSION_TAG}"
-
-      
 
       - name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

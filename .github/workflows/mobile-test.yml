@@ -2,9 +2,12 @@ name: Mobile Tests
 
 on:
   push:
-    branches: [main, "release/*"]
+    branches: [main]
   pull_request:
     branches: [main, "release/*"]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-test.yml"
 
 permissions: {}
 
