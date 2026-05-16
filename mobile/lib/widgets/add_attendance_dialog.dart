@@ -251,13 +251,29 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(primary),
-              const SizedBox(height: 28),
-              const AttendanceDialogLabel(text: 'Date'),
-              const SizedBox(height: 6),
-              _buildDatePicker(primary),
               const SizedBox(height: 20),
+              Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      'DATE',
+                      style: GoogleFonts.manrope(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.3),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildDatePicker(primary)),
+                ],
+              ),
+              const SizedBox(height: 16),
               const AttendanceDialogLabel(text: 'Session'),
-              const SizedBox(height: 6),
               _buildSessionSelector(primary),
               if (_isBlocked)
                 const Padding(
@@ -271,23 +287,20 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const AttendanceDialogLabel(text: 'Subject'),
-              const SizedBox(height: 6),
               _buildSubjectSelectorButton(data, primary),
-              const SizedBox(height: 24),
-              const AttendanceDialogLabel(text: 'Status'),
-              const SizedBox(height: 6),
-              _buildStatusButtons(ghostColors),
               const SizedBox(height: 20),
+              const AttendanceDialogLabel(text: 'Status'),
+              _buildStatusButtons(ghostColors),
+              const SizedBox(height: 16),
               AttendanceDialogLabel(
                 text: _status == AttendanceStatus.dutyLeave
                     ? 'Reason (Optional)'
                     : 'Remarks (Optional)',
               ),
-              const SizedBox(height: 6),
               _buildRemarksField(primary),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               _buildSubmitButton(primary),
             ],
           ),
@@ -357,7 +370,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: uniformColor,
           borderRadius: BorderRadius.circular(12),
@@ -402,7 +415,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
           borderRadius: BorderRadius.circular(10),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: isSelected ? primary : _getUniformFieldColor(),
               borderRadius: BorderRadius.circular(10),
@@ -454,7 +467,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
       onTap: () => _showSubjectPickerBottomSheet(data, primary),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: _getUniformFieldColor(),
           borderRadius: BorderRadius.circular(12),
@@ -736,7 +749,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 12,
         ),
         counterStyle: const TextStyle(fontSize: 10),
       ),

@@ -17,6 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { sendEmail } from "@/lib/email";
 
 // Mock server-only package so Vitest's jsdom environment doesn't reject it.
 // Must be declared before any module that transitively imports server-only.
@@ -58,14 +59,19 @@ vi.mock("@/lib/supabase/admin", () => ({
   getAdminClient: vi.fn(() => ({ from: mockAdminFrom })),
 }));
 
-// ---------------------------------------------------------------------------
-// Supabase server client mock (non-cron path guard — unused in cron tests)
-// ---------------------------------------------------------------------------
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
-  ),
+vi.mock("@/lib/security/app-check", () => ({
+  withSecurity: vi.fn((handler) => (req: any, context: any = { authType: "cron" }) => handler(req, context)),
 }));
+
+const mockCreateClient = vi.fn().mockResolvedValue({
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: null } })
+  }
+});
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: mockCreateClient,
+}));
+
 
 // ---------------------------------------------------------------------------
 // Crypto mock — always return a predictable decrypted token
@@ -133,40 +139,31 @@ function makeCronRequest(username?: string): NextRequest {
 // EzyGo mock response builders
 // ---------------------------------------------------------------------------
 
-/** Courses API mock (institutionuser/courses/withusers) */
 function mockCoursesResponse(courses: { id: number; name: string; code?: string }[] = COURSES) {
-  mockFetch.mockResolvedValueOnce(
-    new Response(JSON.stringify(courses), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })
-  );
+  // We'll handle this in the global mockFetch implementation
+  (mockFetch as any)._courses = courses;
 }
 
-/**
- * Attendance API mock (attendancereports/student/detailed).
- *
- * officialData shape:
- *   { "YYYY-MM-DD": { "<sessionKey>": { session, attendance, course, class_type? } } }
- */
-function mockAttendanceResponse(officialData: Record<string, Record<string, unknown>>) {
-  mockFetch.mockResolvedValueOnce(
-    new Response(JSON.stringify({ studentAttendanceData: officialData }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })
-  );
-}
-
-/** Roles API mock (institutionuser/myroles) */
 function mockRolesResponse(roles: any[] = [{ id: 1, name: "Student" }]) {
-  mockFetch.mockResolvedValueOnce(
-    new Response(JSON.stringify(roles), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })
-  );
+  (mockFetch as any)._roles = roles;
 }
+
+function mockAttendanceResponse(officialData: Record<string, Record<string, unknown>>) {
+  (mockFetch as any)._attendance = officialData;
+}
+
+mockFetch.mockImplementation(async (url: string) => {
+  if (url.includes("institutionuser/courses/withusers")) {
+    return new Response(JSON.stringify((mockFetch as any)._courses || COURSES), { status: 200 });
+  }
+  if (url.includes("institutionuser/myroles")) {
+    return new Response(JSON.stringify((mockFetch as any)._roles || [{ id: 1, name: "Student" }]), { status: 200 });
+  }
+  if (url.includes("attendancereports/student/detailed")) {
+    return new Response(JSON.stringify({ studentAttendanceData: (mockFetch as any)._attendance || {} }), { status: 200 });
+  }
+  return new Response(JSON.stringify({}), { status: 200 });
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -213,7 +210,7 @@ function ezygoSession(
 // The factory mimics the Supabase query builder's fluent interface.
 // ---------------------------------------------------------------------------
 function buildAdminMock(opts: {
-  trackerData: Array<{
+  trackerData?: Array<{
     id: number;
     course: string;
     date: string;
@@ -221,24 +218,35 @@ function buildAdminMock(opts: {
     attendance: string;
     status: string;
   }>;
-}) {
+  usersData?: any[];
+} = {}) {
+  const trackerData = opts.trackerData || [];
+  const users = opts.usersData || [MOCK_USER_ROW];
   const deleteInSpy = vi.fn().mockReturnValue(Promise.resolve({ error: null }));
   const updateTrackerSpy = vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) });
   const notificationInsertSpy = vi.fn().mockResolvedValue({ error: null });
   const usersUpdateSpy = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
 
-  mockAdminFrom.mockImplementation((table: string) => {
+  const usersEqSpy = vi.fn().mockImplementation(() => {
+    const res = Promise.resolve({ data: users, error: null });
+    (res as any).single = vi.fn().mockResolvedValue({ data: users[0], error: null });
+    (res as any).order = vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue({ data: users, error: null }),
+    });
+    return res;
+  });
+
+  const usersQuerySpy = vi.fn().mockImplementation((table: string) => {
     if (table === "users") {
       return {
-        // cron-path user fetch chain:
-        // .select(...).not(...).eq(...) OR .select(...).not(...).order(...).limit(...)
         select: vi.fn().mockReturnValue({
           not: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [MOCK_USER_ROW], error: null }),
+            eq: usersEqSpy,
             order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue({ data: [MOCK_USER_ROW], error: null }),
+              limit: vi.fn().mockResolvedValue({ data: users, error: null }),
             }),
           }),
+          eq: usersEqSpy,
         }),
         update: usersUpdateSpy,
       };
@@ -247,7 +255,7 @@ function buildAdminMock(opts: {
     if (table === "tracker") {
       return {
         select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: opts.trackerData, error: null }),
+          eq: vi.fn().mockResolvedValue({ data: trackerData, error: null }),
         }),
         delete: vi.fn().mockReturnValue({
           in: deleteInSpy,
@@ -260,11 +268,12 @@ function buildAdminMock(opts: {
       return { insert: notificationInsertSpy };
     }
 
-    // Fallback — shouldn't be reached
     return {};
   });
 
-  return { deleteInSpy, updateTrackerSpy, notificationInsertSpy, usersUpdateSpy };
+  mockAdminFrom.mockImplementation(usersQuerySpy);
+
+  return { deleteInSpy, updateTrackerSpy, notificationInsertSpy, usersUpdateSpy, usersEqSpy, usersQuerySpy };
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +283,9 @@ function buildAdminMock(opts: {
 beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
+  (mockFetch as any)._courses = undefined;
+  (mockFetch as any)._roles = undefined;
+  (mockFetch as any)._attendance = undefined;
 
   // Re-stub env vars on every test — the global vitest.setup.ts afterEach calls
   // vi.unstubAllEnvs() which wipes hoisted stubs, causing CRON_SECRET to be
@@ -419,6 +431,12 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications[0].title).toBe("Attendance Conflict 💀");
     expect(notifications[0].topic).toContain("conflict-");
+
+    // Verify email was sent
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: MOCK_USER_ROW.email,
+      subject: "Attendance Conflict 💀",
+    }));
   });
 });
 
@@ -480,6 +498,12 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     const [notifications] = notificationInsertSpy.mock.calls[0];
     expect(notifications[0].title).toBe("Course Mismatch 💀");
     expect(notifications[0].topic).toContain("conflict-course");
+
+    // Verify email was sent
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: MOCK_USER_ROW.email,
+      subject: "Course Mismatch 💀",
+    }));
   });
 });
 
@@ -564,6 +588,122 @@ describe("Cron sync — EzyGo Revision class, correction entry → deleted silen
     expect(deleteInSpy).toHaveBeenCalledWith("id", [101]);
     expect(updateTrackerSpy).not.toHaveBeenCalled();
     expect(notificationInsertSpy).not.toHaveBeenCalled();
+
+    // Verify email was sent (only for 'extra' status in handleRevisionClass)
+    // Wait, let's check handleRevisionClass in route.ts
+    // 185:   if (item.status === "extra") { ... emails.push(...) }
+    // If it's a correction, it doesn't send an email/notification.
+    // The fixture in this test uses status: 'correction'.
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends an email when an extra entry is a Revision class", async () => {
+    buildAdminMock({
+      trackerData: [
+        { id: 105, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "extra" },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-10-24": { "3": ezygoSession(3, 110, 1005, "Revision") },
+    });
+
+    await GET(makeCronRequest("testuser"));
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: MOCK_USER_ROW.email,
+      subject: "Revision Class Detected 📚",
+    }));
+  });
+
+  it("handles email failure gracefully", async () => {
+    buildAdminMock({
+      trackerData: [
+        { id: 101, course: "1001", date: "2025-10-24", session: "I", attendance: "110", status: "extra" },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-10-24": { "1": ezygoSession(1, 111, 1001) }, // Conflict
+    });
+
+    // Mock email to fail
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Email failed"));
+
+    const res = await GET(makeCronRequest("testuser"));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.conflicts).toBe(1);
+    // Should still be successful even if email fails
+    expect(data.success).toBe(true);
+  });
+});
+
+describe("GET /api/cron/sync — Batch & Auth modes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.CRON_SECRET = "cron-secret";
+  });
+
+  it("syncs multiple users when no target is specified in cron mode", async () => {
+    const mockUsers = [
+      { ...MOCK_USER_ROW, auth_id: "u1", username: "user1" },
+      { ...MOCK_USER_ROW, auth_id: "u2", username: "user2" },
+    ];
+
+    const spies = buildAdminMock({
+      usersData: mockUsers,
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer cron-secret" },
+    });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.processed).toBe(2);
+    expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
+  });
+
+  it("syncs the authenticated user when called without cron secret", async () => {
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u-auth" } }, error: null }),
+      },
+    } as any);
+
+    const spies = buildAdminMock({
+      usersData: [{ ...MOCK_USER_ROW, auth_id: "u-auth" }],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    // Use a different path or header that doesn't trigger the cron check, 
+    // or just mock handleAuthentication if we could.
+    // Here we'll just mock the GET params to simulate a non-cron request.
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer user-token" },
+    });
+
+    // We manually override the second argument (context) which has authType
+    const res = await GET(req, { authType: "app-check" } as any);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.processed).toBe(1);
+    expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
+    expect(spies.usersEqSpy).toHaveBeenCalledWith("auth_id", "u-auth");
   });
 });
 
@@ -694,8 +834,8 @@ describe("Cron sync — EzyGo courses API fails → user counted as error", () =
   it("returns 500 when courses fetch returns non-200", async () => {
     buildAdminMock({ trackerData: [] });
 
-    // Courses API returns 500
-    mockFetch.mockResolvedValueOnce(new Response("Server Error", { status: 500 }));
+    // Courses API returns 500 for the first call
+    mockFetch.mockImplementationOnce(async () => new Response("Server Error", { status: 500 }));
 
     const res = await GET(makeCronRequest("testuser"));
     const body = await res.json();

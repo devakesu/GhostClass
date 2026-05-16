@@ -10,6 +10,12 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { withSecurity } from "@/lib/security/app-check";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { sendPushNotification } from "@/lib/notifications/push";
+import { sendEmail } from "@/lib/email";
+import {
+  renderAttendanceConflictEmail,
+  renderCourseMismatchEmail,
+  renderRevisionClassEmail,
+} from "@/lib/email-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +73,36 @@ interface OfficialSlotInfo {
   course: string;
   classType?: string | null;
 }
+
+interface AttendanceConflictProps {
+  username: string;
+  courseLabel: string;
+  date: string;
+  session: string;
+  dashboardUrl: string;
+}
+
+interface CourseMismatchProps {
+  username: string;
+  date: string;
+  session: string;
+  manualCourseName: string;
+  courseLabel: string;
+  dashboardUrl: string;
+}
+
+interface RevisionClassProps {
+  username: string;
+  courseName: string;
+  date: string;
+  session: string;
+  dashboardUrl: string;
+}
+
+type EmailTask = 
+  | { type: "conflict"; props: AttendanceConflictProps }
+  | { type: "mismatch"; props: CourseMismatchProps }
+  | { type: "revision"; props: RevisionClassProps };
 
 function createEmptyStats(): SyncStats {
   return { processed: 0, deletions: 0, conflicts: 0, updates: 0, errors: 0 };
@@ -177,17 +213,30 @@ function buildOfficialMap(officialData: OfficialAttendanceData): Map<string, Off
 function handleRevisionClass(
   item: TrackerItem,
   key: string,
-  userAuthId: string,
+  user: UserSyncData,
   toDelete: Set<number>,
-  notifications: NotificationInsert[]
+  notifications: NotificationInsert[],
+  emails: EmailTask[],
+  courseMap: Map<string, string>,
+  dashboardUrl: string
 ): void {
   toDelete.add(item.id);
   if (item.status === "extra") {
     notifications.push({
-      auth_user_id: userAuthId,
+      auth_user_id: user.auth_id,
       title: "Revision Class — Not Counted 📚",
       description: `Manual entry removed as official slot is a Revision class.`,
       topic: `revision-${key}`,
+    });
+    emails.push({
+      type: "revision",
+      props: {
+        username: user.username,
+        courseName: courseMap.get(String(item.course)) || String(item.course),
+        date: item.date,
+        session: String(item.session),
+        dashboardUrl,
+      },
     });
   }
 }
@@ -196,17 +245,31 @@ function handleCourseMismatch(
   item: TrackerItem,
   officialEntry: OfficialSlotInfo,
   key: string,
-  userAuthId: string,
+  user: UserSyncData,
   toDelete: Set<number>,
-  notifications: NotificationInsert[]
+  notifications: NotificationInsert[],
+  emails: EmailTask[],
+  courseMap: Map<string, string>,
+  dashboardUrl: string
 ): boolean {
   if (item.status === "extra" && String(item.course) !== String(officialEntry.course)) {
     toDelete.add(item.id);
     notifications.push({
-      auth_user_id: userAuthId,
+      auth_user_id: user.auth_id,
       title: "Course Mismatch 💀",
       description: `Course mismatch on date ${item.date}. Official course differs.`,
       topic: `conflict-course-${key}`,
+    });
+    emails.push({
+      type: "mismatch",
+      props: {
+        username: user.username,
+        date: item.date,
+        session: String(item.session),
+        manualCourseName: courseMap.get(String(item.course)) || String(item.course),
+        courseLabel: courseMap.get(officialEntry.course) || officialEntry.course,
+        dashboardUrl,
+      },
     });
     return true;
   }
@@ -223,11 +286,14 @@ function handleAttendanceStatus(
   item: TrackerItem,
   officialEntry: OfficialSlotInfo,
   key: string,
-  userAuthId: string,
+  user: UserSyncData,
   stats: SyncStats,
   toDelete: Set<number>,
   toUpdateStatus: number[],
-  notifications: NotificationInsert[]
+  notifications: NotificationInsert[],
+  emails: EmailTask[],
+  courseMap: Map<string, string>,
+  dashboardUrl: string
 ): void {
   const officialCode = officialEntry.attendance;
   const trackerCode = Number(item.attendance);
@@ -237,7 +303,7 @@ function handleAttendanceStatus(
   if (isOfficialPositive) {
     toDelete.add(item.id);
     notifications.push({
-      auth_user_id: userAuthId,
+      auth_user_id: user.auth_id,
       title: getResolvedTitle(officialCode, trackerCode),
       description: `Attendance resolved to official status.`,
       topic: `sync-surprise-${key}`,
@@ -248,7 +314,7 @@ function handleAttendanceStatus(
   if (officialCode === trackerCode) {
     toDelete.add(item.id);
     notifications.push({
-      auth_user_id: userAuthId,
+      auth_user_id: user.auth_id,
       title: "Attendance Updated 🥳",
       description: `Official record matches manual entry.`,
       topic: `sync-surprise-${key}`,
@@ -261,10 +327,20 @@ function handleAttendanceStatus(
     if (item.status === "extra") {
       toUpdateStatus.push(item.id);
       notifications.push({
-        auth_user_id: userAuthId,
+        auth_user_id: user.auth_id,
         title: "Attendance Conflict 💀",
         description: `Conflict: Marked present but official record is absent.`,
         topic: `conflict-${key}`,
+      });
+      emails.push({
+        type: "conflict",
+        props: {
+          username: user.username,
+          courseLabel: courseMap.get(String(item.course)) || String(item.course),
+          date: item.date,
+          session: String(item.session),
+          dashboardUrl,
+        },
       });
     }
   }
@@ -273,26 +349,29 @@ function handleAttendanceStatus(
 function processTrackerItem(
   item: TrackerItem,
   officialEntry: OfficialSlotInfo,
-  userAuthId: string,
+  user: UserSyncData,
   stats: SyncStats,
   toDelete: Set<number>,
   toUpdateStatus: number[],
-  notifications: NotificationInsert[]
+  notifications: NotificationInsert[],
+  emails: EmailTask[],
+  courseMap: Map<string, string>,
+  dashboardUrl: string
 ): void {
   const trackerDateKey = item.date.replace(/-/g, "");
   const romanSession = toRoman(parseInt(normalizeSession(item.session)) || String(item.session));
   const key = `${trackerDateKey}|${romanSession}`;
 
   if (officialEntry.classType === "Revision") {
-    handleRevisionClass(item, key, userAuthId, toDelete, notifications);
+    handleRevisionClass(item, key, user, toDelete, notifications, emails, courseMap, dashboardUrl);
     return;
   }
 
-  if (handleCourseMismatch(item, officialEntry, key, userAuthId, toDelete, notifications)) {
+  if (handleCourseMismatch(item, officialEntry, key, user, toDelete, notifications, emails, courseMap, dashboardUrl)) {
     return;
   }
 
-  handleAttendanceStatus(item, officialEntry, key, userAuthId, stats, toDelete, toUpdateStatus, notifications);
+  handleAttendanceStatus(item, officialEntry, key, user, stats, toDelete, toUpdateStatus, notifications, emails, courseMap, dashboardUrl);
 }
 
 async function executeSyncMutations(
@@ -300,6 +379,7 @@ async function executeSyncMutations(
   toDelete: Set<number>,
   toUpdateStatus: number[],
   notifications: NotificationInsert[],
+  emails: EmailTask[],
   supabaseAdmin: ReturnType<typeof getAdminClient>
 ): Promise<void> {
   const promises: PromiseLike<unknown>[] = [];
@@ -328,16 +408,53 @@ async function executeSyncMutations(
     }
   });
 
+  // Execute Async Notifications (Push + Email)
+  const notificationPromises: PromiseLike<unknown>[] = [];
+
   if (notificationsInserted && user.fcm_token) {
-    const pushPromises = notifications.map((n) =>
-      sendPushNotification({
-        token: user.fcm_token!,
-        title: n.title,
-        body: n.description,
-        data: { topic: n.topic },
-      })
+    notifications.forEach((n) =>
+      notificationPromises.push(
+        sendPushNotification({
+          token: user.fcm_token!,
+          title: n.title,
+          body: n.description,
+          data: { topic: n.topic },
+        })
+      )
     );
-    await Promise.allSettled(pushPromises);
+  }
+
+  if (emails.length > 0) {
+    emails.forEach((task) => {
+      const emailPromise = (async () => {
+        try {
+          let html = "";
+          let subject = "";
+          switch (task.type) {
+            case "conflict":
+              html = await renderAttendanceConflictEmail(task.props);
+              subject = "Attendance Conflict 💀";
+              break;
+            case "mismatch":
+              html = await renderCourseMismatchEmail(task.props);
+              subject = "Course Mismatch 💀";
+              break;
+            case "revision":
+              html = await renderRevisionClassEmail(task.props);
+              subject = "Revision Class Detected 📚";
+              break;
+          }
+          await sendEmail({ to: user.email, subject, html });
+        } catch (err) {
+          logger.error(`Failed to send sync email to ${redact("email", user.email)}:`, err);
+        }
+      })();
+      notificationPromises.push(emailPromise);
+    });
+  }
+
+  if (notificationPromises.length > 0) {
+    await Promise.allSettled(notificationPromises);
   }
 }
 
@@ -347,10 +464,25 @@ async function syncUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>
 ): Promise<SyncStats> {
   const stats = createEmptyStats();
+  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.ghostclass.in'}/dashboard`;
+
   try {
     const { token, courseRes } = await fetchAndHealToken(user, isCron, supabaseAdmin);
     if (!courseRes.ok) throw new Error(`Courses API: ${courseRes.status}`);
-    await courseRes.json().catch(() => null);
+    
+    interface EzygoCourse {
+      id: number | string;
+      name?: string;
+      code?: string;
+    }
+    const courses = (await courseRes.json().catch(() => [])) as EzygoCourse[];
+    const courseMap = new Map<string, string>();
+    courses.forEach(c => {
+      if (c.name) {
+        courseMap.set(String(c.id), c.name);
+        if (c.code) courseMap.set(String(c.code), c.name);
+      }
+    });
 
     await fetchEzygoResource("institutionuser/myroles", token).catch(() => null);
 
@@ -368,6 +500,7 @@ async function syncUser(
     const toDelete = new Set<number>();
     const toUpdateStatus: number[] = [];
     const notifications: NotificationInsert[] = [];
+    const emails: EmailTask[] = [];
 
     const items = trackerData as TrackerItem[];
     items.forEach((item) => {
@@ -376,11 +509,11 @@ async function syncUser(
       const officialEntry = officialMap.get(`${trackerDateKey}|${romanSession}`);
 
       if (officialEntry) {
-        processTrackerItem(item, officialEntry, user.auth_id, stats, toDelete, toUpdateStatus, notifications);
+        processTrackerItem(item, officialEntry, user, stats, toDelete, toUpdateStatus, notifications, emails, courseMap, dashboardUrl);
       }
     });
 
-    await executeSyncMutations(user, toDelete, toUpdateStatus, notifications, supabaseAdmin);
+    await executeSyncMutations(user, toDelete, toUpdateStatus, notifications, emails, supabaseAdmin);
 
     stats.deletions = toDelete.size;
     stats.updates = toUpdateStatus.length;

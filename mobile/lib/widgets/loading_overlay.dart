@@ -51,20 +51,20 @@ class LoadingOverlay extends StatelessWidget {
                     )
                     .animate(onPlay: (c) => c.repeat())
                     .shimmer(
-                      duration: 400.ms,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      duration: 1500.ms,
+                      color: Colors.white.withValues(alpha: 0.4),
                     )
                     .scale(
                       begin: const Offset(1, 1),
-                      end: const Offset(1.1, 1.1),
-                      duration: 300.ms,
+                      end: const Offset(1.08, 1.08),
+                      duration: 1000.ms,
                       curve: Curves.easeInOut,
                     )
                     .then()
                     .scale(
-                      begin: const Offset(1.1, 1.1),
+                      begin: const Offset(1.08, 1.08),
                       end: const Offset(1, 1),
-                      duration: 300.ms,
+                      duration: 1000.ms,
                       curve: Curves.easeInOut,
                     ),
                 const SizedBox(height: 24),
@@ -81,9 +81,9 @@ class LoadingOverlay extends StatelessWidget {
                       ),
                     )
                     .animate(onPlay: (c) => c.repeat())
-                    .fadeIn(duration: 400.ms)
+                    .fadeIn(duration: 1500.ms)
                     .then()
-                    .fadeOut(duration: 400.ms),
+                    .fadeOut(duration: 1500.ms),
 
                 const SizedBox(height: 8),
 

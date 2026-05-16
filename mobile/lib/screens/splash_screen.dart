@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -48,13 +49,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       api.clearCaches();
 
       final authTask = ref.read(authProvider.future);
-
-      await Future.wait<dynamic>([
-        Future.delayed(
-          const Duration(milliseconds: 1000),
-        ), // Shorter delay since we already waited for integrity
-        jwePreWarm,
-        apiPreWarm,
+      unawaited(
         authTask.then((user) {
           if (!mounted || user == null || user.profile?.avatarUrl == null) {
             return;
@@ -73,6 +68,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             AppLogger.e('SplashScreen: Avatar pre-cache failed', e, st);
           }
         }),
+      );
+
+      await Future.wait<dynamic>([
+        Future.delayed(
+          const Duration(seconds: 1),
+        ), // Keep the splash visible for at least one second.
+        jwePreWarm,
+        apiPreWarm,
+        authTask,
       ]);
     } on Object catch (e) {
       AppLogger.e('SplashScreen: Initialization error', e);
@@ -172,25 +176,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Center(
         child: Image.asset('assets/images/logo.png', height: 120)
             .animate()
-            .fade(duration: 400.ms)
+            .fade(duration: 800.ms)
             .scale(
-              begin: const Offset(0.7, 0.7),
+              begin: const Offset(0.8, 0.8),
               end: const Offset(1, 1),
-              duration: 400.ms,
-              curve: Curves.easeOutBack,
+              duration: 800.ms,
+              curve: Curves.easeOutCubic,
             )
             .then() // Chain effects after the entrance
             .animate(onPlay: (controller) => controller.repeat(reverse: true))
             .scale(
               begin: const Offset(1, 1),
               end: const Offset(1.05, 1.05),
-              duration: 400.ms,
+              duration: 1200.ms,
               curve: Curves.easeInOut,
             )
             .animate(onPlay: (controller) => controller.repeat())
             .shimmer(
-              duration: 600.ms,
-              color: Colors.white.withValues(alpha: 0.4),
+              duration: 2000.ms,
+              color: Colors.white.withValues(alpha: 0.3),
             ),
       ),
     );

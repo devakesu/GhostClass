@@ -372,10 +372,7 @@ class _ProfileDumpContent extends ConsumerWidget {
                           : Colors.redAccent,
                       copyable: true,
                     ),
-                    const _InfoRow(
-                      label: 'Privacy Policy',
-                      value: 'v1.0.0 (Latest)',
-                    ),
+                    // Privacy Policy entry removed per request
                   ],
                 ),
 

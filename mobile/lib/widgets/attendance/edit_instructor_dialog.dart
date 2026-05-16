@@ -256,7 +256,6 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                           TextFormField(
                             controller: _controller,
                             maxLength: 60,
-                            autofocus: true,
                             style: GoogleFonts.manrope(
                               fontWeight: FontWeight.w700,
                             ),

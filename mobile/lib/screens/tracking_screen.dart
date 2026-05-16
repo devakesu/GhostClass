@@ -311,7 +311,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(32)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         builder: (context) => TrackingSubjectPicker(
           selectedCourse: _selectedCourse,

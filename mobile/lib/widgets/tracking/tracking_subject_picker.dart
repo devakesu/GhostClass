@@ -29,109 +29,112 @@ class TrackingSubjectPicker extends ConsumerWidget {
     final primary = Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surface;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Select Subject',
-            style: GoogleFonts.manrope(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Flexible(
-            child: Scrollbar(
-              thumbVisibility: true,
-              thickness: 4,
-              radius: const Radius.circular(2),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(right: 8),
-                physics: const BouncingScrollPhysics(),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _PickerChip(
-                      label: 'All Subjects',
-                      count: groupedByCourse.values.fold(
-                        0,
-                        (p, c) => p + c.length,
-                      ),
-                      isSelected: selectedCourse == 'all',
-                      onTap: () => onSelected('all'),
-                      primary: primary,
-                      surface: surface,
-                    ),
-                    ...courseKeys.map((key) {
-                      final isSelected = selectedCourse == key;
-                      final normKey = key.trim().toUpperCase();
-                      final mergedCourse = (allCourses ?? []).firstWhere(
-                        (c) =>
-                            c.safeId.trim().toUpperCase() == normKey ||
-                            (c.code ?? '').trim().toUpperCase() == normKey,
-                        orElse: () => CourseDetails(id: 0, name: key),
-                      );
-                      final isDisabled =
-                          ref
-                              .watch(authProvider)
-                              .value
-                              ?.settings
-                              .disabledCourses['${ref.watch(dashboardProvider).value?.selectedYear}-${ref.watch(dashboardProvider).value?.selectedSemester}']
-                              ?.containsKey(
-                                utils
-                                    .resolveCourseDisplayCode(
-                                      courseKey: key,
-                                      mergedCourse: mergedCourse,
-                                      officialReport: officialReport,
-                                    )
-                                    ?.toUpperCase(),
-                              ) ??
-                          false;
-
-                      final label = utils.resolveCourseDisplayName(
-                        courseKey: key,
-                        mergedCourse: mergedCourse,
-                        officialReport: officialReport,
-                      );
-                      final count = groupedByCourse[key]?.length ?? 0;
-                      return _PickerChip(
-                        label: isDisabled ? '$label (Disabled)' : label,
-                        count: count,
-                        isSelected: isSelected,
-                        isDisabled: isDisabled,
-                        onTap: () => onSelected(key),
-                        primary: primary,
-                        surface: surface,
-                      );
-                    }),
-                  ],
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'Select Subject',
+              style: GoogleFonts.manrope(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Flexible(
+              child: Scrollbar(
+                thumbVisibility: true,
+                thickness: 4,
+                radius: const Radius.circular(2),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(right: 8),
+                  physics: const BouncingScrollPhysics(),
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _PickerChip(
+                        label: 'All Subjects',
+                        count: groupedByCourse.values.fold(
+                          0,
+                          (p, c) => p + c.length,
+                        ),
+                        isSelected: selectedCourse == 'all',
+                        onTap: () => onSelected('all'),
+                        primary: primary,
+                        surface: surface,
+                      ),
+                      ...courseKeys.map((key) {
+                        final isSelected = selectedCourse == key;
+                        final normKey = key.trim().toUpperCase();
+                        final mergedCourse = (allCourses ?? []).firstWhere(
+                          (c) =>
+                              c.safeId.trim().toUpperCase() == normKey ||
+                              (c.code ?? '').trim().toUpperCase() == normKey,
+                          orElse: () => CourseDetails(id: 0, name: key),
+                        );
+                        final isDisabled =
+                            ref
+                                .watch(authProvider)
+                                .value
+                                ?.settings
+                                .disabledCourses['${ref.watch(dashboardProvider).value?.selectedYear}-${ref.watch(dashboardProvider).value?.selectedSemester}']
+                                ?.containsKey(
+                                  utils
+                                      .resolveCourseDisplayCode(
+                                        courseKey: key,
+                                        mergedCourse: mergedCourse,
+                                        officialReport: officialReport,
+                                      )
+                                      ?.toUpperCase(),
+                                ) ??
+                            false;
+
+                        final label = utils.resolveCourseDisplayName(
+                          courseKey: key,
+                          mergedCourse: mergedCourse,
+                          officialReport: officialReport,
+                        );
+                        final count = groupedByCourse[key]?.length ?? 0;
+                        return _PickerChip(
+                          label: isDisabled ? '$label (Disabled)' : label,
+                          count: count,
+                          isSelected: isSelected,
+                          isDisabled: isDisabled,
+                          onTap: () => onSelected(key),
+                          primary: primary,
+                          surface: surface,
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
