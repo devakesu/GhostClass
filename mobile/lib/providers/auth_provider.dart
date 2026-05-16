@@ -716,6 +716,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           await AnalyticsService.instance.logLogin(method: 'ezygo');
         } on Object catch (_) {}
       }
+    } on AuthException catch (e, st) {
+      AppLogger.e('AuthNotifier: SUPABASE AUTH ERROR', e);
+      state = AsyncValue.error(e, st);
+      rethrow;
     } catch (e, st) {
       AppLogger.e('AuthNotifier: LOGIN ERROR', e);
       state = AsyncValue.error(e, st);

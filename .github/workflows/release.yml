@@ -84,6 +84,18 @@ jobs:
             fi
             APP_DOMAIN="localhost"
           fi
+          echo "APP_DOMAIN=${APP_DOMAIN}" >> $GITHUB_ENV
+
+          # Derive BACKEND_URL if not set
+          BACKEND_URL="${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" = "null" ]; then
+             if [ "$APP_DOMAIN" = "localhost" ]; then
+               BACKEND_URL="http://localhost:3000"
+             else
+               BACKEND_URL="https://${APP_DOMAIN}"
+             fi
+          fi
+          echo "BACKEND_URL=${BACKEND_URL}" >> $GITHUB_ENV
           IMAGE_NAME=$(echo "$REPO" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
 
@@ -473,26 +485,24 @@ jobs:
         env:
           SUPABASE_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_URL_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_URL || vars.NEXT_PUBLIC_SUPABASE_DEV_URL }}
-          SUPABASE_ANON_KEY_DEV: ${{ env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY }}
           SUPABASE_CF_PROXY_URL_PROD: ${{ env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL || vars.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL }}
           SENTRY_DSN: ${{ env.NEXT_PUBLIC_MOBILE_SENTRY_DSN || vars.NEXT_PUBLIC_MOBILE_SENTRY_DSN || env.NEXT_PUBLIC_SENTRY_DSN || vars.NEXT_PUBLIC_SENTRY_DSN }}
-          BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
-          APP_DOMAIN: ${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
         run: |
           set -euo pipefail
 
+          # Resolve values from GITHUB_ENV (exported in previous step)
+          APP_DOMAIN="${APP_DOMAIN:-ghostclass.devakesu.com}"
+          BACKEND_URL="${BACKEND_URL:-https://${APP_DOMAIN}}"
+
           # Encode all sensitive strings to Base64 for uniform obfuscation
-          ENCODED_SUPABASE_URL_DEV=$(echo -n "$SUPABASE_URL_DEV" | base64 | tr -d '\n')
-          ENCODED_SUPABASE_ANON_KEY_DEV=$(echo -n "$SUPABASE_ANON_KEY_DEV" | base64 | tr -d '\n')
+          # Fallbacks ensure no empty strings or "null" literals are baked in
           ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}" | base64 | tr -d '\n')
           ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$SUPABASE_ANON_KEY_PROD" | base64 | tr -d '\n')
           ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
+          ENCODED_GHOSTCLASS_API_URL_PROD=$(echo -n "${BACKEND_URL}/api" | base64 | tr -d '\n')
           ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
           ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
           ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
-
-          GHOSTCLASS_API_URL="https://${APP_DOMAIN}/api"
 
           cat > lib/config/app_secrets.dart << EOF
           import 'package:flutter/foundation.dart';
@@ -500,10 +510,12 @@ jobs:
           class AppSecrets {
             AppSecrets._();
 
-            static const bool isDev = kDebugMode;
+            // Forced to false for production release builds
+            static const bool isDev = false;
 
-            static const String supabaseUrlDev = '${ENCODED_SUPABASE_URL_DEV}';
-            static const String supabasePublishableKeyDev = '${ENCODED_SUPABASE_ANON_KEY_DEV}';
+            // Dev credentials stripped for production security
+            static const String supabaseUrlDev = '';
+            static const String supabasePublishableKeyDev = '';
 
             static const String supabaseProxyUrlProd = '${ENCODED_SUPABASE_PROXY_URL_PROD}';
             static const String supabasePublishableKeyProd = '${ENCODED_SUPABASE_ANON_KEY_PROD}';
@@ -511,8 +523,7 @@ jobs:
             static const String sentryDsn = '${ENCODED_SENTRY_DSN}';
 
             static const String ghostclassApiUrlDev = '';
-
-            static const String ghostclassApiUrlProd = '${GHOSTCLASS_API_URL}';
+            static const String ghostclassApiUrlProd = '${ENCODED_GHOSTCLASS_API_URL_PROD}';
 
             static const String ezygoAuthUrl = '${ENCODED_EZYGO_AUTH_URL}';
             static const String ezygoApiRoot = '${ENCODED_EZYGO_API_ROOT}';
@@ -541,7 +552,8 @@ jobs:
             --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
             --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
             --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }} \
-            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}"
+            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}" \
+            --dart-define=APP_DOMAIN="${APP_DOMAIN}"
 
           dart run sentry_dart_plugin
 
@@ -565,7 +577,8 @@ jobs:
             --dart-define=BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
             --dart-define=GITHUB_RUN_ID=${{ github.run_id }} \
             --dart-define=GITHUB_RUN_NUMBER=${{ github.run_number }} \
-            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}"
+            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}" \
+            --dart-define=APP_DOMAIN="${APP_DOMAIN}"
 
       - name: Generate mobile SBOM
         working-directory: mobile

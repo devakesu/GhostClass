@@ -26,6 +26,9 @@ String formatApiError(dynamic response, String context) {
   if (response is PostgrestException) {
     code = response.code ?? '';
     message = response.message;
+  } else if (response is AuthException) {
+    code = response.statusCode ?? '';
+    message = response.message;
   } else if (response is DioException) {
     status = response.response?.statusCode;
     final data = response.response?.data;
@@ -48,6 +51,13 @@ String formatApiError(dynamic response, String context) {
   }
 
   final lower = message.toLowerCase();
+
+  // Supabase/Auth decoding errors (often due to proxy/ISP blocks or firewalls)
+  if (lower.contains('failed to decode error response') ||
+      lower.contains('unexpected character') ||
+      lower.contains('error code: 1003')) {
+    return 'The authentication server returned an invalid response. This often happens due to network restrictions or a firewall blocking the connection. Please try a different network or disable any active VPN/Proxy.';
+  }
 
   // Row Level Security (RLS) violations
   if (code == '42501' || lower.contains('row-level security')) {
