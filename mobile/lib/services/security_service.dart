@@ -61,7 +61,8 @@ class SecurityService {
             (data?['error'] as String?) ??
             (data?['appCheckError'] as String?);
 
-        if (isSecurityType || appCheckError != null) {
+        if (isSecurityType ||
+            (e.response?.statusCode == 403 && appCheckError != null)) {
           final action =
               data?['action'] ??
               'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';

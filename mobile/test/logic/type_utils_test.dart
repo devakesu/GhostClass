@@ -29,4 +29,21 @@ void main() {
       expect(toInt('999999999999'), 999999999999);
     });
   });
+  group('Type Utils - formatBuildTimestamp', () {
+    test('formats valid ISO timestamp', () {
+      expect(
+        formatBuildTimestamp('2026-05-16T09:00:00.000Z'),
+        '2026-05-16 09:00',
+      );
+    });
+
+    test('returns local if input is local', () {
+      expect(formatBuildTimestamp('local'), 'local');
+    });
+
+    test('returns original if input is invalid', () {
+      expect(formatBuildTimestamp('invalid-date'), 'invalid-date');
+      expect(formatBuildTimestamp(''), '');
+    });
+  });
 }

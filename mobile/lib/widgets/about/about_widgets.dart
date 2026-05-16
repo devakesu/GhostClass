@@ -69,7 +69,7 @@ class MetricCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       color: theme.colorScheme.onSurface,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

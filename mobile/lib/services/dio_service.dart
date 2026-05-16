@@ -1,9 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +11,8 @@ import 'package:sentry_dio/sentry_dio.dart';
 
 /// DioService
 /// ----------
-/// Manages Dio instances for standard and security-sensitive requests.
+/// Centralized network client for the application.
+///
 /// Configures interceptors for JWE, Sentry, and authentication headers.
 class DioService {
   DioService(this._ref) {
@@ -27,30 +24,23 @@ class DioService {
         connectTimeout: timeout,
         receiveTimeout: timeout,
         sendTimeout: timeout,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
       ),
     );
 
     securityDio = Dio(
       BaseOptions(
+        baseUrl: AppConfig.ghostclassApiUrl,
         connectTimeout: timeout,
         receiveTimeout: timeout,
         sendTimeout: timeout,
       ),
     );
 
-    if (kDebugMode) {
-      (securityDio.httpClientAdapter as IOHttpClientAdapter).createHttpClient =
-          () {
-            return HttpClient()
-              ..badCertificateCallback = (cert, host, port) => true;
-          };
-    }
+    dio.addSentry();
+    securityDio.addSentry();
 
-    dio.interceptors.add(JweInterceptor());
+    // Attach JWE Layer first
+    dio.interceptors.add(_ref.read(jweInterceptorProvider));
 
     // Auth & Security Interceptor
     dio.interceptors.add(
@@ -61,7 +51,9 @@ class DioService {
                 .read(stealthHeadersServiceProvider)
                 .getHeaders(url: options.path);
             options.headers.addAll(stealthHeaders);
-          } else if (options.path.startsWith(_ghostclassBaseUrl)) {
+          } else if (options.path.startsWith(_ghostclassBaseUrl) ||
+              (!options.path.startsWith('http') &&
+                  options.baseUrl == _ghostclassBaseUrl)) {
             options.headers['Accept'] = 'application/json';
             options.headers['Origin'] = AppConfig.supabaseOrigin;
             await _addSecurityHeaders(options);
@@ -71,106 +63,103 @@ class DioService {
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          if (response.statusCode == 401) {
-            _handle401(response.requestOptions);
-          }
           return handler.next(response);
         },
-        onError: (e, handler) {
-          if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
-            final data = e.response?.data;
-            if (data is Map<String, dynamic> && data['criticalRisk'] == true) {
-              AppLogger.e(
-                'DioService: CRITICAL SECURITY RISK DETECTED: ${data['error']}',
-              );
-              _lockdownController.add({
-                'title':
-                    (data['error'] as String?) ?? 'Security Handshake Failed',
-                'reason':
-                    (data['reason'] as String?) ??
-                    'Device verification failed.',
-                'action':
-                    (data['action'] as String?) ?? 'Please reinstall the app.',
-                'technicalDetails':
-                    'Context: ${e.requestOptions.path}\nResponse: ${jsonEncode(data)}',
-              });
-              return handler.reject(e); // Stop further processing
-            }
-
-            if (e.response?.statusCode == 401) {
-              _handle401(e.requestOptions);
-            }
+        onError: (err, handler) {
+          if (err.response?.statusCode == 401) {
+            _handle401(err.requestOptions);
           }
-          return handler.next(e);
+          return handler.next(err);
         },
       ),
     );
-
-    // Add Sentry interceptors last
-    dio.addSentry(captureFailedRequests: true);
-    securityDio.addSentry(captureFailedRequests: true);
-
-    _ref.onDispose(() {
-      final _ = _unauthorizedController.close();
-      final _ = _lockdownController.close();
-    });
   }
+
   final Ref _ref;
   late final Dio dio;
   late final Dio securityDio;
 
+  FirebaseAppCheck get _appCheck => _ref.read(appCheckProvider);
+
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
 
   final _unauthorizedController = StreamController<void>.broadcast();
-  Stream<void> get onUnauthorized => _unauthorizedController.stream;
-
   final _lockdownController = StreamController<Map<String, String>>.broadcast();
+
+  Stream<void> get onUnauthorized => _unauthorizedController.stream;
   Stream<Map<String, String>> get onSecurityLockdown =>
       _lockdownController.stream;
 
   bool suppress401 = false;
   DateTime? _last401Broadcast;
 
+  // Futures to deduplicate parallel token requests
+  Future<String?>? _tokenFetchInFlight;
+  Future<String?>? _limitedTokenFetchInFlight;
+
   void _handle401(RequestOptions options) {
     if (suppress401) return;
 
-    final isLoginRequest =
-        options.path.contains('/login') || options.path.contains('/save-token');
-    if (isLoginRequest) return;
-
     final now = DateTime.now();
-    if (_last401Broadcast == null ||
-        now.difference(_last401Broadcast!) > const Duration(seconds: 2)) {
-      _last401Broadcast = now;
-      AppLogger.w(
-        'DioService: 401 detected for ${options.path}. Broadcasting onUnauthorized.',
-      );
-      _unauthorizedController.add(null);
+    if (_last401Broadcast != null &&
+        now.difference(_last401Broadcast!).inSeconds < 5) {
+      return;
     }
+
+    _last401Broadcast = now;
+    _unauthorizedController.add(null);
   }
 
   Future<void> _addSecurityHeaders(RequestOptions options) async {
     try {
       final useLimited = options.extra['useLimitedToken'] == true;
-      final appCheckToken =
-          await (useLimited
-                  ? FirebaseAppCheck.instance.getLimitedUseToken()
-                  : FirebaseAppCheck.instance.getToken())
-              .timeout(const Duration(seconds: 10));
+
+      // Deduplicate parallel token requests to prevent "Too many attempts"
+      String? appCheckToken;
+      if (useLimited) {
+        _limitedTokenFetchInFlight ??= _appCheck.getLimitedUseToken();
+        appCheckToken = await _limitedTokenFetchInFlight!.timeout(
+          const Duration(seconds: 10),
+        );
+        _limitedTokenFetchInFlight = null; // Clear after completion
+      } else {
+        _tokenFetchInFlight ??= _appCheck.getToken();
+        appCheckToken = await _tokenFetchInFlight!.timeout(
+          const Duration(seconds: 10),
+        );
+        _tokenFetchInFlight = null; // Clear after completion
+      }
 
       if (appCheckToken != null && appCheckToken.isNotEmpty) {
         options.headers['X-Firebase-AppCheck'] = appCheckToken;
-        AppLogger.d('DioService: App Check token attached successfully');
       } else {
-        AppLogger.w('DioService: App Check token is empty or null');
         options.extra['appCheckError'] =
             'App Check token is empty - verify Firebase activation';
       }
     } on Object catch (e) {
+      // Ensure futures are cleared on error to allow retries
+      _tokenFetchInFlight = null;
+      _limitedTokenFetchInFlight = null;
+
       AppLogger.w('DioService: Security headers failed: $e');
       options.extra['appCheckError'] = e.toString();
     }
   }
+
+  Future<void> close() async {
+    await _unauthorizedController.close();
+    await _lockdownController.close();
+    dio.close();
+    securityDio.close();
+  }
 }
 
 final dioServiceProvider = Provider<DioService>(DioService.new);
+
+final appCheckProvider = Provider<FirebaseAppCheck>(
+  (ref) => FirebaseAppCheck.instance,
+);
+
+final jweInterceptorProvider = Provider<JweInterceptor>(
+  (ref) => JweInterceptor(),
+);

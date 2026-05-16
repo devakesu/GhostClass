@@ -168,6 +168,34 @@ describe('app-check logic', () => {
 
         expect(res.status).toBe(200);
     });
+
+    it('allows requests without security headers when ENFORCE_APP_CHECK is false', async () => {
+        process.env.ENFORCE_APP_CHECK = 'false';
+        const h = new Headers();
+        vi.mocked(headers).mockResolvedValue(h);
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { headers: h });
+        const res = await wrapped(req as any, { params: {} });
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe('ok');
+    });
+
+    it('fails requests without security headers when ENFORCE_APP_CHECK is true', async () => {
+        process.env.ENFORCE_APP_CHECK = 'true';
+        process.env.VITEST = 'false';
+        const h = new Headers();
+        vi.mocked(headers).mockResolvedValue(h);
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { headers: h });
+        const res = await wrapped(req as any, { params: {} });
+
+        expect(res.status).toBe(401);
+        const data = await res.json();
+        expect(data.error).toBe('Unauthenticated');
+    });
   });
 
   describe('JWE Response Encryption', () => {

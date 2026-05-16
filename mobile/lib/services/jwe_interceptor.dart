@@ -10,7 +10,11 @@ import 'package:uuid/uuid.dart';
 ///    (Response Content Encryption Key) to the headers for server-side use.
 /// 2. [onResponse]: Decrypts incoming encrypted responses using the stored RCEK.
 class JweInterceptor extends Interceptor {
-  JweInterceptor();
+  JweInterceptor([this._serviceOverride]);
+  final JweService? _serviceOverride;
+
+  JweService get _jweService => _serviceOverride ?? JweService.instance;
+
   // Use a map to store RCEKs for concurrent requests
   static final Map<String, String> _rcekMap = {};
 
@@ -33,7 +37,7 @@ class JweInterceptor extends Interceptor {
 
     if (isGhostClassApi && isWrite && options.data is Map<String, dynamic>) {
       try {
-        final jweService = JweService.instance;
+        final jweService = _jweService;
         final result = await jweService.encryptRequest(
           options.data as Map<String, dynamic>,
         );
@@ -66,7 +70,7 @@ class JweInterceptor extends Interceptor {
     } else if (isGhostClassApi && options.method == 'GET') {
       // For GET requests, we still need to send a JWE key if we want the response to be encrypted
       try {
-        final jweService = JweService.instance;
+        final jweService = _jweService;
         final keyResult = await jweService.encryptHeaderKey();
 
         final requestId = const Uuid().v4();
@@ -110,7 +114,7 @@ class JweInterceptor extends Interceptor {
 
       if (jwe != null) {
         try {
-          final jweService = JweService.instance;
+          final jweService = _jweService;
           final decryptedData = await jweService.decryptResponse(jwe, rcek);
           response.data = decryptedData;
           AppLogger.d(

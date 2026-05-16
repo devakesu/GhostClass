@@ -243,6 +243,7 @@ class ApiService {
     }
 
     final appCheckError = e.requestOptions.extra['appCheckError'];
+    final data = e.response?.data;
 
     return AppException(
       message: message,
@@ -250,6 +251,7 @@ class ApiService {
       originalError: e,
       statusCode: status,
       details: {
+        if (data is Map<String, dynamic>) ...data,
         'appCheckError': appCheckError,
         if (e.requestOptions.path.contains('/security/')) 'type': 'security',
       },
