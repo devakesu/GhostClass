@@ -37,6 +37,9 @@ jobs:
     outputs:
       image_digest: ${{ steps.build-push.outputs.digest }}
       platforms: ${{ steps.prep.outputs.platforms }}
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -52,7 +55,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch build-time secrets from Infisical
-        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -360,6 +363,9 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -377,7 +383,7 @@ jobs:
           cache: true
 
       - name: Fetch build-time secrets from Infisical
-        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -674,6 +680,9 @@ jobs:
     permissions:
       contents: write
       actions: read
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -681,7 +690,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch build-time secrets from Infisical
-        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
