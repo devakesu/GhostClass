@@ -52,7 +52,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
+        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -377,7 +377,7 @@ jobs:
           cache: true
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
+        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -681,7 +681,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch build-time secrets from Infisical
-        if: ${{ secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != '' }}
+        if: secrets.INFISICAL_CLIENT_ID != '' && secrets.INFISICAL_CLIENT_SECRET != ''
         uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
