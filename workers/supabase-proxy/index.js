@@ -142,10 +142,12 @@ export default {
         headers: { "Content-Type": "text/plain" },
       });
     }
-    // ── 3. Build upstream URL ─────────────────────────────────────────────────
     // Keep the incoming path + query; only replace the origin.
     const incomingUrl = new URL(request.url);
-    const targetUrl = new URL(incomingUrl.pathname + incomingUrl.search, supabaseOrigin);
+    // Use the URL object's pathname property to prevent protocol-relative hijacking (//path).
+    const targetUrl = new URL(supabaseOrigin);
+    targetUrl.pathname = incomingUrl.pathname.replace(/\/+/g, "/");
+    targetUrl.search = incomingUrl.search;
 
     // ── 4. Build outbound request headers ────────────────────────────────────
     const outHeaders = new Headers();

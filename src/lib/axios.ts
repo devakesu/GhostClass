@@ -246,6 +246,20 @@ axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
     await encryptRequestPayload(config, config.method?.toLowerCase() || "");
     config.headers.set("Accept", "application/jose, application/json");
   }
+
+  // Deduplicate slashes in the final URL (path parts)
+  if (config.url) {
+    // If it's a full URL, we only deduplicate path slashes, not protocol slashes
+    if (config.url.startsWith("http")) {
+      const parts = config.url.split("://");
+      if (parts.length === 2) {
+        config.url = `${parts[0]}://${parts[1].replace(/\/+/g, "/")}`;
+      }
+    } else {
+      config.url = config.url.replace(/\/+/g, "/");
+    }
+  }
+
   return config;
 });
 

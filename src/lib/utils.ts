@@ -342,3 +342,14 @@ export function isValidAvatarUrl(url: string | null | undefined): url is string 
     return false;
   }
 }
+/**
+ * Strips all trailing slashes from a string without using regex backtracking.
+ */
+export function stripTrailingSlashes(str: string | undefined): string {
+  if (!str) return "";
+  let s = str.trim();
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}

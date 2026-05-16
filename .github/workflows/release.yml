@@ -511,14 +511,26 @@ jobs:
           APP_DOMAIN="${APP_DOMAIN:-ghostclass.devakesu.com}"
           BACKEND_URL="${BACKEND_URL:-https://${APP_DOMAIN}}"
 
+          # Helper to treat "null" string as empty and apply fallback
+          safe_val() {
+            local val="$1"
+            local fallback="$2"
+            if [ -z "$val" ] || [ "$val" = "null" ]; then
+              echo -n "$fallback"
+            else
+              echo -n "$val"
+            fi
+          }
+
           # Encode all sensitive strings to Base64 for uniform obfuscation
           # Fallbacks ensure no empty strings or "null" literals are baked in
-          ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}" | base64 | tr -d '\n')
-          ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$SUPABASE_ANON_KEY_PROD" | base64 | tr -d '\n')
-          ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
+          S_PROXY=$(safe_val "$SUPABASE_CF_PROXY_URL_PROD" "$SUPABASE_URL_PROD")
+          ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "$S_PROXY" | base64 | tr -d '\n')
+          ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$(safe_val "$SUPABASE_ANON_KEY_PROD" "")" | base64 | tr -d '\n')
+          ENCODED_SENTRY_DSN=$(echo -n "$(safe_val "$SENTRY_DSN" "")" | base64 | tr -d '\n')
           ENCODED_GHOSTCLASS_API_URL_PROD=$(echo -n "https://${APP_DOMAIN}/api" | base64 | tr -d '\n')
-          ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
-          ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
+          ENCODED_EZYGO_AUTH_URL=$(echo -n "$(safe_val "$BACKEND_URL" "https://${APP_DOMAIN}")/login" | base64 | tr -d '\n')
+          ENCODED_EZYGO_API_ROOT=$(echo -n "$(safe_val "$BACKEND_URL" "https://${APP_DOMAIN}")" | base64 | tr -d '\n')
           ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
 
           cat > lib/config/app_secrets.dart << EOF
