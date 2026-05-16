@@ -48,9 +48,11 @@ class AppConfig {
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
   /// The GhostClass web app's API origin (Auth Bridge).
-  static String get ghostclassApiUrl => AppSecrets.isDev
-      ? AppSecrets.ghostclassApiUrlDev
-      : AppSecrets.ghostclassApiUrlProd;
+  static String get ghostclassApiUrl => _d(
+    AppSecrets.isDev
+        ? AppSecrets.ghostclassApiUrlDev
+        : AppSecrets.ghostclassApiUrlProd,
+  );
 
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
