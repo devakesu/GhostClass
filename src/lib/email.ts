@@ -9,6 +9,7 @@ export interface SendEmailProps {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 }
 
 interface ProviderResult {
@@ -70,12 +71,12 @@ async function getSendPulseToken() {
     const data = await res.json();
     return data.access_token;
   } catch (error) {
-    logger.error("Failed to get SendPulse token", error);
-    throw new Error("SendPulse Auth Failed");
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new Error(`SendPulse Auth Failed: ${msg}`);
   }
 }
 
-async function sendViaSendPulse({ to, subject, html, text }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaSendPulse({ to, subject, html, text, replyTo }: SendEmailProps): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
@@ -87,6 +88,7 @@ async function sendViaSendPulse({ to, subject, html, text }: SendEmailProps): Pr
         subject,
         from: CONFIG.sender,
         to: [{ email: to, name: "User" }],
+        ...(replyTo ? { reply_to: { email: replyTo } } : {}),
       },
     };
 
@@ -105,12 +107,12 @@ async function sendViaSendPulse({ to, subject, html, text }: SendEmailProps): Pr
     const data = await res.json() as { id?: string };
     return { success: true, provider: "SendPulse", id: data.id };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Unknown SendPulse error';
+    const msg = error instanceof Error ? error.message : String(error);
     throw new Error(msg);
   }
 }
 
-async function sendViaBrevo({ to, subject, html, text }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaBrevo({ to, subject, html, text, replyTo }: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
@@ -120,6 +122,7 @@ async function sendViaBrevo({ to, subject, html, text }: SendEmailProps): Promis
       subject,
       htmlContent: html,
       textContent: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
+      ...(replyTo ? { replyTo: { email: replyTo } } : {}),
     };
 
     const res = await fetch(CONFIG.brevo.url, {
@@ -138,7 +141,7 @@ async function sendViaBrevo({ to, subject, html, text }: SendEmailProps): Promis
     const data = await res.json() as { messageId?: string };
     return { success: true, provider: "Brevo", id: data.messageId };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Unknown Brevo error';
+    const msg = error instanceof Error ? error.message : String(error);
     throw new Error(msg);
   }
 }

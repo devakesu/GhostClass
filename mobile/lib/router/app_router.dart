@@ -49,11 +49,11 @@ Page<dynamic> _smoothPage(GoRouterState state, Widget child) {
   return CustomTransitionPage(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 380),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final slide =
           Tween<Offset>(
-            begin: const Offset(0, 0.08),
+            begin: const Offset(0, 0.04),
             end: Offset.zero,
           ).animate(
             CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),

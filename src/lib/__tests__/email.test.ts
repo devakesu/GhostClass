@@ -320,4 +320,79 @@ describe("email.ts", () => {
     const { sendEmail } = await import("../email");
     await expect(sendEmail(mockProps)).rejects.toThrow("No provider");
   });
+
+  it('includes replyTo in Brevo payload', async () => {
+    vi.resetModules();
+    vi.stubEnv('BREVO_API_KEY', 'brevo-key');
+    vi.stubEnv('SENDPULSE_CLIENT_ID', '');
+    vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', 'example.com');
+    
+    global.fetch = vi.fn().mockResolvedValue({ 
+      ok: true, 
+      status: 200, 
+      json: async () => ({ messageId: '123' }) 
+    });
+    
+    const { sendEmail } = await import("../email");
+    await sendEmail({ ...mockProps, replyTo: 'reply@user.com' });
+    
+    const payload = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(payload.replyTo).toEqual({ email: 'reply@user.com' });
+  });
+
+  it('includes reply_to in SendPulse payload', async () => {
+    vi.resetModules();
+    vi.stubEnv('BREVO_API_KEY', '');
+    vi.stubEnv('SENDPULSE_CLIENT_ID', 'sp-id');
+    vi.stubEnv('SENDPULSE_CLIENT_SECRET', 'sp-secret');
+    vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', 'example.com');
+    
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("oauth")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: "t" }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: '123' }) });
+    });
+    
+    const { sendEmail } = await import("../email");
+    await sendEmail({ ...mockProps, replyTo: 'reply@user.com' });
+    
+    const payload = JSON.parse((global.fetch as any).mock.calls[1][1].body);
+    expect(payload.email.reply_to).toEqual({ email: 'reply@user.com' });
+  });
+  it('handles non-Error objects in catch blocks', async () => {
+    vi.resetModules();
+    vi.stubEnv('BREVO_API_KEY', 'key');
+    vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', 'example.com');
+    
+    global.fetch = vi.fn().mockImplementation(() => { throw "Raw error string"; });
+    
+    const { sendEmail } = await import("../email");
+    const res = await sendEmail(mockProps);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("Raw error string");
+  });
+
+  it('handles non-Error objects in failover catch blocks', async () => {
+    vi.resetModules();
+    vi.stubEnv('BREVO_API_KEY', 'key');
+    vi.stubEnv('SENDPULSE_CLIENT_ID', 'sp-id');
+    vi.stubEnv('SENDPULSE_CLIENT_SECRET', 'sp-secret');
+    vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', 'example.com');
+
+    vi.spyOn(crypto, 'getRandomValues').mockImplementation((arr: any) => {
+      arr[0] = 200; // Start with Brevo
+      return arr;
+    });
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes("brevo")) throw new Error("Primary fail");
+      if (url.includes("sendpulse")) throw "Secondary raw fail";
+      return { ok: true, json: async () => ({}) };
+    });
+    
+    const { sendEmail } = await import("../email");
+    const res = await sendEmail(mockProps);
+    
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("Secondary raw fail");
+  });
 });

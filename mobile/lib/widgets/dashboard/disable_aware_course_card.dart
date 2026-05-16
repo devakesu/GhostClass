@@ -412,27 +412,32 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
           ),
           if (isOtherReason) ...[
             const SizedBox(height: 12),
-            TextField(
-              controller: customController,
-              autofocus: true,
-              style: GoogleFonts.manrope(
-                color: Theme.of(context).colorScheme.onSurface,
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Enter your reason',
-                hintStyle: GoogleFonts.manrope(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.3),
+              child: TextField(
+                controller: customController,
+                autofocus: true,
+                style: GoogleFonts.manrope(
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
-                filled: true,
-                fillColor: Theme.of(
-                  context,
-                ).colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Enter your reason',
+                  hintStyle: GoogleFonts.manrope(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.3),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),

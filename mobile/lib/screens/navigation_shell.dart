@@ -214,7 +214,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     alignment: Alignment.centerLeft,
                     fit: BoxFit.fitWidth,
                   ),
-                ).animate().fade().slideX(begin: -0.2),
+                ),
 
                 const SizedBox(width: 8),
 
@@ -400,30 +400,13 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                               .scale(begin: const Offset(0.8, 0.8)),
                     ),
                   ],
-                ).animate().fade().slideX(begin: 0.2),
+                ),
               ],
             ),
           ),
         ),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.01),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        child: KeyedSubtree(key: ValueKey(location), child: widget.child),
-      ),
+      body: widget.child,
       bottomNavigationBar: BottomAppBar(
         height: 75,
         color: bg,

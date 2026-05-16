@@ -418,36 +418,41 @@ class GhostClassScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                onChanged: (val) => setState(() {}),
-                style: GoogleFonts.manrope(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
                 ),
-                decoration: InputDecoration(
-                  hintText: 'DELETE',
-                  hintStyle: GoogleFonts.manrope(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.1),
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  onChanged: (val) => setState(() {}),
+                  style: GoogleFonts.manrope(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
                   ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
+                  decoration: InputDecoration(
+                    hintText: 'DELETE',
+                    hintStyle: GoogleFonts.manrope(
                       color: Theme.of(
                         context,
                       ).colorScheme.onSurface.withValues(alpha: 0.1),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.redAccent),
+                    filled: true,
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.redAccent),
+                    ),
                   ),
                 ),
               ),

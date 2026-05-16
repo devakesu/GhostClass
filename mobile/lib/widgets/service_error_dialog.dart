@@ -110,7 +110,7 @@ class ServiceErrorDialog extends StatelessWidget {
                         .scale(
                           begin: const Offset(1, 1),
                           end: const Offset(1.1, 1.1),
-                          duration: 400.ms,
+                          duration: 1200.ms,
                         ),
 
                     const SizedBox(height: 24),
@@ -367,11 +367,11 @@ class ServiceErrorDialog extends StatelessWidget {
               )
               .animate()
               .scale(
-                duration: 400.ms,
-                curve: Curves.easeOutBack,
+                duration: 800.ms,
+                curve: Curves.easeOutCubic,
                 begin: const Offset(0.9, 0.9),
               )
-              .fade(duration: 400.ms),
+              .fade(duration: 800.ms),
     );
   }
 }

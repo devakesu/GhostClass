@@ -82,6 +82,18 @@ describe('processContactSubmission', () => {
     expect(renderContactConfirmationEmail).toHaveBeenCalled();
   });
 
+  it('passes the user email as replyTo for admin notifications', async () => {
+    await processContactSubmission(mockSupabase, mockSupabaseAdmin, mockPayload);
+
+    // First call is admin email
+    expect(sendEmail).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        replyTo: mockPayload.email,
+      }),
+    );
+  });
+
   it('handles database insertion failure', async () => {
     mockSupabase.single.mockResolvedValueOnce({ data: null, error: { message: 'DB Error' } });
 

@@ -129,6 +129,7 @@ export async function processContactSubmission(
     const adminEmailResult = await sendEmail({
       to: getContactEmail(),
       subject: `[New Inquiry] ${safeSubject}`,
+      replyTo: payload.email,
       html: renderContactAdminEmail({
         name: safeName,
         email: safeEmail,
