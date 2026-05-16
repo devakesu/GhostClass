@@ -1,9 +1,7 @@
-// Handle Notifications
-// src/lib/notifications.ts
-
 import axios from "@/lib/axios";
+import { stripTrailingSlashes } from "@/lib/utils";
 
-const API_URL = `${process.env.NEXT_PUBLIC_SUPABASE_API_URL}/manage-notifications`;
+const API_URL = `${stripTrailingSlashes(process.env.NEXT_PUBLIC_SUPABASE_API_URL)}/manage-notifications`;
 
 export const fetchNotifications = async (page = 1, limit = 15) => {
   const res = await axios.get(API_URL, {

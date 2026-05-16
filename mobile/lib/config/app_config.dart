@@ -164,11 +164,30 @@ class AppConfig {
 
       // Normalize adds padding and handles URL-safe/standard base64 mixed alphabets.
       // If normalization or decoding fails, it's likely not base64, so we return raw.
-      return utf8.decode(base64.decode(base64.normalize(trimmed)));
+      final decoded = utf8.decode(base64.decode(base64.normalize(trimmed))).trim();
+
+      // For URLs, we strip trailing slashes to ensure path joining works consistently
+      if (decoded.startsWith('http')) {
+        var result = decoded;
+        while (result.endsWith('/')) {
+          result = result.substring(0, result.length - 1);
+        }
+        return result;
+      }
+
+      return decoded;
     } on Object {
       // Return the raw string as fallback if it's not actually base64
       // This allows migration and reduces breakage for unencoded dev strings
-      return encoded;
+      final fallback = encoded.trim();
+      if (fallback.startsWith('http')) {
+        var result = fallback;
+        while (result.endsWith('/')) {
+          result = result.substring(0, result.length - 1);
+        }
+        return result;
+      }
+      return fallback;
     }
   }
 }

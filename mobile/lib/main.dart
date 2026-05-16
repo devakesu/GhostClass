@@ -132,11 +132,15 @@ void main() async {
   }
 
   // Initialize Supabase
+  final sUrl = AppConfig.supabaseUrl;
+  final sKey = AppConfig.supabasePublishableKey.value;
+  final sOrigin = AppConfig.supabaseOrigin;
+
   await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabasePublishableKey.value,
+    url: sUrl,
+    anonKey: sKey,
     headers: {
-      'Origin': AppConfig.supabaseOrigin,
+      'Origin': sOrigin,
     },
   );
 
@@ -164,6 +168,18 @@ void main() async {
       );
     },
   );
+
+  await Sentry.addBreadcrumb(Breadcrumb(
+    message: 'Supabase Config',
+    category: 'auth.config',
+    data: {
+      'url': sUrl,
+      'origin': sOrigin,
+      'key_masked': sKey.length > 8
+          ? '${sKey.substring(0, 4)}...${sKey.substring(sKey.length - 4)}'
+          : '[TOO SHORT]',
+    },
+  ));
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
