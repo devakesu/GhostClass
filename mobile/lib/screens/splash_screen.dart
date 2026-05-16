@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -48,13 +49,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       api.clearCaches();
 
       final authTask = ref.read(authProvider.future);
-
-      await Future.wait<dynamic>([
-        Future.delayed(
-          const Duration(milliseconds: 1000),
-        ), // Shorter delay since we already waited for integrity
-        jwePreWarm,
-        apiPreWarm,
+      unawaited(
         authTask.then((user) {
           if (!mounted || user == null || user.profile?.avatarUrl == null) {
             return;
@@ -73,6 +68,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             AppLogger.e('SplashScreen: Avatar pre-cache failed', e, st);
           }
         }),
+      );
+
+      await Future.wait<dynamic>([
+        Future.delayed(
+          const Duration(seconds: 1),
+        ), // Keep the splash visible for at least one second.
+        jwePreWarm,
+        apiPreWarm,
+        authTask,
       ]);
     } on Object catch (e) {
       AppLogger.e('SplashScreen: Initialization error', e);
