@@ -169,17 +169,19 @@ void main() async {
     },
   );
 
-  await Sentry.addBreadcrumb(Breadcrumb(
-    message: 'Supabase Config',
-    category: 'auth.config',
-    data: {
-      'url': sUrl,
-      'origin': sOrigin,
-      'key_masked': sKey.length > 8
-          ? '${sKey.substring(0, 4)}...${sKey.substring(sKey.length - 4)}'
-          : '[TOO SHORT]',
-    },
-  ));
+  await Sentry.addBreadcrumb(
+    Breadcrumb(
+      message: 'Supabase Config',
+      category: 'auth.config',
+      data: {
+        'url': sUrl,
+        'origin': sOrigin,
+        'key_masked': sKey.length > 8
+            ? '${sKey.substring(0, 4)}...${sKey.substring(sKey.length - 4)}'
+            : '[TOO SHORT]',
+      },
+    ),
+  );
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);

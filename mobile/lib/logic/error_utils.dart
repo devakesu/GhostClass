@@ -28,7 +28,8 @@ String formatApiError(dynamic response, String context) {
     message = response.message;
   } else if (response is AuthException) {
     code = response.statusCode ?? '';
-    message = response.toString(); // Use toString() to capture originalError details
+    message = response
+        .toString(); // Use toString() to capture originalError details
   } else if (response is DioException) {
     status = response.response?.statusCode;
     final data = response.response?.data;

@@ -164,7 +164,9 @@ class AppConfig {
 
       // Normalize adds padding and handles URL-safe/standard base64 mixed alphabets.
       // If normalization or decoding fails, it's likely not base64, so we return raw.
-      final decoded = utf8.decode(base64.decode(base64.normalize(trimmed))).trim();
+      final decoded = utf8
+          .decode(base64.decode(base64.normalize(trimmed)))
+          .trim();
 
       // For URLs, we strip trailing slashes to ensure path joining works consistently
       if (decoded.startsWith('http')) {
