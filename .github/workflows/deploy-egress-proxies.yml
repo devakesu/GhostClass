@@ -10,14 +10,15 @@ on:
   # Allow manual deployment/testing
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   deploy-cloudflare-worker:
     name: Deploy Cloudflare Worker
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -83,6 +84,8 @@ jobs:
     name: Deploy AWS Lambda Proxy
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -165,6 +168,8 @@ jobs:
     name: Deploy Supabase CF Worker Proxy
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -221,6 +226,8 @@ jobs:
     name: Deploy Supabase AWS Lambda Proxy
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd

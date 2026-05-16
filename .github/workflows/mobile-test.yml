@@ -6,12 +6,13 @@ on:
   pull_request:
     branches: [main, "release/*"]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   flutter-unit-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: mobile
