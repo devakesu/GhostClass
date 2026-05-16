@@ -52,6 +52,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Set up Flutter
         uses: ./.github/actions/flutter-action
@@ -197,13 +198,28 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: mobile/ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('mobile/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
       - name: Install CocoaPods dependencies
         if: hashFiles('mobile/ios/Podfile') != ''
         run: |
-          sudo gem install cocoapods --no-document
           pushd mobile/ios
-          pod install --repo-update
+          pod install
           popd
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-deriveddata-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-deriveddata-
 
       - name: Initialize CodeQL (Swift)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
@@ -214,7 +230,15 @@ jobs:
       - name: Build iOS app
         run: |
           set -o pipefail
-          xcodebuild -workspace mobile/ios/Runner.xcworkspace -scheme Runner -configuration Debug CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -quiet
+          xcodebuild -workspace mobile/ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 14' \
+            -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
 
       - name: Run CodeQL analysis (Swift)
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e
