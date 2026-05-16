@@ -2,24 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, "release/*"]
   pull_request:
     branches: [main, "release/*"]
-    paths:
-      - "src/**"
-      - "public/**"
-      - "supabase/**"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "next.config.ts"
-      - "vitest.config.ts"
-      - "vitest.setup.ts"
-      - "playwright.config.ts"
-      - "eslint.config.mjs"
-      - "postcss.config.mjs"
-      - "components.json"
-      - ".github/workflows/test.yml"
 
 permissions: {}
 

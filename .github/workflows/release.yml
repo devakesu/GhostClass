@@ -516,7 +516,7 @@ jobs:
           ENCODED_SUPABASE_PROXY_URL_PROD=$(echo -n "${SUPABASE_CF_PROXY_URL_PROD:-$SUPABASE_URL_PROD}" | base64 | tr -d '\n')
           ENCODED_SUPABASE_ANON_KEY_PROD=$(echo -n "$SUPABASE_ANON_KEY_PROD" | base64 | tr -d '\n')
           ENCODED_SENTRY_DSN=$(echo -n "$SENTRY_DSN" | base64 | tr -d '\n')
-          ENCODED_GHOSTCLASS_API_URL_PROD=$(echo -n "${BACKEND_URL}/api" | base64 | tr -d '\n')
+          ENCODED_GHOSTCLASS_API_URL_PROD=$(echo -n "https://${APP_DOMAIN}/api" | base64 | tr -d '\n')
           ENCODED_EZYGO_AUTH_URL=$(echo -n "${BACKEND_URL}/login" | base64 | tr -d '\n')
           ENCODED_EZYGO_API_ROOT=$(echo -n "$BACKEND_URL" | base64 | tr -d '\n')
           ENCODED_EZYGO_ORIGIN=$(echo -n "https://edu.ezygo.app" | base64 | tr -d '\n')
