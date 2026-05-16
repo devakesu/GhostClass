@@ -131,6 +131,10 @@ class DioService {
   bool suppress401 = false;
   DateTime? _last401Broadcast;
 
+  // Futures to deduplicate parallel token requests
+  Future<String?>? _tokenFetchInFlight;
+  Future<String?>? _limitedTokenFetchInFlight;
+
   void _handle401(RequestOptions options) {
     if (suppress401) return;
 
@@ -152,11 +156,23 @@ class DioService {
   Future<void> _addSecurityHeaders(RequestOptions options) async {
     try {
       final useLimited = options.extra['useLimitedToken'] == true;
-      final appCheckToken =
-          await (useLimited
-                  ? FirebaseAppCheck.instance.getLimitedUseToken()
-                  : FirebaseAppCheck.instance.getToken())
-              .timeout(const Duration(seconds: 10));
+
+      // Deduplicate parallel token requests to prevent "Too many attempts"
+      String? appCheckToken;
+      if (useLimited) {
+        _limitedTokenFetchInFlight ??= FirebaseAppCheck.instance
+            .getLimitedUseToken();
+        appCheckToken = await _limitedTokenFetchInFlight!.timeout(
+          const Duration(seconds: 10),
+        );
+        _limitedTokenFetchInFlight = null; // Clear after completion
+      } else {
+        _tokenFetchInFlight ??= FirebaseAppCheck.instance.getToken();
+        appCheckToken = await _tokenFetchInFlight!.timeout(
+          const Duration(seconds: 10),
+        );
+        _tokenFetchInFlight = null; // Clear after completion
+      }
 
       if (appCheckToken != null && appCheckToken.isNotEmpty) {
         options.headers['X-Firebase-AppCheck'] = appCheckToken;
@@ -167,6 +183,10 @@ class DioService {
             'App Check token is empty - verify Firebase activation';
       }
     } on Object catch (e) {
+      // Ensure futures are cleared on error to allow retries
+      _tokenFetchInFlight = null;
+      _limitedTokenFetchInFlight = null;
+
       AppLogger.w('DioService: Security headers failed: $e');
       options.extra['appCheckError'] = e.toString();
     }

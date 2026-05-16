@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/type_utils.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/about/about_widgets.dart';
 import 'package:ghostclass/widgets/about/attestation_section.dart';
@@ -198,7 +199,7 @@ class AboutScreen extends ConsumerWidget {
                       MetricCard(
                         icon: LucideIcons.clock3,
                         label: 'Built',
-                        value: AppConfig.buildTimestamp,
+                        value: formatBuildTimestamp(AppConfig.buildTimestamp),
                         accent: const Color(0xFF0EA5E9),
                         onTap: () {
                           final _ = _copy(

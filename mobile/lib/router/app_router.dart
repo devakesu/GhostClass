@@ -44,6 +44,28 @@ class GoRouterRefreshStream extends ChangeNotifier {
   }
 }
 
+/// Standardizes smooth transitions across all top-level pages.
+Page<dynamic> _smoothPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 380),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final slide =
+          Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          );
+      return FadeTransition(
+        opacity: animation,
+        child: SlideTransition(position: slide, child: child),
+      );
+    },
+  );
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final authRefreshNotifier = ValueNotifier<bool>(false);
 
@@ -130,47 +152,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         name: 'root',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const SplashScreen()),
       ),
       GoRoute(
         path: '/splash',
         name: 'splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const SplashScreen()),
       ),
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/accept-terms',
         name: 'accept-terms',
-        builder: (context, state) => const AcceptTermsScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const AcceptTermsScreen()),
       ),
       GoRoute(
         path: '/about',
         name: 'about',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const AboutScreen(),
-          transitionDuration: const Duration(milliseconds: 380),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide =
-                Tween<Offset>(
-                  begin: const Offset(0, 0.08),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ),
-                );
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: slide, child: child),
-            );
-          },
-        ),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const AboutScreen()),
       ),
 
       // Bottom Navigation Shell
@@ -181,37 +188,44 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const DashboardScreen()),
           ),
           GoRoute(
             path: '/calendar',
             name: 'calendar',
-            builder: (context, state) => const AttendanceCalendarScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const AttendanceCalendarScreen()),
           ),
           GoRoute(
             path: '/tracking',
             name: 'tracking',
-            builder: (context, state) => const TrackingScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const TrackingScreen()),
           ),
           GoRoute(
             path: '/scores',
             name: 'scores',
-            builder: (context, state) => const ScoresScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const ScoresScreen()),
           ),
           GoRoute(
             path: '/leaves',
             name: 'leaves',
-            builder: (context, state) => const LeavesScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const LeavesScreen()),
           ),
           GoRoute(
             path: '/ghostclass',
             name: 'ghostclass',
-            builder: (context, state) => const GhostClassScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const GhostClassScreen()),
           ),
           GoRoute(
             path: '/notifications',
             name: 'notifications',
-            builder: (context, state) => const NotificationsScreen(),
+            pageBuilder: (context, state) =>
+                _smoothPage(state, const NotificationsScreen()),
           ),
         ],
       ),
@@ -220,67 +234,29 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile-dump',
         name: 'profile-dump',
-        builder: (context, state) => const ProfileDumpScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const ProfileDumpScreen()),
       ),
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) =>
+            _smoothPage(state, const ProfileScreen()),
       ),
 
       // Static Pages
       GoRoute(
         path: '/legal',
         name: 'legal',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: LegalScreen(
-            title: 'Legal',
-            body: getLegalPageContent(),
-          ),
-          transitionDuration: const Duration(milliseconds: 380),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide =
-                Tween<Offset>(
-                  begin: const Offset(0, 0.06),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ),
-                );
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: slide, child: child),
-            );
-          },
+        pageBuilder: (context, state) => _smoothPage(
+          state,
+          LegalScreen(title: 'Legal', body: getLegalPageContent()),
         ),
       ),
       GoRoute(
         path: '/help',
         name: 'help',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const HelpScreen(),
-          transitionDuration: const Duration(milliseconds: 380),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final slide =
-                Tween<Offset>(
-                  begin: const Offset(0, 0.06),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ),
-                );
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: slide, child: child),
-            );
-          },
-        ),
+        pageBuilder: (context, state) => _smoothPage(state, const HelpScreen()),
       ),
       GoRoute(
         path: '/contact',
@@ -296,30 +272,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               extra?['message'] as String? ??
               state.uri.queryParameters['message'];
 
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: ContactScreen(
-              prefilledSubject: subject,
-              prefilledMessage: message,
-            ),
-            transitionDuration: const Duration(milliseconds: 380),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  final slide =
-                      Tween<Offset>(
-                        begin: const Offset(0, 0.06),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      );
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  );
-                },
+          return _smoothPage(
+            state,
+            ContactScreen(prefilledSubject: subject, prefilledMessage: message),
           );
         },
       ),

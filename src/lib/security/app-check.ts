@@ -184,6 +184,11 @@ async function verifyAuthentication(
     return { isValid: true, authType: "csrf", isWebRequest: true };
   }
 
+  // Neither header is present. If App Check is not enforced, we allow the request.
+  if (process.env.ENFORCE_APP_CHECK !== "true") {
+    return { isValid: true, authType: "none" };
+  }
+
   return { isValid: false, error: "Unauthenticated", authType: "none" };
 }
 

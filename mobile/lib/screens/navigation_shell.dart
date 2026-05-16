@@ -406,7 +406,24 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
           ),
         ),
       ),
-      body: widget.child,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.01),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(key: ValueKey(location), child: widget.child),
+      ),
       bottomNavigationBar: BottomAppBar(
         height: 75,
         color: bg,
