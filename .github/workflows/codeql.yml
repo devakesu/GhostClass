@@ -234,7 +234,7 @@ jobs:
             -scheme Runner \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 14' \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
