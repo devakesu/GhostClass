@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
+import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
@@ -21,6 +22,7 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/add_attendance_dialog.dart';
+import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -62,9 +64,33 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     }
   }
 
+  void _checkAndShowUpdateDialog() {
+    final updateState = ref.read(appUpdateProvider);
+    if (updateState.checkResult != null &&
+        updateState.checkResult!.hasUpdate &&
+        !updateState.checkResult!.isForceUpdate &&
+        !updateState.dialogDismissed) {
+      unawaited(
+        AppUpdateDialog.show(
+          context,
+          updateState.checkResult!.latestVersion,
+          isForceUpdate: false,
+        ).then((_) {
+          if (mounted) {
+            ref.read(appUpdateProvider.notifier).dismissDialog();
+          }
+        }),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowUpdateDialog();
+    });
 
     ref
       ..listenManual<AsyncValue<AcademicState?>>(academicProvider, (

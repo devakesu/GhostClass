@@ -10,10 +10,12 @@ import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/logic/support_helper.dart';
+import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,7 +44,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       // Perform full server-side integrity check before anything else
       // This satisfies the requirement: "all other reqs must be only if app check success"
-      await api.verifyIntegrity();
+      final versionResult = await api.verifyIntegrity();
+
+      if (versionResult != null && versionResult.hasUpdate) {
+        ref.read(appUpdateProvider.notifier).setCheckResult(versionResult);
+
+        if (versionResult.isForceUpdate) {
+          if (!mounted) return;
+          await AppUpdateDialog.show(
+            context,
+            versionResult.latestVersion,
+            isForceUpdate: true,
+          );
+          // Block splash screen - stay here forever
+          return;
+        }
+      }
 
       // 3. Start hydration only after security is verified
       // CLEAR ALL previous app-open caches for a truly fresh start
@@ -176,11 +193,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Center(
         child: Image.asset('assets/images/logo.png', height: 120)
             .animate()
-            .fade(duration: 800.ms)
+            .fade(duration: 400.ms)
             .scale(
               begin: const Offset(0.8, 0.8),
               end: const Offset(1, 1),
-              duration: 800.ms,
+              duration: 400.ms,
               curve: Curves.easeOutCubic,
             )
             .then() // Chain effects after the entrance
@@ -188,12 +205,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .scale(
               begin: const Offset(1, 1),
               end: const Offset(1.05, 1.05),
-              duration: 1200.ms,
+              duration: 800.ms,
               curve: Curves.easeInOut,
             )
             .animate(onPlay: (controller) => controller.repeat())
             .shimmer(
-              duration: 2000.ms,
+              duration: 1200.ms,
               color: Colors.white.withValues(alpha: 0.3),
             ),
       ),

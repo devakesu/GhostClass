@@ -4,9 +4,11 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/login_screen.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:ghostclass/services/security_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAnalytics extends Mock implements FirebaseAnalytics {}
@@ -24,6 +26,20 @@ class FakeLoginAuthNotifier extends AuthNotifier {
     username,
     password,
   );
+}
+
+class FakeAppUpdateNotifier extends AppUpdateNotifier {
+  @override
+  AppUpdateState build() {
+    return AppUpdateState(
+      checkResult: AppVersionCheckResult(
+        latestVersion: '3.1.0',
+        minVersion: '3.0.8',
+        hasUpdate: true,
+        isForceUpdate: false,
+      ),
+    );
+  }
 }
 
 void main() {
@@ -152,5 +168,26 @@ void main() {
     final loginAttemptParams =
         loginAttemptVerification.captured.single as Map<String, Object?>;
     expect(loginAttemptParams['username_length'], 100);
+  });
+
+  testWidgets('displays optional update dialog when mounted', (tester) async {
+    await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    final fakeNotifier = FakeLoginAuthNotifier((username, password) async {});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith(() => fakeNotifier),
+          appUpdateProvider.overrideWith(FakeAppUpdateNotifier.new),
+        ],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+
+    expect(find.text('New Update Available!'), findsOneWidget);
   });
 }

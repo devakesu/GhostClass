@@ -1,4 +1,4 @@
-import { render } from "@react-email/components";
+import { render } from "react-email";
 import CourseMismatchEmail from "./course-mismatch";
 import AttendanceConflictEmail from "./attendance-conflict";
 import RevisionClassEmail from "./revision-class";

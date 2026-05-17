@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
+import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 
@@ -100,6 +102,21 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
     } on Object catch (_) {}
 
     if (!mounted) return;
-    await ServiceErrorDialog.show(context, title, [message], details: details);
+    await ServiceErrorDialog.show(
+      context,
+      title,
+      [message],
+      details: details,
+      onContactSupport: () => SupportHelper.contactViaEmail(
+        subject: '$title [v${AppConfig.appVersion}]',
+        customBody:
+            'Hello GhostClass Support Team,\n\n'
+            'I encountered an error during $errorContext.\n\n'
+            '-- SUMMARY --\n'
+            'Error Context: $errorContext\n'
+            'Message: $message\n'
+            'Technical Details: $details\n',
+      ),
+    );
   }
 }
