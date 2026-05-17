@@ -120,6 +120,16 @@ updateFile(pubspecPath, (content) => {
   });
 });
 
+
+// 7. Update mobile/lib/config/app_config.dart
+const appConfigPath = path.join(__dirname, '..', 'mobile', 'lib', 'config', 'app_config.dart');
+updateFile(appConfigPath, (content) => {
+  return content.replace(
+    /('APP_VERSION',\s*defaultValue:\s*')\d+\.\d+\.\d+(')/g,
+    `$1${targetVersion}$2`
+  );
+});
+
 // In pre-commit mode, stage all updated files automatically
 if (isPreCommit && updatedFiles.length > 0) {
   console.log('🚀 Husky Pre-commit: Staging auto-synchronized version files...');
