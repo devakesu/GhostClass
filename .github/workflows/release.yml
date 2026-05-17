@@ -371,7 +371,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-artifacts
+          name: web-release-artifacts
           path: |
             sbom.json
             sbom.json.bundle
@@ -392,6 +392,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Download Gradle Wrapper
+        run: |
+          mkdir -p mobile/android/gradle/wrapper
+          curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar
+          echo "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
       - name: Set up Java
         uses: actions/setup-java@b622de1dfa918ecc0ab28f40cd42e3c3752cd6c5
@@ -626,6 +632,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Unset credential-like variables to prevent environment audit exposure warnings during SBOM generation
+          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+                INFISICAL_CLIENT_SECRET \
+                MOBILE_SENTRY_AUTH_TOKEN \
+                NEXT_PUBLIC_APP_EMAIL \
+                NEXT_PUBLIC_LEGAL_EMAIL \
+                NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY \
+                NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+                NEXT_PUBLIC_TURNSTILE_SITE_KEY \
+                SENTRY_AUTH_TOKEN
+
           npx --yes @cyclonedx/cdxgen -t dart --no-install-deps -o release-assets/mobile-sbom.json .
 
       - name: Attest mobile APK provenance
@@ -644,17 +661,18 @@ jobs:
         working-directory: mobile
         env:
           ATTESTATION_BUNDLE: ${{ steps.attest-mobile.outputs.bundle-path }}
+          VERSION_NAME: ${{ steps.mobile-prep.outputs.build_name }}
         run: |
           set -euo pipefail
 
-          cp build/app/outputs/flutter-apk/app-release.apk release-assets/mobile-app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-assets/ghostclass-android-v${VERSION_NAME}.apk
           cp "$ATTESTATION_BUNDLE" release-assets/mobile-provenance.intoto.jsonl
 
           cd release-assets
           {
             echo "# Mobile Release Artifact Checksums"
             echo ""
-            sha256sum mobile-app-release.apk
+            sha256sum ghostclass-android-v${VERSION_NAME}.apk
             sha256sum mobile-sbom.json
             sha256sum mobile-provenance.intoto.jsonl
             echo ""
@@ -664,8 +682,8 @@ jobs:
       - name: Upload mobile APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mobile-app-apk
-          path: mobile/release-assets/mobile-app-release.apk
+          name: ghostclass-android-apk
+          path: mobile/release-assets/ghostclass-android-v${{ steps.mobile-prep.outputs.build_name }}.apk
 
       - name: Upload mobile security metadata artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -771,13 +789,13 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: release-artifacts
+          name: web-release-artifacts
           path: ./artifacts/web
 
       - name: Download mobile APK artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: mobile-app-apk
+          name: ghostclass-android-apk
           path: ./artifacts/mobile
 
       - name: Download mobile security metadata artifacts
@@ -877,7 +895,7 @@ jobs:
           ## Verify Mobile APK
 
           \`\`\`bash
-          gh attestation verify mobile-app-release.apk --owner ${REPOSITORY_OWNER}
+          gh attestation verify ghostclass-android-v${VERSION}.apk --owner ${REPOSITORY_OWNER}
           grep -E '^[0-9a-f]{64}  ' mobile-checksums.txt | sha256sum -c
           \`\`\`
 
@@ -967,7 +985,7 @@ jobs:
             ./artifacts/web/checksums.txt \
             ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \
-            ./artifacts/mobile/mobile-app-release.apk \
+            ./artifacts/mobile/ghostclass-android-v${{ steps.version.outputs.version }}.apk \
             ./artifacts/mobile/mobile-sbom.json \
             ./artifacts/mobile/mobile-checksums.txt \
             ./artifacts/mobile/mobile-provenance.intoto.jsonl \

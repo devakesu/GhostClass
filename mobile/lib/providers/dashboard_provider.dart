@@ -150,9 +150,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                 ? Future.value(trackedAttendance)
                 : _fetchAttendanceOnce(api: api, storage: storage))
             .then((res) {
-          if (res == null) throw Exception('No attendance data');
-          attendance = res;
-        }),
+              if (res == null) throw Exception('No attendance data');
+              attendance = res;
+            }),
         if (classId != null) ...[
           // Fetch Class Courses
           supabase.Supabase.instance.client
@@ -162,19 +162,19 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               .eq('academic_year', academic.year)
               .eq('semester', academic.semester)
               .then((coursesRes) {
-            if (coursesRes.isNotEmpty) {
-              sharedCourses = (coursesRes as List).map((raw) {
-                final c = raw as Map<String, dynamic>;
-                return CourseDetails(
-                  id: 0, // Mark as shared/custom
-                  name: c['course_name'] as String? ?? 'Unnamed Course',
-                  code: c['course_code'] as String?,
-                  academicYear: academic.year,
-                  academicSemester: academic.semester,
-                );
-              }).toList();
-            }
-          }),
+                if (coursesRes.isNotEmpty) {
+                  sharedCourses = (coursesRes as List).map((raw) {
+                    final c = raw as Map<String, dynamic>;
+                    return CourseDetails(
+                      id: 0, // Mark as shared/custom
+                      name: c['course_name'] as String? ?? 'Unnamed Course',
+                      code: c['course_code'] as String?,
+                      academicYear: academic.year,
+                      academicSemester: academic.semester,
+                    );
+                  }).toList();
+                }
+              }),
           // Fetch Instructor Mappings
           supabase.Supabase.instance.client
               .from('course_instructors')
@@ -183,15 +183,16 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               .eq('semester', academic.semester)
               .eq('academic_year', academic.year)
               .then((instructorsRes) {
-            if (instructorsRes.isNotEmpty) {
-              sharedInstructors = (instructorsRes as List)
-                  .map(
-                    (json) =>
-                        CourseInstructor.fromJson(json as Map<String, dynamic>),
-                  )
-                  .toList();
-            }
-          }),
+                if (instructorsRes.isNotEmpty) {
+                  sharedInstructors = (instructorsRes as List)
+                      .map(
+                        (json) => CourseInstructor.fromJson(
+                          json as Map<String, dynamic>,
+                        ),
+                      )
+                      .toList();
+                }
+              }),
         ],
       ]);
 

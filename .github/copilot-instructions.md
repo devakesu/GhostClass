@@ -2,7 +2,7 @@
 
 GhostClass is a full-stack monorepo with two first-class clients sharing the same backend/security model:
 
-- Web app: Next.js 16 + React 19 + TypeScript
+- Web app: Next.js (App Router) + React + TypeScript (strict)
 - Mobile app: Flutter + Dart (Android/iOS)
 
 The product helps students manage attendance using EzyGo data, with bunk calculation, calendar/history, disputed-absence tracking, scores, leave status, and notifications.
@@ -46,13 +46,13 @@ Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `androi
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16.1.x (App Router), React 19.2.x, TypeScript 6 (strict) |
-| UI | Tailwind CSS v4, Radix UI, Shadcn UI, Framer Motion, Lucide |
+| Framework | Next.js (App Router), React, TypeScript (strict) |
+| UI | Tailwind CSS, Radix UI, Shadcn UI, Framer Motion, Lucide |
 | Data / Forms | TanStack Query v5, React Hook Form, Zod v4 |
-| Charts | Recharts v3 |
+| Charts | Recharts |
 | Auth / DB | Supabase (PostgreSQL + RLS), `@supabase/ssr` |
 | Security | AES-256-GCM, CSRF, Upstash Redis rate limiting, Cloudflare Turnstile, CSP |
-| HTTP | Axios v1 + interceptors, LRU Cache v11 |
+| HTTP | Axios + interceptors, LRU Cache |
 | Monitoring | Sentry (`sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation.ts`) |
 | PWA | Serwist (`src/sw.ts`) |
 | Testing | Vitest + Playwright |
@@ -61,7 +61,7 @@ Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `androi
 
 | Layer | Technology |
 |---|---|
-| Framework | Flutter 3.27+, Dart ^3.11.4 |
+| Framework | Flutter, Dart |
 | State | Riverpod 3 (`flutter_riverpod`, `riverpod_annotation`, generator) |
 | HTTP / Backend | Dio, Supabase Flutter |
 | Routing | GoRouter |
@@ -75,20 +75,28 @@ Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `androi
 
 ### Web (repo root)
 
+Recommended: use the package manager the repo is configured for (`npm`, `pnpm`, or `yarn`) — check `package.json`.
+
 ```bash
-npm install
-npm run dev                 # default: next dev --webpack
-npm run dev:turbopack
+# install dependencies (choose one)
+npm ci
+# or
+pnpm install
+# run local dev
+npm run dev                 # or `pnpm dev`
+npm run dev:turbopack       # optional turbopack dev mode
 npm run build
 npm run lint
+npm run format
 npm run test
 npm run test:coverage
-npm run test:e2e            # CI runs chromium project
+npm run test:e2e            # runs Playwright E2E (CI uses chromium project)
 ```
 
 ### Mobile (`mobile/`)
 
 ```bash
+cd mobile
 flutter pub get
 flutter analyze
 flutter test
@@ -99,14 +107,17 @@ flutter build appbundle --release
 flutter build ios --release   # macOS + Xcode required
 ```
 
+If you use a different Flutter toolchain (fvm, etc.), prefer that in CI and local docs.
+
 ---
 
 ## Environment and Secrets
 
 ### Web env
 
-GhostClass utilizes **Infisical** as the single source of truth, organized into 3 folders: `/build-time`, `/runtime`, and `/ci`.
-Instruct developers to authenticate via `infisical login` and run services using `infisical run -- npm run dev`.
+GhostClass utilizes **Infisical** as the single source of truth for runtime and CI secrets. Common folders include `/build-time`, `/runtime`, and `/ci`.
+
+Developers should authenticate via `infisical login` and run services using `infisical run -- <cmd>` (for example `infisical run -- npm run dev`).
 
 Critical upstream dashboard variables mapped include:
 
@@ -146,7 +157,7 @@ import { createClient } from '@/lib/supabase/client';
 
 - Vitest uses `jsdom`, globals, and setup from `vitest.setup.ts`
 - Test files: `**/*.{test,spec}.{ts,tsx}` under `src/` (excluding `e2e/`)
-- Coverage thresholds: lines 7, functions 8, branches 5, statements 7
+- Coverage thresholds are defined in `vitest.config.ts`.
 - Prefer Arrange-Act-Assert
 - Use `it.todo()` for deferred coverage
 
@@ -229,7 +240,7 @@ Important mocking patterns:
 
 ### Version bumping
 
-Automated via `.github/workflows/auto-version-bump.yml`.
+Version bumping is automated via workflows (see `.github/workflows/auto-version-bump.yml`).
 
 - Same-repo PRs: workflow handles bump
 - Fork PRs: run bump script manually, then commit versioned artifacts
@@ -237,9 +248,11 @@ Automated via `.github/workflows/auto-version-bump.yml`.
 Files that must stay in sync for version bumps:
 
 - `package.json`
-- `package-lock.json`
+- `package-lock.json` (or `pnpm-lock.yaml` / `yarn.lock`)
 - `.example.env` (`NEXT_PUBLIC_APP_VERSION`)
 - `public/openapi/openapi.yaml`
+
+When updating core dependency versions, update `package.json` and run the install command for the chosen package manager.
 
 ### Main workflows
 
@@ -265,6 +278,26 @@ Dependabot PRs do not have repository secrets; secret-dependent jobs must stay g
 - Use RSA 4096 GPG keys for CI signing (avoid ECC key issues in CI)
 - Fake timers + `userEvent` can conflict in Vitest; use `fireEvent`
 - Recharts `ResponsiveContainer` can be noisy in tests; prefer direct dimension control
+
+## Recommended local setup
+
+- Check which package manager the repo uses (`package.json` may include `packageManager`).
+- Use `infisical login` then `infisical run -- npm run dev` to ensure runtime secrets are loaded locally.
+- Run `npm run format` before committing; run `npm run lint` to catch style/typing issues.
+
+## PR checklist
+
+- Update tests for any behavioral change
+- Run `npm run lint` and `npm run format`
+- Ensure secrets or credentials are not included in the diff
+- Add a short description of the change and link related docs/migrations
+- For mobile changes, run `flutter analyze` and `flutter test`
+
+## Where to update versions and references
+
+- Web: update `package.json` and `tsconfig.json` as needed
+- Mobile: update `mobile/pubspec.yaml`
+- OpenAPI: update `public/openapi/openapi.yaml` and run any generation scripts in `scripts/`
 
 ---
 

@@ -148,13 +148,13 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           .eq('semester', academic.semester)
           .eq('year', academic.year)
           .then((response) {
-        final data = response as List<dynamic>;
-        records.addAll(
-          data.map(
-            (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
-          ),
-        );
-      }),
+            final data = response as List<dynamic>;
+            records.addAll(
+              data.map(
+                (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
+              ),
+            );
+          }),
     ]);
 
     final grouped = <String, List<TrackingRecord>>{};

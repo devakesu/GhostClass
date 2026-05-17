@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:ghostclass/services/jwe_service.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +13,7 @@ import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';

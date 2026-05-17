@@ -939,7 +939,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final updatedUser = await _applyProfileResponseData(
         currentUser: user,
         data: response.data as Map<String, dynamic>,
-        updateState: true,
       );
 
       // 4. Perform the remaining backend queries blocking (not ezygo ones)
@@ -948,12 +947,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         await api.triggerSync(token, force: true);
 
         // Fetch final profile (blocking)
-        final finalResponse = await api.refreshProfile(token, sync: false);
+        final finalResponse = await api.refreshProfile(token);
         if (finalResponse.statusCode == 200 && finalResponse.data != null) {
           await _applyProfileResponseData(
             currentUser: updatedUser,
             data: finalResponse.data as Map<String, dynamic>,
-            updateState: true,
           );
         }
       } finally {
