@@ -1,9 +1,3 @@
 coverage:
-  status:
-    project:
-      default:
-        target: 50%
-        fail_ci_if_not_met: no
-    patch:
-      default:
-        target: 50%
+  round: up
+  range: 0..50
