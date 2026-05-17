@@ -68,6 +68,10 @@ jobs:
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
+      - name: Synchronize workspace versions
+        run: |
+          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
+
       - name: Prepare derived values
         id: prep
         env:
@@ -408,6 +412,10 @@ jobs:
           env-slug: "prod"
           secret-path: "/build-time"
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
+
+      - name: Synchronize workspace versions
+        run: |
+          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
 
       - name: Prepare mobile release paths
         id: mobile-prep
