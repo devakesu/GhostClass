@@ -263,6 +263,14 @@ All client-side hooks use `axios` which routes through `/api/backend/*` proxy:
 - ⚠️ **NOT rate-limited** (runs infrequently, separate from user traffic)
 - Consider: Add rate limiting if frequency increases
 
+#### Production Cron Setup
+
+To configure automated daily/hourly synchronization in production, set up a cron job on your server executing the following command:
+
+```bash
+infisical run --path /runtime --projectId $INFISICAL_PROJECT_ID --env prod -- sh -c 'curl -sS -H "Authorization: Bearer $CRON_SECRET" "http://localhost:80/api/cron/sync"'
+```
+
 ---
 
 ## Configuration

@@ -11,7 +11,6 @@ import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 // ─── Tracking State ──────────────────────────────────────────────────────────
 
@@ -121,36 +120,42 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       syncCompleted = true;
     }
 
-    AttendanceReportDetailed? officialReport;
-    final res = await api.fetchAttendanceReportDetailed(storage);
-    if (res.statusCode == 200 && res.data is Map) {
-      officialReport = AttendanceReportDetailed.fromJson(
-        res.data as Map<String, dynamic>,
-      );
-    } else {
-      final message = formatApiError(res.data, 'Tracking.OfficialReport');
-      throw AppException(
-        message: message,
-        type: res.statusCode == 401
-            ? AppExceptionType.unauthorized
-            : AppExceptionType.server,
-        statusCode: res.statusCode,
-      );
-    }
-
+    late final AttendanceReportDetailed officialReport;
     final records = <TrackingRecord>[];
-    final response = await supabase.Supabase.instance.client
-        .from('tracker')
-        .select()
-        .eq('auth_user_id', auth.supabaseUserId)
-        .eq('semester', academic.semester)
-        .eq('year', academic.year);
-    final data = response as List<dynamic>;
-    records.addAll(
-      data.map(
-        (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
-      ),
-    );
+
+    await Future.wait([
+      api.fetchAttendanceReportDetailed(storage).then((res) {
+        if (res.statusCode == 200 && res.data is Map) {
+          officialReport = AttendanceReportDetailed.fromJson(
+            res.data as Map<String, dynamic>,
+          );
+        } else {
+          final message = formatApiError(res.data, 'Tracking.OfficialReport');
+          throw AppException(
+            message: message,
+            type: res.statusCode == 401
+                ? AppExceptionType.unauthorized
+                : AppExceptionType.server,
+            statusCode: res.statusCode,
+          );
+        }
+      }),
+      ref
+          .read(supabaseClientProvider)
+          .from('tracker')
+          .select()
+          .eq('auth_user_id', auth.supabaseUserId)
+          .eq('semester', academic.semester)
+          .eq('year', academic.year)
+          .then((response) {
+            final data = response as List<dynamic>;
+            records.addAll(
+              data.map(
+                (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
+              ),
+            );
+          }),
+    ]);
 
     final grouped = <String, List<TrackingRecord>>{};
     for (final record in records) {
@@ -213,8 +218,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
-    final supabaseToken =
-        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    final supabaseToken = ref
+        .read(supabaseClientProvider)
+        .auth
+        .currentSession
+        ?.accessToken;
     // Only trigger a sync when the caller explicitly requests it.
     // DashboardNotifier.refresh() already fires triggerSync before calling us.
     if (forceSync && user != null && supabaseToken != null) {
@@ -250,7 +258,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final canonicalCourseId = _canonicalTrackerCourseCode(courseId);
 
     try {
-      final response = await supabase.Supabase.instance.client
+      final response = await ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .insert({
             'auth_user_id': auth.supabaseUserId,
@@ -317,7 +326,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   /// Delete a single tracking record with instant local update.
   Future<void> deleteRecord(int recordId) async {
     try {
-      await supabase.Supabase.instance.client
+      await ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .delete()
           .eq('id', recordId);
@@ -378,7 +388,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     if (auth == null || academic == null) return;
 
     try {
-      var query = supabase.Supabase.instance.client
+      var query = ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .delete()
           .eq('auth_user_id', auth.supabaseUserId)

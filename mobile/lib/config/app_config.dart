@@ -75,7 +75,7 @@ class AppConfig {
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.2.9');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.3.0');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
@@ -136,6 +136,15 @@ class AppConfig {
       defaultValue: 'com.devakesu.apps.ghostclass',
     );
     return 'https://play.google.com/store/apps/details?id=$pkg';
+  }
+
+  /// The App Store URL for the application.
+  static String get appStoreUrl {
+    const appId = String.fromEnvironment(
+      'IOS_APP_ID',
+      defaultValue: '6478952324',
+    );
+    return 'https://apps.apple.com/app/id$appId';
   }
 
   /// Official legal contact email.

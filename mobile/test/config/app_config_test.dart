@@ -55,6 +55,7 @@ void main() {
       expect(AppConfig.donateUrl, isNotEmpty);
       expect(AppConfig.appName, isNotEmpty);
       expect(AppConfig.playStoreUrl, isNotEmpty);
+      expect(AppConfig.appStoreUrl, isNotEmpty);
       expect(AppConfig.legalEmail, isNotEmpty);
       expect(AppConfig.supportEmail, isNotEmpty);
       expect(governingLawRegion, isNotEmpty);

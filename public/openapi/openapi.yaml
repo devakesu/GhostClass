@@ -6,7 +6,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 4.2.9
+  version: 4.3.0
   description: |
     **GhostClass API** provides endpoints for authentication, profile synchronization,
     attendance integrations with EzyGo, telemetry, and build provenance.
@@ -149,6 +149,7 @@ paths:
                 summary: Valid EzyGo token
                 description: Example of a valid JWT token from EzyGo
                 value:
+                  # trivy:ignore:jwt-token
                   token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJzdHVkZW50MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
       responses:

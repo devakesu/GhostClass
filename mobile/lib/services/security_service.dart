@@ -79,10 +79,13 @@ class SecurityService {
           );
         }
 
-        final latestVersion =
-            (data['latestVersion'] as String?) ?? AppConfig.appVersion;
         final minVersion =
             (data['minVersion'] as String?) ?? AppConfig.appVersion;
+        var latestVersion =
+            (data['latestVersion'] as String?) ?? AppConfig.appVersion;
+        if (_isVersionOlder(latestVersion, minVersion)) {
+          latestVersion = minVersion;
+        }
         final currentVersion = AppConfig.appVersion;
 
         final hasUpdate = _isVersionOlder(currentVersion, latestVersion);

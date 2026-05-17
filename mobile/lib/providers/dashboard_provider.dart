@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
@@ -14,7 +15,6 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class DashboardData {
   DashboardData({
@@ -136,59 +136,68 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final api = ref.read(apiServiceProvider);
       final storage = ref.read(secureStorageProvider);
 
-      final coursesResponse = await api.fetchCourses(storage);
-      final attendance =
-          trackedAttendance ??
-          await _fetchAttendanceOnce(api: api, storage: storage);
+      final classId = ref.read(authProvider).value?.profile?.classField?.id;
 
-      // 2. Fetch Shared Resources (Class Courses & Instructors)
+      late final Response<dynamic> coursesResponse;
+      late final AttendanceReportDetailed attendance;
       var sharedCourses = <CourseDetails>[];
       var sharedInstructors = <CourseInstructor>[];
 
-      final classId = ref.read(authProvider).value?.profile?.classField?.id;
-      if (classId != null) {
-        final client = supabase.Supabase.instance.client;
+      await Future.wait([
+        api.fetchCourses(storage).then((res) => coursesResponse = res),
+        (trackedAttendance != null
+                ? Future.value(trackedAttendance)
+                : _fetchAttendanceOnce(api: api, storage: storage))
+            .then((res) {
+              if (res == null) throw Exception('No attendance data');
+              attendance = res;
+            }),
+        if (classId != null) ...[
+          // Fetch Class Courses
+          ref
+              .read(supabaseClientProvider)
+              .from('class_courses')
+              .select()
+              .eq('class_id', classId)
+              .eq('academic_year', academic.year)
+              .eq('semester', academic.semester)
+              .then((coursesRes) {
+                if (coursesRes.isNotEmpty) {
+                  sharedCourses = (coursesRes as List).map((raw) {
+                    final c = raw as Map<String, dynamic>;
+                    return CourseDetails(
+                      id: 0, // Mark as shared/custom
+                      name: c['course_name'] as String? ?? 'Unnamed Course',
+                      code: c['course_code'] as String?,
+                      academicYear: academic.year,
+                      academicSemester: academic.semester,
+                    );
+                  }).toList();
+                }
+              }),
+          // Fetch Instructor Mappings
+          ref
+              .read(supabaseClientProvider)
+              .from('course_instructors')
+              .select()
+              .eq('class_id', classId)
+              .eq('semester', academic.semester)
+              .eq('academic_year', academic.year)
+              .then((instructorsRes) {
+                if (instructorsRes.isNotEmpty) {
+                  sharedInstructors = (instructorsRes as List)
+                      .map(
+                        (json) => CourseInstructor.fromJson(
+                          json as Map<String, dynamic>,
+                        ),
+                      )
+                      .toList();
+                }
+              }),
+        ],
+      ]);
 
-        // Fetch Class Courses
-        final coursesRes = await client
-            .from('class_courses')
-            .select()
-            .eq('class_id', classId)
-            .eq('academic_year', academic.year)
-            .eq('semester', academic.semester);
-
-        if (coursesRes.isNotEmpty) {
-          sharedCourses = (coursesRes as List).map((raw) {
-            final c = raw as Map<String, dynamic>;
-            return CourseDetails(
-              id: 0, // Mark as shared/custom
-              name: c['course_name'] as String? ?? 'Unnamed Course',
-              code: c['course_code'] as String?,
-              academicYear: academic.year,
-              academicSemester: academic.semester,
-            );
-          }).toList();
-        }
-
-        // Fetch Instructor Mappings
-        final instructorsRes = await client
-            .from('course_instructors')
-            .select()
-            .eq('class_id', classId)
-            .eq('semester', academic.semester)
-            .eq('academic_year', academic.year);
-
-        if (instructorsRes.isNotEmpty) {
-          sharedInstructors = (instructorsRes as List)
-              .map(
-                (json) =>
-                    CourseInstructor.fromJson(json as Map<String, dynamic>),
-              )
-              .toList();
-        }
-      }
-
-      if (coursesResponse.statusCode == 401 || attendance == null) {
+      if (coursesResponse.statusCode == 401) {
         throw Exception('Not authenticated');
       }
 
@@ -410,8 +419,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
     final api = ref.read(apiServiceProvider);
-    final supabaseToken =
-        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    final supabaseToken = ref
+        .read(supabaseClientProvider)
+        .auth
+        .currentSession
+        ?.accessToken;
 
     // 0. Set local loading state
     state = const AsyncValue.loading();

@@ -52,15 +52,13 @@ describe('processContactSubmission', () => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_APP_EMAIL = 'ghostclass.app';
 
-    mockSupabase = {
+    mockSupabase = {};
+
+    mockSupabaseAdmin = {
       from: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: { id: 'msg-123' }, error: null }),
-    };
-
-    mockSupabaseAdmin = {
-      from: vi.fn().mockReturnThis(),
       delete: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
@@ -73,7 +71,7 @@ describe('processContactSubmission', () => {
     
     expect(result.success).toBe(true);
     expect(result.id).toBe('msg-123');
-    expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockSupabaseAdmin.insert).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Test User',
       email: 'test@example.com',
     }));
@@ -95,7 +93,7 @@ describe('processContactSubmission', () => {
   });
 
   it('handles database insertion failure', async () => {
-    mockSupabase.single.mockResolvedValueOnce({ data: null, error: { message: 'DB Error' } });
+    mockSupabaseAdmin.single.mockResolvedValueOnce({ data: null, error: { message: 'DB Error' } });
 
     const result = await processContactSubmission(mockSupabase, mockSupabaseAdmin, mockPayload);
     

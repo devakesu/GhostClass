@@ -8,7 +8,7 @@ COPY .devcontainer/pinned-artifacts.json /tmp/pinned-artifacts.json
 
 # 1. System Dependencies, Java 17, and SSH Setup
 RUN apt-get update && apt-get install -y \
-    openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https \
+    openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https jq \
     && mkdir /var/run/sshd \
     && echo 'vscode:root' | chpasswd \
     && echo 'root:root' | chpasswd \
@@ -16,11 +16,23 @@ RUN apt-get update && apt-get install -y \
     && sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # 2. Node.js 24.14.1 + npm 11.11.0
+ARG NPM_TARBALL_URL
+ARG NPM_SHASUM
+
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update && apt-get install -y nodejs \
-    && npm install -g npm@11.11.0
+    && if [ -f /tmp/pinned-artifacts.json ]; then \
+        NPM_TARBALL_URL=${NPM_TARBALL_URL:-$(jq -r '.npm.url' /tmp/pinned-artifacts.json)}; \
+        NPM_SHASUM=${NPM_SHASUM:-$(jq -r '.npm.shasum' /tmp/pinned-artifacts.json)}; \
+    fi \
+    && if [ -z "$NPM_TARBALL_URL" ] || [ -z "$NPM_SHASUM" ]; then echo "Missing URL or SHASUM for npm" >&2; exit 1; fi \
+    && echo "Downloading npm tarball from $NPM_TARBALL_URL" \
+    && curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz \
+    && echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - \
+    && npm install -g /tmp/npm.tgz \
+    && rm -f /tmp/npm.tgz
 
 # 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
 ARG PLAYWRIGHT_TARBALL_URL
@@ -29,6 +41,8 @@ ARG FIREBASE_TARBALL_URL
 ARG FIREBASE_SHASUM
 ARG SUPABASE_TARBALL_URL
 ARG SUPABASE_SHA256
+ARG INFISICAL_TARBALL_URL
+ARG INFISICAL_SHASUM
 
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
      && install -m 0755 -d /etc/apt/keyrings \
@@ -50,22 +64,25 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
             FIREBASE_SHASUM=${FIREBASE_SHASUM:-$(jq -r '.firebase.shasum' /tmp/pinned-artifacts.json)}; \
             SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url' /tmp/pinned-artifacts.json)}; \
             SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256' /tmp/pinned-artifacts.json)}; \
-        fi; \
+            INFISICAL_TARBALL_URL=${INFISICAL_TARBALL_URL:-$(jq -r '.infisical.url' /tmp/pinned-artifacts.json)}; \
+            INFISICAL_SHASUM=${INFISICAL_SHASUM:-$(jq -r '.infisical.shasum' /tmp/pinned-artifacts.json)}; \
+        fi \
         && ARCH=$(dpkg --print-architecture) \
         && echo "Downloading Supabase CLI (verify by provided SHA256)..." \
-        && if [ -z "$SUPABASE_TARBALL_URL" ] || [ -z "$SUPABASE_SHA256" ]; then echo "SUPABASE_TARBALL_URL and SUPABASE_SHA256 must be provided (build-arg or pinned file)" >&2; exit 1; fi; \
+        && if [ -z "$SUPABASE_TARBALL_URL" ] || [ -z "$SUPABASE_SHA256" ]; then echo "SUPABASE_TARBALL_URL and SUPABASE_SHA256 must be provided (build-arg or pinned file)" >&2; exit 1; fi \
         && curl -fSL "$SUPABASE_TARBALL_URL" -o /tmp/supabase.tar.gz \
         && echo "$SUPABASE_SHA256  /tmp/supabase.tar.gz" | sha256sum -c - \
         && tar -xzf /tmp/supabase.tar.gz -C /tmp \
         && mv /tmp/supabase /usr/local/bin/ \
         && chmod +x /usr/local/bin/supabase \
         && rm -f /tmp/supabase.tar.gz \
-        && set -eux; \
+        && set -eux \
         # Install npm global packages from provided tarball URLs and verify hashes
-        for NAME in "playwright" "firebase-tools"; do \
+        && for NAME in "playwright" "firebase-tools" "infisical"; do \
             case "$NAME" in \
                 playwright) URL="$PLAYWRIGHT_TARBALL_URL"; SUM="$PLAYWRIGHT_SHASUM";; \
                 firebase-tools) URL="$FIREBASE_TARBALL_URL"; SUM="$FIREBASE_SHASUM";; \
+                infisical) URL="$INFISICAL_TARBALL_URL"; SUM="$INFISICAL_SHASUM";; \
             esac; \
             if [ -z "$URL" ] || [ -z "$SUM" ]; then echo "Missing URL or SHASUM for $NAME" >&2; exit 1; fi; \
             echo "Downloading $NAME tarball from $URL"; curl -fSL "$URL" -o /tmp/$NAME.tgz; \
@@ -73,9 +90,9 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
             if [ ${#SUM} -eq 64 ]; then echo "$SUM  /tmp/$NAME.tgz" | sha256sum -c -; else echo "$SUM  /tmp/$NAME.tgz" | sha1sum -c -; fi; \
             npm install -g /tmp/$NAME.tgz; \
             rm -f /tmp/$NAME.tgz; \
-        done; \
+        done \
         # Install Playwright OS dependencies using the installed package
-        npx playwright install-deps
+        && npx playwright install-deps
 
 # Switch to vscode user for user-space SDKs
 USER vscode

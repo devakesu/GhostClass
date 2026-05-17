@@ -92,7 +92,7 @@ const getContactEmail = () => {
  */
 export async function processContactSubmission(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  _supabase: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any, // Required for rollback if RLS is strict
   payload: z.infer<typeof contactSchema>,
@@ -102,7 +102,7 @@ export async function processContactSubmission(
 
   try {
     // 1. Save to Database
-    const { data, error: dbError } = await supabase
+    const { data, error: dbError } = await supabaseAdmin
       .from("contact_messages")
       .insert({
         user_id: ctx.userId ?? null,

@@ -8,8 +8,7 @@
 [![SLSA Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Attestations](https://img.shields.io/badge/Attestations-View-brightgreen?logo=github)](https://github.com/devakesu/GhostClass/attestations)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11930/badge)](https://www.bestpractices.dev/projects/11930)
-[![Security Scan: Trivy](https://img.shields.io/badge/Security-Trivy%20Scanned-blue)](.github/workflows/pipeline.yml)
-[![Build Status](https://img.shields.io/badge/Build-Passing-success)](.github/workflows/pipeline.yml)
+[![Security Scan: Trivy](https://img.shields.io/badge/Security-Trivy%20Scanned-blue)](.github/workflows/release.yml)
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">

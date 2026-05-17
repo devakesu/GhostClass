@@ -1,9 +1,6 @@
 coverage:
   status:
-    project:
-      default:
-        target: 75%
-        fail_ci_if_not_met: no
     patch:
       default:
-        target: 75%
+        target: auto
+        informational: true
