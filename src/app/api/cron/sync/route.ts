@@ -50,6 +50,8 @@ interface UserSyncData {
   ezygo_iv: string;
   auth_id: string;
   fcm_token?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 interface TrackerItem {
@@ -76,6 +78,8 @@ interface OfficialSlotInfo {
 
 interface AttendanceConflictProps {
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   courseLabel: string;
   date: string;
   session: string;
@@ -84,6 +88,8 @@ interface AttendanceConflictProps {
 
 interface CourseMismatchProps {
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   date: string;
   session: string;
   manualCourseName: string;
@@ -93,6 +99,8 @@ interface CourseMismatchProps {
 
 interface RevisionClassProps {
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   courseName: string;
   date: string;
   session: string;
@@ -233,6 +241,8 @@ function handleRevisionClass(
       type: "revision",
       props: {
         username: user.username,
+        firstName: user.first_name,
+        lastName: user.last_name,
         courseName,
         date: item.date,
         session: String(item.session),
@@ -267,6 +277,8 @@ function handleCourseMismatch(
       type: "mismatch",
       props: {
         username: user.username,
+        firstName: user.first_name,
+        lastName: user.last_name,
         date: item.date,
         session: String(item.session),
         manualCourseName: manualCourse,
@@ -340,6 +352,8 @@ function handleAttendanceStatus(
         type: "conflict",
         props: {
           username: user.username,
+          firstName: user.first_name,
+          lastName: user.last_name,
           courseLabel: courseName,
           date: item.date,
           session: String(item.session),
@@ -452,7 +466,14 @@ async function executeSyncMutations(
               subject = "Revision Class Detected 📚";
               break;
           }
-          await sendEmail({ to: user.email, subject, html });
+          await sendEmail({ 
+            to: user.email, 
+            subject, 
+            html,
+            toName: user.first_name && user.last_name 
+              ? `${user.first_name} ${user.last_name}` 
+              : undefined,
+          });
         } catch (err) {
           logger.error(`Failed to send sync email to ${redact("email", user.email)}:`, err);
         }

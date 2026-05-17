@@ -10,6 +10,7 @@ export interface SendEmailProps {
   html: string;
   text?: string;
   replyTo?: string;
+  toName?: string;
 }
 
 interface ProviderResult {
@@ -76,7 +77,7 @@ async function getSendPulseToken() {
   }
 }
 
-async function sendViaSendPulse({ to, subject, html, text, replyTo }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
@@ -87,7 +88,7 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo }: SendEmailP
         text: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
         subject,
         from: CONFIG.sender,
-        to: [{ email: to, name: "User" }],
+        to: [{ email: to, name: toName || "User" }],
         ...(replyTo ? { reply_to: { email: replyTo } } : {}),
       },
     };
@@ -112,13 +113,13 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo }: SendEmailP
   }
 }
 
-async function sendViaBrevo({ to, subject, html, text, replyTo }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaBrevo({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
     const payload = {
       sender: CONFIG.sender,
-      to: [{ email: to }],
+      to: [{ email: to, ...(toName ? { name: toName } : {}) }],
       subject,
       htmlContent: html,
       textContent: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),

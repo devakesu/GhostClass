@@ -54,18 +54,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch build-time secrets from Infisical
+      - name: Fetch build-time variables from Infisical (Unmasked)
         if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
-        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
           INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-        with:
-          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
-          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "prod"
-          secret-path: "/build-time"
+          INFISICAL_PROJECT_SLUG: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENV_SLUG: "prod"
+          INFISICAL_SECRET_PATH: "/build-time"
+        run: node scripts/fetch-build-time-vars.js
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
@@ -399,18 +396,15 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Fetch build-time secrets from Infisical
+      - name: Fetch build-time variables from Infisical (Unmasked)
         if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
-        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
           INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-        with:
-          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
-          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "prod"
-          secret-path: "/build-time"
+          INFISICAL_PROJECT_SLUG: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENV_SLUG: "prod"
+          INFISICAL_SECRET_PATH: "/build-time"
+        run: node scripts/fetch-build-time-vars.js
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
@@ -740,18 +734,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch build-time secrets from Infisical
+      - name: Fetch build-time variables from Infisical (Unmasked)
         if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
-        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
         env:
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
           INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-        with:
-          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
-          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
-          env-slug: "prod"
-          secret-path: "/build-time"
+          INFISICAL_PROJECT_SLUG: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENV_SLUG: "prod"
+          INFISICAL_SECRET_PATH: "/build-time"
+        run: node scripts/fetch-build-time-vars.js
         continue-on-error: true
 
       - name: Determine release version

@@ -188,6 +188,8 @@ const MOCK_USER_ROW = {
   ezygo_token: "encrypted-token-blob",
   ezygo_iv: "test-iv",
   auth_id: AUTH_ID,
+  first_name: "John",
+  last_name: "Doe",
 };
 
 /**
