@@ -164,4 +164,57 @@ describe("GET /api/security/attestation", () => {
     expect(data.minVersion).toBe("4.7.0");
     expect(data.latestVersion).toBe("4.7.0"); // Clamped to minVersion
   });
+
+  it("keeps latestVersion when it is newer than minVersion", async () => {
+    process.env.NEXT_PUBLIC_APP_VERSION = "4.7.1";
+    process.env.NEXT_PUBLIC_MIN_APP_VERSION = "4.7.0";
+
+    const { getAppCheck } = await import("@/lib/firebase/admin");
+    vi.mocked(getAppCheck).mockReturnValue({
+      verifyToken: vi.fn().mockResolvedValue({
+        appId: "android-app-id",
+        token: { iss: "test-iss", app_id: "android-app-id" },
+      }),
+    } as never);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "valid-token",
+      },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.minVersion).toBe("4.7.0");
+    expect(data.latestVersion).toBe("4.7.1");
+  });
+
+  it("falls back to MIN_APP_VERSION when NEXT_PUBLIC_MIN_APP_VERSION is missing", async () => {
+    process.env.NEXT_PUBLIC_APP_VERSION = "4.2.9";
+    delete process.env.NEXT_PUBLIC_MIN_APP_VERSION;
+    process.env.MIN_APP_VERSION = "4.3.0";
+
+    const { getAppCheck } = await import("@/lib/firebase/admin");
+    vi.mocked(getAppCheck).mockReturnValue({
+      verifyToken: vi.fn().mockResolvedValue({
+        appId: "android-app-id",
+        token: { iss: "test-iss", app_id: "android-app-id" },
+      }),
+    } as never);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "X-Firebase-AppCheck": "valid-token",
+      },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.minVersion).toBe("4.3.0");
+    expect(data.latestVersion).toBe("4.3.0");
+  });
 });

@@ -15,7 +15,6 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class DashboardData {
   DashboardData({
@@ -155,7 +154,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             }),
         if (classId != null) ...[
           // Fetch Class Courses
-          supabase.Supabase.instance.client
+          ref
+              .read(supabaseClientProvider)
               .from('class_courses')
               .select()
               .eq('class_id', classId)
@@ -176,7 +176,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                 }
               }),
           // Fetch Instructor Mappings
-          supabase.Supabase.instance.client
+          ref
+              .read(supabaseClientProvider)
               .from('course_instructors')
               .select()
               .eq('class_id', classId)
@@ -418,8 +419,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
     final api = ref.read(apiServiceProvider);
-    final supabaseToken =
-        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    final supabaseToken = ref
+        .read(supabaseClientProvider)
+        .auth
+        .currentSession
+        ?.accessToken;
 
     // 0. Set local loading state
     state = const AsyncValue.loading();

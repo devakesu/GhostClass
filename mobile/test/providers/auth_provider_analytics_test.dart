@@ -5,8 +5,10 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/models/user.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -148,6 +150,7 @@ void main() {
     when(() => mockStorage.saveSupabaseUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveUsername(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveSettings(any())).thenAnswer((_) async {});
+    when(() => mockStorage.saveUserProfile(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveEzygoUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveTermsVersion(any())).thenAnswer((_) async {});
     when(() => mockStorage.clearAll()).thenAnswer((_) async {});
@@ -172,6 +175,10 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
     registerFallbackValue(_UserSettingsFake());
+    registerFallbackValue(const UserProfile(firstName: 'Fallback'));
+    registerFallbackValue(
+      const AcademicState(semester: 'Odd', year: '2025-2026'),
+    );
   });
 
   test(
@@ -370,5 +377,230 @@ void main() {
     // Verify the state was updated correctly
     final state = container.read(authProvider);
     expect(state.isLoading, isFalse);
+  });
+
+  test(
+    'updateAcademicContext updates profile and clears syncing flag',
+    () async {
+      await initAnalytics();
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(authProvider.notifier);
+      currentSession = mockSession;
+
+      notifier.state = AsyncValue.data(
+        AuthenticatedUser(
+          supabaseUserId: 'supabase-user',
+          ezygoToken: EncryptedValue.fromPlaintext('ezygo-token'),
+          settings: UserSettings.defaults(),
+          profile: UserProfile(
+            firstName: 'Before',
+            classField: UserClass(id: 'class-1', name: 'Class A'),
+          ),
+        ),
+      );
+
+      when(
+        () => mockStorage.getAcademicState(),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockStorage.saveAcademicState(any()),
+      ).thenAnswer((_) async {});
+      when(
+        () => mockApi.updateSemester(any(), mockStorage),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/semester'),
+          statusCode: 200,
+          data: {'ok': true},
+        ),
+      );
+      when(
+        () => mockApi.updateAcademicYear(any(), mockStorage),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/year'),
+          statusCode: 200,
+          data: {'ok': true},
+        ),
+      );
+      when(
+        () => mockApi.triggerSync(any(), force: any(named: 'force')),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/sync'),
+          statusCode: 200,
+          data: {'ok': true},
+        ),
+      );
+
+      var refreshCount = 0;
+      when(
+        () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+      ).thenAnswer((invocation) async {
+        refreshCount += 1;
+        final sync = invocation.namedArguments[#sync] as bool? ?? false;
+        final firstName = sync ? 'Synced' : 'Final';
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/profile'),
+          statusCode: 200,
+          data: {
+            'profile': {
+              'first_name': firstName,
+              'class': {'id': 'class-2', 'name': 'Class B'},
+            },
+            'settings': {
+              'bunk_calculator_enabled': true,
+              'target_percentage': 75,
+              'disabled_courses': <String, String>{},
+            },
+            'ezygo_token': 'ezygo-token',
+          },
+        );
+      });
+
+      await notifier.updateAcademicContext('Even', '2025-2026');
+
+      verify(() => mockApi.clearCaches()).called(1);
+      verify(() => mockApi.triggerSync(any(), force: true)).called(1);
+      expect(refreshCount, greaterThanOrEqualTo(2));
+
+      final user = container.read(authProvider).value;
+      expect(user, isNotNull);
+      expect(user!.isSyncing, isFalse);
+      expect(user.profile?.firstName, equals('Final'));
+    },
+  );
+
+  test(
+    'updateAcademicContext does not logout for non-critical security 401',
+    () async {
+      await initAnalytics();
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(authProvider.notifier);
+      currentSession = mockSession;
+
+      notifier.state = AsyncValue.data(
+        AuthenticatedUser(
+          supabaseUserId: 'supabase-user',
+          ezygoToken: EncryptedValue.fromPlaintext('ezygo-token'),
+          settings: UserSettings.defaults(),
+          profile: const UserProfile(firstName: 'Test'),
+        ),
+      );
+
+      when(
+        () => mockStorage.getAcademicState(),
+      ).thenAnswer((_) async => null);
+      when(
+        () => mockStorage.saveAcademicState(any()),
+      ).thenAnswer((_) async {});
+      when(
+        () => mockApi.updateSemester(any(), mockStorage),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/semester'),
+          statusCode: 200,
+          data: {'ok': true},
+        ),
+      );
+      when(
+        () => mockApi.updateAcademicYear(any(), mockStorage),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/year'),
+          statusCode: 200,
+          data: {'ok': true},
+        ),
+      );
+      when(
+        () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(path: '/profile'),
+          statusCode: 401,
+          data: {
+            'type': 'security',
+            'criticalRisk': false,
+            'reason': 'Temporarily blocked',
+          },
+        ),
+      );
+
+      await expectLater(
+        () => notifier.updateAcademicContext('Even', '2025-2026'),
+        throwsA(isA<AppException>()),
+      );
+
+      verifyNever(() => mockAuth.signOut());
+      verifyNever(() => mockStorage.clearAll());
+    },
+  );
+
+  test('updateAcademicContext logs out for critical security 401', () async {
+    await initAnalytics();
+
+    final container = buildContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(authProvider.notifier);
+    currentSession = mockSession;
+
+    notifier.state = AsyncValue.data(
+      AuthenticatedUser(
+        supabaseUserId: 'supabase-user',
+        ezygoToken: EncryptedValue.fromPlaintext('ezygo-token'),
+        settings: UserSettings.defaults(),
+        profile: const UserProfile(firstName: 'Test'),
+      ),
+    );
+
+    when(
+      () => mockStorage.getAcademicState(),
+    ).thenAnswer((_) async => null);
+    when(
+      () => mockStorage.saveAcademicState(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockApi.updateSemester(any(), mockStorage),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(path: '/semester'),
+        statusCode: 200,
+        data: {'ok': true},
+      ),
+    );
+    when(
+      () => mockApi.updateAcademicYear(any(), mockStorage),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(path: '/year'),
+        statusCode: 200,
+        data: {'ok': true},
+      ),
+    );
+    when(
+      () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(path: '/profile'),
+        statusCode: 401,
+        data: {
+          'type': 'security',
+          'criticalRisk': true,
+          'reason': 'Critical security risk',
+        },
+      ),
+    );
+
+    await expectLater(
+      () => notifier.updateAcademicContext('Even', '2025-2026'),
+      throwsA(isA<AppException>()),
+    );
+
+    verify(() => mockAuth.signOut()).called(1);
+    verify(() => mockStorage.clearAll()).called(1);
   });
 }

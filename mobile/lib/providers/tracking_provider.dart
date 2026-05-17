@@ -11,7 +11,6 @@ import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 // ─── Tracking State ──────────────────────────────────────────────────────────
 
@@ -141,7 +140,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           );
         }
       }),
-      supabase.Supabase.instance.client
+      ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .select()
           .eq('auth_user_id', auth.supabaseUserId)
@@ -218,8 +218,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
-    final supabaseToken =
-        supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    final supabaseToken = ref
+        .read(supabaseClientProvider)
+        .auth
+        .currentSession
+        ?.accessToken;
     // Only trigger a sync when the caller explicitly requests it.
     // DashboardNotifier.refresh() already fires triggerSync before calling us.
     if (forceSync && user != null && supabaseToken != null) {
@@ -255,7 +258,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final canonicalCourseId = _canonicalTrackerCourseCode(courseId);
 
     try {
-      final response = await supabase.Supabase.instance.client
+      final response = await ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .insert({
             'auth_user_id': auth.supabaseUserId,
@@ -322,7 +326,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   /// Delete a single tracking record with instant local update.
   Future<void> deleteRecord(int recordId) async {
     try {
-      await supabase.Supabase.instance.client
+      await ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .delete()
           .eq('id', recordId);
@@ -383,7 +388,8 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     if (auth == null || academic == null) return;
 
     try {
-      var query = supabase.Supabase.instance.client
+      var query = ref
+          .read(supabaseClientProvider)
           .from('tracker')
           .delete()
           .eq('auth_user_id', auth.supabaseUserId)

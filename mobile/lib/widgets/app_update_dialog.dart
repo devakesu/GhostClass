@@ -221,8 +221,6 @@ class AppUpdateDialog extends StatelessWidget {
                             ),
                           ),
 
-
-
                           // "Later" / Dismiss Tertiary Button (Only shown if optional)
                           if (!isForceUpdate) ...[
                             const SizedBox(height: 12),
