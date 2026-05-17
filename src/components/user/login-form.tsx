@@ -446,7 +446,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     <motion.div
       className={cn("flex flex-col gap-3 login-page", className)}
       {...props}
-      initial="hidden"
+      initial={false}
       animate="visible"
       variants={containerVariants}
     >

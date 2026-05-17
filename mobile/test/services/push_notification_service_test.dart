@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -82,7 +86,25 @@ void main() {
       ),
     ).thenAnswer((_) async {});
 
+    when(
+      () => mockMessaging.setForegroundNotificationPresentationOptions(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async {});
+
     await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+    final mockRouter = GoRouter(
+      navigatorKey: GlobalKey<NavigatorState>(),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const SizedBox(),
+        ),
+      ],
+    );
 
     container = ProviderContainer(
       overrides: [
@@ -90,6 +112,7 @@ void main() {
         dioServiceProvider.overrideWithValue(mockDioService),
         secureStorageProvider.overrideWithValue(mockStorage),
         supabaseClientProvider.overrideWithValue(mockSupabase),
+        routerProvider.overrideWithValue(mockRouter),
       ],
     );
 
@@ -299,5 +322,309 @@ void main() {
       service.initialize(registerHandlers: false),
       completes,
     );
+  });
+
+  testWidgets(
+    'displays beautiful in-app banner on foreground FCM event and navigates on tap',
+    (tester) async {
+      final foregroundMessages = StreamController<RemoteMessage>();
+
+      when(
+        () => mockSettings.authorizationStatus,
+      ).thenReturn(AuthorizationStatus.authorized);
+      when(
+        () => mockMessaging.requestPermission(
+          alert: any(named: 'alert'),
+          badge: any(named: 'badge'),
+          sound: any(named: 'sound'),
+        ),
+      ).thenAnswer((_) async => mockSettings);
+      when(
+        () => mockMessaging.getToken(),
+      ).thenAnswer((_) async => 'mock-fcm-token');
+      when(
+        () => mockMessaging.onTokenRefresh,
+      ).thenAnswer((_) => const Stream.empty());
+
+      when(
+        () => mockDio.post<dynamic>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<dynamic>(
+          requestOptions: RequestOptions(),
+          statusCode: 200,
+        ),
+      );
+
+      final router = GoRouter(
+        navigatorKey: GlobalKey<NavigatorState>(),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Scaffold(
+              body: Center(child: Text('Main Screen')),
+            ),
+          ),
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const Scaffold(
+              body: Center(child: Text('Notifications Screen')),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            firebaseMessagingProvider.overrideWithValue(mockMessaging),
+            dioServiceProvider.overrideWithValue(mockDioService),
+            secureStorageProvider.overrideWithValue(mockStorage),
+            supabaseClientProvider.overrideWithValue(mockSupabase),
+            routerProvider.overrideWithValue(router),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      final rootContext = tester.element(find.byType(MaterialApp));
+      final container = ProviderScope.containerOf(rootContext);
+      final service = container.read(pushNotificationServiceProvider);
+
+      await service.initialize(
+        registerHandlers: false,
+        onMessageStream: foregroundMessages.stream,
+      );
+
+      foregroundMessages.add(
+        const RemoteMessage(
+          notification: RemoteNotification(
+            title: 'Class Conflict Detected',
+            body: 'Your manual attendance differs from EzyGo.',
+          ),
+        ),
+      );
+
+      // Allow microtasks and streams to complete, and pump animation
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Verify foreground visual banner displays correct content
+      expect(find.text('Class Conflict Detected'), findsOneWidget);
+      expect(
+        find.text('Your manual attendance differs from EzyGo.'),
+        findsOneWidget,
+      );
+
+      // Verify presence of bell icon
+      expect(find.byIcon(LucideIcons.bell), findsOneWidget);
+
+      // Tap the banner to trigger navigation
+      await tester.tap(find.text('Class Conflict Detected'));
+      await tester.pumpAndSettle();
+
+      // Verify GoRouter successfully navigated to notifications route
+      expect(find.text('Notifications Screen'), findsOneWidget);
+
+      await foregroundMessages.close();
+    },
+  );
+
+  test('handles FCM token refresh event and syncs with backend', () async {
+    final refreshController = StreamController<String>();
+
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'initial-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => refreshController.stream);
+
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      ),
+    );
+
+    final service = container.read(pushNotificationServiceProvider);
+    await service.initialize(registerHandlers: false);
+
+    // Emit a refreshed token
+    refreshController.add('refreshed-token');
+    await Future<void>.delayed(Duration.zero);
+
+    verify(() => mockStorage.saveFcmToken('refreshed-token')).called(1);
+
+    await refreshController.close();
+  });
+
+  test('handles backend registration returning non-200 status code', () async {
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'new-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(),
+        statusCode: 500,
+      ),
+    );
+
+    final service = container.read(pushNotificationServiceProvider);
+    await service.initialize(registerHandlers: false);
+
+    // Verify that we did NOT save the token since registration failed
+    verifyNever(() => mockStorage.saveFcmToken(any()));
+  });
+
+  test('handles backend registration throwing network exceptions', () async {
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'new-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenThrow(DioException(requestOptions: RequestOptions()));
+
+    final service = container.read(pushNotificationServiceProvider);
+    await service.initialize(registerHandlers: false);
+
+    // Verify no storage save occurs
+    verifyNever(() => mockStorage.saveFcmToken(any()));
+  });
+
+  testWidgets('handles failures inside foreground banner display gracefully', (
+    tester,
+  ) async {
+    final foregroundMessages = StreamController<RemoteMessage>();
+
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        badge: any(named: 'badge'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'mock-fcm-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          firebaseMessagingProvider.overrideWithValue(mockMessaging),
+          dioServiceProvider.overrideWithValue(mockDioService),
+          secureStorageProvider.overrideWithValue(mockStorage),
+          supabaseClientProvider.overrideWithValue(mockSupabase),
+          routerProvider.overrideWith((ref) => throw Exception('Router crash')),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: SizedBox()),
+        ),
+      ),
+    );
+
+    final rootContext = tester.element(find.byType(MaterialApp));
+    final container = ProviderScope.containerOf(rootContext);
+    final service = container.read(pushNotificationServiceProvider);
+
+    await service.initialize(
+      registerHandlers: false,
+      onMessageStream: foregroundMessages.stream,
+    );
+
+    foregroundMessages.add(
+      const RemoteMessage(
+        notification: RemoteNotification(
+          title: 'Exception trigger',
+          body: 'Should be caught safely.',
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Assert that no banner is displayed, and it completed safely without crashing the app
+    expect(find.text('Exception trigger'), findsNothing);
+
+    await foregroundMessages.close();
   });
 }

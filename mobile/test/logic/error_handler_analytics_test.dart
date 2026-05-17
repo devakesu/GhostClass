@@ -88,6 +88,27 @@ void main() {
     expect(params['env'], anyOf('development', 'production'));
   });
 
+  testWidgets(
+    'logs app_error and allows tapping Contact Support in error dialog',
+    (
+      tester,
+    ) async {
+      await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
+
+      await tester.pumpWidget(
+        const MaterialApp(home: _ErrorHarness(error: 'boom')),
+      );
+
+      await tester.tap(find.text('Trigger'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Contact Support'), findsOneWidget);
+      await tester.tap(find.text('Contact Support'));
+      await tester.pump(const Duration(milliseconds: 100));
+    },
+  );
+
   testWidgets('logs security_failure for security AppExceptions', (
     tester,
   ) async {

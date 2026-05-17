@@ -13,15 +13,23 @@ class MockFirebaseAppCheck extends Mock implements FirebaseAppCheck {}
 
 class MockJweService extends Mock implements JweService {}
 
+class MockHttpClientAdapter extends Mock implements HttpClientAdapter {}
+
 void main() {
   late MockFirebaseAppCheck mockAppCheck;
   late MockJweService mockJweService;
+  late MockHttpClientAdapter mockAdapter;
   late ProviderContainer container;
   late DioService dioService;
+
+  setUpAll(() {
+    registerFallbackValue(RequestOptions());
+  });
 
   setUp(() {
     mockAppCheck = MockFirebaseAppCheck();
     mockJweService = MockJweService();
+    mockAdapter = MockHttpClientAdapter();
 
     when(
       () => mockJweService.encryptHeaderKey(),
@@ -36,6 +44,21 @@ void main() {
       ],
     );
     dioService = container.read(dioServiceProvider);
+
+    dioService.dio.httpClientAdapter = mockAdapter;
+    dioService.securityDio.httpClientAdapter = mockAdapter;
+
+    when(
+      () => mockAdapter.fetch(any(), any(), any()),
+    ).thenAnswer(
+      (_) async => ResponseBody.fromString(
+        '{"status": "ok"}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      ),
+    );
   });
 
   tearDown(() async {
@@ -47,6 +70,9 @@ void main() {
     test('deduplicates parallel getToken calls', () async {
       final completer = Completer<String>();
 
+      when(
+        () => mockAppCheck.getToken(any()),
+      ).thenAnswer((_) => completer.future);
       when(() => mockAppCheck.getToken()).thenAnswer((_) => completer.future);
 
       final future1 = dioService.dio.get<dynamic>('/test');
@@ -61,7 +87,7 @@ void main() {
         future2,
       ]).catchError((_) => <Response<dynamic>>[]);
 
-      verify(() => mockAppCheck.getToken()).called(1);
+      verify(() => mockAppCheck.getToken(any())).called(1);
     });
 
     test('deduplicates parallel getLimitedUseToken calls', () async {
@@ -94,6 +120,9 @@ void main() {
 
     test('clears in-flight future on error to allow retries', () async {
       when(
+        () => mockAppCheck.getToken(any()),
+      ).thenAnswer((_) => Future.error(Exception('Token error')));
+      when(
         () => mockAppCheck.getToken(),
       ).thenAnswer((_) => Future.error(Exception('Token error')));
 
@@ -104,6 +133,9 @@ void main() {
           );
 
       when(
+        () => mockAppCheck.getToken(any()),
+      ).thenAnswer((_) => Future.value('new-token'));
+      when(
         () => mockAppCheck.getToken(),
       ).thenAnswer((_) => Future.value('new-token'));
 
@@ -113,10 +145,13 @@ void main() {
             (_) => Response<dynamic>(requestOptions: RequestOptions()),
           );
 
-      verify(() => mockAppCheck.getToken()).called(2);
+      verify(() => mockAppCheck.getToken(any())).called(2);
     });
 
     test('handles empty token case', () async {
+      when(
+        () => mockAppCheck.getToken(any()),
+      ).thenAnswer((_) => Future.value(''));
       when(() => mockAppCheck.getToken()).thenAnswer((_) => Future.value(''));
 
       final options = RequestOptions(

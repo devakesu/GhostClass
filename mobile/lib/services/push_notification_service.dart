@@ -9,10 +9,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 
 /// Top-level background message handler for FCM.
 /// Must be a standalone function to run in a separate isolate.
@@ -64,6 +66,15 @@ class PushNotificationService {
           );
         }
 
+        // Configure native iOS foreground notifications
+        unawaited(
+          _messaging.setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ),
+        );
+
         // Listen for active app foreground message streams
         (onMessageStream ?? FirebaseMessaging.onMessage).listen((message) {
           AppLogger.d(
@@ -80,6 +91,35 @@ class PushNotificationService {
               ),
             );
           } on Object catch (_) {}
+
+          // Display visual in-app banner for both Android and iOS
+          final notification = message.notification;
+          if (notification != null && notification.title != null) {
+            try {
+              final router = _ref.read(routerProvider);
+              final context = router
+                  .routerDelegate
+                  .navigatorKey
+                  .currentState
+                  ?.overlay
+                  ?.context;
+              if (context != null && context.mounted) {
+                ServiceToast.showNotification(
+                  context,
+                  title: notification.title!,
+                  body: notification.body ?? '',
+                  onTap: () {
+                    router.go('/notifications');
+                  },
+                );
+              }
+            } on Object catch (e) {
+              AppLogger.e(
+                'Failed to display foreground service notification toast',
+                e,
+              );
+            }
+          }
         });
 
         // Track when user taps a notification to open the app

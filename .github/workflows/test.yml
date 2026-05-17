@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.1"
           cache: "npm"
 
       - name: Install dependencies
@@ -64,6 +64,7 @@ jobs:
       JWE_PRIVATE_KEY: "test-jwe-private-key-pem"
       NEXT_PUBLIC_APP_NAME: "GhostClass"
       NEXT_PUBLIC_APP_VERSION: "3.0.8"
+      NEXT_PUBLIC_MIN_APP_VERSION: "3.0.8"
       NEXT_PUBLIC_BACKEND_URL: "http://localhost:8080"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       NEXT_PUBLIC_APP_DOMAIN: "localhost"
@@ -82,7 +83,7 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.1"
           cache: "npm"
 
       - name: Install dependencies

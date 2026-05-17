@@ -38,9 +38,9 @@ describe("LoginFormClient", () => {
     expect(typeof LoginFormClient).toBe("function");
   });
 
-  it("renders the loading fallback while the dynamic import resolves", () => {
+  it("renders the LoginForm", () => {
     render(React.createElement(LoginFormClient as React.FC));
-    // The loading fallback (Loading spinner) should be rendered.
-    expect(screen.getByTestId("loading-spinner")).toBeDefined();
+    // The LoginForm should be rendered directly.
+    expect(screen.getByTestId("login-form")).toBeDefined();
   });
 });

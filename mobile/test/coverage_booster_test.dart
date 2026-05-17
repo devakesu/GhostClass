@@ -11,11 +11,15 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/screens/navigation_shell.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
+import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'coverage_helper.dart';
+
+class MockSecurityService extends Mock implements SecurityService {}
 
 void main() {
   final mockDashboard = createMockDashboardData();
@@ -173,20 +177,39 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
 
+    var supportCalled = false;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.darkTheme,
-        home: ServiceErrorDialog(
-          title: 'Error',
-          messages: const ['Msg'],
-          onRetry: () {},
+        home: Scaffold(
+          body: ServiceErrorDialog(
+            title: 'Error',
+            messages: const ['Msg'],
+            onRetry: () {},
+            onContactSupport: () {
+              supportCalled = true;
+            },
+          ),
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Contact Support'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(supportCalled, isTrue);
   });
 
   testWidgets('Coverage Booster: AppRouter & SplashScreen', (tester) async {
+    final mockSecurity = MockSecurityService();
+    when(mockSecurity.verifyIntegrity).thenAnswer(
+      (_) async => AppVersionCheckResult(
+        latestVersion: '3.1.0',
+        minVersion: '3.1.0',
+        hasUpdate: true,
+        isForceUpdate: true,
+      ),
+    );
+
     final router = GoRouter(
       routes: [
         GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
@@ -200,6 +223,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          securityServiceProvider.overrideWithValue(mockSecurity),
           dashboardProvider.overrideWith(
             () => MockDashboardNotifier(mockDashboard),
           ),
@@ -211,7 +235,12 @@ void main() {
         ),
       ),
     );
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    // Verify dialog content is displayed on splash screen
+    expect(find.text('Critical Update Required'), findsOneWidget);
 
     // Touch routerProvider for coverage
     final container = ProviderContainer(

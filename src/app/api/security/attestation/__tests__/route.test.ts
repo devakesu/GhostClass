@@ -12,6 +12,8 @@ describe("GET /api/security/attestation", () => {
     vi.clearAllMocks();
     process.env.FIREBASE_APP_ID_ANDROID = "android-app-id";
     process.env.FIREBASE_APP_ID_IOS = "ios-app-id";
+    process.env.NEXT_PUBLIC_APP_VERSION = "3.0.8";
+    process.env.NEXT_PUBLIC_MIN_APP_VERSION = "3.0.8";
   });
 
   it("returns error when App Check token is missing", async () => {
@@ -79,6 +81,8 @@ describe("GET /api/security/attestation", () => {
     expect(data.details.custom_claim).toBe("hello");
     expect(data.details.issuer).toBe(mockDecoded.token.iss);
     expect(data.details.exp).toBeUndefined(); // Sensitive key filtered
+    expect(data.latestVersion).toBe("3.0.8");
+    expect(data.minVersion).toBe("3.0.8");
   });
 
   it("handles unauthorized App ID", async () => {

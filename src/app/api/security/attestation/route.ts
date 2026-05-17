@@ -39,6 +39,8 @@ export async function GET(req: Request) {
     enforced: process.env.ENFORCE_APP_CHECK === "true",
     reason: result.reason || "Device verified successfully",
     action: result.isValid ? "No action required." : (result.action || "Please try again."),
+    latestVersion: process.env.NEXT_PUBLIC_APP_VERSION || "3.0.8",
+    minVersion: process.env.NEXT_PUBLIC_MIN_APP_VERSION || process.env.MIN_APP_VERSION || "3.0.8",
     type: "security",
     timestamp: new Date().toISOString(),
   });

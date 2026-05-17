@@ -222,17 +222,18 @@ function handleRevisionClass(
 ): void {
   toDelete.add(item.id);
   if (item.status === "extra") {
+    const courseName = courseMap.get(String(item.course)) || String(item.course);
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Revision Class — Not Counted 📚",
-      description: `Manual entry removed as official slot is a Revision class.`,
+      description: `Manual entry for ${courseName} on ${item.date} (Session ${item.session}) removed as official slot is a Revision class.`,
       topic: `revision-${key}`,
     });
     emails.push({
       type: "revision",
       props: {
         username: user.username,
-        courseName: courseMap.get(String(item.course)) || String(item.course),
+        courseName,
         date: item.date,
         session: String(item.session),
         dashboardUrl,
@@ -254,10 +255,12 @@ function handleCourseMismatch(
 ): boolean {
   if (item.status === "extra" && String(item.course) !== String(officialEntry.course)) {
     toDelete.add(item.id);
+    const manualCourse = courseMap.get(String(item.course)) || String(item.course);
+    const officialCourse = courseMap.get(officialEntry.course) || officialEntry.course;
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Course Mismatch 💀",
-      description: `Course mismatch on date ${item.date}. Official course differs.`,
+      description: `Course mismatch on ${item.date} (Session ${item.session}). Manual: ${manualCourse}, Official: ${officialCourse}.`,
       topic: `conflict-course-${key}`,
     });
     emails.push({
@@ -266,8 +269,8 @@ function handleCourseMismatch(
         username: user.username,
         date: item.date,
         session: String(item.session),
-        manualCourseName: courseMap.get(String(item.course)) || String(item.course),
-        courseLabel: courseMap.get(officialEntry.course) || officialEntry.course,
+        manualCourseName: manualCourse,
+        courseLabel: officialCourse,
         dashboardUrl,
       },
     });
@@ -299,13 +302,14 @@ function handleAttendanceStatus(
   const trackerCode = Number(item.attendance);
   const isOfficialPositive = officialCode === 110 || officialCode === 225 || officialCode === 112;
   const isTrackerPositive = trackerCode === 110 || trackerCode === 225 || trackerCode === 112;
+  const courseName = courseMap.get(String(item.course)) || String(item.course);
 
   if (isOfficialPositive) {
     toDelete.add(item.id);
     notifications.push({
       auth_user_id: user.auth_id,
       title: getResolvedTitle(officialCode, trackerCode),
-      description: `Attendance resolved to official status.`,
+      description: `Attendance for ${courseName} on ${item.date} (Session ${item.session}) resolved to official status.`,
       topic: `sync-surprise-${key}`,
     });
     return;
@@ -316,7 +320,7 @@ function handleAttendanceStatus(
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Attendance Updated 🥳",
-      description: `Official record matches manual entry.`,
+      description: `Official record for ${courseName} on ${item.date} (Session ${item.session}) matches manual entry.`,
       topic: `sync-surprise-${key}`,
     });
     return;
@@ -329,14 +333,14 @@ function handleAttendanceStatus(
       notifications.push({
         auth_user_id: user.auth_id,
         title: "Attendance Conflict 💀",
-        description: `Conflict: Marked present but official record is absent.`,
+        description: `Conflict: Marked present for ${courseName} on ${item.date} (Session ${item.session}) but official record is absent.`,
         topic: `conflict-${key}`,
       });
       emails.push({
         type: "conflict",
         props: {
           username: user.username,
-          courseLabel: courseMap.get(String(item.course)) || String(item.course),
+          courseLabel: courseName,
           date: item.date,
           session: String(item.session),
           dashboardUrl,
@@ -418,7 +422,11 @@ async function executeSyncMutations(
           token: user.fcm_token!,
           title: n.title,
           body: n.description,
-          data: { topic: n.topic },
+          data: { 
+            topic: n.topic,
+            title: n.title,
+            body: n.description,
+          },
         })
       )
     );

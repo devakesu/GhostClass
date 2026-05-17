@@ -128,7 +128,8 @@ class ApiService {
   ) => _ezygo.fetchExamAnswers(examId, storage);
 
   // --- Device & Network Security ---
-  Future<void> verifyIntegrity() => _security.verifyIntegrity();
+  Future<AppVersionCheckResult?> verifyIntegrity() =>
+      _security.verifyIntegrity();
   Future<Response<dynamic>> fetchAttestationDetails([String? supabaseToken]) =>
       _security.fetchAttestationDetails(supabaseToken);
 

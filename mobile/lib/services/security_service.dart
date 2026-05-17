@@ -4,6 +4,20 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
 
+class AppVersionCheckResult {
+  AppVersionCheckResult({
+    required this.latestVersion,
+    required this.minVersion,
+    required this.hasUpdate,
+    required this.isForceUpdate,
+  });
+
+  final String latestVersion;
+  final String minVersion;
+  final bool hasUpdate;
+  final bool isForceUpdate;
+}
+
 /// SecurityService
 /// ---------------
 /// Manages device integrity checks and security attestation with the GhostClass backend.
@@ -14,7 +28,27 @@ class SecurityService {
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
-  Future<void> verifyIntegrity() async {
+  bool _isVersionOlder(String current, String target) {
+    final currentParts = current
+        .split('.')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
+    final targetParts = target
+        .split('.')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
+
+    for (var i = 0; i < 3; i++) {
+      final currentPart = currentParts.length > i ? currentParts[i] : 0;
+      final targetPart = targetParts.length > i ? targetParts[i] : 0;
+
+      if (currentPart < targetPart) return true;
+      if (currentPart > targetPart) return false;
+    }
+    return false;
+  }
+
+  Future<AppVersionCheckResult?> verifyIntegrity() async {
     try {
       final response = await _dio.get<dynamic>(
         '$_ghostclassBaseUrl/security/attestation',
@@ -44,6 +78,22 @@ class SecurityService {
             },
           );
         }
+
+        final latestVersion =
+            (data['latestVersion'] as String?) ?? AppConfig.appVersion;
+        final minVersion =
+            (data['minVersion'] as String?) ?? AppConfig.appVersion;
+        final currentVersion = AppConfig.appVersion;
+
+        final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
+        final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
+
+        return AppVersionCheckResult(
+          latestVersion: latestVersion,
+          minVersion: minVersion,
+          hasUpdate: hasUpdate,
+          isForceUpdate: isForceUpdate,
+        );
       } else {
         throw const AppException(
           message: 'Security verification unavailable',

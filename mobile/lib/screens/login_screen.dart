@@ -7,11 +7,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/error_handler.dart';
+import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/security_guard.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/app_footer.dart';
+import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,6 +37,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   late final SecurityGuard _securityGuard;
 
+  void _checkAndShowUpdateDialog() {
+    final updateState = ref.read(appUpdateProvider);
+    if (updateState.checkResult != null &&
+        updateState.checkResult!.hasUpdate &&
+        !updateState.checkResult!.isForceUpdate &&
+        !updateState.dialogDismissed) {
+      unawaited(
+        AppUpdateDialog.show(
+          context,
+          updateState.checkResult!.latestVersion,
+          isForceUpdate: false,
+        ).then((_) {
+          if (mounted) {
+            ref.read(appUpdateProvider.notifier).dismissDialog();
+          }
+        }),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // Enable screen protection only for the Login screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final _ = _securityGuard.setSecureScreen(enabled: true);
+      _checkAndShowUpdateDialog();
     });
   }
 

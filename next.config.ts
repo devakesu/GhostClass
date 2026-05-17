@@ -161,15 +161,7 @@ const nextConfig = {
           },
         ],
       },
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
+
       // Prevent cross-origin reads of API JSON responses.
       // Complements the existing CORS / origin-validation middleware without breaking
       // same-origin fetch calls from the Next.js frontend.

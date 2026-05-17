@@ -130,5 +130,137 @@ void main() {
         );
       },
     );
+
+    test('verifyIntegrity parses response with no updates correctly', () async {
+      final options = RequestOptions(path: '/api/security/attestation');
+      when(
+        () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'verified': true,
+            'latestVersion': '3.0.8',
+            'minVersion': '3.0.8',
+          },
+        ),
+      );
+
+      final result = await securityService.verifyIntegrity();
+      expect(result, isNotNull);
+      expect(result!.latestVersion, '3.0.8');
+      expect(result.minVersion, '3.0.8');
+      expect(result.hasUpdate, isFalse);
+      expect(result.isForceUpdate, isFalse);
+    });
+
+    test(
+      'verifyIntegrity parses response with optional updates correctly',
+      () async {
+        final options = RequestOptions(path: '/api/security/attestation');
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'verified': true,
+              'latestVersion': '3.0.9',
+              'minVersion': '3.0.8',
+            },
+          ),
+        );
+
+        final result = await securityService.verifyIntegrity();
+        expect(result, isNotNull);
+        expect(result!.latestVersion, '3.0.9');
+        expect(result.minVersion, '3.0.8');
+        expect(result.hasUpdate, isTrue);
+        expect(result.isForceUpdate, isFalse);
+      },
+    );
+
+    test(
+      'verifyIntegrity parses response with forced updates correctly',
+      () async {
+        final options = RequestOptions(path: '/api/security/attestation');
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'verified': true,
+              'latestVersion': '3.1.0',
+              'minVersion': '3.1.0',
+            },
+          ),
+        );
+
+        final result = await securityService.verifyIntegrity();
+        expect(result, isNotNull);
+        expect(result!.latestVersion, '3.1.0');
+        expect(result.minVersion, '3.1.0');
+        expect(result.hasUpdate, isTrue);
+        expect(result.isForceUpdate, isTrue);
+      },
+    );
+
+    test(
+      'verifyIntegrity throws AppException on verified = false in 200 response',
+      () async {
+        final options = RequestOptions(path: '/api/security/attestation');
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'verified': false,
+              'reason': 'Custom verification failed',
+              'action': 'Use official store version',
+              'criticalRisk': true,
+            },
+          ),
+        );
+
+        expect(
+          () => securityService.verifyIntegrity(),
+          throwsA(
+            predicate(
+              (e) =>
+                  e is AppException &&
+                  e.message == 'Custom verification failed' &&
+                  e.details?['action'] == 'Use official store version' &&
+                  e.details?['criticalRisk'] == true,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'verifyIntegrity throws AppException on non-200 success response',
+      () async {
+        final options = RequestOptions(path: '/api/security/attestation');
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 500,
+          ),
+        );
+
+        expect(
+          () => securityService.verifyIntegrity(),
+          throwsA(isA<AppException>()),
+        );
+      },
+    );
   });
 }

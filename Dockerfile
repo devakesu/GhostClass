@@ -1,7 +1,7 @@
 # ===============================
 # 0. Global deterministic settings
 # ===============================
-ARG NODE_IMAGE=node:22.14.0-alpine3.20@sha256:40be979442621049f40b1d51a26b55e281246b5de4e5f51a18da7beb6e17e3f9
+ARG NODE_IMAGE=node:22.22.3-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920
 ARG SOURCE_DATE_EPOCH=1767225600
 
 # ===============================
@@ -14,8 +14,8 @@ FROM ${NODE_IMAGE} AS base
 # so overwriting that directory via tar achieves the same result with no unpinned npm invocation.
 # The tarball is verified by SHA-256 before extraction.
 RUN apk add --no-cache wget && \
-  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-11.11.0.tgz && \
-  echo "cbcf4cc03148ccdb586a8bf2093c952f093fb43d5cbc97593c98b67ef8c003b0  /tmp/npm.tgz" | sha256sum -c - && \
+  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-11.14.1.tgz && \
+  echo "bddc8ec2a698d283674cf0a798ef444ba7332497f330dd166056281fcafaca7a  /tmp/npm.tgz" | sha256sum -c - && \
   rm -rf /usr/local/lib/node_modules/npm && \
   mkdir -p /usr/local/lib/node_modules/npm && \
   tar -xz --strip-components=1 -C /usr/local/lib/node_modules/npm -f /tmp/npm.tgz && \
@@ -109,6 +109,7 @@ ARG NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL
 ARG NEXT_PUBLIC_GITHUB_URL
 ARG NEXT_PUBLIC_APP_NAME
 ARG NEXT_PUBLIC_APP_VERSION
+ARG NEXT_PUBLIC_MIN_APP_VERSION
 ARG NEXT_PUBLIC_APP_DOMAIN
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_SITEMAP_URL
@@ -136,6 +137,7 @@ ENV NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL=${NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL}
 ENV NEXT_PUBLIC_GITHUB_URL=${NEXT_PUBLIC_GITHUB_URL}
 ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
 ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
+ENV NEXT_PUBLIC_MIN_APP_VERSION=${NEXT_PUBLIC_MIN_APP_VERSION}
 ENV NEXT_PUBLIC_APP_DOMAIN=${NEXT_PUBLIC_APP_DOMAIN}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 ENV NEXT_PUBLIC_SITEMAP_URL=${NEXT_PUBLIC_SITEMAP_URL}
