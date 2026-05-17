@@ -22,7 +22,7 @@ describe('validate-env utility', () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'secret_key');
     vi.stubEnv('NEXT_PUBLIC_APP_NAME', 'GhostClass');
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '1.0.0');
-    vi.stubEnv('NEXT_PUBLIC_MIN_APP_VERSION', '1.0.0');
+    vi.stubEnv('MIN_APP_VERSION', '1.0.0');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://ghostclass.app');
     vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'ghostclass.app');
     vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', '@ghostclass.app');
@@ -172,7 +172,7 @@ describe('validate-env utility', () => {
       vi.stubEnv('TURNSTILE_SECRET_KEY', '');
       vi.stubEnv('NEXT_PUBLIC_APP_NAME', '');
       vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '');
-      vi.stubEnv('NEXT_PUBLIC_MIN_APP_VERSION', '');
+      vi.stubEnv('MIN_APP_VERSION', '');
       vi.stubEnv('NEXT_PUBLIC_APP_URL', '');
       vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '');
       vi.stubEnv('NEXT_PUBLIC_APP_EMAIL', '');
@@ -183,7 +183,7 @@ describe('validate-env utility', () => {
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('CRON_SECRET is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_URL is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_APP_NAME is required'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_MIN_APP_VERSION is required'));
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('MIN_APP_VERSION is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_APP_URL is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_APP_DOMAIN is required'));
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_APP_EMAIL is required'));

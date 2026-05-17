@@ -91,7 +91,7 @@ updateFile(pubspecPath, (content) => {
       `$1${targetVersion}`
     );
     return res.replace(
-      /^(NEXT_PUBLIC_MIN_APP_VERSION=)\d+\.\d+\.\d+/gm,
+      /^(MIN_APP_VERSION=)\d+\.\d+\.\d+/gm,
       `$1${targetVersion}`
     );
   });

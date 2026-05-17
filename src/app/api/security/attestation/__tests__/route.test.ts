@@ -13,7 +13,7 @@ describe("GET /api/security/attestation", () => {
     process.env.FIREBASE_APP_ID_ANDROID = "android-app-id";
     process.env.FIREBASE_APP_ID_IOS = "ios-app-id";
     process.env.NEXT_PUBLIC_APP_VERSION = "3.0.8";
-    process.env.NEXT_PUBLIC_MIN_APP_VERSION = "3.0.8";
+    process.env.MIN_APP_VERSION = "3.0.8";
   });
 
   it("returns error when App Check token is missing", async () => {
@@ -132,7 +132,7 @@ describe("GET /api/security/attestation", () => {
 
   it("clamps latestVersion to minVersion when latestVersion is older than minVersion", async () => {
     process.env.NEXT_PUBLIC_APP_VERSION = "4.2.9";
-    process.env.NEXT_PUBLIC_MIN_APP_VERSION = "4.7.0";
+    process.env.MIN_APP_VERSION = "4.7.0";
 
     const { getAppCheck } = await import("@/lib/firebase/admin");
     const mockDecoded = {
@@ -167,7 +167,7 @@ describe("GET /api/security/attestation", () => {
 
   it("keeps latestVersion when it is newer than minVersion", async () => {
     process.env.NEXT_PUBLIC_APP_VERSION = "4.7.1";
-    process.env.NEXT_PUBLIC_MIN_APP_VERSION = "4.7.0";
+    process.env.MIN_APP_VERSION = "4.7.0";
 
     const { getAppCheck } = await import("@/lib/firebase/admin");
     vi.mocked(getAppCheck).mockReturnValue({
@@ -191,9 +191,8 @@ describe("GET /api/security/attestation", () => {
     expect(data.latestVersion).toBe("4.7.1");
   });
 
-  it("falls back to MIN_APP_VERSION when NEXT_PUBLIC_MIN_APP_VERSION is missing", async () => {
+  it("uses MIN_APP_VERSION when present", async () => {
     process.env.NEXT_PUBLIC_APP_VERSION = "4.2.9";
-    delete process.env.NEXT_PUBLIC_MIN_APP_VERSION;
     process.env.MIN_APP_VERSION = "4.3.0";
 
     const { getAppCheck } = await import("@/lib/firebase/admin");

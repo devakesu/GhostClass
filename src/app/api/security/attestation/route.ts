@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     }
   }
 
-  const minVersion = process.env.NEXT_PUBLIC_MIN_APP_VERSION || process.env.MIN_APP_VERSION || "3.0.8";
+  const minVersion = process.env.MIN_APP_VERSION || "3.0.8";
   let latestVersion = process.env.NEXT_PUBLIC_APP_VERSION || "3.0.8";
 
   if (isVersionOlder(latestVersion, minVersion)) {
