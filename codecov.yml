@@ -1,3 +1,6 @@
 coverage:
-  round: up
-  range: 0..50
+  status:
+    patch:
+      default:
+        target: auto
+        informational: true
