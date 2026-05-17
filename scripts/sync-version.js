@@ -10,50 +10,15 @@ if (!targetVersion && !isPreCommit && process.argv[2]) {
   targetVersion = process.argv[2];
 }
 
-// Helper to find the latest git tag
-function getLatestGitTag() {
-  try {
-    /* eslint-disable-next-line */
-    const output = execFileSync('git', ['tag', '--sort=-version:refname'], { encoding: 'utf8' });
-    const tag = output.trim().split('\n')[0];
-    return tag || null;
-  } catch {
-    return null;
-  }
-}
 
-// Pre-commit hook mode: automatically derive target version from the latest git tag
-if (isPreCommit) {
-  const latestTag = getLatestGitTag();
-  if (!latestTag) {
-    console.log(' Husky Pre-commit: No Git tag found. Skipping version sync.');
-    process.exit(0);
-  }
-  
-  // Extract version from tag (e.g. v4.2.7 -> 4.2.7)
-  targetVersion = latestTag.replace(/^v/, '').trim();
-}
-
-if (!targetVersion) {
-  console.log('No target version resolved. Please set NEXT_PUBLIC_APP_VERSION, create a git tag, or pass version as argument.');
-  process.exit(0);
-}
-
-// Clean and validate target version
-targetVersion = targetVersion.replace(/^v/, '').trim();
-const semverPattern = /^\d+\.\d+\.\d+$/;
-if (!semverPattern.test(targetVersion)) {
-  console.error(`Invalid version format: "${targetVersion}". Expected X.Y.Z (e.g. 4.2.7)`);
-  process.exit(1);
-}
-
-// Read current package.json version to check if sync is needed
+// Pre-commit hook mode: automatically derive target version from package.json
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
-if (fs.existsSync(packageJsonPath)) {
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  if (isPreCommit && packageJson.version === targetVersion) {
-    // Already in sync, exit cleanly without touching files
-    console.log(` Husky Pre-commit: Repository is already in sync with tag v${targetVersion}.`);
+if (isPreCommit) {
+  if (fs.existsSync(packageJsonPath)) {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    targetVersion = packageJson.version;
+  } else {
+    console.log(' Husky Pre-commit: package.json not found. Skipping version sync.');
     process.exit(0);
   }
 }
