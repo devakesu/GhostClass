@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:ghostclass/services/jwe_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -143,6 +145,9 @@ void main() async {
       'Origin': sOrigin,
     },
   );
+
+  // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
+  unawaited(JweService.instance.preWarm());
 
   await GoogleFonts.pendingFonts([
     GoogleFonts.manrope(),

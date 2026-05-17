@@ -1,0 +1,3 @@
+secret:
+  skip-dirs:
+    - ".devcontainer"

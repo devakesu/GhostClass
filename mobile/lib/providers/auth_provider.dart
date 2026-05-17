@@ -421,16 +421,17 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
       }
 
-      // Step 3: Profile Fetch (blocking)
-      final updatedUser = await _fetchAndApplyServerProfile(
-        user,
-        supabaseToken: token,
-        updateState: false,
-      );
+      // Step 3 & 4: Fetch Profile & EzyGo Academic Context concurrently (non-blocking bottleneck)
+      late final AuthenticatedUser updatedUser;
+      await Future.wait([
+        _fetchAndApplyServerProfile(
+          user,
+          supabaseToken: token,
+          updateState: false,
+        ).then((res) => updatedUser = res),
+        _fetchAndSaveAcademicContext(token),
+      ]);
       _lastRefresh = DateTime.now();
-
-      // Step 4: Fetch sem/year from EzyGo (blocking — splash waits for this)
-      await _fetchAndSaveAcademicContext(token);
 
       // Step 5: Mark as syncing and kick off cron sync in background
       final syncingUser = updatedUser.copyWith(isSyncing: true);

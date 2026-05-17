@@ -121,36 +121,41 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       syncCompleted = true;
     }
 
-    AttendanceReportDetailed? officialReport;
-    final res = await api.fetchAttendanceReportDetailed(storage);
-    if (res.statusCode == 200 && res.data is Map) {
-      officialReport = AttendanceReportDetailed.fromJson(
-        res.data as Map<String, dynamic>,
-      );
-    } else {
-      final message = formatApiError(res.data, 'Tracking.OfficialReport');
-      throw AppException(
-        message: message,
-        type: res.statusCode == 401
-            ? AppExceptionType.unauthorized
-            : AppExceptionType.server,
-        statusCode: res.statusCode,
-      );
-    }
-
+    late final AttendanceReportDetailed officialReport;
     final records = <TrackingRecord>[];
-    final response = await supabase.Supabase.instance.client
-        .from('tracker')
-        .select()
-        .eq('auth_user_id', auth.supabaseUserId)
-        .eq('semester', academic.semester)
-        .eq('year', academic.year);
-    final data = response as List<dynamic>;
-    records.addAll(
-      data.map(
-        (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
-      ),
-    );
+
+    await Future.wait([
+      api.fetchAttendanceReportDetailed(storage).then((res) {
+        if (res.statusCode == 200 && res.data is Map) {
+          officialReport = AttendanceReportDetailed.fromJson(
+            res.data as Map<String, dynamic>,
+          );
+        } else {
+          final message = formatApiError(res.data, 'Tracking.OfficialReport');
+          throw AppException(
+            message: message,
+            type: res.statusCode == 401
+                ? AppExceptionType.unauthorized
+                : AppExceptionType.server,
+            statusCode: res.statusCode,
+          );
+        }
+      }),
+      supabase.Supabase.instance.client
+          .from('tracker')
+          .select()
+          .eq('auth_user_id', auth.supabaseUserId)
+          .eq('semester', academic.semester)
+          .eq('year', academic.year)
+          .then((response) {
+        final data = response as List<dynamic>;
+        records.addAll(
+          data.map(
+            (json) => TrackingRecord.fromJson(json as Map<String, dynamic>),
+          ),
+        );
+      }),
+    ]);
 
     final grouped = <String, List<TrackingRecord>>{};
     for (final record in records) {

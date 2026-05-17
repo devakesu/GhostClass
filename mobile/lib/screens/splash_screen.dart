@@ -205,12 +205,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .scale(
               begin: const Offset(1, 1),
               end: const Offset(1.05, 1.05),
-              duration: 800.ms,
+              duration: 500.ms,
               curve: Curves.easeInOut,
             )
             .animate(onPlay: (controller) => controller.repeat())
             .shimmer(
-              duration: 1200.ms,
+              duration: 600.ms,
               color: Colors.white.withValues(alpha: 0.3),
             ),
       ),

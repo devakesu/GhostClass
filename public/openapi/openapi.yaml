@@ -149,6 +149,7 @@ paths:
                 summary: Valid EzyGo token
                 description: Example of a valid JWT token from EzyGo
                 value:
+                  # trivy:ignore:jwt-token
                   token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJzdHVkZW50MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
       responses:
