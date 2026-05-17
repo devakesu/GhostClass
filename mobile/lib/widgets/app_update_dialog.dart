@@ -18,9 +18,12 @@ class AppUpdateDialog extends StatelessWidget {
   final String latestVersion;
   final bool isForceUpdate;
 
-  /// Launches the Google Play Store URL.
+  /// Launches the store URL based on OS.
   Future<void> _launchStore() async {
-    final url = Uri.parse(AppConfig.playStoreUrl);
+    final urlString = (!kIsWeb && Platform.isIOS)
+        ? AppConfig.appStoreUrl
+        : AppConfig.playStoreUrl;
+    final url = Uri.parse(urlString);
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -218,34 +221,7 @@ class AppUpdateDialog extends StatelessWidget {
                             ),
                           ),
 
-                          if (!kIsWeb && Platform.isAndroid) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton.icon(
-                                onPressed: _launchStore,
-                                icon: const Icon(LucideIcons.play, size: 18),
-                                label: Text(
-                                  'Google Play Store',
-                                  style: GoogleFonts.manrope(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: primaryColor,
-                                  side: BorderSide(
-                                    color: primaryColor.withValues(alpha: 0.5),
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+
 
                           // "Later" / Dismiss Tertiary Button (Only shown if optional)
                           if (!isForceUpdate) ...[
