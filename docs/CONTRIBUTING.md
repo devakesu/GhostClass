@@ -19,10 +19,10 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 ### Prerequisites
 
-- **Node.js**: 22.12.0+
-- **npm**: 11+
-- **Flutter SDK**: 3.41+ (for mobile development)
-- **Dart SDK**: 3.11.5+ (bundled with Flutter)
+- **Node.js**: 24.14.1+
+- **npm**: 11.11.0+
+- **Flutter SDK**: 3.27+ (for mobile development)
+- **Dart SDK**: ^3.11.4 (bundled with Flutter)
 - **Git**: Latest version
 
 **That's it!** External contributors don't need GPG keys, GitHub PAT tokens, or access to secrets.

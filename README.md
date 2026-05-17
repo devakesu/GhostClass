@@ -7,6 +7,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/devakesu/GhostClass/badge)](https://scorecard.dev/viewer/?uri=github.com/devakesu/GhostClass)
 [![SLSA Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![Attestations](https://img.shields.io/badge/Attestations-View-brightgreen?logo=github)](https://github.com/devakesu/GhostClass/attestations)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11930/badge)](https://www.bestpractices.dev/projects/11930)
 [![Security Scan: Trivy](https://img.shields.io/badge/Security-Trivy%20Scanned-blue)](.github/workflows/pipeline.yml)
 [![Build Status](https://img.shields.io/badge/Build-Passing-success)](.github/workflows/pipeline.yml)
 
@@ -57,7 +58,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 - **Next.js 16.1.6** - React 19 with App Router
 - **TypeScript 6.0.3** - Strict mode for type safety
 - **Flutter 3.27+** - Cross-platform native mobile application
-- **Node.js** - v22.12.0+
+- **Node.js** - v24.14.1+
 
 ### Styling & UI
 
@@ -138,8 +139,9 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 
 ### Prerequisites
 
-- **Node.js** - v22.12.0+
-- **npm** - v11+
+- **Node.js** - v24.14.1+
+- **npm** - v11.11.0+
+
 - **Flutter SDK** - 3.27+
 - **Docker** - For containerized deployment (optional)
 
