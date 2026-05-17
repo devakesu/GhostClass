@@ -23,6 +23,18 @@ if (isPreCommit) {
   }
 }
 
+// Fail-fast validation: ensure targetVersion is present and is a valid semver string
+if (!targetVersion) {
+  console.error('❌ Error: Target version is missing. Please set NEXT_PUBLIC_APP_VERSION, provide a target version CLI argument, or run in --pre-commit mode.');
+  process.exit(1);
+}
+
+const semverRegex = /^\d+\.\d+\.\d+$/;
+if (!semverRegex.test(targetVersion)) {
+  console.error(`❌ Error: Invalid version format "${targetVersion}". Version must be a valid major.minor.patch semver string (e.g., "1.2.3").`);
+  process.exit(1);
+}
+
 console.log(`🚀 Syncing repository files to version v${targetVersion}...`);
 
 const updatedFiles = [];
