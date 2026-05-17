@@ -900,18 +900,88 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       // 3. Trigger server-side profile sync to align database with new Ezygo state
-      // This also updates our local profile and settings via _applyProfileResponseData
-      // We set isSyncing=true here because refreshProfile(sync: true) kicks off cron sync.
-      // Changing the state here will also trigger academicProvider to rebuild because it watches authProvider.
+      // This also updates our local profile and settings via _applyProfileResponseData.
+      // We set isSyncing=true here to show the syncing overlay while backend sync runs.
       state = AsyncValue.data(user.copyWith(isSyncing: true));
 
-      await refreshProfile(force: true, sync: true);
+      final token = await _getFreshSupabaseToken();
+      if (token == null) {
+        await logout();
+        return;
+      }
+
+      // Fetch profile with sync=true to force database to sync with Ezygo and get the new class label first (blocking).
+      final response = await api.refreshProfile(token, sync: true);
+      if (response.statusCode == 401) {
+        final data = response.data as Map<String, dynamic>?;
+        throw AppException(
+          message: formatApiError(data, 'Security Verification'),
+          type: AppExceptionType.unauthorized,
+          statusCode: 401,
+          details: data,
+        );
+      }
+
+      if (response.statusCode != 200 || response.data == null) {
+        if (response.statusCode != null && response.statusCode! >= 500) {
+          throw const AppException(
+            message: 'Ezygo issues (5xx)',
+            type: AppExceptionType.server,
+          );
+        }
+        throw const AppException(
+          message: 'Profile sync failed',
+          type: AppExceptionType.server,
+        );
+      }
+
+      final updatedUser = await _applyProfileResponseData(
+        currentUser: user,
+        data: response.data as Map<String, dynamic>,
+        updateState: true,
+      );
+
+      // 4. Perform the remaining backend queries blocking (not ezygo ones)
+      try {
+        api.clearCaches();
+        await api.triggerSync(token, force: true);
+
+        // Fetch final profile (blocking)
+        final finalResponse = await api.refreshProfile(token, sync: false);
+        if (finalResponse.statusCode == 200 && finalResponse.data != null) {
+          await _applyProfileResponseData(
+            currentUser: updatedUser,
+            data: finalResponse.data as Map<String, dynamic>,
+            updateState: true,
+          );
+        }
+      } finally {
+        final finalUser = state.value;
+        if (finalUser != null) {
+          state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+        }
+      }
 
       AppLogger.i(
         'AuthNotifier: Academic context updated successfully ($sem, $year)',
       );
     } catch (e) {
       AppLogger.e('AuthNotifier: Failed to update academic context', e);
+      if (e is AppException && e.isAuthError) {
+        final isSecurityError = e.details?['type'] == 'security';
+        final isCritical = e.details?['criticalRisk'] == true;
+
+        if (isSecurityError && !isCritical) {
+          AppLogger.w(
+            'AuthNotifier: Non-critical security block. Skipping logout.',
+          );
+        } else {
+          if (isCritical) {
+            AppLogger.e('AuthNotifier: CRITICAL SECURITY RISK. Logging out.');
+          }
+          await logout();
+        }
+      }
       rethrow;
     }
   }

@@ -278,5 +278,35 @@ void main() {
         );
       },
     );
+
+    test(
+      'verifyIntegrity clamps latestVersion to minVersion when latestVersion is older than minVersion',
+      () async {
+        final options = RequestOptions(path: '/api/security/attestation');
+        final minVersion = '4.7.0';
+        final olderLatestVersion = '4.2.9';
+
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'verified': true,
+              'latestVersion': olderLatestVersion,
+              'minVersion': minVersion,
+            },
+          ),
+        );
+
+        final result = await securityService.verifyIntegrity();
+        expect(result, isNotNull);
+        expect(result!.latestVersion, minVersion); // Should be clamped to minVersion
+        expect(result.minVersion, minVersion);
+        expect(result.hasUpdate, isTrue); // Should be true since currentVersion (4.2.9) < latestVersion (4.7.0)
+        expect(result.isForceUpdate, isTrue);
+      },
+    );
   });
 }
