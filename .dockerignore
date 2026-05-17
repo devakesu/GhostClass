@@ -24,7 +24,6 @@ playwright.config.ts
 .hintrc
 eslint.config.mjs
 lint-staged.config.js
-postcss.config.mjs
 
 # Documentation
 README.md

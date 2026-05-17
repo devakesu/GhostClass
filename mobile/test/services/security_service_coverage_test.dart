@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/security_service.dart';
@@ -133,6 +134,7 @@ void main() {
 
     test('verifyIntegrity parses response with no updates correctly', () async {
       final options = RequestOptions(path: '/api/security/attestation');
+      final version = AppConfig.appVersion;
       when(
         () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
       ).thenAnswer(
@@ -141,16 +143,16 @@ void main() {
           statusCode: 200,
           data: {
             'verified': true,
-            'latestVersion': '3.0.8',
-            'minVersion': '3.0.8',
+            'latestVersion': version,
+            'minVersion': version,
           },
         ),
       );
 
       final result = await securityService.verifyIntegrity();
       expect(result, isNotNull);
-      expect(result!.latestVersion, '3.0.8');
-      expect(result.minVersion, '3.0.8');
+      expect(result!.latestVersion, version);
+      expect(result.minVersion, version);
       expect(result.hasUpdate, isFalse);
       expect(result.isForceUpdate, isFalse);
     });
@@ -158,6 +160,14 @@ void main() {
     test(
       'verifyIntegrity parses response with optional updates correctly',
       () async {
+        final currentParts = AppConfig.appVersion
+            .split('.')
+            .map(int.parse)
+            .toList();
+        final nextPatchVersion =
+            '${currentParts[0]}.${currentParts[1]}.${currentParts[2] + 1}';
+        final currentVersion = AppConfig.appVersion;
+
         final options = RequestOptions(path: '/api/security/attestation');
         when(
           () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
@@ -167,16 +177,16 @@ void main() {
             statusCode: 200,
             data: {
               'verified': true,
-              'latestVersion': '3.0.9',
-              'minVersion': '3.0.8',
+              'latestVersion': nextPatchVersion,
+              'minVersion': currentVersion,
             },
           ),
         );
 
         final result = await securityService.verifyIntegrity();
         expect(result, isNotNull);
-        expect(result!.latestVersion, '3.0.9');
-        expect(result.minVersion, '3.0.8');
+        expect(result!.latestVersion, nextPatchVersion);
+        expect(result.minVersion, currentVersion);
         expect(result.hasUpdate, isTrue);
         expect(result.isForceUpdate, isFalse);
       },
@@ -185,6 +195,12 @@ void main() {
     test(
       'verifyIntegrity parses response with forced updates correctly',
       () async {
+        final currentParts = AppConfig.appVersion
+            .split('.')
+            .map(int.parse)
+            .toList();
+        final nextMinorVersion = '${currentParts[0]}.${currentParts[1] + 1}.0';
+
         final options = RequestOptions(path: '/api/security/attestation');
         when(
           () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
@@ -194,16 +210,16 @@ void main() {
             statusCode: 200,
             data: {
               'verified': true,
-              'latestVersion': '3.1.0',
-              'minVersion': '3.1.0',
+              'latestVersion': nextMinorVersion,
+              'minVersion': nextMinorVersion,
             },
           ),
         );
 
         final result = await securityService.verifyIntegrity();
         expect(result, isNotNull);
-        expect(result!.latestVersion, '3.1.0');
-        expect(result.minVersion, '3.1.0');
+        expect(result!.latestVersion, nextMinorVersion);
+        expect(result.minVersion, nextMinorVersion);
         expect(result.hasUpdate, isTrue);
         expect(result.isForceUpdate, isTrue);
       },

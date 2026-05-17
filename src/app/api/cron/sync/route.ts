@@ -50,6 +50,8 @@ interface UserSyncData {
   ezygo_iv: string;
   auth_id: string;
   fcm_token?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 interface TrackerItem {
@@ -452,7 +454,14 @@ async function executeSyncMutations(
               subject = "Revision Class Detected 📚";
               break;
           }
-          await sendEmail({ to: user.email, subject, html });
+          await sendEmail({ 
+            to: user.email, 
+            subject, 
+            html,
+            toName: user.first_name && user.last_name 
+              ? `${user.first_name} ${user.last_name}` 
+              : undefined,
+          });
         } catch (err) {
           logger.error(`Failed to send sync email to ${redact("email", user.email)}:`, err);
         }

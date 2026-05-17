@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -7,6 +8,12 @@ void main() {
   testWidgets('AppUpdateDialog renders optional update layout correctly', (
     tester,
   ) async {
+    final currentParts = AppConfig.appVersion
+        .split('.')
+        .map(int.parse)
+        .toList();
+    final latestVersion = '${currentParts[0]}.${currentParts[1] + 1}.0';
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -16,7 +23,7 @@ void main() {
                 onPressed: () async {
                   await AppUpdateDialog.show(
                     context,
-                    '3.1.0',
+                    latestVersion,
                     isForceUpdate: false,
                   );
                 },
@@ -34,11 +41,14 @@ void main() {
 
     // Verify dialog content
     expect(find.text('New Update Available!'), findsOneWidget);
-    expect(find.text('v3.0.8'), findsOneWidget); // Current version
-    expect(find.text('v3.1.0'), findsOneWidget); // Latest version
+    expect(
+      find.text('v${AppConfig.appVersion}'),
+      findsOneWidget,
+    ); // Current version
+    expect(find.text('v$latestVersion'), findsOneWidget); // Latest version
     expect(
       find.text(
-        'A new version of GhostClass (v3.1.0) is available! We highly recommend updating now to experience improved stability and fresh features.',
+        'A new version of GhostClass (v$latestVersion) is available! We highly recommend updating now to experience improved stability and fresh features.',
       ),
       findsOneWidget,
     );
@@ -68,6 +78,12 @@ void main() {
   testWidgets('AppUpdateDialog renders forced update layout correctly', (
     tester,
   ) async {
+    final currentParts = AppConfig.appVersion
+        .split('.')
+        .map(int.parse)
+        .toList();
+    final latestVersion = '${currentParts[0]}.${currentParts[1] + 1}.0';
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -77,7 +93,7 @@ void main() {
                 onPressed: () async {
                   await AppUpdateDialog.show(
                     context,
-                    '3.1.0',
+                    latestVersion,
                     isForceUpdate: true,
                   );
                 },
@@ -95,11 +111,14 @@ void main() {
 
     // Verify dialog content
     expect(find.text('Critical Update Required'), findsOneWidget);
-    expect(find.text('v3.0.8'), findsOneWidget); // Current version
-    expect(find.text('v3.1.0'), findsOneWidget); // Latest version
+    expect(
+      find.text('v${AppConfig.appVersion}'),
+      findsOneWidget,
+    ); // Current version
+    expect(find.text('v$latestVersion'), findsOneWidget); // Latest version
     expect(
       find.text(
-        'A critical new security and feature update is required to continue using GhostClass. Please download the latest version (v3.1.0) to stay secure.',
+        'A critical new security and feature update is required to continue using GhostClass. Please download the latest version (v$latestVersion) to stay secure.',
       ),
       findsOneWidget,
     );
