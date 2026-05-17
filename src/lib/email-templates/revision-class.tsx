@@ -13,8 +13,6 @@ import { emailStyles, tableStyles, getLogoUrl, headerLogoStyle } from "./styles"
 
 interface RevisionClassEmailProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseName: string;
   date: string;
   session: string;
@@ -23,8 +21,6 @@ interface RevisionClassEmailProps {
 
 export const RevisionClassEmail = ({
   username,
-  firstName,
-  lastName,
   courseName,
   date,
   session,
@@ -42,7 +38,7 @@ export const RevisionClassEmail = ({
           <Heading style={emailStyles.title}>Revision Class — Not Counted 📚</Heading>
 
           <Text style={emailStyles.paragraph}>
-            Hi <strong>{firstName && lastName ? `${firstName} ${lastName}` : username}</strong>,<br />
+            Hi <strong>{username}</strong>,<br />
             EzyGo marked one of your self-recorded classes as a{" "}
             <strong>Revision</strong> class. Revision classes are not counted
             toward attendance, so your manual entry has been removed.

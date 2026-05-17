@@ -13,8 +13,6 @@ import { emailStyles, tableStyles, getLogoUrl, headerLogoStyle } from "./styles"
 
 interface CourseMismatchEmailProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   date: string;
   session: string;
   manualCourseName: string;
@@ -24,8 +22,6 @@ interface CourseMismatchEmailProps {
 
 export const CourseMismatchEmail = ({
   username,
-  firstName,
-  lastName,
   date,
   session,
   manualCourseName,
@@ -44,7 +40,7 @@ export const CourseMismatchEmail = ({
           <Heading style={emailStyles.title}>Course Mismatch Detected</Heading>
 
           <Text style={emailStyles.paragraph}>
-            Hi <strong>{firstName && lastName ? `${firstName} ${lastName}` : username}</strong>,<br />
+            Hi <strong>{username}</strong>,<br />
             We noticed a mix-up. You self-recorded a class for one course, but
             the official record shows a different one for that time slot.
           </Text>

@@ -19,8 +19,6 @@ export type {
  */
 export const renderCourseMismatchEmail = async (props: {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   date: string;
   session: string;
   manualCourseName: string;
@@ -32,8 +30,6 @@ export const renderCourseMismatchEmail = async (props: {
 
 export const renderAttendanceConflictEmail = async (props: {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseLabel: string;
   date: string;
   session: string;
@@ -44,8 +40,6 @@ export const renderAttendanceConflictEmail = async (props: {
 
 export const renderRevisionClassEmail = async (props: {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseName: string;
   date: string;
   session: string;

@@ -78,8 +78,6 @@ interface OfficialSlotInfo {
 
 interface AttendanceConflictProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseLabel: string;
   date: string;
   session: string;
@@ -88,8 +86,6 @@ interface AttendanceConflictProps {
 
 interface CourseMismatchProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   date: string;
   session: string;
   manualCourseName: string;
@@ -99,8 +95,6 @@ interface CourseMismatchProps {
 
 interface RevisionClassProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseName: string;
   date: string;
   session: string;
@@ -241,8 +235,6 @@ function handleRevisionClass(
       type: "revision",
       props: {
         username: user.username,
-        firstName: user.first_name,
-        lastName: user.last_name,
         courseName,
         date: item.date,
         session: String(item.session),
@@ -277,8 +269,6 @@ function handleCourseMismatch(
       type: "mismatch",
       props: {
         username: user.username,
-        firstName: user.first_name,
-        lastName: user.last_name,
         date: item.date,
         session: String(item.session),
         manualCourseName: manualCourse,
@@ -352,8 +342,6 @@ function handleAttendanceStatus(
         type: "conflict",
         props: {
           username: user.username,
-          firstName: user.first_name,
-          lastName: user.last_name,
           courseLabel: courseName,
           date: item.date,
           session: String(item.session),

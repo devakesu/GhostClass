@@ -13,8 +13,6 @@ import { emailStyles, tableStyles, badgeStyles, getLogoUrl, headerLogoStyle } fr
 
 interface AttendanceConflictEmailProps {
   username: string;
-  firstName?: string | null;
-  lastName?: string | null;
   courseLabel: string;
   date: string;
   session: string;
@@ -23,8 +21,6 @@ interface AttendanceConflictEmailProps {
 
 export const AttendanceConflictEmail = ({
   username,
-  firstName,
-  lastName,
   courseLabel,
   date,
   session,
@@ -42,7 +38,7 @@ export const AttendanceConflictEmail = ({
           <Heading style={emailStyles.title}>Attendance Conflict Detected</Heading>
 
           <Text style={emailStyles.paragraph}>
-            Hi <strong>{firstName && lastName ? `${firstName} ${lastName}` : username}</strong>,<br />
+            Hi <strong>{username}</strong>,<br />
             We found a discrepancy between your self-marked attendance and the
             official record.
           </Text>
