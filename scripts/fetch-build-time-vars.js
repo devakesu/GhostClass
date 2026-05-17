@@ -31,8 +31,8 @@ async function main() {
   const { accessToken } = await loginRes.json();
   console.log(`✓ Authenticated successfully.`);
 
-  // Resolve project slug/id to workspaceId
-  let workspaceId = projectSlugOrId;
+  // Resolve project slug/id to projectId
+  let projectId = projectSlugOrId;
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectSlugOrId);
 
   if (!isUuid) {
@@ -44,18 +44,18 @@ async function main() {
     if (projectRes.ok) {
       const projectData = await projectRes.json();
       const projectObj = projectData.project || projectData.workspace || projectData;
-      workspaceId = projectObj.id || projectObj._id || workspaceId;
-      console.log(`✓ Resolved project slug to ID: ${workspaceId}`);
+      projectId = projectObj.id || projectObj._id || projectId;
+      console.log(`✓ Resolved project slug to ID: ${projectId}`);
     } else {
       const errText = await projectRes.text();
-      console.log(`⚠ Failed to resolve slug via API, falling back to slug value as workspaceId: ${errText}`);
+      console.log(`⚠ Failed to resolve slug via API, falling back to slug value as projectId: ${errText}`);
     }
   } else {
-    console.log(`✓ Using project ID: ${workspaceId}`);
+    console.log(`✓ Using project ID: ${projectId}`);
   }
 
   console.log(`📥 Fetching variables from path "${secretPath}" [env: ${envSlug}]...`);
-  const secretsUrl = `${apiBaseUrl}/api/v4/secrets?workspaceId=${encodeURIComponent(workspaceId)}&environment=${encodeURIComponent(envSlug)}&secretPath=${encodeURIComponent(secretPath)}&viewSecretValue=true`;
+  const secretsUrl = `${apiBaseUrl}/api/v4/secrets?projectId=${encodeURIComponent(projectId)}&environment=${encodeURIComponent(envSlug)}&secretPath=${encodeURIComponent(secretPath)}&viewSecretValue=true`;
   
   const secretsRes = await fetch(secretsUrl, {
     headers: { 'Authorization': `Bearer ${accessToken}` }
