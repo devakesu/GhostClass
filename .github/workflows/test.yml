@@ -64,7 +64,7 @@ jobs:
       JWE_PRIVATE_KEY: "test-jwe-private-key-pem"
       NEXT_PUBLIC_APP_NAME: "GhostClass"
       NEXT_PUBLIC_APP_VERSION: "3.0.8"
-      NEXT_PUBLIC_MIN_APP_VERSION: "3.0.8"
+      MIN_APP_VERSION: "3.0.8"
       NEXT_PUBLIC_BACKEND_URL: "http://localhost:8080"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       NEXT_PUBLIC_APP_DOMAIN: "localhost"

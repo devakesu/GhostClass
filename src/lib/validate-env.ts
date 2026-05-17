@@ -128,8 +128,8 @@ function validateAppConfigCore(errors: string[], warnings: string[]) {
     errors.push("❌ NEXT_PUBLIC_APP_VERSION is required");
   }
 
-  if (!process.env.NEXT_PUBLIC_MIN_APP_VERSION) {
-    errors.push("❌ NEXT_PUBLIC_MIN_APP_VERSION is required");
+  if (!process.env.MIN_APP_VERSION) {
+    errors.push("❌ MIN_APP_VERSION is required");
   }
 
   if (!process.env.NEXT_PUBLIC_APP_URL) {
