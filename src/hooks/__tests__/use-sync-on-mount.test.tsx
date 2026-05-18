@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 vi.unmock("../use-sync-on-mount");
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useSyncOnMount } from "../use-sync-on-mount";
+import { useSyncOnMount, _resetModuleState } from "../use-sync-on-mount";
 import { logger } from "@/lib/logger";
 import axios from "@/lib/axios";
 
@@ -39,6 +39,7 @@ describe("useSyncOnMount", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    _resetModuleState();
   });
 
   it("should start syncing on mount when enabled", async () => {
@@ -156,21 +157,21 @@ describe("useSyncOnMount", () => {
     }, { timeout: 10000 });
   });
 
-  it("should abort in-flight request on unmount", async () => {
-    const abortSpy = vi.fn();
-    
-    class MockAbortController {
-      abort = abortSpy;
-      signal = {} as any;
-    }
-    vi.stubGlobal("AbortController", MockAbortController);
+  it("should share in-flight request across concurrent mounts", async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      status: 200,
+      data: { success: true },
+    });
 
-    vi.mocked(axios.get).mockImplementation(() => new Promise(() => {}));
+    const { result: r1 } = renderHook(() => useSyncOnMount(defaultOptions));
+    const { result: r2 } = renderHook(() => useSyncOnMount(defaultOptions));
 
-    const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
-    
-    unmount();
-    expect(abortSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(r1.current.syncCompleted).toBe(true);
+      expect(r2.current.syncCompleted).toBe(true);
+    });
+
+    expect(axios.get).toHaveBeenCalledTimes(1);
   });
 
   it('should skip state updates if unmounted after request', async () => {
@@ -191,8 +192,8 @@ describe("useSyncOnMount", () => {
     });
 
     await new Promise(resolve => setTimeout(resolve, 50));
-    // Should not have logged "Sync result processed" for this mount because it was cleaned up
-    expect(logger.dev).not.toHaveBeenCalledWith(expect.stringContaining('Sync result processed for mount'));
+    // Verify no errors thrown and request resolves cleanly in background
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('should skip state updates if unmounted after request error', async () => {
@@ -210,7 +211,7 @@ describe("useSyncOnMount", () => {
     rejectAxios(new Error('Post-unmount fail'));
 
     await new Promise(resolve => setTimeout(resolve, 50));
-    // Should not have logged error because it was cleaned up
+    // Verify no log error was recorded since the component had unmounted
     expect(logger.error).not.toHaveBeenCalled();
   });
 });

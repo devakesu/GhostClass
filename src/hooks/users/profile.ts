@@ -15,7 +15,7 @@ interface UpdateProfileData {
 
 export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean }) => {
   return useQuery<UserProfile | null>({
-    queryKey: ["profile", options?.sync],
+    queryKey: ["profile"],
     queryFn: async () => {
       const res = await axiosInstance.get<UserProfile>("/api/profile", {
         params: options?.sync ? { sync: "true" } : {},
