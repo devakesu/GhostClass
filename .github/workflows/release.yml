@@ -683,13 +683,13 @@ jobs:
       - name: Upload mobile APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ghostclass-android-apk
+          name: ghostclass-android-apk-v${{ steps.mobile-prep.outputs.build_name }}
           path: mobile/release-assets/ghostclass-android-v${{ steps.mobile-prep.outputs.build_name }}.apk
 
       - name: Upload mobile security metadata artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mobile-security-metadata
+          name: android-release-artifacts
           path: |
             mobile/release-assets/mobile-sbom.json
             mobile/release-assets/mobile-provenance.intoto.jsonl
@@ -796,13 +796,13 @@ jobs:
       - name: Download mobile APK artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: ghostclass-android-apk
+          name: ghostclass-android-apk-v${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
           path: ./artifacts/mobile
 
       - name: Download mobile security metadata artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: mobile-security-metadata
+          name: android-release-artifacts
           path: ./artifacts/mobile
 
       - name: Verify downloaded artifacts
