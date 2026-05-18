@@ -38,7 +38,10 @@ export interface UseSyncOnMountReturn {
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown
 let lastSyncSuccessTime = 0;
 let lastSyncUsername: string | null = null;
-let activeSyncPromise: Promise<{ data: SyncResponse; status: number }> | null = null;
+let activeSyncPromise: {
+  username: string;
+  promise: Promise<{ data: SyncResponse; status: number }>;
+} | null = null;
 
 async function executeGlobalSync() {
   const res = await axios.get<SyncResponse>(`/api/cron/sync`, {
@@ -111,6 +114,7 @@ export function useSyncOnMount({
     let isCleanedUp = false;
 
     const finalizeSync = (status: number, data: SyncResponse) => {
+      if (isCleanedUp) return;
       syncFinishedRef.current = true;
       lastSyncSuccessTime = Date.now();
       lastSyncUsername = username;
@@ -144,23 +148,31 @@ export function useSyncOnMount({
       setIsSyncing(true);
 
       try {
-        if (!activeSyncPromise) {
+        if (!activeSyncPromise || activeSyncPromise.username !== username) {
           logger.dev(`[${sentryLocation}] Initiating global EzyGo sync request`);
-          activeSyncPromise = (async () => {
+          let currentPromise: Promise<{ data: SyncResponse; status: number }> | null = null;
+          const promise = (async () => {
             try {
               return await executeGlobalSync();
             } catch (err) {
-              activeSyncPromise = null; // Reset on failure so it can be retried
+              if (activeSyncPromise?.promise === currentPromise) {
+                activeSyncPromise = null; // Reset on failure so it can be retried
+              }
               throw err;
             } finally {
-              activeSyncPromise = null; // Always clear when done
+              if (activeSyncPromise?.promise === currentPromise) {
+                activeSyncPromise = null; // Always clear when done
+              }
             }
           })();
+          currentPromise = promise;
+          activeSyncPromise = { username, promise };
         } else {
           logger.dev(`[${sentryLocation}] Awaiting existing active EzyGo sync request`);
         }
 
-        const result = await activeSyncPromise;
+        const result = await activeSyncPromise.promise;
+        if (isCleanedUp) return;
         finalizeSync(result.status, result.data);
       } catch (error: unknown) {
         if (isCleanedUp) return;
