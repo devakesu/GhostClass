@@ -20,6 +20,7 @@ abstract final class _Keys {
   static const stealthInfo = 'browser_stealth_info';
   static const academicState = 'academic_state';
   static const fcmToken = 'fcm_token';
+  static const attestationResult = 'attestation_result';
 }
 
 /// Wraps [FlutterSecureStorage] with typed helpers.
@@ -191,6 +192,14 @@ class SecureStorageService {
       return null;
     }
   }
+
+  // ─── Attestation Result ──────────────────────────────────────────────────
+
+  Future<void> saveAttestationResult(String resultJson) =>
+      _storage.write(key: _Keys.attestationResult, value: resultJson);
+
+  Future<String?> getAttestationResult() =>
+      _storage.read(key: _Keys.attestationResult);
 
   // ─── Generic Read/Write (Safe access to _storage) ──────────────────────
 

@@ -28,11 +28,11 @@ void main() {
 
     when(() => mockDioService.dio).thenReturn(mockDio);
     when(
-      () => mockSecureStorage.readSecure(any()),
+      () => mockSecureStorage.getAttestationResult(),
     ).thenAnswer((_) async => null);
     when(
-      () => mockSecureStorage.writeSecure(any(), any()),
-    ).thenAnswer((_) async => {});
+      () => mockSecureStorage.saveAttestationResult(any()),
+    ).thenAnswer((_) async {});
 
     container = ProviderContainer(
       overrides: [

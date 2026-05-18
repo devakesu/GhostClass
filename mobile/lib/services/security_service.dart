@@ -57,7 +57,7 @@ class SecurityService {
 
   Future<AppVersionCheckResult?> verifyIntegrity() async {
     final storage = _ref.read(secureStorageProvider);
-    final cachedRaw = await storage.readSecure('attestation_result');
+    final cachedRaw = await storage.getAttestationResult();
 
     if (cachedRaw != null) {
       try {
@@ -96,7 +96,7 @@ class SecurityService {
         'hasUpdate': result.hasUpdate,
         'isForceUpdate': result.isForceUpdate,
       };
-      await storage.writeSecure('attestation_result', jsonEncode(map));
+      await storage.saveAttestationResult(jsonEncode(map));
       AppLogger.d('SecurityService: Cached attestation check result.');
     } on Object catch (e) {
       AppLogger.w('SecurityService: Failed to write attestation cache', e);
