@@ -7,6 +7,9 @@ on:
   merge_group:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 permissions: {}
 jobs:
   guard:

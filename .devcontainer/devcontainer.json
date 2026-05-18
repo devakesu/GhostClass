@@ -1,0 +1,11 @@
+{
+  "name": "GhostClass DevContainer",
+  "context": "..",
+  "dockerFile": "Dockerfile",
+  "build": {
+    "args": {}
+  },
+  "workspaceFolder": "/workspace",
+  "runArgs": ["--init"],
+  "remoteUser": "vscode"
+}

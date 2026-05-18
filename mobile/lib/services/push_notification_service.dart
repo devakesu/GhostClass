@@ -38,6 +38,8 @@ class PushNotificationService {
   final Ref _ref;
   final FirebaseMessaging _messaging;
   StreamSubscription<String>? _tokenSub;
+  StreamSubscription<RemoteMessage>? _messageSub;
+  StreamSubscription<RemoteMessage>? _messageOpenedSub;
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
   SecureStorageService get _storage => _ref.read(secureStorageProvider);
@@ -50,6 +52,9 @@ class PushNotificationService {
     Stream<RemoteMessage>? onMessageOpenedAppStream,
   }) async {
     try {
+      await _tokenSub?.cancel();
+      await _messageSub?.cancel();
+      await _messageOpenedSub?.cancel();
       // Request permissions natively on iOS and Android targets
       final settings = await _messaging.requestPermission();
 
@@ -76,7 +81,9 @@ class PushNotificationService {
         );
 
         // Listen for active app foreground message streams
-        (onMessageStream ?? FirebaseMessaging.onMessage).listen((message) {
+        _messageSub = (onMessageStream ?? FirebaseMessaging.onMessage).listen((
+          message,
+        ) {
           AppLogger.d(
             'Received foreground message: ${message.notification?.title}',
           );
@@ -123,21 +130,22 @@ class PushNotificationService {
         });
 
         // Track when user taps a notification to open the app
-        (onMessageOpenedAppStream ?? FirebaseMessaging.onMessageOpenedApp)
-            .listen((message) {
-              AppLogger.i('User opened app from notification');
-              try {
-                unawaited(
-                  AnalyticsService.instance.logCustom(
-                    'fcm_opened',
-                    {
-                      'title': message.notification?.title ?? '',
-                      'has_data': message.data.isNotEmpty,
-                    },
-                  ),
-                );
-              } on Object catch (_) {}
-            });
+        _messageOpenedSub =
+            (onMessageOpenedAppStream ?? FirebaseMessaging.onMessageOpenedApp)
+                .listen((message) {
+                  AppLogger.i('User opened app from notification');
+                  try {
+                    unawaited(
+                      AnalyticsService.instance.logCustom(
+                        'fcm_opened',
+                        {
+                          'title': message.notification?.title ?? '',
+                          'has_data': message.data.isNotEmpty,
+                        },
+                      ),
+                    );
+                  } on Object catch (_) {}
+                });
 
         // Retrieve token and execute initial synchronization
         final token = await _messaging.getToken();
@@ -232,6 +240,8 @@ class PushNotificationService {
 
   Future<void> dispose() async {
     await _tokenSub?.cancel();
+    await _messageSub?.cancel();
+    await _messageOpenedSub?.cancel();
   }
 }
 

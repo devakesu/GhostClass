@@ -92,7 +92,7 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
             rm -f /tmp/$NAME.tgz; \
         done \
         # Install Playwright OS dependencies using the installed package
-        && npx playwright install-deps
+        && playwright install-deps
 
 # Switch to vscode user for user-space SDKs
 USER vscode

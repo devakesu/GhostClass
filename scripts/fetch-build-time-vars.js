@@ -89,6 +89,7 @@ function exportSecrets(secrets) {
   // Define exactly which keys should be masked in GitHub logs
   const keysToMask = [
     'NEXT_PUBLIC_BACKEND_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'NEXT_PUBLIC_SENTRY_DSN',
     'NEXT_PUBLIC_TURNSTILE_SITE_KEY',

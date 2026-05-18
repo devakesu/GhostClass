@@ -411,6 +411,18 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ezygoToken: ezygoToken ?? '',
     );
 
+    // Run the heavy startup network tasks asynchronously in the background
+    unawaited(_runBackgroundStartupHydration(user));
+
+    // Return the cached user immediately with isSyncing set to true.
+    // This allows the splash screen to resolve instantly (<1s) and navigates to the dashboard,
+    // which displays the page-wise loading screen until the background tasks complete.
+    return user.copyWith(isSyncing: true);
+  }
+
+  Future<void> _runBackgroundStartupHydration(
+    AuthenticatedUser cachedUser,
+  ) async {
     final api = ref.read(apiServiceProvider)..suppress401 = true;
     try {
       final token = await _getFreshSupabaseToken();
@@ -421,50 +433,48 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
       }
 
-      // Step 3 & 4: Fetch Profile & EzyGo Academic Context concurrently (non-blocking bottleneck)
-      late final AuthenticatedUser updatedUser;
+      // Fetch Profile & EzyGo Academic Context concurrently in the background
       await Future.wait([
         _fetchAndApplyServerProfile(
-          user,
+          cachedUser,
           supabaseToken: token,
-          updateState: false,
-        ).then((res) => updatedUser = res),
+        ),
         _fetchAndSaveAcademicContext(token),
       ]);
       _lastRefresh = DateTime.now();
 
-      // Step 5: Mark as syncing and kick off cron sync in background
-      final syncingUser = updatedUser.copyWith(isSyncing: true);
-      unawaited(
-        Future.microtask(() async {
-          try {
-            // Pre-fetch institutions so they are ready in settings
-            unawaited(ref.read(institutionsProvider.future));
+      // Pre-fetch institutions so they are ready in settings
+      unawaited(ref.read(institutionsProvider.future));
 
-            await api.triggerSync(token, force: true);
-            // Refresh profile after cron so class name, etc. are accurate
-            await refreshProfile(force: true);
-          } on Object catch (e) {
-            AppLogger.w('AuthNotifier: Background startup tasks failed', e);
-          } finally {
-            final finalUser = state.value;
-            if (finalUser != null) {
-              state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
-            }
-          }
-        }),
-      );
+      // Trigger server-side EzyGo cron sync
+      await api.triggerSync(token, force: true);
 
-      return syncingUser;
+      // Refresh profile after cron so class name, etc. are accurate
+      await refreshProfile(force: true);
+
+      final finalUser = state.value;
+      if (finalUser != null &&
+          finalUser.supabaseUserId == cachedUser.supabaseUserId) {
+        state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
+      }
     } on Object catch (e) {
       if (e is AppException && e.isAuthError) {
+        AppLogger.e('AuthNotifier: Background auth error, logging out', e);
         await logout();
-        return null;
+        return;
       }
 
-      // Network / server errors: return cached user so app is usable offline.
-      AppLogger.w('AuthNotifier: Startup sync failed. Using cached data.', e);
-      return user;
+      AppLogger.w(
+        'AuthNotifier: Background startup hydration failed. Using cached data.',
+        e,
+      );
+      // Ensure we clear the syncing status so the user can access the cached dashboard offline,
+      // but only if the user is still logged in and matches the session that started hydration.
+      final currentUser = state.value;
+      if (currentUser != null &&
+          currentUser.supabaseUserId == cachedUser.supabaseUserId) {
+        state = AsyncValue.data(currentUser.copyWith(isSyncing: false));
+      }
     } finally {
       api.suppress401 = false;
     }
@@ -903,7 +913,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       // 3. Trigger server-side profile sync to align database with new Ezygo state
       // This also updates our local profile and settings via _applyProfileResponseData.
       // We set isSyncing=true here to show the syncing overlay while backend sync runs.
-      state = AsyncValue.data(user.copyWith(isSyncing: true));
+      final syncingUser = user.copyWith(isSyncing: true);
+      state = AsyncValue.data(syncingUser);
 
       final token = await _getFreshSupabaseToken();
       if (token == null) {
@@ -937,7 +948,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       final updatedUser = await _applyProfileResponseData(
-        currentUser: user,
+        currentUser: syncingUser,
         data: response.data as Map<String, dynamic>,
       );
 

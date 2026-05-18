@@ -86,20 +86,33 @@ class JweService {
       if (cachedJson != null && cachedTimeStr != null) {
         try {
           final cachedTime = DateTime.parse(cachedTimeStr);
-          if (DateTime.now().difference(cachedTime).inHours < 1) {
-            _cachedJwks = JsonWebKeySet.fromJson(
-              json.decode(cachedJson) as Map<String, dynamic>,
-            );
-            _lastFetch = cachedTime;
-            AppLogger.d('JweService: Loaded JWKS from persistent cache.');
-            return;
+          _cachedJwks = JsonWebKeySet.fromJson(
+            json.decode(cachedJson) as Map<String, dynamic>,
+          );
+          _lastFetch = cachedTime;
+          AppLogger.d('JweService: Loaded JWKS from persistent cache.');
+
+          // Stale-While-Revalidate: if cached keys are older than 24 hours,
+          // refresh from network in the background without blocking startup.
+          if (DateTime.now().difference(cachedTime).inHours >= 24) {
+            unawaited(_refreshJwksFromNetwork(prefs));
           }
+          return;
         } on Object catch (e) {
           AppLogger.w('JweService: Failed to parse cached JWKS time', e);
         }
       }
 
-      // 4. Network fetch
+      // 4. Cache miss: Blocking network fetch
+      await _refreshJwksFromNetwork(prefs);
+    } on Object catch (e) {
+      AppLogger.e('JweService: JWKS Fetch Error', e);
+      rethrow;
+    }
+  }
+
+  Future<void> _refreshJwksFromNetwork(SharedPreferences prefs) async {
+    try {
       final url = '$_ghostclassApiUrl/.well-known/jwks.json';
       final response = await _dio.get<dynamic>(url);
 
@@ -117,8 +130,11 @@ class JweService {
         throw Exception('Failed to fetch JWKS: ${response.statusCode}');
       }
     } on Object catch (e) {
-      AppLogger.e('JweService: JWKS Fetch Error', e);
-      rethrow;
+      AppLogger.e('JweService: Failed to refresh JWKS from network', e);
+      // If we already have a cached copy, don't bubble up background errors
+      if (_cachedJwks == null) {
+        rethrow;
+      }
     }
   }
 

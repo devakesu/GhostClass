@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
+import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/security_service.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -11,21 +12,32 @@ class MockDio extends Mock implements Dio {}
 
 class MockDioService extends Mock implements DioService {}
 
+class MockSecureStorageService extends Mock implements SecureStorageService {}
+
 void main() {
   late SecurityService securityService;
   late MockDio mockDio;
   late MockDioService mockDioService;
+  late MockSecureStorageService mockSecureStorage;
   late ProviderContainer container;
 
   setUp(() {
     mockDio = MockDio();
     mockDioService = MockDioService();
+    mockSecureStorage = MockSecureStorageService();
 
     when(() => mockDioService.dio).thenReturn(mockDio);
+    when(
+      () => mockSecureStorage.getAttestationResult(),
+    ).thenAnswer((_) async => null);
+    when(
+      () => mockSecureStorage.saveAttestationResult(any()),
+    ).thenAnswer((_) async {});
 
     container = ProviderContainer(
       overrides: [
         dioServiceProvider.overrideWith((ref) => mockDioService),
+        secureStorageProvider.overrideWith((ref) => mockSecureStorage),
       ],
     );
 

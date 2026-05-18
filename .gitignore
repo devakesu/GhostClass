@@ -90,6 +90,7 @@ certificates/
 /mobile/*.iml
 /mobile/${workspaceFolder}*/
 /mobile/$*
+/mobile/scratch/
 
 # Android Additional
 /mobile/android/**/*.jks

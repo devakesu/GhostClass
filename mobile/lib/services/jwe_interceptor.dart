@@ -15,8 +15,16 @@ class JweInterceptor extends Interceptor {
 
   JweService get _jweService => _serviceOverride ?? JweService.instance;
 
-  // Use a map to store RCEKs for concurrent requests
-  static final Map<String, String> _rcekMap = {};
+  // Use a map to store RCEKs for concurrent requests with self-pruning timestamps
+  static final Map<String, _RcekEntry> _rcekMap = {};
+
+  static void _pruneExpiredRceks() {
+    final now = DateTime.now();
+    // Prune entries older than 2 minutes (120 seconds) to prevent any unbounded leak
+    _rcekMap.removeWhere(
+      (key, entry) => now.difference(entry.timestamp).inSeconds > 120,
+    );
+  }
 
   @override
   Future<void> onRequest(
@@ -44,7 +52,11 @@ class JweInterceptor extends Interceptor {
 
         // Store the RCEK for this request's response decryption using a unique request ID
         final requestId = const Uuid().v4();
-        _rcekMap[requestId] = result.rcek;
+        _pruneExpiredRceks();
+        _rcekMap[requestId] = _RcekEntry(
+          rcek: result.rcek,
+          timestamp: DateTime.now(),
+        );
         options.headers['X-GhostClass-Request-ID'] = requestId;
 
         options.data = result.jwe;
@@ -74,7 +86,11 @@ class JweInterceptor extends Interceptor {
         final keyResult = await jweService.encryptHeaderKey();
 
         final requestId = const Uuid().v4();
-        _rcekMap[requestId] = keyResult.rcek;
+        _pruneExpiredRceks();
+        _rcekMap[requestId] = _RcekEntry(
+          rcek: keyResult.rcek,
+          timestamp: DateTime.now(),
+        );
         options.headers['X-GhostClass-Request-ID'] = requestId;
 
         options.headers['x-jwe-key'] = keyResult.jwe;
@@ -103,8 +119,9 @@ class JweInterceptor extends Interceptor {
         contentType.contains('application/jose') ||
         response.headers.value('x-jwe') == 'true';
     final requestId =
-        response.requestOptions.headers['X-GhostClass-Request-ID'];
-    final rcek = _rcekMap.remove(requestId);
+        response.requestOptions.headers['X-GhostClass-Request-ID'] as String?;
+    final entry = _rcekMap.remove(requestId);
+    final rcek = entry?.rcek;
 
     if (isEncrypted && rcek != null) {
       String? jwe;
@@ -145,4 +162,10 @@ class JweInterceptor extends Interceptor {
     _rcekMap.remove(requestId);
     return handler.next(err);
   }
+}
+
+class _RcekEntry {
+  _RcekEntry({required this.rcek, required this.timestamp});
+  final String rcek;
+  final DateTime timestamp;
 }

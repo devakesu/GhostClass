@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-// flutter_riverpod not required in this helper; keep imports minimal
 import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
@@ -10,8 +9,10 @@ import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
+import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 
@@ -26,7 +27,7 @@ class MockAuthNotifier extends AuthNotifier {
   MockAuthNotifier(this.user);
   final AuthenticatedUser? user;
   @override
-  FutureOr<AuthenticatedUser?> build() async => user;
+  FutureOr<AuthenticatedUser?> build() => user;
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {}
 }
@@ -35,7 +36,7 @@ class MockTrackingNotifier extends TrackingNotifier {
   MockTrackingNotifier(this.data);
   final TrackingState data;
   @override
-  FutureOr<TrackingState> build() async => data;
+  FutureOr<TrackingState> build() => data;
 
   @override
   Future<void> insertRecord({
@@ -54,7 +55,7 @@ class MockAcademicNotifier extends AcademicNotifier {
   MockAcademicNotifier(this.data);
   final AcademicState data;
   @override
-  FutureOr<AcademicState> build() async => data;
+  FutureOr<AcademicState> build() => data;
 }
 
 class MockNotificationNotifier extends NotificationsNotifier {
@@ -76,6 +77,20 @@ class MockOutageNotifier extends OutageNotifier {
   final bool data;
   @override
   bool build() => data;
+}
+
+class MockScoreNotifier extends ScoreNotifier {
+  MockScoreNotifier(this.data);
+  final ScoreState data;
+  @override
+  Future<ScoreState> build() async => data;
+}
+
+class MockLeaveNotifier extends LeaveNotifier {
+  MockLeaveNotifier(this.data);
+  final LeaveState data;
+  @override
+  FutureOr<LeaveState> build() => data;
 }
 
 DashboardData createMockDashboardData() {
@@ -126,5 +141,26 @@ AuthenticatedUser createMockUser() {
     username: 'testuser',
     settings: UserSettings.defaults(),
     ezygoToken: EncryptedValue.fromPlaintext('testtoken'),
+  );
+}
+
+ScoreState createMockScoreState() {
+  return ScoreState(
+    rawExams: [],
+    groupedExams: [],
+    questions: {},
+    answers: {},
+    resolvedScores: {},
+    filterType: 'all',
+    totalExams: 0,
+    scoredCount: 0,
+    pendingCount: 0,
+  );
+}
+
+LeaveState createMockLeaveState() {
+  return LeaveState(
+    leaves: [],
+    sessions: {},
   );
 }

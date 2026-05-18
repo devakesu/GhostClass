@@ -42,6 +42,7 @@ class DashboardData {
 class DashboardNotifier extends AsyncNotifier<DashboardData> {
   // Cached per signed-in user to avoid leaking across accounts.
   String? _lastUserId;
+  String? _lastClassId;
 
   List<CourseDetails>? _cachedCourses;
   AttendanceReportDetailed? _cachedAttendance;
@@ -62,6 +63,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = null;
       _cachedInstructors = null;
       _lastAcademic = null;
+      _lastClassId = null;
       throw Exception('Not authenticated');
     }
 
@@ -86,14 +88,26 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = null;
       _cachedInstructors = null;
       _lastAcademic = null;
+      _lastClassId = null;
     }
     _lastUserId = user.supabaseUserId;
+
+    // Invalidate caches when class changes.
+    final classId = user.profile?.classField?.id;
+    if (_lastClassId != null && _lastClassId != classId) {
+      _cachedCourses = null;
+      _cachedAttendance = null;
+      _cachedInstructors = null;
+      _lastAcademic = null;
+    }
+    _lastClassId = classId;
 
     // Invalidate cache if academic changed
     if (_lastAcademic != null && _lastAcademic != academic) {
       _cachedCourses = null;
       _cachedAttendance = null;
       _cachedInstructors = null;
+      _lastClassId = null;
     }
     _lastAcademic = academic;
 
