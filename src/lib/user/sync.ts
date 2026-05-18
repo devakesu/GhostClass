@@ -435,6 +435,10 @@ export async function performProfileSync(
     // When the stable class ID changes (programme_config_group_id replaces the old
     // semester-scoped usersubgroup.id), forward-migrate class_courses so existing
     // manually-added courses are not orphaned on the old class row.
+    // class_courses is class-scoped (not user-scoped): all members of a class share
+    // the same rows, so migrating the entire set for the old class UUID to the new one
+    // is correct and idempotent — subsequent syncs by other members of the same cohort
+    // will find no rows remaining on the old class_id and perform a safe no-op.
     const oldClassId = existingUser?.class_id;
     if (classId && oldClassId && oldClassId !== classId) {
       const { error: migrateError } = await supabaseAdmin

@@ -573,6 +573,7 @@ describe('performProfileSync', () => {
 
     // class_courses should have been updated from old → new class_id
     expect(mockSupabase.update).toHaveBeenCalledWith({ class_id: 'new-class-uuid' });
+    expect(mockSupabase.eq).toHaveBeenCalledWith('class_id', 'old-class-uuid');
     expect(result.class?.id).toBe('new-class-uuid');
   });
 
