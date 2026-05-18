@@ -5,7 +5,7 @@ import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/tracking/tracking_record_card.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class TrackingCourseSection extends StatelessWidget {
   const TrackingCourseSection({

@@ -10,7 +10,7 @@ import 'package:ghostclass/widgets/about/attestation_section.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends ConsumerWidget {
@@ -89,7 +89,7 @@ class AboutScreen extends ConsumerWidget {
                         ),
                         const Spacer(),
                         _PillButton(
-                          icon: LucideIcons.github,
+                          icon: LucideIcons.gitBranch,
                           label: 'Repo',
                           onTap: () {
                             final _ = _launchUrl(AppConfig.githubUrl);
@@ -301,7 +301,7 @@ class AboutScreen extends ConsumerWidget {
                           },
                         ),
                         LinkRow(
-                          icon: LucideIcons.github,
+                          icon: LucideIcons.gitBranch,
                           title: 'GitHub repository',
                           value: AppConfig.githubUrl,
                           onTap: () {

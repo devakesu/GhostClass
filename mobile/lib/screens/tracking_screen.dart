@@ -24,7 +24,7 @@ import 'package:ghostclass/widgets/tracking/tracking_filter_chip.dart';
 import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key});

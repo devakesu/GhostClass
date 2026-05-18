@@ -6,7 +6,7 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/attendance/edit_instructor_dialog.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CourseCard extends StatelessWidget {
   const CourseCard({
