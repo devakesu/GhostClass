@@ -62,11 +62,21 @@ class SecurityService {
     if (cachedRaw != null) {
       try {
         final map = jsonDecode(cachedRaw) as Map<String, dynamic>;
+        final latestVersion = map['latestVersion'] as String;
+        final minVersion = map['minVersion'] as String;
+        final currentVersion = AppConfig.appVersion;
+
+        // Dynamically recompute update flags based on the currently running app version.
+        // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
+        // on the first open after an update.
+        final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
+        final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
+
         final cachedResult = AppVersionCheckResult(
-          latestVersion: map['latestVersion'] as String,
-          minVersion: map['minVersion'] as String,
-          hasUpdate: map['hasUpdate'] as bool,
-          isForceUpdate: map['isForceUpdate'] as bool,
+          latestVersion: latestVersion,
+          minVersion: minVersion,
+          hasUpdate: hasUpdate,
+          isForceUpdate: isForceUpdate,
         );
 
         // Run background verification asynchronously

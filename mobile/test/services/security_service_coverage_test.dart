@@ -326,5 +326,24 @@ void main() {
         expect(result.isForceUpdate, isTrue);
       },
     );
+
+    test(
+      'verifyIntegrity recomputes hasUpdate and isForceUpdate from cache against AppConfig.appVersion',
+      () async {
+        final cachedJson =
+            '{"latestVersion": "${AppConfig.appVersion}", "minVersion": "${AppConfig.appVersion}", "hasUpdate": true, "isForceUpdate": true}';
+
+        when(
+          () => mockSecureStorage.getAttestationResult(),
+        ).thenAnswer((_) async => cachedJson);
+
+        final result = await securityService.verifyIntegrity();
+        expect(result, isNotNull);
+        expect(result!.latestVersion, AppConfig.appVersion);
+        expect(result.minVersion, AppConfig.appVersion);
+        expect(result.hasUpdate, isFalse); // Recomputed dynamically
+        expect(result.isForceUpdate, isFalse); // Recomputed dynamically
+      },
+    );
   });
 }

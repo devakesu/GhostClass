@@ -109,7 +109,7 @@ describe('performProfileSync', () => {
         return createMockResponse('2024-25');
       }
       if (url === 'institutionuser/courses/withusers') {
-        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "usergroup": {"id": 301}}}]');
+        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "programme_config_group_id": 710, "usergroup": {"id": 301, "name": "Computer Science"}}}]');
       }
       if (url === 'institutionuser/myroles') {
         return createMockResponse('{"data": {"subgroupRoles": []}}');
@@ -457,13 +457,13 @@ describe('performProfileSync', () => {
     vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') {
-        return createMockResponse('[{"id": 101, "code": "C1", "usersubgroup": {"id": 1, "name": "G1", "usergroup": {"id": 1}}}]');
+        return createMockResponse('[{"id": 101, "code": "C1", "usersubgroup": {"id": 1, "name": "G1", "programme_config_group_id": 710, "usergroup": {"id": 1, "name": "Programme A"}}}]');
       }
       return createMockResponse('{}');
     });
     vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
       const text = await (res as Response).text();
-      if (text.includes('G1')) return [{ id: 101, code: 'C1', usersubgroup: { id: 1, name: 'G1', usergroup: { id: 1 } } }];
+      if (text.includes('G1')) return [{ id: 101, code: 'C1', usersubgroup: { id: 1, name: 'G1', programme_config_group_id: 710, usergroup: { id: 1, name: 'Programme A' } } }];
       return { user_id: '123' };
     });
 
