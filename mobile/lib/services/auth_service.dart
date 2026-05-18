@@ -70,7 +70,6 @@ class AuthService {
       queryParameters: sync ? {'sync': 'true'} : null,
       options: Options(
         headers: {'Authorization': 'Bearer $supabaseToken'},
-        extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,
       ),
     );

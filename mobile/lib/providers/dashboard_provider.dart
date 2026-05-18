@@ -55,6 +55,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final userAsync = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
 
+    // If either core dependency is actively reloading (e.g. changing semester),
+    // suspend the dashboard build to prevent showing a split-second stale UI.
+    if (userAsync.isLoading || academicAsync.isLoading) {
+      return Completer<DashboardData>().future;
+    }
+
     final user = userAsync.value;
     final academic = academicAsync.value;
 

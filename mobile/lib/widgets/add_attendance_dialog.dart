@@ -12,6 +12,7 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/attendance/attendance_dialog_widgets.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -807,9 +808,15 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             courseId: trackerCourseCode,
             remarks: _reasonController.text.trim(),
           );
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+        ServiceToast.show(context, 'Record added successfully');
+      }
     } on Object catch (e, st) {
       AppLogger.e('AddAttendanceDialog: Insert failed', e, st);
+      if (mounted) {
+        ServiceToast.show(context, 'Failed to add record', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

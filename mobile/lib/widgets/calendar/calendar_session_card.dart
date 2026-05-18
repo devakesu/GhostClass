@@ -222,7 +222,9 @@ class CalendarSessionCard extends StatelessWidget {
               ),
             ),
           ],
-          if (!event.isExtra && !event.isCorrection) ...[
+          if (!event.isExtra &&
+              !event.isCorrection &&
+              event.status == 'Absent') ...[
             const SizedBox(height: 16),
             Row(
               children: [

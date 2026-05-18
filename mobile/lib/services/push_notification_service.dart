@@ -197,7 +197,6 @@ class PushNotificationService {
         data: {'fcm_token': token.trim()},
         options: Options(
           headers: {'Authorization': 'Bearer $accessToken'},
-          extra: {'useLimitedToken': true},
           validateStatus: (s) => s != null && s < 600,
         ),
       );
