@@ -78,7 +78,6 @@ class EzygoService {
           data: {'default_institutionUser': institutionUserId},
           options: Options(
             headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-            extra: {'useLimitedToken': true},
             validateStatus: (s) => s != null && s < 600,
           ),
         );
@@ -97,7 +96,6 @@ class EzygoService {
           data: {'default_semester': semester},
           options: Options(
             headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-            extra: {'useLimitedToken': true},
             validateStatus: (s) => s != null && s < 600,
           ),
         );
@@ -116,7 +114,6 @@ class EzygoService {
           data: {'default_academic_year': year},
           options: Options(
             headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-            extra: {'useLimitedToken': true},
             validateStatus: (s) => s != null && s < 600,
           ),
         );

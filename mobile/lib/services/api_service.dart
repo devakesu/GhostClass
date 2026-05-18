@@ -171,7 +171,6 @@ class ApiService {
           '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
           options: Options(
             headers: {'Authorization': 'Bearer $supabaseToken'},
-            extra: {'useLimitedToken': true},
             sendTimeout: const Duration(seconds: 15),
             receiveTimeout: const Duration(seconds: 15),
           ),
