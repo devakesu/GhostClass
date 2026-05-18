@@ -77,6 +77,7 @@ vi.mock("@/lib/security/app-check", async () => {
 const mockGetAuthToken = vi.fn();
 vi.mock("@/lib/security/auth-cookie", () => ({
   getAuthTokenServer: mockGetAuthToken,
+  getAuthTokenWithFallback: mockGetAuthToken,
 }));
 
 // --- Mock egressFetch (for EzyGo calls) ---

@@ -2,7 +2,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { encrypt } from "@/lib/crypto";
-import { getAuthTokenServer } from "@/lib/security/auth-cookie";
+import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
@@ -90,7 +90,7 @@ async function authenticateUser(req: NextRequest, supabaseAdmin: ReturnType<type
 }
 
 async function ingestNewProfile(user: { id: string }, supabaseAdmin: ReturnType<typeof getAdminClient>): Promise<NextResponse> {
-  const token = await getAuthTokenServer();
+  const token = await getAuthTokenWithFallback();
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   let ezygoRes: Response;
   try {
@@ -161,7 +161,7 @@ async function loadExistingUserBundle(
   let resolvedToken: string | null = null;
   let syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null = null;
   if (shouldSync) {
-    resolvedToken = (await getAuthTokenServer()) ?? null;
+    resolvedToken = (await getAuthTokenWithFallback()) ?? null;
     if (resolvedToken) {
       try {
         syncResult = await performProfileSync(resolvedToken, String(existingUser.id), userId);
@@ -175,7 +175,7 @@ async function loadExistingUserBundle(
 
   if (!shouldSync) {
     after(async () => {
-      const syncToken = resolvedToken ?? await getAuthTokenServer();
+      const syncToken = resolvedToken ?? await getAuthTokenWithFallback();
       if (!syncToken) return;
       try {
         await performProfileSync(syncToken, String(existingUser.id), userId);

@@ -41,6 +41,7 @@ class AppUpdateDialog extends StatelessWidget {
   }) {
     return showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: !isForceUpdate,
       barrierColor: Colors.black.withValues(alpha: 0.8),
       builder: (ctx) => PopScope(
