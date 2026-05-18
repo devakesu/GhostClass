@@ -50,6 +50,7 @@ const mockAdminMaybeSingle = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   getAdminClient: vi.fn(() => ({
+    auth: { getUser: mockGetUser },
     from: vi.fn(() => ({
       select: mockAdminSelect,
       upsert: mockAdminUpsert,
@@ -75,9 +76,10 @@ vi.mock("@/lib/security/app-check", async () => {
 
 // --- Mock auth cookie ---
 const mockGetAuthToken = vi.fn();
+const mockGetAuthTokenWithFallback = vi.fn();
 vi.mock("@/lib/security/auth-cookie", () => ({
   getAuthTokenServer: mockGetAuthToken,
-  getAuthTokenWithFallback: mockGetAuthToken,
+  getAuthTokenWithFallback: mockGetAuthTokenWithFallback,
 }));
 
 // --- Mock egressFetch (for EzyGo calls) ---
@@ -170,6 +172,7 @@ describe("GET /api/profile", () => {
       error: null,
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
+    mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
     // Default: no existing DB row
     mockAdminSelect.mockReturnValue({
       eq: mockAdminEq.mockReturnValue({
@@ -252,6 +255,19 @@ describe("GET /api/profile", () => {
     expect(body.birth_date).toBe(MOCK_EZYGO_PROFILE.birth_date);
     expect(body.username).toBe(MOCK_EZYGO_PROFILE.username);
     expect(body.email).toBe(MOCK_EZYGO_PROFILE.email);
+  });
+
+  it("resolves the EzyGo fallback token using the authenticated user id for bearer tokens", async () => {
+    makeEzygoFetchOk();
+    const { GET } = await import("../route");
+    
+    // Simulate bearer token authorization header
+    const req = makeGetReq({ authorization: "Bearer some-supabase-token" });
+    const res = await GET(req, { params: {} });
+    expect(res.status).toBe(200);
+    
+    // Verify getAuthTokenWithFallback was called with the authenticated user ID
+    expect(mockGetAuthTokenWithFallback).toHaveBeenCalledWith(MOCK_USER.id);
   });
 
   it("never exposes IV columns in the response", async () => {
@@ -554,6 +570,7 @@ describe("Edge Case & Branch Coverage", () => {
     mockAdminUpdate.mockReset();
     mockPerformProfileSync.mockReset();
     mockGetAuthToken.mockReset();
+    mockGetAuthTokenWithFallback.mockReset();
     mockRateLimiterLimit.mockReset();
     mockGetUser.mockReset();
     mockEgressFetch.mockReset();
@@ -567,6 +584,7 @@ describe("Edge Case & Branch Coverage", () => {
       error: null,
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
+    mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
     mockAdminSelect.mockReturnValue({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
@@ -592,6 +610,7 @@ describe("Edge Case & Branch Coverage", () => {
       }),
     }));
     mockGetAuthToken.mockResolvedValue(null);
+    mockGetAuthTokenWithFallback.mockResolvedValue(null);
     
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile?sync=true");

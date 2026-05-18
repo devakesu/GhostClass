@@ -27,28 +27,36 @@ export async function getAuthTokenServer() {
 }
 
 // Compatibility export used by backend proxy route.
-export async function getAuthTokenWithFallback() {
+export async function getAuthTokenWithFallback(userId?: string) {
   const cookieToken = await getAuthTokenServer();
   if (cookieToken) return cookieToken;
 
   // Self-Healing Fallback: Restore token from DB if cookie is missing but Supabase session exists
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return undefined;
+    let finalUserId = userId;
+    if (!finalUserId) {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return undefined;
+      finalUserId = user.id;
+    }
 
     const supabaseAdmin = getAdminClient();
     const { data: dbUser } = await supabaseAdmin
       .from("users")
       .select("ezygo_token, ezygo_iv")
-      .eq("auth_id", user.id)
+      .eq("auth_id", finalUserId)
       .maybeSingle();
 
     if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
-      const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
+      const token = decrypt({ iv: dbUser.ezygo_iv, content: dbUser.ezygo_token });
       // Attempt to restore the cookie for future requests
-      await setAuthCookie(token);
-      logger.info("[auth-cookie] EzyGo token healed from database fallback", { userId: redact("id", user.id) });
+      try {
+        await setAuthCookie(token);
+      } catch (cookieErr) {
+        logger.dev("[auth-cookie] Could not set auth cookie in fallback", cookieErr);
+      }
+      logger.info("[auth-cookie] EzyGo token healed from database fallback", { userId: redact("id", finalUserId) });
       return token;
     }
   } catch (err) {

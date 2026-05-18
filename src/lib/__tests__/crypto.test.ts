@@ -21,11 +21,11 @@ describe("crypto.ts", () => {
     expect(decrypted).toBe(text);
   });
 
-  it("decrypts correctly using deprecated two-argument form", () => {
+  it("decrypts correctly using object destructuring", () => {
     const text = "Secret data";
     const encrypted = encrypt(text);
     
-    const decrypted = decrypt(encrypted.iv, encrypted.content);
+    const decrypted = decrypt({ iv: encrypted.iv, content: encrypted.content });
     expect(decrypted).toBe(text);
   });
 
@@ -53,27 +53,27 @@ describe("crypto.ts", () => {
   });
 
   it("throws error for invalid IV format in decrypt", () => {
-    expect(() => decrypt("invalid-iv", "tag:content")).toThrow("Invalid IV format");
+    expect(() => decrypt({ iv: "invalid-iv", content: "tag:content" })).toThrow("Invalid IV format");
   });
 
   it("throws error for invalid content format (missing separator) in decrypt", () => {
     const iv = "0".repeat(24);
-    expect(() => decrypt(iv, "no-separator")).toThrow("Invalid content format (missing separator)");
+    expect(() => decrypt({ iv, content: "no-separator" })).toThrow("Invalid content format (missing separator)");
   });
 
   it("throws error for invalid content format (too many separators) in decrypt", () => {
     const iv = "0".repeat(24);
-    expect(() => decrypt(iv, "tag:content:extra")).toThrow("Invalid content format (unexpected separators)");
+    expect(() => decrypt({ iv, content: "tag:content:extra" })).toThrow("Invalid content format (unexpected separators)");
   });
 
   it("throws error for non-hex characters in decrypt", () => {
     const iv = "0".repeat(24);
-    expect(() => decrypt(iv, "tag:content-with-non-hex!")).toThrow("Invalid content format (non-hex characters)");
+    expect(() => decrypt({ iv, content: "tag:content-with-non-hex!" })).toThrow("Invalid content format (non-hex characters)");
   });
 
   it("throws error for invalid auth tag length in decrypt", () => {
     const iv = "0".repeat(24);
-    expect(() => decrypt(iv, "0123456789abcdef:0123456789abcdef")).toThrow("Invalid auth tag length");
+    expect(() => decrypt({ iv, content: "0123456789abcdef:0123456789abcdef" })).toThrow("Invalid auth tag length");
   });
 
   it("throws generic error when decryption fails (e.g. wrong key)", () => {
@@ -114,12 +114,12 @@ describe("crypto.ts", () => {
   });
 
   it("should throw error for non-hex IV", () => {
-    expect(() => decrypt("not-a-hex-value-at-all--", "tag:content")).toThrow("Invalid IV format");
+    expect(() => decrypt({ iv: "not-a-hex-value-at-all--", content: "tag:content" })).toThrow("Invalid IV format");
   });
 
   it("throws error for missing IV or content in decrypt", () => {
-    expect(() => decrypt(null as any, null as any)).toThrow("Invalid input: IV and content are required");
-    expect(() => decrypt("", "")).toThrow("Invalid input: IV and content are required");
+    expect(() => decrypt(null as any)).toThrow("Invalid input: IV and content are required");
+    expect(() => decrypt({ iv: "", content: "" })).toThrow("Invalid input: IV and content are required");
     expect(() => decrypt({ iv: "", content: "test" })).toThrow("Invalid input: IV and content are required");
     expect(() => decrypt({ iv: "123456789012345678901234", content: "" })).toThrow("Invalid input: IV and content are required");
   });

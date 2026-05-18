@@ -90,7 +90,7 @@ async function authenticateUser(req: NextRequest, supabaseAdmin: ReturnType<type
 }
 
 async function ingestNewProfile(user: { id: string }, supabaseAdmin: ReturnType<typeof getAdminClient>): Promise<NextResponse> {
-  const token = await getAuthTokenWithFallback();
+  const token = await getAuthTokenWithFallback(user.id);
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   let ezygoRes: Response;
   try {
@@ -161,7 +161,7 @@ async function loadExistingUserBundle(
   let resolvedToken: string | null = null;
   let syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null = null;
   if (shouldSync) {
-    resolvedToken = (await getAuthTokenWithFallback()) ?? null;
+    resolvedToken = (await getAuthTokenWithFallback(userId)) ?? null;
     if (resolvedToken) {
       try {
         syncResult = await performProfileSync(resolvedToken, String(existingUser.id), userId);
@@ -175,7 +175,7 @@ async function loadExistingUserBundle(
 
   if (!shouldSync) {
     after(async () => {
-      const syncToken = resolvedToken ?? await getAuthTokenWithFallback();
+      const syncToken = resolvedToken ?? await getAuthTokenWithFallback(userId);
       if (!syncToken) return;
       try {
         await performProfileSync(syncToken, String(existingUser.id), userId);

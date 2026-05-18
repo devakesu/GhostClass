@@ -292,7 +292,7 @@ interface ExistingUserData {
 function safeDecryptField(iv: string | null | undefined, content: string | null | undefined): string | null {
   if (!iv || !content) return null;
   try {
-    return decrypt(iv, content);
+    return decrypt({ iv, content });
   } catch {
     return null;
   }

@@ -86,7 +86,7 @@ async function selfHealEzygoCookie(
       .maybeSingle();
 
     if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
-      const token = decrypt(dbUser.ezygo_iv, dbUser.ezygo_token);
+      const token = decrypt({ iv: dbUser.ezygo_iv, content: dbUser.ezygo_token });
       response.cookies.set("ezygo_access_token", token, {
         httpOnly: true,
         secure: isProd,
