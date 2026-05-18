@@ -243,9 +243,7 @@ void main() {
   });
 
   group('AppSecrets Coverage', () {
-    test('AppSecrets private constructor is covered', () {
-      final secret = AppSecrets();
-      expect(secret, isNotNull);
+    test('AppSecrets values are non-empty', () {
       expect(AppSecrets.supabaseUrlDev, isNotEmpty);
     });
   });
