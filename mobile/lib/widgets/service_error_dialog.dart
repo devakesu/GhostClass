@@ -229,16 +229,21 @@ class ServiceErrorDialog extends StatelessWidget {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.05),
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.05,
+                                      ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: SelectableText(
                                   details!,
                                   style: GoogleFonts.robotoMono(
                                     fontSize: 10,
-                                    color: Theme.of(context).colorScheme.onSurface
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
                                         .withValues(alpha: 0.6),
                                   ),
                                 ),
