@@ -182,7 +182,7 @@ interface RoleSubgroup {
 /** Upserts a row in the `classes` table and returns its Supabase UUID + display name. */
 async function upsertClass(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-  externalId: string | number,
+  externalId: string,
   name: string,
 ): Promise<{ id: string; name: string } | null> {
   const { data, error } = await supabaseAdmin
@@ -220,8 +220,8 @@ async function detectAndSyncClass(
     const sub = courseWithGroup.usersubgroup;
     const stableId = sub.programme_config_group_id ?? sub.usergroup?.id;
     const displayName = sub.name ?? sub.usergroup?.name ?? "";
-    if (stableId != null) {
-      const classInfo = await upsertClass(supabaseAdmin, stableId, displayName);
+    if (stableId != null && displayName) {
+      const classInfo = await upsertClass(supabaseAdmin, String(stableId), displayName);
       if (classInfo) return { classId: classInfo.id, classInfo };
     }
   }
@@ -431,6 +431,24 @@ export async function performProfileSync(
       )
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
       .maybeSingle();
+
+    // When the stable class ID changes (programme_config_group_id replaces the old
+    // semester-scoped usersubgroup.id), forward-migrate class_courses so existing
+    // manually-added courses are not orphaned on the old class row.
+    // class_courses is class-scoped (not user-scoped): all members of a class share
+    // the same rows, so migrating the entire set for the old class UUID to the new one
+    // is correct and idempotent — subsequent syncs by other members of the same cohort
+    // will find no rows remaining on the old class_id and perform a safe no-op.
+    const oldClassId = existingUser?.class_id;
+    if (classId && oldClassId && oldClassId !== classId) {
+      const { error: migrateError } = await supabaseAdmin
+        .from("class_courses")
+        .update({ class_id: classId })
+        .eq("class_id", oldClassId);
+      if (migrateError) {
+        logger.warn(`[sync] class_courses migration skipped for ${redact("id", authId)}: ${migrateError.message}`);
+      }
+    }
 
     const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
 
