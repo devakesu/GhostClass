@@ -33,7 +33,14 @@ interface CourseItem {
   usersubgroup?: {
     id?: string | number;
     name?: string;
-    usergroup?: { id?: string | number };
+    /** Stable section-level ID — confirmed constant across semester transitions.
+     *  Preferred over usersubgroup.id (semester-scoped) for classes.external_group_id. */
+    programme_config_group_id?: string | number;
+    usergroup?: {
+      id?: string | number;
+      /** Programme display name (e.g. "Computer Science and Business Systems") */
+      name?: string;
+    };
   };
 }
 
@@ -172,59 +179,61 @@ interface RoleSubgroup {
   name?: string;
 }
 
+/** Upserts a row in the `classes` table and returns its Supabase UUID + display name. */
+async function upsertClass(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  externalId: string,
+  name: string,
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("classes")
+    .upsert({ external_group_id: externalId, name }, { onConflict: "external_group_id" })
+    .select("id")
+    .single();
+  if (error || !data) return null;
+  return { id: data.id, name };
+}
+
 async function detectAndSyncClass(
   coursesList: CourseItem[],
   rolesData: unknown,
 ): Promise<{ classId: string | null; classInfo: { id: string; name: string } | null }> {
   const supabaseAdmin = getAdminClient();
-  let classId: string | null = null;
-  let classInfo: { id: string; name: string } | null = null;
 
   const safeGet = (obj: unknown, prop: string) => obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
   const rolesObj = safeGet(rolesData, "data") ?? rolesData;
-  const subgroupRoles = Array.isArray(safeGet(rolesObj, "subgroupRoles")) 
-    ? (safeGet(rolesObj, "subgroupRoles") as RoleSubgroup[]) 
+  const subgroupRoles = Array.isArray(safeGet(rolesObj, "subgroupRoles"))
+    ? (safeGet(rolesObj, "subgroupRoles") as RoleSubgroup[])
     : [];
 
-  const courseWithGroup = coursesList.find(c => c.usersubgroup?.usergroup?.id);
+  // Priority 1: course usersubgroup.
+  // Identity preference:
+  //   1. programme_config_group_id — section-level, confirmed stable across
+  //      consecutive semesters (S1 id=9888 → S2 id=11509, pcg stayed 710).
+  //   2. usergroup.id — programme-level fallback when pcg is absent.
+  const courseWithGroup = coursesList.find(
+    c => c.usersubgroup?.programme_config_group_id != null
+      || c.usersubgroup?.usergroup?.id != null,
+  );
 
-  if (courseWithGroup?.usersubgroup?.name && courseWithGroup.usersubgroup.id) {
-    const subgroup = courseWithGroup.usersubgroup;
-    const { data: classData, error: classError } = await supabaseAdmin
-      .from("classes")
-      .upsert({
-        external_group_id: String(subgroup.id),
-        name: subgroup.name,
-      }, { onConflict: "external_group_id" })
-      .select("id")
-      .single();
-
-    if (!classError && classData) {
-      classId = classData.id;
-      classInfo = { id: classData.id, name: subgroup.name ?? "" };
+  if (courseWithGroup?.usersubgroup) {
+    const sub = courseWithGroup.usersubgroup;
+    const stableId = sub.programme_config_group_id ?? sub.usergroup?.id;
+    const displayName = sub.name ?? sub.usergroup?.name ?? "";
+    if (stableId != null && displayName) {
+      const classInfo = await upsertClass(supabaseAdmin, String(stableId), displayName);
+      if (classInfo) return { classId: classInfo.id, classInfo };
     }
   }
 
-  if (!classId && subgroupRoles.length > 0) {
-    const primarySubgroup = subgroupRoles[0];
-    if (primarySubgroup?.name && primarySubgroup.id) {
-      const { data: classData, error: classError } = await supabaseAdmin
-        .from("classes")
-        .upsert({
-          external_group_id: String(primarySubgroup.id),
-          name: primarySubgroup.name,
-        }, { onConflict: "external_group_id" })
-        .select("id")
-        .single();
-
-      if (!classError && classData) {
-        classId = classData.id;
-        classInfo = { id: classData.id, name: primarySubgroup.name };
-      }
-    }
+  // Priority 2: subgroupRoles fallback (institutionuser/myroles).
+  const primarySubgroup = subgroupRoles[0];
+  if (primarySubgroup?.name && primarySubgroup.id) {
+    const classInfo = await upsertClass(supabaseAdmin, String(primarySubgroup.id), primarySubgroup.name);
+    if (classInfo) return { classId: classInfo.id, classInfo };
   }
 
-  return { classId, classInfo };
+  return { classId: null, classInfo: null };
 }
 
 async function populateCourseCatalogAndMigrateTrackers(
@@ -263,6 +272,22 @@ async function populateCourseCatalogAndMigrateTrackers(
           .eq("course", ezygoIdStr);
       }
     }
+  }
+}
+
+async function migrateClassCourses(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  classId: string | null,
+  oldClassId: string | null | undefined,
+  authId: string,
+): Promise<void> {
+  if (!classId || !oldClassId || oldClassId === classId) return;
+  const { error: migrateError } = await supabaseAdmin
+    .from("class_courses")
+    .update({ class_id: classId })
+    .eq("class_id", oldClassId);
+  if (migrateError) {
+    logger.warn(`[sync] class_courses migration skipped for ${redact("id", authId)}: ${migrateError.message}`);
   }
 }
 
@@ -422,6 +447,16 @@ export async function performProfileSync(
       )
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
       .maybeSingle();
+
+    // When the stable class ID changes (programme_config_group_id replaces the old
+    // semester-scoped usersubgroup.id), forward-migrate class_courses so existing
+    // manually-added courses are not orphaned on the old class row.
+    // class_courses is class-scoped (not user-scoped): all members of a class share
+    // the same rows, so migrating the entire set for the old class UUID to the new one
+    // is correct and idempotent — subsequent syncs by other members of the same cohort
+    // will find no rows remaining on the old class_id and perform a safe no-op.
+    const oldClassId = existingUser?.class_id;
+    await migrateClassCourses(supabaseAdmin, classId, oldClassId, authId);
 
     const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
 

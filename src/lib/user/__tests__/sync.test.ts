@@ -109,7 +109,7 @@ describe('performProfileSync', () => {
         return createMockResponse('2024-25');
       }
       if (url === 'institutionuser/courses/withusers') {
-        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "usergroup": {"id": 301}}}]');
+        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "programme_config_group_id": 710, "usergroup": {"id": 301, "name": "Computer Science"}}}]');
       }
       if (url === 'institutionuser/myroles') {
         return createMockResponse('{"data": {"subgroupRoles": []}}');
@@ -457,13 +457,13 @@ describe('performProfileSync', () => {
     vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "123"}');
       if (url === 'institutionuser/courses/withusers') {
-        return createMockResponse('[{"id": 101, "code": "C1", "usersubgroup": {"id": 1, "name": "G1", "usergroup": {"id": 1}}}]');
+        return createMockResponse('[{"id": 101, "code": "C1", "usersubgroup": {"id": 1, "name": "G1", "programme_config_group_id": 710, "usergroup": {"id": 1, "name": "Programme A"}}}]');
       }
       return createMockResponse('{}');
     });
     vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
       const text = await (res as Response).text();
-      if (text.includes('G1')) return [{ id: 101, code: 'C1', usersubgroup: { id: 1, name: 'G1', usergroup: { id: 1 } } }];
+      if (text.includes('G1')) return [{ id: 101, code: 'C1', usersubgroup: { id: 1, name: 'G1', programme_config_group_id: 710, usergroup: { id: 1, name: 'Programme A' } } }];
       return { user_id: '123' };
     });
 
@@ -518,6 +518,63 @@ describe('performProfileSync', () => {
     const result = await performProfileSync(mockToken, '123', mockAuthId);
     expect(result.courses['C1']).toBeDefined();
     // No ID-based key should exist
+  });
+
+  it('skips class upsert when no display name is available (priority 1)', async () => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      if (url === 'institutionuser/courses/withusers') {
+        // Course has programme_config_group_id but neither sub.name nor usergroup.name
+        return createMockResponse('[{"id": 101, "code": "CS101", "usersubgroup": {"id": 1, "programme_config_group_id": 710, "usergroup": {"id": 301}}}]');
+      }
+      if (url === 'institutionuser/myroles') return createMockResponse('{"data": {"subgroupRoles": []}}');
+      return createMockResponse('{}');
+    });
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      try {
+        const text = await (res as Response).text();
+        return JSON.parse(text);
+      } catch { return null; }
+    });
+
+    mockSupabase.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
+    // upsertClass should NOT have been called (no .single())
+    expect(mockSupabase.single).not.toHaveBeenCalled();
+    expect(result.class).toBeNull();
+  });
+
+  it('migrates class_courses when the detected class_id differs from the stored one', async () => {
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      if (url === 'institutionuser/courses/withusers') {
+        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "programme_config_group_id": 710, "usergroup": {"id": 301, "name": "Computer Science"}}}]');
+      }
+      if (url === 'institutionuser/myroles') return createMockResponse('{"data": {"subgroupRoles": []}}');
+      return createMockResponse('{}');
+    });
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      try {
+        const text = await (res as Response).text();
+        return JSON.parse(text);
+      } catch { return null; }
+    });
+
+    // Existing user has an old (semester-scoped) class_id
+    mockSupabase.maybeSingle.mockResolvedValue({
+      data: { class_id: 'old-class-uuid' },
+      error: null,
+    });
+    // upsertClass returns the new stable class UUID
+    mockSupabase.single.mockResolvedValue({ data: { id: 'new-class-uuid' }, error: null });
+
+    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
+
+    // class_courses should have been updated from old → new class_id
+    expect(mockSupabase.update).toHaveBeenCalledWith({ class_id: 'new-class-uuid' });
+    expect(mockSupabase.eq).toHaveBeenCalledWith('class_id', 'old-class-uuid');
+    expect(result.class?.id).toBe('new-class-uuid');
   });
 
   it('redacts authId and ezygoId in Sentry on sync error', async () => {
