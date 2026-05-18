@@ -53,7 +53,7 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
   }
 
   // Use development overrides if present to ensure dev/prod isolation
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development" && process.env.FORCE_PROD_SUPABASE !== "true") {
     const devUrl = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
     const devKey = type === 'admin' 
         ? process.env.SUPABASE_DEV_SECRET_KEY 
@@ -224,7 +224,7 @@ export function buildSupabaseTieredFetch(
     }
   };
 
-  const isDev = process.env.NODE_ENV === "development";
+  const isDev = process.env.NODE_ENV === "development" && process.env.FORCE_PROD_SUPABASE !== "true";
   const devBase = isDev ? parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL) : null;
   const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
   const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);

@@ -16,6 +16,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'coverage_helper.dart';
 
@@ -200,6 +201,11 @@ void main() {
   });
 
   testWidgets('Coverage Booster: AppRouter & SplashScreen', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'ghostclass_jwks_cache': '{"keys": []}',
+      'ghostclass_jwks_time': DateTime.now().toIso8601String(),
+    });
+
     final mockSecurity = MockSecurityService();
     when(mockSecurity.verifyIntegrity).thenAnswer(
       (_) async => AppVersionCheckResult(
@@ -236,8 +242,9 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Verify dialog content is displayed on splash screen
     expect(find.text('Critical Update Required'), findsOneWidget);

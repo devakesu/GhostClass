@@ -18,12 +18,13 @@ export async function getProfileBundle(
     semester?: string | null;
     year?: string | null;
   },
+  preFetchedUser?: unknown,
 ) {
   const supabaseAdmin = getAdminClient();
   
   // 1. Fetch user and settings in parallel
   const [userRes, settingsRes] = await Promise.all([
-    supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", authId).maybeSingle(),
+    preFetchedUser ? Promise.resolve({ data: preFetchedUser }) : supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", authId).maybeSingle(),
     supabaseAdmin.from("user_settings").select("*").eq("user_id", authId).maybeSingle()
   ]);
 

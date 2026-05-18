@@ -270,6 +270,12 @@ function buildAdminMock(opts: {
       return { insert: notificationInsertSpy };
     }
 
+    if (table === "course_mappings") {
+      return {
+        select: vi.fn().mockResolvedValue({ data: [], error: null })
+      };
+    }
+
     return {};
   });
 

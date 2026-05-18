@@ -208,6 +208,11 @@ class SecureStorageService {
 
   Future<String?> readSecure(String key) => _storage.read(key: key);
 
+  Future<void> deleteSecure(String key) => _storage.delete(key: key);
+
+  Future<void> deleteCachedData(String key) =>
+      _storage.delete(key: 'cache_$key');
+
   // ─── Full Clear ──────────────────────────────────────────────────────────
 
   /// Deletes every key managed by this service. Should be called on logout.

@@ -46,6 +46,8 @@ class EzygoBatchFetcher {
   // Tracker for log throttling
   static DateTime? _lastCircuitBreakerLog;
 
+  static int _generation = 0;
+
   /// Executes an authenticated request with deduplication and caching.
   ///
   /// [path] The full URL or relative path.
@@ -62,6 +64,7 @@ class EzygoBatchFetcher {
     // We include method, path, token, and a hash of the body data to avoid collisions.
     final dataKey = data != null ? json.encode(data) : '';
     final cacheKey = '$method|$path|$token|$dataKey';
+    final startGeneration = _generation;
 
     // 0. Security Barrier: If the backend connection is compromised, block immediately.
     if (_isBackendUnauthorized()) {
@@ -169,19 +172,26 @@ class EzygoBatchFetcher {
         final response = await requestFuture;
 
         // 5. Cache the result
-        if (response.statusCode == 200) {
-          // Success cache (Longer)
-          _cache[cacheKey] = _CacheEntry(
-            response: response,
-            expiry: DateTime.now().add(_cacheTtl),
-          );
-        } else if (response.statusCode != null && response.statusCode! >= 500) {
-          // NEGATIVE CACHE (Circuit Breaker):
-          // Remember 5xx failures briefly to prevent Request Storms.
-          _setOutage(true);
-          _cache[cacheKey] = _CacheEntry(
-            response: response,
-            expiry: DateTime.now().add(const Duration(seconds: 15)),
+        if (_generation == startGeneration) {
+          if (response.statusCode == 200) {
+            // Success cache (Longer)
+            _cache[cacheKey] = _CacheEntry(
+              response: response,
+              expiry: DateTime.now().add(_cacheTtl),
+            );
+          } else if (response.statusCode != null &&
+              response.statusCode! >= 500) {
+            // NEGATIVE CACHE (Circuit Breaker):
+            // Remember 5xx failures briefly to prevent Request Storms.
+            _setOutage(true);
+            _cache[cacheKey] = _CacheEntry(
+              response: response,
+              expiry: DateTime.now().add(const Duration(seconds: 15)),
+            );
+          }
+        } else {
+          AppLogger.d(
+            'EzygoBatchFetcher: Discarded caching for $path due to cache clear during request.',
           );
         }
 
@@ -193,7 +203,7 @@ class EzygoBatchFetcher {
             e.type == DioExceptionType.connectionError) {
           _setOutage(true);
           // Short error TTL for transient network issues to recover faster
-          if (e.response != null) {
+          if (e.response != null && _generation == startGeneration) {
             _cache[cacheKey] = _CacheEntry(
               response: e.response!,
               expiry: DateTime.now().add(const Duration(seconds: 5)),
@@ -261,7 +271,10 @@ class EzygoBatchFetcher {
     _cache.clear();
     _inFlight.clear();
     _setOutage(false);
-    AppLogger.i('EzygoBatchFetcher: Cache and Outage state cleared.');
+    _generation++;
+    AppLogger.i(
+      'EzygoBatchFetcher: Cache and Outage state cleared. Generation updated to $_generation.',
+    );
   }
 }
 

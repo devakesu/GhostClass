@@ -26,8 +26,8 @@ vi.mock("@/lib/logger", () => ({
 const MOCK_COURSE = {
   courseCode: "CS101",
   courseName: "Intro to Computer Science",
-  semester: "1",
-  academicYear: "2024",
+  semester: "odd",
+  academicYear: "2024-2025",
 };
 
 describe("POST /api/courses/add", () => {
@@ -109,8 +109,8 @@ describe("POST /api/courses/add", () => {
       class_id: "class-456",
       course_code: "CS101",
       course_name: "Intro To Computer Science",
-      semester: "1",
-      academic_year: "2024",
+      semester: "odd",
+      academic_year: "2024-2025",
       created_by: "user-123"
     });
   });

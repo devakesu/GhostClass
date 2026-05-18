@@ -289,7 +289,7 @@ export async function proxy(request: NextRequest) {
   response.headers.set("x-nonce", nonce);
 
   // Initialize Supabase
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
   const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
     ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
     : process.env.NEXT_PUBLIC_SUPABASE_URL;

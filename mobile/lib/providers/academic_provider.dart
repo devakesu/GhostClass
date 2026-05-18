@@ -84,11 +84,10 @@ final academicProvider =
 class AcademicNotifier extends AsyncNotifier<AcademicState?> {
   @override
   FutureOr<AcademicState?> build() async {
-    // Academic state is pre-populated by AuthNotifier during startup
-    // (via _fetchAndSaveAcademicContext) before authProvider.future resolves.
-    // We gate on auth being available to avoid building while logged out.
-    final authAsync = ref.watch(authProvider);
-    if (!authAsync.hasValue || authAsync.value == null) return null;
+    // Read authProvider to see if we have a logged-in user.
+    // Do NOT watch it to avoid circular dependency loops with authProvider's initialization.
+    final auth = ref.read(authProvider).value;
+    if (auth == null) return null;
 
     final storage = ref.read(secureStorageProvider);
 
@@ -97,7 +96,6 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     if (cached != null) return cached;
 
     // 2. Fallback: User settings from profile sync
-    final auth = authAsync.value!;
     final semester = auth.settings.semester;
     final year = auth.settings.academicYear;
 

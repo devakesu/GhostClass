@@ -47,13 +47,15 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: un
     const token = authHeader.split(" ")[1];
     const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !authUser) {
+      logger.error("[register-fcm] Supabase auth.getUser error:", error || "No user returned");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
     user = authUser;
   } else {
     const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) {
+    const { data: { user: authUser }, error } = await supabase.auth.getUser();
+    if (error || !authUser) {
+      logger.error("[register-fcm] Supabase client auth.getUser error:", error || "No user returned");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
     user = authUser;

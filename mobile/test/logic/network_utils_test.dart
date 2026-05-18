@@ -29,11 +29,10 @@ void main() {
     });
 
     test('validates hostname matching expected host exactly', () {
-      // In tests/dev mode, expected hostname defaults to localhost
-      when(() => mockCert.subject).thenReturn('CN=localhost,O=Test');
+      when(() => mockCert.subject).thenReturn('CN=192.168.0.103,O=Test');
       final isValid = NetworkUtils.validateCertificateHostname(
         mockCert,
-        'localhost',
+        '192.168.0.103',
         8080,
       );
       expect(isValid, true);

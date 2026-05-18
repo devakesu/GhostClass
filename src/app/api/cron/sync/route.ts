@@ -149,21 +149,21 @@ async function fetchEzygoResource(path: string, token: string, method: string = 
   }
 }
 
-async function fetchAndHealToken(
+async function getValidTokenAndAttendance(
   user: UserSyncData,
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>
-): Promise<{ token: string; courseRes: Response }> {
+): Promise<{ token: string; officialData: OfficialAttendanceData }> {
   let decryptedToken = decrypt({ iv: user.ezygo_iv, content: user.ezygo_token });
   if (!decryptedToken) throw new Error("Decryption failed");
 
-  let courseRes = await fetchEzygoResource("institutionuser/courses/withusers", decryptedToken);
+  let attRes = await fetchEzygoResource("attendancereports/student/detailed", decryptedToken, "POST", {});
   
-  if (courseRes.status === 401 && !isCron) {
+  if (attRes.status === 401 && !isCron) {
     const cookieToken = await getAuthTokenServer();
     if (cookieToken && cookieToken !== decryptedToken) {
-      courseRes = await fetchEzygoResource("institutionuser/courses/withusers", cookieToken);
-      if (courseRes.ok) {
+      attRes = await fetchEzygoResource("attendancereports/student/detailed", cookieToken, "POST", {});
+      if (attRes.ok) {
         decryptedToken = cookieToken;
         const { iv, content } = encrypt(decryptedToken);
         await supabaseAdmin.from("users").update({ ezygo_token: content, ezygo_iv: iv }).eq("auth_id", user.auth_id);
@@ -171,20 +171,15 @@ async function fetchAndHealToken(
     }
   }
 
-  return { token: decryptedToken, courseRes };
-}
-
-async function fetchOfficialAttendance(token: string): Promise<OfficialAttendanceData> {
-  const attRes = await fetchEzygoResource("attendancereports/student/detailed", token, "POST", {});
   if (!attRes.ok) throw new Error(`Attendance API: ${attRes.status}`);
-  
+
   const attData = await attRes.json();
   const officialDataRaw = attData?.studentAttendanceData;
   const normalizedOfficial = Array.isArray(officialDataRaw) && officialDataRaw.length === 0 ? {} : officialDataRaw;
   const officialParse = OfficialAttendanceDataSchema.safeParse(normalizedOfficial);
   if (!officialParse.success) throw new Error("Invalid attendance data shape");
 
-  return officialParse.data;
+  return { token: decryptedToken, officialData: officialParse.data };
 }
 
 function buildOfficialMap(officialData: OfficialAttendanceData): Map<string, OfficialSlotInfo> {
@@ -478,32 +473,15 @@ async function executeSyncMutations(
 async function syncUser(
   user: UserSyncData,
   isCron: boolean,
-  supabaseAdmin: ReturnType<typeof getAdminClient>
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  courseMap: Map<string, string>
 ): Promise<SyncStats> {
   const stats = createEmptyStats();
   const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.ghostclass.in'}/dashboard`;
 
   try {
-    const { token, courseRes } = await fetchAndHealToken(user, isCron, supabaseAdmin);
-    if (!courseRes.ok) throw new Error(`Courses API: ${courseRes.status}`);
+    const { officialData } = await getValidTokenAndAttendance(user, isCron, supabaseAdmin);
     
-    interface EzygoCourse {
-      id: number | string;
-      name?: string;
-      code?: string;
-    }
-    const courses = (await courseRes.json().catch(() => [])) as EzygoCourse[];
-    const courseMap = new Map<string, string>();
-    courses.forEach(c => {
-      if (c.name) {
-        courseMap.set(String(c.id), c.name);
-        if (c.code) courseMap.set(String(c.code), c.name);
-      }
-    });
-
-    await fetchEzygoResource("institutionuser/myroles", token).catch(() => null);
-
-    const officialData = await fetchOfficialAttendance(token);
     stats.processed = 1;
 
     const { data: trackerData } = await supabaseAdmin
@@ -576,9 +554,15 @@ export const GET = withSecurity(async (req, { authType }) => {
     users = data || [];
   }
 
+  const { data: mappings } = await supabaseAdmin.from("course_mappings").select("ezygo_id, course_name");
+  const courseMap = new Map<string, string>();
+  if (mappings) {
+    mappings.forEach(m => courseMap.set(String(m.ezygo_id), m.course_name));
+  }
+
   const overallStats = createEmptyStats();
   for (const user of users) {
-    const userStats = await syncUser(user, auth.isCron, supabaseAdmin);
+    const userStats = await syncUser(user, auth.isCron, supabaseAdmin, courseMap);
     overallStats.processed += userStats.processed;
     overallStats.deletions += userStats.deletions;
     overallStats.updates += userStats.updates;

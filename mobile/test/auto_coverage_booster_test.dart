@@ -170,6 +170,7 @@ void main() {
     await pumpScreen(const ProfileScreen());
     await pumpScreen(const ScoresScreen());
     await pumpScreen(const SplashScreen());
+    await tester.pump(const Duration(seconds: 5));
     await pumpScreen(const StaticPageScreen(title: 'Static'));
     await pumpScreen(const TrackingScreen());
   });

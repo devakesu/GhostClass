@@ -15,6 +15,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -30,7 +31,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    final _ = _initializeApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final _ = _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {
@@ -42,14 +45,46 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     try {
       final api = ref.read(apiServiceProvider);
 
-      // Perform full server-side integrity check before anything else
-      // This satisfies the requirement: "all other reqs must be only if app check success"
-      final versionResult = await api.verifyIntegrity();
+      AppLogger.i('SplashScreen: Starting parallel initialization tasks...');
+
+      // Start device attestation and auth profile sync in parallel!
+      final integrityTask = api.verifyIntegrity().then((res) {
+        AppLogger.i('SplashScreen: integrityTask completed');
+        return res;
+      });
+      final authTask = ref.read(authProvider.future).then((res) {
+        AppLogger.i('SplashScreen: authTask completed');
+        return res;
+      });
+
+      // CLEAR ALL previous app-open caches for a truly fresh start
+      api.clearCaches();
+
+      AppLogger.i('SplashScreen: Awaiting Future.wait...');
+      // Wait for both critical security attestation & profile sync to resolve successfully
+      final results = await Future.wait<dynamic>([
+        integrityTask,
+        authTask,
+        jwePreWarm.then((_) {
+          AppLogger.i('SplashScreen: jwePreWarm completed');
+        }),
+        apiPreWarm.then((_) {
+          AppLogger.i('SplashScreen: apiPreWarm completed');
+        }),
+        Future<void>.delayed(const Duration(milliseconds: 3000)).then((_) {
+          AppLogger.i('SplashScreen: 3s delay completed');
+        }),
+      ]);
+
+      AppLogger.i('SplashScreen: Future.wait completed successfully');
+
+      final versionResult = results[0] as AppVersionCheckResult?;
 
       if (versionResult != null && versionResult.hasUpdate) {
         ref.read(appUpdateProvider.notifier).setCheckResult(versionResult);
 
         if (versionResult.isForceUpdate) {
+          AppLogger.w('SplashScreen: Force update required!');
           if (!mounted) return;
           await AppUpdateDialog.show(
             context,
@@ -61,40 +96,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         }
       }
 
-      // 3. Start hydration only after security is verified
-      // CLEAR ALL previous app-open caches for a truly fresh start
-      api.clearCaches();
-
-      final authTask = ref.read(authProvider.future);
-      unawaited(
-        authTask.then((user) {
-          if (!mounted || user == null || user.profile?.avatarUrl == null) {
-            return;
-          }
-          try {
-            final _ = precacheImage(
-              NetworkImage(
-                user.profile!.avatarUrl!,
-                headers: {
-                  'Origin': AppConfig.supabaseOrigin,
-                },
-              ),
-              context,
-            );
-          } on Object catch (e, st) {
-            AppLogger.e('SplashScreen: Avatar pre-cache failed', e, st);
-          }
-        }),
+      final user = results[1] as AuthenticatedUser?;
+      AppLogger.i(
+        'SplashScreen: Initialized user: ${user?.supabaseUserId ?? "null"} (syncing: ${user?.isSyncing ?? "false"})',
       );
-
-      await Future.wait<dynamic>([
-        Future.delayed(
-          const Duration(milliseconds: 2500),
-        ), // Keep the splash visible for at least 2.5 seconds.
-        jwePreWarm,
-        apiPreWarm,
-        authTask,
-      ]);
+      if (mounted && user != null && user.profile?.avatarUrl != null) {
+        try {
+          final _ = precacheImage(
+            NetworkImage(
+              user.profile!.avatarUrl!,
+              headers: {
+                'Origin': AppConfig.supabaseOrigin,
+              },
+            ),
+            context,
+          );
+        } on Object catch (e, st) {
+          AppLogger.e('SplashScreen: Avatar pre-cache failed', e, st);
+        }
+      }
     } on Object catch (e) {
       AppLogger.e('SplashScreen: Initialization error', e);
 
