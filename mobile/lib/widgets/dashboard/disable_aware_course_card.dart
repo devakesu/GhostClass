@@ -351,72 +351,69 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
           fontWeight: FontWeight.w900,
         ),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Disabling this course will exclude it from your total attendance, stat cards, and the attendance chart. It will still appear on the course grid and calendar.',
-            style: GoogleFonts.manrope(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Reason',
-            style: GoogleFonts.manrope(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: selectedReason,
-            dropdownColor: Theme.of(context).colorScheme.surface,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Theme.of(
-                context,
-              ).colorScheme.secondaryContainer.withValues(alpha: 0.5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Disabling this course will exclude it from your total attendance, stat cards, and the attendance chart. It will still appear on the course grid and calendar.',
+              style: GoogleFonts.manrope(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                height: 1.4,
               ),
             ),
-            style: GoogleFonts.manrope(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            items: widget.reasons
-                .map(
-                  (reason) => DropdownMenuItem<String>(
-                    value: reason,
-                    child: Text(reason),
-                  ),
-                )
-                .toList(),
-            onChanged: isSaving
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    setState(() {
-                      selectedReason = value;
-                      if (value != 'Other') {
-                        customController.clear();
-                      }
-                    });
-                  },
-          ),
-          if (isOtherReason) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+            const SizedBox(height: 18),
+            Text(
+              'Reason',
+              style: GoogleFonts.manrope(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
-              child: TextField(
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: selectedReason,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: GoogleFonts.manrope(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              items: widget.reasons
+                  .map(
+                    (reason) => DropdownMenuItem<String>(
+                      value: reason,
+                      child: Text(reason),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isSaving
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        selectedReason = value;
+                        if (value != 'Other') {
+                          customController.clear();
+                        }
+                      });
+                    },
+            ),
+            if (isOtherReason) ...[
+              const SizedBox(height: 12),
+              TextField(
                 controller: customController,
                 autofocus: true,
                 style: GoogleFonts.manrope(
@@ -440,9 +437,9 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
       actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
       actions: [

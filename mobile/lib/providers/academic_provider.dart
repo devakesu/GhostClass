@@ -169,10 +169,14 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     // 1. Show loading immediately in the state
     state = const AsyncValue.loading();
 
-    // 2. Perform the heavy lifting on the server
-    await ref
-        .read(authProvider.notifier)
-        .updateAcademicContext(semester, nextYear);
+    try {
+      // 2. Perform the heavy lifting on the server
+      await ref
+          .read(authProvider.notifier)
+          .updateAcademicContext(semester, nextYear);
+    } finally {
+      ref.invalidateSelf();
+    }
   }
 
   Future<void> setYear(String year) async {
@@ -184,10 +188,14 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     // 1. Show loading immediately
     state = const AsyncValue.loading();
 
-    // 2. Update server
-    await ref
-        .read(authProvider.notifier)
-        .updateAcademicContext(nextSemester, year);
+    try {
+      // 2. Update server
+      await ref
+          .read(authProvider.notifier)
+          .updateAcademicContext(nextSemester, year);
+    } finally {
+      ref.invalidateSelf();
+    }
   }
 }
 

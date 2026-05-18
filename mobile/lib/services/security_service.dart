@@ -1,8 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/providers/app_update_provider.dart';
+import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/services/dio_service.dart';
+import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/secure_storage.dart';
 
 class AppVersionCheckResult {
   AppVersionCheckResult({
@@ -49,6 +56,92 @@ class SecurityService {
   }
 
   Future<AppVersionCheckResult?> verifyIntegrity() async {
+    final storage = _ref.read(secureStorageProvider);
+    final cachedRaw = await storage.readSecure('attestation_result');
+
+    if (cachedRaw != null) {
+      try {
+        final map = jsonDecode(cachedRaw) as Map<String, dynamic>;
+        final cachedResult = AppVersionCheckResult(
+          latestVersion: map['latestVersion'] as String,
+          minVersion: map['minVersion'] as String,
+          hasUpdate: map['hasUpdate'] as bool,
+          isForceUpdate: map['isForceUpdate'] as bool,
+        );
+
+        // Run background verification asynchronously
+        unawaited(_runBackgroundIntegrityCheck());
+
+        AppLogger.d('SecurityService: Returned cached attestation check.');
+        return cachedResult;
+      } on Object catch (e) {
+        AppLogger.w('SecurityService: Failed to parse cached attestation', e);
+      }
+    }
+
+    // Cache miss / first run: Blocking network attestation
+    final result = await _performNetworkVerify();
+    if (result != null) {
+      await _cacheAttestationResult(result);
+    }
+    return result;
+  }
+
+  Future<void> _cacheAttestationResult(AppVersionCheckResult result) async {
+    try {
+      final storage = _ref.read(secureStorageProvider);
+      final map = {
+        'latestVersion': result.latestVersion,
+        'minVersion': result.minVersion,
+        'hasUpdate': result.hasUpdate,
+        'isForceUpdate': result.isForceUpdate,
+      };
+      await storage.writeSecure('attestation_result', jsonEncode(map));
+      AppLogger.d('SecurityService: Cached attestation check result.');
+    } on Object catch (e) {
+      AppLogger.w('SecurityService: Failed to write attestation cache', e);
+    }
+  }
+
+  Future<void> _runBackgroundIntegrityCheck() async {
+    try {
+      final result = await _performNetworkVerify();
+      if (result != null) {
+        await _cacheAttestationResult(result);
+
+        // Update the reactive update state
+        _ref.read(appUpdateProvider.notifier).setCheckResult(result);
+      }
+    } on AppException catch (e) {
+      if (e.details?['type'] == 'security') {
+        AppLogger.e(
+          'SecurityService: Background attestation failure detected.',
+        );
+        _ref
+            .read(securityFailureProvider.notifier)
+            .setFailure(
+              e.message,
+              criticalRisk: e.details?['criticalRisk'] == true,
+              reason: e.details?['reason'] as String?,
+              action: e.details?['action'] as String?,
+              source: 'BackgroundAttestation',
+            );
+      } else {
+        AppLogger.w(
+          'SecurityService: Background check AppException ignored',
+          e,
+        );
+      }
+    } on Object catch (e) {
+      // Offline/DioException is caught here and safely ignored for background checks
+      AppLogger.d(
+        'SecurityService: Background attestation network error ignored',
+        e,
+      );
+    }
+  }
+
+  Future<AppVersionCheckResult?> _performNetworkVerify() async {
     try {
       final response = await _dio.get<dynamic>(
         '$_ghostclassBaseUrl/security/attestation',

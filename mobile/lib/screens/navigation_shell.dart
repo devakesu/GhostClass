@@ -66,21 +66,28 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
   void _checkAndShowUpdateDialog() {
     final updateState = ref.read(appUpdateProvider);
-    if (updateState.checkResult != null &&
-        updateState.checkResult!.hasUpdate &&
-        !updateState.checkResult!.isForceUpdate &&
-        !updateState.dialogDismissed) {
-      unawaited(
-        AppUpdateDialog.show(
-          context,
-          updateState.checkResult!.latestVersion,
-          isForceUpdate: false,
-        ).then((_) {
-          if (mounted) {
-            ref.read(appUpdateProvider.notifier).dismissDialog();
-          }
-        }),
-      );
+    if (updateState.checkResult != null && updateState.checkResult!.hasUpdate) {
+      if (updateState.checkResult!.isForceUpdate) {
+        unawaited(
+          AppUpdateDialog.show(
+            context,
+            updateState.checkResult!.latestVersion,
+            isForceUpdate: true,
+          ),
+        );
+      } else if (!updateState.dialogDismissed) {
+        unawaited(
+          AppUpdateDialog.show(
+            context,
+            updateState.checkResult!.latestVersion,
+            isForceUpdate: false,
+          ).then((_) {
+            if (mounted) {
+              ref.read(appUpdateProvider.notifier).dismissDialog();
+            }
+          }),
+        );
+      }
     }
   }
 
@@ -93,6 +100,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     });
 
     ref
+      ..listenManual<AppUpdateState>(appUpdateProvider, (previous, next) {
+        _checkAndShowUpdateDialog();
+      })
       ..listenManual<AsyncValue<AcademicState?>>(academicProvider, (
         previous,
         next,

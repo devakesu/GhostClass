@@ -203,8 +203,11 @@ jobs:
       - name: Install Android SDK (basic)
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
         with:
-          api-level: 33
-          components: "platform-tools,build-tools;33.0.2"
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            build-tools;33.0.2
+            platforms;android-33
 
       - name: Initialize CodeQL (Java + Kotlin)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
@@ -212,7 +215,7 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
-      - name: Build Android app
+      - name: Build Android app (required for manual CodeQL extraction)
         working-directory: mobile/android
         run: |
           chmod +x ./gradlew

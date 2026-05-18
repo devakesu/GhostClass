@@ -192,6 +192,13 @@ class SecureStorageService {
     }
   }
 
+  // ─── Generic Read/Write (Safe access to _storage) ──────────────────────
+
+  Future<void> writeSecure(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  Future<String?> readSecure(String key) => _storage.read(key: key);
+
   // ─── Full Clear ──────────────────────────────────────────────────────────
 
   /// Deletes every key managed by this service. Should be called on logout.

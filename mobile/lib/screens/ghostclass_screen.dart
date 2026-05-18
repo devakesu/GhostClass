@@ -354,75 +354,72 @@ class GhostClassScreen extends ConsumerWidget {
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.85),
-                    fontSize: 13,
-                    height: 1.5,
-                    fontWeight: FontWeight.w500,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.85),
+                      fontSize: 13,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    children: [
+                      const TextSpan(text: 'This will permanently erase your '),
+                      TextSpan(
+                        text: 'GhostClass',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const TextSpan(
+                        text:
+                            ' account, including all attendance logs and personal settings.\n\n',
+                      ),
+                      TextSpan(
+                        text:
+                            'Note: Your official EzyGo account remains unaffected.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ),
-                  children: [
-                    const TextSpan(text: 'This will permanently erase your '),
-                    TextSpan(
-                      text: 'GhostClass',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const TextSpan(
-                      text:
-                          ' account, including all attendance logs and personal settings.\n\n',
-                    ),
-                    TextSpan(
-                      text:
-                          'Note: Your official EzyGo account remains unaffected.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(height: 24),
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Type '),
+                      TextSpan(
+                        text: 'DELETE',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const TextSpan(text: ' to confirm'),
+                    ],
                   ),
-                  children: [
-                    const TextSpan(text: 'Type '),
-                    TextSpan(
-                      text: 'DELETE',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const TextSpan(text: ' to confirm'),
-                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: TextField(
+                const SizedBox(height: 8),
+                TextField(
                   controller: controller,
                   autofocus: true,
                   onChanged: (val) => setState(() {}),
@@ -455,8 +452,8 @@ class GhostClassScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
