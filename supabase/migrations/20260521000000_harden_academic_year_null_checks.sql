@@ -33,7 +33,7 @@ ALTER TABLE "public"."class_courses" VALIDATE CONSTRAINT "class_courses_course_n
 -- Ensure academic_year strictly matches YYYY-YYYY or YYYY-YY format
 ALTER TABLE "public"."course_instructors"
   ADD CONSTRAINT "course_instructors_academic_year_check"
-  CHECK ("academic_year" ~ '^[0-9]{4}-([0-9]{4}|[0-9]{2})$') NOT VALID;
+  CHECK ("academic_year" IS NOT NULL AND "academic_year" ~ '^[0-9]{4}-([0-9]{4}|[0-9]{2})$') NOT VALID;
 
 ALTER TABLE "public"."course_instructors" VALIDATE CONSTRAINT "course_instructors_academic_year_check";
 

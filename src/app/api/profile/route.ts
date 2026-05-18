@@ -92,17 +92,21 @@ async function resolveAuthToken(existingUserRaw: ExistingUserRawType): Promise<s
   if (cookieToken) return cookieToken;
 
   if (existingUserRaw.ezygo_token && existingUserRaw.ezygo_iv) {
-    const resolvedToken = decrypt({
-      iv: existingUserRaw.ezygo_iv as string,
-      content: existingUserRaw.ezygo_token as string,
-    }) ?? null;
-    if (resolvedToken) {
-      try {
-        await setAuthCookie(resolvedToken);
-      } catch (cookieErr) {
-        logger.dev("[auth-cookie] Could not set auth cookie in fallback", cookieErr);
+    try {
+      const resolvedToken = decrypt({
+        iv: existingUserRaw.ezygo_iv as string,
+        content: existingUserRaw.ezygo_token as string,
+      });
+      if (resolvedToken) {
+        try {
+          await setAuthCookie(resolvedToken);
+        } catch (cookieErr) {
+          logger.dev("[auth-cookie] Could not set auth cookie in fallback", cookieErr);
+        }
+        return resolvedToken;
       }
-      return resolvedToken;
+    } catch (decryptErr) {
+      logger.warn("[resolveAuthToken] Failed to decrypt fallback ezygo token:", decryptErr);
     }
   }
   return null;
@@ -154,7 +158,17 @@ async function loadExistingUserBundle(
 
   if (!shouldSync && !isDebounced) {
     after(async () => {
-      const syncToken = resolvedToken ?? await getAuthTokenServer() ?? (existingUser.ezygo_token && existingUser.ezygo_iv ? decrypt({ iv: existingUser.ezygo_iv as string, content: existingUser.ezygo_token as string }) : null);
+      let syncToken = resolvedToken ?? await getAuthTokenServer();
+      if (!syncToken && existingUser.ezygo_token && existingUser.ezygo_iv) {
+        try {
+          syncToken = decrypt({
+            iv: existingUser.ezygo_iv as string,
+            content: existingUser.ezygo_token as string,
+          });
+        } catch (decryptErr) {
+          logger.warn("[loadExistingUserBundle] Background decrypt failed:", decryptErr);
+        }
+      }
       if (!syncToken) return;
       try {
         await performProfileSync(syncToken, String(existingUser.id), userId);

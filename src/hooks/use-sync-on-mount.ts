@@ -38,7 +38,7 @@ export interface UseSyncOnMountReturn {
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown
 let lastSyncSuccessTime = 0;
 let lastSyncUsername: string | null = null;
-let activeSyncPromise: Promise<SyncResponse> | null = null;
+let activeSyncPromise: Promise<{ data: SyncResponse; status: number }> | null = null;
 
 async function executeGlobalSync() {
   const res = await axios.get<SyncResponse>(`/api/cron/sync`, {
@@ -148,9 +148,7 @@ export function useSyncOnMount({
           logger.dev(`[${sentryLocation}] Initiating global EzyGo sync request`);
           activeSyncPromise = (async () => {
             try {
-              const { data, status } = await executeGlobalSync();
-              finalizeSync(status, data);
-              return data;
+              return await executeGlobalSync();
             } catch (err) {
               activeSyncPromise = null; // Reset on failure so it can be retried
               throw err;
@@ -162,7 +160,8 @@ export function useSyncOnMount({
           logger.dev(`[${sentryLocation}] Awaiting existing active EzyGo sync request`);
         }
 
-        await activeSyncPromise;
+        const result = await activeSyncPromise;
+        finalizeSync(result.status, result.data);
       } catch (error: unknown) {
         if (isCleanedUp) return;
         handleSyncError(error, sentryLocation, sentryTag, userId, setIsSyncing);

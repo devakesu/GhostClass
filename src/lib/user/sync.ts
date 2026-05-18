@@ -565,15 +565,6 @@ export async function performProfileSync(
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
       .maybeSingle();
 
-    // When the stable class ID changes (programme_config_group_id replaces the old
-    // semester-scoped usersubgroup.id), forward-migrate class_courses so existing
-    // manually-added courses are not orphaned on the old class row.
-    // class_courses is class-scoped (not user-scoped): all members of a class share
-    // the same rows, so migrating the entire set for the old class UUID to the new one
-    // is correct and idempotent — subsequent syncs by other members of the same cohort
-    // will find no rows remaining on the old class_id and perform a safe no-op.
-
-
     const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
 
     const encPhone = mergedPhone ? encrypt(mergedPhone) : null;

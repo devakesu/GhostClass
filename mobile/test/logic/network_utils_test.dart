@@ -32,7 +32,7 @@ void main() {
       when(() => mockCert.subject).thenReturn('CN=192.168.0.103,O=Test');
       final isValid = NetworkUtils.validateCertificateHostname(
         mockCert,
-        '192.168.0.103',
+        '192.168.0.100',
         8080,
       );
       expect(isValid, true);
