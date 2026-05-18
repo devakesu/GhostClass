@@ -81,3 +81,40 @@ COMMENT ON COLUMN public.classes.external_group_id IS
 --   SELECT DISTINCT class_id FROM public.users WHERE class_id IS NOT NULL
 -- );
 -- ============================================================================
+
+-- ============================================================================
+-- 4. Expected data-migration behaviour after deploy
+-- ============================================================================
+--
+-- The application sync layer (performProfileSync) handles forward-migration
+-- automatically on each user's first re-sync after this change:
+--
+--   a) upsertClass creates (or finds) a `classes` row keyed by
+--      programme_config_group_id (e.g. 710 instead of the old 9888).
+--   b) users.class_id is updated to the new row's UUID.
+--   c) Any existing class_courses rows for the old class UUID are repointed
+--      to the new class UUID via:
+--
+--        UPDATE class_courses
+--           SET class_id = <new-uuid>
+--         WHERE class_id = <old-uuid>;
+--
+--      If a unique-constraint conflict occurs (the new class already has the
+--      same course_code/academic_year/semester), the migration is skipped for
+--      that sync and a warning is logged; the row remains on the old class
+--      until manual clean-up.
+--
+-- NOTE: course_instructors rows (same class_id column) are NOT auto-migrated
+-- by the app layer. If instructors were assigned under the old semester-scoped
+-- class row, run the following manually after the rollout window:
+--
+--   UPDATE public.course_instructors AS ci
+--      SET class_id = new_cls.id
+--     FROM public.classes AS old_cls
+--     JOIN public.classes AS new_cls
+--          ON new_cls.external_group_id IN (
+--             /* insert the programme_config_group_id values for affected cohorts */
+--          )
+--    WHERE ci.class_id = old_cls.id;
+--
+-- ============================================================================
