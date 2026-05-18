@@ -87,10 +87,10 @@ export function useTrackingData(
       return (data as TrackAttendance[]) || [];
     },
     enabled: !!user && (options?.enabled !== false),
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    refetchInterval: 60 * 1000,
+    refetchInterval: false,
   });
 }

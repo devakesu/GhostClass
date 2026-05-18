@@ -236,8 +236,12 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     final cacheKeyQs = 'exam_questions_${exam.id}';
     final cacheKeyAns = 'exam_answers_${exam.id}';
 
-    dynamic qsData = await storage.getCachedData(cacheKeyQs);
-    dynamic ansData = await storage.getCachedData(cacheKeyAns);
+    final cacheResults = await Future.wait([
+      storage.getCachedData(cacheKeyQs),
+      storage.getCachedData(cacheKeyAns),
+    ]);
+    dynamic qsData = cacheResults[0];
+    dynamic ansData = cacheResults[1];
 
     if (qsData == null || ansData == null) {
       final results = await Future.wait([

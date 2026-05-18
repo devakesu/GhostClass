@@ -24,7 +24,7 @@ import 'package:ghostclass/widgets/tracking/tracking_filter_chip.dart';
 import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key});
@@ -60,7 +60,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             ref.read(apiServiceProvider).clearCaches();
             ref.invalidate(trackingProvider);
             try {
-              await ref.read(trackingProvider.future);
+              await ref
+                  .read(trackingProvider.future)
+                  .timeout(const Duration(seconds: 10));
             } on Object catch (e, st) {
               AppLogger.e('TrackingScreen: Retry failed', e, st);
             }

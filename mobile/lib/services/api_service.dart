@@ -60,7 +60,8 @@ class ApiService {
   Future<Response<dynamic>> refreshProfile(
     String supabaseToken, {
     bool sync = false,
-  }) => _auth.refreshProfile(supabaseToken, sync: sync);
+    bool force = false,
+  }) => _auth.refreshProfile(supabaseToken, sync: sync, force: force);
 
   Future<Response<dynamic>> syncMobileAuth(String supabaseToken) =>
       _auth.syncMobileAuth(supabaseToken);

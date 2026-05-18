@@ -308,7 +308,15 @@ const handler = async (
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
-          setAll: () => {},
+          setAll: (cookiesToSet) => {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch (error) {
+              logger.warn("Non-critical: Failed to set Supabase session cookies in save-token route", error);
+            }
+          },
         },
       }
     );

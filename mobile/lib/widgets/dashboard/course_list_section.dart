@@ -6,7 +6,7 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/widgets/attendance/add_course_dialog.dart';
 import 'package:ghostclass/widgets/dashboard/disable_aware_course_card.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CourseLineupHeader extends StatelessWidget {
   const CourseLineupHeader({super.key});

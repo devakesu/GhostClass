@@ -124,7 +124,7 @@ class _AttendanceCalendarScreenState
                 ref.read(dashboardProvider.future),
                 ref.read(trackingProvider.future),
                 ref.read(academicProvider.future),
-              ]);
+              ]).timeout(const Duration(seconds: 10));
             } on Object catch (e, st) {
               AppLogger.e('AttendanceCalendarScreen: Retry failed', e, st);
             }

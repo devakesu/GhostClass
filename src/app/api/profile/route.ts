@@ -1,55 +1,20 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { encrypt } from "@/lib/crypto";
-import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
+import { decrypt, encrypt } from "@/lib/crypto";
+import { getAuthTokenServer, getAuthTokenWithFallback, setAuthCookie } from "@/lib/security/auth-cookie";
 import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
-import { egressFetch, getClientIp } from "@/lib/utils.server";
+import { getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
 import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
-import { safeResponseJson } from "@/lib/json";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
 
 export const dynamic = "force-dynamic";
-
-interface EzygoProfileData {
-  mobile?: string;
-  gender?: string;
-  birth_date?: string;
-  user_id?: string | number;
-  username?: string;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  created_at?: string;
-  current_semester?: string;
-  current_term?: string;
-  current_year?: string;
-  academic_year?: string;
-  user?: {
-    mobile?: string;
-    username?: string;
-    email?: string;
-  };
-}
-
-interface EzygoProfileResponse extends EzygoProfileData {
-  data?: EzygoProfileData;
-}
-
-function resolve(
-  local: string | null | undefined,
-  remote: string | number | null | undefined
-): string | null {
-  if (local && local !== "") return local;
-  return remote ? String(remote) : null;
-}
 
 function validateRequestOrigin(req: NextRequest): NextResponse | null {
   if (process.env.NODE_ENV === "development") return null;
@@ -78,104 +43,132 @@ async function authenticateUser(req: NextRequest, supabaseAdmin: ReturnType<type
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    if (!token) return null;
+    if (!token) {
+      logger.error("[authenticateUser] Bearer token is missing");
+      return null;
+    }
     const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !authUser) return null;
+    if (error || !authUser) {
+      logger.error("[authenticateUser] Supabase auth.getUser error:", error || "No user returned");
+      return null;
+    }
     return authUser;
   }
   const supabase = await createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  if (!authUser) return null;
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
+  if (error || !authUser) {
+    logger.error("[authenticateUser] Supabase client auth.getUser error:", error || "No user returned");
+    return null;
+  }
   return authUser;
 }
 
-async function ingestNewProfile(user: { id: string }, supabaseAdmin: ReturnType<typeof getAdminClient>): Promise<NextResponse> {
+async function ingestNewProfile(user: { id: string }): Promise<NextResponse> {
   const token = await getAuthTokenWithFallback(user.id);
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  let ezygoRes: Response;
+
   try {
-    ezygoRes = await egressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-    if (!ezygoRes.ok) {
-      logger.error("[profile GET] EzyGo profile fetch failed:", ezygoRes.status);
-      Sentry.captureException(
-        new Error(`EzyGo profile fetch failed with status ${ezygoRes.status}`),
-        { tags: { type: "ezygo_api_error", location: "api/profile/get" } },
-      );
-      return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
-    }
+    const syncResult = await performProfileSync(token, "", user.id);
+    const bundle = await getProfileBundle(user.id, syncResult?.academic);
+    if (!bundle) return NextResponse.json({ error: "Profile not found after ingestion" }, { status: 404 });
+    return NextResponse.json(bundle);
   } catch (err) {
-    logger.error("[profile GET] EzyGo profile fetch exception:", err);
-    Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "api/profile/get" } });
+    logger.error("[profile GET] ingestNewProfile sync exception:", err);
+    Sentry.captureException(err, { tags: { type: "ezygo_network_error", location: "api/profile/get/ingest" } });
     return NextResponse.json({ error: "Failed to reach EzyGo profile service" }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
-  const json = await safeResponseJson<EzygoProfileResponse>(ezygoRes);
-  if (!json) {
-    return NextResponse.json({ error: "EzyGo profile returned empty or invalid JSON" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+}
+
+type ExistingUserRawType = {
+  id: string | number;
+  first_name?: string | null;
+  ezygo_token?: unknown;
+  ezygo_iv?: unknown;
+  [key: string]: unknown;
+};
+
+async function resolveAuthToken(existingUserRaw: ExistingUserRawType): Promise<string | null> {
+  const cookieToken = await getAuthTokenServer();
+  if (cookieToken) return cookieToken;
+
+  if (existingUserRaw.ezygo_token && existingUserRaw.ezygo_iv) {
+    try {
+      const resolvedToken = decrypt({
+        iv: existingUserRaw.ezygo_iv as string,
+        content: existingUserRaw.ezygo_token as string,
+      });
+      if (resolvedToken) {
+        try {
+          await setAuthCookie(resolvedToken);
+        } catch (cookieErr) {
+          logger.dev("[auth-cookie] Could not set auth cookie in fallback", cookieErr);
+        }
+        return resolvedToken;
+      }
+    } catch (decryptErr) {
+      logger.warn("[resolveAuthToken] Failed to decrypt fallback ezygo token:", decryptErr);
+    }
   }
-  const d: EzygoProfileData = json.data || json;
-  const mobileVal = d.mobile || d.user?.mobile;
-  const encPhone = mobileVal ? encrypt(mobileVal) : null;
-  const encGender = d.gender ? encrypt(d.gender) : null;
-  const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+  return null;
+}
 
-  const upsertData = { 
-    id: d.user_id, 
-    auth_id: user.id, 
-    username: d.username || d.user?.username || null,
-    email: d.email || d.user?.email || null,
-    first_name: resolve(null, d.first_name || d.full_name?.split(" ")[0]), 
-    last_name: resolve(null, d.last_name || d.full_name?.split(" ").slice(1).join(" ")), 
-    phone: encPhone?.content, 
-    phone_iv: encPhone?.iv,
-    gender: encGender?.content,
-    gender_iv: encGender?.iv,
-    birth_date: encBirthDate?.content,
-    birth_date_iv: encBirthDate?.iv,
-    ezygo_created_at: d.created_at || null,
-    current_semester: d.current_semester || d.current_term || null,
-    current_year: d.current_year || d.academic_year || null,
-  };
-  await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
-  
-  const safeData: Record<string, unknown> = { ...upsertData };
-  delete safeData.phone_iv;
-  delete safeData.gender_iv;
-  delete safeData.birth_date_iv;
-
-  return NextResponse.json({ 
-    ...safeData, 
-    phone: mobileVal || null,
-    gender: d.gender || null,
-    birth_date: d.birth_date || null,
-    created_at: new Date().toISOString()
-  });
+async function performSyncAndFetchUser(
+  token: string,
+  userId: string,
+  existingUser: ExistingUserRawType,
+  isDebounced: boolean,
+  supabaseAdmin: ReturnType<typeof getAdminClient>
+): Promise<{
+  updatedUser: ExistingUserRawType;
+  syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null;
+}> {
+  try {
+    const fullSync = !isDebounced;
+    const syncResult = await performProfileSync(token, String(existingUser.id), userId, fullSync);
+    
+    const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", userId).single();
+    return {
+      updatedUser: updatedUser ?? existingUser,
+      syncResult,
+    };
+  } catch (err) {
+    logger.warn("Synchronous profile sync failed", err);
+    return { updatedUser: existingUser, syncResult: null };
+  }
 }
 
 async function loadExistingUserBundle(
-  existingUserRaw: { id: string | number; first_name?: string | null; [key: string]: unknown },
+  existingUserRaw: ExistingUserRawType,
   userId: string,
   shouldSync: boolean,
+  isDebounced: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>
 ): Promise<NextResponse> {
   let existingUser = existingUserRaw;
   let resolvedToken: string | null = null;
   let syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null = null;
   if (shouldSync) {
-    resolvedToken = (await getAuthTokenWithFallback(userId)) ?? null;
+    resolvedToken = await resolveAuthToken(existingUserRaw);
     if (resolvedToken) {
-      try {
-        syncResult = await performProfileSync(resolvedToken, String(existingUser.id), userId);
-        const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", userId).single();
-        if (updatedUser) {
-          existingUser = updatedUser;
-        }
-      } catch (err) { logger.warn("Synchronous profile sync failed", err); }
+      const sync = await performSyncAndFetchUser(resolvedToken, userId, existingUser, isDebounced, supabaseAdmin);
+      existingUser = sync.updatedUser;
+      syncResult = sync.syncResult;
     }
   }
 
-  if (!shouldSync) {
+  if (!shouldSync && !isDebounced) {
     after(async () => {
-      const syncToken = resolvedToken ?? await getAuthTokenWithFallback(userId);
+      let syncToken = resolvedToken ?? await getAuthTokenServer();
+      if (!syncToken && existingUser.ezygo_token && existingUser.ezygo_iv) {
+        try {
+          syncToken = decrypt({
+            iv: existingUser.ezygo_iv as string,
+            content: existingUser.ezygo_token as string,
+          });
+        } catch (decryptErr) {
+          logger.warn("[loadExistingUserBundle] Background decrypt failed:", decryptErr);
+        }
+      }
       if (!syncToken) return;
       try {
         await performProfileSync(syncToken, String(existingUser.id), userId);
@@ -184,7 +177,7 @@ async function loadExistingUserBundle(
       }
     });
   }
-  const bundle = await getProfileBundle(userId, syncResult?.academic);
+  const bundle = await getProfileBundle(userId, syncResult?.academic, existingUser);
   if (!bundle) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   return NextResponse.json(bundle);
@@ -228,12 +221,18 @@ const getHandler = async (req: NextRequest) => {
   const { data: existingUserRaw } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
   const searchParams = req.nextUrl.searchParams;
   const shouldSync = searchParams.get("sync") === "true";
+  const force = searchParams.get("force") === "true";
 
   if (existingUserRaw && existingUserRaw.first_name) {
-    return loadExistingUserBundle(existingUserRaw, user.id, shouldSync, supabaseAdmin);
+    const lastSyncedAtStr = existingUserRaw.last_synced_at as string | null | undefined;
+    const lastSyncedAt = lastSyncedAtStr ? new Date(lastSyncedAtStr) : new Date(0);
+    const minutesSinceSync = (Date.now() - lastSyncedAt.getTime()) / 60000;
+    const isDebounced = !force && minutesSinceSync < 5;
+
+    return loadExistingUserBundle(existingUserRaw, user.id, shouldSync, isDebounced, supabaseAdmin);
   }
 
-  return ingestNewProfile(user, supabaseAdmin);
+  return ingestNewProfile(user);
 };
 
 const patchSchema = z.object({

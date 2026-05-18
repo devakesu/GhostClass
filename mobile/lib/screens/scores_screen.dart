@@ -9,7 +9,7 @@ import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ScoresScreen extends ConsumerStatefulWidget {
   const ScoresScreen({super.key});

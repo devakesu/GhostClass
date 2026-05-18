@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/network_utils.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -29,11 +30,11 @@ void main() {
     });
 
     test('validates hostname matching expected host exactly', () {
-      // In tests/dev mode, expected hostname defaults to localhost
-      when(() => mockCert.subject).thenReturn('CN=localhost,O=Test');
+      final expectedHost = Uri.parse(AppConfig.ghostclassApiUrl).host;
+      when(() => mockCert.subject).thenReturn('CN=$expectedHost,O=Test');
       final isValid = NetworkUtils.validateCertificateHostname(
         mockCert,
-        'localhost',
+        expectedHost,
         8080,
       );
       expect(isValid, true);

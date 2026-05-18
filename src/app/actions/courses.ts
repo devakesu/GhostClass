@@ -14,8 +14,16 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
   const academicYear = String(formData.get("academicYear") ?? "").trim();
   const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
 
-  if (!code || !name) {
-    return { error: "Course code and name are required" };
+  if (!code || !name || !semester || !academicYear) {
+    return { error: "Course code, name, semester, and academic year are required" };
+  }
+
+  if (semester !== "odd" && semester !== "even") {
+    return { error: "Semester must be 'odd' or 'even'" };
+  }
+
+  if (!/^\d{4}-(\d{4}|\d{2})$/.test(academicYear)) {
+    return { error: "Academic year must be in format YYYY-YYYY or YYYY-YY (e.g. 2025-2026 or 2025-26)" };
   }
 
   // 1. Verify Turnstile Security Token

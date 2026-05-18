@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { __resetCachedKey } from "@/lib/crypto";
 import { __resetAllowedHostsCache } from "@/lib/security/origin-validation";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 // Mock server-only to allow tests to run in jsdom / Node environments.
 // Without this, importing any server-only module (e.g. @/lib/utils.server)
@@ -97,7 +98,52 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 
 // --- Mock sync logic ---
-const mockPerformProfileSync = vi.fn();
+const mockPerformProfileSync = vi.fn().mockImplementation(async (token, _ezygoId, authId) => {
+  const supabaseAdmin = getAdminClient();
+  
+  // Fetch from the mocked egressFetch
+  const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    throw new Error(`EzyGo Profile failed: ${res.status}`);
+  }
+  const json = await res.json();
+  const d = json.data || json;
+  
+  const { encrypt } = await import("@/lib/crypto");
+  
+  const mobileVal = d.mobile || d.user?.mobile;
+  const encPhone = mobileVal ? encrypt(mobileVal) : null;
+  const encGender = d.gender ? encrypt(d.gender) : null;
+  const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+  const upsertData = { 
+    id: d.user_id || 42, 
+    auth_id: authId, 
+    username: d.username || d.user?.username || null,
+    email: d.email || d.user?.email || null,
+    first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
+    last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
+    phone: encPhone?.content || null, 
+    phone_iv: encPhone?.iv || null,
+    gender: encGender?.content || null,
+    gender_iv: encGender?.iv || null,
+    birth_date: encBirthDate?.content || null,
+    birth_date_iv: encBirthDate?.iv || null,
+    ezygo_created_at: d.created_at || null,
+    current_semester: d.current_semester || d.current_term || null,
+    current_year: d.current_year || d.academic_year || null,
+  };
+  await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
+
+  return {
+    academic: {
+      year: d.current_year || d.academic_year || null,
+      semester: d.current_semester || d.current_term || null,
+      current_year: d.current_year || d.academic_year || null,
+      current_semester: d.current_semester || d.current_term || null,
+    }
+  };
+});
 vi.mock("@/lib/user/sync", () => ({
   performProfileSync: mockPerformProfileSync,
 }));
@@ -161,6 +207,15 @@ describe("GET /api/profile", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    
+    // Reset all database and sync mocks to clear any mockImplementations from previous tests
+    mockAdminSelect.mockReset();
+    mockAdminUpsert.mockReset();
+    mockAdminUpdate.mockReset();
+    mockAdminEq.mockReset();
+    mockAdminMaybeSingle.mockReset();
+    mockPerformProfileSync.mockReset();
+
     // Set a valid encryption key directly (bypasses vi.unstubAllEnvs cleanup)
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
     __resetCachedKey();
@@ -173,17 +228,73 @@ describe("GET /api/profile", () => {
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
     mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
+    
+    // Re-assign mockPerformProfileSync implementation
+    mockPerformProfileSync.mockImplementation(async (token, _ezygoId, authId) => {
+      const supabaseAdmin = getAdminClient();
+      
+      // Fetch from the mocked egressFetch
+      const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        throw new Error(`EzyGo Profile failed: ${res.status}`);
+      }
+      const json = await res.json();
+      const d = json.data || json;
+      
+      const { encrypt } = await import("@/lib/crypto");
+      
+      const mobileVal = d.mobile || d.user?.mobile;
+      const encPhone = mobileVal ? encrypt(mobileVal) : null;
+      const encGender = d.gender ? encrypt(d.gender) : null;
+      const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+      const upsertData = { 
+        id: d.user_id || 42, 
+        auth_id: authId, 
+        username: d.username || d.user?.username || null,
+        email: d.email || d.user?.email || null,
+        first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
+        last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
+        phone: encPhone?.content || null, 
+        phone_iv: encPhone?.iv || null,
+        gender: encGender?.content || null,
+        gender_iv: encGender?.iv || null,
+        birth_date: encBirthDate?.content || null,
+        birth_date_iv: encBirthDate?.iv || null,
+        ezygo_created_at: d.created_at || null,
+        current_semester: d.current_semester || d.current_term || null,
+        current_year: d.current_year || d.academic_year || null,
+      };
+      await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
+
+      return {
+        academic: {
+          year: d.current_year || d.academic_year || null,
+          semester: d.current_semester || d.current_term || null,
+          current_year: d.current_year || d.academic_year || null,
+          current_semester: d.current_semester || d.current_term || null,
+        }
+      };
+    });
+
+    // Dynamic Mock Database State
+    let storedUser: any = null;
+    mockAdminUpsert.mockImplementation(async (data: any) => {
+      storedUser = data;
+      return { error: null };
+    });
+
     // Default: no existing DB row
     mockAdminSelect.mockReturnValue({
       eq: mockAdminEq.mockReturnValue({
-        maybeSingle: mockAdminMaybeSingle.mockResolvedValue({
-          data: null,
-          error: null,
+        maybeSingle: mockAdminMaybeSingle.mockImplementation(async () => {
+          if (storedUser) {
+            return { data: storedUser, error: null };
+          }
+          return { data: null, error: null };
         }),
       }),
     });
-    // Default: upsert succeeds
-    mockAdminUpsert.mockResolvedValue({ error: null });
     // Default: rate limiter allows the request
     mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
   });
@@ -585,15 +696,73 @@ describe("Edge Case & Branch Coverage", () => {
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
     mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
+    
+    // Re-assign mockPerformProfileSync implementation
+    mockPerformProfileSync.mockImplementation(async (token, _ezygoId, authId) => {
+      const supabaseAdmin = getAdminClient();
+      
+      // Fetch from the mocked egressFetch
+      const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        throw new Error(`EzyGo Profile failed: ${res.status}`);
+      }
+      const json = await res.json();
+      const d = json.data || json;
+      
+      const { encrypt } = await import("@/lib/crypto");
+      
+      const mobileVal = d.mobile || d.user?.mobile;
+      const encPhone = mobileVal ? encrypt(mobileVal) : null;
+      const encGender = d.gender ? encrypt(d.gender) : null;
+      const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+      const upsertData = { 
+        id: d.user_id || 42, 
+        auth_id: authId, 
+        username: d.username || d.user?.username || null,
+        email: d.email || d.user?.email || null,
+        first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
+        last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
+        phone: encPhone?.content || null, 
+        phone_iv: encPhone?.iv || null,
+        gender: encGender?.content || null,
+        gender_iv: encGender?.iv || null,
+        birth_date: encBirthDate?.content || null,
+        birth_date_iv: encBirthDate?.iv || null,
+        ezygo_created_at: d.created_at || null,
+        current_semester: d.current_semester || d.current_term || null,
+        current_year: d.current_year || d.academic_year || null,
+      };
+      await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
+
+      return {
+        academic: {
+          year: d.current_year || d.academic_year || null,
+          semester: d.current_semester || d.current_term || null,
+          current_year: d.current_year || d.academic_year || null,
+          current_semester: d.current_semester || d.current_term || null,
+        }
+      };
+    });
+
+    // Dynamic Mock Database State
+    let storedUser: any = null;
+    mockAdminUpsert.mockImplementation(async (data: any) => {
+      storedUser = data;
+      return { error: null };
+    });
+
+    // Default: no existing DB row
     mockAdminSelect.mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: null,
-          error: null,
+        maybeSingle: mockAdminMaybeSingle.mockImplementation(async () => {
+          if (storedUser) {
+            return { data: storedUser, error: null };
+          }
+          return { data: null, error: null };
         }),
       }),
     });
-    mockAdminUpsert.mockResolvedValue({ error: null });
     mockAdminUpdate.mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
     });

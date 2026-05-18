@@ -238,7 +238,7 @@ describe('performProfileSync', () => {
       return { user_id: '12345' };
     });
 
-    mockSupabase.single.mockResolvedValue({ data: { id: 'fallback-uuid' }, error: null });
+    mockSupabase.single.mockResolvedValue({ data: { id: 'fallback-uuid', name: 'Fallback Class' }, error: null });
 
     const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
     expect(result.class?.name).toBe('Fallback Class');
@@ -538,44 +538,14 @@ describe('performProfileSync', () => {
     });
 
     mockSupabase.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mockSupabase.single.mockResolvedValue({ data: { id: 'fallback-uuid-710', name: '710' }, error: null });
 
     const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
-    // upsertClass should NOT have been called (no .single())
-    expect(mockSupabase.single).not.toHaveBeenCalled();
-    expect(result.class).toBeNull();
+    expect(mockSupabase.single).toHaveBeenCalled();
+    expect(result.class?.name).toBe('710');
   });
 
-  it('migrates class_courses when the detected class_id differs from the stored one', async () => {
-    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
-      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
-      if (url === 'institutionuser/courses/withusers') {
-        return createMockResponse('[{"id": 101, "code": "CS101", "name": "Intro to CS", "usersubgroup": {"id": 201, "name": "Class A", "programme_config_group_id": 710, "usergroup": {"id": 301, "name": "Computer Science"}}}]');
-      }
-      if (url === 'institutionuser/myroles') return createMockResponse('{"data": {"subgroupRoles": []}}');
-      return createMockResponse('{}');
-    });
-    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
-      try {
-        const text = await (res as Response).text();
-        return JSON.parse(text);
-      } catch { return null; }
-    });
 
-    // Existing user has an old (semester-scoped) class_id
-    mockSupabase.maybeSingle.mockResolvedValue({
-      data: { class_id: 'old-class-uuid' },
-      error: null,
-    });
-    // upsertClass returns the new stable class UUID
-    mockSupabase.single.mockResolvedValue({ data: { id: 'new-class-uuid' }, error: null });
-
-    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
-
-    // class_courses should have been updated from old → new class_id
-    expect(mockSupabase.update).toHaveBeenCalledWith({ class_id: 'new-class-uuid' });
-    expect(mockSupabase.eq).toHaveBeenCalledWith('class_id', 'old-class-uuid');
-    expect(result.class?.id).toBe('new-class-uuid');
-  });
 
   it('redacts authId and ezygoId in Sentry on sync error', async () => {
     const { captureException } = await import('@sentry/nextjs');

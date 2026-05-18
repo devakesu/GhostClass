@@ -49,6 +49,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   List<CourseInstructor>? _cachedInstructors;
   AcademicState? _lastAcademic;
 
+  bool _needsRevalidate = true;
+
   @override
   FutureOr<DashboardData> build() async {
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
@@ -70,10 +72,79 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedInstructors = null;
       _lastAcademic = null;
       _lastClassId = null;
+      _needsRevalidate = true;
       throw Exception('Not authenticated');
     }
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
+    // Invalidate caches when account switches.
+    if (_lastUserId != null && _lastUserId != user.supabaseUserId) {
+      _cachedCourses = null;
+      _cachedAttendance = null;
+      _cachedInstructors = null;
+      _lastAcademic = null;
+      _lastClassId = null;
+      _needsRevalidate = true;
+    }
+    _lastUserId = user.supabaseUserId;
+
+    // Invalidate caches when class changes.
+    final classId = user.profile?.classField?.id;
+    if (_lastClassId != null && _lastClassId != classId) {
+      _cachedCourses = null;
+      _cachedAttendance = null;
+      _cachedInstructors = null;
+      _lastAcademic = null;
+      _needsRevalidate = true;
+    }
+    _lastClassId = classId;
+
+    // Invalidate cache if academic changed
+    if (_lastAcademic != null && _lastAcademic != academic) {
+      _cachedCourses = null;
+      _cachedAttendance = null;
+      _cachedInstructors = null;
+      _needsRevalidate = true;
+    }
+    _lastAcademic = academic;
+
+    // Load Disk Cache (Secure Storage) if in-memory cache is empty
+    final storage = ref.read(secureStorageProvider);
+    final cacheKeySuffix =
+        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    if (_cachedCourses == null || _cachedAttendance == null) {
+      try {
+        final results = await Future.wait([
+          storage.getCachedData('dashboard_courses_$cacheKeySuffix'),
+          storage.getCachedData('dashboard_attendance_$cacheKeySuffix'),
+          storage.getCachedData('dashboard_instructors_$cacheKeySuffix'),
+        ]);
+        final cachedCoursesRaw = results[0];
+        final cachedAttendanceRaw = results[1];
+        final cachedInstructorsRaw = results[2];
+
+        if (cachedCoursesRaw != null && cachedAttendanceRaw != null) {
+          _cachedCourses = (cachedCoursesRaw as List)
+              .map((c) => CourseDetails.fromJson(c as Map<String, dynamic>))
+              .toList();
+          _cachedAttendance = AttendanceReportDetailed.fromJson(
+            cachedAttendanceRaw as Map<String, dynamic>,
+          );
+          if (cachedInstructorsRaw != null) {
+            _cachedInstructors = (cachedInstructorsRaw as List)
+                .map(
+                  (i) => CourseInstructor.fromJson(i as Map<String, dynamic>),
+                )
+                .toList();
+          } else {
+            _cachedInstructors = [];
+          }
+        }
+      } on Object catch (e) {
+        AppLogger.w('DashboardNotifier: Error loading disk cache', e);
+      }
+    }
+
+    // BLOCKER: Do not fire server queries until Cron Sync is finished
     if (user.isSyncing) {
       if (_cachedCourses != null && _cachedAttendance != null) {
         return _processData(
@@ -88,35 +159,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       return Completer<DashboardData>().future;
     }
 
-    // Invalidate caches when account switches.
-    if (_lastUserId != null && _lastUserId != user.supabaseUserId) {
-      _cachedCourses = null;
-      _cachedAttendance = null;
-      _cachedInstructors = null;
-      _lastAcademic = null;
-      _lastClassId = null;
-    }
-    _lastUserId = user.supabaseUserId;
-
-    // Invalidate caches when class changes.
-    final classId = user.profile?.classField?.id;
-    if (_lastClassId != null && _lastClassId != classId) {
-      _cachedCourses = null;
-      _cachedAttendance = null;
-      _cachedInstructors = null;
-      _lastAcademic = null;
-    }
-    _lastClassId = classId;
-
-    // Invalidate cache if academic changed
-    if (_lastAcademic != null && _lastAcademic != academic) {
-      _cachedCourses = null;
-      _cachedAttendance = null;
-      _cachedInstructors = null;
-      _lastClassId = null;
-    }
-    _lastAcademic = academic;
-
     // 2. Wait for tracking data
     final tracking = await ref.watch(trackingProvider.future);
 
@@ -129,12 +171,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         .expand((e) => e)
         .toList();
 
-    // 2.5 Logic moved to NavigationShell for centralized app-startup sync.
-
     // 3. Fast Path: If we have cached official data AND the term hasn't changed
     if (_cachedCourses != null &&
         _cachedAttendance != null &&
         _lastAcademic == academic) {
+      if (_needsRevalidate) {
+        _needsRevalidate = false;
+        unawaited(
+          Future.microtask(() => _silentRevalidate(trackingList, academic)),
+        );
+      }
+
       return _processData(
         _cachedCourses!,
         _cachedAttendance!,
@@ -144,6 +191,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       );
     }
 
+    _needsRevalidate = false;
     return _fetchAndProcess(trackingList, academic, tracking.officialReport);
   }
 
@@ -247,6 +295,30 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedCourses = merged.values.toList();
       _cachedAttendance = _mergeAttendanceCourses(attendance, sharedCourses);
       _cachedInstructors = sharedInstructors;
+
+      final user = ref.read(authProvider).value;
+      if (user != null) {
+        final cacheKeySuffix =
+            '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        unawaited(
+          storage.saveCachedData(
+            'dashboard_courses_$cacheKeySuffix',
+            _cachedCourses!.map((c) => c.toJson()).toList(),
+          ),
+        );
+        unawaited(
+          storage.saveCachedData(
+            'dashboard_attendance_$cacheKeySuffix',
+            _cachedAttendance!.toJson(),
+          ),
+        );
+        unawaited(
+          storage.saveCachedData(
+            'dashboard_instructors_$cacheKeySuffix',
+            _cachedInstructors!.map((i) => i.toJson()).toList(),
+          ),
+        );
+      }
 
       return _processData(
         _cachedCourses!,
@@ -435,6 +507,21 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     );
   }
 
+  Future<void> _silentRevalidate(
+    List<TrackingRecord> tracking,
+    AcademicState academic,
+  ) async {
+    try {
+      final freshData = await _fetchAndProcess(tracking, academic, null);
+      state = AsyncValue.data(freshData);
+    } on Object catch (e) {
+      AppLogger.w(
+        'DashboardNotifier: Silent background revalidation failed',
+        e,
+      );
+    }
+  }
+
   Future<void> refresh() async {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
@@ -454,9 +541,21 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       await api.triggerSync(supabaseToken, force: true);
 
       // 2. Fetch the fresh profile from the server
-      await ref
-          .read(authProvider.notifier)
-          .refreshProfile(force: true, sync: true);
+      await ref.read(authProvider.notifier).refreshProfile(force: true);
+
+      // Clear disk cache for current user/term so refresh is guaranteed fresh
+      final storage = ref.read(secureStorageProvider);
+      final academicAsync = ref.read(academicProvider);
+      final academic = academicAsync.value;
+      if (academic != null) {
+        final suffix =
+            '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        await Future.wait([
+          storage.deleteCachedData('dashboard_courses_$suffix'),
+          storage.deleteCachedData('dashboard_attendance_$suffix'),
+          storage.deleteCachedData('dashboard_instructors_$suffix'),
+        ]);
+      }
     }
 
     // 3. Refresh Tracking (Official Report + Tracker Records)
@@ -469,6 +568,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     _cachedAttendance = null;
     _cachedInstructors = null;
     _lastAcademic = null;
+    _needsRevalidate = true;
 
     state = await AsyncValue.guard(() async {
       final academicAsync = ref.read(academicProvider);

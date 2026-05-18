@@ -14,6 +14,7 @@ import 'package:ghostclass/widgets/add_attendance_dialog.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'coverage_helper.dart';
 
@@ -33,7 +34,13 @@ void main() {
     unreadCount: 2,
   );
 
-  setUp(TestWidgetsFlutterBinding.ensureInitialized);
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({
+      'ghostclass_jwks_cache': '{"keys": []}',
+      'ghostclass_jwks_time': DateTime.now().toIso8601String(),
+    });
+  });
 
   testWidgets('Shallow render important widgets', (tester) async {
     tester.view.physicalSize = const Size(800, 800);
@@ -166,6 +173,7 @@ void main() {
         child: const MaterialApp(home: SplashScreen()),
       ),
     );
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
   });
 }

@@ -6,6 +6,10 @@ import * as Sentry from "@sentry/nextjs";
 import { safeResponseJson } from "@/lib/json";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 
+function safeGet(obj: unknown, prop: string): unknown {
+  return obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
+}
+
 interface EzygoProfileResponse {
   user_id?: string | number;
   username?: string;
@@ -70,7 +74,6 @@ async function processCoursesData(coursesRes: Response): Promise<{ coursesMap: R
   try {
     const parsed = await safeResponseJson<{ data?: CourseItem[] } | CourseItem[]>(coursesRes);
     if (!parsed) return { coursesMap: {}, coursesList: [] };
-    const safeGet = (obj: unknown, prop: string) => obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
     coursesList = Array.isArray(parsed) ? parsed : ((safeGet(parsed, "data") as CourseItem[] | undefined) ?? []);
 
     if (Array.isArray(coursesList)) {
@@ -93,11 +96,6 @@ async function processCoursesData(coursesRes: Response): Promise<{ coursesMap: R
 function extractAcademicSettingValue(raw: unknown, primaryKey: string, fallbackKeys: string[] = []): string | null {
   if (!raw) return null;
   if (typeof raw !== "object") return String(raw);
-
-  const safeGet = (obj: unknown, prop: string) => {
-    if (obj && typeof obj === "object") return Reflect.get(obj, prop);
-    return undefined;
-  };
 
   const keysToTry = [primaryKey, "data", "value", ...fallbackKeys];
   for (const k of keysToTry) {
@@ -144,7 +142,7 @@ function triggerAcademicSelfHeal(
   ezygoAcademicSemester: string | null,
   ezygoAcademicYear: string | null,
   currentAcademic: { current_semester: string; current_year: string },
-) {
+): Promise<unknown> | void {
   if (ezygoAcademicSemester && ezygoAcademicYear) return;
 
   logger.info(`[sync] Self-healing academic context for ${authId}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year}`);
@@ -171,7 +169,7 @@ function triggerAcademicSelfHeal(
     }));
   }
 
-  Promise.all(pushPromises).catch(err => logger.warn("[sync] Academic self-heal push failed", err));
+  return Promise.all(pushPromises).catch(err => logger.warn("[sync] Academic self-heal push failed", err));
 }
 
 interface RoleSubgroup {
@@ -179,19 +177,26 @@ interface RoleSubgroup {
   name?: string;
 }
 
-/** Upserts a row in the `classes` table and returns its Supabase UUID + display name. */
+/** Upserts a row in the `classes` table and returns its Supabase UUID + display name.
+ *
+ * Identity: external_group_id = programme_config_group_id (stable across semesters).
+ * Name:     usergroup.name = programme name — truly immutable (e.g. "Computer Science and Business Systems").
+ *           Using regular ON CONFLICT DO UPDATE so the first sync after this change
+ *           corrects any previously-written stale names (e.g. "CB2 2025-2029").
+ *           Subsequent syncs are idempotent because usergroup.name never changes.
+ */
 async function upsertClass(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-  externalId: string,
+  externalId: string | number,
   name: string,
 ): Promise<{ id: string; name: string } | null> {
   const { data, error } = await supabaseAdmin
     .from("classes")
     .upsert({ external_group_id: externalId, name }, { onConflict: "external_group_id" })
-    .select("id")
+    .select("id, name")
     .single();
   if (error || !data) return null;
-  return { id: data.id, name };
+  return { id: data.id, name: data.name };
 }
 
 async function detectAndSyncClass(
@@ -200,36 +205,56 @@ async function detectAndSyncClass(
 ): Promise<{ classId: string | null; classInfo: { id: string; name: string } | null }> {
   const supabaseAdmin = getAdminClient();
 
-  const safeGet = (obj: unknown, prop: string) => obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
   const rolesObj = safeGet(rolesData, "data") ?? rolesData;
   const subgroupRoles = Array.isArray(safeGet(rolesObj, "subgroupRoles"))
     ? (safeGet(rolesObj, "subgroupRoles") as RoleSubgroup[])
     : [];
 
   // Priority 1: course usersubgroup.
-  // Identity preference:
-  //   1. programme_config_group_id — section-level, confirmed stable across
-  //      consecutive semesters (S1 id=9888 → S2 id=11509, pcg stayed 710).
-  //   2. usergroup.id — programme-level fallback when pcg is absent.
-  const courseWithGroup = coursesList.find(
-    c => c.usersubgroup?.programme_config_group_id != null
-      || c.usersubgroup?.usergroup?.id != null,
+  //
+  // Identity (external_group_id): programme_config_group_id
+  //   - Confirmed stable across consecutive semesters in real EzyGo data
+  //     (usersubgroup.id changed 9888→11509 between S1/S2, pcg stayed 710).
+  //   - Falls back to usergroup.id if pcg is absent.
+  //   - Do NOT change this to usergroup.id — existing DB rows are keyed by pcg
+  //     and changing would orphan class_courses for all current users.
+  //
+  // Display name (classes.name): usergroup.name
+  //   - "Computer Science and Business Systems" — the programme name, truly immutable.
+  //   - NOT usersubgroup.name ("CB2 2025-2029", "CU12025-2029...") which changes
+  //     every semester when the admin creates a new usersubgroup for the new term.
+  //   - Upsert uses ON CONFLICT DO UPDATE so the first sync after this change
+  //     corrects any stale names already in the database.
+  //     Subsequent syncs are idempotent since usergroup.name never changes.
+  // Find the best course with both stable group ID and usergroup details populated
+  let courseWithGroup = coursesList.find(
+    c => (c.usersubgroup?.programme_config_group_id != null || c.usersubgroup?.usergroup?.id != null)
+      && c.usersubgroup?.usergroup?.name != null
   );
+
+  // If no course has usergroup details populated, fall back to any course with a stable ID
+  if (!courseWithGroup) {
+    courseWithGroup = coursesList.find(
+      c => c.usersubgroup?.programme_config_group_id != null
+        || c.usersubgroup?.usergroup?.id != null
+    );
+  }
 
   if (courseWithGroup?.usersubgroup) {
     const sub = courseWithGroup.usersubgroup;
     const stableId = sub.programme_config_group_id ?? sub.usergroup?.id;
-    const displayName = sub.name ?? sub.usergroup?.name ?? "";
-    if (stableId != null && displayName) {
-      const classInfo = await upsertClass(supabaseAdmin, String(stableId), displayName);
+    const stableName = sub.usergroup?.name ?? (stableId != null ? String(stableId) : "");
+    if (stableId != null && stableName) {
+      const classInfo = await upsertClass(supabaseAdmin, stableId, stableName);
       if (classInfo) return { classId: classInfo.id, classInfo };
     }
   }
 
   // Priority 2: subgroupRoles fallback (institutionuser/myroles).
   const primarySubgroup = subgroupRoles[0];
-  if (primarySubgroup?.name && primarySubgroup.id) {
-    const classInfo = await upsertClass(supabaseAdmin, String(primarySubgroup.id), primarySubgroup.name);
+  if (primarySubgroup?.id) {
+    const fallbackName = String(primarySubgroup.id);
+    const classInfo = await upsertClass(supabaseAdmin, String(primarySubgroup.id), fallbackName);
     if (classInfo) return { classId: classInfo.id, classInfo };
   }
 
@@ -275,21 +300,7 @@ async function populateCourseCatalogAndMigrateTrackers(
   }
 }
 
-async function migrateClassCourses(
-  supabaseAdmin: ReturnType<typeof getAdminClient>,
-  classId: string | null,
-  oldClassId: string | null | undefined,
-  authId: string,
-): Promise<void> {
-  if (!classId || !oldClassId || oldClassId === classId) return;
-  const { error: migrateError } = await supabaseAdmin
-    .from("class_courses")
-    .update({ class_id: classId })
-    .eq("class_id", oldClassId);
-  if (migrateError) {
-    logger.warn(`[sync] class_courses migration skipped for ${redact("id", authId)}: ${migrateError.message}`);
-  }
-}
+
 
 async function detectClassAndPopulateCatalog(
   coursesList: CourseItem[],
@@ -377,6 +388,115 @@ function resolveMergedProfile(
   };
 }
 
+export interface LightSyncResult {
+  academic: {
+    year: string | null;
+    semester: "even" | "odd" | null;
+    current_year: string;
+    current_semester: string;
+  };
+}
+
+export interface FullSyncResult extends LightSyncResult {
+  id: string;
+  class: { id: string; name: string } | null;
+  profile: {
+    firstName: string | null;
+    lastName: string | null;
+    username: string | null;
+    email: string | null;
+    phone: string | null;
+    gender: string | null;
+    birthDate: string | null;
+    lastSyncedAt: string | null;
+  };
+  courses: Record<string, unknown>;
+  terms_version: string | null;
+  updated: boolean;
+}
+
+export type SyncResult = FullSyncResult | LightSyncResult;
+
+async function fetchAcademicAndProfileData(
+  token: string,
+  fullSync: boolean
+): Promise<[Response | undefined, unknown, unknown]> {
+  if (fullSync) {
+    return Promise.all([
+      egressFetch("myprofile", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }),
+      egressFetch("user/setting/default_semester", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }).then(safeEzygoJson),
+      egressFetch("user/setting/default_academic_year", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }).then(safeEzygoJson),
+    ]);
+  }
+
+  const [semRaw, yearRaw] = await Promise.all([
+    egressFetch("user/setting/default_semester", {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }).then(safeEzygoJson),
+    egressFetch("user/setting/default_academic_year", {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }).then(safeEzygoJson),
+  ]);
+  return [undefined, semRaw, yearRaw];
+}
+
+async function parseProfileResponse(
+  ezygoRes: Response | undefined,
+  ezygoId: string
+): Promise<{ ezygoData: EzygoProfileResponse; resolvedEzygoId: string }> {
+  if (!ezygoRes || !ezygoRes.ok) {
+    throw new Error(`EzyGo Profile failed: ${ezygoRes?.status}`);
+  }
+
+  const json = await safeResponseJson<{ data?: EzygoProfileResponse } | EzygoProfileResponse>(ezygoRes);
+  if (!json) {
+    throw new Error(`EzyGo Profile returned empty or invalid JSON: ${ezygoRes?.status}`);
+  }
+  const ezygoData = (safeGet(json, "data") ?? json) as EzygoProfileResponse;
+
+  const resolvedEzygoId = (ezygoId && String(ezygoId).trim() !== "")
+    ? String(ezygoId)
+    : String(ezygoData.user_id || ezygoData.user?.id || "");
+
+  if (!resolvedEzygoId) {
+    throw new Error("Missing EzyGo User ID (local and remote)");
+  }
+
+  return { ezygoData, resolvedEzygoId };
+}
+
+export async function performProfileSync(
+  token: string,
+  ezygoId: string,
+  authId: string,
+  fullSync: false
+): Promise<LightSyncResult>;
+
+export async function performProfileSync(
+  token: string,
+  ezygoId: string,
+  authId: string,
+  fullSync?: true
+): Promise<FullSyncResult>;
+
+export async function performProfileSync(
+  token: string,
+  ezygoId: string,
+  authId: string,
+  fullSync?: boolean
+): Promise<SyncResult>;
+
 /**
  * Centrally performs a full profile sync from EzyGo to Supabase.
  * Handles Name, Email, Phone, Gender, Birth Date, and Academic Context.
@@ -385,24 +505,41 @@ export async function performProfileSync(
   token: string,
   ezygoId: string,
   authId: string,
-) {
+  fullSync: boolean = true
+): Promise<SyncResult> {
   const supabaseAdmin = getAdminClient();
 
   try {
-    const [ezygoRes, semRaw, yearRaw, coursesRes, rolesData] = await Promise
-      .all([
-        egressFetch("myprofile", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }),
-        egressFetch("user/setting/default_semester", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }).then(safeEzygoJson),
-        egressFetch("user/setting/default_academic_year", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }).then(safeEzygoJson),
+    // Step 1: Fetch Profile and Academic Context
+    const [ezygoRes, semRaw, yearRaw] = await fetchAcademicAndProfileData(token, fullSync);
+
+    const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } = resolveAcademicContext(semRaw, yearRaw);
+
+    // Step 2: Self-heal academic context if missing, and WAIT for it to finish
+    await triggerAcademicSelfHeal(token, authId, ezygoAcademicSemester, ezygoAcademicYear, currentAcademic);
+
+    if (!fullSync) {
+      // Fast path: if only a light sync is requested, we just return the academic context.
+      // The backend route only uses `syncResult.academic` in this scenario.
+      return {
+        academic: {
+          year: ezygoAcademicYear,
+          semester: ezygoAcademicSemester,
+          current_year: currentAcademic.current_year,
+          current_semester: currentAcademic.current_semester,
+        }
+      };
+    }
+
+    const { ezygoData, resolvedEzygoId } = await parseProfileResponse(ezygoRes, ezygoId);
+
+    let classId: string | null = null;
+    let classInfo: { id: string; name: string } | null = null;
+    let coursesMap: Record<string, unknown> = {};
+
+    if (fullSync) {
+      // Step 3: Now fetch courses and roles (which depend on the healed semester)
+      const [coursesRes, rolesData] = await Promise.all([
         egressFetch("institutionuser/courses/withusers", {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
@@ -413,50 +550,20 @@ export async function performProfileSync(
         }).then(safeResponseJson),
       ]);
 
-    if (!ezygoRes.ok) {
-      throw new Error(`EzyGo Profile failed: ${ezygoRes.status}`);
+      const processed = await processCoursesData(coursesRes);
+      coursesMap = processed.coursesMap;
+      const detection = await detectClassAndPopulateCatalog(processed.coursesList, rolesData, authId);
+      classId = detection.classId;
+      classInfo = detection.classInfo;
     }
-
-    const json = await safeResponseJson<{ data?: EzygoProfileResponse } | EzygoProfileResponse>(ezygoRes);
-    if (!json) {
-      throw new Error(`EzyGo Profile returned empty or invalid JSON: ${ezygoRes.status}`);
-    }
-    const safeGet = (obj: unknown, prop: string) => obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
-    const ezygoData: EzygoProfileResponse = (safeGet(json, "data") ?? json) as EzygoProfileResponse;
-
-    const resolvedEzygoId = (ezygoId && String(ezygoId).trim() !== "")
-      ? String(ezygoId)
-      : String(ezygoData.user_id || ezygoData.user?.id || "");
-
-    if (!resolvedEzygoId) {
-      throw new Error("Missing EzyGo User ID (local and remote)");
-    }
-
-    const { coursesMap, coursesList } = await processCoursesData(coursesRes);
-
-    const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } = resolveAcademicContext(semRaw, yearRaw);
-
-    triggerAcademicSelfHeal(token, authId, ezygoAcademicSemester, ezygoAcademicYear, currentAcademic);
-
-    const { classId, classInfo } = await detectClassAndPopulateCatalog(coursesList, rolesData, authId);
 
     const { data: existingUser } = await supabaseAdmin
       .from("users")
       .select(
-        "first_name, last_name, phone, phone_iv, gender, gender_iv, birth_date, birth_date_iv, terms_version, class_id",
+        "first_name, last_name, phone, phone_iv, gender, gender_iv, birth_date, birth_date_iv, terms_version, class_id, last_synced_at",
       )
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
       .maybeSingle();
-
-    // When the stable class ID changes (programme_config_group_id replaces the old
-    // semester-scoped usersubgroup.id), forward-migrate class_courses so existing
-    // manually-added courses are not orphaned on the old class row.
-    // class_courses is class-scoped (not user-scoped): all members of a class share
-    // the same rows, so migrating the entire set for the old class UUID to the new one
-    // is correct and idempotent — subsequent syncs by other members of the same cohort
-    // will find no rows remaining on the old class_id and perform a safe no-op.
-    const oldClassId = existingUser?.class_id;
-    await migrateClassCourses(supabaseAdmin, classId, oldClassId, authId);
 
     const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
 
@@ -466,9 +573,8 @@ export async function performProfileSync(
 
     const upsertUsername = ezygoData.username ?? ezygoData.user?.username ?? null;
     const upsertEmail = ezygoData.email ?? ezygoData.user?.email ?? null;
-    const upsertLastSyncedAt = new Date().toISOString();
 
-    const upsertData = {
+    const upsertData: Record<string, unknown> = {
       id: resolvedEzygoId,
       auth_id: authId,
       username: upsertUsername,
@@ -481,10 +587,13 @@ export async function performProfileSync(
       gender_iv: encGender?.iv ?? null,
       birth_date: encBirthDate?.content ?? null,
       birth_date_iv: encBirthDate?.iv ?? null,
-      last_synced_at: upsertLastSyncedAt,
       ezygo_created_at: safeGet(ezygoData, "created_at") ? String(safeGet(ezygoData, "created_at")) : null,
       class_id: classId || existingUser?.class_id || null,
     };
+
+    if (fullSync) {
+      upsertData.last_synced_at = new Date().toISOString();
+    }
 
     const { error: upsertError } = await supabaseAdmin
       .from("users")
@@ -508,7 +617,7 @@ export async function performProfileSync(
         phone: mergedPhone,
         gender: mergedGender,
         birthDate: mergedBirthDate,
-        lastSyncedAt: upsertLastSyncedAt,
+        lastSyncedAt: (upsertData.last_synced_at as string) || existingUser?.last_synced_at || null,
       },
       academic: {
         year: ezygoAcademicYear,

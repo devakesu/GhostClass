@@ -437,7 +437,11 @@ void main() {
 
       var refreshCount = 0;
       when(
-        () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+        () => mockApi.refreshProfile(
+          any(),
+          sync: any(named: 'sync'),
+          force: any(named: 'force'),
+        ),
       ).thenAnswer((invocation) async {
         refreshCount += 1;
         final sync = invocation.namedArguments[#sync] as bool? ?? false;
@@ -464,12 +468,12 @@ void main() {
 
       verify(() => mockApi.clearCaches()).called(1);
       verify(() => mockApi.triggerSync(any(), force: true)).called(1);
-      expect(refreshCount, greaterThanOrEqualTo(2));
+      expect(refreshCount, equals(1));
 
       final user = container.read(authProvider).value;
       expect(user, isNotNull);
       expect(user!.isSyncing, isFalse);
-      expect(user.profile?.firstName, equals('Final'));
+      expect(user.profile?.firstName, equals('Synced'));
     },
   );
 
@@ -517,7 +521,11 @@ void main() {
         ),
       );
       when(
-        () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+        () => mockApi.refreshProfile(
+          any(),
+          sync: any(named: 'sync'),
+          force: any(named: 'force'),
+        ),
       ).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/profile'),
@@ -582,7 +590,11 @@ void main() {
       ),
     );
     when(
-      () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
+      () => mockApi.refreshProfile(
+        any(),
+        sync: any(named: 'sync'),
+        force: any(named: 'force'),
+      ),
     ).thenAnswer(
       (_) async => Response<dynamic>(
         requestOptions: RequestOptions(path: '/profile'),

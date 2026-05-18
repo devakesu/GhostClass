@@ -26,7 +26,7 @@ import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class NavigationShell extends ConsumerStatefulWidget {
   const NavigationShell({required this.child, super.key});
@@ -594,7 +594,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       await Future.wait([
                         ref.read(dashboardProvider.future),
                         ref.read(trackingProvider.future),
-                      ]);
+                      ]).timeout(const Duration(seconds: 10));
                       AppLogger.i(
                         'NavigationShell: Outage recovery wait completed (or partial success).',
                       );
