@@ -275,6 +275,22 @@ async function populateCourseCatalogAndMigrateTrackers(
   }
 }
 
+async function migrateClassCourses(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  classId: string | null,
+  oldClassId: string | null | undefined,
+  authId: string,
+): Promise<void> {
+  if (!classId || !oldClassId || oldClassId === classId) return;
+  const { error: migrateError } = await supabaseAdmin
+    .from("class_courses")
+    .update({ class_id: classId })
+    .eq("class_id", oldClassId);
+  if (migrateError) {
+    logger.warn(`[sync] class_courses migration skipped for ${redact("id", authId)}: ${migrateError.message}`);
+  }
+}
+
 async function detectClassAndPopulateCatalog(
   coursesList: CourseItem[],
   rolesData: unknown,
@@ -440,15 +456,7 @@ export async function performProfileSync(
     // is correct and idempotent — subsequent syncs by other members of the same cohort
     // will find no rows remaining on the old class_id and perform a safe no-op.
     const oldClassId = existingUser?.class_id;
-    if (classId && oldClassId && oldClassId !== classId) {
-      const { error: migrateError } = await supabaseAdmin
-        .from("class_courses")
-        .update({ class_id: classId })
-        .eq("class_id", oldClassId);
-      if (migrateError) {
-        logger.warn(`[sync] class_courses migration skipped for ${redact("id", authId)}: ${migrateError.message}`);
-      }
-    }
+    await migrateClassCourses(supabaseAdmin, classId, oldClassId, authId);
 
     const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
 
