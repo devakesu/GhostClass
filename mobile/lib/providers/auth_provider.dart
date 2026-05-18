@@ -453,7 +453,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       await refreshProfile(force: true);
 
       final finalUser = state.value;
-      if (finalUser != null) {
+      if (finalUser != null &&
+          finalUser.supabaseUserId == cachedUser.supabaseUserId) {
         state = AsyncValue.data(finalUser.copyWith(isSyncing: false));
       }
     } on Object catch (e) {
@@ -467,9 +468,13 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         'AuthNotifier: Background startup hydration failed. Using cached data.',
         e,
       );
-      // Ensure we clear the syncing status so the user can access the cached dashboard offline
-      final currentUser = state.value ?? cachedUser;
-      state = AsyncValue.data(currentUser.copyWith(isSyncing: false));
+      // Ensure we clear the syncing status so the user can access the cached dashboard offline,
+      // but only if the user is still logged in and matches the session that started hydration.
+      final currentUser = state.value;
+      if (currentUser != null &&
+          currentUser.supabaseUserId == cachedUser.supabaseUserId) {
+        state = AsyncValue.data(currentUser.copyWith(isSyncing: false));
+      }
     } finally {
       api.suppress401 = false;
     }

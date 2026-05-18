@@ -52,6 +52,7 @@ class PushNotificationService {
     Stream<RemoteMessage>? onMessageOpenedAppStream,
   }) async {
     try {
+      await _tokenSub?.cancel();
       await _messageSub?.cancel();
       await _messageOpenedSub?.cancel();
       // Request permissions natively on iOS and Android targets

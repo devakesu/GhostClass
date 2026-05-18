@@ -45,6 +45,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   // is the only correct escape path — matching the threat model for critical failures.
   // A fresh NavigationShell instance created on the next login resets it to false.
   bool _criticalSecurityLogoutStarted = false;
+  final List<ProviderSubscription<Object?>> _subscriptions = [];
 
   AcademicState? _asyncValueOrNull(AsyncValue<AcademicState?> value) {
     return value.hasValue ? value.value : null;
@@ -99,11 +100,11 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       _checkAndShowUpdateDialog();
     });
 
-    ref
-      ..listenManual<AppUpdateState>(appUpdateProvider, (previous, next) {
+    _subscriptions.addAll([
+      ref.listenManual<AppUpdateState>(appUpdateProvider, (previous, next) {
         _checkAndShowUpdateDialog();
-      })
-      ..listenManual<AsyncValue<AcademicState?>>(academicProvider, (
+      }),
+      ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
         previous,
         next,
       ) {
@@ -118,8 +119,8 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         // Keep calendar dependencies warm in the background whenever the
         // academic context changes, even if the calendar screen is not open.
         unawaited(_prewarmCalendarData());
-      })
-      ..listenManual<SecurityFailureState?>(securityFailureProvider, (
+      }),
+      ref.listenManual<SecurityFailureState?>(securityFailureProvider, (
         previous,
         next,
       ) {
@@ -129,7 +130,17 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
           _criticalSecurityLogoutStarted = true;
           unawaited(ref.read(authProvider.notifier).logout(force: true));
         }
-      });
+      }),
+    ]);
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.close();
+    }
+    _subscriptions.clear();
+    super.dispose();
   }
 
   @override
