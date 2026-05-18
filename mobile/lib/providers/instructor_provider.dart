@@ -16,7 +16,11 @@ final instructorProvider = Provider.family<CourseInstructor?, String>((
       }
       return null;
     },
-    loading: () => null,
-    error: (e, st) => null,
+    loading: () {
+      return null;
+    },
+    error: (e, st) {
+      return null;
+    },
   );
 });

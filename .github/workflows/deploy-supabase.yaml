@@ -2,6 +2,9 @@ name: Deploy Supabase
 
 permissions: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   workflow_dispatch: # Allows manual triggering if GitHub path filtering skips a commit
   push:
