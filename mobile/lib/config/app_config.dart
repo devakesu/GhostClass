@@ -75,7 +75,7 @@ class AppConfig {
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.3.5');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.3.6');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
