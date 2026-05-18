@@ -187,7 +187,7 @@ enum AttendanceStatus {
   present(110),
   absent(111),
   otherLeave(112),
-  dutyLeave(225)
+  dutyLeave(225),
   ;
 
   const AttendanceStatus(this.code);
