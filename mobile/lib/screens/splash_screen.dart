@@ -89,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       await Future.wait<dynamic>([
         Future.delayed(
-          const Duration(milliseconds: 1500),
+          const Duration(milliseconds: 2500),
         ), // Keep the splash visible for at least 1.5 seconds.
         jwePreWarm,
         apiPreWarm,
