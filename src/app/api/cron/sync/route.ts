@@ -154,7 +154,7 @@ async function fetchAndHealToken(
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>
 ): Promise<{ token: string; courseRes: Response }> {
-  let decryptedToken = decrypt(user.ezygo_iv, user.ezygo_token);
+  let decryptedToken = decrypt({ iv: user.ezygo_iv, content: user.ezygo_token });
   if (!decryptedToken) throw new Error("Decryption failed");
 
   let courseRes = await fetchEzygoResource("institutionuser/courses/withusers", decryptedToken);

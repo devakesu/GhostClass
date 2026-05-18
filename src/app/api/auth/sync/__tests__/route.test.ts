@@ -29,7 +29,7 @@ vi.mock("@/lib/security/auth-cookie", () => ({
 }));
 
 vi.mock("@/lib/crypto", () => ({
-  decrypt: vi.fn((_iv, content) => `decrypted-${content}`),
+  decrypt: vi.fn((data: any) => `decrypted-${data.content}`),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({

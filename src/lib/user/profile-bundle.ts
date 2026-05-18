@@ -39,14 +39,14 @@ export async function getProfileBundle(
   }) : null;
 
   // 2. Resolve decrypted fields
-  const decryptedGender = existingUser.gender && existingUser.gender_iv ? decrypt(existingUser.gender_iv, existingUser.gender) : null;
-  const decryptedBirthDate = existingUser.birth_date && existingUser.birth_date_iv ? decrypt(existingUser.birth_date_iv, existingUser.birth_date) : null;
-  const decryptedPhone = existingUser.phone && existingUser.phone_iv ? decrypt(existingUser.phone_iv, existingUser.phone) : null;
+  const decryptedGender = existingUser.gender && existingUser.gender_iv ? decrypt({ iv: existingUser.gender_iv, content: existingUser.gender }) : null;
+  const decryptedBirthDate = existingUser.birth_date && existingUser.birth_date_iv ? decrypt({ iv: existingUser.birth_date_iv, content: existingUser.birth_date }) : null;
+  const decryptedPhone = existingUser.phone && existingUser.phone_iv ? decrypt({ iv: existingUser.phone_iv, content: existingUser.phone }) : null;
 
   let decryptedEzygoToken: string | null = null;
   if (existingUser.ezygo_token && existingUser.ezygo_iv) {
     try {
-      decryptedEzygoToken = decrypt(existingUser.ezygo_iv, existingUser.ezygo_token);
+      decryptedEzygoToken = decrypt({ iv: existingUser.ezygo_iv, content: existingUser.ezygo_token });
     } catch (e) {
       logger.error("Failed to decrypt EzyGo token", e);
     }

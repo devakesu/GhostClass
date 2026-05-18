@@ -21,7 +21,7 @@ vi.mock('@/lib/utils.server', () => ({
 
 vi.mock('@/lib/crypto', () => ({
   encrypt: vi.fn((val) => ({ content: `enc_${val}`, iv: 'iv' })),
-  decrypt: vi.fn((_iv, content) => content.replace('enc_', '')),
+  decrypt: vi.fn((data: any) => data.content.replace('enc_', '')),
 }));
 
 vi.mock('@/lib/logic/academic', () => ({

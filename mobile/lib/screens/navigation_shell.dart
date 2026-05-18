@@ -66,6 +66,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   }
 
   void _checkAndShowUpdateDialog() {
+    if (!mounted) return;
     final updateState = ref.read(appUpdateProvider);
     if (updateState.checkResult != null && updateState.checkResult!.hasUpdate) {
       if (updateState.checkResult!.isForceUpdate) {

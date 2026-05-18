@@ -201,7 +201,7 @@ async function provisionSupabaseAuthUser(
 
     return {
       authUserId: existing.auth_id,
-      passwordToUse: decrypt(existing.auth_password_iv!, existing.auth_password!),
+      passwordToUse: decrypt({ iv: existing.auth_password_iv!, content: existing.auth_password! }),
       isFirstLogin: false,
     };
   }
