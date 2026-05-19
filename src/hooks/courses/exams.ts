@@ -183,7 +183,7 @@ export const useBatchExamDetails = (examIds: number[], options?: { enabled?: boo
     queryKey: ["exam-details-batch", examIds],
     queryFn: async () => {
       if (!examIds.length) return {};
-      const res = await axios.post("/scores/batch", { examIds });
+      const res = await axios.post("/api/scores/batch", { examIds }, { baseURL: "" });
       return res.data;
     },
     enabled: (options?.enabled !== false) && examIds.length > 0,

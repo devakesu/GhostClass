@@ -280,7 +280,7 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
       </CardHeader>
 
       <CardContent className="py-4 space-y-5 flex-1 text-sm">
-        <div className="grid grid-cols-2 gap-4 text-muted-foreground">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-muted-foreground">
           <div>
             <span className="block text-[11px] sm:text-xs uppercase tracking-wider opacity-80 dark:opacity-60 mb-1 font-semibold dark:font-normal">
               Applied On

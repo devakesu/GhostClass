@@ -417,9 +417,15 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
         <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
         <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
           <div className="mb-6 flex flex-col lg:flex-row gap-6 lg:items-end justify-between">
-            <div className="flex flex-col gap-4 flex-1">
+            <div className="flex flex-col gap-3 flex-1">
               <h1 className="text-2xl font-bold">Welcome back, <span className="gradient-name">{profile?.first_name} {profile?.last_name}!</span></h1>
-              <div className="flex gap-4 items-center">
+              <span className="inline-flex items-center justify-center rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary w-fit">
+                {profile?.class?.name || "Unassigned"}
+              </span>
+              <p className="text-xs text-foreground/50 font-medium italic">
+                For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚
+              </p>
+              <div className="flex gap-4 items-center mt-2">
                 <p className="flex flex-wrap items-center gap-2.5 text-muted-foreground">
                   <span>Semester:</span>
                   <Select value={effectiveSemester || ""} onValueChange={(v) => { setPendingChange({ type: "semester", value: v }); setShowConfirmDialog(true); }} disabled={isUpdating}>
