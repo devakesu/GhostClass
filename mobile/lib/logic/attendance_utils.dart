@@ -102,7 +102,8 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) &&
           RegExp(r'^\d+$').hasMatch(b) &&
           RegExp(r'^\d+$').hasMatch(c)) {
-        final year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        var year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        if (year < 100) year += 2000;
         final month = int.parse(b);
         final day = (a.length == 4) ? int.parse(c) : int.parse(a);
 
@@ -118,13 +119,10 @@ String normalizeDate(dynamic date) {
           return '';
         }
 
-        if (a.length == 4) {
-          // YYYY-MM-DD
-          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
-        } else if (c.length == 4) {
-          // DD-MM-YYYY
-          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
-        }
+        final yearStr = year.toString().padLeft(4, '0');
+        final monthStr = month.toString().padLeft(2, '0');
+        final dayStr = day.toString().padLeft(2, '0');
+        return '$yearStr$monthStr$dayStr';
       }
     }
   }
@@ -140,7 +138,8 @@ String normalizeDate(dynamic date) {
       if (RegExp(r'^\d+$').hasMatch(a) &&
           RegExp(r'^\d+$').hasMatch(b) &&
           RegExp(r'^\d+$').hasMatch(c)) {
-        final year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        var year = (a.length == 4) ? int.parse(a) : int.parse(c);
+        if (year < 100) year += 2000;
         final month = int.parse(b);
         final day = (a.length == 4) ? int.parse(c) : int.parse(a);
 
@@ -156,13 +155,10 @@ String normalizeDate(dynamic date) {
           return '';
         }
 
-        if (a.length == 4) {
-          // YYYY/MM/DD
-          return "$a${b.padLeft(2, '0')}${c.padLeft(2, '0')}";
-        } else {
-          // DD/MM/YYYY
-          return "$c${b.padLeft(2, '0')}${a.padLeft(2, '0')}";
-        }
+        final yearStr = year.toString().padLeft(4, '0');
+        final monthStr = month.toString().padLeft(2, '0');
+        final dayStr = day.toString().padLeft(2, '0');
+        return '$yearStr$monthStr$dayStr';
       }
     }
   }

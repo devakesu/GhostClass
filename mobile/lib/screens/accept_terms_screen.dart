@@ -218,10 +218,11 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               const SizedBox(height: 20),
 
               // Full Policy Link (Moved outside)
-              GestureDetector(
+              InkWell(
                 onTap: () {
                   final _ = context.push('/legal');
                 },
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -277,8 +278,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               const SizedBox(height: 32),
 
               // Acceptance
-              GestureDetector(
+              InkWell(
                 onTap: () => setState(() => _accepted = !_accepted),
+                borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

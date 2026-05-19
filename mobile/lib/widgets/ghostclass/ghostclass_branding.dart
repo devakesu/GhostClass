@@ -3,6 +3,7 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:ghostclass/widgets/footer/footer_action_button.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -29,9 +30,10 @@ class GhostClassBranding extends StatelessWidget {
       child: Column(
         children: [
           // Author Credits at Very Top
-          GestureDetector(
+          InkWell(
             onTap: () => _launchUrl(authorUrl),
-            behavior: HitTestBehavior.opaque,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: Column(
               children: [
                 RichText(
@@ -79,22 +81,24 @@ class GhostClassBranding extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _FooterActionButton(
+              FooterActionButton(
                 icon: LucideIcons.coffee,
                 label: 'Buy me a Coffee',
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.pinkAccent
                     : const Color(0xFFDB2777),
                 onTap: () => _launchUrl(donateUrl),
+                uppercase: false,
               ),
               const SizedBox(width: 8),
-              _FooterActionButton(
+              FooterActionButton(
                 icon: LucideIcons.star,
                 label: 'Star on GitHub',
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.amber
                     : Colors.amber.shade700,
                 onTap: () => _launchUrl(githubUrl),
+                uppercase: false,
               ),
             ],
           ),
@@ -140,50 +144,7 @@ class GhostClassBranding extends StatelessWidget {
   }
 }
 
-class _FooterActionButton extends StatelessWidget {
-  const _FooterActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 10),
-            Text(
-              label.toUpperCase(),
-              style: GoogleFonts.manrope(
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-                color: color,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// FooterActionButton provided by shared widget.
 
 class _SecondaryLink extends StatelessWidget {
   const _SecondaryLink({required this.label, required this.onTap});
@@ -192,16 +153,19 @@ class _SecondaryLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Text(
-        label,
-        style: GoogleFonts.manrope(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-          letterSpacing: 1.2,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(
+          label,
+          style: GoogleFonts.manrope(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            letterSpacing: 1.2,
+          ),
         ),
       ),
     );

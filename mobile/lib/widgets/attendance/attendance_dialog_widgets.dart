@@ -40,35 +40,34 @@ class AttendanceStatusToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? color.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? color
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.1),
-              width: 1.5,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label ?? value,
-              style: GoogleFonts.manrope(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+      child: Semantics(
+        button: true,
+        label: label ?? value,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
                 color: isSelected
                     ? color
-                    : Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                width: 1.5,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                label ?? value,
+                style: GoogleFonts.manrope(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? color
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
               ),
             ),
           ),

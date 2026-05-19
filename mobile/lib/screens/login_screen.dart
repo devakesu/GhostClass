@@ -204,8 +204,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
 
-          GestureDetector(
+          InkWell(
             onTap: () => FocusScope.of(context).unfocus(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SafeArea(
               child: Center(
                 child: SingleChildScrollView(
@@ -307,7 +309,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               label: 'Forgot password',
                               hint:
                                   'Opens EzyGo website to reset your password',
-                              child: GestureDetector(
+                              child: InkWell(
                                 onTap: () async {
                                   final url = Uri.parse(AppConfig.ezygoOrigin);
                                   if (await canLaunchUrl(url)) {
@@ -317,12 +319,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     );
                                   }
                                 },
-                                child: Text(
-                                  'Forgot password?',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: primaryColor,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Text(
+                                    'Forgot password?',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: primaryColor,
+                                    ),
                                   ),
                                 ),
                               ),

@@ -344,9 +344,14 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
-      body: GestureDetector(
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: CustomScrollView(
+      body: Semantics(
+        button: true,
+        label: 'Dismiss keyboard',
+        child: InkWell(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          child: CustomScrollView(
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -490,6 +495,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

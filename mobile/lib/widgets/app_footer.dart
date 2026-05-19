@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ghostclass/widgets/footer/footer_text_button.dart';
 
 class AppFooter extends StatelessWidget {
   const AppFooter({super.key});
@@ -56,7 +57,6 @@ class AppFooter extends StatelessWidget {
                         'Your EzyGo password is safe. We strictly do not read, store, or share your login password. GhostClass is just here to help you skip. 👻',
                     color: primary.withValues(alpha: 0.08),
                     iconColor: primary,
-                    onTap: () {},
                   ),
                 ),
               ],
@@ -68,17 +68,17 @@ class AppFooter extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _FooterTextButton(
+              FooterTextButton(
                 icon: LucideIcons.helpCircle,
                 label: 'Help',
                 onTap: () => context.push('/help'),
               ),
-              _FooterTextButton(
+              FooterTextButton(
                 icon: LucideIcons.shield,
                 label: 'Legal',
                 onTap: () => context.push('/legal'),
               ),
-              _FooterTextButton(
+              FooterTextButton(
                 icon: LucideIcons.messageSquare,
                 label: 'Contact',
                 onTap: () => context.push('/contact'),
@@ -103,25 +103,30 @@ class AppFooter extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      onTap: () => _launchUrl(AppConfig.authorUrl),
-                      child: Row(
-                        children: [
-                          Text(
-                            AppConfig.authorName,
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: onSurface.withValues(alpha: 0.9),
+                    Semantics(
+                      button: true,
+                      label: 'Open author website',
+                      child: InkWell(
+                        onTap: () => _launchUrl(AppConfig.authorUrl),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Row(
+                          children: [
+                            Text(
+                              AppConfig.authorName,
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: onSurface.withValues(alpha: 0.9),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            LucideIcons.externalLink,
-                            size: 11,
-                            color: onSurface.withValues(alpha: 0.3),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Icon(
+                              LucideIcons.externalLink,
+                              size: 11,
+                              color: onSurface.withValues(alpha: 0.3),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -151,7 +156,7 @@ class _CompactActionTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.subtitle,
-    required this.onTap,
+    this.onTap,
     this.gradientColors,
     this.color,
     this.iconColor,
@@ -159,7 +164,7 @@ class _CompactActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final List<Color>? gradientColors;
   final Color? color;
   final Color? iconColor;
@@ -241,45 +246,7 @@ class _CompactActionTile extends StatelessWidget {
   }
 }
 
-class _FooterTextButton extends StatelessWidget {
-  const _FooterTextButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: onSurface.withValues(alpha: 0.5)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// FooterTextButton moved to shared widget: widgets/footer/footer_text_button.dart
 
 class _CoffeeButton extends StatelessWidget {
   const _CoffeeButton({required this.onTap});

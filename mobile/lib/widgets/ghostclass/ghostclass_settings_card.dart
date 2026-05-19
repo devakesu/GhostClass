@@ -41,9 +41,9 @@ class GhostClassSettingsCard extends StatelessWidget {
         absorbing: isDisabled,
         child: Opacity(
           opacity: isDisabled ? 0.5 : 1.0,
-          child: GestureDetector(
-            onTap: onTap,
-            behavior: HitTestBehavior.opaque,
+          child: InkWell(
+            onTap: isDisabled ? null : onTap,
+            borderRadius: BorderRadius.circular(20),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(

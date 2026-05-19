@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,6 +53,42 @@ void main() {
   });
 
   group('SecurityService Coverage', () {
+    test('verifyIntegrity refreshes stale cached attestation before returning', () async {
+      when(
+        () => mockSecureStorage.getAttestationResult(),
+      ).thenAnswer(
+        (_) async => jsonEncode({
+          'latestVersion': AppConfig.appVersion,
+          'minVersion': AppConfig.appVersion,
+          'cachedAt': DateTime.now()
+              .subtract(const Duration(hours: 7))
+              .toIso8601String(),
+        }),
+      );
+
+      final options = RequestOptions(path: '/api/security/attestation');
+      when(
+        () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'verified': true,
+            'latestVersion': AppConfig.appVersion,
+            'minVersion': AppConfig.appVersion,
+          },
+        ),
+      );
+
+      final result = await securityService.verifyIntegrity();
+
+      expect(result, isNotNull);
+      expect(result!.hasUpdate, isFalse);
+      verify(() => mockDio.get<dynamic>(any(), options: any(named: 'options')))
+          .called(1);
+    });
+
     test(
       'verifyIntegrity throws security exception on 403 with appCheckError',
       () async {
@@ -331,7 +369,13 @@ void main() {
       'verifyIntegrity recomputes hasUpdate and isForceUpdate from cache against AppConfig.appVersion',
       () async {
         final cachedJson =
-            '{"latestVersion": "${AppConfig.appVersion}", "minVersion": "${AppConfig.appVersion}", "hasUpdate": true, "isForceUpdate": true}';
+            jsonEncode({
+          'latestVersion': AppConfig.appVersion,
+          'minVersion': AppConfig.appVersion,
+          'hasUpdate': true,
+          'isForceUpdate': true,
+          'cachedAt': DateTime.now().toIso8601String(),
+        });
 
         when(
           () => mockSecureStorage.getAttestationResult(),

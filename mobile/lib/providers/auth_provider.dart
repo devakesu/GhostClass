@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -18,11 +19,11 @@ import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/cache_manager.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
-import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,9 +36,6 @@ class LoginException implements Exception {
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final Provider<StealthHeadersService> stealthHeadersServiceProvider = Provider(
-  (ref) => StealthHeadersService(ref.watch(secureStorageProvider)),
-);
 final Provider<ProfileService> profileServiceProvider = Provider(
   (ref) => ProfileService(),
 );
@@ -159,6 +157,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   bool _isRefreshing = false;
   bool _isInitializing = false;
   int _consecutiveHealFailures = 0;
+  Future<void>? _refreshProfileInFlight;
+  Future<AuthenticatedUser>? _profileRefreshInFlight;
 
   @override
   FutureOr<AuthenticatedUser?> build() async {
@@ -331,6 +331,19 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   }
 
   Future<void> refreshProfile({bool force = false}) async {
+    final inFlight = _refreshProfileInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _refreshProfileInternal(force: force);
+    _refreshProfileInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_refreshProfileInFlight, future)) {
+        _refreshProfileInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _refreshProfileInternal({bool force = false}) async {
     final currentUser = state.value;
     if (currentUser == null) return;
 
@@ -438,7 +451,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       // 1. Fetch Profile and trigger backend full EzyGo sync synchronously
-      await _fetchAndApplyServerProfile(
+      await _runProfileRefresh(
         cachedUser,
         supabaseToken: token,
         sync: true,
@@ -593,7 +606,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final token = await _getFreshSupabaseToken();
       if (token != null) {
         // Mark as syncing and trigger backend full EzyGo sync
-        final profiledUser = await _fetchAndApplyServerProfile(
+        final profiledUser = await _runProfileRefresh(
           cachedUser,
           supabaseToken: token,
           updateState: false,
@@ -625,7 +638,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           await AnalyticsService.instance.logLogin(method: 'ezygo');
         } on Object catch (_) {}
       } else {
-        await _fetchAndApplyServerProfile(cachedUser);
+        await _runProfileRefresh(cachedUser);
         try {
           await AnalyticsService.instance.logLogin(method: 'ezygo');
         } on Object catch (_) {}
@@ -642,12 +655,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   }
 
   Future<void> logout({bool force = false}) async {
-    final storage = ref.read(secureStorageProvider);
     // Reset security failure state on normal logout so the next login starts clean.
     if (!force) {
       ref.read(securityFailureProvider.notifier).clearFailure();
     }
-    ref.read(apiServiceProvider).clearCaches();
+    await ref.read(cacheManagerProvider).clearAllCaches();
     ref
       ..invalidate(institutionsProvider)
       ..invalidate(academicProvider);
@@ -656,7 +668,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     try {
       await Future.wait([
         ref.read(supabaseClientProvider).auth.signOut(),
-        storage.clearAll(),
         _clearSharedPrefs(),
       ]);
     } on Object catch (e) {
@@ -1021,10 +1032,40 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     );
 
     if (updateState) {
-      state = AsyncValue.data(updatedUser);
+      final currentState = state.value;
+      if (currentState == null ||
+          currentState.supabaseUserId == user.supabaseUserId) {
+        state = AsyncValue.data(updatedUser);
+      }
     }
 
     return updatedUser;
+  }
+
+  Future<AuthenticatedUser> _runProfileRefresh(
+    AuthenticatedUser user, {
+    String? supabaseToken,
+    bool updateState = true,
+    bool sync = false,
+    bool force = false,
+  }) {
+    final inFlight = _profileRefreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _fetchAndApplyServerProfile(
+      user,
+      supabaseToken: supabaseToken,
+      updateState: updateState,
+      sync: sync,
+      force: force,
+    );
+    _profileRefreshInFlight = future;
+
+    return future.whenComplete(() {
+      if (identical(_profileRefreshInFlight, future)) {
+        _profileRefreshInFlight = null;
+      }
+    });
   }
 
   Future<AuthenticatedUser> _applyProfileResponseData({
@@ -1096,7 +1137,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         (currentUser.profile?.currentSemester != nextAcademic.semester ||
             currentUser.profile?.currentYear != nextAcademic.year);
 
-    if (academicChanged) {
+      if (academicChanged) {
       ref.read(apiServiceProvider).clearCaches();
       try {
         final api = ref.read(apiServiceProvider);

@@ -273,6 +273,67 @@ void main() {
     },
   );
 
+  test(
+    'refreshProfile deduplicates concurrent profile refresh requests',
+    () async {
+      final refreshGate = Completer<Response<dynamic>>();
+      var refreshCalls = 0;
+
+      when(
+        () => mockApi.refreshProfile(
+          any(),
+          sync: any(named: 'sync'),
+          force: any(named: 'force'),
+        ),
+      ).thenAnswer((_) {
+        refreshCalls += 1;
+        return refreshGate.future;
+      });
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(authProvider.notifier);
+
+      await container.read(authProvider.future);
+
+      notifier.state = AsyncValue.data(
+        AuthenticatedUser(
+          supabaseUserId: 'supabase-user',
+          ezygoToken: EncryptedValue.fromPlaintext('ezygo-token'),
+          settings: UserSettings.defaults(),
+          profile: const UserProfile(firstName: 'Test'),
+        ),
+      );
+
+      currentSession = mockSession;
+
+      final first = notifier.refreshProfile(force: true);
+      final second = notifier.refreshProfile(force: true);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(refreshCalls, 1);
+
+      refreshGate.complete(
+        Response<dynamic>(
+          requestOptions: RequestOptions(path: '/profile'),
+          statusCode: 200,
+          data: {
+            'profile': {'first_name': 'Test'},
+            'settings': {
+              'bunk_calculator_enabled': true,
+              'target_percentage': 75,
+              'disabled_courses': <String, String>{},
+            },
+            'ezygo_token': 'ezygo-token',
+          },
+        ),
+      );
+
+      await Future.wait([first, second]);
+      expect(refreshCalls, 1);
+    },
+  );
+
   test('updateSettings logs analytics for changed settings', () async {
     await initAnalytics();
 

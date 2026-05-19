@@ -91,15 +91,16 @@ class AttendanceCalendarWidget extends StatelessWidget {
 
               final status = _getDayStatus(date, context);
 
-              return GestureDetector(
-                onTap: () => onDaySelected(date),
-                child: Center(
+              return Center(
                   child: Semantics(
                     label:
                         '${DateFormat('MMMM d').format(date)}${status != null ? ", $status" : ""}',
                     selected: isSelected,
                     button: true,
-                    child: AnimatedContainer(
+                    child: InkWell(
+                      onTap: () => onDaySelected(date),
+                      borderRadius: BorderRadius.circular(20),
+                      child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: 40,
                       height: 40,

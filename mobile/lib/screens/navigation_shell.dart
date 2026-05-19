@@ -274,8 +274,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     Semantics(
                       button: true,
                       label: 'Notifications',
-                      child: GestureDetector(
+                      child: InkWell(
                         onTap: showNotificationsOverlay,
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -344,8 +346,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     Semantics(
                       button: true,
                       label: 'Tracking',
-                      child: GestureDetector(
+                      child: InkWell(
                         onTap: showTrackingOverlay,
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
                         child: Container(
                           width: 36,
                           height: 36,
@@ -374,9 +378,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     Semantics(
                       button: true,
                       label: 'Profile',
-                      child:
-                          GestureDetector(
+                      child: InkWell(
                                 onTap: () => context.go('/ghostclass'),
+                                splashColor: Colors.transparent,
+                                highlightColor: Colors.transparent,
                                 child: Container(
                                   padding: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
@@ -547,21 +552,25 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       showSecurityBarrier)
                   ? 0
                   : 1,
-              child: GestureDetector(
-                onTap: showAddAttendanceDialog,
-                child: Container(
-                  width: 72,
-                  height: 34, // Reduced height
-                  decoration: BoxDecoration(
-                    color: primary,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(72),
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: showAddAttendanceDialog,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(72)),
+                  child: Container(
+                    width: 72,
+                    height: 34, // Reduced height
+                    decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(72),
+                      ),
                     ),
-                  ),
-                  child: Icon(
-                    LucideIcons.plus,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 24,
+                    child: Icon(
+                      LucideIcons.plus,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
@@ -781,9 +790,9 @@ class _NavButton extends StatelessWidget {
       button: true,
       label: '$label tab',
       selected: isSelected,
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
+        borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,

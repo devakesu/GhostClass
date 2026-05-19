@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
-import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
@@ -73,10 +73,12 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       );
 
       // Update dashboard locally to show new name without full refresh
-      await ref.read(dashboardProvider.notifier).updateLocalInstructor(
-        widget.courseCode,
-        name,
-      );
+      await ref
+          .read(dashboardProvider.notifier)
+          .updateLocalInstructor(
+            widget.courseCode,
+            name,
+          );
 
       if (mounted) Navigator.pop(context);
     } on Object catch (e, st) {

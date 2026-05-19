@@ -46,7 +46,6 @@ void main() {
     dioService = container.read(dioServiceProvider);
 
     dioService.dio.httpClientAdapter = mockAdapter;
-    dioService.securityDio.httpClientAdapter = mockAdapter;
 
     when(
       () => mockAdapter.fetch(any(), any(), any()),

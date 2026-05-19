@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -12,7 +13,6 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/attendance/attendance_dialog_widgets.dart';
-import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -43,6 +43,12 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     super.initState();
     _precomputeFrequencies();
     WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDefaults());
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
   }
 
   void _precomputeFrequencies() {

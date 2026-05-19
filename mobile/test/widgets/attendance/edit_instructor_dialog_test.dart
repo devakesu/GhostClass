@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,13 +11,15 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/widgets/attendance/edit_instructor_dialog.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
-import 'package:dio/dio.dart';
 
 import '../../coverage_helper.dart';
 
 class MockApiService extends Mock implements ApiService {}
+
 class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
+
 class MockGoTrueClient extends Mock implements supabase.GoTrueClient {}
+
 class MockSession extends Mock implements supabase.Session {}
 
 class TestMockDashboardNotifier extends MockDashboardNotifier {
@@ -67,22 +70,26 @@ void main() {
         ),
       );
 
-      final mockAcademicVal = const AcademicState(
+      const mockAcademicVal = AcademicState(
         semester: 'odd',
         year: '2024-2025',
       );
 
-      when(() => mockApi.upsertInstructor(
-        courseCode: any(named: 'courseCode'),
-        instructorName: any(named: 'instructorName'),
-        semester: any(named: 'semester'),
-        academicYear: any(named: 'academicYear'),
-        supabaseToken: any(named: 'supabaseToken'),
-      )).thenAnswer((_) async => Response(
-        requestOptions: RequestOptions(path: '/api/instructors/upsert'),
-        statusCode: 200,
-        data: {'message': 'Success'},
-      ));
+      when(
+        () => mockApi.upsertInstructor(
+          courseCode: any(named: 'courseCode'),
+          instructorName: any(named: 'instructorName'),
+          semester: any(named: 'semester'),
+          academicYear: any(named: 'academicYear'),
+          supabaseToken: any(named: 'supabaseToken'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/instructors/upsert'),
+          statusCode: 200,
+          data: {'message': 'Success'},
+        ),
+      );
 
       final overrides = [
         authProvider.overrideWith(
@@ -148,13 +155,15 @@ void main() {
       await tester.pump();
 
       // Verify API was called
-      verify(() => mockApi.upsertInstructor(
-        courseCode: 'CS101',
-        instructorName: 'Dr. New',
-        semester: 'odd',
-        academicYear: '2024-2025',
-        supabaseToken: 'test-supabase-token',
-      )).called(1);
+      verify(
+        () => mockApi.upsertInstructor(
+          courseCode: 'CS101',
+          instructorName: 'Dr. New',
+          semester: 'odd',
+          academicYear: '2024-2025',
+          supabaseToken: 'test-supabase-token',
+        ),
+      ).called(1);
     },
   );
 }

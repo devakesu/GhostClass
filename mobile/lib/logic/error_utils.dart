@@ -62,9 +62,7 @@ String formatApiError(dynamic response, String context) {
   }
 
   // 403 Forbidden / Access Denied
-  if (status == 403 ||
-      code == '403' ||
-      lower.contains('forbidden')) {
+  if (status == 403 || code == '403' || lower.contains('forbidden')) {
     return 'Access denied. Permission required.';
   }
 

@@ -65,7 +65,7 @@ class JweInterceptor extends Interceptor {
         // The server needs the RCEK to decrypt the request and to encrypt the response
         // In the GhostClass protocol, we send the RCEK encrypted with the server's public key
         final keyResult = await jweService.encryptHeaderKey();
-        options.headers['X-JWE-Key'] = keyResult.jwe;
+        options.headers['x-jwe-key'] = keyResult.jwe;
 
         AppLogger.d('JweInterceptor: Request encrypted for ${options.path}');
       } on Object catch (e) {

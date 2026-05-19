@@ -266,8 +266,9 @@ class _DeleteButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Delete tracked event',
-      child: GestureDetector(
+      child: InkWell(
         onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(

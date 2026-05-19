@@ -41,7 +41,7 @@ class AuthService {
       _ezygoAuthUrl,
       data: {
         'username': username.trim(),
-        'password': password.trim(),
+        'password': password,
         'stay_logged_in': true,
       },
       options: Options(validateStatus: (s) => s != null && s < 600),

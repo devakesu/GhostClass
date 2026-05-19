@@ -133,7 +133,10 @@ void main() {
         type: AppExceptionType.forbidden,
         statusCode: 403,
       );
-      expect(formatApiError(appErr, 'sync'), 'Access denied. Permission required.');
+      expect(
+        formatApiError(appErr, 'sync'),
+        'Access denied. Permission required.',
+      );
 
       const emptyAppErr = AppException(
         message: '',

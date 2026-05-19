@@ -570,17 +570,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     _lastAcademic = null;
     _needsRevalidate = true;
 
-    state = await AsyncValue.guard(() async {
-      final academicAsync = ref.read(academicProvider);
-      final academic = academicAsync.value;
-      if (academic == null) throw Exception('No academic context');
-
-      final trackingState = await ref.read(trackingProvider.future);
-      final tracking = trackingState.groupedByCourse.values
-          .expand((e) => e)
-          .toList();
-      return _fetchAndProcess(tracking, academic, trackingState.officialReport);
-    });
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> updateLocalInstructor(

@@ -24,46 +24,51 @@ class ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         children: [
           Stack(
             children: [
-              GestureDetector(
-                onTap: isUploadingAvatar ? null : onAvatarTap,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: surface,
-                    border: Border.all(
-                      color: primary.withValues(alpha: 0.2),
-                      width: 4,
+              Semantics(
+                button: true,
+                label: 'Profile avatar',
+                child: InkWell(
+                  onTap: isUploadingAvatar ? null : onAvatarTap,
+                  borderRadius: BorderRadius.circular(40),
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: surface,
+                      border: Border.all(
+                        color: primary.withValues(alpha: 0.2),
+                        width: 4,
+                      ),
+                      image: avatarUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(
+                                avatarUrl!,
+                                headers: {
+                                  'Origin': AppConfig.supabaseOrigin,
+                                },
+                              ),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
-                    image: avatarUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(
-                              avatarUrl!,
-                              headers: {
-                                'Origin': AppConfig.supabaseOrigin,
-                              },
-                            ),
-                            fit: BoxFit.cover,
+                    child: avatarUrl == null
+                        ? Icon(
+                            LucideIcons.user,
+                            size: 32,
+                            color: onSurface.withValues(alpha: 0.15),
                           )
                         : null,
                   ),
-                  child: avatarUrl == null
-                      ? Icon(
-                          LucideIcons.user,
-                          size: 32,
-                          color: onSurface.withValues(alpha: 0.15),
-                        )
-                      : null,
                 ),
               ),
+
               if (isUploadingAvatar)
                 Positioned.fill(
                   child: Container(
@@ -78,32 +83,38 @@ class ProfileHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+
               Positioned(
                 bottom: 2,
                 right: 2,
-                child: GestureDetector(
-                  onTap: isUploadingAvatar ? null : onAvatarTap,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 10,
-                          spreadRadius: 2,
+                child: Semantics(
+                  button: true,
+                  label: 'Change avatar',
+                  child: InkWell(
+                    onTap: isUploadingAvatar ? null : onAvatarTap,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          width: 3,
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      LucideIcons.camera,
-                      size: 14,
-                      color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        LucideIcons.camera,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

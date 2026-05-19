@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class ServiceErrorView extends ConsumerWidget {
+class ServiceErrorView extends ConsumerStatefulWidget {
   const ServiceErrorView({
     super.key,
     this.title = 'Connection Error',
@@ -20,12 +22,19 @@ class ServiceErrorView extends ConsumerWidget {
   });
   final String title;
   final String description;
-  final VoidCallback? onRetry;
+  final FutureOr<void> Function()? onRetry;
   final bool showHome;
   final Object? error;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ServiceErrorView> createState() => _ServiceErrorViewState();
+}
+
+class _ServiceErrorViewState extends ConsumerState<ServiceErrorView> {
+  bool _isRetrying = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -53,7 +62,7 @@ class ServiceErrorView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  title,
+                  widget.title,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                     fontSize: 22,
@@ -62,7 +71,7 @@ class ServiceErrorView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  description,
+                  widget.description,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
                     fontSize: 14,
@@ -78,7 +87,26 @@ class ServiceErrorView extends ConsumerWidget {
                   runSpacing: 12,
                   children: [
                     FilledButton(
-                      onPressed: onRetry ?? () => context.go('/'),
+                      onPressed: _isRetrying
+                          ? null
+                          : () async {
+                              setState(() {
+                                _isRetrying = true;
+                              });
+                              try {
+                                if (widget.onRetry != null) {
+                                  await widget.onRetry!();
+                                } else {
+                                  context.go('/');
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isRetrying = false;
+                                  });
+                                }
+                              }
+                            },
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
@@ -90,10 +118,24 @@ class ServiceErrorView extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(LucideIcons.refreshCcw, size: 16),
-                          const SizedBox(width: 8),
+                          if (_isRetrying) ...[
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ] else ...[
+                            const Icon(LucideIcons.refreshCcw, size: 16),
+                            const SizedBox(width: 8),
+                          ],
                           Text(
-                            'Retry',
+                            _isRetrying ? 'Retrying...' : 'Retry',
                             style: GoogleFonts.manrope(
                               fontWeight: FontWeight.w700,
                               height: 1.1,
@@ -102,7 +144,7 @@ class ServiceErrorView extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (showHome)
+                    if (widget.showHome)
                       FilledButton(
                         onPressed: () => context.go('/'),
                         style: FilledButton.styleFrom(
@@ -135,10 +177,10 @@ class ServiceErrorView extends ConsumerWidget {
                     FilledButton(
                       onPressed: () => SupportHelper.openContactPage(
                         context,
-                        subject: title,
+                        subject: widget.title,
                         message:
                             'I am experiencing an issue with the Ezygo API.\n\n'
-                            'Context: ${error?.toString() ?? "Unknown Error"}',
+                            'Context: ${widget.error?.toString() ?? "Unknown Error"}',
                       ),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(

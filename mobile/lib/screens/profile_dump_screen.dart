@@ -675,27 +675,28 @@ class _InfoRow {
   final IconData? trailingIcon;
 
   Widget _buildRow(BuildContext context) {
-    return GestureDetector(
-      onTap:
-          onTap ??
-          (copyable
-              ? () {
-                  final _ = Clipboard.setData(ClipboardData(text: value));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '$label copied',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+    final effectiveOnTap = onTap ??
+        (copyable
+            ? () {
+                final _ = Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '$label copied',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                  );
-                }
-              : null),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                );
+              }
+            : null);
+
+    return InkWell(
+      onTap: effectiveOnTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(

@@ -286,83 +286,88 @@ class _NotificationToastWidgetState extends State<_NotificationToastWidget>
               opacity: _opacity,
               child: Material(
                 color: Colors.transparent,
-                child: GestureDetector(
-                  onTap: widget.onTap,
-                  child: ClipRRect(
+                child: Semantics(
+                  button: true,
+                  label: widget.title,
+                  child: InkWell(
+                    onTap: widget.onTap,
                     borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: textColor.withValues(alpha: 0.1),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 24,
-                              offset: const Offset(0, 12),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: textColor.withValues(alpha: 0.1),
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color:
-                                    (isDark ? Colors.blue : Colors.blueAccent)
-                                        .withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 24,
+                                offset: const Offset(0, 12),
                               ),
-                              child: Icon(
-                                LucideIcons.bell,
-                                color: isDark ? Colors.blue : Colors.blueAccent,
-                                size: 20,
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      (isDark ? Colors.blue : Colors.blueAccent)
+                                          .withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  LucideIcons.bell,
+                                  color: isDark ? Colors.blue : Colors.blueAccent,
+                                  size: 20,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.title,
-                                    style: GoogleFonts.manrope(
-                                      color: textColor,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.title,
+                                      style: GoogleFonts.manrope(
+                                        color: textColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.body,
-                                    style: GoogleFonts.manrope(
-                                      color: subtextColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      widget.body,
+                                      style: GoogleFonts.manrope(
+                                        color: subtextColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              LucideIcons.chevronRight,
-                              color: textColor.withValues(alpha: 0.3),
-                              size: 16,
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Icon(
+                                LucideIcons.chevronRight,
+                                color: textColor.withValues(alpha: 0.3),
+                                size: 16,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

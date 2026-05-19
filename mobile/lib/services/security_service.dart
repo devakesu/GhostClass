@@ -32,6 +32,7 @@ class SecurityService {
   SecurityService(this._ref);
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
+  static const Duration _cachedAttestationMaxAge = Duration(hours: 6);
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
@@ -64,26 +65,33 @@ class SecurityService {
         final map = jsonDecode(cachedRaw) as Map<String, dynamic>;
         final latestVersion = map['latestVersion'] as String;
         final minVersion = map['minVersion'] as String;
+        final cachedAt = DateTime.tryParse(map['cachedAt'] as String? ?? '');
         final currentVersion = AppConfig.appVersion;
+        final isFreshCache = cachedAt != null &&
+            DateTime.now().difference(cachedAt) <= _cachedAttestationMaxAge;
 
-        // Dynamically recompute update flags based on the currently running app version.
-        // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
-        // on the first open after an update.
-        final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
-        final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
+        if (isFreshCache) {
+          // Dynamically recompute update flags based on the currently running app version.
+          // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
+          // on the first open after an update.
+          final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
+          final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
 
-        final cachedResult = AppVersionCheckResult(
-          latestVersion: latestVersion,
-          minVersion: minVersion,
-          hasUpdate: hasUpdate,
-          isForceUpdate: isForceUpdate,
-        );
+          final cachedResult = AppVersionCheckResult(
+            latestVersion: latestVersion,
+            minVersion: minVersion,
+            hasUpdate: hasUpdate,
+            isForceUpdate: isForceUpdate,
+          );
 
-        // Run background verification asynchronously
-        unawaited(_runBackgroundIntegrityCheck());
+          // Run background verification asynchronously
+          unawaited(_runBackgroundIntegrityCheck());
 
-        AppLogger.d('SecurityService: Returned cached attestation check.');
-        return cachedResult;
+          AppLogger.d('SecurityService: Returned cached attestation check.');
+          return cachedResult;
+        }
+
+        AppLogger.i('SecurityService: Cached attestation is stale; refreshing.');
       } on Object catch (e) {
         AppLogger.w('SecurityService: Failed to parse cached attestation', e);
       }
@@ -105,6 +113,7 @@ class SecurityService {
         'minVersion': result.minVersion,
         'hasUpdate': result.hasUpdate,
         'isForceUpdate': result.isForceUpdate,
+        'cachedAt': DateTime.now().toIso8601String(),
       };
       await storage.saveAttestationResult(jsonEncode(map));
       AppLogger.d('SecurityService: Cached attestation check result.');

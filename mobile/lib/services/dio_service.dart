@@ -27,17 +27,7 @@ class DioService {
       ),
     );
 
-    securityDio = Dio(
-      BaseOptions(
-        baseUrl: AppConfig.ghostclassApiUrl,
-        connectTimeout: timeout,
-        receiveTimeout: timeout,
-        sendTimeout: timeout,
-      ),
-    );
-
     dio.addSentry();
-    securityDio.addSentry();
 
     // Attach JWE Layer first
     dio.interceptors.add(_ref.read(jweInterceptorProvider));
@@ -77,7 +67,6 @@ class DioService {
 
   final Ref _ref;
   late final Dio dio;
-  late final Dio securityDio;
 
   FirebaseAppCheck get _appCheck => _ref.read(appCheckProvider);
 
@@ -117,17 +106,37 @@ class DioService {
       // Deduplicate parallel token requests to prevent "Too many attempts"
       String? appCheckToken;
       if (useLimited) {
-        _limitedTokenFetchInFlight ??= _appCheck.getLimitedUseToken();
+        var isNew = false;
+        if (_limitedTokenFetchInFlight == null) {
+          _limitedTokenFetchInFlight = _appCheck.getLimitedUseToken();
+          isNew = true;
+        }
         appCheckToken = await _limitedTokenFetchInFlight!.timeout(
           const Duration(seconds: 10),
         );
-        _limitedTokenFetchInFlight = null; // Clear after completion
+        if (isNew) {
+          unawaited(
+            Future.delayed(const Duration(seconds: 5), () {
+              _limitedTokenFetchInFlight = null;
+            }),
+          );
+        }
       } else {
-        _tokenFetchInFlight ??= _appCheck.getToken();
+        var isNew = false;
+        if (_tokenFetchInFlight == null) {
+          _tokenFetchInFlight = _appCheck.getToken();
+          isNew = true;
+        }
         appCheckToken = await _tokenFetchInFlight!.timeout(
           const Duration(seconds: 10),
         );
-        _tokenFetchInFlight = null; // Clear after completion
+        if (isNew) {
+          unawaited(
+            Future.delayed(const Duration(seconds: 5), () {
+              _tokenFetchInFlight = null;
+            }),
+          );
+        }
       }
 
       if (appCheckToken != null && appCheckToken.isNotEmpty) {
@@ -150,7 +159,6 @@ class DioService {
     await _unauthorizedController.close();
     await _lockdownController.close();
     dio.close();
-    securityDio.close();
   }
 }
 
