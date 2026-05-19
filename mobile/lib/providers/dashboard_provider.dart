@@ -583,6 +583,62 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     });
   }
 
+  Future<void> updateLocalInstructor(
+    String courseCode,
+    String instructorName,
+  ) async {
+    final user = ref.read(authProvider).value;
+    final academic = ref.read(academicProvider).value;
+    if (user == null || academic == null) return;
+
+    final stdCode = courseCode.toUpperCase().replaceAll(' ', '');
+
+    // 1. Update in-memory cache
+    final updatedList = List<CourseInstructor>.from(_cachedInstructors ?? []);
+    final index = updatedList.indexWhere(
+      (i) => i.courseCode.toUpperCase().replaceAll(' ', '') == stdCode,
+    );
+
+    final updatedInstructor = CourseInstructor(
+      courseCode: courseCode,
+      instructorName: instructorName,
+    );
+
+    if (index >= 0) {
+      updatedList[index] = updatedInstructor;
+    } else {
+      updatedList.add(updatedInstructor);
+    }
+    _cachedInstructors = updatedList;
+
+    // 2. Persist to disk cache
+    final storage = ref.read(secureStorageProvider);
+    final cacheKeySuffix =
+        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    await storage.saveCachedData(
+      'dashboard_instructors_$cacheKeySuffix',
+      updatedList.map((i) => i.toJson()).toList(),
+    );
+
+    // 3. Update active Riverpod state if it has data
+    if (state.hasValue) {
+      final currentData = state.value!;
+      state = AsyncValue.data(
+        DashboardData(
+          courses: currentData.courses,
+          attendance: currentData.attendance,
+          tracking: currentData.tracking,
+          stats: currentData.stats,
+          selectedSemester: currentData.selectedSemester,
+          selectedYear: currentData.selectedYear,
+          instructors: updatedList,
+          className: currentData.className,
+          disabledCodes: currentData.disabledCodes,
+        ),
+      );
+    }
+  }
+
   Future<void> setSemester(String sem) async {
     await ref.read(academicProvider.notifier).setSemester(sem);
   }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { withSecurity } from "@/lib/security/app-check";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -13,7 +13,7 @@ async function authenticateRequest(req: Request) {
     const supabaseAdmin = getAdminClient();
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
-      logger.error("API Course Add: Bearer auth.getUser error:", error || "No user");
+      logger.error("API Instructor Upsert: Bearer auth.getUser error:", error || "No user");
       return null;
     }
     return { user, supabase: supabaseAdmin };
@@ -22,27 +22,22 @@ async function authenticateRequest(req: Request) {
   const supabaseClient = await createClient();
   const { data: { user }, error } = await supabaseClient.auth.getUser();
   if (error || !user) {
-    logger.error("API Course Add: Client auth.getUser error:", error || "No user");
+    logger.error("API Instructor Upsert: Client auth.getUser error:", error || "No user");
     return null;
   }
   return { user, supabase: supabaseClient };
 }
 
-/**
- * API Route for adding a new course to a class lineup.
- * Primarily used by the mobile app which bypasses the Turnstile check 
- * but uses JWE/AppCheck/PlayIntegrity for security.
- */
-async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknown }) {
+async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) {
   try {
     const body = decryptedBody || await req.json();
-    
-    const code = String(body.courseCode ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
-    const name = toTitleCase(String(body.courseName ?? ""));
+
+    const courseCode = String(body.courseCode ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+    const instructorName = toTitleCase(String(body.instructorName ?? ""));
     const semester = String(body.semester ?? "").trim();
     const academicYear = String(body.academicYear ?? "").trim();
 
-    if (!code || !name || !semester || !academicYear) {
+    if (!courseCode || !instructorName || !semester || !academicYear) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -69,33 +64,32 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
       .single();
 
     if (profileError || !profile?.class_id) {
-      logger.error("API Course Add: Failed to fetch user class", profileError);
+      logger.error("API Instructor Upsert: Failed to fetch user class", profileError);
       return NextResponse.json({ error: "No class associated with your profile" }, { status: 400 });
     }
 
-    // Insert into class_courses
-    const { error: insertError } = await supabase
-      .from("class_courses")
-      .insert({
+    // Upsert into course_instructors (communal mapping shared by the class)
+    const { error: upsertError } = await supabase
+      .from("course_instructors")
+      .upsert({
         class_id: profile.class_id,
-        course_code: code,
-        course_name: name,
+        course_code: courseCode,
+        instructor_name: instructorName,
         semester,
         academic_year: academicYear,
-        created_by: user.id
+        updated_by: user.id
+      }, {
+        onConflict: "class_id, course_code, semester, academic_year"
       });
 
-    if (insertError) {
-      if (insertError.code === "23505") {
-        return NextResponse.json({ error: "This course is already in your class lineup." }, { status: 409 });
-      }
-      logger.error("API Course Add: Database insert failed", insertError);
-      return NextResponse.json({ error: "Failed to add course to lineup" }, { status: 500 });
+    if (upsertError) {
+      logger.error("API Instructor Upsert: Database upsert failed", upsertError);
+      return NextResponse.json({ error: "Failed to save instructor to database" }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Course added successfully" }, { status: 201 });
+    return NextResponse.json({ message: "Instructor saved successfully" }, { status: 200 });
   } catch (error) {
-    logger.error("API Course Add: Unexpected error", error);
+    logger.error("API Instructor Upsert: Unexpected error", error);
     return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

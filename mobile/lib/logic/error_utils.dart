@@ -53,6 +53,21 @@ String formatApiError(dynamic response, String context) {
 
   final lower = message.toLowerCase();
 
+  // 401 Unauthorized / Session Expired
+  if (status == 401 ||
+      code == '401' ||
+      lower.contains('unauthorized') ||
+      lower.contains('unauthenticated')) {
+    return 'Session expired. Please log in again.';
+  }
+
+  // 403 Forbidden / Access Denied
+  if (status == 403 ||
+      code == '403' ||
+      lower.contains('forbidden')) {
+    return 'Access denied. Permission required.';
+  }
+
   // Supabase/Auth decoding errors (often due to proxy/ISP blocks or firewalls)
   if (lower.contains('failed to decode error response') ||
       lower.contains('unexpected character') ||

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/error_handler.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
@@ -549,12 +550,12 @@ class _CalendarContent extends ConsumerWidget {
                                             'Correction added successfully',
                                           );
                                         }
-                                      } on Object {
+                                      } on Object catch (e) {
                                         if (context.mounted) {
                                           setState(() => isSubmitting = false);
                                           ServiceToast.show(
                                             context,
-                                            'Failed to add correction',
+                                            formatApiError(e, 'attendance'),
                                             isError: true,
                                           );
                                         }
@@ -661,12 +662,12 @@ class _CalendarContent extends ConsumerWidget {
                                 'Record deleted successfully',
                               );
                             }
-                          } on Object {
+                          } on Object catch (e) {
                             if (context.mounted) {
                               setDialogState(() => isDeleting = false);
                               ServiceToast.show(
                                 context,
-                                'Failed to delete record',
+                                formatApiError(e, 'deleting record'),
                                 isError: true,
                               );
                             }

@@ -8,6 +8,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/dashboard/course_card.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -233,7 +234,7 @@ class _DisableAwareCourseCardState
                               setDialogState(() => isSaving = false);
                               ServiceToast.show(
                                 context,
-                                'Failed: $e',
+                                formatApiError(e, 'course configuration'),
                                 isError: true,
                               );
                             }
@@ -492,7 +493,7 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
                     setState(() => isSaving = false);
                     ServiceToast.show(
                       context,
-                      'We encountered an error while disabling this course. Please try again later. If the issue persists, please contact us.',
+                      formatApiError(e, 'course configuration'),
                       isError: true,
                     );
                   }

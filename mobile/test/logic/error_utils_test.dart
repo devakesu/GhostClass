@@ -129,11 +129,11 @@ void main() {
 
     test('handles AppException', () {
       const appErr = AppException(
-        message: 'Forbidden action',
+        message: 'Some internal details',
         type: AppExceptionType.forbidden,
         statusCode: 403,
       );
-      expect(formatApiError(appErr, 'sync'), 'Forbidden action');
+      expect(formatApiError(appErr, 'sync'), 'Access denied. Permission required.');
 
       const emptyAppErr = AppException(
         message: '',
@@ -141,6 +141,32 @@ void main() {
         statusCode: 500,
       );
       expect(formatApiError(emptyAppErr, 'sync'), 'Failed to complete sync');
+    });
+
+    test('handles 401 and 403 status codes and messages', () {
+      final dio401 = DioException(
+        requestOptions: RequestOptions(path: '/test'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 401,
+        ),
+      );
+      expect(
+        formatApiError(dio401, 'fetching'),
+        'Session expired. Please log in again.',
+      );
+
+      final dio403 = DioException(
+        requestOptions: RequestOptions(path: '/test'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 403,
+        ),
+      );
+      expect(
+        formatApiError(dio403, 'fetching'),
+        'Access denied. Permission required.',
+      );
     });
 
     test('handles various specific error codes and messages', () {

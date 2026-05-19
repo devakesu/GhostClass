@@ -46,20 +46,32 @@ const allowedImageHostnames = (() => {
     "avatars.githubusercontent.com", // GitHub
     "secure.gravatar.com",           // Gravatar
   ];
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname); } catch { /* ignore */ }
+
+  const envUrls = [
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_DEV_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL,
+  ];
+
+  for (const urlString of envUrls) {
+    if (urlString) {
+      try {
+        hosts.push(new URL(urlString).hostname);
+      } catch {
+        /* ignore */
+      }
+    }
   }
-  if (process.env.NEXT_PUBLIC_SUPABASE_DEV_URL) {
-    try { hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_DEV_URL).hostname); } catch { /* ignore */ }
-  }
-  
-  if (hosts.length === 3 && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    // We only throw if even Supabase is missing, as that's the primary storage
+
+  if (!envUrls.some(Boolean)) {
     throw new Error(
-      '[next.config.ts] At least one Supabase URL (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_DEV_URL) ' +
+      '[next.config.ts] At least one Supabase URL or Supabase Proxy URL ' +
       'is required at build time for images.remotePatterns.'
     );
   }
+
   // Deduplicate
   return Array.from(new Set(hosts));
 })();

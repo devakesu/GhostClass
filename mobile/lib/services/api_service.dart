@@ -212,6 +212,25 @@ class ApiService {
     );
   }
 
+  Future<Response<dynamic>> upsertInstructor({
+    required String courseCode,
+    required String instructorName,
+    required String semester,
+    required String academicYear,
+    required String supabaseToken,
+  }) async {
+    return client.post(
+      '${AppConfig.ghostclassApiUrl}/instructors/upsert',
+      data: {
+        'courseCode': courseCode,
+        'instructorName': instructorName,
+        'semester': semester,
+        'academicYear': academicYear,
+      },
+      options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
+    );
+  }
+
   // --- Error Handling ---
   AppException mapDioError(DioException e) {
     final status = e.response?.statusCode;

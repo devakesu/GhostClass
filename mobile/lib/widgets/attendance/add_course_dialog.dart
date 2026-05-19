@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
@@ -73,7 +74,11 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       Navigator.pop(context);
     } on Object catch (e) {
       if (!mounted) return;
-      ServiceToast.show(context, e.toString(), isError: true);
+      ServiceToast.show(
+        context,
+        formatApiError(e, 'adding course'),
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
