@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:ghostclass/widgets/footer/footer_text_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:ghostclass/widgets/footer/footer_text_button.dart';
 
 class AppFooter extends StatelessWidget {
   const AppFooter({super.key});

@@ -18,6 +18,11 @@ vi.mock("@/lib/query-utils", () => ({
   retryTwice: false,
 }));
 
+vi.mock("../../users/settings", () => ({
+  useFetchAcademicYear: vi.fn(() => ({ data: "2023" })),
+  useFetchSemester: vi.fn(() => ({ data: "1" })),
+}));
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -210,8 +215,8 @@ describe("attendance hooks", () => {
       expect(result.current.data?.CS102.total).toBe(20);
 
       // Check if individual cache was updated
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101"], expect.any(Object));
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102"], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101", 123], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102", 456], expect.any(Object));
     });
 
     it("should handle missing course in batch courses list", async () => {

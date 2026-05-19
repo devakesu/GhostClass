@@ -67,7 +67,8 @@ class SecurityService {
         final minVersion = map['minVersion'] as String;
         final cachedAt = DateTime.tryParse(map['cachedAt'] as String? ?? '');
         final currentVersion = AppConfig.appVersion;
-        final isFreshCache = cachedAt != null &&
+        final isFreshCache =
+            cachedAt != null &&
             DateTime.now().difference(cachedAt) <= _cachedAttestationMaxAge;
 
         if (isFreshCache) {
@@ -91,7 +92,9 @@ class SecurityService {
           return cachedResult;
         }
 
-        AppLogger.i('SecurityService: Cached attestation is stale; refreshing.');
+        AppLogger.i(
+          'SecurityService: Cached attestation is stale; refreshing.',
+        );
       } on Object catch (e) {
         AppLogger.w('SecurityService: Failed to parse cached attestation', e);
       }

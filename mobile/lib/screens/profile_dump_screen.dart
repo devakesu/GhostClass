@@ -675,7 +675,8 @@ class _InfoRow {
   final IconData? trailingIcon;
 
   Widget _buildRow(BuildContext context) {
-    final effectiveOnTap = onTap ??
+    final effectiveOnTap =
+        onTap ??
         (copyable
             ? () {
                 final _ = Clipboard.setData(ClipboardData(text: value));

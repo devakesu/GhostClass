@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
+import 'package:ghostclass/widgets/common/icon_badge.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -154,20 +155,12 @@ class _StatCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: isFullWidth ? 28 : 20,
-                    color: color,
-                  ),
+                IconBadge(
+                  icon: icon,
+                  color: color,
+                  radius: 12,
+                  bgAlpha: 0.2,
+                  borderColor: color.withValues(alpha: 0.3),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

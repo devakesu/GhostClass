@@ -328,7 +328,9 @@ class _NotificationToastWidgetState extends State<_NotificationToastWidget>
                                 ),
                                 child: Icon(
                                   LucideIcons.bell,
-                                  color: isDark ? Colors.blue : Colors.blueAccent,
+                                  color: isDark
+                                      ? Colors.blue
+                                      : Colors.blueAccent,
                                   size: 20,
                                 ),
                               ),

@@ -1,9 +1,10 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
-import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/error_handler.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';

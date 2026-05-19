@@ -240,7 +240,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
 
-  const { data: rawTrackingData, isLoading: isLoadingTracking, refetch: refetchTracking } = useTrackingData(profile, {
+  const { data: rawTrackingData, refetch: refetchTracking } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted,
@@ -284,8 +284,6 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     if (!pendingChange || !profile?.username || isUpdating) return;
     setIsUpdating(true);
     setShowConfirmDialog(false);
-    await queryClient.cancelQueries();
-    queryClient.invalidateQueries();
 
     try {
       if (pendingChange.type === "semester") {
@@ -407,7 +405,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return <div className="h-50 flex items-center justify-center">No data</div>;
   };
 
-  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating) return <CompLoading />;
+  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted) return <CompLoading />;
 
   const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
 

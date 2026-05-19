@@ -1268,10 +1268,23 @@ export default function TrackingClient() {
   const coursesPerPage = 3;
 
   const {
+    data: semesterData,
+    isError: isSemesterError,
+  } = useFetchSemester();
+  const {
+    data: academicYearData,
+    isError: isAcademicYearError,
+  } = useFetchAcademicYear();
+
+  const {
     data: coursesData,
     isError: isCoursesError,
     refetch: refetchCourses,
-  } = useFetchCourses();
+  } = useFetchCourses({
+    semester: semesterData || undefined,
+    year: academicYearData || undefined,
+    enabled: !!semesterData && !!academicYearData,
+  });
   const {
     data: count,
     isError: isCountError,
@@ -1287,15 +1300,11 @@ export default function TrackingClient() {
     data: attendanceData,
     isError: isAttendanceError,
     refetch: refetchAttendance,
-  } = useAttendanceReport();
-  const {
-    data: semesterData,
-    isError: isSemesterError,
-  } = useFetchSemester();
-  const {
-    data: academicYearData,
-    isError: isAcademicYearError,
-  } = useFetchAcademicYear();
+  } = useAttendanceReport(
+    semesterData || undefined,
+    academicYearData || undefined,
+    { enabled: !!semesterData && !!academicYearData },
+  );
   const {
     data: classCourses,
   } = useFetchClassCourses({

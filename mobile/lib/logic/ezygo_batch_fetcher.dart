@@ -289,7 +289,8 @@ String _encodeStableRequestData(dynamic data) {
       final entries = value.entries.toList()
         ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
       return <String, dynamic>{
-        for (final entry in entries) entry.key.toString(): normalize(entry.value),
+        for (final entry in entries)
+          entry.key.toString(): normalize(entry.value),
       };
     }
     if (value is Iterable) {

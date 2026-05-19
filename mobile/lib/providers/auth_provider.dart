@@ -1137,7 +1137,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         (currentUser.profile?.currentSemester != nextAcademic.semester ||
             currentUser.profile?.currentYear != nextAcademic.year);
 
-      if (academicChanged) {
+    if (academicChanged) {
       ref.read(apiServiceProvider).clearCaches();
       try {
         final api = ref.read(apiServiceProvider);
@@ -1156,11 +1156,15 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       }
 
       // Clear all page caches/providers to force clean re-fetch of all pages
-      ref
-        ..invalidate(dashboardProvider)
-        ..invalidate(trackingProvider)
-        ..invalidate(scoreProvider)
-        ..invalidate(leaveProvider);
+      unawaited(
+        Future.microtask(() {
+          ref
+            ..invalidate(dashboardProvider)
+            ..invalidate(trackingProvider)
+            ..invalidate(scoreProvider)
+            ..invalidate(leaveProvider);
+        }),
+      );
     }
 
     if (nextAcademic != null) {

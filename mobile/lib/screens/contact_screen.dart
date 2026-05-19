@@ -352,150 +352,154 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
           child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              expandedHeight: 160,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              surfaceTintColor: Colors.transparent,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        primary.withValues(alpha: 0.12),
-                        Colors.transparent,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                expandedHeight: 160,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                surfaceTintColor: Colors.transparent,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          primary.withValues(alpha: 0.12),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF7C3AED,
+                            ).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            LucideIcons.send,
+                            color: primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Contact Us',
+                          style: GoogleFonts.manrope(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: -0.6,
+                            height: 1.1,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          LucideIcons.send,
-                          color: primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Contact Us',
-                        style: GoogleFonts.manrope(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          letterSpacing: -0.6,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  Text(
-                    "Our team is happy to help. Fill in the form below and we'll get back to you within 24–48 hours.",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.85),
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _field(
-                    label: 'Name',
-                    controller: _nameController,
-                    hint: 'Your full name',
-                    autofillHints: [AutofillHints.name],
-                  ),
-                  _field(
-                    label: 'Email',
-                    controller: _emailController,
-                    hint: 'cooked_fr@attendance.edu',
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: [AutofillHints.email],
-                  ),
-                  _field(
-                    label: 'Subject',
-                    controller: _subjectController,
-                    hint: 'How can we help?',
-                  ),
-                  _field(
-                    label: 'Message',
-                    controller: _messageController,
-                    hint: 'Describe your issue or question...',
-                    keyboardType: TextInputType.multiline,
-                    action: TextInputAction.newline,
-                    maxLines: 5,
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _sending
-                          ? null
-                          : () {
-                              final _ = _handleSend();
-                            },
-                      icon: _sending
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(LucideIcons.send, size: 15),
-                      label: Text(_sending ? 'Sending...' : 'Send Message'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                        disabledForegroundColor: Theme.of(
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    Text(
+                      "Our team is happy to help. Fill in the form below and we'll get back to you within 24–48 hours.",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.7),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: GoogleFonts.manrope(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                        ).colorScheme.onSurface.withValues(alpha: 0.85),
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _field(
+                      label: 'Name',
+                      controller: _nameController,
+                      hint: 'Your full name',
+                      autofillHints: [AutofillHints.name],
+                    ),
+                    _field(
+                      label: 'Email',
+                      controller: _emailController,
+                      hint: 'cooked_fr@attendance.edu',
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: [AutofillHints.email],
+                    ),
+                    _field(
+                      label: 'Subject',
+                      controller: _subjectController,
+                      hint: 'How can we help?',
+                    ),
+                    _field(
+                      label: 'Message',
+                      controller: _messageController,
+                      hint: 'Describe your issue or question...',
+                      keyboardType: TextInputType.multiline,
+                      action: TextInputAction.newline,
+                      maxLines: 5,
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _sending
+                            ? null
+                            : () {
+                                final _ = _handleSend();
+                              },
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(LucideIcons.send, size: 15),
+                        label: Text(_sending ? 'Sending...' : 'Send Message'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: primary.withValues(
+                            alpha: 0.5,
+                          ),
+                          disabledForegroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: GoogleFonts.manrope(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ]),
+                  ]),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }

@@ -72,7 +72,8 @@ void main() {
         ),
       ).thenAnswer(
         (invocation) async {
-          capturedData = invocation.namedArguments[#data] as Map<String, dynamic>?;
+          capturedData =
+              invocation.namedArguments[#data] as Map<String, dynamic>?;
           return Response<dynamic>(
             requestOptions: RequestOptions(path: '/auth'),
             statusCode: 200,
@@ -96,7 +97,8 @@ void main() {
           options: any(named: 'options'),
         ),
       ).thenAnswer((invocation) async {
-        capturedData = invocation.namedArguments[#data] as Map<String, dynamic>?;
+        capturedData =
+            invocation.namedArguments[#data] as Map<String, dynamic>?;
         return Response<dynamic>(
           requestOptions: RequestOptions(path: '/auth'),
           statusCode: 200,

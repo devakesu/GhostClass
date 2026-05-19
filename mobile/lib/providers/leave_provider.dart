@@ -24,7 +24,13 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
   @override
   FutureOr<LeaveState> build() async {
     final authState = ref.watch(authProvider);
-    final academic = ref.watch(academicProvider).value;
+    final academicAsync = ref.watch(academicProvider);
+
+    if (authState.isLoading || academicAsync.isLoading) {
+      return Completer<LeaveState>().future;
+    }
+
+    final academic = academicAsync.value;
 
     if (authState.value == null || academic == null) return LeaveState.empty();
 

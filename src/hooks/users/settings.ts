@@ -78,13 +78,17 @@ export const useSetSemester = () => {
       // 2. Refresh ALL Dependent Data
       // This ensures courses, attendance, tracking, and scores all switch to the new semester
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+      queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] }); // Refetch tracking data
       queryClient.invalidateQueries({ queryKey: ["count"] });      // Refetch stats
       queryClient.invalidateQueries({ queryKey: ["profile"] });    // Refetch profile (syncs class)
       queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
+      queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }); // Clear batch scores cache
     },
     onError: (error) => {
       logger.error("Error setting semester:", error);
@@ -112,13 +116,17 @@ export const useSetAcademicYear = () => {
 
       // Refresh ALL Dependent Data
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+      queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] });
       queryClient.invalidateQueries({ queryKey: ["count"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
+      queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }); // Clear batch scores cache
     },
     onError: (error) => {
       logger.error("Error setting academic year:", error);

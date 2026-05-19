@@ -71,6 +71,11 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   Future<ScoreState> build() async {
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
+
+    if (authState.isLoading || academicAsync.isLoading) {
+      return Completer<ScoreState>().future;
+    }
+
     final academic = academicAsync.value;
 
     // BLOCKER: Do not fire queries until Cron Sync is finished

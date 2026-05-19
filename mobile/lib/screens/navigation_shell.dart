@@ -378,7 +378,8 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                     Semantics(
                       button: true,
                       label: 'Profile',
-                      child: InkWell(
+                      child:
+                          InkWell(
                                 onTap: () => context.go('/ghostclass'),
                                 splashColor: Colors.transparent,
                                 highlightColor: Colors.transparent,
@@ -556,7 +557,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                 type: MaterialType.transparency,
                 child: InkWell(
                   onTap: showAddAttendanceDialog,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(72)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(72),
+                  ),
                   child: Container(
                     width: 72,
                     height: 34, // Reduced height

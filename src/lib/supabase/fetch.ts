@@ -66,10 +66,12 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
       // Environment Guard: Alert developer if production URL is leaking into development
       // Use a delayed logger to avoid circular dependency issues if logger imports config
       setTimeout(() => {
-        logger.warn(
-          `[Supabase Security] Production URL detected in development! ⚠️`,
-          `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`
-        );
+        if (typeof logger.warn === "function") {
+          logger.warn(
+            `[Supabase Security] Production URL detected in development! ⚠️`,
+            `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`
+          );
+        }
       }, 0);
     }
   }

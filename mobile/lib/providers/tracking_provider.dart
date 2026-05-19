@@ -63,6 +63,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
+
+    if (authState.isLoading || academicAsync.isLoading) {
+      return Completer<TrackingState>().future;
+    }
+
     final academic = academicAsync.value;
 
     if (authState.value == null || academic == null) {

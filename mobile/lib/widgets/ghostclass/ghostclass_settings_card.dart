@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ghostclass/widgets/common/icon_badge.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class GhostClassSettingsCard extends StatelessWidget {
@@ -71,19 +72,10 @@ class GhostClassSettingsCard extends StatelessWidget {
               child: isFullWidth
                   ? Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: (isActive ? Colors.white : color).withValues(
-                              alpha: 0.15,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            icon,
-                            size: 20,
-                            color: isActive ? Colors.white : color,
-                          ),
+                        IconBadge(
+                          icon: icon,
+                          color: isActive ? Colors.white : color,
+                          bgAlpha: 0.15,
                         ),
                         const SizedBox(width: 16),
                         Expanded(

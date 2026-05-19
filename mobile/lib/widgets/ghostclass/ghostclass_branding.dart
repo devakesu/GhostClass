@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/widgets/footer/footer_action_button.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ghostclass/widgets/footer/footer_action_button.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -88,7 +88,6 @@ class GhostClassBranding extends StatelessWidget {
                     ? Colors.pinkAccent
                     : const Color(0xFFDB2777),
                 onTap: () => _launchUrl(donateUrl),
-                uppercase: false,
               ),
               const SizedBox(width: 8),
               FooterActionButton(
@@ -98,7 +97,6 @@ class GhostClassBranding extends StatelessWidget {
                     ? Colors.amber
                     : Colors.amber.shade700,
                 onTap: () => _launchUrl(githubUrl),
-                uppercase: false,
               ),
             ],
           ),
@@ -163,7 +161,9 @@ class _SecondaryLink extends StatelessWidget {
           style: GoogleFonts.manrope(
             fontSize: 10,
             fontWeight: FontWeight.w800,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
             letterSpacing: 1.2,
           ),
         ),

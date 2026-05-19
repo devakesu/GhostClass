@@ -37,7 +37,7 @@ export const useExams = (options?: { enabled?: boolean }) => {
       if (!res) throw new Error("Failed to fetch exams data");
       return res.data;
     },
-    enabled: options?.enabled,
+    enabled: (options?.enabled !== false) && !!semester && !!year,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
@@ -179,14 +179,17 @@ export const useAllExamQuestions = (examIds: number[]) => {
  * This is the preferred way to pre-fetch data for the Scores page.
  */
 export const useBatchExamDetails = (examIds: number[], options?: { enabled?: boolean }) => {
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
+
   return useQuery<Record<number, { questions: ExamQuestion[]; answers: ExamAnswer[] }>>({
-    queryKey: ["exam-details-batch", examIds],
+    queryKey: ["exam-details-batch", examIds, semester ?? null, year ?? null],
     queryFn: async () => {
       if (!examIds.length) return {};
       const res = await axios.post("/api/scores/batch", { examIds }, { baseURL: "" });
       return res.data;
     },
-    enabled: (options?.enabled !== false) && examIds.length > 0,
+    enabled: (options?.enabled !== false) && examIds.length > 0 && !!semester && !!year,
     staleTime: 15 * 60 * 1000, // Cache batch heavily (15 mins)
     gcTime: 20 * 60 * 1000,
     retry: retryOnce,

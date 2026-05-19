@@ -321,7 +321,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 },
                                 borderRadius: BorderRadius.circular(4),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
+                                  ),
                                   child: Text(
                                     'Forgot password?',
                                     style: GoogleFonts.manrope(
