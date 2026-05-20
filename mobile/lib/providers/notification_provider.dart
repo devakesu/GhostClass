@@ -289,7 +289,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .from('notification')
           .update({'is_read': newIsRead})
           .eq('id', id);
-    } catch (e) {
+    } on Object catch (_) {
       state = AsyncValue.data(previousState);
       rethrow;
     }
@@ -348,7 +348,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .update({'is_read': true})
           .eq('auth_user_id', userId)
           .eq('is_read', false);
-    } catch (e) {
+    } on Object catch (_) {
       state = AsyncValue.data(previousState);
       rethrow;
     }

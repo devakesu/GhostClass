@@ -68,6 +68,9 @@ void main() {
     when(() => mockSession.isExpired).thenReturn(false);
 
     when(() => mockStorage.getFcmToken()).thenAnswer((_) async => null);
+    when(
+      () => mockStorage.getNormalizedFcmToken(),
+    ).thenAnswer((_) async => null);
     when(() => mockStorage.saveFcmToken(any())).thenAnswer((_) async => true);
 
     when(

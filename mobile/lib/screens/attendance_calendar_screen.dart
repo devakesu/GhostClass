@@ -416,195 +416,206 @@ class _CalendarContent extends ConsumerWidget {
         : 'Enter reason for being Present...';
 
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    final _ = showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) {
-        var isSubmitting = false;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 12,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+    final _ =
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          builder: (context) {
+            var isSubmitting = false;
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                    left: 24,
+                    right: 24,
+                    top: 12,
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Mark as ${initialStatus == 'dutyLeave' ? "Duty Leave" : "Present"}',
-                    style: GoogleFonts.manrope(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Enter a remark for this correction:',
-                    style: GoogleFonts.manrope(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    style: GoogleFonts.manrope(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: hint,
-                      hintStyle: GoogleFonts.manrope(
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(
-                              alpha: 0.4,
-                            ),
-                        fontSize: 13,
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.05),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: isSubmitting
-                              ? null
-                              : () => Navigator.pop(context),
-                          child: Text(
-                            'CANCEL',
-                            style: GoogleFonts.manrope(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.4),
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
-                            ),
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Consumer(
-                          builder: (context, ref, _) {
-                            return ElevatedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                      final remark = controller.text.trim();
-                                      final finalRemark = remark.isEmpty
-                                          ? (attendance == 225
-                                                ? 'Duty Leave'
-                                                : 'Self-Marked: Present')
-                                          : remark;
-
-                                      setState(() => isSubmitting = true);
-
-                                      try {
-                                        await ref
-                                            .read(trackingProvider.notifier)
-                                            .insertRecord(
-                                              courseId: event.courseId,
-                                              date: event.dbDate,
-                                              session: event.displaySessionName,
-                                              attendance: attendance,
-                                              status: 'correction',
-                                              remarks: finalRemark,
-                                            );
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          ServiceToast.show(
-                                            context,
-                                            'Correction added successfully',
-                                          );
-                                        }
-                                      } on Object catch (e) {
-                                        if (context.mounted) {
-                                          setState(() => isSubmitting = false);
-                                          ServiceToast.show(
-                                            context,
-                                            formatApiError(e, 'attendance'),
-                                            isError: true,
-                                          );
-                                        }
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: attendance == 225
-                                    ? const Color(0xFFF59E0B)
-                                    : const Color(0xFF10B981),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                              ),
-                              child: isSubmitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Text(
-                                      'CONFIRM',
-                                      style: GoogleFonts.manrope(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                            );
-                          },
+                      const SizedBox(height: 24),
+                      Text(
+                        'Mark as ${initialStatus == 'dutyLeave' ? "Duty Leave" : "Present"}',
+                        style: GoogleFonts.manrope(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Enter a remark for this correction:',
+                        style: GoogleFonts.manrope(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: controller,
+                        autofocus: true,
+                        style: GoogleFonts.manrope(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          hintStyle: GoogleFonts.manrope(
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(
+                                  alpha: 0.4,
+                                ),
+                            fontSize: 13,
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.05),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.all(16),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              child: Text(
+                                'CANCEL',
+                                style: GoogleFonts.manrope(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                return ElevatedButton(
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : () async {
+                                          final remark = controller.text.trim();
+                                          final finalRemark = remark.isEmpty
+                                              ? (attendance == 225
+                                                    ? 'Duty Leave'
+                                                    : 'Self-Marked: Present')
+                                              : remark;
+
+                                          setState(() => isSubmitting = true);
+
+                                          try {
+                                            await ref
+                                                .read(trackingProvider.notifier)
+                                                .insertRecord(
+                                                  courseId: event.courseId,
+                                                  date: event.dbDate,
+                                                  session:
+                                                      event.displaySessionName,
+                                                  attendance: attendance,
+                                                  status: 'correction',
+                                                  remarks: finalRemark,
+                                                );
+                                            if (context.mounted) {
+                                              Navigator.pop(context);
+                                              ServiceToast.show(
+                                                context,
+                                                'Correction added successfully',
+                                              );
+                                            }
+                                          } on Object catch (e) {
+                                            if (context.mounted) {
+                                              setState(
+                                                () => isSubmitting = false,
+                                              );
+                                              ServiceToast.show(
+                                                context,
+                                                formatApiError(e, 'attendance'),
+                                                isError: true,
+                                              );
+                                            }
+                                          }
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: attendance == 225
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                  child: isSubmitting
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'CONFIRM',
+                                          style: GoogleFonts.manrope(
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                );
+              },
             );
           },
-        );
-      },
-    ).then((_) => ref.read(uiModalOpenProvider.notifier).setOpen(false));
+        ).then((_) {
+          if (context.mounted) {
+            ref.read(uiModalOpenProvider.notifier).setOpen(false);
+          }
+        });
   }
 
   void _deleteRecord(BuildContext context, WidgetRef ref, int id) {

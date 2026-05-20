@@ -144,11 +144,13 @@ class DioService {
             Future.delayed(const Duration(seconds: 5), () {
               _limitedTokenFetchInFlight = null;
             }).catchError(
-              (Object e, StackTrace st) => AppLogger.e(
-                'DioService: delayed clear of limited token fetch failed',
-                e,
-                st,
-              ),
+              (Object e, StackTrace st) {
+                AppLogger.e(
+                  'DioService: delayed clear of limited token fetch failed',
+                  e,
+                  st,
+                );
+              },
             ),
             'DioService: delayed clear limited token fetch',
           );
@@ -167,11 +169,13 @@ class DioService {
             Future.delayed(const Duration(seconds: 5), () {
               _tokenFetchInFlight = null;
             }).catchError(
-              (Object e, StackTrace st) => AppLogger.e(
-                'DioService: delayed clear of token fetch failed',
-                e,
-                st,
-              ),
+              (Object e, StackTrace st) {
+                AppLogger.e(
+                  'DioService: delayed clear of token fetch failed',
+                  e,
+                  st,
+                );
+              },
             ),
             'DioService: delayed clear token fetch',
           );
@@ -184,7 +188,7 @@ class DioService {
           'DioService: App Check token attached (limited: $useLimited, length: ${appCheckToken.length})',
         );
       } else {
-        final errorMsg =
+        const errorMsg =
             'App Check token is empty - verify Firebase activation';
         options.extra['appCheckError'] = errorMsg;
         AppLogger.e('DioService: $errorMsg');

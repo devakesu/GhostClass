@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/about_screen.dart';
@@ -22,6 +21,7 @@ import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

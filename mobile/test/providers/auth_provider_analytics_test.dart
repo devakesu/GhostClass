@@ -107,6 +107,12 @@ void main() {
     );
     when(() => mockApi.clearCaches()).thenReturn(null);
     when(
+      () => mockApi.scheduleSync(
+        any(),
+        force: any(named: 'force'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
       () => mockApi.refreshProfile(
         any(),
         sync: any(named: 'sync'),
@@ -487,7 +493,7 @@ void main() {
         ),
       );
       when(
-        () => mockApi.triggerSync(any(), force: any(named: 'force')),
+        () => mockApi.scheduleSync(any(), force: any(named: 'force')),
       ).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/sync'),
@@ -528,7 +534,7 @@ void main() {
       await notifier.updateAcademicContext('Even', '2025-2026');
 
       verify(() => mockApi.clearCaches()).called(1);
-      verify(() => mockApi.triggerSync(any(), force: true)).called(1);
+      verify(() => mockApi.scheduleSync(any(), force: true)).called(1);
       expect(refreshCount, equals(1));
 
       final user = container.read(authProvider).value;

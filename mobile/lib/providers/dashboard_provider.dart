@@ -181,11 +181,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           Future.microtask(
             () => _silentRevalidate(trackingList, academic),
           ).catchError(
-            (Object e, StackTrace st) => AppLogger.e(
-              'DashboardNotifier: Silent revalidate failed',
-              e,
-              st,
-            ),
+            (Object e, StackTrace st) {
+              AppLogger.e(
+                'DashboardNotifier: Silent revalidate failed',
+                e,
+                st,
+              );
+            },
           ),
           'DashboardNotifier: silent revalidate',
         );
@@ -339,7 +341,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         academic,
         sharedInstructors,
       );
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('DashboardNotifier: Server fetch failed', e);
       rethrow;
     }

@@ -117,8 +117,9 @@ class AppLogger {
       Sentry.addBreadcrumb(
         Breadcrumb(message: message, level: SentryLevel.info),
       ).catchError(
-        (Object e, StackTrace st) =>
-            debugPrint('Sentry breadcrumb failed: $e ${st ?? ''}'),
+        (Object e, StackTrace st) {
+          debugPrint('Sentry breadcrumb failed: $e $st');
+        },
       ),
     );
   }
@@ -138,8 +139,9 @@ class AppLogger {
           data: error != null ? {'error': error.toString()} : null,
         ),
       ).catchError(
-        (Object e, StackTrace st) =>
-            debugPrint('Sentry breadcrumb failed: $e ${st ?? ''}'),
+        (Object e, StackTrace st) {
+          debugPrint('Sentry breadcrumb failed: $e $st');
+        },
       ),
     );
   }
@@ -211,8 +213,10 @@ class AppLogger {
           await scope.setContexts('logger', loggerContext);
         },
       ).catchError(
-        (Object e, StackTrace st) =>
-            debugPrint('Sentry capture failed: $e ${st ?? ''}'),
+        (Object e, StackTrace st) {
+          debugPrint('Sentry capture failed: $e $st');
+          return const SentryId.empty();
+        },
       ),
     );
   }

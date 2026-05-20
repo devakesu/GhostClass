@@ -97,11 +97,13 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                 }
               })
               .catchError(
-                (Object e, StackTrace st) => AppLogger.e(
-                  'NavigationShell: Failed to show update dialog',
-                  e,
-                  st,
-                ),
+                (Object e, StackTrace st) {
+                  AppLogger.e(
+                    'NavigationShell: Failed to show update dialog',
+                    e,
+                    st,
+                  );
+                },
               ),
           'NavigationShell: show update dialog',
         );
@@ -125,7 +127,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     // Subscribe to academic changes and security failures. We keep the
     // returned ProviderSubscription objects so we can close them in dispose.
     _subscriptions.addAll([
-      ref.listen<AsyncValue<AcademicState?>>(academicProvider, (
+      ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
         previous,
         next,
       ) {
@@ -141,8 +143,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         // academic context changes, even if the calendar screen is not open.
         AppLogger.safeUnawait(
           _prewarmCalendarData().catchError(
-            (Object e, StackTrace st) =>
-                AppLogger.e('NavigationShell: Prewarm calendar failed', e, st),
+            (Object e, StackTrace st) {
+              AppLogger.e('NavigationShell: Prewarm calendar failed', e, st);
+            },
           ),
           'NavigationShell: prewarm calendar',
         );
@@ -157,16 +160,15 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
             previous?.criticalRisk != true) {
           _criticalSecurityLogoutStarted = true;
           AppLogger.safeUnawait(
-            ref
-                .read(authProvider.notifier)
-                .logout(force: true)
-                .catchError(
-                  (Object e, StackTrace st) => AppLogger.e(
-                    'NavigationShell: Forced logout failed',
-                    e,
-                    st,
-                  ),
-                ),
+            ref.read(authProvider.notifier).logout(force: true).catchError(
+              (Object e, StackTrace st) {
+                AppLogger.e(
+                  'NavigationShell: Forced logout failed',
+                  e,
+                  st,
+                );
+              },
+            ),
             'NavigationShell: forced logout',
           );
         }
@@ -241,7 +243,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         ),
         builder: (context) => const TrackingScreen(),
       );
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      if (mounted) {
+        ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      }
     }
 
     Future<void> showNotificationsOverlay() async {
@@ -256,7 +260,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         ),
         builder: (context) => const NotificationsScreen(),
       );
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      if (mounted) {
+        ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      }
     }
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -280,7 +286,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         context: context,
         builder: (context) => const AddAttendanceDialog(),
       );
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      if (mounted) {
+        ref.read(uiModalOpenProvider.notifier).setOpen(false);
+      }
     }
 
     final mainScaffold = Scaffold(

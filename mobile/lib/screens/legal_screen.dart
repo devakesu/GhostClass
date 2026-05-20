@@ -202,17 +202,20 @@ class _LegalScreenState extends State<LegalScreen> {
                           ? MarkdownBody(
                               data: widget.body,
                               onTapLink: (text, href, title) {
-                                if (href != null)
+                                if (href != null) {
                                   AppLogger.safeUnawait(
                                     _launchUrl(href).catchError(
-                                      (Object e, StackTrace st) => AppLogger.e(
-                                        'LegalScreen: launchUrl failed',
-                                        e,
-                                        st,
-                                      ),
+                                      (Object e, StackTrace st) {
+                                        AppLogger.e(
+                                          'LegalScreen: launchUrl failed',
+                                          e,
+                                          st,
+                                        );
+                                      },
                                     ),
                                     'LegalScreen: launchUrl',
                                   );
+                                }
                               },
                               styleSheet: MarkdownStyleSheet(
                                 p: GoogleFonts.manrope(

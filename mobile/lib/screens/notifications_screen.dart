@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:ghostclass/services/logger.dart';
 
 // The exact Riverpod 3.x auto-dispose future provider type is an internal
 // generic that cannot be named explicitly in consumer code.
@@ -135,7 +135,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                                     context,
                                     'All notifications marked as read',
                                   );
-                                } catch (e) {
+                                } on Object catch (_) {
                                   if (!context.mounted) return;
                                   ServiceToast.show(
                                     context,

@@ -99,7 +99,7 @@ class GhostClassScreen extends ConsumerWidget {
                           await ref
                               .read(authProvider.notifier)
                               .updateSettings(bunkEnabled: val);
-                        } on Object catch (e) {
+                        } on Object catch (_) {
                           if (context.mounted) {
                             ServiceToast.show(
                               context,
@@ -117,7 +117,7 @@ class GhostClassScreen extends ConsumerWidget {
                                 bunkEnabled:
                                     !user.settings.bunkCalculatorEnabled,
                               );
-                        } on Object catch (e) {
+                        } on Object catch (_) {
                           if (context.mounted) {
                             ServiceToast.show(
                               context,
@@ -664,7 +664,7 @@ class GhostClassScreen extends ConsumerWidget {
                             .read(authProvider.notifier)
                             .updateSettings(targetPercentage: localTarget);
                         if (context.mounted) Navigator.pop(context);
-                      } on Object catch (e) {
+                      } on Object catch (_) {
                         if (context.mounted) {
                           ServiceToast.show(
                             context,

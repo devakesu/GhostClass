@@ -680,6 +680,7 @@ class _InfoRow {
         (copyable
             ? () {
                 final _ = Clipboard.setData(ClipboardData(text: value));
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(

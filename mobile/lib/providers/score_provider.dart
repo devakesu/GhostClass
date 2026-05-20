@@ -171,7 +171,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       );
 
       return _applyFilter(state, 'all');
-    } catch (e) {
+    } on Object catch (e) {
       throw Exception('Failed to load internal marks: $e');
     }
   }

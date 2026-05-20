@@ -698,7 +698,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         academicYear: initialYear?.toString(),
       );
 
-      final _saves = <Future<void>>[
+      final saves = <Future<void>>[
         storage.saveEzygoToken(ezygoToken).catchError((
           Object e,
           StackTrace st,
@@ -759,7 +759,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             );
           }),
       ];
-      await Future.wait(_saves);
+      await Future.wait(saves);
 
       final cachedUser = await _buildStoredUserForIdentity(
         supabaseUserId: supabaseUser.id,
@@ -862,7 +862,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       AppLogger.e('AuthNotifier: SUPABASE AUTH ERROR', e);
       state = AsyncValue.error(e, st);
       rethrow;
-    } catch (e, st) {
+    } on Object catch (e, st) {
       AppLogger.e('AuthNotifier: LOGIN ERROR', e);
       state = AsyncValue.error(e, st);
       rethrow;
@@ -891,13 +891,15 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       // On forced logout (e.g. security lockdown), also wipe sensitive
       // secure storage entries such as EzyGo and FCM tokens.
       final storage = ref.read(secureStorageProvider);
-      final ops = <Future>[
+      final ops = <Future<dynamic>>[
         ref.read(supabaseClientProvider).auth.signOut(),
         _clearSharedPrefs(),
       ];
       if (force) {
-        ops.add(storage.clearEzygoToken());
-        ops.add(storage.saveFcmToken(''));
+        ops.addAll([
+          storage.clearEzygoToken(),
+          storage.saveFcmToken(''),
+        ]);
       }
       await Future.wait(ops);
     } on Object catch (e) {
@@ -1129,7 +1131,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       AppLogger.i(
         'AuthNotifier: Academic context updated successfully ($sem, $year)',
       );
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: Failed to update academic context', e);
       if (e is AppException && e.isAuthError) {
         final isSecurityError = e.details?['type'] == 'security';
@@ -1165,7 +1167,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
       // Update local state by re-fetching profile (this ensures ID and other fields sync)
       await refreshProfile(force: true);
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('AuthNotifier: Institution update failed', e);
       rethrow;
     }
@@ -1371,7 +1373,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       return mergedUser;
     }
 
-    final _saves = <Future<void>>[
+    final saves = <Future<void>>[
       storage.saveEzygoToken(mergedUser.ezygoToken.value).catchError((
         Object e,
         StackTrace st,
@@ -1451,7 +1453,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           );
         }),
     ];
-    await Future.wait(_saves);
+    await Future.wait(saves);
 
     final academicChanged =
         nextAcademic != null &&

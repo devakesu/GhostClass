@@ -15,6 +15,7 @@ import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Top-level background message handler for FCM.
 /// Must be a standalone function to run in a separate isolate.
@@ -236,7 +237,7 @@ class PushNotificationService {
       // registration when a session becomes available. This avoids silently
       // dropping device tokens that arrived before login.
       if (currentSession == null) {
-        StreamSubscription? sub;
+        StreamSubscription<AuthState>? sub;
         // Defensive timeout: if the user never signs in, cancel the listener
         // after a reasonable period to avoid resource leaks.
         Timer? timeoutTimer;

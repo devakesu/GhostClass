@@ -322,7 +322,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           );
         } on Object catch (_) {}
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to insert record', e);
       rethrow;
     }
@@ -378,7 +378,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           } on Object catch (_) {}
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to delete record', e);
       rethrow;
     }
@@ -426,7 +426,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
       await query;
       await refresh();
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to clear records', e);
       rethrow;
     }

@@ -201,6 +201,9 @@ void main() {
         when(
           () => mockStorage.getEzygoToken(),
         ).thenAnswer((_) async => 'stored_token');
+        when(
+          () => mockStorage.getNormalizedEzygoToken(),
+        ).thenAnswer((_) async => 'stored_token');
 
         await authService.refreshProfile('sub', sync: true);
         await authService.refreshProfile('sub');
@@ -218,6 +221,9 @@ void main() {
 
         // test getUser with null token
         when(() => mockStorage.getEzygoToken()).thenAnswer((_) async => null);
+        when(
+          () => mockStorage.getNormalizedEzygoToken(),
+        ).thenAnswer((_) async => null);
         await authService.getUser(mockStorage);
       },
     );
