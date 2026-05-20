@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -6,14 +5,15 @@ import { headers, cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import crypto from "crypto";
 import { z } from "zod";
-import { redis } from "@/lib/redis";
-import { redact, getClientIp, egressFetch } from "@/lib/utils.server";
+import { getClientIp, egressFetch } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseConfig } from "@/lib/supabase/fetch";
 import { performProfileSync } from "@/lib/user/sync";
 import { withSecurity } from "@/lib/security/app-check";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
+import { getAuthLock, releaseAuthLock as releaseAuthLockUtil } from "@/lib/security/auth-lock";
 
 export const dynamic = "force-dynamic";
 
@@ -33,60 +33,13 @@ const EzygoUserSchema = z.object({
   mobile: z.string().optional(),
 });
 
+// Auth-lock TTL in seconds (15–60 s), converted to ms when calling auth-lock module.
 const AUTH_LOCK_TTL = (() => {
   const raw = process.env.AUTH_LOCK_TTL;
   const parsed = raw ? parseInt(raw, 10) : NaN;
   if (isNaN(parsed) || parsed <= 0) return 20;
   return Math.max(15, Math.min(parsed, 60));
 })();
-
-async function acquireAuthLock(userId: string): Promise<string | null> {
-  const lockKey = `auth_lock:${userId}`;
-  const lockValue = crypto.randomBytes(16).toString("hex");
-  try {
-    const result = await redis.set(lockKey, lockValue, {
-      nx: true,
-      ex: AUTH_LOCK_TTL,
-    });
-    return result === "OK" ? lockValue : null;
-  } catch (error) {
-    logger.error("Failed to acquire auth lock:", error);
-    Sentry.captureException(error, {
-      tags: { type: "redis_lock_error", location: "acquire_auth_lock" },
-      extra: { userId: redact("id", userId) },
-    });
-    throw error;
-  }
-}
-
-async function releaseAuthLock(
-  userId: string,
-  lockValue: string
-): Promise<void> {
-  const lockKey = `auth_lock:${userId}`;
-  try {
-    const luaScript = `
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-      else
-        return 0
-      end
-    `;
-    const result = await redis.eval(luaScript, [lockKey], [lockValue]);
-    if (result === 0) {
-      logger.warn(
-        `Lock for user ${redact("id", userId)} was already released or expired`
-      );
-    }
-  } catch (error) {
-    logger.error("Failed to release auth lock:", error);
-    Sentry.captureException(error, {
-      tags: { type: "redis_lock_error", location: "release_auth_lock" },
-      extra: { userId: redact("id", userId) },
-    });
-    throw error;
-  }
-}
 
 async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (isMobileApp || process.env.NODE_ENV === "development") return null;
@@ -137,20 +90,29 @@ async function handleOrphanUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   email: string
 ) {
-  let page = 1;
-  const PER_PAGE = 1000;
-  while (page <= 10) {
-    const { data } = await supabaseAdmin.auth.admin.listUsers({
-      page,
-      perPage: PER_PAGE,
-    });
-    const found = data.users.find((u: { email?: string; id: string }) => u.email === email);
-    if (found) {
-      await supabaseAdmin.auth.admin.deleteUser(found.id);
-      return;
-    }
-    if (data.users.length < PER_PAGE) break;
-    page++;
+  const { url, key } = getSupabaseConfig("admin");
+  const endpoint = new URL("/auth/v1/admin/users", url);
+  endpoint.searchParams.set("email", email);
+  endpoint.searchParams.set("page", "1");
+  endpoint.searchParams.set("per_page", "1");
+
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Orphan user lookup failed");
+  }
+
+  const payload = await response.json().catch(() => null) as { users?: Array<{ email?: string; id: string }> } | null;
+  const found = payload?.users?.find((u) => u.email === email);
+  if (found) {
+    await supabaseAdmin.auth.admin.deleteUser(found.id);
+    return;
   }
   throw new Error("Orphan user not found");
 }
@@ -158,12 +120,12 @@ async function handleOrphanUser(
 async function validateClientIpAndRateLimit(headerList: Headers): Promise<NextResponse | null> {
   const ip = getClientIp(headerList);
   if (!ip) {
-    return NextResponse.json({ error: "Unable to determine client IP" }, { status: 400 });
+    return NextResponse.json({ message: "Unable to determine client IP" }, { status: 400 });
   }
 
   const { success } = await authRateLimiter.limit(ip);
   if (!success) {
-    return NextResponse.json({ error: "Rate limit" }, { status: 429 });
+    return NextResponse.json({ message: "Rate limit" }, { status: 429 });
   }
 
   return null;
@@ -236,7 +198,7 @@ async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean):
   const originError = await validateOrigin(headerList, isAppCheck);
   if (originError) {
     const status = originError === "Server configuration error" ? 500 : 403;
-    return NextResponse.json({ error: originError }, { status });
+    return NextResponse.json({ message: originError }, { status });
   }
 
   const rateLimitErr = await validateClientIpAndRateLimit(headerList);
@@ -257,7 +219,8 @@ function handleAuthError(error: unknown) {
   if (errObj?.message?.includes("Redis")) {
     return NextResponse.json({ message: "Service Unavailable" }, { status: 503 });
   }
-  return NextResponse.json({ error: "Auth failed" }, { status: 500 });
+  // L-1: Standardised to {message} to match all other error responses in this handler.
+  return NextResponse.json({ message: "Auth failed" }, { status: 500 });
 }
 
 const handler = async (
@@ -287,9 +250,10 @@ const handler = async (
       return NextResponse.json({ message: "Invalid user identifier" }, { status: 400 });
     }
 
-    lockValue = await acquireAuthLock(verifiedId);
+    // C-3: Use canonical auth-lock module (removes duplicated Lua script).
+    lockValue = await getAuthLock(verifiedId, AUTH_LOCK_TTL * 1000);
     if (!lockValue) {
-      return NextResponse.json({ error: "Lock contention" }, { status: 409 });
+      return NextResponse.json({ message: "Lock contention" }, { status: 409 });
     }
 
     const supabaseAdmin = getAdminClient();
@@ -302,9 +266,19 @@ const handler = async (
       verifiedId
     );
 
+    // C-1: Mirror the isProd guard from proxy.ts so dev/staging sessions are set
+    // against the correct Supabase project and match the middleware's session cookies.
+    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
+    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      supabaseUrl,
+      supabaseKey,
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
@@ -371,7 +345,7 @@ const handler = async (
     return handleAuthError(error);
   } finally {
     if (lockValue && verifiedId) {
-      await releaseAuthLock(verifiedId, lockValue);
+      await releaseAuthLockUtil(verifiedId, lockValue);
     }
   }
 };

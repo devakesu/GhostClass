@@ -34,6 +34,8 @@ describe('GlobalError', () => {
 
     render(<GlobalError error={error} reset={reset} />);
 
+    expect(screen.getByText(/Error ID:/)).toBeDefined();
+    expect(screen.getByText('global-digest')).toBeDefined();
     expect(Sentry.captureException).toHaveBeenCalledWith(error, expect.objectContaining({
       tags: expect.objectContaining({ digest: 'global-digest' }),
     }));

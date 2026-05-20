@@ -39,10 +39,9 @@ describe("Auth Lock", () => {
       expect(lock).toBeNull();
     });
 
-    it("handles redis errors gracefully", async () => {
+    it("handles redis errors by throwing", async () => {
       (redis.set as any).mockRejectedValue(new Error("Redis down"));
-      const lock = await getAuthLock("user-1");
-      expect(lock).toBeNull();
+      await expect(getAuthLock("user-1")).rejects.toThrow("Redis down");
     });
   });
 
@@ -64,10 +63,9 @@ describe("Auth Lock", () => {
       expect(success).toBe(false);
     });
 
-    it("handles errors during release", async () => {
+    it("handles errors during release by throwing", async () => {
       (redis.eval as any).mockRejectedValue(new Error("Eval failed"));
-      const success = await releaseAuthLock("user-1", "val");
-      expect(success).toBe(false);
+      await expect(releaseAuthLock("user-1", "val")).rejects.toThrow("Eval failed");
     });
   });
 

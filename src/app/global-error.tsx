@@ -135,6 +135,12 @@ export default function GlobalError({
             You can try refreshing the page or return to the homepage.
           </p>
 
+          {error.digest && (
+            <p style={{ color: 'var(--ge-muted)', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
+              Error ID: <code style={{ color: 'var(--ge-error-code)' }}>{error.digest}</code>
+            </p>
+          )}
+
           {process.env.NODE_ENV === 'development' && (
             <details style={{
               textAlign: 'left',

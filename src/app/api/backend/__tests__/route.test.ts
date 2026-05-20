@@ -109,7 +109,7 @@ describe('Backend Proxy Route', () => {
     HEAD = routeModule.HEAD;
 
     const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
-    ezygoCircuitBreaker.reset();
+    await ezygoCircuitBreaker.reset();
   });
 
   afterEach(() => {
@@ -577,7 +577,7 @@ describe('Backend Proxy Route', () => {
     beforeEach(async () => {
       // Reset circuit breaker before each test to ensure clean state
       const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
-      ezygoCircuitBreaker.reset();
+      await ezygoCircuitBreaker.reset();
     });
 
     it('should treat 429 as breaker-worthy and preserve error message in production', async () => {

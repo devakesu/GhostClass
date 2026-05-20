@@ -64,22 +64,19 @@ export function getRedis(): Redis {
  */
 export function __resetRedisClient(): void {
   redisInstance = null;
-  proxyClient = null;
 }
 
 /**
  * Default export for convenience - uses lazy initialization
  * Usage: import redis from '@/lib/redis'
- * 
- * Note: This creates a getter that initializes Redis on first access
+ *
+ * The proxy always resolves through getRedis() so every access shares the
+ * same singleton instance.
  */
-let proxyClient: Redis | null = null;
 export const redis = new Proxy({} as Redis, {
   get(_target, prop) {
-    if (!proxyClient) {
-      proxyClient = getRedis();
-    }
-    const value = proxyClient[prop as keyof Redis];
-    return typeof value === 'function' ? value.bind(proxyClient) : value;
+    const client = getRedis();
+    const value = client[prop as keyof Redis];
+    return typeof value === 'function' ? value.bind(client) : value;
   }
 });

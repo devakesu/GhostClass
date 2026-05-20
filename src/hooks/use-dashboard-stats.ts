@@ -204,8 +204,8 @@ function updateCourseStatForTrack(
       cStat.present++;
       cStat.correctionPresent++;
     } else if (offPos && !trackPos) {
-      cStat.present--;
-      cStat.correctionPresent--;
+      cStat.present = Math.max(0, cStat.present - 1);
+      cStat.correctionPresent = Math.max(0, cStat.correctionPresent - 1);
     }
   }
 }

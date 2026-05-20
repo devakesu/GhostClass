@@ -24,6 +24,7 @@ export function _resetModuleState() {
   SECRET = null;
   secretWarningShown = false;
   hasLoggedDevIpWarning = false;
+  _resetEgressTargetsCache();
 }
 
 function getSecret(): string {
@@ -118,7 +119,7 @@ export function getClientIp(headerList: Headers): string | null {
 // egressFetch — multi-tier fetch wrapper with automatic failover
 // ---------------------------------------------------------------------------
 
-const RETRYABLE_EGRESS_STATUSES = new Set([429, 502, 503, 504]);
+const RETRYABLE_EGRESS_STATUSES = new Set([429, 500, 502, 503, 504]);
 const PER_TIER_TIMEOUT_MS = 10_000;
 
 interface EgressTarget {
@@ -157,6 +158,23 @@ function buildEgressTargets(): EgressTarget[] {
   }
 
   return targets;
+}
+
+// H-4: Cache the egress target list for the process lifetime.
+// Env vars do not change at runtime; rebuilding the list on every fetch is
+// wasteful. Tests can call _resetEgressTargetsCache() to force a rebuild.
+let _cachedEgressTargets: EgressTarget[] | null = null;
+
+/** @internal Test helper — resets the egress-targets module cache. */
+export function _resetEgressTargetsCache(): void {
+  _cachedEgressTargets = null;
+}
+
+function getCachedEgressTargets(): EgressTarget[] {
+  if (!_cachedEgressTargets) {
+    _cachedEgressTargets = buildEgressTargets();
+  }
+  return _cachedEgressTargets;
 }
 
 async function populateStealthHeaders(headers: Headers, targetHeaders: Record<string, string>): Promise<void> {
@@ -247,7 +265,7 @@ export async function egressFetch(
   endpoint: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const targets = buildEgressTargets();
+  const targets = getCachedEgressTargets();
   if (targets.length === 0) {
     throw new Error("No egress targets configured — set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL");
   }

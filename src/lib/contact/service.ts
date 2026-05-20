@@ -129,6 +129,8 @@ export async function processContactSubmission(
     const adminEmailResult = await sendEmail({
       to: getContactEmail(),
       subject: `[New Inquiry] ${safeSubject}`,
+      fromName: safeName,
+      toName: "GhostClass Team",
       replyTo: payload.email,
       html: renderContactAdminEmail({
         name: safeName,
@@ -149,6 +151,7 @@ export async function processContactSubmission(
       await sendEmail({
         to: payload.email,
         subject: `We received your message: ${safeSubject}`,
+        toName: safeName,
         html: renderContactConfirmationEmail({
           name: safeName,
           subject: safeSubject,

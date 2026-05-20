@@ -10,6 +10,7 @@ export interface SendEmailProps {
   html: string;
   text?: string;
   replyTo?: string;
+  fromName?: string;
   toName?: string;
 }
 
@@ -35,6 +36,8 @@ const getSenderEmail = () => {
   }
   return 'admin@' + appEmail.replace(/^@/, '');
 };
+
+const getSenderName = (fromName?: string) => fromName?.trim() || process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass';
 
 const CONFIG = {
   get sender() {
@@ -77,7 +80,7 @@ async function getSendPulseToken() {
   }
 }
 
-async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
@@ -87,7 +90,10 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: Se
         html: Buffer.from(html).toString("base64"), 
         text: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
         subject,
-        from: CONFIG.sender,
+        from: {
+          email: CONFIG.sender.email,
+          name: getSenderName(fromName),
+        },
         to: [{ email: to, name: toName || "User" }],
         ...(replyTo ? { reply_to: { email: replyTo } } : {}),
       },
@@ -113,12 +119,15 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: Se
   }
 }
 
-async function sendViaBrevo({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaBrevo({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
     const payload = {
-      sender: CONFIG.sender,
+      sender: {
+        email: CONFIG.sender.email,
+        name: getSenderName(fromName),
+      },
       to: [{ email: to, ...(toName ? { name: toName } : {}) }],
       subject,
       htmlContent: html,

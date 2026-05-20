@@ -7,6 +7,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
 import * as Sentry from "@sentry/nextjs";
+import { Ratelimit } from "@upstash/ratelimit";
+
+// C-2: Module-level lazy singletons — avoids creating a new Ratelimit instance
+// (and its internal HTTP connection pool) on every inbound request.
+let _webProxyLimiter: Ratelimit | null = null;
+let _webApiLimiter: Ratelimit | null = null;
+
+function getWebProxyLimiter(): Ratelimit {
+  if (!_webProxyLimiter) {
+    const limit = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10);
+    const window = parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10);
+    _webProxyLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
+      prefix: "@ghostclass/web-proxy",
+    });
+  }
+  return _webProxyLimiter;
+}
+
+function getWebApiLimiter(): Ratelimit {
+  if (!_webApiLimiter) {
+    const limit = parseInt(process.env.WEB_RATE_LIMIT_REQUESTS || "60", 10);
+    const window = parseInt(process.env.WEB_RATE_LIMIT_WINDOW || "60", 10);
+    _webApiLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
+      prefix: "@ghostclass/web-api",
+    });
+  }
+  return _webApiLimiter;
+}
 
 export interface AppCheckResult {
   isValid: boolean;
@@ -230,16 +262,8 @@ async function handleRateLimit(req: NextRequest, clientIp: string | null) {
   try {
     const path = req.nextUrl?.pathname || new URL(req.url).pathname;
     const isBackend = path.startsWith("/api/backend/");
-    const limit = isBackend ? parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10) : parseInt(process.env.WEB_RATE_LIMIT_REQUESTS || "60", 10);
-    const window = isBackend ? parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10) : 60;
-
-    const { Ratelimit } = await import("@upstash/ratelimit");
-    const limiter = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
-      prefix: isBackend ? "@ghostclass/web-proxy" : "@ghostclass/web-api",
-    });
-
+    // C-2: Use pre-initialised module-level singletons instead of per-request instantiation.
+    const limiter = isBackend ? getWebProxyLimiter() : getWebApiLimiter();
     const result = await limiter.limit(`web:${clientIp}`);
     return result.success;
   } catch (e) {

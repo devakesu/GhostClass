@@ -52,11 +52,21 @@ vi.mock("@/lib/crypto", () => ({
   decrypt: vi.fn(() => "decrypted-token")
 }));
 
+// Mock redis
+vi.mock("@/lib/redis", () => ({
+  redis: {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => null),
+  }
+}));
+
 // Mock logger
 vi.mock("@/lib/logger", () => ({
   logger: {
     info: vi.fn(),
-    warn: vi.fn()
+    warn: vi.fn(),
+    dev: vi.fn(),
+    error: vi.fn(),
   }
 }));
 
