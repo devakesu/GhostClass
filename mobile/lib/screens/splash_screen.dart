@@ -12,6 +12,11 @@ import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/leave_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/score_provider.dart';
+import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -28,6 +33,23 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  void _prewarmAppData() {
+    void prewarm(Future<dynamic> future, String label) {
+      AppLogger.safeUnawait(
+        future.catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
+        }),
+        'SplashScreen: $label prewarm',
+      );
+    }
+
+    prewarm(ref.read(dashboardProvider.future), 'dashboard');
+    prewarm(ref.read(trackingProvider.future), 'tracking');
+    prewarm(ref.read(leaveProvider.future), 'leave');
+    prewarm(ref.read(scoreProvider.future), 'scores');
+    prewarm(ref.read(notificationsProvider.future), 'notifications');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +62,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     // 1. Proactively pre-warm security layers while logo is showing
     final jwePreWarm = JweService.instance.preWarm();
     final apiPreWarm = ref.read(apiServiceProvider).preWarm();
+    final splashHold = Future<void>.delayed(
+      const Duration(milliseconds: 3000),
+      () {
+        AppLogger.i('SplashScreen: 3s delay completed');
+      },
+    );
 
     // 2. Critical Security Check First
     try {
@@ -71,9 +99,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         apiPreWarm.then((_) {
           AppLogger.i('SplashScreen: apiPreWarm completed');
         }),
-        Future<void>.delayed(const Duration(milliseconds: 3000)).then((_) {
-          AppLogger.i('SplashScreen: 3s delay completed');
-        }),
       ]);
 
       AppLogger.i('SplashScreen: Future.wait completed successfully');
@@ -97,6 +122,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
 
       final user = results[1] as AuthenticatedUser?;
+      _prewarmAppData();
+
+      await splashHold;
+
       AppLogger.i(
         'SplashScreen: Initialized user: ${user?.supabaseUserId ?? "null"} (syncing: ${user?.isSyncing ?? "false"})',
       );

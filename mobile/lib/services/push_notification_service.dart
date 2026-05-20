@@ -220,14 +220,8 @@ class PushNotificationService {
     try {
       final cachedToken = await _storage.getNormalizedFcmToken();
 
-      // Always persist the token locally so we can retry registration later
-      // even if the current session is not available right now.
-      if (cachedToken != token) {
-        try {
-          await _storage.saveFcmToken(token);
-        } on Object catch (e, st) {
-          AppLogger.e('PushNotificationService: saveFcmToken failed', e, st);
-        }
+      if (cachedToken == token) {
+        return;
       }
 
       final supabase = _ref.read(supabaseClientProvider);
@@ -257,6 +251,15 @@ class PushNotificationService {
               );
               if (response.statusCode == 200) {
                 AppLogger.i('FCM push token registered on auth event');
+                try {
+                  await _storage.saveFcmToken(token);
+                } on Object catch (e, st) {
+                  AppLogger.e(
+                    'PushNotificationService: saveFcmToken failed on auth event',
+                    e,
+                    st,
+                  );
+                }
                 try {
                   AppLogger.safeUnawait(
                     AnalyticsService.instance
@@ -310,6 +313,11 @@ class PushNotificationService {
 
       if (response.statusCode == 200) {
         AppLogger.i('FCM push token securely registered with backend services');
+        try {
+          await _storage.saveFcmToken(token);
+        } on Object catch (e, st) {
+          AppLogger.e('PushNotificationService: saveFcmToken failed', e, st);
+        }
         try {
           AppLogger.safeUnawait(
             AnalyticsService.instance

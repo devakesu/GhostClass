@@ -115,6 +115,16 @@ void main() async {
 
   HttpOverrides.global = MyHttpOverrides();
 
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    AppLogger.e('Flutter Framework Error', details.exception, details.stack);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.e('Uncaught Async Error', error, stack);
+    return true;
+  };
+
   // Initialize Firebase & App Check
   try {
     await _initializeFirebase();
@@ -146,6 +156,8 @@ void main() async {
       'Origin': sOrigin,
     },
   );
+
+  await ThemeNotifier.preload();
 
   // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
   AppLogger.safeUnawait(JweService.instance.preWarm(), 'JWE pre-warm');
@@ -188,16 +200,6 @@ void main() async {
       },
     ),
   );
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    AppLogger.e('Flutter Framework Error', details.exception, details.stack);
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.e('Uncaught Async Error', error, stack);
-    return true;
-  };
 }
 
 /// MyApp

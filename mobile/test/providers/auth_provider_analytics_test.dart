@@ -534,7 +534,6 @@ void main() {
       await notifier.updateAcademicContext('Even', '2025-2026');
 
       verify(() => mockApi.clearCaches()).called(1);
-      verify(() => mockApi.scheduleSync(any(), force: true)).called(1);
       expect(refreshCount, equals(1));
 
       final user = container.read(authProvider).value;

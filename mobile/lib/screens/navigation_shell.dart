@@ -581,45 +581,55 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        mainScaffold,
+        ExcludeSemantics(
+          excluding: showSecurityBarrier,
+          child: mainScaffold,
+        ),
         // The Semicircle Button (Positioned at bottom center, above everything)
         Positioned(
           bottom: 75 + bottomPadding, // Account for bottom safe area/notch
-          child: IgnorePointer(
-            ignoring:
+          child: ExcludeSemantics(
+            excluding:
                 isModalOpen ||
                 (selectedIndex > 1) ||
                 showOutageBarrier ||
                 showSecurityBarrier,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity:
-                  (isModalOpen ||
-                      (selectedIndex > 1) ||
-                      showOutageBarrier ||
-                      showSecurityBarrier)
-                  ? 0
-                  : 1,
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  onTap: showAddAttendanceDialog,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(72),
-                  ),
-                  child: Container(
-                    width: 72,
-                    height: 34, // Reduced height
-                    decoration: BoxDecoration(
-                      color: primary,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(72),
-                      ),
+            child: IgnorePointer(
+              ignoring:
+                  isModalOpen ||
+                  (selectedIndex > 1) ||
+                  showOutageBarrier ||
+                  showSecurityBarrier,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity:
+                    (isModalOpen ||
+                        (selectedIndex > 1) ||
+                        showOutageBarrier ||
+                        showSecurityBarrier)
+                    ? 0
+                    : 1,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: showAddAttendanceDialog,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(72),
                     ),
-                    child: Icon(
-                      LucideIcons.plus,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      size: 24,
+                    child: Container(
+                      width: 72,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(72),
+                        ),
+                      ),
+                      child: Icon(
+                        LucideIcons.plus,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
@@ -671,147 +681,169 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         // --- GLOBAL SECURITY BARRIER ---
         if (showSecurityBarrier)
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.red.withValues(alpha: 0.3),
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              label: securityMessage.isEmpty
+                  ? 'Security verification failed.'
+                  : 'Security verification failed. $securityMessage',
+              child: Stack(
+                children: [
+                  const ModalBarrier(
+                    dismissible: false,
+                    color: Colors.black,
+                    semanticsLabel: 'Security verification failed',
+                  ),
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.red.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  LucideIcons.shieldAlert,
+                                  size: 48,
+                                  color: Colors.red,
+                                ),
+                              )
+                              .animate(
+                                onPlay: (controller) =>
+                                    controller.repeat(reverse: true),
+                              )
+                              .scale(
+                                begin: const Offset(1, 1),
+                                end: const Offset(1.1, 1.1),
+                                duration: 1000.ms,
+                              ),
+                          const SizedBox(height: 32),
+                          Text(
+                            'Security Verification Failed',
+                            style: GoogleFonts.manrope(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            securityMessage,
+                            style: GoogleFonts.manrope(
+                              fontSize: 15,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 48),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () async {
+                                if (isCriticalSecurityFailure) {
+                                  exit(0);
+                                }
+
+                                // Clear lock and retry
+                                ref.read(apiServiceProvider).clearCaches();
+                                ref
+                                    .read(securityFailureProvider.notifier)
+                                    .clearFailure();
+                                try {
+                                  await ref
+                                      .read(authProvider.notifier)
+                                      .refreshProfile(force: true);
+                                } on Object {
+                                  // The 401 interceptor will catch it again if it still fails
+                                }
+                              },
+                              child: Text(
+                                isCriticalSecurityFailure
+                                    ? 'Close App'
+                                    : 'Restart App',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black,
+                                ),
+                              ),
                             ),
                           ),
-                          child: const Icon(
-                            LucideIcons.shieldAlert,
-                            size: 48,
-                            color: Colors.red,
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () => SupportHelper.contactViaEmail(
+                                subject:
+                                    'Security Failure Report [v${AppConfig.appVersion}]',
+                                customBody:
+                                    'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+                                    '-- SUMMARY --\n'
+                                    'Message: $securityMessage\n\n'
+                                    '-- PERSISTENCE --\n'
+                                    '${SupportHelper.persistenceMessage}\n',
+                              ),
+                              icon: const Icon(LucideIcons.mail, size: 18),
+                              label: Text(
+                                'Contact Support',
+                                style: GoogleFonts.manrope(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                        )
-                        .animate(
-                          onPlay: (controller) =>
-                              controller.repeat(reverse: true),
-                        )
-                        .scale(
-                          begin: const Offset(1, 1),
-                          end: const Offset(1.1, 1.1),
-                          duration: 1000.ms,
-                        ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Security Verification Failed',
-                      style: GoogleFonts.manrope(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      securityMessage,
-                      style: GoogleFonts.manrope(
-                        fontSize: 15,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 48),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: () async {
-                          if (isCriticalSecurityFailure) {
-                            exit(0);
-                          }
-
-                          // Clear lock and retry
-                          ref.read(apiServiceProvider).clearCaches();
-                          ref
-                              .read(securityFailureProvider.notifier)
-                              .clearFailure();
-                          try {
-                            await ref
-                                .read(authProvider.notifier)
-                                .refreshProfile(force: true);
-                          } on Object {
-                            // The 401 interceptor will catch it again if it still fails
-                          }
-                        },
-                        child: Text(
-                          isCriticalSecurityFailure
-                              ? 'Close App'
-                              : 'Restart App',
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                          if (!isCriticalSecurityFailure) ...[
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () =>
+                                  ref.read(authProvider.notifier).logout(),
+                              child: Text(
+                                'Logout of GhostClass',
+                                style: GoogleFonts.manrope(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.3),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: () => SupportHelper.contactViaEmail(
-                          subject:
-                              'Security Failure Report [v${AppConfig.appVersion}]',
-                          customBody:
-                              'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
-                              '-- SUMMARY --\n'
-                              'Message: $securityMessage\n\n'
-                              '-- PERSISTENCE --\n'
-                              '${SupportHelper.persistenceMessage}\n',
-                        ),
-                        icon: const Icon(LucideIcons.mail, size: 18),
-                        label: Text(
-                          'Contact Support',
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (!isCriticalSecurityFailure) ...[
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () =>
-                            ref.read(authProvider.notifier).logout(),
-                        child: Text(
-                          'Logout of GhostClass',
-                          style: GoogleFonts.manrope(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ).animate().fadeIn(duration: 400.ms),

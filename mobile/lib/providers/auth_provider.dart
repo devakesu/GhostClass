@@ -24,7 +24,6 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginException implements Exception {
@@ -157,6 +156,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   bool _isRefreshing = false;
   bool _isInitializing = false;
   int _consecutiveHealFailures = 0;
+  int _profileRefreshGeneration = 0;
   Future<void>? _refreshProfileInFlight;
   Future<AuthenticatedUser>? _profileRefreshInFlight;
 
@@ -576,17 +576,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         'AuthNotifier: prefetch institutions',
       );
 
-      // 2. Trigger EzyGo cron sync in background (non-blocking)
-      AppLogger.safeUnawait(
-        api.scheduleSync(token, force: true).catchError((
-          Object e,
-          StackTrace st,
-        ) {
-          AppLogger.e('AuthNotifier: scheduleSync (startup) failed', e, st);
-        }),
-        'AuthNotifier: scheduleSync(startup)',
-      );
-
       // If we are not running silently, clear the syncing status to unlock the UI
       if (!silent) {
         final finalUser = state.value;
@@ -817,20 +806,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
                 }),
                 'AuthNotifier: prefetch institutions (post-login)',
               );
-
-              AppLogger.safeUnawait(
-                ref
-                    .read(apiServiceProvider)
-                    .scheduleSync(token, force: true)
-                    .catchError((Object e, StackTrace st) {
-                      AppLogger.e(
-                        'AuthNotifier: scheduleSync (post-login) failed',
-                        e,
-                        st,
-                      );
-                    }),
-                'AuthNotifier: scheduleSync (post-login)',
-              );
             } on Object catch (e) {
               AppLogger.e('AuthNotifier: Post-login cron sync failed', e);
             } finally {
@@ -882,6 +857,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     state = const AsyncValue.data(null);
     // Stop periodic refreshes and prevent in-flight refresh continuations
     _refreshTimer?.cancel();
+    _profileRefreshGeneration++;
     _refreshProfileInFlight = null;
     _profileRefreshInFlight = null;
     // Wipe any in-memory entropy used by `EncryptedValue` to prevent
@@ -893,7 +869,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final storage = ref.read(secureStorageProvider);
       final ops = <Future<dynamic>>[
         ref.read(supabaseClientProvider).auth.signOut(),
-        _clearSharedPrefs(),
       ];
       if (force) {
         ops.addAll([
@@ -908,15 +883,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     try {
       await AnalyticsService.instance.logLogout();
     } on Object catch (_) {}
-  }
-
-  Future<void> _clearSharedPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-    } on Object catch (e, st) {
-      AppLogger.e('AuthNotifier: Failed to clear shared preferences', e, st);
-    }
   }
 
   Future<void> updateAvatar(String publicUrl) async {
@@ -1102,21 +1068,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           );
         }
 
-        // 2. Trigger the backend cron sync in the background (non-blocking)
-        AppLogger.safeUnawait(
-          api.scheduleSync(token, force: true).catchError((
-            Object e,
-            StackTrace st,
-          ) {
-            AppLogger.e(
-              'AuthNotifier: scheduleSync (academic update) failed',
-              e,
-              st,
-            );
-          }),
-          'AuthNotifier: scheduleSync (academic update)',
-        );
-
         await _applyProfileResponseData(
           currentUser: syncingUser,
           data: response.data as Map<String, dynamic>,
@@ -1235,6 +1186,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     bool sync = false,
     bool force = false,
   }) async {
+    final refreshGeneration = _profileRefreshGeneration;
     final token = supabaseToken ?? await _getFreshSupabaseToken();
     if (token == null) {
       throw const AppException(
@@ -1275,7 +1227,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       updateState: false,
     );
 
-    if (updateState) {
+    if (updateState && refreshGeneration == _profileRefreshGeneration) {
       final currentState = state.value;
       if (currentState == null ||
           currentState.supabaseUserId == user.supabaseUserId) {
