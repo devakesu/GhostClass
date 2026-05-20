@@ -163,7 +163,7 @@ String normalizeDate(dynamic date) {
     }
   }
 
-  AppLogger.w(
+  AppLogger.e(
     'attendance_utils.normalizeDate: Unrecognized date format. Returning empty string to avoid invalid slot keys.',
     {'raw': s},
   );

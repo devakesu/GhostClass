@@ -43,19 +43,37 @@ class SecureStorageService {
 
   // ─── EzyGo Token ─────────────────────────────────────────────────────────
 
-  Future<void> saveEzygoToken(String token) =>
-      _storage.write(key: _Keys.ezygoToken, value: token);
+  Future<void> saveEzygoToken(String token) => token.trim().isEmpty
+      ? _storage.delete(key: _Keys.ezygoToken)
+      : _storage.write(key: _Keys.ezygoToken, value: token);
 
   Future<String?> getEzygoToken() => _storage.read(key: _Keys.ezygoToken);
+
+  /// Return `null` if the stored token is missing or empty to avoid callers
+  /// accidentally treating an empty string as a valid token.
+  Future<String?> getNormalizedEzygoToken() async {
+    final raw = await _storage.read(key: _Keys.ezygoToken);
+    if (raw == null) return null;
+    final t = raw.trim();
+    return t.isEmpty ? null : t;
+  }
 
   Future<void> clearEzygoToken() => _storage.delete(key: _Keys.ezygoToken);
 
   // ─── FCM Token ───────────────────────────────────────────────────────────
 
-  Future<void> saveFcmToken(String token) =>
-      _storage.write(key: _Keys.fcmToken, value: token);
+  Future<void> saveFcmToken(String token) => token.trim().isEmpty
+      ? _storage.delete(key: _Keys.fcmToken)
+      : _storage.write(key: _Keys.fcmToken, value: token);
 
   Future<String?> getFcmToken() => _storage.read(key: _Keys.fcmToken);
+
+  Future<String?> getNormalizedFcmToken() async {
+    final raw = await _storage.read(key: _Keys.fcmToken);
+    if (raw == null) return null;
+    final t = raw.trim();
+    return t.isEmpty ? null : t;
+  }
 
   // ─── Supabase User ID ────────────────────────────────────────────────────
 
@@ -166,7 +184,7 @@ class SecureStorageService {
       }
       return decoded['data'];
     } on Object {
-      AppLogger.w('SecureStorage: Error decoding cache for $key');
+      AppLogger.e('SecureStorage: Error decoding cache for $key');
       return null;
     }
   }
@@ -188,7 +206,7 @@ class SecureStorageService {
         year: decoded['year'] as String,
       );
     } on Object {
-      AppLogger.w('SecureStorage: Error decoding academic state');
+      AppLogger.e('SecureStorage: Error decoding academic state');
       return null;
     }
   }

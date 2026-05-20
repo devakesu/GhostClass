@@ -183,5 +183,16 @@ describe("Proxy Utils", () => {
     it("returns fallback for sanitized empty body", () => {
         expect(resolveSafeUpstreamErrorMessage("   ", 400)).toBe("Unable to process request");
     });
+
+    it("returns fallback for HTML response bodies", () => {
+      const htmlBody1 = "<!DOCTYPE html><html><body><h1>500 Internal Server Error</h1></body></html>";
+      expect(resolveSafeUpstreamErrorMessage(htmlBody1, 500)).toBe("Upstream service error");
+
+      const htmlBody2 = "<html><body>Error</body></html>";
+      expect(resolveSafeUpstreamErrorMessage(htmlBody2, 400)).toBe("Unable to process request");
+
+      const htmlBody3 = "  <div class=\"error\">Something went wrong</div>";
+      expect(resolveSafeUpstreamErrorMessage(htmlBody3, 400)).toBe("Unable to process request");
+    });
   });
 });

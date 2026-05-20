@@ -70,24 +70,40 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     final updateState = ref.read(appUpdateProvider);
     if (updateState.checkResult != null && updateState.checkResult!.hasUpdate) {
       if (updateState.checkResult!.isForceUpdate) {
-        unawaited(
+        AppLogger.safeUnawait(
           AppUpdateDialog.show(
             context,
             updateState.checkResult!.latestVersion,
             isForceUpdate: true,
+          ).catchError(
+            (Object e, StackTrace st) => AppLogger.e(
+              'NavigationShell: Failed to show force update dialog',
+              e,
+              st,
+            ),
           ),
+          'NavigationShell: show force update dialog',
         );
       } else if (!updateState.dialogDismissed) {
-        unawaited(
+        AppLogger.safeUnawait(
           AppUpdateDialog.show(
-            context,
-            updateState.checkResult!.latestVersion,
-            isForceUpdate: false,
-          ).then((_) {
-            if (mounted) {
-              ref.read(appUpdateProvider.notifier).dismissDialog();
-            }
-          }),
+                context,
+                updateState.checkResult!.latestVersion,
+                isForceUpdate: false,
+              )
+              .then((_) {
+                if (mounted) {
+                  ref.read(appUpdateProvider.notifier).dismissDialog();
+                }
+              })
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'NavigationShell: Failed to show update dialog',
+                  e,
+                  st,
+                ),
+              ),
+          'NavigationShell: show update dialog',
         );
       }
     }
@@ -97,15 +113,19 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   void initState() {
     super.initState();
 
+    // Run update dialog check after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndShowUpdateDialog();
+      try {
+        _checkAndShowUpdateDialog();
+      } on Object catch (e, st) {
+        AppLogger.e('NavigationShell: update dialog check failed', e, st);
+      }
     });
 
+    // Subscribe to academic changes and security failures. We keep the
+    // returned ProviderSubscription objects so we can close them in dispose.
     _subscriptions.addAll([
-      ref.listenManual<AppUpdateState>(appUpdateProvider, (previous, next) {
-        _checkAndShowUpdateDialog();
-      }),
-      ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
+      ref.listen<AsyncValue<AcademicState?>>(academicProvider, (
         previous,
         next,
       ) {
@@ -119,8 +139,15 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
         // Keep calendar dependencies warm in the background whenever the
         // academic context changes, even if the calendar screen is not open.
-        unawaited(_prewarmCalendarData());
+        AppLogger.safeUnawait(
+          _prewarmCalendarData().catchError(
+            (Object e, StackTrace st) =>
+                AppLogger.e('NavigationShell: Prewarm calendar failed', e, st),
+          ),
+          'NavigationShell: prewarm calendar',
+        );
       }),
+
       ref.listenManual<SecurityFailureState?>(securityFailureProvider, (
         previous,
         next,
@@ -129,7 +156,19 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
             !_criticalSecurityLogoutStarted &&
             previous?.criticalRisk != true) {
           _criticalSecurityLogoutStarted = true;
-          unawaited(ref.read(authProvider.notifier).logout(force: true));
+          AppLogger.safeUnawait(
+            ref
+                .read(authProvider.notifier)
+                .logout(force: true)
+                .catchError(
+                  (Object e, StackTrace st) => AppLogger.e(
+                    'NavigationShell: Forced logout failed',
+                    e,
+                    st,
+                  ),
+                ),
+            'NavigationShell: forced logout',
+          );
         }
       }),
     ]);
@@ -611,7 +650,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         'NavigationShell: Outage recovery wait completed (or partial success).',
                       );
                     } on Object catch (e) {
-                      AppLogger.w(
+                      AppLogger.e(
                         'NavigationShell: Outage recovery wait timed out or failed ($e). Re-enabling UI.',
                       );
                     }

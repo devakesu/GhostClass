@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/about_screen.dart';
@@ -39,7 +40,14 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
   @override
   void dispose() {
-    unawaited(_subscription.cancel());
+    try {
+      AppLogger.safeUnawait(
+        _subscription.cancel(),
+        'GoRouterRefreshStream.cancel',
+      );
+    } on Object catch (e) {
+      debugPrint('GoRouterRefreshStream: cancel threw: $e');
+    }
     super.dispose();
   }
 }

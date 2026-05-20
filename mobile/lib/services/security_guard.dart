@@ -27,7 +27,7 @@ class SecurityGuard {
 
   /// Wipes all sensitive storage and exits the app immediately.
   Future<void> wipeAndExit() async {
-    AppLogger.w('SecurityGuard: SECURITY BREACH DETECTED. WIPING AND EXITING.');
+    AppLogger.e('SecurityGuard: SECURITY BREACH DETECTED. WIPING AND EXITING.');
     try {
       await storage.clearAll();
       if (Platform.isAndroid) {

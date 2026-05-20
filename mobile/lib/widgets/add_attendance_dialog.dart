@@ -523,7 +523,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     if (data == null || data.courses.isEmpty) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    unawaited(
+    AppLogger.safeUnawait(
       showModalBottomSheet<void>(
         context: context,
         backgroundColor: Colors.transparent,
@@ -690,6 +690,12 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             ),
           );
         },
+      ).catchError(
+        (Object e, StackTrace st) => AppLogger.e(
+          'AddAttendanceDialog: showSubjectPickerBottomSheet failed',
+          e,
+          st,
+        ),
       ),
     );
   }

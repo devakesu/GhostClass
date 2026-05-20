@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:ghostclass/services/logger.dart';
 
 // The exact Riverpod 3.x auto-dispose future provider type is an internal
 // generic that cannot be named explicitly in consumer code.
@@ -66,7 +67,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       if (state != null &&
           state.hasNextPage &&
           !ref.read(notificationsProvider).isLoading) {
-        final _ = notifier.fetchNextPage();
+        AppLogger.safeUnawait(
+          notifier.fetchNextPage().catchError((Object e, StackTrace st) {
+            AppLogger.e('Notifications: fetchNextPage failed', e, st);
+          }),
+          'Notifications: fetchNextPage',
+        );
       }
     }
   }
@@ -118,15 +124,25 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                               child: const Text('Cancel'),
                             ),
                             TextButton(
-                              onPressed: () {
-                                final _ = ref
-                                    .read(notificationsProvider.notifier)
-                                    .markAllAsRead();
+                              onPressed: () async {
                                 Navigator.pop(context);
-                                ServiceToast.show(
-                                  context,
-                                  'All notifications marked as read',
-                                );
+                                try {
+                                  await ref
+                                      .read(notificationsProvider.notifier)
+                                      .markAllAsRead();
+                                  if (!context.mounted) return;
+                                  ServiceToast.show(
+                                    context,
+                                    'All notifications marked as read',
+                                  );
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ServiceToast.show(
+                                    context,
+                                    'Failed to mark notifications as read',
+                                    isError: true,
+                                  );
+                                }
                               },
                               child: const Text('Mark all read'),
                             ),

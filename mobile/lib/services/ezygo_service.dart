@@ -28,7 +28,7 @@ class EzygoService {
   void clearCaches() => _fetcher.clearAll();
 
   Future<Response<dynamic>> fetchCourses(SecureStorageService storage) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionuser/courses/withusers';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
@@ -37,7 +37,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchAttendanceReportDetailed(
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/attendancereports/student/detailed';
     if (token == null) {
       return _ref
@@ -59,7 +59,7 @@ class EzygoService {
   Future<Response<dynamic>> getInstitutions(
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionusers/myinstitutions';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
@@ -69,7 +69,7 @@ class EzygoService {
     int institutionUserId,
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     return _ref
         .read(dioServiceProvider)
         .dio
@@ -87,7 +87,7 @@ class EzygoService {
     String semester,
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     return _ref
         .read(dioServiceProvider)
         .dio
@@ -105,7 +105,7 @@ class EzygoService {
     String year,
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     return _ref
         .read(dioServiceProvider)
         .dio
@@ -120,7 +120,7 @@ class EzygoService {
   }
 
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_semester';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
@@ -129,14 +129,14 @@ class EzygoService {
   Future<Response<dynamic>> fetchAcademicYear(
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_academic_year';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
   }
 
   Future<Response<dynamic>> fetchLeaveData(SecureStorageService storage) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     if (token == null) {
       throw const AppException(
         message: 'No EzyGo credentials found. Please log in.',
@@ -195,7 +195,7 @@ class EzygoService {
   }
 
   Future<Response<dynamic>> fetchExams(SecureStorageService storage) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);
@@ -205,7 +205,7 @@ class EzygoService {
     int examId,
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path =
         '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
@@ -216,7 +216,7 @@ class EzygoService {
     int examId,
     SecureStorageService storage,
   ) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams/$examId/institutionuser/examanswers';
     if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
     return _fetcher.fetch(path: path, token: token);

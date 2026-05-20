@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/constants/static_content.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -201,7 +202,17 @@ class _LegalScreenState extends State<LegalScreen> {
                           ? MarkdownBody(
                               data: widget.body,
                               onTapLink: (text, href, title) {
-                                if (href != null) unawaited(_launchUrl(href));
+                                if (href != null)
+                                  AppLogger.safeUnawait(
+                                    _launchUrl(href).catchError(
+                                      (Object e, StackTrace st) => AppLogger.e(
+                                        'LegalScreen: launchUrl failed',
+                                        e,
+                                        st,
+                                      ),
+                                    ),
+                                    'LegalScreen: launchUrl',
+                                  );
                               },
                               styleSheet: MarkdownStyleSheet(
                                 p: GoogleFonts.manrope(

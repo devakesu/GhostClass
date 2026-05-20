@@ -57,7 +57,7 @@ class NetworkUtils {
         return true;
       }
 
-      AppLogger.w(
+      AppLogger.e(
         'NetworkUtils: Certificate mismatch. Expected: $expectedHost, Found: ${hostnames.join(", ")}',
       );
       return false;
@@ -127,7 +127,7 @@ class NetworkUtils {
         }
       }
     } on Object catch (e) {
-      AppLogger.w('NetworkUtils: Failed to parse SAN from certificate DER', e);
+      AppLogger.e('NetworkUtils: Failed to parse SAN from certificate DER', e);
     }
 
     return hostnames.map((h) => h.toLowerCase()).toSet().toList();

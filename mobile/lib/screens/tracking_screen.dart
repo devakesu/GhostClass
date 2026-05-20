@@ -307,7 +307,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     List<CourseDetails>? allCourses,
     List<String> keys,
   ) {
-    unawaited(
+    AppLogger.safeUnawait(
       showModalBottomSheet<void>(
         context: context,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -326,7 +326,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             Navigator.pop(context);
           },
         ),
+      ).catchError(
+        (Object e, StackTrace st) =>
+            AppLogger.e('TrackingScreen: showModalBottomSheet failed', e, st),
       ),
+      'TrackingScreen: subject picker',
     );
   }
 
@@ -358,7 +362,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final title = isFiltered ? 'Clear Subject Records' : 'Delete All Records';
     final buttonText = isFiltered ? 'CLEAR SUBJECT' : 'DELETE ALL';
 
-    unawaited(
+    AppLogger.safeUnawait(
       showDialog<void>(
         context: context,
         builder: (context) {
@@ -474,12 +478,19 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             ),
           );
         },
+      ).catchError(
+        (Object e, StackTrace st) => AppLogger.e(
+          'TrackingScreen: showDeleteAllConfirm dialog failed',
+          e,
+          st,
+        ),
       ),
+      'TrackingScreen: delete all confirm',
     );
   }
 
   void _showDeleteRecordConfirm(int id) {
-    unawaited(
+    AppLogger.safeUnawait(
       showDialog<void>(
         context: context,
         builder: (context) {
@@ -593,7 +604,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             ),
           );
         },
+      ).catchError(
+        (Object e, StackTrace st) => AppLogger.e(
+          'TrackingScreen: showDeleteRecordConfirm dialog failed',
+          e,
+          st,
+        ),
       ),
+      'TrackingScreen: delete record confirm',
     );
   }
 }

@@ -123,7 +123,7 @@ void main() async {
     try {
       await AnalyticsService.initialize();
     } on Object catch (_) {
-      AppLogger.w('Analytics initialization failed');
+      AppLogger.e('Analytics initialization failed');
     }
 
     AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
@@ -148,7 +148,7 @@ void main() async {
   );
 
   // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
-  unawaited(JweService.instance.preWarm());
+  AppLogger.safeUnawait(JweService.instance.preWarm(), 'JWE pre-warm');
 
   await GoogleFonts.pendingFonts([
     GoogleFonts.manrope(),
@@ -217,7 +217,10 @@ class _MyAppState extends ConsumerState<MyApp> {
     super.initState();
     // Initialize push notification listeners and tokens after layout mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final _ = ref.read(pushNotificationServiceProvider).initialize();
+      AppLogger.safeUnawait(
+        ref.read(pushNotificationServiceProvider).initialize(),
+        'Push init',
+      );
     });
   }
 

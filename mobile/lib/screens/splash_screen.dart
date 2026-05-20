@@ -84,7 +84,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         ref.read(appUpdateProvider.notifier).setCheckResult(versionResult);
 
         if (versionResult.isForceUpdate) {
-          AppLogger.w('SplashScreen: Force update required!');
+          AppLogger.e('SplashScreen: Force update required!');
           if (!mounted) return;
           await AppUpdateDialog.show(
             context,
@@ -127,15 +127,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         final reason = e.details?['reason'] ?? e.message;
         final action = e.details?['action'] ?? 'Please restart the app.';
         final criticalRisk = e.details?['criticalRisk'] == true;
+        final appCheckError = e.details?['appCheckError'] as String?;
+
+        AppLogger.e(
+          'SplashScreen: Security failure detected. Critical: $criticalRisk, AppCheckError: $appCheckError',
+          e,
+        );
 
         if (criticalRisk) {
-          ref.read(apiServiceProvider).clearCaches();
+          api.clearCaches();
           await ref.read(authProvider.notifier).logout(force: true);
         }
 
         if (!mounted) return;
-
-        final appCheckError = e.details?['appCheckError'];
 
         // Use backend-provided strings directly for the main message
         final dialogMessage = '$reason\n\n$action';

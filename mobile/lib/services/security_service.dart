@@ -86,7 +86,16 @@ class SecurityService {
           );
 
           // Run background verification asynchronously
-          unawaited(_runBackgroundIntegrityCheck());
+          AppLogger.safeUnawait(
+            _runBackgroundIntegrityCheck().catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'SecurityService: Background integrity check failed',
+                e,
+                st,
+              ),
+            ),
+            'SecurityService: background integrity check',
+          );
 
           AppLogger.d('SecurityService: Returned cached attestation check.');
           return cachedResult;
@@ -96,7 +105,7 @@ class SecurityService {
           'SecurityService: Cached attestation is stale; refreshing.',
         );
       } on Object catch (e) {
-        AppLogger.w('SecurityService: Failed to parse cached attestation', e);
+        AppLogger.e('SecurityService: Failed to parse cached attestation', e);
       }
     }
 
@@ -121,7 +130,7 @@ class SecurityService {
       await storage.saveAttestationResult(jsonEncode(map));
       AppLogger.d('SecurityService: Cached attestation check result.');
     } on Object catch (e) {
-      AppLogger.w('SecurityService: Failed to write attestation cache', e);
+      AppLogger.e('SecurityService: Failed to write attestation cache', e);
     }
   }
 
@@ -149,7 +158,7 @@ class SecurityService {
               source: 'BackgroundAttestation',
             );
       } else {
-        AppLogger.w(
+        AppLogger.e(
           'SecurityService: Background check AppException ignored',
           e,
         );
@@ -182,6 +191,11 @@ class SecurityService {
               'Please ensure you are using a genuine version of GhostClass from the Play Store.';
           final criticalRisk = data['criticalRisk'] == true;
 
+          AppLogger.e(
+            'SecurityService: Integrity verification failed. Reason: $reason',
+            Exception(reason),
+          );
+
           throw AppException(
             message: reason,
             type: AppExceptionType.unauthorized,
@@ -206,6 +220,10 @@ class SecurityService {
         final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
         final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
 
+        AppLogger.d(
+          'SecurityService: Integrity check passed. Current: $currentVersion, Latest: $latestVersion, Min: $minVersion',
+        );
+
         return AppVersionCheckResult(
           latestVersion: latestVersion,
           minVersion: minVersion,
@@ -213,6 +231,9 @@ class SecurityService {
           isForceUpdate: isForceUpdate,
         );
       } else {
+        AppLogger.e(
+          'SecurityService: Attestation endpoint returned ${response.statusCode}',
+        );
         throw const AppException(
           message: 'Security verification unavailable',
           type: AppExceptionType.server,
@@ -235,6 +256,14 @@ class SecurityService {
               data?['action'] ??
               'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';
 
+          final finalReason =
+              appCheckError ?? backendReason ?? 'App attestation failed';
+
+          AppLogger.e(
+            'SecurityService: Security verification failed with ${e.response?.statusCode}. Reason: $finalReason',
+            e,
+          );
+
           throw AppException(
             message: appCheckError != null
                 ? 'Device verification failed: $appCheckError'
@@ -243,8 +272,7 @@ class SecurityService {
             details: {
               ...?data,
               'type': 'security',
-              'reason':
-                  appCheckError ?? backendReason ?? 'App attestation failed',
+              'reason': finalReason,
               'appCheckError': appCheckError,
               'action': action,
             },

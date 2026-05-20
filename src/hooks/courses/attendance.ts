@@ -185,7 +185,8 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
 
           const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
           if (course) {
-            queryClient.setQueryData(["attendance-report", code, Number(course.id)], detail);
+            const normalizedCode = code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+            queryClient.setQueryData(["attendance-report", normalizedCode, Number(course.id)], detail);
           }
         }
       }

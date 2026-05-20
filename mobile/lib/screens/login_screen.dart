@@ -10,6 +10,7 @@ import 'package:ghostclass/logic/error_handler.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/security_guard.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/app_footer.dart';
@@ -43,7 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         updateState.checkResult!.hasUpdate &&
         !updateState.checkResult!.isForceUpdate &&
         !updateState.dialogDismissed) {
-      unawaited(
+      AppLogger.safeUnawait(
         AppUpdateDialog.show(
           context,
           updateState.checkResult!.latestVersion,
@@ -53,6 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ref.read(appUpdateProvider.notifier).dismissDialog();
           }
         }),
+        'LoginScreen: show update dialog',
       );
     }
   }
@@ -124,10 +126,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     try {
       try {
-        unawaited(
-          AnalyticsService.instance.logCustom('login_attempt', {
-            'username_length': _usernameController.text.trim().length,
-          }),
+        AppLogger.safeUnawait(
+          AnalyticsService.instance
+              .logCustom('login_attempt', {
+                'username_length': _usernameController.text.trim().length,
+              })
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'LoginScreen: Analytics login_attempt failed',
+                  e,
+                  st,
+                ),
+              ),
+          'LoginScreen: analytics login_attempt',
         );
       } on Object catch (_) {}
 
@@ -143,10 +154,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (!mounted) return;
       LoadingOverlay.hide(context);
       try {
-        unawaited(
-          AnalyticsService.instance.logCustom('login_failed', {
-            'reason': e.message,
-          }),
+        AppLogger.safeUnawait(
+          AnalyticsService.instance
+              .logCustom('login_failed', {
+                'reason': e.message,
+              })
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'LoginScreen: Analytics login_failed failed',
+                  e,
+                  st,
+                ),
+              ),
+          'LoginScreen: analytics login_failed',
         );
       } on Object catch (_) {}
       await handleError(e.message, title: 'Login Failed');
@@ -154,7 +174,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (!mounted) return;
       LoadingOverlay.hide(context);
       try {
-        unawaited(AnalyticsService.instance.logError(e.toString()));
+        AppLogger.safeUnawait(
+          AnalyticsService.instance
+              .logError(e.toString())
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'LoginScreen: Analytics logError failed',
+                  e,
+                  st,
+                ),
+              ),
+          'LoginScreen: analytics logError',
+        );
       } on Object catch (_) {}
       await handleError(e);
     } finally {

@@ -237,7 +237,7 @@ class DashboardStats {
     final rawFinalAbsent = officialAbsent - savedAbsent + extraAbsent;
     final finalAbsentCount = rawFinalAbsent.clamp(0, double.maxFinite).toInt();
     if (rawFinalAbsent < 0) {
-      AppLogger.w(
+      AppLogger.e(
         'DashboardStats: Attendance invariant violation – finalAbsent was '
         '$rawFinalAbsent, clamped to 0 '
         '(official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)',

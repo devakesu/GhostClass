@@ -92,7 +92,7 @@ class EzygoBatchFetcher {
       if (_lastCircuitBreakerLog == null ||
           now.difference(_lastCircuitBreakerLog!) > logThrottle) {
         _lastCircuitBreakerLog = now;
-        AppLogger.w(
+        AppLogger.e(
           'EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path',
         );
       } else {

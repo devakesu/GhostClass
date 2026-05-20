@@ -191,10 +191,12 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     if (current == null || !current.hasNextPage || _isFetchingNextPage) return;
 
     _isFetchingNextPage = true;
+    final page = _currentPage + 1;
     try {
-      _currentPage++;
-      // We don't set state to loading to avoid full-screen spinner.
-      final nextState = await _fetchNextPage(page: _currentPage);
+      final nextState = await _fetchNextPage(page: page);
+      // Only advance the current page after a successful fetch to avoid
+      // skipping pages when a network call fails.
+      _currentPage = page;
       state = AsyncValue.data(nextState);
     } finally {
       _isFetchingNextPage = false;

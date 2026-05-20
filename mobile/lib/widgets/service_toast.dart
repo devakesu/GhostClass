@@ -37,27 +37,30 @@ class ServiceToast {
   }) {
     if (!context.mounted) return;
 
-    OverlayState? overlay;
-    try {
-      overlay = Overlay.of(context);
-    } on Object catch (_) {
-      if (context is StatefulElement && context.state is OverlayState) {
-        overlay = context.state as OverlayState;
-      } else {
-        void visitor(Element element) {
-          if (overlay != null) return;
-          if (element is StatefulElement && element.state is OverlayState) {
-            overlay = element.state as OverlayState;
-            return;
+    // Prefer root overlay (works with nested navigators). Fallback to
+    // local overlay and lastly attempt element tree traversal.
+    OverlayState? overlay =
+        Overlay.of(context, rootOverlay: true) ?? Overlay.of(context);
+    if (overlay == null) {
+      try {
+        if (context is StatefulElement && context.state is OverlayState) {
+          overlay = context.state as OverlayState;
+        } else {
+          void visitor(Element element) {
+            if (overlay != null) return;
+            if (element is StatefulElement && element.state is OverlayState) {
+              overlay = element.state as OverlayState;
+              return;
+            }
+            element.visitChildren(visitor);
           }
-          element.visitChildren(visitor);
-        }
 
-        context.visitChildElements(visitor);
-      }
+          context.visitChildElements(visitor);
+        }
+      } on Object catch (_) {}
     }
 
-    if (overlay == null) return;
+    if (overlay == null) return; // Give up if no overlay found.
     late OverlayEntry entry;
 
     entry = OverlayEntry(

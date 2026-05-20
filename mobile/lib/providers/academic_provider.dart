@@ -47,7 +47,7 @@ class AcademicState {
       return DateTime(parsed.$2);
     }
     // Unrecognised semester name — default to even-semester dates and warn.
-    AppLogger.w(
+    AppLogger.e(
       'AcademicState.startDate: Unrecognised semester "$semester" for year "$year". '
       'Defaulting to even-semester start (Jan 1). Consider mapping this name.',
     );
@@ -64,7 +64,7 @@ class AcademicState {
       return DateTime(parsed.$2, 6, 30, 23, 59, 59);
     }
     // Unrecognised semester name — default to even-semester dates and warn.
-    AppLogger.w(
+    AppLogger.e(
       'AcademicState.endDate: Unrecognised semester "$semester" for year "$year". '
       'Defaulting to even-semester end (Jun 30). Consider mapping this name.',
     );
@@ -101,7 +101,12 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
 
     if (semester != null && year != null) {
       final state = AcademicState(semester: semester, year: year);
-      unawaited(storage.saveAcademicState(state));
+      AppLogger.safeUnawait(
+        storage.saveAcademicState(state).catchError((Object e, StackTrace st) {
+          AppLogger.e('AcademicNotifier: saveAcademicState failed', e, st);
+        }),
+        'AcademicNotifier: saveAcademicState',
+      );
       return state;
     }
 

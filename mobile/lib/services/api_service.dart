@@ -179,7 +179,7 @@ class ApiService {
         _lastSyncTime = DateTime.now();
         return response;
       } on Object catch (e) {
-        AppLogger.w('ApiService: Background sync failed', e);
+        AppLogger.e('ApiService: Background sync failed', e);
         // Return a mock 304 to let downstream continue without hanging
         return Response<dynamic>(
           requestOptions: RequestOptions(path: 'sync'),
@@ -191,6 +191,20 @@ class ApiService {
     }();
 
     return _syncInFlight!;
+  }
+
+  /// Schedule a background sync safely. This wraps [triggerSync] and ensures
+  /// any thrown errors are logged and do not bubble to callers that intended
+  /// to run sync in a fire-and-forget manner.
+  Future<void> scheduleSync(
+    String supabaseToken, {
+    bool force = false,
+  }) async {
+    try {
+      await triggerSync(supabaseToken, force: force);
+    } on Object catch (e, st) {
+      AppLogger.e('ApiService: Background scheduled sync failed', e, st);
+    }
   }
 
   Future<Response<dynamic>> addCourse({

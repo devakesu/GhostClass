@@ -11,6 +11,7 @@ import 'package:ghostclass/widgets/ghostclass/ghostclass_footer.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_menu_tile.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_settings_card.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -93,17 +94,38 @@ class GhostClassScreen extends ConsumerWidget {
                       showToggle: true,
                       toggleValue: user.settings.bunkCalculatorEnabled,
                       isDisabled: user.isUpdatingSettings,
-                      onToggle: (val) {
-                        final _ = ref
-                            .read(authProvider.notifier)
-                            .updateSettings(bunkEnabled: val);
-                      },
-                      onTap: () {
-                        final _ = ref
-                            .read(authProvider.notifier)
-                            .updateSettings(
-                              bunkEnabled: !user.settings.bunkCalculatorEnabled,
+                      onToggle: (val) async {
+                        try {
+                          await ref
+                              .read(authProvider.notifier)
+                              .updateSettings(bunkEnabled: val);
+                        } on Object catch (e) {
+                          if (context.mounted) {
+                            ServiceToast.show(
+                              context,
+                              'Failed to update settings',
+                              isError: true,
                             );
+                          }
+                        }
+                      },
+                      onTap: () async {
+                        try {
+                          await ref
+                              .read(authProvider.notifier)
+                              .updateSettings(
+                                bunkEnabled:
+                                    !user.settings.bunkCalculatorEnabled,
+                              );
+                        } on Object catch (e) {
+                          if (context.mounted) {
+                            ServiceToast.show(
+                              context,
+                              'Failed to update settings',
+                              isError: true,
+                            );
+                          }
+                        }
                       },
                     ),
                     // Theme Switcher
@@ -636,11 +658,21 @@ class GhostClassScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      final _ = ref
-                          .read(authProvider.notifier)
-                          .updateSettings(targetPercentage: localTarget);
-                      Navigator.pop(context);
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(authProvider.notifier)
+                            .updateSettings(targetPercentage: localTarget);
+                        if (context.mounted) Navigator.pop(context);
+                      } on Object catch (e) {
+                        if (context.mounted) {
+                          ServiceToast.show(
+                            context,
+                            'Failed to update target',
+                            isError: true,
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,

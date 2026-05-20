@@ -57,6 +57,17 @@ class EncryptedValue {
     return Key(keyBytes);
   }
 
+  /// Overwrite entropy buffers to reduce risk of key reconstruction after logout.
+  /// Call this when the app is performing a full logout or memory wipe.
+  static void clearEntropy() {
+    for (var i = 0; i < _entropyA.length; i++) {
+      _entropyA[i] = 0;
+    }
+    for (var i = 0; i < _entropyB.length; i++) {
+      _entropyB[i] = 0;
+    }
+  }
+
   /// Decrypts and returns the plaintext value.
   String get value {
     if (_encryptedBase64.isEmpty) return '';

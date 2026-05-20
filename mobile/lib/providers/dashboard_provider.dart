@@ -140,7 +140,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           }
         }
       } on Object catch (e) {
-        AppLogger.w('DashboardNotifier: Error loading disk cache', e);
+        AppLogger.e('DashboardNotifier: Error loading disk cache', e);
       }
     }
 
@@ -177,8 +177,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         _lastAcademic == academic) {
       if (_needsRevalidate) {
         _needsRevalidate = false;
-        unawaited(
-          Future.microtask(() => _silentRevalidate(trackingList, academic)),
+        AppLogger.safeUnawait(
+          Future.microtask(
+            () => _silentRevalidate(trackingList, academic),
+          ).catchError(
+            (Object e, StackTrace st) => AppLogger.e(
+              'DashboardNotifier: Silent revalidate failed',
+              e,
+              st,
+            ),
+          ),
+          'DashboardNotifier: silent revalidate',
         );
       }
 
@@ -300,23 +309,26 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       if (user != null) {
         final cacheKeySuffix =
             '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_courses_$cacheKeySuffix',
             _cachedCourses!.map((c) => c.toJson()).toList(),
           ),
+          'Dashboard: save courses cache',
         );
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_attendance_$cacheKeySuffix',
             _cachedAttendance!.toJson(),
           ),
+          'Dashboard: save attendance cache',
         );
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_instructors_$cacheKeySuffix',
             _cachedInstructors!.map((i) => i.toJson()).toList(),
           ),
+          'Dashboard: save instructors cache',
         );
       }
 
@@ -515,7 +527,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final freshData = await _fetchAndProcess(tracking, academic, null);
       state = AsyncValue.data(freshData);
     } on Object catch (e) {
-      AppLogger.w(
+      AppLogger.e(
         'DashboardNotifier: Silent background revalidation failed',
         e,
       );

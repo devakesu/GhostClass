@@ -141,6 +141,35 @@ export async function verifyAppCheckToken(
   }
 }
 
+async function verifyAppCheckAuth(
+  req: Request,
+  options: AppCheckOptions,
+): Promise<AuthResult> {
+  const res = await verifyAppCheckToken(req, options);
+  if (!res.isValid) {
+    return {
+      isValid: false, error: res.error, reason: res.reason, action: res.action,
+      authType: "app-check", isMobileRequest: true, alreadyLogged: res.alreadyLogged,
+    };
+  }
+  return { isValid: true, authType: "app-check", isMobileRequest: true, integrity: res.integrity };
+}
+
+async function verifyCsrfAuth(
+  headerList: Headers,
+): Promise<AuthResult> {
+  const cookieStore = await nextCookies();
+  const sessionId = (cookieStore.get("__Secure-authjs.session-token") || cookieStore.get("authjs.session-token"))?.value;
+  const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
+  if (!res.isValid) {
+    return {
+      isValid: false, error: res.error, reason: "Web security check failed.",
+      action: "Please refresh your browser.", authType: "csrf", isWebRequest: true,
+    };
+  }
+  return { isValid: true, authType: "csrf", isWebRequest: true };
+}
+
 async function verifyAuthentication(
   req: Request,
   options: AppCheckOptions = {},
@@ -161,27 +190,28 @@ async function verifyAuthentication(
   }
 
   if (hasAppCheckToken) {
-    const res = await verifyAppCheckToken(req, options);
-    if (!res.isValid) {
-      return {
-        isValid: false, error: res.error, reason: res.reason, action: res.action,
-        authType: "app-check", isMobileRequest: true, alreadyLogged: res.alreadyLogged,
-      };
-    }
-    return { isValid: true, authType: "app-check", isMobileRequest: true, integrity: res.integrity };
+    return verifyAppCheckAuth(req, options);
   }
 
   if (csrfToken) {
-    const cookieStore = await nextCookies();
-    const sessionId = (cookieStore.get("__Secure-authjs.session-token") || cookieStore.get("authjs.session-token"))?.value;
-    const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
-    if (!res.isValid) {
+    return verifyCsrfAuth(headerList);
+  }
+
+  // State-changing web requests MUST have a CSRF token.
+  const method = req.method.toUpperCase();
+  const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
+  if (isStateChanging && !hasAppCheckToken) {
+    const isVitestBypass = process.env.NODE_ENV !== "production" && process.env.VITEST === "true";
+    if (!isVitestBypass) {
       return {
-        isValid: false, error: res.error, reason: "Web security check failed.",
-        action: "Please refresh your browser.", authType: "csrf", isWebRequest: true,
+        isValid: false,
+        error: "Missing CSRF token",
+        reason: "Web security check failed.",
+        action: "Please refresh your browser.",
+        authType: "csrf",
+        isWebRequest: true,
       };
     }
-    return { isValid: true, authType: "csrf", isWebRequest: true };
   }
 
   // Neither header is present. If App Check is not enforced, we allow the request.

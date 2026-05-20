@@ -17,7 +17,7 @@ class CacheManager {
       // Then wipe secure storage (tokens/profile/settings)
       await _ref.read(secureStorageProvider).clearAll();
     } on Object catch (e) {
-      AppLogger.w('CacheManager: Failed to clear caches', e);
+      AppLogger.e('CacheManager: Failed to clear caches', e);
     }
   }
 }

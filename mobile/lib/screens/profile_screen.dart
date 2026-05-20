@@ -53,7 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       try {
         _selectedBirthDate = DateTime.parse(user!.profile!.birthDate!);
       } on Object catch (e) {
-        AppLogger.w('ProfileScreen: Failed to parse birth date', e);
+        AppLogger.e('ProfileScreen: Failed to parse birth date', e);
       }
     }
   }
@@ -687,7 +687,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ).format(DateTime.parse(user.profile!.ezygoCreatedAt!));
                       }
                     } on Object catch (e) {
-                      AppLogger.w(
+                      AppLogger.e(
                         'ProfileScreen: Failed to parse EzyGo created date',
                         e,
                       );
@@ -699,7 +699,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ).format(DateTime.parse(user.profile!.createdAt!));
                       }
                     } on Object catch (e) {
-                      AppLogger.w(
+                      AppLogger.e(
                         'ProfileScreen: Failed to parse account created date',
                         e,
                       );

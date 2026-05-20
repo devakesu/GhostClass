@@ -219,6 +219,32 @@ describe("attendance hooks", () => {
       expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102", 456], expect.any(Object));
     });
 
+    it("should normalize cache keys for courses with spaces and hyphens", async () => {
+      const courses = [
+        { code: "CS-101 2", id: 123, name: "Intro" },
+      ];
+      const mockBatchData = {
+        "CS-101 2": { totel: 10, persantage: 90 },
+      };
+      (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
+
+      const queryClient = new QueryClient();
+      const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+
+      const { result } = renderHook(() => useAllCourseDetails(courses), {
+        wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      
+      // The cached key should be normalized (uppercase, spaces and hyphens removed)
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS1012", 123], expect.any(Object));
+    });
+
     it("should handle missing course in batch courses list", async () => {
        const mockBatchData = {
          UNKNOWN: { total: 10, percentage: 90 },

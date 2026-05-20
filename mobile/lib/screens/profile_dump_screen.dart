@@ -78,7 +78,7 @@ class _ProfileDumpContent extends ConsumerWidget {
       }
       return s;
     } on Object catch (e) {
-      AppLogger.w('ProfileDumpScreen: Failed to format date', e);
+      AppLogger.e('ProfileDumpScreen: Failed to format date', e);
       return s;
     }
   }
@@ -102,7 +102,7 @@ class _ProfileDumpContent extends ConsumerWidget {
               .firstWhere((i) => i.id.toString().trim() == searchId)
               .name;
         } on Object catch (e) {
-          AppLogger.w(
+          AppLogger.e(
             'ProfileDumpScreen: Failed to resolve institution by id',
             e,
           );

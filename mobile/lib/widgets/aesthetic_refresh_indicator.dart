@@ -78,7 +78,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
         );
       }
     } on Object catch (e) {
-      AppLogger.w('AestheticRefreshIndicator: Refresh failed', e);
+      AppLogger.e('AestheticRefreshIndicator: Refresh failed', e);
     } finally {
       if (widget.useOverlay) {
         try {
@@ -86,7 +86,7 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
             rootNavigator.pop();
           }
         } on Object catch (e) {
-          AppLogger.w('AestheticRefreshIndicator: Failed to hide overlay', e);
+          AppLogger.e('AestheticRefreshIndicator: Failed to hide overlay', e);
         }
       }
       _safeSetState(() => _isRefreshing = false);

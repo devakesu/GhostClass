@@ -72,12 +72,21 @@ class PushNotificationService {
         }
 
         // Configure native iOS foreground notifications
-        unawaited(
-          _messaging.setForegroundNotificationPresentationOptions(
-            alert: true,
-            badge: true,
-            sound: true,
-          ),
+        AppLogger.safeUnawait(
+          _messaging
+              .setForegroundNotificationPresentationOptions(
+                alert: true,
+                badge: true,
+                sound: true,
+              )
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'PushNotificationService: Failed to set foreground presentation options',
+                  e,
+                  st,
+                ),
+              ),
+          'PushNotificationService: set foreground presentation options',
         );
 
         // Listen for active app foreground message streams
@@ -88,14 +97,23 @@ class PushNotificationService {
             'Received foreground message: ${message.notification?.title}',
           );
           try {
-            unawaited(
-              AnalyticsService.instance.logCustom(
-                'fcm_foreground_received',
-                {
-                  'title': message.notification?.title ?? '',
-                  'has_data': message.data.isNotEmpty,
-                },
-              ),
+            AppLogger.safeUnawait(
+              AnalyticsService.instance
+                  .logCustom(
+                    'fcm_foreground_received',
+                    {
+                      'title': message.notification?.title ?? '',
+                      'has_data': message.data.isNotEmpty,
+                    },
+                  )
+                  .catchError(
+                    (Object e, StackTrace st) => AppLogger.e(
+                      'PushNotificationService: Analytics fcm_foreground_received failed',
+                      e,
+                      st,
+                    ),
+                  ),
+              'PushNotificationService: analytics fcm_foreground_received',
             );
           } on Object catch (_) {}
 
@@ -135,14 +153,23 @@ class PushNotificationService {
                 .listen((message) {
                   AppLogger.i('User opened app from notification');
                   try {
-                    unawaited(
-                      AnalyticsService.instance.logCustom(
-                        'fcm_opened',
-                        {
-                          'title': message.notification?.title ?? '',
-                          'has_data': message.data.isNotEmpty,
-                        },
-                      ),
+                    AppLogger.safeUnawait(
+                      AnalyticsService.instance
+                          .logCustom(
+                            'fcm_opened',
+                            {
+                              'title': message.notification?.title ?? '',
+                              'has_data': message.data.isNotEmpty,
+                            },
+                          )
+                          .catchError(
+                            (Object e, StackTrace st) => AppLogger.e(
+                              'PushNotificationService: Analytics fcm_opened failed',
+                              e,
+                              st,
+                            ),
+                          ),
+                      'PushNotificationService: analytics fcm_opened',
                     );
                   } on Object catch (_) {}
                 });
@@ -152,10 +179,19 @@ class PushNotificationService {
         if (token != null) {
           await _syncTokenWithBackend(token);
           try {
-            unawaited(
-              AnalyticsService.instance.logCustom('fcm_token_retrieved', {
-                'length': token.length,
-              }),
+            AppLogger.safeUnawait(
+              AnalyticsService.instance
+                  .logCustom('fcm_token_retrieved', {
+                    'length': token.length,
+                  })
+                  .catchError(
+                    (Object e, StackTrace st) => AppLogger.e(
+                      'PushNotificationService: Analytics fcm_token_retrieved failed',
+                      e,
+                      st,
+                    ),
+                  ),
+              'PushNotificationService: analytics fcm_token_retrieved',
             );
           } on Object catch (_) {}
         }
@@ -163,7 +199,10 @@ class PushNotificationService {
         // Establish ongoing refresh listener for security token rotations
         _tokenSub = _messaging.onTokenRefresh.listen((newToken) {
           AppLogger.i('FCM device token refreshed');
-          unawaited(_syncTokenWithBackend(newToken));
+          AppLogger.safeUnawait(
+            _syncTokenWithBackend(newToken),
+            'FCM token refresh',
+          );
         });
       }
     } on Object catch (e, st) {
@@ -178,14 +217,81 @@ class PushNotificationService {
   /// Synchronises the secure push token with the backend storage route.
   Future<void> _syncTokenWithBackend(String token) async {
     try {
-      final cachedToken = await _storage.getFcmToken();
-      final currentSession = _ref
-          .read(supabaseClientProvider)
-          .auth
-          .currentSession;
+      final cachedToken = await _storage.getNormalizedFcmToken();
 
-      // Avoid repeating network handshakes if token remains unchanged or session is inactive
-      if (cachedToken == token || currentSession == null) {
+      // Always persist the token locally so we can retry registration later
+      // even if the current session is not available right now.
+      if (cachedToken != token) {
+        try {
+          await _storage.saveFcmToken(token);
+        } on Object catch (e, st) {
+          AppLogger.e('PushNotificationService: saveFcmToken failed', e, st);
+        }
+      }
+
+      final supabase = _ref.read(supabaseClientProvider);
+      final currentSession = supabase.auth.currentSession;
+
+      // If there is no active session, schedule a one-shot listener to attempt
+      // registration when a session becomes available. This avoids silently
+      // dropping device tokens that arrived before login.
+      if (currentSession == null) {
+        StreamSubscription? sub;
+        // Defensive timeout: if the user never signs in, cancel the listener
+        // after a reasonable period to avoid resource leaks.
+        Timer? timeoutTimer;
+        sub = supabase.auth.onAuthStateChange.listen((data) async {
+          final session = data.session;
+          if (session != null) {
+            try {
+              final accessToken = session.accessToken;
+              final baseUrl = AppConfig.ghostclassApiUrl;
+              final response = await _dio.post<dynamic>(
+                '$baseUrl/auth/register-fcm',
+                data: {'fcm_token': token.trim()},
+                options: Options(
+                  headers: {'Authorization': 'Bearer $accessToken'},
+                  validateStatus: (s) => s != null && s < 600,
+                ),
+              );
+              if (response.statusCode == 200) {
+                AppLogger.i('FCM push token registered on auth event');
+                try {
+                  AppLogger.safeUnawait(
+                    AnalyticsService.instance
+                        .logCustom('fcm_registered', {
+                          'registered': true,
+                        })
+                        .catchError(
+                          (Object e, StackTrace st) => AppLogger.e(
+                            'PushNotificationService: Analytics fcm_registered (deferred) failed',
+                            e,
+                            st,
+                          ),
+                        ),
+                    'PushNotificationService: analytics fcm_registered (deferred)',
+                  );
+                } on Object catch (_) {}
+              } else {
+                AppLogger.e(
+                  'FCM registration on auth event returned ${response.statusCode}',
+                );
+              }
+            } on Object catch (e) {
+              AppLogger.e('FCM deferred registration failed', e);
+            } finally {
+              await sub?.cancel();
+              timeoutTimer?.cancel();
+            }
+          }
+        });
+
+        // Cancel the subscription after 5 minutes if no session event occurs.
+        timeoutTimer = Timer(const Duration(minutes: 5), () async {
+          AppLogger.d('FCM deferred registration listener timeout; cancelling');
+          await sub?.cancel();
+        });
+
         return;
       }
 
@@ -203,35 +309,61 @@ class PushNotificationService {
 
       if (response.statusCode == 200) {
         AppLogger.i('FCM push token securely registered with backend services');
-        await _storage.saveFcmToken(token);
         try {
-          unawaited(
-            AnalyticsService.instance.logCustom('fcm_registered', {
-              'registered': true,
-            }),
+          AppLogger.safeUnawait(
+            AnalyticsService.instance
+                .logCustom('fcm_registered', {
+                  'registered': true,
+                })
+                .catchError(
+                  (Object e, StackTrace st) => AppLogger.e(
+                    'PushNotificationService: Analytics fcm_registered failed',
+                    e,
+                    st,
+                  ),
+                ),
+            'PushNotificationService: analytics fcm_registered',
           );
         } on Object catch (_) {}
       } else {
-        AppLogger.w(
+        AppLogger.e(
           'Backend token registration returned non-success code: ${response.statusCode}',
         );
         try {
-          unawaited(
-            AnalyticsService.instance.logCustom('fcm_registered', {
-              'registered': false,
-              'status': response.statusCode,
-            }),
+          AppLogger.safeUnawait(
+            AnalyticsService.instance
+                .logCustom('fcm_registered', {
+                  'registered': false,
+                  'status': response.statusCode,
+                })
+                .catchError(
+                  (Object e, StackTrace st) => AppLogger.e(
+                    'PushNotificationService: Analytics fcm_registered (failure) failed',
+                    e,
+                    st,
+                  ),
+                ),
+            'PushNotificationService: analytics fcm_registered (failure)',
           );
         } on Object catch (_) {}
       }
     } on Object catch (e) {
-      AppLogger.w('FCM backend token attestation/handshake failure', e);
+      AppLogger.e('FCM backend token attestation/handshake failure', e);
       try {
-        unawaited(
-          AnalyticsService.instance.logCustom('fcm_registered', {
-            'registered': false,
-            'error': e.toString(),
-          }),
+        AppLogger.safeUnawait(
+          AnalyticsService.instance
+              .logCustom('fcm_registered', {
+                'registered': false,
+                'error': e.toString(),
+              })
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'PushNotificationService: Analytics fcm_registered (exception) failed',
+                  e,
+                  st,
+                ),
+              ),
+          'PushNotificationService: analytics fcm_registered (exception)',
         );
       } on Object catch (_) {}
     }
