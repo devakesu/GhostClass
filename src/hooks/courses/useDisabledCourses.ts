@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useUserSettings } from "@/providers/user-settings";
 import { DisabledCoursesMap } from "@/types/user-settings";
+import { reasonTextSchema } from "@/lib/validation/text";
 
 /**
  * Generates the semester key used as the top-level key in `disabled_courses`.
@@ -107,12 +108,13 @@ export function useDisabledCourses({
   const disableCourse = useCallback(
     async (code: string, reason: string) => {
       if (!semKey) return;
+      const safeReason = reasonTextSchema.parse(reason);
       const newMap: DisabledCoursesMap = structuredClone(disabledCoursesMap);
       if (!Object.prototype.hasOwnProperty.call(newMap, semKey)) {
         Reflect.set(newMap, semKey, {});
       }
       const semMap = Reflect.get(newMap, semKey)!;
-      Reflect.set(semMap, code.toUpperCase(), reason);
+      Reflect.set(semMap, code.toUpperCase(), safeReason);
       await updateDisabledCourses(newMap);
     },
     [semKey, disabledCoursesMap, updateDisabledCourses]

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -50,7 +51,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
 
       final res = await api.addCourse(
         courseCode: _codeController.text.trim().toUpperCase(),
-        courseName: _nameController.text.trim(),
+        courseName: utils.normalizePersonName(_nameController.text),
         semester: widget.semester,
         academicYear: widget.academicYear,
         supabaseToken: supabaseToken,
@@ -195,7 +196,16 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   label: 'Course Name',
                   controller: _nameController,
                   hint: 'Data Structures & Algorithms',
-                  validator: (v) => v!.isEmpty ? 'Name is required' : null,
+                  validator: (v) {
+                    final value = v?.trim() ?? '';
+                    if (value.length < 2) return 'Min 2 characters';
+                    if (value.length > 100) return 'Max 100 characters';
+                    if (!utils.isValidPersonName(value)) {
+                      return 'Name contains invalid characters';
+                    }
+                    return null;
+                  },
+                  textCapitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 32),
 

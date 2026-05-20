@@ -5,6 +5,7 @@ import { decrypt, encrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
 import { safeResponseJson } from "@/lib/json";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
+import { ezygoProfileSchema, shortTextSchema } from "@/lib/validation/text";
 
 function safeGet(obj: unknown, prop: string): unknown {
   return obj && typeof obj === "object" ? Reflect.get(obj, prop) : undefined;
@@ -12,20 +13,20 @@ function safeGet(obj: unknown, prop: string): unknown {
 
 interface EzygoProfileResponse {
   user_id?: string | number;
-  username?: string;
-  email?: string;
-  mobile?: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  gender?: string;
-  sex?: string;
-  birth_date?: string;
-  dob?: string;
+  username?: string | null;
+  email?: string | null;
+  mobile?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  gender?: string | null;
+  sex?: string | null;
+  birth_date?: string | null;
+  dob?: string | null;
   user?: {
-    username?: string;
-    email?: string;
-    mobile?: string;
+    username?: string | null;
+    email?: string | null;
+    mobile?: string | null;
     id?: string | number;
   };
 }
@@ -190,9 +191,10 @@ async function upsertClass(
   externalId: string | number,
   name: string,
 ): Promise<{ id: string; name: string } | null> {
+  const safeName = shortTextSchema.parse(name);
   const { data, error } = await supabaseAdmin
     .from("classes")
-    .upsert({ external_group_id: externalId, name }, { onConflict: "external_group_id" })
+    .upsert({ external_group_id: externalId, name: safeName }, { onConflict: "external_group_id" })
     .select("id, name")
     .single();
   if (error || !data) return null;
@@ -463,7 +465,11 @@ async function parseProfileResponse(
   if (!json) {
     throw new Error(`EzyGo Profile returned empty or invalid JSON: ${ezygoRes?.status}`);
   }
-  const ezygoData = (safeGet(json, "data") ?? json) as EzygoProfileResponse;
+  const parsedProfile = ezygoProfileSchema.safeParse(safeGet(json, "data") ?? json);
+  if (!parsedProfile.success) {
+    throw new Error(`EzyGo Profile returned invalid data: ${ezygoRes?.status}`);
+  }
+  const ezygoData = parsedProfile.data;
 
   const resolvedEzygoId = (ezygoId && String(ezygoId).trim() !== "")
     ? String(ezygoId)

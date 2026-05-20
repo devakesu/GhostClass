@@ -45,6 +45,7 @@ import {
   subMonths,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { optionalReasonSchema } from "@/lib/validation/text";
 import {
   Popover,
   PopoverContent,
@@ -474,7 +475,7 @@ export function AddAttendanceDialog({
         courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
       }
 
-      const finalRemarks = (remarks.trim() || "").substring(0, 255) || null;
+      const finalRemarks = optionalReasonSchema.parse(remarks);
 
       const { error } = await supabase
         .from("tracker")

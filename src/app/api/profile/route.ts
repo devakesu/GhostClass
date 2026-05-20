@@ -10,9 +10,9 @@ import { getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
-import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
+import { birthDateSchema, genderSchema, optionalPersonNameSchema, personNameSchema } from "@/lib/validation/text";
 
 export const dynamic = "force-dynamic";
 
@@ -236,18 +236,15 @@ const getHandler = async (req: NextRequest) => {
 };
 
 const patchSchema = z.object({
-  first_name: z.string().min(2),
-  last_name: z.string().optional().nullable(),
-  gender: z.enum(["male", "female", "other"]).optional().nullable(),
-  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  first_name: personNameSchema,
+  last_name: optionalPersonNameSchema,
+  gender: genderSchema.optional().nullable(),
+  birth_date: birthDateSchema.optional().nullable(),
 });
 
 function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
   const { first_name, last_name, gender, birth_date } = parsedData;
-  const sanitizedFirstName = toTitleCase(first_name);
-  const sanitizedLastName = last_name ? toTitleCase(last_name) : null;
-  
-  const up: Record<string, unknown> = { first_name: sanitizedFirstName, last_name: sanitizedLastName };
+  const up: Record<string, unknown> = { first_name, last_name };
   if (gender !== undefined) {
     if (gender === null) {
       up.gender = null;
@@ -268,7 +265,7 @@ function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
       up.birth_date_iv = enc.iv;
     }
   }
-  return { up, sanitizedFirstName, sanitizedLastName, gender, birth_date };
+  return { up, first_name, last_name, gender, birth_date };
 }
 
 const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) => {
@@ -314,7 +311,7 @@ const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
 
-  const { up, sanitizedFirstName, sanitizedLastName, gender, birth_date } = buildUpdatePayload(parsed.data);
+  const { up, first_name, last_name, gender, birth_date } = buildUpdatePayload(parsed.data);
 
   const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
   if (updateError) {
@@ -324,7 +321,7 @@ const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody
     });
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
-  return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
+  return NextResponse.json({ first_name, last_name, gender, birth_date });
 };
 
 export const GET = withSecurity(getHandler);

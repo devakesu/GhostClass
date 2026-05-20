@@ -48,9 +48,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
   }
 
   Future<void> _handleSave() async {
-    final name = utils.toTitleCase(_controller.text.trim());
+    final name = utils.normalizePersonName(_controller.text);
     if (name.isEmpty) return;
-    if (name.length > 60) return;
+    if (name.length > 100) return;
 
     setState(() => _isSaving = true);
 
@@ -263,7 +263,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                         children: [
                           TextFormField(
                             controller: _controller,
-                            maxLength: 60,
+                            maxLength: 100,
+                            textCapitalization: TextCapitalization.words,
                             style: GoogleFonts.manrope(
                               fontWeight: FontWeight.w700,
                             ),
@@ -317,10 +318,11 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                               if (val == null || val.trim().isEmpty) {
                                 return 'Required';
                               }
-                              if (!RegExp(
-                                r'^[a-zA-Z\s.]+$',
-                              ).hasMatch(val.trim())) {
-                                return 'Letters, spaces, and dots only';
+                              if (val.trim().length > 100) {
+                                return 'Max 100 characters';
+                              }
+                              if (!utils.isValidPersonName(val)) {
+                                return 'Name contains invalid characters';
                               }
                               return null;
                             },

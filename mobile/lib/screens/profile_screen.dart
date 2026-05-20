@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -77,9 +78,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           Supabase.instance.client.auth.currentSession?.accessToken;
       if (supabaseToken == null) throw Exception('Session expired');
 
+      final normalizedFirstName = utils.normalizePersonName(
+        _firstNameController.text,
+      );
+      final rawLastName = _lastNameController.text.trim();
+      final normalizedLastName = rawLastName.isEmpty
+          ? null
+          : utils.normalizePersonName(rawLastName);
+
       final data = {
-        'first_name': _firstNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
+        'first_name': normalizedFirstName,
+        'last_name': normalizedLastName,
         'gender': _selectedGender,
         'birth_date': _selectedBirthDate != null
             ? DateFormat('yyyy-MM-dd').format(_selectedBirthDate!)
@@ -262,10 +271,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               label: 'First Name',
               controller: _firstNameController,
               enabled: _isEditing,
-              maxLength: 50,
+              maxLength: 100,
+              textCapitalization: TextCapitalization.words,
               validator: (v) {
-                if ((v?.trim().length ?? 0) < 2) return 'Min 2 characters';
-                if ((v?.trim().length ?? 0) > 50) return 'Max 50 characters';
+                final value = v?.trim() ?? '';
+                if (value.length < 2) return 'Min 2 characters';
+                if (value.length > 100) return 'Max 100 characters';
+                if (!utils.isValidPersonName(value)) {
+                  return 'Name contains invalid characters';
+                }
                 return null;
               },
             ),
@@ -274,9 +288,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               label: 'Last Name',
               controller: _lastNameController,
               enabled: _isEditing,
-              maxLength: 50,
+              maxLength: 100,
+              textCapitalization: TextCapitalization.words,
               validator: (v) {
-                if ((v?.trim().length ?? 0) > 50) return 'Max 50 characters';
+                final value = v?.trim() ?? '';
+                if (value.isEmpty) return null;
+                if (value.length > 100) return 'Max 100 characters';
+                if (!utils.isValidPersonName(value)) {
+                  return 'Name contains invalid characters';
+                }
                 return null;
               },
             ),

@@ -366,6 +366,16 @@ String toTitleCase(String text) {
       .join(' ');
 }
 
+String normalizePersonName(String text) {
+  return toTitleCase(text.trim().replaceAll(RegExp(r'\s+'), ' '));
+}
+
+bool isValidPersonName(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+  return RegExp(r"^[\p{L}\p{M}.'’\- ]+$", unicode: true).hasMatch(trimmed);
+}
+
 String standardizeCourseCode(String input) {
   return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
 }

@@ -213,12 +213,14 @@ class ProfileField extends StatelessWidget {
     super.key,
     this.maxLength,
     this.validator,
+    this.textCapitalization = TextCapitalization.none,
   });
   final String label;
   final TextEditingController controller;
   final bool enabled;
   final int? maxLength;
   final String? Function(String?)? validator;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +242,7 @@ class ProfileField extends StatelessWidget {
           enabled: enabled,
           validator: validator,
           maxLength: maxLength,
+          textCapitalization: textCapitalization,
           buildCounter:
               (
                 context, {

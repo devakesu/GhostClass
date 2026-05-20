@@ -3,7 +3,8 @@ import { withSecurity } from "@/lib/security/app-check";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
-import { toTitleCase } from "@/lib/utils";
+import { z } from "zod";
+import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
 
 async function authenticateRequest(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -37,21 +38,21 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
   try {
     const body = decryptedBody || await req.json();
     
-    const code = String(body.courseCode ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
-    const name = toTitleCase(String(body.courseName ?? ""));
-    const semester = String(body.semester ?? "").trim();
-    const academicYear = String(body.academicYear ?? "").trim();
+    const parsed = z.object({
+      courseCode: courseCodeSchema,
+      courseName: personNameSchema,
+      semester: semesterSchema,
+      academicYear: academicYearSchema,
+    }).safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid course details" }, { status: 422 });
+    }
+
+    const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
 
     if (!code || !name || !semester || !academicYear) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    if (semester !== "odd" && semester !== "even") {
-      return NextResponse.json({ error: "Semester must be 'odd' or 'even'" }, { status: 400 });
-    }
-
-    if (!/^\d{4}-(\d{4}|\d{2})$/.test(academicYear)) {
-      return NextResponse.json({ error: "Invalid academic year format (expected YYYY-YYYY or YYYY-YY)" }, { status: 400 });
     }
 
     const auth = await authenticateRequest(req);

@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
+import { disabledCoursesSchema } from "@/lib/validation/text";
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -71,7 +72,11 @@ const parsePrefetchedSession = (currentUserId: string): UserSettings | null => {
       if (typeof s.bunk_calculator_enabled === 'boolean' && 
           typeof s.target_percentage === 'number' &&
           s.disabled_courses) {
-        return s as UserSettings;
+        const disabledCourses = disabledCoursesSchema.safeParse(s.disabled_courses);
+        return {
+          ...s,
+          disabled_courses: disabledCourses.success ? disabledCourses.data : {},
+        } as UserSettings;
       }
     }
   } catch {
@@ -214,6 +219,7 @@ function useUserSettingsState() {
         .upsert({
           user_id: userId,
           ...updates,
+          ...(updates.disabled_courses ? { disabled_courses: disabledCoursesSchema.parse(updates.disabled_courses) } : {}),
           updated_at: new Date().toISOString(),
         });
 

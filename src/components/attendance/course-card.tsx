@@ -12,6 +12,7 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useProfile } from "@/hooks/users/profile";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { reasonTextSchema } from "@/lib/validation/text";
 import { toast } from "sonner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchUserSettings } from "@/hooks/users/settings";
@@ -816,7 +817,7 @@ function DisableCourseDialog({
       return;
     }
     disableInFlightRef.current = true;
-    const reason = isOtherReason ? customReason.trim() : disableReason;
+    const reason = isOtherReason ? reasonTextSchema.parse(customReason) : disableReason;
     setIsDisabling(true);
     try {
       await disableCourse(courseCode, reason);

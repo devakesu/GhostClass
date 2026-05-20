@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import React, { useState, forwardRef } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,29 +28,18 @@ import {
 } from "@/components/ui/select";
 import { useUpdateProfile } from "@/hooks/users/profile";
 import { UserProfile } from "@/types";
-import { cn, redact, toTitleCase } from "@/lib/utils";
+import { cn, redact } from "@/lib/utils";
+import { birthDateSchema, genderSchema, optionalPersonNameSchema, personNameSchema } from "@/lib/validation/text";
 import { Separator } from "../ui/separator";
 import { DeleteAccount } from "./delete-account";
 
 const profileFormSchema = z.object({
-  first_name: z.string().min(2, {
-    message: "First name must be at least 2 characters.",
-  }),
-  last_name: z.string().optional(),
-  gender: z.string().min(1, {
-    message: "Please select a gender.",
-  }),
-  birth_date: z
-    .string()
+  first_name: personNameSchema,
+  last_name: optionalPersonNameSchema,
+  gender: z.union([genderSchema, z.literal("")]),
+  birth_date: birthDateSchema
     .optional()
     .nullable()
-    // Guard against non-standard date strings stored in legacy records.
-    // HTML <input type="date"> enforces YYYY-MM-DD but this makes it explicit at
-    // the Zod layer so API submissions and legacy data are also validated.
-    .refine(
-      (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
-      "Birth date must be in YYYY-MM-DD format",
-    )
     .refine((val) => {
       if (!val) return true;
 
@@ -67,7 +56,12 @@ const profileFormSchema = z.object({
     }, "Birth date cannot be in the future"),
 });
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
+type ProfileFormInput = {
+  first_name: string;
+  last_name: string | null;
+  gender: "" | "male" | "female" | "other";
+  birth_date: string | null;
+};
 
 interface ReadOnlyFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value'> {
   value?: string | null;
@@ -117,7 +111,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
 
   const getGenderValue = (val: string | undefined | null) => {
     if (!val) return "";
-    return val.toLowerCase();
+    return val.toLowerCase() as ProfileFormInput["gender"];
   };
 
   const displayGender = (val: string | undefined | null) => {
@@ -125,8 +119,8 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
     return val.charAt(0).toUpperCase() + val.slice(1);
   };
 
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
+  const form = useForm<ProfileFormInput, unknown, ProfileFormInput>({
+    resolver: zodResolver(profileFormSchema) as unknown as Resolver<ProfileFormInput, unknown, ProfileFormInput>,
     defaultValues: {
       first_name: "",
       last_name: "",
@@ -144,15 +138,12 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
     }
   });
 
-  function onSubmit(formValues: ProfileFormValues) {
-    const sanitizedFirstName = toTitleCase(formValues.first_name);
-    const sanitizedLastName = formValues.last_name ? toTitleCase(formValues.last_name) : null;
-
+  function onSubmit(formValues: ProfileFormInput) {
     updateProfileMutation.mutate(
       { 
         data: {
-          first_name: sanitizedFirstName,
-          last_name: sanitizedLastName,
+          first_name: formValues.first_name,
+          last_name: formValues.last_name?.trim() || null,
           gender: formValues.gender || null,
           birth_date: formValues.birth_date || null,
         } 
@@ -259,6 +250,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                           placeholder="Enter last name"
                           className="pl-9 custom-input bg-background/50 h-11"
                           {...field}
+                          value={field.value ?? ""}
                         />
                       ) : (
                         <ReadOnlyField value={field.value} className="pl-9" />
