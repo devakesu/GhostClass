@@ -32,6 +32,20 @@ async function authenticateRequest(req: Request) {
 async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) {
   try {
     const body = decryptedBody || await req.json();
+    const rawBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+    const courseCodeValue = rawBody.courseCode;
+    const instructorNameValue = rawBody.instructorName;
+    const semesterValue = rawBody.semester;
+    const academicYearValue = rawBody.academicYear;
+
+    if (
+      typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
+      typeof instructorNameValue !== "string" || instructorNameValue.trim() === "" ||
+      typeof semesterValue !== "string" || semesterValue.trim() === "" ||
+      typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+    ) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
     const parsed = z.object({
       courseCode: courseCodeSchema,
@@ -45,10 +59,6 @@ async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: un
     }
 
     const { courseCode, instructorName, semester, academicYear } = parsed.data;
-
-    if (!courseCode || !instructorName || !semester || !academicYear) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
 
     const auth = await authenticateRequest(req);
     if (!auth) {

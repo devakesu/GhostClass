@@ -35,6 +35,7 @@ export default function ProtectedLayout({
   const { scrollY } = useScroll();
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
+  const isHiddenRef = useRef(false);
   const supabaseRef = useRef(createClient());
 
   // Initialize CSRF token
@@ -48,9 +49,11 @@ export default function ProtectedLayout({
           const shouldHide = latest > previous && latest > 150;
           const shouldShow = latest <= previous || latest <= 150;
           
-          if (shouldHide && !isHidden) {
+          if (shouldHide && !isHiddenRef.current) {
+            isHiddenRef.current = true;
             setIsHidden(true);
-          } else if (shouldShow && isHidden) {
+          } else if (shouldShow && isHiddenRef.current) {
+            isHiddenRef.current = false;
             setIsHidden(false);
           }
           
@@ -64,7 +67,7 @@ export default function ProtectedLayout({
     return () => {
       unsubscribe();
     };
-  }, [scrollY, isHidden]);
+  }, [scrollY]);
 
   // useInstitutions is also called inside <Navbar>; React Query deduplicates the
   // network request so there is no extra fetch here. We only subscribe to it at

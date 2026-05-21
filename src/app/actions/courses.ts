@@ -8,6 +8,20 @@ import { z } from "zod";
 import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
+  const courseCodeValue = formData.get("courseCode");
+  const courseNameValue = formData.get("courseName");
+  const semesterValue = formData.get("semester");
+  const academicYearValue = formData.get("academicYear");
+
+  if (
+    typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
+    typeof courseNameValue !== "string" || courseNameValue.trim() === "" ||
+    typeof semesterValue !== "string" || semesterValue.trim() === "" ||
+    typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+  ) {
+    return { error: "Course code, name, semester, and academic year are required" };
+  }
+
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
   const parsed = z.object({
     courseCode: courseCodeSchema,
@@ -15,10 +29,10 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
     semester: semesterSchema,
     academicYear: academicYearSchema,
   }).safeParse({
-    courseCode: formData.get("courseCode"),
-    courseName: formData.get("courseName"),
-    semester: formData.get("semester"),
-    academicYear: formData.get("academicYear"),
+    courseCode: courseCodeValue,
+    courseName: courseNameValue,
+    semester: semesterValue,
+    academicYear: academicYearValue,
   });
 
   if (!parsed.success) {
@@ -27,10 +41,6 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
 
   const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
   const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
-
-  if (!code || !name || !semester || !academicYear) {
-    return { error: "Course code, name, semester, and academic year are required" };
-  }
 
   // 1. Verify Turnstile Security Token
   if (!turnstileToken) {
