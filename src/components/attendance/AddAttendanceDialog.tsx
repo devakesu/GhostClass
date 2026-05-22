@@ -66,6 +66,7 @@ import { AttendanceReport, Course, TrackAttendance } from "@/types";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useProfile } from "@/hooks/users/profile";
 
 interface User {
   id: string | number;
@@ -342,6 +343,8 @@ export function AddAttendanceDialog({
   selectedSemester,
   selectedYear,
 }: AddAttendanceDialogProps) {
+  const { data: profile } = useProfile();
+
   // --- STATE ---
   const [date, setDate] = useState<Date>(new Date());
   const [session, setSession] = useState<string>("");
@@ -733,6 +736,7 @@ export function AddAttendanceDialog({
               <Select
                 value={courseId}
                 onValueChange={setCourseId}
+                disabled={!profile?.class?.id || sortedCourses.length === 0}
               >
                 <SelectTrigger
                   id="course-select"
@@ -747,7 +751,7 @@ export function AddAttendanceDialog({
                         courseId ? "text-primary" : "text-muted-foreground",
                       )}
                     />
-                    <SelectValue placeholder="Select Subject" />
+                    <SelectValue placeholder={!profile?.class?.id || sortedCourses.length === 0 ? "No courses available" : "Select Subject"} />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">

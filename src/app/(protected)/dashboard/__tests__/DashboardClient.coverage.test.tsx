@@ -108,6 +108,10 @@ vi.mock('@/components/attendance/EditInstructorDialog', () => ({
   EditInstructorDialog: ({ open }: any) => (open ? <div data-testid="edit-instructor-dialog" /> : null),
 }));
 
+vi.mock('@/components/attendance/SelectClassDialog', () => ({
+  SelectClassDialog: () => null,
+}));
+
 vi.mock('next/dynamic', () => ({
   default: () => {
     return function DynamicComponent() {
@@ -127,10 +131,10 @@ vi.mock('@/components/ui/select', () => ({
       {children}
     </select>
   ),
-  SelectTrigger: ({ children }: any) => <option>{children}</option>,
-  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectTrigger: ({ children }: any) => <button type="button">{children}</button>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
   SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
-  SelectValue: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ children }: any) => <span>{children}</span>,
 }));
 
 vi.mock('@/components/ui/alert-dialog', () => ({
@@ -162,7 +166,7 @@ vi.mock('@/components/loading', () => ({
 }));
 
 describe('DashboardClient', () => {
-  const mockProfile = { id: '123', username: 'testuser', first_name: 'Test' };
+  const mockProfile = { id: '123', username: 'testuser', first_name: 'Test', class: { id: '1', name: 'Test Class' } };
   
   beforeEach(() => {
     vi.useRealTimers();
@@ -191,8 +195,7 @@ describe('DashboardClient', () => {
     });
 
     expect(screen.getByText(/Welcome back/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue('odd')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2024-25')).toBeInTheDocument();
+    expect(screen.getAllByText(/ODD 2024-25/i).length).toBeGreaterThan(0);
   });
 
   it('handles serverError by showing a toast', () => {
@@ -212,10 +215,9 @@ describe('DashboardClient', () => {
       expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument();
     });
 
-    const selects = screen.getAllByTestId('select-component');
-    fireEvent.change(selects[0], { target: { value: 'even' } });
+    fireEvent.click(screen.getByLabelText('Go to next academic period'));
     
-    expect(screen.getByText(/Confirm Change/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confirm academic period change/i)).toBeInTheDocument();
   });
 
   it('calculates stats correctly', async () => {
@@ -260,9 +262,10 @@ describe('DashboardClient', () => {
       expect(screen.getByText(/No courses found/i)).toBeInTheDocument();
     });
     
-    const addBtn = screen.getByText('Add Your First Course');
-    fireEvent.click(addBtn);
-    expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Add Your First Course'));
+    await waitFor(() => {
+      expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
+    });
   });
 
   it('handles confirm and cancel in AlertDialog', async () => {
@@ -272,15 +275,14 @@ describe('DashboardClient', () => {
     render(<DashboardClient />);
     await waitFor(() => expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument());
 
-    const selects = screen.getAllByTestId('select-component');
-    fireEvent.change(selects[0], { target: { value: 'even' } });
+    fireEvent.click(screen.getByLabelText('Go to next academic period'));
     
     // Cancel first
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
 
     // Trigger again and confirm
-    fireEvent.change(selects[0], { target: { value: 'even' } });
+    fireEvent.click(screen.getByLabelText('Go to next academic period'));
     fireEvent.click(screen.getByText('Confirm'));
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled();
@@ -322,8 +324,9 @@ describe('DashboardClient', () => {
     render(<DashboardClient />);
     await waitFor(() => expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument());
     
-    const addCard = screen.getByText(/Can't find a course/i);
-    fireEvent.click(addCard);
-    expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Can't find a course/i));
+    await waitFor(() => {
+      expect(screen.getByTestId('add-course-dialog')).toBeInTheDocument();
+    });
   });
 });

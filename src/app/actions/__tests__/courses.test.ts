@@ -93,7 +93,7 @@ describe("course actions", () => {
       expect(result).toEqual({});
       expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
         course_code: "CS101",
-        course_name: "Intro To Computer Science"
+        course_name: "intro to computer science"
       }));
       expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
     });

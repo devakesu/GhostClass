@@ -124,3 +124,35 @@ export async function clearTermsRedirectCountCookie() {
     httpOnly: true,
   });
 }
+
+export async function getAvailableClassesAction(semester: string, academicYear: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("classes")
+    .select("id, name")
+    .eq("sem", semester)
+    .eq("year", academicYear)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data || [];
+}
+
+export async function selectUserClassAction(classId: string | null) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  
+  const { error } = await supabase
+    .from("users")
+    .update({ class_id: classId })
+    .eq("auth_id", user.id);
+    
+  if (error) {
+    throw new Error(error.message);
+  }
+  
+  revalidatePath("/dashboard");
+}

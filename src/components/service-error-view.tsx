@@ -35,9 +35,17 @@ export function ServiceErrorView({
   };
 
   const handleLogout = async () => {
+    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
+    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
     const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      supabaseUrl!,
+      supabaseKey!
     );
     await supabase.auth.signOut();
     router.push("/");
@@ -86,8 +94,8 @@ export function ServiceErrorView({
 
         {/* Actions */}
         <div className="flex w-full flex-col gap-6 sm:flex-row sm:justify-center mt-4 mb-8">
-          <Button 
-            onClick={onRetry ?? (() => window.location.reload())} 
+          <Button
+            onClick={onRetry ?? (() => window.location.reload())}
             className="h-16 w-full sm:w-80 rounded-2xl bg-primary px-10 text-lg font-extrabold text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
           >
             <RefreshCcw className="mr-3 h-6 w-6" />
@@ -95,9 +103,9 @@ export function ServiceErrorView({
           </Button>
 
           {showHome && (
-            <Button 
+            <Button
               variant="outline"
-              onClick={() => router.push("/")} 
+              onClick={() => router.push("/")}
               className="h-14 rounded-2xl border-white/10 bg-white/5 px-10 text-base font-bold text-foreground hover:bg-white/10 transition-all"
             >
               <Home className="mr-2 h-5 w-5" />
@@ -108,16 +116,16 @@ export function ServiceErrorView({
 
         {/* Tertiary Actions */}
         <div className="mt-12 flex flex-wrap justify-center gap-6">
-          <button 
-            onClick={handleContactUs} 
+          <button
+            onClick={handleContactUs}
             className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
           >
             <MessageSquare className="mr-2 h-4 w-4" />
             Contact Support
           </button>
-          
-          <button 
-            onClick={handleLogout} 
+
+          <button
+            onClick={handleLogout}
             className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
           >
             <LogOut className="mr-2 h-4 w-4" />

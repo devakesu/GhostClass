@@ -96,7 +96,11 @@ export async function uploadUserAvatar(file: File) {
       // Guard: getPublicUrl() is synchronous and cannot fail — it constructs the URL
       // client-side from NEXT_PUBLIC_SUPABASE_URL. A misconfigured env var would silently
       // write a wrong-project URL to the DB without this check.
-      const supabaseProjectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
+      const supabaseProjectUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+        ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+        : process.env.NEXT_PUBLIC_SUPABASE_URL;
+        
       if (supabaseProjectUrl && !publicUrl.startsWith(supabaseProjectUrl)) {
         throw new Error(
           `Avatar URL origin mismatch: expected URL starting with ${supabaseProjectUrl} but got ${publicUrl}. Check NEXT_PUBLIC_SUPABASE_URL.`

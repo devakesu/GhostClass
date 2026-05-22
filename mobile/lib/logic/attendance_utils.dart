@@ -376,6 +376,12 @@ bool isValidPersonName(String text) {
   return RegExp(r"^[\p{L}\p{M}.'’\- ]+$", unicode: true).hasMatch(trimmed);
 }
 
+bool isValidCourseName(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+  return RegExp(r"^[\p{L}\p{M}\p{N}.'’&/()+,:;\- ]+$", unicode: true).hasMatch(trimmed);
+}
+
 String standardizeCourseCode(String input) {
   return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
 }

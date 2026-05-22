@@ -6,13 +6,29 @@ import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class HeaderSection extends ConsumerWidget {
+class HeaderSection extends ConsumerStatefulWidget {
   const HeaderSection({required this.data, super.key});
+
   final DashboardData data;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HeaderSection> createState() => _HeaderSectionState();
+}
+
+class _HeaderSectionState extends ConsumerState<HeaderSection> {
+  bool _academicPeriodChangeLocked = false;
+
+  @override
+  Widget build(BuildContext context) {
     final profile = ref.watch(authProvider).value?.profile;
+    final isUpdating = ref.watch(academicProvider).isLoading || _academicPeriodChangeLocked;
+
+    final currentPeriod = _AcademicPeriod(
+      semester: widget.data.selectedSemester,
+      year: widget.data.selectedYear,
+    );
+    final previousPeriod = _shiftAcademicPeriod(currentPeriod, _PeriodDirection.previous);
+    final nextPeriod = _shiftAcademicPeriod(currentPeriod, _PeriodDirection.next);
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -20,7 +36,6 @@ class HeaderSection extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Welcome Message
             RichText(
               text: TextSpan(
                 style: GoogleFonts.manrope(
@@ -42,23 +57,17 @@ class HeaderSection extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // 2. Class Badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.08),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(100),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                 ),
               ),
               child: Text(
-                (profile?.classField?.name ?? data.className ?? 'Unassigned')
-                    .toUpperCase(),
+                (profile?.classField?.name ?? widget.data.className ?? 'Unassigned').toUpperCase(),
                 style: GoogleFonts.manrope(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
@@ -72,49 +81,31 @@ class HeaderSection extends ConsumerWidget {
               'For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚',
               style: GoogleFonts.manrope(
                 fontSize: 12,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontWeight: FontWeight.w500,
                 fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: 20),
-
-            // 3. Selectors
-            Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    label:
-                        'Current semester: ${data.selectedSemester}. Tap to change.',
-                    button: true,
-                    child: _SelectorButton(
-                      label: data.selectedSemester.toUpperCase(),
-                      icon: LucideIcons.calendar,
-                      onTap: () => _showSemesterPicker(
-                        context,
-                        ref,
-                        data.selectedSemester,
-                      ),
-                    ),
-                  ),
+            Semantics(
+              label: 'Current academic period: ${_formatAcademicPeriod(currentPeriod)}. Use the arrows to change it.',
+              button: true,
+              child: _AcademicPeriodSwitcher(
+                currentPeriod: currentPeriod,
+                previousPeriod: previousPeriod,
+                nextPeriod: nextPeriod,
+                isBusy: isUpdating,
+                onPrevious: () => _requestAcademicPeriodChange(
+                  context,
+                  currentPeriod: currentPeriod,
+                  targetPeriod: previousPeriod,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Semantics(
-                    label:
-                        'Current academic year: ${data.selectedYear}. Tap to change.',
-                    button: true,
-                    child: _SelectorButton(
-                      label: data.selectedYear,
-                      icon: LucideIcons.calendarDays,
-                      onTap: () =>
-                          _showYearPicker(context, ref, data.selectedYear),
-                    ),
-                  ),
+                onNext: () => _requestAcademicPeriodChange(
+                  context,
+                  currentPeriod: currentPeriod,
+                  targetPeriod: nextPeriod,
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -122,248 +113,234 @@ class HeaderSection extends ConsumerWidget {
     );
   }
 
-  void _showSemesterPicker(
-    BuildContext context,
-    WidgetRef ref,
-    String current,
-  ) {
-    final _ = showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _PickerSheet(
-        title: 'Select Semester',
-        options: const ['odd', 'even'],
-        selected: current.toLowerCase(),
-        onSelected: (val) => _handleAcademicChange(
-          context,
-          ref,
-          type: 'semester',
-          value: val,
-          current: current,
-        ),
-      ),
-    );
-  }
-
-  void _showYearPicker(BuildContext context, WidgetRef ref, String current) {
-    final currentYear = DateTime.now().year;
-    final years = List.generate(
-      (currentYear - 2022) + 1,
-      (i) => '${2022 + i}-${(2023 + i).toString().substring(2)}',
-    );
-
-    final _ = showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _PickerSheet(
-        title: 'Select Academic Year',
-        options: years,
-        selected: current,
-        onSelected: (val) => _handleAcademicChange(
-          context,
-          ref,
-          type: 'academicYear',
-          value: val,
-          current: current,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleAcademicChange(
-    BuildContext context,
-    WidgetRef ref, {
-    required String type,
-    required String value,
-    required String current,
+  Future<void> _requestAcademicPeriodChange(
+    BuildContext context, {
+    required _AcademicPeriod currentPeriod,
+    required _AcademicPeriod? targetPeriod,
   }) async {
-    Navigator.pop(context);
-    if (value == current) return;
+    if (_academicPeriodChangeLocked || targetPeriod == null) return;
 
-    if (type == 'semester') {
-      await ref.read(academicProvider.notifier).setSemester(value);
-    } else {
-      await ref.read(academicProvider.notifier).setYear(value);
+    setState(() {
+      _academicPeriodChangeLocked = true;
+    });
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm academic period change'),
+        content: Text(
+          'Change from ${_formatAcademicPeriod(currentPeriod)} to ${_formatAcademicPeriod(targetPeriod)}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      if (mounted) {
+        setState(() {
+          _academicPeriodChangeLocked = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      await ref.read(academicProvider.notifier).setAcademicPeriod(
+            targetPeriod.semester,
+            targetPeriod.year,
+          );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _academicPeriodChangeLocked = false;
+        });
+      }
     }
   }
 }
 
-class _SelectorButton extends StatelessWidget {
-  const _SelectorButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
+enum _PeriodDirection { previous, next }
 
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              LucideIcons.chevronDown,
-              size: 14,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _AcademicPeriod {
+  const _AcademicPeriod({required this.semester, required this.year});
+
+  final String semester;
+  final String year;
 }
 
-class _PickerSheet extends StatelessWidget {
-  const _PickerSheet({
-    required this.title,
-    required this.options,
-    required this.selected,
-    required this.onSelected,
+class _AcademicPeriodSwitcher extends StatelessWidget {
+  const _AcademicPeriodSwitcher({
+    required this.currentPeriod,
+    required this.previousPeriod,
+    required this.nextPeriod,
+    required this.isBusy,
+    required this.onPrevious,
+    required this.onNext,
   });
-  final String title;
-  final List<String> options;
-  final String selected;
-  final void Function(String) onSelected;
+
+  final _AcademicPeriod currentPeriod;
+  final _AcademicPeriod? previousPeriod;
+  final _AcademicPeriod? nextPeriod;
+  final bool isBusy;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          // Drag Handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(2),
-            ),
+          _PeriodArrowButton(
+            icon: LucideIcons.chevronLeft,
+            label: previousPeriod == null
+                ? 'Previous academic period unavailable'
+                : 'Go to ${_formatAcademicPeriod(previousPeriod!)}',
+            onTap: isBusy || previousPeriod == null ? null : onPrevious,
           ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.manrope(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Flexible(
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(right: 8),
-                child: Column(
-                  children: options.map((opt) {
-                    final isSelected =
-                        opt.toLowerCase() == selected.toLowerCase();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: InkWell(
-                        onTap: () => onSelected(opt),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withValues(alpha: 0.2)
-                                  : Colors.transparent,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                opt.toUpperCase(),
-                                style: GoogleFonts.manrope(
-                                  fontSize: 16,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurface,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              if (isSelected)
-                                Icon(
-                                  LucideIcons.checkCircle,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Academic period',
+                    style: GoogleFonts.manrope(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      color: scheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatAcademicPeriod(currentPeriod),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+          _PeriodArrowButton(
+            icon: LucideIcons.chevronRight,
+            label: nextPeriod == null
+                ? 'Next academic period unavailable'
+                : 'Go to ${_formatAcademicPeriod(nextPeriod!)}',
+            onTap: isBusy || nextPeriod == null ? null : onNext,
           ),
         ],
       ),
     );
   }
+}
+
+class _PeriodArrowButton extends StatelessWidget {
+  const _PeriodArrowButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: onTap == null ? scheme.onSurface.withValues(alpha: 0.04) : scheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: onTap == null ? scheme.onSurface.withValues(alpha: 0.28) : scheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final _academicYearPattern = RegExp(r'^(\d{2}|\d{4})-(\d{2}|\d{4})$');
+
+_AcademicPeriod? _shiftAcademicPeriod(
+  _AcademicPeriod current,
+  _PeriodDirection direction,
+) {
+  final startYear = _parseAcademicYearStart(current.year);
+  if (startYear == null) return null;
+
+  if (direction == _PeriodDirection.previous) {
+    return current.semester.toLowerCase() == 'odd'
+        ? _AcademicPeriod(semester: 'even', year: _formatAcademicYear(startYear - 1))
+        : _AcademicPeriod(semester: 'odd', year: _formatAcademicYear(startYear));
+  }
+
+  return current.semester.toLowerCase() == 'odd'
+      ? _AcademicPeriod(semester: 'even', year: _formatAcademicYear(startYear))
+      : _AcademicPeriod(semester: 'odd', year: _formatAcademicYear(startYear + 1));
+}
+
+int? _parseAcademicYearStart(String year) {
+  final match = _academicYearPattern.firstMatch(year.trim());
+  if (match == null) return null;
+
+  final startRaw = match.group(1)!;
+  final normalizedStart = startRaw.length == 2 ? '20$startRaw' : startRaw;
+  return int.tryParse(normalizedStart);
+}
+
+String _formatAcademicYear(int startYear) {
+  return '$startYear-${(startYear + 1).toString().substring(2)}';
+}
+
+String _formatAcademicPeriod(_AcademicPeriod period) {
+  return '${period.semester.toUpperCase()} ${period.year}';
 }

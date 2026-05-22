@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
+import { academicYearSchema, courseCodeSchema, courseNameSchema, semesterSchema } from "@/lib/validation/text";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
   const courseCodeValue = formData.get("courseCode");
@@ -25,7 +25,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
   const parsed = z.object({
     courseCode: courseCodeSchema,
-    courseName: personNameSchema,
+    courseName: courseNameSchema,
     semester: semesterSchema,
     academicYear: academicYearSchema,
   }).safeParse({

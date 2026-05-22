@@ -8,7 +8,6 @@ export interface ExamCourse {
   code: string;
   department_course_code: string | null;
   start_year: string | null;
-  end_year: string | null;
   institution_id: number;
   usersubgroup_id: number;
   created_by: number;
@@ -39,7 +38,6 @@ export interface ExamCourse {
     end_date: string;
     start_date: string;
     start_year: string;
-    end_year: string;
     usergroup_id: number;
     programme_config_group_id: number;
     institution_id: number;

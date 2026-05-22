@@ -51,7 +51,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
 
       final res = await api.addCourse(
         courseCode: _codeController.text.trim().toUpperCase(),
-        courseName: utils.normalizePersonName(_nameController.text),
+        courseName: _nameController.text.trim().replaceAll(RegExp(r'\s+'), ' '),
         semester: widget.semester,
         academicYear: widget.academicYear,
         supabaseToken: supabaseToken,
@@ -70,8 +70,9 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       );
 
       // Refresh dashboard
-      ref.invalidate(dashboardProvider);
+      await ref.read(dashboardProvider.notifier).refreshAfterCourseAdded();
 
+      if (!mounted) return;
       Navigator.pop(context);
     } on Object catch (e) {
       if (!mounted) return;
@@ -200,8 +201,8 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                     final value = v?.trim() ?? '';
                     if (value.length < 2) return 'Min 2 characters';
                     if (value.length > 100) return 'Max 100 characters';
-                    if (!utils.isValidPersonName(value)) {
-                      return 'Name contains invalid characters';
+                    if (!utils.isValidCourseName(value)) {
+                      return 'Course name contains invalid characters';
                     }
                     return null;
                   },

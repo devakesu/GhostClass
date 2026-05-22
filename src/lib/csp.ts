@@ -36,10 +36,10 @@ export const getCspHeader = (nonce?: string) => {
   const isActualProduction = process.env.NODE_ENV === "production";
   const isDev = !isActualProduction && !forceStrictCsp;
   const supabaseOrigin = (() => {
-    const isProd = process.env.NODE_ENV === "production";
-    const urlString = (isProd || !process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
+    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
+    const urlString = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL;
 
     if (!urlString) return "";
     try {
@@ -63,10 +63,10 @@ export const getCspHeader = (nonce?: string) => {
   
   // Supabase WebSocket URL for Realtime features
   const supabaseWsUrl = (() => {
-    const isProd = process.env.NODE_ENV === "production";
-    const urlString = (isProd || !process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
+    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
+    const urlString = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
+      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL;
 
     if (!urlString) return "";
 

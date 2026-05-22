@@ -588,6 +588,21 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     await future;
   }
 
+  Future<void> refreshAfterCourseAdded() async {
+    final user = ref.read(authProvider).value;
+    final academic = ref.read(academicProvider).value;
+    if (user != null && academic != null) {
+      final storage = ref.read(secureStorageProvider);
+      final suffix =
+          '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+      await storage.deleteCachedData('dashboard_courses_$suffix');
+    }
+    _cachedCourses = null;
+    _needsRevalidate = true;
+    ref.invalidateSelf();
+    await future;
+  }
+
   Future<void> updateLocalInstructor(
     String courseCode,
     String instructorName,

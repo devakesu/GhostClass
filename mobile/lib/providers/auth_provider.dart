@@ -12,11 +12,7 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/institution.dart';
 import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
-import 'package:ghostclass/providers/dashboard_provider.dart';
-import 'package:ghostclass/providers/leave_provider.dart';
-import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
-import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/cache_manager.dart';
@@ -436,11 +432,15 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     await logout(force: true);
   }
 
-  Future<void> refreshProfile({bool force = false}) async {
+  Future<void> refreshProfile({
+    bool force = false,
+  }) async {
     final inFlight = _refreshProfileInFlight;
     if (inFlight != null) return inFlight;
 
-    final future = _refreshProfileInternal(force: force);
+    final future = _refreshProfileInternal(
+      force: force,
+    );
     _refreshProfileInFlight = future;
     return future.whenComplete(() {
       if (identical(_refreshProfileInFlight, future)) {
@@ -449,7 +449,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     });
   }
 
-  Future<void> _refreshProfileInternal({bool force = false}) async {
+  Future<void> _refreshProfileInternal({
+    bool force = false,
+  }) async {
     final currentUser = state.value;
     if (currentUser == null) return;
 
@@ -993,25 +995,27 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     try {
       // 1. Inform Ezygo of the change first (matches web parity)
-      final updates = <Future<dynamic>>[];
-      if (sem != null) updates.add(api.updateSemester(sem, storage));
-      if (year != null) updates.add(api.updateAcademicYear(year, storage));
+      if (year != null) {
+        final yearResponse = await api.updateAcademicYear(year, storage);
+        if (yearResponse.statusCode != 200 && yearResponse.statusCode != 201) {
+          final resData = yearResponse.data as Map<String, dynamic>?;
+          throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
+        }
+      }
 
-      if (updates.isNotEmpty) {
-        final results = await Future.wait(updates);
-        for (final r in results) {
-          final res = r as Response<dynamic>;
-          if (res.statusCode != 200 && res.statusCode != 201) {
-            final resData = res.data as Map<String, dynamic>?;
-            throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
-          }
+      if (sem != null) {
+        final semesterResponse = await api.updateSemester(sem, storage);
+        if (semesterResponse.statusCode != 200 && semesterResponse.statusCode != 201) {
+          final resData = semesterResponse.data as Map<String, dynamic>?;
+          throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
         }
       }
 
       // 2. Update the dedicated academic state in storage immediately so providers see it
+      AcademicState? nextAcademic;
       if (sem != null || year != null) {
         final currentAcademic = await storage.getAcademicState();
-        final nextAcademic = AcademicState(
+        nextAcademic = AcademicState(
           semester:
               sem ??
               currentAcademic?.semester ??
@@ -1196,7 +1200,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
 
     final api = ref.read(apiServiceProvider);
-    final response = await api.refreshProfile(token, sync: sync, force: force);
+    final response = await api.refreshProfile(
+      token,
+      sync: sync,
+      force: force,
+    );
 
     if (response.statusCode == 401) {
       final data = response.data as Map<String, dynamic>?;
@@ -1414,35 +1422,6 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     if (academicChanged) {
       ref.read(apiServiceProvider).clearCaches();
-      try {
-        final api = ref.read(apiServiceProvider);
-        await Future.wait([
-          api.updateSemester(nextAcademic.semester, storage),
-          api.updateAcademicYear(nextAcademic.year, storage),
-        ]);
-        AppLogger.i(
-          'AuthNotifier: Successfully synced EzyGo session state to new academic context: ${nextAcademic.semester} ${nextAcademic.year}',
-        );
-      } on Object catch (e) {
-        AppLogger.e(
-          'AuthNotifier: Failed to update EzyGo active semester during self-heal',
-          e,
-        );
-      }
-
-      // Clear all page caches/providers to force clean re-fetch of all pages
-      AppLogger.safeUnawait(
-        Future.microtask(() {
-          ref
-            ..invalidate(dashboardProvider)
-            ..invalidate(trackingProvider)
-            ..invalidate(scoreProvider)
-            ..invalidate(leaveProvider);
-        }).catchError((Object e, StackTrace st) {
-          AppLogger.e('AuthNotifier: Background invalidation failed', e, st);
-        }),
-        'AuthNotifier: background invalidation',
-      );
     }
 
     if (nextAcademic != null) {

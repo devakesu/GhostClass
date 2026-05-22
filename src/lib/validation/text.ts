@@ -62,6 +62,7 @@ export function makeOptionalTextSchema(options: TextSchemaOptions = {}) {
 }
 
 const NAME_PATTERN = /^[\p{L}\p{M}.'’\- ]+$/u;
+const COURSE_NAME_PATTERN = /^[\p{L}\p{M}\p{N}.'’&/()+,:;\- ]+$/u;
 
 export const personNameSchema = makeTextSchema({
   min: 2,
@@ -69,6 +70,13 @@ export const personNameSchema = makeTextSchema({
   pattern: NAME_PATTERN,
   error: "Name contains invalid characters",
 }).transform((value) => toTitleCase(value));
+
+export const courseNameSchema = makeTextSchema({
+  min: 2,
+  max: 100,
+  pattern: COURSE_NAME_PATTERN,
+  error: "Course name contains invalid characters",
+});
 
 export const optionalPersonNameSchema = makeOptionalTextSchema({
   min: 2,

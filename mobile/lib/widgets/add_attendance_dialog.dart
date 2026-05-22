@@ -463,13 +463,60 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   }
 
   Widget _buildSubjectSelectorButton(DashboardData? data, Color primary) {
-    final selectedCourse = data?.courses.firstWhere(
+    final profile = ref.watch(authProvider).value?.profile;
+    final hasNoClass = profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+    final hasNoCourses = data == null || data.courses.isEmpty;
+
+    if (hasNoClass || hasNoCourses) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _getUniformFieldColor(),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.bookOpen,
+              size: 18,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No courses available',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronDown,
+              size: 16,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.2),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final selectedCourse = data.courses.firstWhere(
       (c) => c.safeId == _selectedCourseId,
       orElse: () => const CourseDetails(id: 0, name: 'Select Subject'),
     );
-    final name = selectedCourse?.name ?? 'Select Subject';
-    final isDisabled =
-        selectedCourse != null && _isCourseDisabled(selectedCourse, data);
+    final name = selectedCourse.name;
+    final isDisabled = _isCourseDisabled(selectedCourse, data);
 
     return InkWell(
       onTap: () => _showSubjectPickerBottomSheet(data, primary),
@@ -771,6 +818,9 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   }
 
   Widget _buildSubmitButton(Color primary) {
+    final profile = ref.watch(authProvider).value?.profile;
+    final hasNoClass = profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -779,7 +829,8 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             (_isSubmitting ||
                 _isBlocked ||
                 _selectedSession == null ||
-                _selectedCourseId == null)
+                _selectedCourseId == null ||
+                hasNoClass)
             ? null
             : _handleSubmit,
         style: ElevatedButton.styleFrom(

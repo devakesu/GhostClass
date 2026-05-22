@@ -59,24 +59,43 @@ describe('performProfileSync', () => {
     select: ReturnType<typeof vi.fn>;
     eq: ReturnType<typeof vi.fn>;
     or: ReturnType<typeof vi.fn>;
+    is: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
     maybeSingle: ReturnType<typeof vi.fn>;
     single: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    data: any;
+    error: any;
   };
+
+  let lastTable = '';
+  let lastSelect = '';
 
   beforeEach(() => {
     vi.clearAllMocks();
+    lastTable = '';
+    lastSelect = '';
 
     mockSupabase = {
-      from: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockImplementation((table) => {
+        lastTable = table;
+        return mockSupabase;
+      }),
+      select: vi.fn().mockImplementation((sel) => {
+        lastSelect = sel;
+        return mockSupabase;
+      }),
       eq: vi.fn().mockReturnThis(),
       or: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       single: vi.fn().mockResolvedValue({ data: null, error: null }),
       upsert: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
+      data: null,
+      error: null,
     };
 
     vi.mocked(getAdminClient).mockReturnValue(mockSupabase as unknown as ReturnType<typeof getAdminClient>);
@@ -222,7 +241,7 @@ describe('performProfileSync', () => {
     expect(result.academic.semester).toBe('even');
   });
 
-  it('falls back to subgroupRoles for class detection', async () => {
+  it('does not create a class from subgroupRoles when courses are empty', async () => {
     vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
       if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
       if (url === 'institutionuser/courses/withusers') return createMockResponse('[]'); // No courses
@@ -238,10 +257,10 @@ describe('performProfileSync', () => {
       return { user_id: '12345' };
     });
 
-    mockSupabase.single.mockResolvedValue({ data: { id: 'fallback-uuid', name: 'Fallback Class' }, error: null });
+    mockSupabase.single.mockResolvedValue({ data: null, error: null });
 
     const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
-    expect(result.class?.name).toBe('Fallback Class');
+    expect(result.class).toBeNull();
   });
 
   it('handles upsert error', async () => {
@@ -581,5 +600,206 @@ describe('performProfileSync', () => {
     // Verify the redacted values are NOT the original secrets
     expect(opts.extra.ezygoId).not.toBe(testEzygoId);
     expect(opts.extra.authId).not.toBe(testAuthId);
+  });
+
+  it('clones class when EzyGo returns empty and user has a class from a previous semester', async () => {
+    // 1. Mock empty courses from EzyGo
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      if (url === 'institutionuser/courses/withusers') return createMockResponse('[]');
+      return createMockResponse('{}');
+    });
+    vi.mocked(safeResponseJson).mockResolvedValue({ user_id: '12345' });
+
+    // 2. Mock user to have a previous class and mock fetching that class details
+    mockSupabase.maybeSingle.mockImplementation(async () => {
+      if (lastTable === 'users') {
+        if (lastSelect.includes('classes(sem, year)')) {
+          // Parallel class query
+          return { data: null, error: null };
+        }
+        // existingUser fetch
+        return {
+          data: { class_id: 'old-class-uuid' },
+          error: null,
+        };
+      }
+      if (lastTable === 'classes') {
+        // fetch old class details
+        return {
+          data: {
+            id: 'old-class-uuid',
+            name: 'Computer Science - 2029',
+            programme_config_group_id: 709,
+            usersubgroup_name: 'CS1B2025-2029 Batch odd S1',
+            sem: 'odd',
+            year: '2023-24',
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    // Mock search for existing current semester class (returns empty)
+    mockSupabase.data = [];
+
+    // Mock insert of the new cloned class
+    mockSupabase.single.mockResolvedValue({
+      data: {
+        id: 'cloned-class-uuid',
+        name: 'Computer Science - 2029',
+      },
+      error: null,
+    });
+
+    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
+
+    expect(result.class?.id).toBe('cloned-class-uuid');
+    expect(mockSupabase.upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        programme_config_group_id: 709,
+        sem: 'odd', // from calculatedCurrentAcademicInfo odd
+        year: '2024-25', // from calculatedCurrentAcademicInfo 2024-25
+        name: 'Computer Science - 2029 odd 2024-25',
+      }),
+      { onConflict: 'programme_config_group_id, sem, year, name' },
+    );
+  });
+
+  it('matches and updates class when official EzyGo data arrives', async () => {
+    // 1. Mock EzyGo response returning course with subgroup
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      if (url === 'institutionuser/courses/withusers') {
+        return createMockResponse(JSON.stringify([
+          {
+            id: 101,
+            code: 'CS101',
+            usersubgroup: {
+              id: 9886,
+              name: 'CS1B2025-2029 Batch even S2',
+              end_year: '2029',
+              programme_config_group_id: 709,
+              academic_semester: 'even',
+              academic_year: '2024-25',
+              usergroup: {
+                id: 65,
+                name: 'Computer Science',
+              },
+            },
+          },
+        ]));
+      }
+      return createMockResponse('{}');
+    });
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { user_id: '12345' };
+      }
+    });
+
+    // Mock existingUser to return the user's class, and subsequent query to return that class details
+    mockSupabase.maybeSingle.mockImplementation(async () => {
+      if (lastTable === 'users') {
+        if (lastSelect.includes('classes(sem, year)')) {
+          // Parallel class query
+          return { data: null, error: null };
+        }
+        // existingUser fetch
+        return {
+          data: { class_id: 'cloned-class-uuid' },
+          error: null,
+        };
+      }
+      if (lastTable === 'classes') {
+        // fetch cloned class details
+        return {
+          data: {
+            id: 'cloned-class-uuid',
+            name: 'Computer Science - 2029',
+            programme_config_group_id: 709,
+            usersubgroup_name: 'CS1B2025-2029 Batch odd S1',
+            sem: 'even',
+            year: '2024-25',
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    // Mock update
+    mockSupabase.update.mockReturnThis();
+
+    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
+
+    // Verify it matches the cloned class and returns its ID
+    expect(result.class?.id).toBe('cloned-class-uuid');
+    // Verify it updates it with the new official subgroup name
+    expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'CS1B2025-2029 Batch even S2',
+      external_group_id: 9886,
+    }));
+  });
+
+  it('overrides academic context and triggers self-heal when there is a mismatch between EzyGo default settings and courses list cohort', async () => {
+    // 1. Mock EzyGo response returning default settings as "odd" and "2024-25"
+    // and course subgroup with "even" and "2024-25"
+    vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
+      if (url === 'myprofile') return createMockResponse('{"user_id": "12345"}');
+      if (url === 'user/setting/default_semester') return createMockResponse('Odd');
+      if (url === 'user/setting/default_academic_year') return createMockResponse('2024-25');
+      if (url === 'institutionuser/courses/withusers') {
+        return createMockResponse(JSON.stringify([
+          {
+            id: 101,
+            code: 'CS101',
+            usersubgroup: {
+              id: 9886,
+              name: 'CS1B2025-2029 Batch even S2',
+              end_year: '2029',
+              programme_config_group_id: 709,
+              academic_semester: 'even',
+              academic_year: '2024-25',
+              usergroup: {
+                id: 65,
+                name: 'Computer Science',
+              },
+            },
+          },
+        ]));
+      }
+      return createMockResponse('{}');
+    });
+
+    vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
+      const text = await (res as Response).text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { user_id: '12345' };
+      }
+    });
+
+    // 2. Mock Supabase Responses
+    mockSupabase.maybeSingle.mockResolvedValue({ data: null, error: null }); // existingUser
+    mockSupabase.single.mockResolvedValue({ data: { id: 'cloned-class-uuid', name: 'CS1B2025-2029 Batch even S2' }, error: null }); // classData
+
+    const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
+
+    // Verify it overrides the returned academic context to "even"
+    expect(result.academic.current_semester).toBe('even');
+    expect(result.academic.current_year).toBe('2024-25');
+
+    // Verify it triggered the self-heal update call to user/setting/default_semester setting it to "even"
+    const calls = vi.mocked(egressFetch).mock.calls;
+    const postCall = calls.find(c => c[0] === 'user/setting/default_semester' && c[1]?.method === 'POST');
+    expect(postCall).toBeDefined();
+    expect(JSON.parse(postCall![1]!.body as string)).toEqual({ default_semester: 'even' });
   });
 });
