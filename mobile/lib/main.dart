@@ -65,8 +65,8 @@ class _SecurityFailureApp extends StatelessWidget {
               title: 'Security Handshake Failed',
               message: friendlyMessage,
               technicalDetails: technicalDetails,
-              retryLabel: 'Close App',
-              onRetry: () => exit(0),
+              retryLabel: Platform.isAndroid ? 'Close App' : null,
+              onRetry: Platform.isAndroid ? () => exit(0) : null,
             );
           });
           return const Scaffold(
@@ -113,7 +113,30 @@ Future<void> _initializeFirebase() async {
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Sentry early to capture all startup exceptions
+  await SentryFlutter.init(
+    (options) {
+      options
+        ..dsn = AppConfig.sentryDsn
+        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
+        ..release = 'ghostclass@${AppConfig.appVersion}'
+        ..environment = kDebugMode ? 'development' : 'production'
+        ..attachStacktrace = true
+        ..enableAutoPerformanceTracing = true;
+    },
+  );
+
   HttpOverrides.global = MyHttpOverrides();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    AppLogger.e('Flutter Framework Error', details.exception, details.stack);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.e('Uncaught Async Error', error, stack);
+    return true;
+  };
 
   // Initialize Firebase & App Check
   try {
@@ -123,7 +146,7 @@ void main() async {
     try {
       await AnalyticsService.initialize();
     } on Object catch (_) {
-      AppLogger.w('Analytics initialization failed');
+      AppLogger.e('Analytics initialization failed');
     }
 
     AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
@@ -147,32 +170,20 @@ void main() async {
     },
   );
 
+  await ThemeNotifier.preload();
+
   // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
-  unawaited(JweService.instance.preWarm());
+  AppLogger.safeUnawait(JweService.instance.preWarm(), 'JWE pre-warm');
 
   await GoogleFonts.pendingFonts([
     GoogleFonts.manrope(),
     GoogleFonts.firaCode(),
   ]);
 
-  // Initialize Sentry
-  await SentryFlutter.init(
-    (options) {
-      options
-        ..dsn = AppConfig.sentryDsn
-        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
-        ..release = 'ghostclass@${AppConfig.appVersion}'
-        ..environment = kDebugMode ? 'development' : 'production'
-        ..attachStacktrace = true
-        ..enableAutoPerformanceTracing = true;
-    },
-    appRunner: () {
-      return runApp(
-        ProviderScope(
-          child: SentryWidget(child: const MyApp()),
-        ),
-      );
-    },
+  runApp(
+    ProviderScope(
+      child: SentryWidget(child: const MyApp()),
+    ),
   );
 
   await Sentry.addBreadcrumb(
@@ -188,16 +199,6 @@ void main() async {
       },
     ),
   );
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    AppLogger.e('Flutter Framework Error', details.exception, details.stack);
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.e('Uncaught Async Error', error, stack);
-    return true;
-  };
 }
 
 /// MyApp
@@ -217,7 +218,10 @@ class _MyAppState extends ConsumerState<MyApp> {
     super.initState();
     // Initialize push notification listeners and tokens after layout mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final _ = ref.read(pushNotificationServiceProvider).initialize();
+      AppLogger.safeUnawait(
+        ref.read(pushNotificationServiceProvider).initialize(),
+        'Push init',
+      );
     });
   }
 

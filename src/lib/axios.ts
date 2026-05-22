@@ -211,6 +211,16 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+// L-4: Auto-recovery — reset the outage flag when the user returns to the tab
+// so the app doesn't stay blocked after EzyGo recovers while the tab was open.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && isOutageDetected) {
+      resetOutageDetection();
+    }
+  });
+}
+
 async function encryptRequestPayload(config: JweAxiosConfig, method: string) {
   if (["post", "put", "patch"].includes(method) && config.data) {
     if (!(typeof config.data === "string" && config.data.split(".").length === 5)) {
@@ -239,7 +249,18 @@ axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
   if (token) config.headers.set(CSRF_HEADER, token);
 
   const url = config.url || "";
-  const isInternal = (url.startsWith("/api/") || !url.startsWith("http") || url.startsWith(window.location.origin)) && !url.includes("ezygo.app");
+  // H-5: Use URL parsing for isInternal detection instead of string heuristics.
+  // The previous check misclassified proxy paths containing "ezygo.app" as
+  // external, causing them to skip CSRF/JWE headers.
+  const isInternal = (() => {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      return parsed.origin === window.location.origin;
+    } catch {
+      // Non-parseable values (e.g. bare relative paths like "/api/...") are internal.
+      return !url.startsWith("http");
+    }
+  })();
   const isPublic = url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
 
   if (isInternal && !isPublic) {

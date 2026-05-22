@@ -106,6 +106,11 @@ export function resolveSafeUpstreamErrorMessage(
 
   if (!body) return fallback;
 
+  const trimmed = body.trim();
+  if (trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") || trimmed.toLowerCase().includes("<html")) {
+    return fallback;
+  }
+
   try {
     const parsed = JSON.parse(body) as {
       message?: string;

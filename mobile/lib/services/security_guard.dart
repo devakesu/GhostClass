@@ -27,16 +27,21 @@ class SecurityGuard {
 
   /// Wipes all sensitive storage and exits the app immediately.
   Future<void> wipeAndExit() async {
-    AppLogger.w('SecurityGuard: SECURITY BREACH DETECTED. WIPING AND EXITING.');
+    AppLogger.e('SecurityGuard: SECURITY BREACH DETECTED. WIPING AND EXITING.');
     try {
       await storage.clearAll();
       if (Platform.isAndroid) {
         await _channel.invokeMethod('exitApp');
+      } else if (Platform.isIOS) {
+        // On iOS, programmatic exit is not allowed. We have wiped the storage
+        // and will let the UI lockdown remain in place.
       } else {
         exit(0);
       }
     } on Object {
-      exit(1);
+      if (!Platform.isIOS) {
+        exit(1);
+      }
     }
   }
 }

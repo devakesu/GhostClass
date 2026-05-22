@@ -63,6 +63,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
+
+    if (authState.isLoading || academicAsync.isLoading) {
+      return Completer<TrackingState>().future;
+    }
+
     final academic = academicAsync.value;
 
     if (authState.value == null || academic == null) {
@@ -317,7 +322,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           );
         } on Object catch (_) {}
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to insert record', e);
       rethrow;
     }
@@ -373,7 +378,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
           } on Object catch (_) {}
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to delete record', e);
       rethrow;
     }
@@ -421,7 +426,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
       await query;
       await refresh();
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to clear records', e);
       rethrow;
     }

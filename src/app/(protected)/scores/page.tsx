@@ -7,7 +7,7 @@ import { Loading } from "@/components/loading";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Scores",
+  title: "Internal Marks",
   robots: {
     index: false,
     follow: false,

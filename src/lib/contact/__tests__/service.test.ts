@@ -78,6 +78,20 @@ describe('processContactSubmission', () => {
     expect(sendEmail).toHaveBeenCalledTimes(2); // Admin + User confirmation
     expect(renderContactAdminEmail).toHaveBeenCalled();
     expect(renderContactConfirmationEmail).toHaveBeenCalled();
+
+    expect(sendEmail).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        fromName: 'Test User',
+        replyTo: mockPayload.email,
+      }),
+    );
+    expect(sendEmail).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        toName: 'Test User',
+      }),
+    );
   });
 
   it('passes the user email as replyTo for admin notifications', async () => {

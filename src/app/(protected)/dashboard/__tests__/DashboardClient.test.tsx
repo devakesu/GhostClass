@@ -31,7 +31,7 @@ type MotionProps = MockComponentProps & {
 
 // Mock all hooks
 vi.mock('@/hooks/users/profile', () => ({
-  useProfile: vi.fn(() => ({ data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1 }, isLoading: false, isFetching: false, refetch: vi.fn() })),
+  useProfile: vi.fn(() => ({ data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1, class: { id: 1, name: 'Test Class' } }, isLoading: false, isFetching: false, refetch: vi.fn() })),
 }));
 
 vi.mock('@/hooks/courses/attendance', () => ({
@@ -183,6 +183,10 @@ vi.mock('@/components/attendance/EditInstructorDialog', () => ({
   EditInstructorDialog: ({ open }: { open?: boolean }) => open ? <div data-testid="edit-instructor-dialog" /> : null,
 }));
 
+vi.mock('@/components/attendance/SelectClassDialog', () => ({
+  SelectClassDialog: () => null,
+}));
+
 // Mock axios
 vi.mock('@/lib/axios', () => ({
   default: {
@@ -216,8 +220,8 @@ describe('DashboardClient', () => {
       </QueryClientProvider>
     );
 
-    const changeButtons = await screen.findAllByText('Change to EVEN');
-    fireEvent.click(changeButtons[0]);
+    const nextButton = await screen.findByLabelText('Go to next academic period');
+    fireEvent.click(nextButton);
 
     expect(screen.getByTestId('alert-dialog')).toBeInTheDocument();
     

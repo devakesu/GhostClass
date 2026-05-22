@@ -23,24 +23,19 @@ export async function getAuthLock(
   const lockKey = `auth_lock:${userId}`;
   const lockValue = crypto.randomUUID();
 
-  try {
-    // NX: Only set if not exists, PX: Set expiry in ms
-    const acquired = await redis.set(lockKey, lockValue, {
-      nx: true,
-      px: ttlMs,
-    });
+  // NX: Only set if not exists, PX: Set expiry in ms
+  const acquired = await redis.set(lockKey, lockValue, {
+    nx: true,
+    px: ttlMs,
+  });
 
-    if (acquired === "OK") {
-      if (process.env.NODE_ENV === "development") {
-        logger.dev(`[Auth-Lock] Acquired for ${redact("id", userId)}`);
-      }
-      return lockValue;
+  if (acquired === "OK") {
+    if (process.env.NODE_ENV === "development") {
+      logger.dev(`[Auth-Lock] Acquired for ${redact("id", userId)}`);
     }
-    return null;
-  } catch (err) {
-    logger.error(`[Auth-Lock] Failed to acquire for ${redact("id", userId)}:`, err);
-    return null;
+    return lockValue;
   }
+  return null;
 }
 
 /**
@@ -58,27 +53,22 @@ export async function releaseAuthLock(
 ): Promise<boolean> {
   const lockKey = `auth_lock:${userId}`;
 
-  try {
-    // Atomic check-and-delete Lua script
-    const script = `
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-      else
-        return 0
-      end
-    `;
+  // Atomic check-and-delete Lua script
+  const script = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  `;
 
-    const result = await redis.eval(script, [lockKey], [lockValue]);
+  const result = await redis.eval(script, [lockKey], [lockValue]);
 
-    if (result === 1) {
-      if (process.env.NODE_ENV === "development") {
-        logger.dev(`[Auth-Lock] Released for ${redact("id", userId)}`);
-      }
-      return true;
+  if (result === 1) {
+    if (process.env.NODE_ENV === "development") {
+      logger.dev(`[Auth-Lock] Released for ${redact("id", userId)}`);
     }
-    return false;
-  } catch (err) {
-    logger.error(`[Auth-Lock] Failed to release for ${redact("id", userId)}:`, err);
-    return false;
+    return true;
   }
+  return false;
 }

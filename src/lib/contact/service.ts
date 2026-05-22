@@ -8,28 +8,14 @@ import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { redact } from "@/lib/utils.server";
+import { emailSchema, longTextSchema, personNameSchema, shortTextSchema } from "@/lib/validation/text";
 
 // VALIDATION SCHEMA
 export const contactSchema = z.object({
-  name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name too long")
-    .regex(/^[a-zA-Z\s'-]+$/, "Name contains invalid characters"),
-  
-  email: z
-    .email("Invalid email format")
-    .max(255, "Email too long")
-    .transform(val => val.toLowerCase().trim()),
-  
-  subject: z.string()
-    .max(200, "Subject too long")
-    .transform(val => val.trim())
-    .optional(),
-  
-  message: z.string()
-    .min(10, "Message must be at least 10 characters")
-    .max(5000, "Message too long")
-    .transform(val => val.trim()),
+  name: personNameSchema,
+  email: emailSchema,
+  subject: shortTextSchema.optional().nullable(),
+  message: longTextSchema,
   
   token: z.string().optional(),
   csrf_token: z.string().optional(),
@@ -106,10 +92,10 @@ export async function processContactSubmission(
       .from("contact_messages")
       .insert({
         user_id: ctx.userId ?? null,
-        name: payload.name.trim(),
-        email: payload.email.trim().toLowerCase(),
-        subject: payload.subject?.trim() || "New Contact Form Submission",
-        message: payload.message.trim(),
+        name: payload.name,
+        email: payload.email,
+        subject: payload.subject ?? "New Contact Form Submission",
+        message: payload.message,
         status: "new",
       })
       .select("id")
@@ -129,6 +115,8 @@ export async function processContactSubmission(
     const adminEmailResult = await sendEmail({
       to: getContactEmail(),
       subject: `[New Inquiry] ${safeSubject}`,
+      fromName: safeName,
+      toName: "GhostClass Team",
       replyTo: payload.email,
       html: renderContactAdminEmail({
         name: safeName,
@@ -149,6 +137,7 @@ export async function processContactSubmission(
       await sendEmail({
         to: payload.email,
         subject: `We received your message: ${safeSubject}`,
+        toName: safeName,
         html: renderContactConfirmationEmail({
           name: safeName,
           subject: safeSubject,

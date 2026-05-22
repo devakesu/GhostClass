@@ -13,12 +13,16 @@ interface UpdateProfileData {
   birth_date?: string | null;
 }
 
-export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean }) => {
+export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean; force?: boolean }) => {
   return useQuery<UserProfile | null>({
-    queryKey: ["profile"],
+    queryKey: ["profile", !!options?.sync, !!options?.force],
     queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (options?.sync) params.sync = "true";
+      if (options?.force) params.force = "true";
+
       const res = await axiosInstance.get<UserProfile>("/api/profile", {
-        params: options?.sync ? { sync: "true" } : {},
+        params: Object.keys(params).length > 0 ? params : undefined,
         baseURL: "", // Override baseURL to hit top-level /api/profile
       });
       return res.data;

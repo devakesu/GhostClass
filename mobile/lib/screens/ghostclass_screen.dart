@@ -11,6 +11,7 @@ import 'package:ghostclass/widgets/ghostclass/ghostclass_footer.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_menu_tile.dart';
 import 'package:ghostclass/widgets/ghostclass/ghostclass_settings_card.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -93,17 +94,38 @@ class GhostClassScreen extends ConsumerWidget {
                       showToggle: true,
                       toggleValue: user.settings.bunkCalculatorEnabled,
                       isDisabled: user.isUpdatingSettings,
-                      onToggle: (val) {
-                        final _ = ref
-                            .read(authProvider.notifier)
-                            .updateSettings(bunkEnabled: val);
-                      },
-                      onTap: () {
-                        final _ = ref
-                            .read(authProvider.notifier)
-                            .updateSettings(
-                              bunkEnabled: !user.settings.bunkCalculatorEnabled,
+                      onToggle: (val) async {
+                        try {
+                          await ref
+                              .read(authProvider.notifier)
+                              .updateSettings(bunkEnabled: val);
+                        } on Object catch (_) {
+                          if (context.mounted) {
+                            ServiceToast.show(
+                              context,
+                              'Failed to update settings',
+                              isError: true,
                             );
+                          }
+                        }
+                      },
+                      onTap: () async {
+                        try {
+                          await ref
+                              .read(authProvider.notifier)
+                              .updateSettings(
+                                bunkEnabled:
+                                    !user.settings.bunkCalculatorEnabled,
+                              );
+                        } on Object catch (_) {
+                          if (context.mounted) {
+                            ServiceToast.show(
+                              context,
+                              'Failed to update settings',
+                              isError: true,
+                            );
+                          }
+                        }
                       },
                     ),
                     // Theme Switcher
@@ -326,192 +348,198 @@ class GhostClassScreen extends ConsumerWidget {
 
   Future<void> _handleDeleteAccount(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Row(
-            children: [
-              const Icon(
-                LucideIcons.alertTriangle,
-                color: Colors.redAccent,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Are you absolutely sure?',
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: Row(
               children: [
-                RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.manrope(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.85),
-                      fontSize: 13,
-                      height: 1.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    children: [
-                      const TextSpan(text: 'This will permanently erase your '),
-                      TextSpan(
-                        text: 'GhostClass',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const TextSpan(
-                        text:
-                            ' account, including all attendance logs and personal settings.\n\n',
-                      ),
-                      TextSpan(
-                        text:
-                            'Note: Your official EzyGo account remains unaffected.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
+                const Icon(
+                  LucideIcons.alertTriangle,
+                  color: Colors.redAccent,
+                  size: 22,
                 ),
-                const SizedBox(height: 24),
-                RichText(
-                  text: TextSpan(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Are you absolutely sure?',
                     style: GoogleFonts.manrope(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    children: [
-                      const TextSpan(text: 'Type '),
-                      TextSpan(
-                        text: 'DELETE',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const TextSpan(text: ' to confirm'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  onChanged: (val) => setState(() {}),
-                  style: GoogleFonts.manrope(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'DELETE',
-                    hintStyle: GoogleFonts.manrope(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.1),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.redAccent),
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.manrope(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w600,
-                ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.manrope(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.85),
+                        fontSize: 13,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'This will permanently erase your ',
+                        ),
+                        TextSpan(
+                          text: 'GhostClass',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text:
+                              ' account, including all attendance logs and personal settings.\n\n',
+                        ),
+                        TextSpan(
+                          text:
+                              'Note: Your official EzyGo account remains unaffected.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.manrope(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Type '),
+                        TextSpan(
+                          text: 'DELETE',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const TextSpan(text: ' to confirm'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    onChanged: (val) => setState(() {}),
+                    style: GoogleFonts.manrope(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'DELETE',
+                      hintStyle: GoogleFonts.manrope(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.05),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ElevatedButton(
-                onPressed: controller.text.trim() == 'DELETE'
-                    ? () => Navigator.pop(context, true)
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.redAccent.withValues(
-                    alpha: 0.1,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
                 child: Text(
-                  'Permanently Delete',
-                  style: GoogleFonts.manrope(fontWeight: FontWeight.w900),
+                  'Cancel',
+                  style: GoogleFonts.manrope(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ElevatedButton(
+                  onPressed: controller.text.trim() == 'DELETE'
+                      ? () => Navigator.pop(context, true)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.redAccent.withValues(
+                      alpha: 0.1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Permanently Delete',
+                    style: GoogleFonts.manrope(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
 
-    if (confirmed == true) {
-      if (!context.mounted) return;
-      LoadingOverlay.show(context, message: 'Purging your mortal data... 💀');
-      try {
-        await ref.read(authProvider.notifier).deleteAccount();
-      } on Object catch (e, st) {
-        AppLogger.e('GhostClassScreen: Account deletion failed', e, st);
-        if (context.mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to delete account. Please try again.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      if (confirmed == true) {
+        if (!context.mounted) return;
+        LoadingOverlay.show(context, message: 'Purging your mortal data... 💀');
+        try {
+          await ref.read(authProvider.notifier).deleteAccount();
+        } on Object catch (e, st) {
+          AppLogger.e('GhostClassScreen: Account deletion failed', e, st);
+          if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete account. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -630,11 +658,21 @@ class GhostClassScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      final _ = ref
-                          .read(authProvider.notifier)
-                          .updateSettings(targetPercentage: localTarget);
-                      Navigator.pop(context);
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(authProvider.notifier)
+                            .updateSettings(targetPercentage: localTarget);
+                        if (context.mounted) Navigator.pop(context);
+                      } on Object catch (_) {
+                        if (context.mounted) {
+                          ServiceToast.show(
+                            context,
+                            'Failed to update target',
+                            isError: true,
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,

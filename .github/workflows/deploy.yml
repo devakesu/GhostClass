@@ -1,27 +1,69 @@
-name: Deploy Egress Proxies
+name: Deploy
 
 on:
-  # Auto-run when worker source files change on main (like deploy-supabase.yaml)
-  push:
-    branches:
-      - main
-    paths:
-      - "workers/**"
-  # Allow manual deployment/testing
   workflow_dispatch:
+
+permissions: {}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-permissions: {}
-
 jobs:
-  deploy-cloudflare-worker:
-    name: Deploy Cloudflare Worker
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 1: Deploy Supabase (Migrations)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-supabase:
+    name: Deploy Supabase
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID || '' }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET || '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Fetch CI secrets from Infisical
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        with:
+          client-id: ${{ env.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ env.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          env-slug: "prod"
+          secret-path: "/ci"
+        continue-on-error: true
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333
+        with:
+          version: 2.98.2
+
+      - name: Link Project
+        env:
+          SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
+        run: supabase link --project-ref $SUPABASE_PROJECT_ID
+
+      - name: Deploy Database Changes (Migrations)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ env.SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ env.SUPABASE_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
+        run: supabase db push
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 2: Deploy Proxies (Cloudflare Workers & AWS Lambdas)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-proxy:
+    name: Deploy Proxy
+    needs: deploy-supabase
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -31,8 +73,9 @@ jobs:
         with:
           node-version: "24.14.1"
 
+      # ── Cloudflare Worker Egress Proxy ──
       - name: Validate Cloudflare deploy secrets
-        id: validate
+        id: validate-cf
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -49,14 +92,11 @@ jobs:
           fi
 
       - name: Install Wrangler
-        if: steps.validate.outputs.skip != 'true'
-        # workers/package-lock.json pins wrangler@4.59.1 with full dependency
-        # integrity hashes (SHA-512 SRI). npm ci verifies all hashes before
-        # installation, preventing supply-chain substitution attacks.
+        if: steps.validate-cf.outputs.skip != 'true'
         run: npm ci --prefix workers
 
       - name: Update Cloudflare Worker secret (PROXY_SECRET)
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-cf.outputs.skip != 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -67,7 +107,7 @@ jobs:
           printf "%s" "${CF_PROXY_SECRET}" | ./workers/node_modules/.bin/wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}"
 
       - name: Deploy Cloudflare Worker
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-cf.outputs.skip != 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -75,26 +115,54 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
         run: |
           set -euo pipefail
-          # Evaluate the commit date in UTC so Cloudflare (UTC) never sees a future date
-          # (commits made in east-of-UTC timezones would otherwise record tomorrow's date)
           COMPAT_DATE=$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d' "${{ github.sha }}")
           ./workers/node_modules/.bin/wrangler deploy workers/ezygo-proxy/index.js \
             --name "${CF_WORKER_NAME}" \
             --var "EZYGO_API_URL:${NEXT_PUBLIC_BACKEND_URL}" \
             --compatibility-date "${COMPAT_DATE}"
 
-  deploy-aws-lambda:
-    name: Deploy AWS Lambda Proxy
-    if: github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # ── Supabase CF Worker Proxy ──
+      - name: Validate Supabase Cloudflare deploy secrets
+        id: validate-supabase-cf
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_SUPABASE_PROXY_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${NEXT_PUBLIC_APP_DOMAIN}" ]; then
+            echo "::warning::Skipping Supabase CF Worker deploy because required credentials/vars are missing."
+            echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, vars.CF_SUPABASE_PROXY_WORKER_NAME, vars.NEXT_PUBLIC_SUPABASE_URL, vars.NEXT_PUBLIC_APP_DOMAIN"
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
 
+      - name: Install Wrangler (Supabase CF Worker)
+        if: steps.validate-supabase-cf.outputs.skip != 'true' && steps.validate-cf.outputs.skip == 'true'
+        run: npm ci --prefix workers
+
+      - name: Deploy Supabase CF Worker
+        if: steps.validate-supabase-cf.outputs.skip != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+          COMPAT_DATE=$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d' "${{ github.sha }}")
+          ./workers/node_modules/.bin/wrangler deploy workers/supabase-proxy/index.js \
+            --name "${CF_SUPABASE_PROXY_WORKER_NAME}" \
+            --var "SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL}" \
+            --var "ALLOWED_ORIGIN:https://${NEXT_PUBLIC_APP_DOMAIN}" \
+            --compatibility-date "${COMPAT_DATE}"
+
+      # ── AWS Lambda Proxy ──
       - name: Validate AWS deploy secrets
-        id: validate
+        id: validate-aws
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
@@ -112,7 +180,7 @@ jobs:
           fi
 
       - name: Configure AWS credentials
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-aws.outputs.skip != 'true'
         uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -120,7 +188,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Update Lambda environment variables
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-aws.outputs.skip != 'true'
         env:
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.NEXT_PUBLIC_BACKEND_URL }}
@@ -146,14 +214,14 @@ jobs:
           aws lambda wait function-updated --function-name "${AWS_LAMBDA_FUNCTION_NAME}"
 
       - name: Package Lambda source
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-aws.outputs.skip != 'true'
         run: |
           set -euo pipefail
           cd workers/ezygo-proxy-aws
           zip -q -r "${GITHUB_WORKSPACE}/ezygo-proxy-aws.zip" index.mjs
 
       - name: Deploy Lambda function code
-        if: steps.validate.outputs.skip != 'true'
+        if: steps.validate-aws.outputs.skip != 'true'
         env:
           AWS_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_LAMBDA_FUNCTION_NAME }}
         run: |
@@ -164,79 +232,9 @@ jobs:
             --zip-file "fileb://${GITHUB_WORKSPACE}/ezygo-proxy-aws.zip" \
             --publish
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # Supabase ISP-block bypass proxy — Cloudflare Worker (Tier 1)
-  # ────────────────────────────────────────────────────────────────────────────
-  deploy-supabase-cf-proxy:
-    name: Deploy Supabase CF Worker Proxy
-    if: github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-        with:
-          node-version: "24.14.1"
-
-      - name: Validate Cloudflare deploy secrets
-        id: validate
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
-        run: |
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_SUPABASE_PROXY_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${NEXT_PUBLIC_APP_DOMAIN}" ]; then
-            echo "::warning::Skipping Supabase CF Worker deploy because required credentials/vars are missing."
-            echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, vars.CF_SUPABASE_PROXY_WORKER_NAME, vars.NEXT_PUBLIC_SUPABASE_URL, vars.NEXT_PUBLIC_APP_DOMAIN"
-            echo "skip=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "skip=false" >> "${GITHUB_OUTPUT}"
-          fi
-
-      - name: Install Wrangler
-        if: steps.validate.outputs.skip != 'true'
-        run: npm ci --prefix workers
-
-      - name: Deploy Supabase CF Worker
-        if: steps.validate.outputs.skip != 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_SUPABASE_PROXY_WORKER_NAME: ${{ vars.CF_SUPABASE_PROXY_WORKER_NAME }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_APP_DOMAIN: ${{ vars.NEXT_PUBLIC_APP_DOMAIN }}
-        run: |
-          set -euo pipefail
-          # Evaluate the commit date in UTC so Cloudflare (UTC) never sees a future date
-          # (commits made in east-of-UTC timezones would otherwise record tomorrow's date)
-          COMPAT_DATE=$(TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d' "${{ github.sha }}")
-          ./workers/node_modules/.bin/wrangler deploy workers/supabase-proxy/index.js \
-            --name "${CF_SUPABASE_PROXY_WORKER_NAME}" \
-            --var "SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL}" \
-            --var "ALLOWED_ORIGIN:https://${NEXT_PUBLIC_APP_DOMAIN}" \
-            --compatibility-date "${COMPAT_DATE}"
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # Supabase ISP-block bypass proxy — AWS Lambda (Tier 2 / fallback)
-  # ────────────────────────────────────────────────────────────────────────────
-  deploy-supabase-aws-proxy:
-    name: Deploy Supabase AWS Lambda Proxy
-    if: github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-
-      - name: Validate AWS deploy secrets
-        id: validate
+      # ── Supabase AWS Lambda Proxy ──
+      - name: Validate Supabase AWS deploy secrets
+        id: validate-supabase-aws
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
@@ -253,16 +251,16 @@ jobs:
             echo "skip=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Configure AWS credentials
-        if: steps.validate.outputs.skip != 'true'
+      - name: Configure AWS credentials (Supabase AWS Lambda)
+        if: steps.validate-supabase-aws.outputs.skip != 'true' && steps.validate-aws.outputs.skip == 'true'
         uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Update Lambda environment variables
-        if: steps.validate.outputs.skip != 'true'
+      - name: Update Lambda environment variables (Supabase AWS Lambda)
+        if: steps.validate-supabase-aws.outputs.skip != 'true'
         env:
           AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
@@ -287,15 +285,15 @@ jobs:
 
           aws lambda wait function-updated --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}"
 
-      - name: Package Lambda source
-        if: steps.validate.outputs.skip != 'true'
+      - name: Package Lambda source (Supabase AWS Lambda)
+        if: steps.validate-supabase-aws.outputs.skip != 'true'
         run: |
           set -euo pipefail
           cd workers/supabase-proxy-aws
           zip -q -r "${GITHUB_WORKSPACE}/supabase-proxy-aws.zip" index.mjs
 
-      - name: Deploy Lambda function code
-        if: steps.validate.outputs.skip != 'true'
+      - name: Deploy Lambda function code (Supabase AWS Lambda)
+        if: steps.validate-supabase-aws.outputs.skip != 'true'
         env:
           AWS_SUPABASE_LAMBDA_FUNCTION_NAME: ${{ vars.AWS_SUPABASE_LAMBDA_FUNCTION_NAME }}
         run: |
@@ -305,3 +303,40 @@ jobs:
             --function-name "${AWS_SUPABASE_LAMBDA_FUNCTION_NAME}" \
             --zip-file "fileb://${GITHUB_WORKSPACE}/supabase-proxy-aws.zip" \
             --publish
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 3: Deploy to Production (Coolify Trigger)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy Production
+    needs: deploy-proxy
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      - name: Trigger Coolify deployment
+        env:
+          COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+          COOLIFY_APP_ID: ${{ secrets.COOLIFY_APP_ID }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Validate required Coolify configuration
+          : "${COOLIFY_BASE_URL:?COOLIFY_BASE_URL secret is required}"
+          : "${COOLIFY_APP_ID:?COOLIFY_APP_ID secret is required}"
+          : "${COOLIFY_API_TOKEN:?COOLIFY_API_TOKEN secret is required}"
+
+          [ -n "$COOLIFY_API_TOKEN" ] && echo "::add-mask::$COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
+          [ -n "$COOLIFY_APP_ID" ] && echo "::add-mask::$COOLIFY_APP_ID"
+
+          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          echo "Deploying version ${VERSION} to Coolify"
+          echo "Note: Ensure Coolify is configured to pull the versioned tag (e.g., ${VERSION})"
+
+          curl --fail-with-body --silent --show-error \
+            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_APP_ID" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN"
+
+          echo "✓ Deployment triggered successfully"

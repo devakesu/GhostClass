@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -71,8 +75,30 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
           ServiceRefreshIndicator(
             useOverlay: false,
             onRefresh: () async {
-              final scoreNotifier = ref.read(scoreProvider.notifier);
-              await scoreNotifier.refresh();
+              try {
+                await runUnifiedPullToRefresh(
+                  logLabel: 'ScoresScreen',
+                  refreshProfile: () => ref
+                      .read(authProvider.notifier)
+                      .refreshProfile(force: true),
+                  syncCron: () async {
+                    final supabaseToken = ref
+                        .read(supabaseClientProvider)
+                        .auth
+                        .currentSession
+                        ?.accessToken;
+                    if (supabaseToken == null) return;
+                    await ref
+                        .read(apiServiceProvider)
+                        .triggerSync(supabaseToken, force: true);
+                  },
+                  refreshData: () => ref.read(scoreProvider.notifier).refresh(),
+                );
+              } on Object {
+                if (!context.mounted) rethrow;
+                ServiceToast.show(context, 'Refresh failed', isError: true);
+                rethrow;
+              }
             },
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(

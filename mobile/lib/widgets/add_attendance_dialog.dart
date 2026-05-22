@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -42,6 +43,12 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     super.initState();
     _precomputeFrequencies();
     WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDefaults());
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
   }
 
   void _precomputeFrequencies() {
@@ -456,13 +463,65 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   }
 
   Widget _buildSubjectSelectorButton(DashboardData? data, Color primary) {
-    final selectedCourse = data?.courses.firstWhere(
+    final profile = ref.watch(authProvider).value?.profile;
+    final hasNoClass =
+        profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+    final hasNoCourses = data == null || data.courses.isEmpty;
+
+    if (hasNoClass || hasNoCourses) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _getUniformFieldColor(),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.bookOpen,
+              size: 18,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No courses available',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronDown,
+              size: 16,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.2),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final selectedCourse = data.courses.firstWhere(
       (c) => c.safeId == _selectedCourseId,
       orElse: () => const CourseDetails(id: 0, name: 'Select Subject'),
     );
-    final name = selectedCourse?.name ?? 'Select Subject';
-    final isDisabled =
-        selectedCourse != null && _isCourseDisabled(selectedCourse, data);
+    final name = selectedCourse.name;
+    final isDisabled = _isCourseDisabled(selectedCourse, data);
 
     return InkWell(
       onTap: () => _showSubjectPickerBottomSheet(data, primary),
@@ -516,7 +575,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     if (data == null || data.courses.isEmpty) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    unawaited(
+    AppLogger.safeUnawait(
       showModalBottomSheet<void>(
         context: context,
         backgroundColor: Colors.transparent,
@@ -683,6 +742,12 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             ),
           );
         },
+      ).catchError(
+        (Object e, StackTrace st) => AppLogger.e(
+          'AddAttendanceDialog: showSubjectPickerBottomSheet failed',
+          e,
+          st,
+        ),
       ),
     );
   }
@@ -758,6 +823,10 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
   }
 
   Widget _buildSubmitButton(Color primary) {
+    final profile = ref.watch(authProvider).value?.profile;
+    final hasNoClass =
+        profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -766,7 +835,8 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             (_isSubmitting ||
                 _isBlocked ||
                 _selectedSession == null ||
-                _selectedCourseId == null)
+                _selectedCourseId == null ||
+                hasNoClass)
             ? null
             : _handleSubmit,
         style: ElevatedButton.styleFrom(
@@ -815,7 +885,11 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
     } on Object catch (e, st) {
       AppLogger.e('AddAttendanceDialog: Insert failed', e, st);
       if (mounted) {
-        ServiceToast.show(context, 'Failed to add record', isError: true);
+        ServiceToast.show(
+          context,
+          formatApiError(e, 'attendance'),
+          isError: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

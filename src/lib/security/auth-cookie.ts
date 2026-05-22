@@ -7,6 +7,8 @@ import { decrypt } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils.server";
 
+import { redis } from "@/lib/redis";
+
 export async function setAuthCookie(token: string, days = 31) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   (await cookies()).set("ezygo_access_token", token, {
@@ -41,6 +43,26 @@ export async function getAuthTokenWithFallback(userId?: string) {
       finalUserId = user.id;
     }
 
+    // M-8: Try Redis cache first to avoid DB query penalty
+    const cacheKey = `healed_token:${finalUserId}`;
+    try {
+      const cachedToken = await redis.get<string>(cacheKey);
+      if (cachedToken) {
+        logger.info("[auth-cookie] EzyGo token healed from Redis cache", { userId: redact("id", finalUserId) });
+        // Attempt to restore the cookie for future requests
+        try {
+          await setAuthCookie(cachedToken);
+        } catch (cookieErr) {
+          logger.dev("[auth-cookie] Could not set auth cookie in cache fallback", cookieErr);
+        }
+        return cachedToken;
+      }
+    } catch (redisErr) {
+      logger.dev("[auth-cookie] Redis cache check failed", redisErr);
+    }
+
+    logger.warn("[auth-cookie] Cold start: EzyGo cookie missing. Falling back to DB healing.", { userId: redact("id", finalUserId) });
+
     const supabaseAdmin = getAdminClient();
     const { data: dbUser } = await supabaseAdmin
       .from("users")
@@ -50,6 +72,14 @@ export async function getAuthTokenWithFallback(userId?: string) {
 
     if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
       const token = decrypt({ iv: dbUser.ezygo_iv, content: dbUser.ezygo_token });
+      
+      // Cache in Redis for 5 minutes (300 seconds)
+      try {
+        await redis.set(cacheKey, token, { ex: 300 });
+      } catch (redisErr) {
+        logger.dev("[auth-cookie] Failed to cache token in Redis", redisErr);
+      }
+
       // Attempt to restore the cookie for future requests
       try {
         await setAuthCookie(token);

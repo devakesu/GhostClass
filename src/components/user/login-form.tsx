@@ -379,7 +379,16 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       persistPrefetchedSettings(saveTokenResponse.data, queryClient);
 
       // 4. Success - navigate to dashboard
-      router.push("/dashboard");
+      // Use a full navigation to ensure server-side middleware runs and
+      // the client receives any HTTP-only Supabase session cookies that were
+      // set by the /api/auth/save-token response. A client-side push can
+      // render the protected layout before cookies are available which
+      // caused an immediate logout previously.
+      if (typeof window !== "undefined") {
+        window.location.href = "/dashboard";
+      } else {
+        router.push("/dashboard");
+      }
 
     } catch (error) {
       const err = error as AxiosError<ErrorResponse>;

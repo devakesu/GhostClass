@@ -75,6 +75,11 @@ void main() {
       expect(normalizeDate('2024/01/15'), '20240115');
     });
 
+    test('handles 2-digit years', () {
+      expect(normalizeDate('15-01-24'), '20240115');
+      expect(normalizeDate('15/01/24'), '20240115');
+    });
+
     test('returns empty string for invalid dates', () {
       expect(normalizeDate('invalid'), '');
       expect(normalizeDate(null), '');

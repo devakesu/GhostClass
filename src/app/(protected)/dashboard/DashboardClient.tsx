@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
   domAnimation,
@@ -8,6 +8,7 @@ import {
   m as motion,
 } from "framer-motion";
 import { toast } from "sonner";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,12 +17,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { useProfile } from "@/hooks/users/profile";
 import {
   useAllCourseDetails,
@@ -54,6 +49,7 @@ import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 import { AddCourseDialog } from "@/components/attendance/AddCourseDialog";
 import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
 import { EditInstructorDialog } from "@/components/attendance/EditInstructorDialog";
+import { SelectClassDialog } from "@/components/attendance/SelectClassDialog";
 import { useFetchCourseInstructors } from "@/hooks/courses/instructors";
 import { ClassCourse, useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
@@ -100,6 +96,47 @@ type InitialDashboardData = {
   courses: unknown;
   attendance: unknown;
 } | null;
+
+type AcademicSemester = "even" | "odd";
+
+type AcademicPeriod = {
+  semester: AcademicSemester;
+  year: string;
+};
+
+const academicYearPattern = /^(\d{2}|\d{4})-(\d{2}|\d{4})$/;
+
+const formatAcademicYear = (startYear: number) => `${startYear}-${String(startYear + 1).slice(-2)}`;
+
+const parseAcademicYearStart = (year: string) => {
+  const match = academicYearPattern.exec(year.trim());
+  if (!match) return null;
+
+  const startValue = match[1].length === 2 ? `20${match[1]}` : match[1];
+  const startYear = Number.parseInt(startValue, 10);
+  return Number.isNaN(startYear) ? null : startYear;
+};
+
+const shiftAcademicPeriod = (
+  semester: AcademicSemester,
+  year: string,
+  direction: "previous" | "next",
+): AcademicPeriod | null => {
+  const startYear = parseAcademicYearStart(year);
+  if (startYear == null) return null;
+
+  if (direction === "previous") {
+    return semester === "odd"
+      ? { semester: "even", year: formatAcademicYear(startYear - 1) }
+      : { semester: "odd", year: formatAcademicYear(startYear) };
+  }
+
+  return semester === "odd"
+    ? { semester: "even", year: formatAcademicYear(startYear) }
+    : { semester: "odd", year: formatAcademicYear(startYear + 1) };
+};
+
+const formatAcademicPeriod = (period: AcademicPeriod) => `${period.semester.toUpperCase()} ${period.year}`;
 
 interface DashboardClientProps {
   initialData?: InitialDashboardData;
@@ -178,7 +215,7 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
 };
 
 export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
-  const { data: rawProfile, isLoading: isLoadingProfile } = useProfile({ sync: true });
+  const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
   const setSemesterMutation = useSetSemester();
@@ -213,23 +250,41 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [isAddAttendanceOpen, setIsAddAttendanceOpen] = useState(false);
-  const [pendingChange, setPendingChange] = useState<{ type: "semester" | "academicYear"; value: string } | null>(null);
+  const [pendingChange, setPendingChange] = useState<AcademicPeriod | null>(null);
   const [isEditInstructorOpen, setIsEditInstructorOpen] = useState(false);
   const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<{ code: string; name: string; initialName: string } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSelectClassOpen, setIsSelectClassOpen] = useState(false);
+  const academicShiftLockRef = useRef(false);
 
-  const { syncCompleted } = useSyncOnMount({ 
-    username: profile?.username, 
-    userId: profile?.id ? String(profile.id) : undefined, 
-    enabled: !!profile?.username, 
+  const { syncCompleted } = useSyncOnMount({
+    username: profile?.username,
+    userId: profile?.id ? String(profile.id) : undefined,
+    enabled: !!profile?.username,
     sentryLocation: "DashboardClient",
     sentryTag: "background_sync"
   });
 
+  useEffect(() => {
+    const shouldOpen = !!(syncCompleted && profile && !profile.class?.id);
+    const timer = setTimeout(() => {
+      setIsSelectClassOpen(shouldOpen);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [syncCompleted, profile]);
+
+  const isAttendanceStale =
+    initialData?.attendance &&
+    typeof initialData.attendance === "object" &&
+    "studentAttendanceData" in initialData.attendance &&
+    initialData.attendance.studentAttendanceData &&
+    typeof initialData.attendance.studentAttendanceData === "object" &&
+    "stale" in initialData.attendance.studentAttendanceData &&
+    (initialData.attendance.studentAttendanceData as { stale?: unknown }).stale === true;
+
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncCompleted,
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    initialData: (selectedSemester === null && selectedYear === null) ? (initialData?.attendance as any) : undefined,
+    initialData: isAttendanceStale ? undefined : (initialData?.attendance as AttendanceReport ?? undefined),
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 
@@ -237,10 +292,11 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted && !!currentSem && !!currentYear,
+    initialData: initialData?.courses as { courses: Record<string, Course> } ?? undefined,
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
 
-  const { data: rawTrackingData, isLoading: isLoadingTracking, refetch: refetchTracking } = useTrackingData(profile, {
+  const { data: rawTrackingData, refetch: refetchTracking } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted,
@@ -251,11 +307,11 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncCompleted && !!profile?.class?.id });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
-  const { getCourseCodeById: getCourseCode } = useCourseLookup({ 
-    coursesData, 
-    classCourses, 
+  const { getCourseCodeById: getCourseCode } = useCourseLookup({
+    coursesData,
+    classCourses,
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    attendanceData: attendanceData as any 
+    attendanceData: attendanceData as any
   }) as { getCourseCodeById: (id: string | number) => string };
 
   const courseList = useMemo(() => {
@@ -280,37 +336,49 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const { disabledCodes } = useDisabledCourses({ academicYear: currentYear, semester: currentSem });
 
+  const pendingPeriodLabel = pendingChange ? formatAcademicPeriod(pendingChange) : null;
+
+  const requestAcademicShift = (direction: "previous" | "next") => {
+    if (!effectiveSemester || !effectiveYear || isUpdating || academicShiftLockRef.current) return;
+
+    const nextPeriod = shiftAcademicPeriod(effectiveSemester, effectiveYear, direction);
+    if (!nextPeriod) {
+      toast.error("Could not compute the next academic period.");
+      return;
+    }
+
+    academicShiftLockRef.current = true;
+    setPendingChange(nextPeriod);
+    setShowConfirmDialog(true);
+  };
+
   const handleConfirmChange = async () => {
     if (!pendingChange || !profile?.username || isUpdating) return;
     setIsUpdating(true);
     setShowConfirmDialog(false);
-    await queryClient.cancelQueries();
-    queryClient.invalidateQueries();
 
     try {
-      if (pendingChange.type === "semester") {
-        await setSemesterMutation.mutateAsync({ default_semester: pendingChange.value as "even" | "odd" });
-        setSelectedSemester(pendingChange.value as "even" | "odd");
-      } else {
-        await setAcademicYearMutation.mutateAsync({ default_academic_year: pendingChange.value });
-        setSelectedYear(pendingChange.value);
+      if (pendingChange.year !== effectiveYear) {
+        await setAcademicYearMutation.mutateAsync({ default_academic_year: pendingChange.year });
       }
+
+      if (pendingChange.semester !== effectiveSemester) {
+        await setSemesterMutation.mutateAsync({ default_semester: pendingChange.semester });
+      }
+
+      setSelectedSemester(pendingChange.semester);
+      setSelectedYear(pendingChange.year);
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await refetchProfile();
     } catch (error) {
       logger.error("Update Failed:", error);
       toast.error("Failed to update settings");
     } finally {
       setIsUpdating(false);
       setPendingChange(null);
+      academicShiftLockRef.current = false;
     }
   };
-
-  const academicYears = useMemo(() => {
-    const current = new Date().getFullYear();
-    const years = [];
-    for (let y = 2022; y <= current; y++) years.push(`${y}-${(y + 1).toString().slice(-2)}`);
-    return years;
-  }, []);
 
   const activeCourseCount = useMemo(() => getActiveCourseStats(attendanceData, trackingData || [], coursesData, classCourses || [], disabledCodes, effectiveSemester, effectiveYear, getCourseCode), [attendanceData, trackingData, coursesData, classCourses, disabledCodes, effectiveSemester, effectiveYear, getCourseCode]);
 
@@ -395,19 +463,19 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     }
     if (attendanceData) {
       return (
-        <AttendanceCalendar 
-          attendanceData={attendanceData} 
-          semester={effectiveSemester || undefined} 
-          year={effectiveYear || undefined} 
-          coursesData={{ courses: courseRegistry as unknown as Record<string, Course> }} 
-          classCourses={classCourses} 
+        <AttendanceCalendar
+          attendanceData={attendanceData}
+          semester={effectiveSemester || undefined}
+          year={effectiveYear || undefined}
+          coursesData={{ courses: courseRegistry as unknown as Record<string, Course> }}
+          classCourses={classCourses}
         />
       );
     }
     return <div className="h-50 flex items-center justify-center">No data</div>;
   };
 
-  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted || isLoadingAttendance || isLoadingCourses || isLoadingTracking || isLoadingAllCourseSummaries || isUpdating) return <CompLoading />;
+  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted) return <CompLoading />;
 
   const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
 
@@ -417,21 +485,43 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
         <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
         <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
           <div className="mb-6 flex flex-col lg:flex-row gap-6 lg:items-end justify-between">
-            <div className="flex flex-col gap-4 flex-1">
+            <div className="flex flex-col gap-3 flex-1">
               <h1 className="text-2xl font-bold">Welcome back, <span className="gradient-name">{profile?.first_name} {profile?.last_name}!</span></h1>
-              <div className="flex gap-4 items-center">
-                <p className="flex flex-wrap items-center gap-2.5 text-muted-foreground">
-                  <span>Semester:</span>
-                  <Select value={effectiveSemester || ""} onValueChange={(v) => { setPendingChange({ type: "semester", value: v }); setShowConfirmDialog(true); }} disabled={isUpdating}>
-                    <SelectTrigger className="w-fit h-8 px-2 font-medium uppercase">{effectiveSemester || "semester"}</SelectTrigger>
-                    <SelectContent><SelectItem value="odd">ODD</SelectItem><SelectItem value="even">EVEN</SelectItem></SelectContent>
-                  </Select>
-                  <span>Year:</span>
-                  <Select value={effectiveYear || ""} onValueChange={(v) => { setPendingChange({ type: "academicYear", value: v }); setShowConfirmDialog(true); }} disabled={isUpdating}>
-                    <SelectTrigger className="w-fit h-8 px-2 font-medium">{effectiveYear || "year"}</SelectTrigger>
-                    <SelectContent className="max-h-70">{academicYears.map((y) => (<SelectItem key={y} value={y}>{y}</SelectItem>))}</SelectContent>
-                  </Select>
-                </p>
+              <span className="inline-flex items-center justify-center rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary w-fit">
+                {profile?.class?.name || "Unassigned"}
+              </span>
+              <p className="text-xs text-foreground/50 font-medium italic">
+                For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
+                <div className="inline-flex items-center rounded-full border border-primary/15 bg-background/80 p-1 shadow-sm backdrop-blur-sm">
+                  <button
+                    type="button"
+                    aria-label="Go to previous academic period"
+                    onClick={() => requestAcademicShift("previous")}
+                    disabled={isUpdating}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <div className="min-w-[11rem] px-3 text-center">
+                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/70">
+                      Current
+                    </div>
+                    <div className="mt-1 text-sm font-extrabold uppercase tracking-[0.18em] text-foreground">
+                      {effectiveSemester?.toUpperCase()} {effectiveYear}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Go to next academic period"
+                    onClick={() => requestAcademicShift("next")}
+                    disabled={isUpdating}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             </div>
             <StatsPanel stats={stats} isLoadingAttendance={isLoadingAttendance} targetPercentage={targetPercentage || 75} />
@@ -439,30 +529,59 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
           <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
           <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses as Record<string, unknown>[]} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile as unknown as Record<string, unknown>} onEditInstructor={(course: Record<string, unknown>, _name: string, hasCustomName: boolean, customInstructor?: unknown) => {
-              const customInst = customInstructor as CustomInstructor | undefined;
-              setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
-              setIsEditInstructorOpen(true);
-            }} onAddCourse={() => setIsAddCourseOpen(true)} />
+            const customInst = customInstructor as CustomInstructor | undefined;
+            setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
+            setIsEditInstructorOpen(true);
+          }} onAddCourse={() => {
+            if (!profile?.class?.id) {
+              toast.error("You have not assigned a class yet.");
+            } else {
+              setIsAddCourseOpen(true);
+            }
+          }} />
 
           <div className="mb-6">
-              <Card className="custom-container">
-                <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
-                <CardContent>
-                  {renderAttendanceCalendarContent()}
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="custom-container">
+              <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
+              <CardContent>
+                {renderAttendanceCalendarContent()}
+              </CardContent>
+            </Card>
+          </div>
 
-          <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <AlertDialog
+            open={showConfirmDialog}
+            onOpenChange={(open) => {
+              setShowConfirmDialog(open);
+              if (!open) {
+                setPendingChange(null);
+                academicShiftLockRef.current = false;
+              }
+            }}
+          >
             <AlertDialogContent className="custom-container">
-              <AlertDialogHeader><AlertDialogTitle>Confirm Change</AlertDialogTitle><AlertDialogDescription>Change {pendingChange?.type}?</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel onClick={() => { setShowConfirmDialog(false); setPendingChange(null); }}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmChange}>Confirm</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm academic period change</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Change from {effectiveSemester?.toUpperCase()} {effectiveYear} to {pendingPeriodLabel}?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter><AlertDialogCancel onClick={() => { setShowConfirmDialog(false); setPendingChange(null); academicShiftLockRef.current = false; }}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmChange}>Confirm</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
 
           <AddCourseDialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen} semester={currentSem} academicYear={currentYear} />
           <AddAttendanceDialog open={isAddAttendanceOpen} onOpenChange={setIsAddAttendanceOpen} attendanceData={attendanceData} trackingData={trackingData || []} coursesData={coursesData || undefined} user={profile ? { id: String(profile.id) } : { id: "" }} onSuccess={() => Promise.all([refetchAttendance(), refetchTracking()])} selectedSemester={currentSem} selectedYear={currentYear} />
           <EditInstructorDialog open={isEditInstructorOpen} onOpenChange={setIsEditInstructorOpen} courseCode={selectedInstructorCourse?.code ?? ""} courseName={selectedInstructorCourse?.name ?? ""} initialName={selectedInstructorCourse?.initialName ?? ""} semester={currentSem || ""} academicYear={currentYear || ""} />
+          {currentSem && currentYear && (
+            <SelectClassDialog
+              open={isSelectClassOpen}
+              onOpenChange={setIsSelectClassOpen}
+              semester={currentSem}
+              academicYear={currentYear}
+              isCloseable={false}
+            />
+          )}
         </main>
       </div>
       <PWAInstallBanner />

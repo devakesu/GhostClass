@@ -94,6 +94,21 @@ class AppLogger {
     }
   }
 
+  /// Safely attach a top-level catcher to a fire-and-forget future.
+  /// Use this instead of calling `unawaited(...)` directly to ensure
+  /// exceptions are logged and do not get silently dropped.
+  static void safeUnawait(Future<dynamic> future, [String? context]) {
+    unawaited(
+      future.catchError(
+        (Object e, StackTrace st) => AppLogger.e(
+          'SafeUnawait${context != null ? ': $context' : ''}',
+          e,
+          st,
+        ),
+      ),
+    );
+  }
+
   /// Logs an information message.
   static void i(String message) {
     _addToBuffer('INFO', message);
@@ -101,6 +116,10 @@ class AppLogger {
     unawaited(
       Sentry.addBreadcrumb(
         Breadcrumb(message: message, level: SentryLevel.info),
+      ).catchError(
+        (Object e, StackTrace st) {
+          debugPrint('Sentry breadcrumb failed: $e $st');
+        },
       ),
     );
   }
@@ -119,6 +138,10 @@ class AppLogger {
           level: SentryLevel.warning,
           data: error != null ? {'error': error.toString()} : null,
         ),
+      ).catchError(
+        (Object e, StackTrace st) {
+          debugPrint('Sentry breadcrumb failed: $e $st');
+        },
       ),
     );
   }
@@ -165,9 +188,11 @@ class AppLogger {
         uuidRegex.firstMatch(error?.toString() ?? '');
     if (match != null) hashedUserId = _hashString(match.group(0)!);
 
+    final capturedError = error ?? Exception(message);
+
     unawaited(
       Sentry.captureException(
-        error ?? message,
+        capturedError,
         stackTrace: stackTrace,
         withScope: (scope) async {
           await scope.setTag('logger_message', sanitizedMessage);
@@ -188,6 +213,11 @@ class AppLogger {
             loggerContext['details'] = sanitizedExtras;
           }
           await scope.setContexts('logger', loggerContext);
+        },
+      ).catchError(
+        (Object e, StackTrace st) {
+          debugPrint('Sentry capture failed: $e $st');
+          return const SentryId.empty();
         },
       ),
     );

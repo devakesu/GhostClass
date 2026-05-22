@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
-![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-^3.11.4-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.44.0-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.12.0-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -29,8 +29,8 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 
 | Package | Version | Purpose |
 | :--- | :--- | :--- |
-| **Flutter** | 3.27+ | Cross-platform UI framework |
-| **Dart** | ^3.11.4 | Language |
+| **Flutter** | 3.44.0 | Cross-platform UI framework |
+| **Dart** | 3.12.0 | Language |
 
 ### State Management
 
@@ -200,8 +200,8 @@ mobile/
 
 ### Prerequisites
 
-- **Flutter SDK** — 3.27+ ([install](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** — ^3.11.4 (bundled with Flutter)
+- **Flutter SDK** — 3.44.0 ([install](https://docs.flutter.dev/get-started/install))
+- **Dart SDK** — 3.12.0 (bundled with Flutter)
 - **Android Studio / Xcode** — for emulator/simulator
 - **Firebase CLI** — for App Check configuration
 - **A GhostClass backend** — see the [root README](../README.md) for web setup

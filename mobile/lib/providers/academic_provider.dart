@@ -47,7 +47,7 @@ class AcademicState {
       return DateTime(parsed.$2);
     }
     // Unrecognised semester name — default to even-semester dates and warn.
-    AppLogger.w(
+    AppLogger.e(
       'AcademicState.startDate: Unrecognised semester "$semester" for year "$year". '
       'Defaulting to even-semester start (Jan 1). Consider mapping this name.',
     );
@@ -64,7 +64,7 @@ class AcademicState {
       return DateTime(parsed.$2, 6, 30, 23, 59, 59);
     }
     // Unrecognised semester name — default to even-semester dates and warn.
-    AppLogger.w(
+    AppLogger.e(
       'AcademicState.endDate: Unrecognised semester "$semester" for year "$year". '
       'Defaulting to even-semester end (Jun 30). Consider mapping this name.',
     );
@@ -82,42 +82,14 @@ final academicProvider =
 /// Manages the current academic context state, synchronizing with
 /// secure storage, user settings, and the EzyGo portal.
 class AcademicNotifier extends AsyncNotifier<AcademicState?> {
-  @override
-  FutureOr<AcademicState?> build() async {
-    // Read authProvider to see if we have a logged-in user.
-    // Do NOT watch it to avoid circular dependency loops with authProvider's initialization.
-    final auth = ref.read(authProvider).value;
-    if (auth == null) return null;
-
+  Future<AcademicState?> _fetchFreshAcademicState() async {
+    final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
-    // 1. Primary source: secure storage (written by auth startup flow)
-    final cached = await storage.getAcademicState();
-    if (cached != null) return cached;
-
-    // 2. Fallback: User settings from profile sync
-    final semester = auth.settings.semester;
-    final year = auth.settings.academicYear;
-
-    if (semester != null && year != null) {
-      final state = AcademicState(semester: semester, year: year);
-      unawaited(storage.saveAcademicState(state));
-      return state;
-    }
-
-    // 3. Last resort: Calculate from current date
-    final fallback = calculateCurrentAcademicInfo();
-    return AcademicState(
-      semester: fallback['current_semester']!,
-      year: fallback['current_year']!,
-    );
-  }
-
-  Future<void> refreshFromEzygo() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final api = ref.read(apiServiceProvider);
-      final storage = ref.read(secureStorageProvider);
+    try {
+      // Always clear the local fetch cache before reading semester/year so app open
+      // reflects the current EzyGo defaults instead of a previous session.
+      api.clearCaches();
 
       final results = await Future.wait<Response<dynamic>>([
         api.fetchSemester(storage),
@@ -154,8 +126,76 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
         return next;
       }
 
+      AppLogger.e(
+        'AcademicNotifier: Live EzyGo academic fetch returned incomplete data. Falling back to local state.',
+      );
+    } on Object catch (e, st) {
+      AppLogger.e('AcademicNotifier: Live EzyGo academic fetch failed', e, st);
+    }
+
+    return null;
+  }
+
+  @override
+  FutureOr<AcademicState?> build() async {
+    // Read authProvider to see if we have a logged-in user.
+    // Do NOT watch it to avoid circular dependency loops with authProvider's initialization.
+    final auth = ref.read(authProvider).value;
+    if (auth == null) return null;
+
+    final storage = ref.read(secureStorageProvider);
+
+    // 1. Primary source: the academic context already seeded by auth/profile sync.
+    final seededSemester =
+        auth.profile?.currentSemester ?? auth.settings.semester;
+    final seededYear = auth.profile?.currentYear ?? auth.settings.academicYear;
+
+    if (seededSemester != null && seededYear != null) {
+      final seeded = AcademicState(semester: seededSemester, year: seededYear);
+      AppLogger.safeUnawait(
+        storage.saveAcademicState(seeded).catchError((Object e, StackTrace st) {
+          AppLogger.e('AcademicNotifier: saveAcademicState failed', e, st);
+        }),
+        'AcademicNotifier: saveAcademicState',
+      );
+      return seeded;
+    }
+
+    // 2. Fallback: secure storage (written by auth startup flow)
+    final cached = await storage.getAcademicState();
+    if (cached != null) return cached;
+
+    // 3. Last resort: Calculate from current date
+    final fallback = calculateCurrentAcademicInfo();
+    return AcademicState(
+      semester: fallback['current_semester']!,
+      year: fallback['current_year']!,
+    );
+  }
+
+  Future<void> refreshFromEzygo() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final storage = ref.read(secureStorageProvider);
+
+      final fresh = await _fetchFreshAcademicState();
+      if (fresh != null) return fresh;
+
       final cached = await storage.getAcademicState();
-      return cached ?? state.value;
+      if (cached != null) return cached;
+
+      final auth = ref.read(authProvider).value;
+      final semester = auth?.settings.semester;
+      final year = auth?.settings.academicYear;
+      if (semester != null && year != null) {
+        return AcademicState(semester: semester, year: year);
+      }
+
+      final fallback = calculateCurrentAcademicInfo();
+      return AcademicState(
+        semester: fallback['current_semester']!,
+        year: fallback['current_year']!,
+      );
     });
   }
 
@@ -195,10 +235,22 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
       ref.invalidateSelf();
     }
   }
+
+  Future<void> setAcademicPeriod(String semester, String year) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .updateAcademicContext(semester, year);
+    } finally {
+      ref.invalidateSelf();
+    }
+  }
 }
 
 (int, int) _parseAcademicYear(String year) {
-  final parts = year.split('-');
+  final parts = year.replaceAll('/', '-').split('-');
 
   // Expand short-form start year: "25-26" → "2025-2026".
   var startPart = parts.isNotEmpty ? parts.first : '';

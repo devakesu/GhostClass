@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class EditInstructorDialog extends ConsumerStatefulWidget {
   const EditInstructorDialog({
@@ -47,9 +48,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
   }
 
   Future<void> _handleSave() async {
-    final name = utils.toTitleCase(_controller.text.trim());
+    final name = utils.normalizePersonName(_controller.text);
     if (name.isEmpty) return;
-    if (name.length > 60) return;
+    if (name.length > 100) return;
 
     setState(() => _isSaving = true);
 
@@ -58,19 +59,26 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       final auth = ref.read(authProvider).value;
       if (academic == null || auth == null) throw Exception('Missing context');
 
-      final client = supabase.Supabase.instance.client;
+      final apiService = ref.read(apiServiceProvider);
+      final client = ref.read(supabaseClientProvider);
+      final supabaseToken = client.auth.currentSession?.accessToken;
+      if (supabaseToken == null) throw Exception('Not authenticated');
 
-      await client.from('course_instructors').upsert({
-        'class_id': auth.profile?.classField?.id,
-        'course_code': widget.courseCode.toUpperCase().replaceAll(' ', ''),
-        'semester': academic.semester,
-        'academic_year': academic.year,
-        'instructor_name': name,
-        'updated_by': auth.supabaseUserId,
-      }, onConflict: 'class_id, course_code, semester, academic_year');
+      await apiService.upsertInstructor(
+        courseCode: widget.courseCode,
+        instructorName: name,
+        semester: academic.semester,
+        academicYear: academic.year,
+        supabaseToken: supabaseToken,
+      );
 
-      // Refresh dashboard to show new name
-      await ref.read(dashboardProvider.notifier).refresh();
+      // Update dashboard locally to show new name without full refresh
+      await ref
+          .read(dashboardProvider.notifier)
+          .updateLocalInstructor(
+            widget.courseCode,
+            name,
+          );
 
       if (mounted) Navigator.pop(context);
     } on Object catch (e, st) {
@@ -86,9 +94,9 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'We encountered an error while saving the instructor. Please try again later. If the issue persists, please contact us.',
+              formatApiError(e, 'saving instructor'),
             ),
           ),
         );
@@ -255,7 +263,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                         children: [
                           TextFormField(
                             controller: _controller,
-                            maxLength: 60,
+                            maxLength: 100,
+                            textCapitalization: TextCapitalization.words,
                             style: GoogleFonts.manrope(
                               fontWeight: FontWeight.w700,
                             ),
@@ -309,10 +318,11 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                               if (val == null || val.trim().isEmpty) {
                                 return 'Required';
                               }
-                              if (!RegExp(
-                                r'^[a-zA-Z\s.]+$',
-                              ).hasMatch(val.trim())) {
-                                return 'Letters, spaces, and dots only';
+                              if (val.trim().length > 100) {
+                                return 'Max 100 characters';
+                              }
+                              if (!utils.isValidPersonName(val)) {
+                                return 'Name contains invalid characters';
                               }
                               return null;
                             },

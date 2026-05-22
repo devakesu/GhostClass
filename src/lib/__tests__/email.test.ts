@@ -47,6 +47,14 @@ describe("email.ts", () => {
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("brevo"), expect.objectContaining({
       headers: expect.objectContaining({ "api-key": "brevo-key" })
     }));
+
+    const brevoCall = vi.mocked(global.fetch).mock.calls[0];
+    if (!brevoCall) throw new Error("Expected Brevo fetch call");
+    const brevoOptions = brevoCall[1];
+    if (!brevoOptions) throw new Error("Expected Brevo fetch options");
+    const payload = JSON.parse((brevoOptions as RequestInit).body as string);
+    expect(payload.sender.name).toBe("GhostClass");
+    expect(payload.to[0].email).toBe("test@example.com");
   });
 
   it("sends via SendPulse when only SendPulse is configured", async () => {
@@ -68,6 +76,16 @@ describe("email.ts", () => {
     expect(result.success).toBe(true);
     expect(result.provider).toBe("SendPulse");
     expect(result.id).toBe("sp-123");
+
+    const sendPulseCall = vi.mocked(global.fetch).mock.calls.find(([url]) => String(url).includes("smtp/emails"));
+    expect(sendPulseCall).toBeDefined();
+    if (sendPulseCall) {
+      const sendPulseOptions = sendPulseCall[1];
+      if (!sendPulseOptions) throw new Error("Expected SendPulse fetch options");
+      const payload = JSON.parse((sendPulseOptions as RequestInit).body as string);
+      expect(payload.email.from.name).toBe("GhostClass");
+      expect(payload.email.to[0].email).toBe("test@example.com");
+    }
   });
 
   it("fails over to secondary if primary fails", async () => {

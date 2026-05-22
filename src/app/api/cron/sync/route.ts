@@ -453,6 +453,7 @@ async function executeSyncMutations(
             to: user.email, 
             subject, 
             html,
+            fromName: "GhostClass Alerts",
             toName: user.first_name && user.last_name 
               ? `${user.first_name} ${user.last_name}` 
               : undefined,
@@ -477,7 +478,14 @@ async function syncUser(
   courseMap: Map<string, string>
 ): Promise<SyncStats> {
   const stats = createEmptyStats();
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.ghostclass.in'}/dashboard`;
+  // L-2: NEXT_PUBLIC_APP_URL is required by validate-env.ts; the hardcoded
+  // production fallback was removed to prevent staging/preview notification
+  // emails linking to the wrong environment.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  if (!appUrl) {
+    logger.warn("[cron/sync] NEXT_PUBLIC_APP_URL is not set — dashboard links in notifications will be broken");
+  }
+  const dashboardUrl = `${appUrl}/dashboard`;
 
   try {
     const { officialData } = await getValidTokenAndAttendance(user, isCron, supabaseAdmin);
@@ -518,9 +526,16 @@ async function syncUser(
     stats.errors = 1;
     return stats;
   } finally {
-    await supabaseAdmin.from("users").update({
-      last_synced_at: new Date().toISOString(),
-    }).eq("auth_id", user.auth_id);
+    // H-3: Only update last_synced_at when a sync was actually attempted.
+    // Previously this always ran, including on token-expired / decryption-failed
+    // paths, which bumped the timestamp and pushed the user to the back of the
+    // retry queue — meaning they'd be skipped for the longest possible time
+    // instead of being retried promptly.
+    if (stats.processed > 0) {
+      await supabaseAdmin.from("users").update({
+        last_synced_at: new Date().toISOString(),
+      }).eq("auth_id", user.auth_id);
+    }
   }
 }
 
@@ -535,7 +550,11 @@ export const GET = withSecurity(async (req, { authType }) => {
 
   if (auth.isCron) {
     const target = searchParams.get("username");
-    let q = supabaseAdmin.from("users").select("*").not("ezygo_token", "is", null);
+    // H-2: Explicit column list — avoids loading sensitive password fields
+    // (auth_password, auth_password_iv) into cron memory.
+    let q = supabaseAdmin.from("users")
+      .select("username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name")
+      .not("ezygo_token", "is", null);
     if (target) q = q.eq("username", target);
     else q = q.order("last_synced_at", { ascending: true }).limit(BATCH_SIZE);
     const { data } = await q;
@@ -544,13 +563,16 @@ export const GET = withSecurity(async (req, { authType }) => {
     const supabase = await createClient();
     const authHeader = req.headers.get("authorization");
     const supabaseToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
-    
-    const { data: { user } } = supabaseToken 
+
+    const { data: { user } } = supabaseToken
       ? await supabase.auth.getUser(supabaseToken)
       : await supabase.auth.getUser();
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const { data } = await supabaseAdmin.from("users").select("*").eq("auth_id", user.id);
+    // H-2: Explicit column list here too.
+    const { data } = await supabaseAdmin.from("users")
+      .select("username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name")
+      .eq("auth_id", user.id);
     users = data || [];
   }
 
@@ -561,8 +583,14 @@ export const GET = withSecurity(async (req, { authType }) => {
   }
 
   const overallStats = createEmptyStats();
-  for (const user of users) {
-    const userStats = await syncUser(user, auth.isCron, supabaseAdmin, courseMap);
+  // L-3: Process users concurrently instead of sequentially.
+  // With BATCH_SIZE=10 and 1-2 EzyGo API calls + DB writes per user,
+  // sequential processing takes 30-60 s per cron run. Parallel execution
+  // keeps this well within serverless and Docker health-check timeouts.
+  const userResults = await Promise.all(
+    users.map((user) => syncUser(user, auth.isCron, supabaseAdmin, courseMap))
+  );
+  for (const userStats of userResults) {
     overallStats.processed += userStats.processed;
     overallStats.deletions += userStats.deletions;
     overallStats.updates += userStats.updates;

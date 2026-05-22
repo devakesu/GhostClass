@@ -115,7 +115,7 @@ describe('exams hooks', () => {
       
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockBatch);
-      expect(axios.post).toHaveBeenCalledWith('/scores/batch', { examIds: [1] });
+      expect(axios.post).toHaveBeenCalledWith('/api/scores/batch', { examIds: [1] }, { baseURL: '' });
     });
 
     it('returns empty object for empty examIds', async () => {

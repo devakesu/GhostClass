@@ -71,6 +71,11 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   Future<ScoreState> build() async {
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
+
+    if (authState.isLoading || academicAsync.isLoading) {
+      return Completer<ScoreState>().future;
+    }
+
     final academic = academicAsync.value;
 
     // BLOCKER: Do not fire queries until Cron Sync is finished
@@ -82,7 +87,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     return _initialFetch(academic: academic);
   }
 
-  Future<ScoreState> _initialFetch({AcademicState? academic}) async {
+  Future<ScoreState> _initialFetch({
+    AcademicState? academic,
+    bool bypassCache = false,
+  }) async {
     final authState = ref.watch(authProvider);
     final user = authState.value;
     if (user == null) throw Exception('Unauthorized');
@@ -127,6 +135,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
               questionsMap: questionsMap,
               answersMap: answersMap,
               resolvedScores: resolvedScores,
+              bypassCache: bypassCache,
             ),
           ),
         );
@@ -162,7 +171,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       );
 
       return _applyFilter(state, 'all');
-    } catch (e) {
+    } on Object catch (e) {
       throw Exception('Failed to load internal marks: $e');
     }
   }
@@ -210,7 +219,9 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     final academicAsync = ref.read(academicProvider);
     final academic = academicAsync.value;
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _initialFetch(academic: academic));
+    state = await AsyncValue.guard(
+      () => _initialFetch(academic: academic, bypassCache: true),
+    );
   }
 
   bool _matchesAcademic(Exam exam, AcademicState? academic) {
@@ -232,16 +243,22 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     required Map<int, List<ExamQuestion>> questionsMap,
     required Map<int, List<ExamAnswer>> answersMap,
     required Map<int, ResolvedScore> resolvedScores,
+    bool bypassCache = false,
   }) async {
     final cacheKeyQs = 'exam_questions_${exam.id}';
     final cacheKeyAns = 'exam_answers_${exam.id}';
 
-    final cacheResults = await Future.wait([
-      storage.getCachedData(cacheKeyQs),
-      storage.getCachedData(cacheKeyAns),
-    ]);
-    dynamic qsData = cacheResults[0];
-    dynamic ansData = cacheResults[1];
+    dynamic qsData;
+    dynamic ansData;
+
+    if (!bypassCache) {
+      final cacheResults = await Future.wait([
+        storage.getCachedData(cacheKeyQs),
+        storage.getCachedData(cacheKeyAns),
+      ]);
+      qsData = cacheResults[0];
+      ansData = cacheResults[1];
+    }
 
     if (qsData == null || ansData == null) {
       final results = await Future.wait([

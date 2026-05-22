@@ -62,7 +62,7 @@ class EzygoBatchFetcher {
   }) async {
     // Generate a unique cache key based on the request identity
     // We include method, path, token, and a hash of the body data to avoid collisions.
-    final dataKey = data != null ? json.encode(data) : '';
+    final dataKey = data != null ? _encodeStableRequestData(data) : '';
     final cacheKey = '$method|$path|$token|$dataKey';
     final startGeneration = _generation;
 
@@ -92,7 +92,7 @@ class EzygoBatchFetcher {
       if (_lastCircuitBreakerLog == null ||
           now.difference(_lastCircuitBreakerLog!) > logThrottle) {
         _lastCircuitBreakerLog = now;
-        AppLogger.w(
+        AppLogger.e(
           'EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path',
         );
       } else {
@@ -272,10 +272,49 @@ class EzygoBatchFetcher {
     _inFlight.clear();
     _setOutage(false);
     _generation++;
+
+    // Reject all pending completers in the queue with a cancellation error
+    for (final completer in _queue) {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          const AppException(
+            message: 'Ezygo fetch queue cleared.',
+            type: AppExceptionType.network,
+          ),
+        );
+      }
+    }
+    _queue.clear();
+    _activeRequests = 0;
+
     AppLogger.i(
-      'EzygoBatchFetcher: Cache and Outage state cleared. Generation updated to $_generation.',
+      'EzygoBatchFetcher: Cache, Outage, Queue cleared & Requests reset. Generation updated to $_generation.',
     );
   }
+}
+
+String _encodeStableRequestData(dynamic data) {
+  dynamic normalize(dynamic value) {
+    if (value == null || value is num || value is bool || value is String) {
+      return value;
+    }
+    if (value is DateTime) return value.toIso8601String();
+    if (value is Uri) return value.toString();
+    if (value is Map) {
+      final entries = value.entries.toList()
+        ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
+      return <String, dynamic>{
+        for (final entry in entries)
+          entry.key.toString(): normalize(entry.value),
+      };
+    }
+    if (value is Iterable) {
+      return value.map(normalize).toList(growable: false);
+    }
+    return value.toString();
+  }
+
+  return json.encode(normalize(data));
 }
 
 class _CacheEntry {

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/security_provider.dart';
+import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/security_guard.dart';
 
 /// SecurityLockdownListener
 /// ------------------------
@@ -19,21 +21,34 @@ class SecurityLockdownListener extends ConsumerWidget {
     // AuthNotifier handles the stream from DioService and updates this provider
     ref.listen(securityFailureProvider, (previous, next) {
       if (next != null && next.criticalRisk) {
-        _handleLockdown(context, next);
+        _handleLockdown(context, ref, next);
       }
     });
 
     return child;
   }
 
-  void _handleLockdown(BuildContext context, SecurityFailureState state) {
+  void _handleLockdown(
+    BuildContext context,
+    WidgetRef ref,
+    SecurityFailureState state,
+  ) {
+    if (Platform.isIOS) {
+      // Wipe storage immediately on iOS since we won't show the exit button
+      AppLogger.safeUnawait(
+        ref.read(securityGuardProvider).wipeAndExit(),
+        'SecurityLockdownListener: wipeAndExit',
+      );
+    }
     final _ = SecurityUtils.showSecurityFailureDialog(
       context,
       title: state.message,
       message: state.reason ?? 'Your device failed the security verification.',
       technicalDetails: state.source ?? 'Unknown security context.',
-      retryLabel: 'Close App',
-      onRetry: () => exit(0),
+      retryLabel: Platform.isAndroid ? 'Close App' : null,
+      onRetry: Platform.isAndroid
+          ? () => ref.read(securityGuardProvider).wipeAndExit()
+          : null,
     );
   }
 }

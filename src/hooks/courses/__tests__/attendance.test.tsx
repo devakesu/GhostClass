@@ -18,6 +18,11 @@ vi.mock("@/lib/query-utils", () => ({
   retryTwice: false,
 }));
 
+vi.mock("../../users/settings", () => ({
+  useFetchAcademicYear: vi.fn(() => ({ data: "2023" })),
+  useFetchSemester: vi.fn(() => ({ data: "1" })),
+}));
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -210,8 +215,34 @@ describe("attendance hooks", () => {
       expect(result.current.data?.CS102.total).toBe(20);
 
       // Check if individual cache was updated
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101"], expect.any(Object));
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102"], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101", 123], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102", 456], expect.any(Object));
+    });
+
+    it("should normalize cache keys for courses with spaces and hyphens", async () => {
+      const courses = [
+        { code: "CS-101 2", id: 123, name: "Intro" },
+      ];
+      const mockBatchData = {
+        "CS-101 2": { totel: 10, persantage: 90 },
+      };
+      (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
+
+      const queryClient = new QueryClient();
+      const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+
+      const { result } = renderHook(() => useAllCourseDetails(courses), {
+        wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      
+      // The cached key should be normalized (uppercase, spaces and hyphens removed)
+      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS1012", 123], expect.any(Object));
     });
 
     it("should handle missing course in batch courses list", async () => {

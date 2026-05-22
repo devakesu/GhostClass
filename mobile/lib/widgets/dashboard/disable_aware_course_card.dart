@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
@@ -233,7 +234,7 @@ class _DisableAwareCourseCardState
                               setDialogState(() => isSaving = false);
                               ServiceToast.show(
                                 context,
-                                'Failed: $e',
+                                formatApiError(e, 'course configuration'),
                                 isError: true,
                               );
                             }
@@ -492,7 +493,7 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
                     setState(() => isSaving = false);
                     ServiceToast.show(
                       context,
-                      'We encountered an error while disabling this course. Please try again later. If the issue persists, please contact us.',
+                      formatApiError(e, 'course configuration'),
                       isError: true,
                     );
                   }

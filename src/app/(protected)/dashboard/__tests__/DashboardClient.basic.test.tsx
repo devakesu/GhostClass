@@ -61,6 +61,7 @@ vi.mock('lucide-react', async () => {
     XCircle: Icon,
     XIcon: Icon,
     BookOpen: Icon,
+    GraduationCap: Icon,
   };
 });
 

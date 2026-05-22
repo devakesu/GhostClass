@@ -60,6 +60,9 @@ const SESSION_ROMANS = new Map<string, string>([
  * Normalizes session identifiers to a standard format.
  */
 export const normalizeSession = (session: string | number): string => {
+  if (session === null || session === undefined || String(session).toLowerCase().trim() === 'null' || String(session).trim() === '') {
+    return '1';
+  }
   let s = String(session).toLowerCase().trim();
   
   s = s.replace(/session|lecture|lec|lab|hour|hr|period/g, '').trim();

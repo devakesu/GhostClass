@@ -126,7 +126,7 @@ describe("POST /api/auth/save-token", () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body.error).toBe("Invalid origin");
+    expect(body.message).toBe("Invalid origin");
   });
 
   it("returns 429 when rate limited", async () => {
@@ -233,6 +233,16 @@ describe("POST /api/auth/save-token", () => {
       json: async () => ({ username: "orphanuser", id: "99999", email: "orphan@example.com" }),
     } as any);
 
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "service-role-key");
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ users: [{ id: "orphan-uuid", email: "ezygo_99999@localhost:3000" }] }),
+    });
+    vi.stubGlobal("fetch", mockFetch as unknown as typeof fetch);
+
     const mockSupabaseAdmin = {
       auth: {
         admin: {
@@ -259,6 +269,9 @@ describe("POST /api/auth/save-token", () => {
     const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const requestUrl = new URL(String(mockFetch.mock.calls[0]?.[0]));
+    expect(requestUrl.searchParams.get("email")).toBe("ezygo_99999@localhost:3000");
     const body = await response.json();
     expect(body.userId).toBe("new-auth-id-after-cleanup");
   });
@@ -280,7 +293,7 @@ describe("POST /api/auth/save-token", () => {
     const response = await POST(req, {} as any);
     expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body.error).toContain("Server configuration error");
+    expect(body.message).toContain("Server configuration error");
   });
 
   it("returns 500 when NEXT_PUBLIC_APP_DOMAIN contains protocol", async () => {
@@ -296,7 +309,7 @@ describe("POST /api/auth/save-token", () => {
     const req = { json: async () => ({ token: "test-token" }) } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Unable to determine client IP" });
+    expect(await response.json()).toEqual({ message: "Unable to determine client IP" });
   });
 
   it("returns 401 when EzyGo returns 401", async () => {

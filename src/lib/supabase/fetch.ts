@@ -53,7 +53,7 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
   }
 
   // Use development overrides if present to ensure dev/prod isolation
-  if (process.env.NODE_ENV === "development" && process.env.FORCE_PROD_SUPABASE !== "true") {
+  if (process.env.NODE_ENV === "development") {
     const devUrl = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
     const devKey = type === 'admin' 
         ? process.env.SUPABASE_DEV_SECRET_KEY 
@@ -66,10 +66,12 @@ export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
       // Environment Guard: Alert developer if production URL is leaking into development
       // Use a delayed logger to avoid circular dependency issues if logger imports config
       setTimeout(() => {
-        logger.warn(
-          `[Supabase Security] Production URL detected in development! ⚠️`,
-          `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`
-        );
+        if (typeof logger.warn === "function") {
+          logger.warn(
+            `[Supabase Security] Production URL detected in development! ⚠️`,
+            `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`
+          );
+        }
       }, 0);
     }
   }
@@ -224,7 +226,7 @@ export function buildSupabaseTieredFetch(
     }
   };
 
-  const isDev = process.env.NODE_ENV === "development" && process.env.FORCE_PROD_SUPABASE !== "true";
+  const isDev = process.env.NODE_ENV === "development";
   const devBase = isDev ? parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL) : null;
   const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
   const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);

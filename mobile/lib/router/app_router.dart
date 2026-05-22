@@ -21,6 +21,7 @@ import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -39,7 +40,14 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
   @override
   void dispose() {
-    unawaited(_subscription.cancel());
+    try {
+      AppLogger.safeUnawait(
+        _subscription.cancel(),
+        'GoRouterRefreshStream.cancel',
+      );
+    } on Object catch (e) {
+      debugPrint('GoRouterRefreshStream: cancel threw: $e');
+    }
     super.dispose();
   }
 }
@@ -76,11 +84,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     }
   });
 
+  final refreshStream = GoRouterRefreshStream(
+    Supabase.instance.client.auth.onAuthStateChange,
+  );
+  ref.onDispose(() {
+    refreshStream.dispose();
+    authRefreshNotifier.dispose();
+  });
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: Listenable.merge([
-      GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+      refreshStream,
       authRefreshNotifier,
     ]),
     observers: [SentryNavigatorObserver(), AnalyticsService.instance.observer],

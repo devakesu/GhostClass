@@ -108,7 +108,7 @@ describe("useTrackingData", () => {
     expect(result.current.data).toEqual([]);
   });
 
-  it("should return [] if semester or year missing", async () => {
+  it("should be disabled if semester or year missing", async () => {
     mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
     (useFetchSemester as any).mockReturnValue({ data: null });
 
@@ -116,8 +116,7 @@ describe("useTrackingData", () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([]);
+    expect(result.current.fetchStatus).toBe("idle");
   });
 
   it("should handle error and capture exception", async () => {

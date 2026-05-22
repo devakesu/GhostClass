@@ -45,6 +45,7 @@ import {
   subMonths,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { optionalReasonSchema } from "@/lib/validation/text";
 import {
   Popover,
   PopoverContent,
@@ -65,6 +66,7 @@ import { AttendanceReport, Course, TrackAttendance } from "@/types";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useProfile } from "@/hooks/users/profile";
 
 interface User {
   id: string | number;
@@ -341,6 +343,8 @@ export function AddAttendanceDialog({
   selectedSemester,
   selectedYear,
 }: AddAttendanceDialogProps) {
+  const { data: profile } = useProfile();
+
   // --- STATE ---
   const [date, setDate] = useState<Date>(new Date());
   const [session, setSession] = useState<string>("");
@@ -474,7 +478,7 @@ export function AddAttendanceDialog({
         courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
       }
 
-      const finalRemarks = (remarks.trim() || "").substring(0, 255) || null;
+      const finalRemarks = optionalReasonSchema.parse(remarks);
 
       const { error } = await supabase
         .from("tracker")
@@ -732,6 +736,7 @@ export function AddAttendanceDialog({
               <Select
                 value={courseId}
                 onValueChange={setCourseId}
+                disabled={!profile?.class?.id || sortedCourses.length === 0}
               >
                 <SelectTrigger
                   id="course-select"
@@ -746,7 +751,7 @@ export function AddAttendanceDialog({
                         courseId ? "text-primary" : "text-muted-foreground",
                       )}
                     />
-                    <SelectValue placeholder="Select Subject" />
+                    <SelectValue placeholder={!profile?.class?.id || sortedCourses.length === 0 ? "No courses available" : "Select Subject"} />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
@@ -881,6 +886,7 @@ export function AddAttendanceDialog({
                 "bg-red-600 hover:bg-red-700 text-white",
               statusType === "Duty Leave" &&
                 "bg-yellow-600 hover:bg-yellow-700 text-white",
+              "disabled:opacity-100 disabled:bg-muted disabled:text-muted-foreground disabled:border-border/70",
             )}
           >
             {isSubmitting

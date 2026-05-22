@@ -122,7 +122,7 @@ describe('ScoresClient', () => {
         <ScoresClient />
       </QueryClientProvider>
     );
-    expect(screen.getByText(/Failed to load scores/i)).toBeInTheDocument();
+    expect(screen.getByText(/Failed to load internal marks/i)).toBeInTheDocument();
   });
 
   it('renders exams and allows filtering', async () => {
@@ -163,7 +163,7 @@ describe('ScoresClient', () => {
       </QueryClientProvider>
     );
 
-    const refreshButton = screen.getByLabelText(/Refresh scores/i);
+    const refreshButton = screen.getByLabelText(/Refresh internal marks/i);
     const userEvent = (await import('@testing-library/user-event')).default;
     await userEvent.click(refreshButton);
 

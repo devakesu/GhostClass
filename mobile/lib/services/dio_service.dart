@@ -27,17 +27,7 @@ class DioService {
       ),
     );
 
-    securityDio = Dio(
-      BaseOptions(
-        baseUrl: AppConfig.ghostclassApiUrl,
-        connectTimeout: timeout,
-        receiveTimeout: timeout,
-        sendTimeout: timeout,
-      ),
-    );
-
     dio.addSentry();
-    securityDio.addSentry();
 
     // Attach JWE Layer first
     dio.interceptors.add(_ref.read(jweInterceptorProvider));
@@ -66,8 +56,32 @@ class DioService {
           return handler.next(response);
         },
         onError: (err, handler) {
-          if (err.response?.statusCode == 401) {
-            _handle401(err.requestOptions);
+          try {
+            if (err.response?.statusCode == 401) {
+              _handle401(err.requestOptions);
+            }
+
+            // If App Check produced a local error (token issue), surface a
+            // lockdown event so security flows can react (e.g. forced logout).
+            final appCheckError =
+                err.requestOptions.extra['appCheckError'] as String?;
+            if (err.response?.statusCode == 403 && appCheckError != null) {
+              AppLogger.e(
+                'DioService: 403 + App Check error detected. Triggering security lockdown.',
+                Exception(appCheckError),
+              );
+              try {
+                _lockdownController.add({
+                  'title': 'Device verification failed',
+                  'reason': appCheckError,
+                  'technicalDetails': appCheckError,
+                });
+              } on Object catch (e, st) {
+                AppLogger.e('DioService: Failed to emit lockdown event', e, st);
+              }
+            }
+          } on Object catch (e, st) {
+            AppLogger.e('DioService: onError handler failed', e, st);
           }
           return handler.next(err);
         },
@@ -77,7 +91,6 @@ class DioService {
 
   final Ref _ref;
   late final Dio dio;
-  late final Dio securityDio;
 
   FirebaseAppCheck get _appCheck => _ref.read(appCheckProvider);
 
@@ -107,6 +120,7 @@ class DioService {
     }
 
     _last401Broadcast = now;
+    AppLogger.d('DioService: Emitting 401 via onUnauthorized stream');
     _unauthorizedController.add(null);
   }
 
@@ -117,31 +131,74 @@ class DioService {
       // Deduplicate parallel token requests to prevent "Too many attempts"
       String? appCheckToken;
       if (useLimited) {
-        _limitedTokenFetchInFlight ??= _appCheck.getLimitedUseToken();
+        var isNew = false;
+        if (_limitedTokenFetchInFlight == null) {
+          _limitedTokenFetchInFlight = _appCheck.getLimitedUseToken();
+          isNew = true;
+        }
         appCheckToken = await _limitedTokenFetchInFlight!.timeout(
           const Duration(seconds: 10),
         );
-        _limitedTokenFetchInFlight = null; // Clear after completion
+        if (isNew) {
+          AppLogger.safeUnawait(
+            Future.delayed(const Duration(seconds: 5), () {
+              _limitedTokenFetchInFlight = null;
+            }).catchError(
+              (Object e, StackTrace st) {
+                AppLogger.e(
+                  'DioService: delayed clear of limited token fetch failed',
+                  e,
+                  st,
+                );
+              },
+            ),
+            'DioService: delayed clear limited token fetch',
+          );
+        }
       } else {
-        _tokenFetchInFlight ??= _appCheck.getToken();
+        var isNew = false;
+        if (_tokenFetchInFlight == null) {
+          _tokenFetchInFlight = _appCheck.getToken();
+          isNew = true;
+        }
         appCheckToken = await _tokenFetchInFlight!.timeout(
           const Duration(seconds: 10),
         );
-        _tokenFetchInFlight = null; // Clear after completion
+        if (isNew) {
+          AppLogger.safeUnawait(
+            Future.delayed(const Duration(seconds: 5), () {
+              _tokenFetchInFlight = null;
+            }).catchError(
+              (Object e, StackTrace st) {
+                AppLogger.e(
+                  'DioService: delayed clear of token fetch failed',
+                  e,
+                  st,
+                );
+              },
+            ),
+            'DioService: delayed clear token fetch',
+          );
+        }
       }
 
       if (appCheckToken != null && appCheckToken.isNotEmpty) {
         options.headers['X-Firebase-AppCheck'] = appCheckToken;
+        AppLogger.d(
+          'DioService: App Check token attached (limited: $useLimited, length: ${appCheckToken.length})',
+        );
       } else {
-        options.extra['appCheckError'] =
+        const errorMsg =
             'App Check token is empty - verify Firebase activation';
+        options.extra['appCheckError'] = errorMsg;
+        AppLogger.e('DioService: $errorMsg');
       }
     } on Object catch (e) {
       // Ensure futures are cleared on error to allow retries
       _tokenFetchInFlight = null;
       _limitedTokenFetchInFlight = null;
 
-      AppLogger.w('DioService: Security headers failed: $e');
+      AppLogger.e('DioService: Security headers failed: $e');
       options.extra['appCheckError'] = e.toString();
     }
   }
@@ -150,7 +207,6 @@ class DioService {
     await _unauthorizedController.close();
     await _lockdownController.close();
     dio.close();
-    securityDio.close();
   }
 }
 

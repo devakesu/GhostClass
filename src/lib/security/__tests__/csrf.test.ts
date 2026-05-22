@@ -42,6 +42,7 @@ describe('CSRF Security', () => {
     get: vi.fn(),
     set: vi.fn(),
     delete: vi.fn(),
+    getAll: vi.fn(() => []),
   };
 
   beforeEach(() => {

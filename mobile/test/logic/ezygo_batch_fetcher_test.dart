@@ -164,6 +164,56 @@ void main() {
       expect(r.statusCode, 200);
     });
 
+    test(
+      'deduplicates request data regardless of map insertion order',
+      () async {
+        final fetcher = createFetcher();
+        final res = Response<dynamic>(
+          requestOptions: RequestOptions(path: '/order'),
+          statusCode: 200,
+          data: {'ok': true},
+        );
+
+        when(
+          () => mockDio.request<dynamic>(
+            '/order',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          return res;
+        });
+
+        final firstPayload = <String, dynamic>{'a': 1, 'b': 2};
+        final secondPayload = <String, dynamic>{'b': 2, 'a': 1};
+
+        final results = await Future.wait([
+          fetcher.fetch(
+            path: '/order',
+            token: 'token',
+            method: 'POST',
+            data: firstPayload,
+          ),
+          fetcher.fetch(
+            path: '/order',
+            token: 'token',
+            method: 'POST',
+            data: secondPayload,
+          ),
+        ]);
+
+        expect(results[0], results[1]);
+        verify(
+          () => mockDio.request<dynamic>(
+            '/order',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
+
     test('deduplicates identical concurrent in-flight requests', () async {
       final fetcher = createFetcher();
       final res = Response<dynamic>(

@@ -10,8 +10,8 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 describe('CircuitBreaker', () => {
-  beforeEach(() => {
-    ezygoCircuitBreaker.reset();
+  beforeEach(async () => {
+    await ezygoCircuitBreaker.reset();
     vi.useFakeTimers();
   });
 

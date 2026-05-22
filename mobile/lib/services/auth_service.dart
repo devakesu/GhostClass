@@ -41,7 +41,7 @@ class AuthService {
       _ezygoAuthUrl,
       data: {
         'username': username.trim(),
-        'password': password.trim(),
+        'password': password,
         'stay_logged_in': true,
       },
       options: Options(validateStatus: (s) => s != null && s < 600),
@@ -144,7 +144,7 @@ class AuthService {
   }
 
   Future<Response<dynamic>> getUser(SecureStorageService storage) async {
-    final token = await storage.getEzygoToken();
+    final token = await storage.getNormalizedEzygoToken();
     final path = '${AppConfig.ezygoApiRoot}/user';
     if (token == null) return _dio.get(path);
     return _dio.get(

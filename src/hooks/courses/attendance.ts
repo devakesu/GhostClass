@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { useMemo } from "react";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
+import { useFetchSemester, useFetchAcademicYear } from "../users/settings";
 
 /** Normalize the EzyGo API typos (`totel`, `persantage`) into `total` / `percentage`. */
 function normalizeCourseDetail(raw: unknown): CourseDetail {
@@ -88,10 +89,9 @@ async function fetchCourseDetail(courseId: string, ezygoId: number, courseName?:
 /** Shared query options for a single course — keeps staleTime/gcTime/etc. in sync. */
 function courseDetailQueryOptions(courseId: string, ezygoId: number, courseName?: string) {
   return {
-    // The EzyGo /summery endpoint is semester-agnostic: the same data is returned
-    // regardless of sem/year. Key only on courseId to prevent N duplicate requests
-    // whenever the dashboard's term selection changes.
-    queryKey: ["attendance-report", courseId] as const,
+    // Key on both courseId and ezygoId to ensure attendance details are cached
+    // independently across semesters/enrollments.
+    queryKey: ["attendance-report", courseId, ezygoId] as const,
     queryFn: () => fetchCourseDetail(courseId, ezygoId, courseName),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000,    // 30 minutes
@@ -143,6 +143,8 @@ export const useCourseDetails = (
  */
 export const useAllCourseDetails = (courses: { code: string; id: number; name: string }[]) => {
   const queryClient = useQueryClient();
+  const { data: semester } = useFetchSemester();
+  const { data: year } = useFetchAcademicYear();
   
   // Explicitly deduplicate courses by code to prevent redundant batching.
   // This ensures the queryKey remains stable and the API receives a clean list.
@@ -162,7 +164,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   );
 
   return useQuery<Record<string, CourseDetail>>({
-    queryKey: ["attendance-report-all", sortedCodes],
+    queryKey: ["attendance-report-all", sortedCodes, semester ?? null, year ?? null],
     queryFn: async () => {
       const res = await axios.post("/api/attendance/summary-batch", { courses: uniqueCourses }, { baseURL: "" });
       if (!res || !res.data) throw new Error("Failed to fetch batch course details");
@@ -183,7 +185,8 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
 
           const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
           if (course) {
-            queryClient.setQueryData(["attendance-report", code], detail);
+            const normalizedCode = code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+            queryClient.setQueryData(["attendance-report", normalizedCode, Number(course.id)], detail);
           }
         }
       }

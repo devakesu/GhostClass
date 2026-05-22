@@ -2,29 +2,45 @@
 
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
-import { toTitleCase } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
+import { academicYearSchema, courseCodeSchema, courseNameSchema, semesterSchema } from "@/lib/validation/text";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
-  // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
-  const code = String(formData.get("courseCode") ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
-  const name = toTitleCase(String(formData.get("courseName") ?? ""));
-  const semester = String(formData.get("semester") ?? "").trim();
-  const academicYear = String(formData.get("academicYear") ?? "").trim();
-  const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
+  const courseCodeValue = formData.get("courseCode");
+  const courseNameValue = formData.get("courseName");
+  const semesterValue = formData.get("semester");
+  const academicYearValue = formData.get("academicYear");
 
-  if (!code || !name || !semester || !academicYear) {
+  if (
+    typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
+    typeof courseNameValue !== "string" || courseNameValue.trim() === "" ||
+    typeof semesterValue !== "string" || semesterValue.trim() === "" ||
+    typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+  ) {
     return { error: "Course code, name, semester, and academic year are required" };
   }
 
-  if (semester !== "odd" && semester !== "even") {
-    return { error: "Semester must be 'odd' or 'even'" };
+  // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
+  const parsed = z.object({
+    courseCode: courseCodeSchema,
+    courseName: courseNameSchema,
+    semester: semesterSchema,
+    academicYear: academicYearSchema,
+  }).safeParse({
+    courseCode: courseCodeValue,
+    courseName: courseNameValue,
+    semester: semesterValue,
+    academicYear: academicYearValue,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid course details" };
   }
 
-  if (!/^\d{4}-(\d{4}|\d{2})$/.test(academicYear)) {
-    return { error: "Academic year must be in format YYYY-YYYY or YYYY-YY (e.g. 2025-2026 or 2025-26)" };
-  }
+  const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
+  const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
 
   // 1. Verify Turnstile Security Token
   if (!turnstileToken) {

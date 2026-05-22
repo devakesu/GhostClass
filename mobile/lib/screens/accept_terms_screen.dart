@@ -31,7 +31,18 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
       }
     });
     try {
-      unawaited(AnalyticsService.instance.logScreenView('accept_terms'));
+      AppLogger.safeUnawait(
+        AnalyticsService.instance
+            .logScreenView('accept_terms')
+            .catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'AcceptTermsScreen: analytics logScreenView failed',
+                e,
+                st,
+              ),
+            ),
+        'AcceptTermsScreen: analytics logScreenView',
+      );
     } on Object catch (_) {}
   }
 
@@ -43,10 +54,19 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
 
     try {
       try {
-        unawaited(
-          AnalyticsService.instance.logCustom('accept_terms_tap', {
-            'version': _termsVersion,
-          }),
+        AppLogger.safeUnawait(
+          AnalyticsService.instance
+              .logCustom('accept_terms_tap', {
+                'version': _termsVersion,
+              })
+              .catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'AcceptTermsScreen: analytics accept_terms_tap failed',
+                  e,
+                  st,
+                ),
+              ),
+          'AcceptTermsScreen: analytics accept_terms_tap',
         );
       } on Object catch (_) {}
       await ref.read(authProvider.notifier).acceptTerms();
@@ -218,10 +238,11 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               const SizedBox(height: 20),
 
               // Full Policy Link (Moved outside)
-              GestureDetector(
+              InkWell(
                 onTap: () {
                   final _ = context.push('/legal');
                 },
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -277,8 +298,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               const SizedBox(height: 32),
 
               // Acceptance
-              GestureDetector(
+              InkWell(
                 onTap: () => setState(() => _accepted = !_accepted),
+                borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

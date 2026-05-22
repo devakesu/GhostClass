@@ -24,6 +24,18 @@ class JweInterceptor extends Interceptor {
     _rcekMap.removeWhere(
       (key, entry) => now.difference(entry.timestamp).inSeconds > 120,
     );
+    // Defensive cap: if an attacker floods requests, prevent the map from
+    // growing without bound by removing the oldest entries when exceeding
+    // a reasonable limit.
+    const maxEntries = 256;
+    if (_rcekMap.length > maxEntries) {
+      final entries = _rcekMap.entries.toList()
+        ..sort((a, b) => a.value.timestamp.compareTo(b.value.timestamp));
+      final toRemove = _rcekMap.length - maxEntries;
+      for (var i = 0; i < toRemove; i++) {
+        _rcekMap.remove(entries[i].key);
+      }
+    }
   }
 
   @override
@@ -65,7 +77,7 @@ class JweInterceptor extends Interceptor {
         // The server needs the RCEK to decrypt the request and to encrypt the response
         // In the GhostClass protocol, we send the RCEK encrypted with the server's public key
         final keyResult = await jweService.encryptHeaderKey();
-        options.headers['X-JWE-Key'] = keyResult.jwe;
+        options.headers['x-jwe-key'] = keyResult.jwe;
 
         AppLogger.d('JweInterceptor: Request encrypted for ${options.path}');
       } on Object catch (e) {
@@ -118,9 +130,18 @@ class JweInterceptor extends Interceptor {
     final isEncrypted =
         contentType.contains('application/jose') ||
         response.headers.value('x-jwe') == 'true';
-    final requestId =
-        response.requestOptions.headers['X-GhostClass-Request-ID'] as String?;
-    final entry = _rcekMap.remove(requestId);
+    // Header casing can vary depending on platform/transport. Try common
+    // variants to robustly retrieve the request ID used to store the RCEK.
+    String? requestId;
+    final headers = response.requestOptions.headers;
+    if (headers.containsKey('X-GhostClass-Request-ID')) {
+      requestId = headers['X-GhostClass-Request-ID'] as String?;
+    } else if (headers.containsKey('x-ghostclass-request-id')) {
+      requestId = headers['x-ghostclass-request-id'] as String?;
+    } else if (headers.containsKey('X-Ghostclass-Request-Id')) {
+      requestId = headers['X-Ghostclass-Request-Id'] as String?;
+    }
+    final entry = requestId == null ? null : _rcekMap.remove(requestId);
     final rcek = entry?.rcek;
 
     if (isEncrypted && rcek != null) {
@@ -158,8 +179,14 @@ class JweInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // Clean up RCEK on error to prevent memory leaks
-    final requestId = err.requestOptions.headers['X-GhostClass-Request-ID'];
-    _rcekMap.remove(requestId);
+    final headers = err.requestOptions.headers;
+    String? requestId;
+    if (headers.containsKey('X-GhostClass-Request-ID')) {
+      requestId = headers['X-GhostClass-Request-ID'] as String?;
+    } else if (headers.containsKey('x-ghostclass-request-id')) {
+      requestId = headers['x-ghostclass-request-id'] as String?;
+    }
+    if (requestId != null) _rcekMap.remove(requestId);
     return handler.next(err);
   }
 }

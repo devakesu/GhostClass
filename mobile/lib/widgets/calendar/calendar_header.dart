@@ -42,8 +42,9 @@ class CalendarHeader extends StatelessWidget {
                   button: true,
                   label:
                       'Select Month, currently ${DateFormat('MMMM yyyy').format(focusedDay)}',
-                  child: GestureDetector(
+                  child: InkWell(
                     onTap: onDateSelect,
+                    borderRadius: BorderRadius.circular(6),
                     child: Row(
                       children: [
                         Text(
@@ -71,14 +72,18 @@ class CalendarHeader extends StatelessWidget {
                   Semantics(
                     button: true,
                     label: 'Jump to today',
-                    child: GestureDetector(
+                    child: InkWell(
                       onTap: onToday,
-                      child: Text(
-                        'Jump to Today',
-                        style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          'Jump to Today',
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: primary,
+                          ),
                         ),
                       ),
                     ),
@@ -123,8 +128,9 @@ class _HeaderNavButton extends StatelessWidget {
       button: true,
       label: icon == LucideIcons.chevronLeft ? 'Previous Month' : 'Next Month',
       enabled: enabled,
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
           opacity: enabled ? 1.0 : 0.3,

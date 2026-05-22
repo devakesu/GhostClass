@@ -95,11 +95,20 @@ class JweService {
           // Stale-While-Revalidate: if cached keys are older than 24 hours,
           // refresh from network in the background without blocking startup.
           if (DateTime.now().difference(cachedTime).inHours >= 24) {
-            unawaited(_refreshJwksFromNetwork(prefs));
+            AppLogger.safeUnawait(
+              _refreshJwksFromNetwork(prefs).catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'JweService: Background JWKS refresh failed',
+                  e,
+                  st,
+                ),
+              ),
+              'JweService: background JWKS refresh',
+            );
           }
           return;
         } on Object catch (e) {
-          AppLogger.w('JweService: Failed to parse cached JWKS time', e);
+          AppLogger.e('JweService: Failed to parse cached JWKS time', e);
         }
       }
 
@@ -165,13 +174,22 @@ class JweService {
   JsonWebKey _getSanitizedServerKey(JsonWebKey key) {
     final rawJson = key.toJson();
 
+    // Ensure the server key has the required RSA parameters. If the server
+    // provides an unexpected key shape, fail fast instead of constructing a
+    // potentially invalid JWK which could cause subtle crypto errors later.
+    final n = rawJson['n'] as String?;
+    final e = rawJson['e'] as String?;
+    if (n == null || n.isEmpty || e == null || e.isEmpty) {
+      throw Exception('Server JWK missing RSA modulus or exponent.');
+    }
+
     return JsonWebKey.fromJson({
       'kty': 'RSA',
-      'n': rawJson['n'],
-      'e': rawJson['e'],
+      'n': n,
+      'e': e,
       if (rawJson['kid'] != null) 'kid': rawJson['kid'],
-      // Notice: We completely omit 'alg', 'use', and 'key_ops'.
-      // The library can no longer reject it for operation mismatches.
+      // Notice: We deliberately omit 'alg', 'use', and 'key_ops' to avoid
+      // rejecting the key for operation mismatches while preserving the kid.
     });
   }
 

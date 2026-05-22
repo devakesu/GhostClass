@@ -191,10 +191,12 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     if (current == null || !current.hasNextPage || _isFetchingNextPage) return;
 
     _isFetchingNextPage = true;
+    final page = _currentPage + 1;
     try {
-      _currentPage++;
-      // We don't set state to loading to avoid full-screen spinner.
-      final nextState = await _fetchNextPage(page: _currentPage);
+      final nextState = await _fetchNextPage(page: page);
+      // Only advance the current page after a successful fetch to avoid
+      // skipping pages when a network call fails.
+      _currentPage = page;
       state = AsyncValue.data(nextState);
     } finally {
       _isFetchingNextPage = false;
@@ -287,7 +289,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .from('notification')
           .update({'is_read': newIsRead})
           .eq('id', id);
-    } catch (e) {
+    } on Object catch (_) {
       state = AsyncValue.data(previousState);
       rethrow;
     }
@@ -346,7 +348,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .update({'is_read': true})
           .eq('auth_user_id', userId)
           .eq('is_read', false);
-    } catch (e) {
+    } on Object catch (_) {
       state = AsyncValue.data(previousState);
       rethrow;
     }

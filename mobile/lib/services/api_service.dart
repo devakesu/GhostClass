@@ -61,7 +61,11 @@ class ApiService {
     String supabaseToken, {
     bool sync = false,
     bool force = false,
-  }) => _auth.refreshProfile(supabaseToken, sync: sync, force: force);
+  }) => _auth.refreshProfile(
+    supabaseToken,
+    sync: sync,
+    force: force,
+  );
 
   Future<Response<dynamic>> syncMobileAuth(String supabaseToken) =>
       _auth.syncMobileAuth(supabaseToken);
@@ -179,18 +183,28 @@ class ApiService {
         _lastSyncTime = DateTime.now();
         return response;
       } on Object catch (e) {
-        AppLogger.w('ApiService: Background sync failed', e);
-        // Return a mock 304 to let downstream continue without hanging
-        return Response<dynamic>(
-          requestOptions: RequestOptions(path: 'sync'),
-          statusCode: 304,
-        );
+        AppLogger.e('ApiService: Background sync failed', e);
+        rethrow;
       } finally {
         _syncInFlight = null;
       }
     }();
 
     return _syncInFlight!;
+  }
+
+  /// Schedule a background sync safely. This wraps [triggerSync] and ensures
+  /// any thrown errors are logged and do not bubble to callers that intended
+  /// to run sync in a fire-and-forget manner.
+  Future<void> scheduleSync(
+    String supabaseToken, {
+    bool force = false,
+  }) async {
+    try {
+      await triggerSync(supabaseToken, force: force);
+    } on Object catch (e, st) {
+      AppLogger.e('ApiService: Background scheduled sync failed', e, st);
+    }
   }
 
   Future<Response<dynamic>> addCourse({
@@ -205,6 +219,25 @@ class ApiService {
       data: {
         'courseCode': courseCode,
         'courseName': courseName,
+        'semester': semester,
+        'academicYear': academicYear,
+      },
+      options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
+    );
+  }
+
+  Future<Response<dynamic>> upsertInstructor({
+    required String courseCode,
+    required String instructorName,
+    required String semester,
+    required String academicYear,
+    required String supabaseToken,
+  }) async {
+    return client.post(
+      '${AppConfig.ghostclassApiUrl}/instructors/upsert',
+      data: {
+        'courseCode': courseCode,
+        'instructorName': instructorName,
         'semester': semester,
         'academicYear': academicYear,
       },

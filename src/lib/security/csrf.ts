@@ -76,6 +76,14 @@ async function getSessionIdFromCookie(): Promise<string | null> {
     }
   }
 
+  // M-4: Also support Supabase-SSR auth cookies (starts with "sb-" and ends with "-auth-token")
+  const allCookies = cookieStore.getAll();
+  for (const cookie of allCookies) {
+    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
+      return cookie.value;
+    }
+  }
+
   return null;
 }
 
@@ -158,15 +166,17 @@ export async function validateCsrfToken(requestToken: string | null | undefined)
       Buffer.from(requestToken)
     );
   } catch (_error) {
-    // timingSafeEqual throws RangeError if buffers have different lengths.
-    // Treat any error as a failed comparison without exposing timing details.
-    // Log sanitized error for debugging in development only (avoid exposing info in production logs)
-    if (!IS_PRODUCTION) {
-      logger.error("CSRF token validation failed", {
-        errorType: _error instanceof Error ? _error.name : 'unknown',
-      });
+    // L-5: timingSafeEqual throws RangeError if buffers have different lengths.
+    // Catch RangeError specifically; let other unexpected failures propagate.
+    if (_error instanceof RangeError) {
+      if (!IS_PRODUCTION) {
+        logger.error("CSRF token validation failed", {
+          errorType: _error.name,
+        });
+      }
+      return false;
     }
-    return false;
+    throw _error;
   }
 }
 

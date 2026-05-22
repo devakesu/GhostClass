@@ -5,6 +5,7 @@ import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/widgets/common/pill.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TrackingSubjectPicker extends ConsumerWidget {
@@ -74,7 +75,7 @@ class TrackingSubjectPicker extends ConsumerWidget {
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      _PickerChip(
+                      SelectablePill(
                         label: 'All Subjects',
                         count: groupedByCourse.values.fold(
                           0,
@@ -117,14 +118,14 @@ class TrackingSubjectPicker extends ConsumerWidget {
                           officialReport: officialReport,
                         );
                         final count = groupedByCourse[key]?.length ?? 0;
-                        return _PickerChip(
+                        return SelectablePill(
                           label: isDisabled ? '$label (Disabled)' : label,
                           count: count,
                           isSelected: isSelected,
-                          isDisabled: isDisabled,
                           onTap: () => onSelected(key),
                           primary: primary,
                           surface: surface,
+                          isDisabled: isDisabled,
                         );
                       }),
                     ],
@@ -140,100 +141,4 @@ class TrackingSubjectPicker extends ConsumerWidget {
   }
 }
 
-class _PickerChip extends StatelessWidget {
-  const _PickerChip({
-    required this.label,
-    required this.count,
-    required this.isSelected,
-    required this.onTap,
-    required this.primary,
-    required this.surface,
-    this.isDisabled = false,
-  });
-  final String label;
-  final int count;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color primary;
-  final Color surface;
-
-  final bool isDisabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? primary : surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? primary.withValues(alpha: isDark ? 0.35 : 0.8)
-                : isDisabled
-                ? Theme.of(context).colorScheme.outlineVariant.withValues(
-                    alpha: isDark ? 0.2 : 0.1,
-                  )
-                : Theme.of(context).colorScheme.outlineVariant.withValues(
-                    alpha: isDark ? 0.25 : 0.35,
-                  ),
-          ),
-          boxShadow: isSelected && !isDark
-              ? [
-                  BoxShadow(
-                    color: primary.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                  fontStyle: isDisabled ? FontStyle.italic : FontStyle.normal,
-                  color: isSelected
-                      ? Colors.white
-                      : isDisabled
-                      ? Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.3)
-                      : Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                count.toString(),
-                style: GoogleFonts.manrope(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// Replaced by shared SelectablePill in widgets/common/pill.dart

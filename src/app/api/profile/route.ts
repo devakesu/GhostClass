@@ -10,9 +10,9 @@ import { getClientIp } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
-import { toTitleCase } from "@/lib/utils";
 import { performProfileSync } from "@/lib/user/sync";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
+import { birthDateSchema, genderSchema, optionalPersonNameSchema, personNameSchema } from "@/lib/validation/text";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +63,14 @@ async function authenticateUser(req: NextRequest, supabaseAdmin: ReturnType<type
   return authUser;
 }
 
-async function ingestNewProfile(user: { id: string }): Promise<NextResponse> {
+async function ingestNewProfile(
+  user: { id: string },
+): Promise<NextResponse> {
   const token = await getAuthTokenWithFallback(user.id);
   if (!token) return NextResponse.json({ error: "No token" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
   try {
-    const syncResult = await performProfileSync(token, "", user.id);
+    const syncResult = await performProfileSync(token, "", user.id, true);
     const bundle = await getProfileBundle(user.id, syncResult?.academic);
     if (!bundle) return NextResponse.json({ error: "Profile not found after ingestion" }, { status: 404 });
     return NextResponse.json(bundle);
@@ -117,7 +119,7 @@ async function performSyncAndFetchUser(
   userId: string,
   existingUser: ExistingUserRawType,
   isDebounced: boolean,
-  supabaseAdmin: ReturnType<typeof getAdminClient>
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<{
   updatedUser: ExistingUserRawType;
   syncResult: { academic?: { current_semester?: string | null; current_year?: string | null } } | null;
@@ -142,7 +144,7 @@ async function loadExistingUserBundle(
   userId: string,
   shouldSync: boolean,
   isDebounced: boolean,
-  supabaseAdmin: ReturnType<typeof getAdminClient>
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<NextResponse> {
   let existingUser = existingUserRaw;
   let resolvedToken: string | null = null;
@@ -171,7 +173,7 @@ async function loadExistingUserBundle(
       }
       if (!syncToken) return;
       try {
-        await performProfileSync(syncToken, String(existingUser.id), userId);
+        await performProfileSync(syncToken, String(existingUser.id), userId, true);
       } catch (err) { 
         logger.warn("Profile background sync failed", err); 
       }
@@ -222,7 +224,6 @@ const getHandler = async (req: NextRequest) => {
   const searchParams = req.nextUrl.searchParams;
   const shouldSync = searchParams.get("sync") === "true";
   const force = searchParams.get("force") === "true";
-
   if (existingUserRaw && existingUserRaw.first_name) {
     const lastSyncedAtStr = existingUserRaw.last_synced_at as string | null | undefined;
     const lastSyncedAt = lastSyncedAtStr ? new Date(lastSyncedAtStr) : new Date(0);
@@ -236,18 +237,19 @@ const getHandler = async (req: NextRequest) => {
 };
 
 const patchSchema = z.object({
-  first_name: z.string().min(2),
-  last_name: z.string().optional().nullable(),
-  gender: z.enum(["male", "female", "other"]).optional().nullable(),
-  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  first_name: personNameSchema.optional(),
+  last_name: optionalPersonNameSchema.optional(),
+  gender: genderSchema.optional().nullable(),
+  birth_date: birthDateSchema.optional().nullable(),
+  class_id: z.string().uuid().optional().nullable(),
 });
 
 function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
-  const { first_name, last_name, gender, birth_date } = parsedData;
-  const sanitizedFirstName = toTitleCase(first_name);
-  const sanitizedLastName = last_name ? toTitleCase(last_name) : null;
-  
-  const up: Record<string, unknown> = { first_name: sanitizedFirstName, last_name: sanitizedLastName };
+  const { first_name, last_name, gender, birth_date, class_id } = parsedData;
+  const up: Record<string, unknown> = {};
+  if (first_name !== undefined) up.first_name = first_name;
+  if (last_name !== undefined) up.last_name = last_name;
+  if (class_id !== undefined) up.class_id = class_id;
   if (gender !== undefined) {
     if (gender === null) {
       up.gender = null;
@@ -268,10 +270,17 @@ function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
       up.birth_date_iv = enc.iv;
     }
   }
-  return { up, sanitizedFirstName, sanitizedLastName, gender, birth_date };
+  return { up, first_name, last_name, gender, birth_date, class_id };
 }
 
 const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) => {
+  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    const originErr = validateRequestOrigin(req);
+    if (originErr) return originErr;
+  }
+
   const ip = getClientIp(req.headers);
   if (!ip) {
     return NextResponse.json(
@@ -314,7 +323,7 @@ const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
 
-  const { up, sanitizedFirstName, sanitizedLastName, gender, birth_date } = buildUpdatePayload(parsed.data);
+  const { up, first_name, last_name, gender, birth_date, class_id } = buildUpdatePayload(parsed.data);
 
   const { error: updateError } = await supabaseAdmin.from("users").update(up).eq("auth_id", user.id);
   if (updateError) {
@@ -324,7 +333,7 @@ const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody
     });
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
-  return NextResponse.json({ first_name: sanitizedFirstName, last_name: sanitizedLastName, gender, birth_date });
+  return NextResponse.json({ first_name, last_name, gender, birth_date, class_id });
 };
 
 export const GET = withSecurity(getHandler);

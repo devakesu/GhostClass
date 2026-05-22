@@ -51,7 +51,9 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   });
   
   const { data: coursesData } = useFetchCourses({ 
-    enabled: isOpen 
+    enabled: isOpen,
+    semester: selectedSemester ?? undefined,
+    year: selectedYear ?? undefined,
   });
 
   // Handle local success, then bubble up

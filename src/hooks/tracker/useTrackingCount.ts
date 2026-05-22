@@ -50,7 +50,7 @@ export function useTrackingCount(
 
       return count ?? 0;
     },
-    enabled: !!user?.username,
+    enabled: !!user?.username && !!semesterData && !!academicYearData,
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,

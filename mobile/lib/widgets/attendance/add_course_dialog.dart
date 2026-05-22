@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
@@ -49,7 +51,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
 
       final res = await api.addCourse(
         courseCode: _codeController.text.trim().toUpperCase(),
-        courseName: _nameController.text.trim(),
+        courseName: _nameController.text.trim().replaceAll(RegExp(r'\s+'), ' '),
         semester: widget.semester,
         academicYear: widget.academicYear,
         supabaseToken: supabaseToken,
@@ -68,12 +70,17 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       );
 
       // Refresh dashboard
-      ref.invalidate(dashboardProvider);
+      await ref.read(dashboardProvider.notifier).refreshAfterCourseAdded();
 
+      if (!mounted) return;
       Navigator.pop(context);
     } on Object catch (e) {
       if (!mounted) return;
-      ServiceToast.show(context, e.toString(), isError: true);
+      ServiceToast.show(
+        context,
+        formatApiError(e, 'adding course'),
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -190,7 +197,16 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   label: 'Course Name',
                   controller: _nameController,
                   hint: 'Data Structures & Algorithms',
-                  validator: (v) => v!.isEmpty ? 'Name is required' : null,
+                  validator: (v) {
+                    final value = v?.trim() ?? '';
+                    if (value.length < 2) return 'Min 2 characters';
+                    if (value.length > 100) return 'Max 100 characters';
+                    if (!utils.isValidCourseName(value)) {
+                      return 'Course name contains invalid characters';
+                    }
+                    return null;
+                  },
+                  textCapitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 32),
 

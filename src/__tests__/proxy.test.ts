@@ -36,7 +36,7 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
   });
 
-  it("redirects to / and clears session cookies (but preserves csrf_token)", async () => {
+  it("redirects to / and clears session cookies", async () => {
     const request = new NextRequest("http://localhost/dashboard");
     const response = await proxy(request);
 
@@ -57,10 +57,7 @@ describe("proxy – Scenario A: unauthenticated user on protected route", () => 
     expect(isDeleted("ezygo_access_token")).toBe(true);
     expect(isDeleted("terms_version")).toBe(true);
     expect(isDeleted("terms_redirect_count")).toBe(true);
-    // csrf_token is intentionally NOT cleared on unauthenticated redirects — only on
-    // explicit logout. Clearing it here would break the login flow when the 30-minute
-    // per-tab throttle in useCSRFToken is still active (cookie gone, sessionStorage stale).
-    expect(isDeleted("csrf_token")).toBe(false);
+    expect(isDeleted("csrf_token")).toBe(true);
   });
 });
 

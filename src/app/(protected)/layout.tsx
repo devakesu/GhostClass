@@ -4,15 +4,10 @@ import { Navbar } from "@/components/layout/private-navbar";
 import { Footer } from "@/components/layout/footer";
 import { useInstitutions } from "@/hooks/users/institutions";
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/toaster";
 import { LazyMotion, domAnimation, m as motion, useScroll } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { createClient } from "@/lib/supabase/client";
-import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
-import { logger } from "@/lib/logger";
-import * as Sentry from "@sentry/nextjs";
 import { useCSRFToken } from "@/hooks/use-csrf-token";
 import { OutageProvider } from "@/providers/outage-provider";
 
@@ -21,7 +16,6 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   // IMPORTANT — No loading state is tracked here.
   //
   // The server middleware (proxy.ts) already verified the Supabase session
@@ -35,7 +29,7 @@ export default function ProtectedLayout({
   const { scrollY } = useScroll();
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
-  const supabaseRef = useRef(createClient());
+  const isHiddenRef = useRef(false);
 
   // Initialize CSRF token
   useCSRFToken();
@@ -48,9 +42,11 @@ export default function ProtectedLayout({
           const shouldHide = latest > previous && latest > 150;
           const shouldShow = latest <= previous || latest <= 150;
           
-          if (shouldHide && !isHidden) {
+          if (shouldHide && !isHiddenRef.current) {
+            isHiddenRef.current = true;
             setIsHidden(true);
-          } else if (shouldShow && isHidden) {
+          } else if (shouldShow && isHiddenRef.current) {
+            isHiddenRef.current = false;
             setIsHidden(false);
           }
           
@@ -64,7 +60,7 @@ export default function ProtectedLayout({
     return () => {
       unsubscribe();
     };
-  }, [scrollY, isHidden]);
+  }, [scrollY]);
 
   // useInstitutions is also called inside <Navbar>; React Query deduplicates the
   // network request so there is no extra fetch here. We only subscribe to it at
@@ -75,51 +71,15 @@ export default function ProtectedLayout({
   useInstitutions();
 
   useEffect(() => {
-    let active = true;
-
-    const checkUser = async () => {
-      try {
-        const { data: { user }, error } = await supabaseRef.current.auth.getUser();
-        // Handle auth session missing errors — force full logout to clear cookies/storage
-        if (error && isAuthSessionMissingError(error)) {
-          active = false;
-          await handleLogout();
-          return;
-        }
-        if (error) throw error;
-
-        // No Supabase user means the session is gone — force full logout so httpOnly
-        // cookies (ezygo_access_token, CSRF) and client storage are properly cleared
-        if (!user) {
-          active = false;
-          await handleLogout();
-          return;
-        }
-
-        // At this point, Supabase has confirmed a valid user session.
-      } catch (err) {
-        if (!active) return;
-        // Log the error for debugging, then attempt logout
-        logger.error("Auth check failed:", err instanceof Error ? err.message : String(err));
-        Sentry.captureException(err, {
-          tags: { type: "client_auth_check_failure", location: "protected/layout" },
-        });
-        try {
-          await handleLogout();
-        } catch (logoutErr) {
-          // If logout also fails, force navigation to login page
-          logger.error("Logout failed after auth check error:", logoutErr instanceof Error ? logoutErr.message : String(logoutErr));
-          router.replace("/");
-        }
-      }
-    };
-
-    checkUser();
-    
-    return () => { 
-      active = false;
-    };
-  }, [router]); 
+    // No client-side auth gate here.
+    //
+    // The server middleware (`proxy.ts`) already validates the Supabase
+    // session before this layout renders. On local dev, the browser-side
+    // Supabase client can temporarily report no user immediately after login
+    // even when the server session is valid, which caused an unwanted logout.
+    // We keep the client session code out of the critical path and let the
+    // server remain the source of truth.
+  }, []);
 
   return (
     <ErrorBoundary>

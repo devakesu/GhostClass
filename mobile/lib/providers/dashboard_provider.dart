@@ -14,6 +14,7 @@ import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class DashboardData {
@@ -140,7 +141,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           }
         }
       } on Object catch (e) {
-        AppLogger.w('DashboardNotifier: Error loading disk cache', e);
+        AppLogger.e('DashboardNotifier: Error loading disk cache', e);
       }
     }
 
@@ -177,8 +178,19 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         _lastAcademic == academic) {
       if (_needsRevalidate) {
         _needsRevalidate = false;
-        unawaited(
-          Future.microtask(() => _silentRevalidate(trackingList, academic)),
+        AppLogger.safeUnawait(
+          Future.microtask(
+            () => _silentRevalidate(trackingList, academic),
+          ).catchError(
+            (Object e, StackTrace st) {
+              AppLogger.e(
+                'DashboardNotifier: Silent revalidate failed',
+                e,
+                st,
+              );
+            },
+          ),
+          'DashboardNotifier: silent revalidate',
         );
       }
 
@@ -300,23 +312,26 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       if (user != null) {
         final cacheKeySuffix =
             '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_courses_$cacheKeySuffix',
             _cachedCourses!.map((c) => c.toJson()).toList(),
           ),
+          'Dashboard: save courses cache',
         );
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_attendance_$cacheKeySuffix',
             _cachedAttendance!.toJson(),
           ),
+          'Dashboard: save attendance cache',
         );
-        unawaited(
+        AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_instructors_$cacheKeySuffix',
             _cachedInstructors!.map((i) => i.toJson()).toList(),
           ),
+          'Dashboard: save instructors cache',
         );
       }
 
@@ -327,7 +342,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         academic,
         sharedInstructors,
       );
-    } catch (e) {
+    } on Object catch (e) {
       AppLogger.e('DashboardNotifier: Server fetch failed', e);
       rethrow;
     }
@@ -513,9 +528,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   ) async {
     try {
       final freshData = await _fetchAndProcess(tracking, academic, null);
-      state = AsyncValue.data(freshData);
+      final currentAcademic = ref.read(academicProvider).value;
+      if (academic == currentAcademic) {
+        state = AsyncValue.data(freshData);
+      } else {
+        AppLogger.i(
+          'DashboardNotifier: Discarded stale silent revalidation for '
+          '${academic.semester} ${academic.year} (current: ${currentAcademic?.semester} ${currentAcademic?.year})',
+        );
+      }
     } on Object catch (e) {
-      AppLogger.w(
+      AppLogger.e(
         'DashboardNotifier: Silent background revalidation failed',
         e,
       );
@@ -525,42 +548,53 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   Future<void> refresh() async {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
-    final api = ref.read(apiServiceProvider);
-    final supabaseToken = ref
-        .read(supabaseClientProvider)
-        .auth
-        .currentSession
-        ?.accessToken;
 
     // 0. Set local loading state
     state = const AsyncValue.loading();
 
-    if (user != null && supabaseToken != null) {
-      // 1. Trigger the server-side sync (this updates the database)
-      // We await this to ensure the server has latest data before we fetch it back
-      await api.triggerSync(supabaseToken, force: true);
+    Object? refreshError;
+    StackTrace? refreshStackTrace;
 
-      // 2. Fetch the fresh profile from the server
-      await ref.read(authProvider.notifier).refreshProfile(force: true);
-
-      // Clear disk cache for current user/term so refresh is guaranteed fresh
-      final storage = ref.read(secureStorageProvider);
-      final academicAsync = ref.read(academicProvider);
-      final academic = academicAsync.value;
-      if (academic != null) {
-        final suffix =
-            '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-        await Future.wait([
-          storage.deleteCachedData('dashboard_courses_$suffix'),
-          storage.deleteCachedData('dashboard_attendance_$suffix'),
-          storage.deleteCachedData('dashboard_instructors_$suffix'),
-        ]);
+    if (user != null) {
+      try {
+        await runUnifiedPullToRefresh(
+          logLabel: 'DashboardNotifier',
+          refreshProfile: () =>
+              ref.read(authProvider.notifier).refreshProfile(force: true),
+          syncCron: () async {
+            final supabaseToken = ref
+                .read(supabaseClientProvider)
+                .auth
+                .currentSession
+                ?.accessToken;
+            if (supabaseToken == null) return;
+            await ref
+                .read(apiServiceProvider)
+                .triggerSync(supabaseToken, force: true);
+          },
+          refreshData: () => ref.read(trackingProvider.notifier).refresh(),
+        );
+      } on Object catch (e, st) {
+        AppLogger.e('DashboardNotifier: refresh coordinator failed', e, st);
+        refreshError = e;
+        refreshStackTrace = st;
+      } finally {
+        // Clear disk cache even when refresh fails so the next launch or retry
+        // cannot silently reuse stale dashboard data.
+        final storage = ref.read(secureStorageProvider);
+        final academicAsync = ref.read(academicProvider);
+        final academic = academicAsync.value;
+        if (academic != null) {
+          final suffix =
+              '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+          await Future.wait([
+            storage.deleteCachedData('dashboard_courses_$suffix'),
+            storage.deleteCachedData('dashboard_attendance_$suffix'),
+            storage.deleteCachedData('dashboard_instructors_$suffix'),
+          ]);
+        }
       }
     }
-
-    // 3. Refresh Tracking (Official Report + Tracker Records)
-    // We don't need forceSync: true here because we already triggered it above
-    await ref.read(trackingProvider.notifier).refresh();
 
     // 4. Force a rebuild of the dashboard with fresh data
     // We clear local caches to ensure we don't return stale combined data
@@ -570,17 +604,86 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     _lastAcademic = null;
     _needsRevalidate = true;
 
-    state = await AsyncValue.guard(() async {
-      final academicAsync = ref.read(academicProvider);
-      final academic = academicAsync.value;
-      if (academic == null) throw Exception('No academic context');
+    ref.invalidateSelf();
+    await future;
 
-      final trackingState = await ref.read(trackingProvider.future);
-      final tracking = trackingState.groupedByCourse.values
-          .expand((e) => e)
-          .toList();
-      return _fetchAndProcess(tracking, academic, trackingState.officialReport);
-    });
+    if (refreshError != null) {
+      Error.throwWithStackTrace(
+        refreshError,
+        refreshStackTrace ?? StackTrace.current,
+      );
+    }
+  }
+
+  Future<void> refreshAfterCourseAdded() async {
+    final user = ref.read(authProvider).value;
+    final academic = ref.read(academicProvider).value;
+    if (user != null && academic != null) {
+      final storage = ref.read(secureStorageProvider);
+      final suffix =
+          '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+      await storage.deleteCachedData('dashboard_courses_$suffix');
+    }
+    _cachedCourses = null;
+    _needsRevalidate = true;
+    ref.invalidateSelf();
+    await future;
+  }
+
+  Future<void> updateLocalInstructor(
+    String courseCode,
+    String instructorName,
+  ) async {
+    final user = ref.read(authProvider).value;
+    final academic = ref.read(academicProvider).value;
+    if (user == null || academic == null) return;
+
+    final stdCode = courseCode.toUpperCase().replaceAll(' ', '');
+
+    // 1. Update in-memory cache
+    final updatedList = List<CourseInstructor>.from(_cachedInstructors ?? []);
+    final index = updatedList.indexWhere(
+      (i) => i.courseCode.toUpperCase().replaceAll(' ', '') == stdCode,
+    );
+
+    final updatedInstructor = CourseInstructor(
+      courseCode: courseCode,
+      instructorName: instructorName,
+    );
+
+    if (index >= 0) {
+      updatedList[index] = updatedInstructor;
+    } else {
+      updatedList.add(updatedInstructor);
+    }
+    _cachedInstructors = updatedList;
+
+    // 2. Persist to disk cache
+    final storage = ref.read(secureStorageProvider);
+    final cacheKeySuffix =
+        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    await storage.saveCachedData(
+      'dashboard_instructors_$cacheKeySuffix',
+      updatedList.map((i) => i.toJson()).toList(),
+    );
+
+    // 3. Update active Riverpod state if it has data
+    if (state.hasValue) {
+      final currentData = state.value!;
+      state = AsyncValue.data(
+        DashboardData(
+          courses: currentData.courses,
+          attendance: currentData.attendance,
+          tracking: currentData.tracking,
+          stats: currentData.stats,
+          selectedSemester: currentData.selectedSemester,
+          selectedYear: currentData.selectedYear,
+          instructors: updatedList,
+          className: currentData.className,
+          disabledCodes: currentData.disabledCodes,
+        ),
+      );
+    }
   }
 
   Future<void> setSemester(String sem) async {

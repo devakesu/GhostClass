@@ -10,6 +10,7 @@ export interface SendEmailProps {
   html: string;
   text?: string;
   replyTo?: string;
+  fromName?: string;
   toName?: string;
 }
 
@@ -35,6 +36,8 @@ const getSenderEmail = () => {
   }
   return 'admin@' + appEmail.replace(/^@/, '');
 };
+
+const getSenderName = (fromName?: string) => fromName?.trim() || process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass';
 
 const CONFIG = {
   get sender() {
@@ -72,12 +75,16 @@ async function getSendPulseToken() {
     const data = await res.json();
     return data.access_token;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(`SendPulse Auth Failed: ${msg}`);
+    if (error instanceof Error) {
+      const wrapped = new Error(`SendPulse Auth Failed: ${error.message}`);
+      (wrapped as Error & { cause?: unknown }).cause = error;
+      throw wrapped;
+    }
+    throw new Error(`SendPulse Auth Failed: ${String(error)}`);
   }
 }
 
-async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
@@ -87,7 +94,10 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: Se
         html: Buffer.from(html).toString("base64"), 
         text: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
         subject,
-        from: CONFIG.sender,
+        from: {
+          email: CONFIG.sender.email,
+          name: getSenderName(fromName),
+        },
         to: [{ email: to, name: toName || "User" }],
         ...(replyTo ? { reply_to: { email: replyTo } } : {}),
       },
@@ -108,17 +118,22 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, toName }: Se
     const data = await res.json() as { id?: string };
     return { success: true, provider: "SendPulse", id: data.id };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(msg);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
 }
 
-async function sendViaBrevo({ to, subject, html, text, replyTo, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaBrevo({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
     const payload = {
-      sender: CONFIG.sender,
+      sender: {
+        email: CONFIG.sender.email,
+        name: getSenderName(fromName),
+      },
       to: [{ email: to, ...(toName ? { name: toName } : {}) }],
       subject,
       htmlContent: html,
@@ -142,8 +157,10 @@ async function sendViaBrevo({ to, subject, html, text, replyTo, toName }: SendEm
     const data = await res.json() as { messageId?: string };
     return { success: true, provider: "Brevo", id: data.messageId };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(msg);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
 }
 
@@ -162,50 +179,73 @@ async function executeFailover(
   secondary: ProviderFn,
   props: SendEmailProps,
   sName: "Brevo" | "SendPulse",
-  errMsg: string
+  err: unknown
 ): Promise<ProviderResult> {
+  const errMsg = err instanceof Error ? err.message : String(err);
   try {
     return await secondary(props);
   } catch (err2: unknown) {
     const err2Msg = err2 instanceof Error ? err2.message : String(err2);
     const msg = `All providers failed. P: ${errMsg} | S: ${err2Msg}`;
     logger.error(msg);
-    Sentry.captureException(new Error(msg), {
+    Sentry.captureException(err2 instanceof Error ? err2 : new Error(msg), {
       tags: { type: "email_critical" },
-      extra: { to: redact("email", props.to) }
+      extra: {
+        to: redact("email", props.to),
+        primary_error: errMsg,
+        secondary_error: err2Msg,
+      }
     });
     return { success: false, provider: sName, error: msg };
   }
 }
 
-export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
-  const useSP = shouldUseSendPulse();
-  const primary: ProviderFn = useSP ? sendViaSendPulse : sendViaBrevo;
-  let secondary: ProviderFn | null = null;
-  if (hasBrevo && hasSendPulse) {
-    secondary = useSP ? sendViaBrevo : sendViaSendPulse;
-  }
-  const pName: "SendPulse" | "Brevo" = useSP ? "SendPulse" : "Brevo";
-  const sName: "Brevo" | "SendPulse" = useSP ? "Brevo" : "SendPulse";
+interface ProvidersConfig {
+  primary: ProviderFn;
+  secondary: ProviderFn | null;
+  pName: "SendPulse" | "Brevo";
+  sName: "Brevo" | "SendPulse";
+}
 
+function getProviders(useSP: boolean): ProvidersConfig {
+  if (useSP) {
+    return {
+      primary: sendViaSendPulse,
+      secondary: hasBrevo ? sendViaBrevo : null,
+      pName: "SendPulse",
+      sName: "Brevo",
+    };
+  }
+  return {
+    primary: sendViaBrevo,
+    secondary: hasSendPulse ? sendViaSendPulse : null,
+    pName: "Brevo",
+    sName: "SendPulse",
+  };
+}
+
+export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo && !hasSendPulse) {
     const err = new Error("No provider");
     Sentry.captureException(err, { tags: { location: "sendEmail" } });
     throw err;
   }
 
+  const useSP = shouldUseSendPulse();
+  const { primary, secondary, pName, sName } = getProviders(useSP);
+
   try {
     return await primary(props);
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    logger.warn(`${pName} failed:`, errMsg);
+    logger.warn(`${pName} failed:`, err instanceof Error ? err : errMsg);
     Sentry.captureMessage(`Failover: ${pName} failed`, {
       level: "warning",
       tags: { provider: pName, location: "sendEmail" },
     });
 
     if (secondary) {
-      return await executeFailover(secondary, props, sName, errMsg);
+      return await executeFailover(secondary, props, sName, err);
     }
     return { success: false, provider: pName, error: errMsg };
   }

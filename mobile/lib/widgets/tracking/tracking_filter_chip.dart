@@ -46,8 +46,9 @@ class TrackingFilterChip extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Filter by $label ${isFiltered ? "active filter" : "unfiltered"}',
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -97,14 +98,22 @@ class TrackingFilterChip extends StatelessWidget {
                 Semantics(
                   button: true,
                   label: 'Clear filter $label',
-                  child: GestureDetector(
-                    onTap: onClear,
-                    child: Icon(
-                      LucideIcons.x,
-                      size: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.2),
+                  child: Semantics(
+                    button: true,
+                    label: 'Clear filter $label',
+                    child: InkWell(
+                      onTap: onClear,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          LucideIcons.x,
+                          size: 14,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.2),
+                        ),
+                      ),
                     ),
                   ),
                 ),

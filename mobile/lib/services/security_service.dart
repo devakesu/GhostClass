@@ -32,6 +32,7 @@ class SecurityService {
   SecurityService(this._ref);
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
+  static const Duration _cachedAttestationMaxAge = Duration(hours: 6);
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
@@ -64,28 +65,47 @@ class SecurityService {
         final map = jsonDecode(cachedRaw) as Map<String, dynamic>;
         final latestVersion = map['latestVersion'] as String;
         final minVersion = map['minVersion'] as String;
+        final cachedAt = DateTime.tryParse(map['cachedAt'] as String? ?? '');
         final currentVersion = AppConfig.appVersion;
+        final isFreshCache =
+            cachedAt != null &&
+            DateTime.now().difference(cachedAt) <= _cachedAttestationMaxAge;
 
-        // Dynamically recompute update flags based on the currently running app version.
-        // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
-        // on the first open after an update.
-        final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
-        final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
+        if (isFreshCache) {
+          // Dynamically recompute update flags based on the currently running app version.
+          // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
+          // on the first open after an update.
+          final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
+          final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
 
-        final cachedResult = AppVersionCheckResult(
-          latestVersion: latestVersion,
-          minVersion: minVersion,
-          hasUpdate: hasUpdate,
-          isForceUpdate: isForceUpdate,
+          final cachedResult = AppVersionCheckResult(
+            latestVersion: latestVersion,
+            minVersion: minVersion,
+            hasUpdate: hasUpdate,
+            isForceUpdate: isForceUpdate,
+          );
+
+          // Run background verification asynchronously
+          AppLogger.safeUnawait(
+            _runBackgroundIntegrityCheck().catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'SecurityService: Background integrity check failed',
+                e,
+                st,
+              ),
+            ),
+            'SecurityService: background integrity check',
+          );
+
+          AppLogger.d('SecurityService: Returned cached attestation check.');
+          return cachedResult;
+        }
+
+        AppLogger.i(
+          'SecurityService: Cached attestation is stale; refreshing.',
         );
-
-        // Run background verification asynchronously
-        unawaited(_runBackgroundIntegrityCheck());
-
-        AppLogger.d('SecurityService: Returned cached attestation check.');
-        return cachedResult;
       } on Object catch (e) {
-        AppLogger.w('SecurityService: Failed to parse cached attestation', e);
+        AppLogger.e('SecurityService: Failed to parse cached attestation', e);
       }
     }
 
@@ -105,11 +125,12 @@ class SecurityService {
         'minVersion': result.minVersion,
         'hasUpdate': result.hasUpdate,
         'isForceUpdate': result.isForceUpdate,
+        'cachedAt': DateTime.now().toIso8601String(),
       };
       await storage.saveAttestationResult(jsonEncode(map));
       AppLogger.d('SecurityService: Cached attestation check result.');
     } on Object catch (e) {
-      AppLogger.w('SecurityService: Failed to write attestation cache', e);
+      AppLogger.e('SecurityService: Failed to write attestation cache', e);
     }
   }
 
@@ -137,7 +158,7 @@ class SecurityService {
               source: 'BackgroundAttestation',
             );
       } else {
-        AppLogger.w(
+        AppLogger.e(
           'SecurityService: Background check AppException ignored',
           e,
         );
@@ -170,6 +191,11 @@ class SecurityService {
               'Please ensure you are using a genuine version of GhostClass from the Play Store.';
           final criticalRisk = data['criticalRisk'] == true;
 
+          AppLogger.e(
+            'SecurityService: Integrity verification failed. Reason: $reason',
+            Exception(reason),
+          );
+
           throw AppException(
             message: reason,
             type: AppExceptionType.unauthorized,
@@ -194,6 +220,10 @@ class SecurityService {
         final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
         final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
 
+        AppLogger.d(
+          'SecurityService: Integrity check passed. Current: $currentVersion, Latest: $latestVersion, Min: $minVersion',
+        );
+
         return AppVersionCheckResult(
           latestVersion: latestVersion,
           minVersion: minVersion,
@@ -201,6 +231,9 @@ class SecurityService {
           isForceUpdate: isForceUpdate,
         );
       } else {
+        AppLogger.e(
+          'SecurityService: Attestation endpoint returned ${response.statusCode}',
+        );
         throw const AppException(
           message: 'Security verification unavailable',
           type: AppExceptionType.server,
@@ -223,6 +256,14 @@ class SecurityService {
               data?['action'] ??
               'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';
 
+          final finalReason =
+              appCheckError ?? backendReason ?? 'App attestation failed';
+
+          AppLogger.e(
+            'SecurityService: Security verification failed with ${e.response?.statusCode}. Reason: $finalReason',
+            e,
+          );
+
           throw AppException(
             message: appCheckError != null
                 ? 'Device verification failed: $appCheckError'
@@ -231,8 +272,7 @@ class SecurityService {
             details: {
               ...?data,
               'type': 'security',
-              'reason':
-                  appCheckError ?? backendReason ?? 'App attestation failed',
+              'reason': finalReason,
               'appCheckError': appCheckError,
               'action': action,
             },

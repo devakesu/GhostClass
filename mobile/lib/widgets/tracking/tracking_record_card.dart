@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:ghostclass/widgets/common/pill.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -98,9 +99,9 @@ class TrackingRecordCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _Badge(label: typeLabel, color: typeColor),
+                  LabelPill(label: typeLabel, color: typeColor),
                   const SizedBox(height: 4),
-                  _Badge(
+                  LabelPill(
                     label: statusText,
                     color: _getStatusColor(context, record.attendance),
                   ),
@@ -229,33 +230,7 @@ class TrackingRecordCard extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(
-          alpha: Theme.of(context).brightness == Brightness.dark ? 0.15 : 0.1,
-        ),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: GoogleFonts.manrope(
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          color: color,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
+// Replaced by shared LabelPill in widgets/common/pill.dart
 
 class _DeleteButton extends StatelessWidget {
   const _DeleteButton({required this.onPressed});
@@ -266,8 +241,9 @@ class _DeleteButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Delete tracked event',
-      child: GestureDetector(
+      child: InkWell(
         onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(

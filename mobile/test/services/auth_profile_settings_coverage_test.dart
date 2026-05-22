@@ -63,6 +63,7 @@ void main() {
 
   group('AuthService Coverage', () {
     test('loginEzygo passes standard request data', () async {
+      Map<String, dynamic>? capturedData;
       when(
         () => mockDio.post<dynamic>(
           any(),
@@ -70,15 +71,43 @@ void main() {
           options: any(named: 'options'),
         ),
       ).thenAnswer(
-        (_) async => Response<dynamic>(
-          requestOptions: RequestOptions(path: '/auth'),
-          statusCode: 200,
-          data: {'token': 'ezygo_token'},
-        ),
+        (invocation) async {
+          capturedData =
+              invocation.namedArguments[#data] as Map<String, dynamic>?;
+          return Response<dynamic>(
+            requestOptions: RequestOptions(path: '/auth'),
+            statusCode: 200,
+            data: {'token': 'ezygo_token'},
+          );
+        },
       );
 
       final resp = await authService.loginEzygo('username', 'password');
       expect(resp.statusCode, 200);
+      expect(capturedData?['username'], 'username');
+      expect(capturedData?['password'], 'password');
+    });
+
+    test('loginEzygo preserves password whitespace', () async {
+      Map<String, dynamic>? capturedData;
+      when(
+        () => mockDio.post<dynamic>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((invocation) async {
+        capturedData =
+            invocation.namedArguments[#data] as Map<String, dynamic>?;
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/auth'),
+          statusCode: 200,
+          data: {'token': 'ezygo_token'},
+        );
+      });
+
+      await authService.loginEzygo('username', '  password  ');
+      expect(capturedData?['password'], '  password  ');
     });
 
     test('loginAndProvision handles successful path', () async {
@@ -172,6 +201,9 @@ void main() {
         when(
           () => mockStorage.getEzygoToken(),
         ).thenAnswer((_) async => 'stored_token');
+        when(
+          () => mockStorage.getNormalizedEzygoToken(),
+        ).thenAnswer((_) async => 'stored_token');
 
         await authService.refreshProfile('sub', sync: true);
         await authService.refreshProfile('sub');
@@ -189,6 +221,9 @@ void main() {
 
         // test getUser with null token
         when(() => mockStorage.getEzygoToken()).thenAnswer((_) async => null);
+        when(
+          () => mockStorage.getNormalizedEzygoToken(),
+        ).thenAnswer((_) async => null);
         await authService.getUser(mockStorage);
       },
     );

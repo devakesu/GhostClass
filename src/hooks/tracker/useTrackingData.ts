@@ -86,7 +86,7 @@ export function useTrackingData(
 
       return (data as TrackAttendance[]) || [];
     },
-    enabled: !!user && (options?.enabled !== false),
+    enabled: !!user && (options?.enabled !== false) && !!resolvedSemester && !!resolvedAcademicYear,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,

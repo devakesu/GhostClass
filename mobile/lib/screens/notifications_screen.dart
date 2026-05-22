@@ -2,7 +2,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -66,7 +70,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       if (state != null &&
           state.hasNextPage &&
           !ref.read(notificationsProvider).isLoading) {
-        final _ = notifier.fetchNextPage();
+        AppLogger.safeUnawait(
+          notifier.fetchNextPage().catchError((Object e, StackTrace st) {
+            AppLogger.e('Notifications: fetchNextPage failed', e, st);
+          }),
+          'Notifications: fetchNextPage',
+        );
       }
     }
   }
@@ -118,15 +127,25 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                               child: const Text('Cancel'),
                             ),
                             TextButton(
-                              onPressed: () {
-                                final _ = ref
-                                    .read(notificationsProvider.notifier)
-                                    .markAllAsRead();
+                              onPressed: () async {
                                 Navigator.pop(context);
-                                ServiceToast.show(
-                                  context,
-                                  'All notifications marked as read',
-                                );
+                                try {
+                                  await ref
+                                      .read(notificationsProvider.notifier)
+                                      .markAllAsRead();
+                                  if (!context.mounted) return;
+                                  ServiceToast.show(
+                                    context,
+                                    'All notifications marked as read',
+                                  );
+                                } on Object catch (_) {
+                                  if (!context.mounted) return;
+                                  ServiceToast.show(
+                                    context,
+                                    'Failed to mark notifications as read',
+                                    isError: true,
+                                  );
+                                }
                               },
                               child: const Text('Mark all read'),
                             ),
@@ -148,7 +167,36 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
           Expanded(
             child: notificationsAsync.when(
               data: (data) => ServiceRefreshIndicator(
-                onRefresh: () => ref.refresh(notificationsProvider.future),
+                onRefresh: () async {
+                  try {
+                    await runUnifiedPullToRefresh(
+                      logLabel: 'NotificationsScreen',
+                      refreshProfile: () => ref
+                          .read(authProvider.notifier)
+                          .refreshProfile(force: true),
+                      syncCron: () async {
+                        final supabaseToken = ref
+                            .read(supabaseClientProvider)
+                            .auth
+                            .currentSession
+                            ?.accessToken;
+                        if (supabaseToken == null) return;
+                        await ref
+                            .read(apiServiceProvider)
+                            .triggerSync(supabaseToken, force: true);
+                      },
+                      refreshData: () async {
+                        final _ = await ref.refresh(
+                          notificationsProvider.future,
+                        );
+                      },
+                    );
+                  } on Object {
+                    if (!context.mounted) rethrow;
+                    ServiceToast.show(context, 'Refresh failed', isError: true);
+                    rethrow;
+                  }
+                },
                 child: _buildList(context, ref, data),
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -308,63 +356,68 @@ class _PermissionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: openAppSettings,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.amber.withValues(alpha: 0.25),
+    return Semantics(
+      button: true,
+      label: 'Open app settings',
+      child: InkWell(
+        onTap: openAppSettings,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.amber.withValues(alpha: 0.25),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  LucideIcons.bellOff,
+                  size: 18,
+                  color: Colors.amber,
+                ),
               ),
-              child: const Icon(
-                LucideIcons.bellOff,
-                size: 18,
-                color: Colors.amber,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Notifications are paused',
-                    style: GoogleFonts.manrope(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.amber.shade700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Notifications are paused',
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.amber.shade700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Tap to enable push notifications in Settings.',
-                    style: GoogleFonts.manrope(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.amber.shade600,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tap to enable push notifications in Settings.',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.amber.shade600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              LucideIcons.arrowRight,
-              size: 16,
-              color: Colors.amber.withValues(alpha: 0.6),
-            ),
-          ],
+              Icon(
+                LucideIcons.arrowRight,
+                size: 16,
+                color: Colors.amber.withValues(alpha: 0.6),
+              ),
+            ],
+          ),
         ),
       ),
     ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1);

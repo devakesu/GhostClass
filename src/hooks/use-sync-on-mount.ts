@@ -150,22 +150,26 @@ export function useSyncOnMount({
       try {
         if (!activeSyncPromise || activeSyncPromise.username !== username) {
           logger.dev(`[${sentryLocation}] Initiating global EzyGo sync request`);
-          let currentPromise: Promise<{ data: SyncResponse; status: number }> | null = null;
+          // H-6: Use a shared object reference so the promise identity is captured
+          // before any async continuation (catch/finally) fires. The previous pattern
+          // assigned currentPromise after the IIFE started, so a synchronous throw
+          // inside executeGlobalSync would compare against null and leave activeSyncPromise stale.
+          const syncHandle: { promise: Promise<{ data: SyncResponse; status: number }> | null } = { promise: null };
           const promise = (async () => {
             try {
               return await executeGlobalSync();
             } catch (err) {
-              if (activeSyncPromise?.promise === currentPromise) {
-                activeSyncPromise = null; // Reset on failure so it can be retried
+              if (activeSyncPromise?.promise === syncHandle.promise) {
+                activeSyncPromise = null;
               }
               throw err;
             } finally {
-              if (activeSyncPromise?.promise === currentPromise) {
-                activeSyncPromise = null; // Always clear when done
+              if (activeSyncPromise?.promise === syncHandle.promise) {
+                activeSyncPromise = null;
               }
             }
           })();
-          currentPromise = promise;
+          syncHandle.promise = promise;
           activeSyncPromise = { username, promise };
         } else {
           logger.dev(`[${sentryLocation}] Awaiting existing active EzyGo sync request`);

@@ -379,11 +379,9 @@ export function getRateLimiterStats() {
  */
 export function invalidateEzygoCacheForUser(token: string) {
   const tokenHash = createHash('sha256').update(token).digest('hex');
-  const iterableCache = requestCache as unknown as Iterable<
-    [string, Promise<unknown>]
-  >;
+  const entries = Array.from(requestCache.entries());
 
-  for (const [key] of iterableCache) {
+  for (const [key] of entries) {
     if (key.includes(`:${tokenHash}:`)) {
       requestCache.delete(key);
     }

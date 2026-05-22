@@ -6,15 +6,17 @@ import { logger } from "./lib/logger";
 import { isAuthSessionMissingError } from "./lib/security/auth";
 import { decrypt } from "./lib/crypto";
 import { redact } from "./lib/utils.server";
+import { getSupabaseConfig } from "./lib/supabase/fetch";
 
 /**
  * Clears all session-related cookies on a redirect response.
  */
 function clearSessionCookies(res: NextResponse, request: NextRequest) {
   res.cookies.delete('ezygo_access_token');
+  res.cookies.delete('csrf_token');
   res.cookies.delete('terms_version');
   res.cookies.delete('terms_redirect_count');
-  
+
   try {
     const allCookies = request.cookies.getAll();
     for (const cookie of allCookies) {
@@ -34,6 +36,48 @@ function createNonce() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return btoa(String.fromCharCode(...bytes));
+}
+
+function applyProxyHeaders(response: NextResponse, cspHeader: string, nonce: string, isApiDocs: boolean) {
+  response.headers.set('Content-Security-Policy', cspHeader);
+  response.headers.set("x-nonce", nonce);
+  if (isApiDocs) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+}
+
+function redirectWithProxyHeaders(url: URL, status: number, cspHeader: string, nonce: string, isApiDocs: boolean) {
+  const response = NextResponse.redirect(url, { status });
+  applyProxyHeaders(response, cspHeader, nonce, isApiDocs);
+  return response;
+}
+
+async function shouldBypassTermsRedirect(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  isProd: boolean,
+  response: NextResponse
+): Promise<boolean> {
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("terms_version")
+      .eq("auth_id", userId)
+      .single();
+
+    if (userProfile?.terms_version === TERMS_VERSION) {
+      response.cookies.set("terms_version", TERMS_VERSION, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 31536000,
+      });
+      return true;
+    }
+  } catch { /* proceed to redirect */ }
+
+  return false;
 }
 
 function isRefreshTokenNotFoundError(error: unknown): boolean {
@@ -72,6 +116,23 @@ async function getUserWithRetry(supabase: { auth: { getUser(): Promise<{ data: {
   }
 }
 
+function getJwtRemainingMaxAge(token: string, fallbackMaxAge: number): number {
+  try {
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+      if (payload.exp && typeof payload.exp === "number") {
+        const remainingSeconds = payload.exp - Math.floor(Date.now() / 1000);
+        if (remainingSeconds <= 0) return 0;
+        return Math.min(remainingSeconds, fallbackMaxAge);
+      }
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  return fallbackMaxAge;
+}
+
 async function selfHealEzygoCookie(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
@@ -87,14 +148,21 @@ async function selfHealEzygoCookie(
 
     if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
       const token = decrypt({ iv: dbUser.ezygo_iv, content: dbUser.ezygo_token });
-      response.cookies.set("ezygo_access_token", token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 31 * 24 * 60 * 60, // 31 days
-      });
-      logger.info("EzyGo session cookie self-healed in middleware", { userId: redact("id", userId) });
+      // M-1: Verify that the stored token has not expired before setting cookie
+      // to avoid plant-and-fail cycles. Use 24 hours fallback instead of 31 days if not a JWT.
+      const maxAge = getJwtRemainingMaxAge(token, 24 * 60 * 60);
+      if (maxAge > 0) {
+        response.cookies.set("ezygo_access_token", token, {
+          httpOnly: true,
+          secure: isProd,
+          sameSite: "lax",
+          path: "/",
+          maxAge,
+        });
+        logger.info("EzyGo session cookie self-healed in middleware", { userId: redact("id", userId) });
+      } else {
+        logger.warn("EzyGo session token in DB is expired, skipping self-heal", { userId: redact("id", userId) });
+      }
     }
   } catch (err) {
     logger.warn("Non-critical: EzyGo self-healing failed in middleware", err);
@@ -174,52 +242,34 @@ async function enforceRoutingScenarios({
   if (isUnauthenticatedCertain && (isProtectedRoute || isAcceptTermsRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
-    redirectRes.headers.set('Content-Security-Policy', cspHeader);
-    redirectRes.headers.set("x-nonce", nonce);
+    const redirectRes = redirectWithProxyHeaders(url, redirectStatus, cspHeader, nonce, false);
     clearSessionCookies(redirectRes, request);
     return redirectRes;
   }
 
   // Scenario B: Terms Enforcement
   if (user && (!termsVersion || termsVersion !== TERMS_VERSION) && isProtectedRoute) {
-    try {
-      const { data: userProfile } = await supabase
-        .from("users")
-        .select("terms_version")
-        .eq("auth_id", user.id)
-        .single();
-
-      if (userProfile?.terms_version === TERMS_VERSION) {
-        response.cookies.set("terms_version", TERMS_VERSION, {
-          httpOnly: true,
-          secure: isProd,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 31536000,
-        });
-        return response;
-      }
-    } catch { /* proceed to redirect */ }
+    if (await shouldBypassTermsRedirect(supabase, user.id, isProd, response)) {
+      return response;
+    }
 
     const url = request.nextUrl.clone();
-    const redirectCount = parseInt(request.cookies.get('terms_redirect_count')?.value || "0", 10);
-    
+    // H-1: Guard against NaN — a malformed cookie value would make
+    // redirectCount >= 3 always false, producing an infinite redirect loop.
+    const rawRedirectCount = parseInt(request.cookies.get('terms_redirect_count')?.value ?? "0", 10);
+    const redirectCount = Number.isFinite(rawRedirectCount) ? rawRedirectCount : 0;
+
     if (redirectCount >= 3) {
       const homeUrl = url.clone();
       homeUrl.pathname = '/';
       homeUrl.search = '';
-      const logoutRes = NextResponse.redirect(homeUrl, { status: redirectStatus });
-      logoutRes.headers.set('Content-Security-Policy', cspHeader);
-      logoutRes.headers.set("x-nonce", nonce);
+      const logoutRes = redirectWithProxyHeaders(homeUrl, redirectStatus, cspHeader, nonce, false);
       clearSessionCookies(logoutRes, request);
       return logoutRes;
     }
     
     url.pathname = "/accept-terms";
-    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
-    redirectRes.headers.set('Content-Security-Policy', cspHeader);
-    redirectRes.headers.set("x-nonce", nonce);
+    const redirectRes = redirectWithProxyHeaders(url, redirectStatus, cspHeader, nonce, false);
     redirectRes.cookies.set('terms_redirect_count', String(redirectCount + 1), {
       httpOnly: true,
       secure: isProd,
@@ -234,9 +284,7 @@ async function enforceRoutingScenarios({
   if (user && termsVersion === TERMS_VERSION && isAcceptTermsRoute && isNavigationRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
-    redirectRes.headers.set('Content-Security-Policy', cspHeader);
-    redirectRes.headers.set("x-nonce", nonce);
+    const redirectRes = redirectWithProxyHeaders(url, redirectStatus, cspHeader, nonce, false);
     redirectRes.cookies.delete('terms_redirect_count');
     return redirectRes;
   }
@@ -244,9 +292,7 @@ async function enforceRoutingScenarios({
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    const redirectRes = NextResponse.redirect(url, { status: redirectStatus });
-    redirectRes.headers.set('Content-Security-Policy', cspHeader);
-    redirectRes.headers.set("x-nonce", nonce);
+    const redirectRes = redirectWithProxyHeaders(url, redirectStatus, cspHeader, nonce, false);
     redirectRes.cookies.delete('terms_redirect_count');
     return redirectRes;
   }
@@ -287,15 +333,14 @@ export async function proxy(request: NextRequest) {
     
   response.headers.set('Content-Security-Policy', effectiveCspHeader);
   response.headers.set("x-nonce", nonce);
+  if (isApiDocs) {
+    // M-2: Restrict indexing under degraded CSP for Scalar docs.
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
 
   // Initialize Supabase
-  const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-  const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-    : process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
-    : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const isProd = process.env.NODE_ENV === "production";
+  const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
   const supabase = createServerClient(
     supabaseUrl!,
@@ -309,8 +354,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
-          response.headers.set('Content-Security-Policy', effectiveCspHeader);
-          response.headers.set("x-nonce", nonce);
+          applyProxyHeaders(response, effectiveCspHeader, nonce, isApiDocs);
         },
       },
     }

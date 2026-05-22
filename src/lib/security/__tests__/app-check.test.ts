@@ -196,6 +196,36 @@ describe('app-check logic', () => {
         const data = await res.json();
         expect(data.error).toBe('Unauthenticated');
     });
+
+    it('blocks state-changing requests without CSRF token when ENFORCE_APP_CHECK is false', async () => {
+        process.env.ENFORCE_APP_CHECK = 'false';
+        process.env.VITEST = 'false';
+        const h = new Headers();
+        vi.mocked(headers).mockResolvedValue(h);
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { method: 'POST', headers: h });
+        const res = await wrapped(req as any, { params: {} });
+
+        expect(res.status).toBe(403);
+        const data = await res.json();
+        expect(data.error).toBe('Missing CSRF token');
+    });
+
+    it('allows state-changing requests with valid CSRF token when ENFORCE_APP_CHECK is false', async () => {
+        process.env.ENFORCE_APP_CHECK = 'false';
+        process.env.VITEST = 'false';
+        const h = new Headers({ 'x-csrf-token': 'valid-csrf-token' });
+        vi.mocked(headers).mockResolvedValue(h);
+        vi.mocked(validateCsrfToken).mockResolvedValue(true);
+
+        const wrapped = withSecurity(vi.fn().mockResolvedValue(new Response('ok')));
+        const req = new Request('https://test.com', { method: 'POST', headers: h });
+        const res = await wrapped(req as any, { params: {} });
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe('ok');
+    });
   });
 
   describe('JWE Response Encryption', () => {

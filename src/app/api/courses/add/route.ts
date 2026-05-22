@@ -1,8 +1,33 @@
 import { NextResponse } from "next/server";
 import { withSecurity } from "@/lib/security/app-check";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
-import { toTitleCase } from "@/lib/utils";
+import { z } from "zod";
+import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
+
+async function authenticateRequest(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    if (!token) return null;
+    const supabaseAdmin = getAdminClient();
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      logger.error("API Course Add: Bearer auth.getUser error:", error || "No user");
+      return null;
+    }
+    return { user, supabase: supabaseAdmin };
+  }
+
+  const supabaseClient = await createClient();
+  const { data: { user }, error } = await supabaseClient.auth.getUser();
+  if (error || !user) {
+    logger.error("API Course Add: Client auth.getUser error:", error || "No user");
+    return null;
+  }
+  return { user, supabase: supabaseClient };
+}
 
 /**
  * API Route for adding a new course to a class lineup.
@@ -12,31 +37,40 @@ import { toTitleCase } from "@/lib/utils";
 async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknown }) {
   try {
     const body = decryptedBody || await req.json();
-    
-    const code = String(body.courseCode ?? "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
-    const name = toTitleCase(String(body.courseName ?? ""));
-    const semester = String(body.semester ?? "").trim();
-    const academicYear = String(body.academicYear ?? "").trim();
+    const rawBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+    const courseCodeValue = rawBody.courseCode;
+    const courseNameValue = rawBody.courseName;
+    const semesterValue = rawBody.semester;
+    const academicYearValue = rawBody.academicYear;
 
-    if (!code || !name || !semester || !academicYear) {
+    if (
+      typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
+      typeof courseNameValue !== "string" || courseNameValue.trim() === "" ||
+      typeof semesterValue !== "string" || semesterValue.trim() === "" ||
+      typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+    ) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
-
-    if (semester !== "odd" && semester !== "even") {
-      return NextResponse.json({ error: "Semester must be 'odd' or 'even'" }, { status: 400 });
-    }
-
-    if (!/^\d{4}-(\d{4}|\d{2})$/.test(academicYear)) {
-      return NextResponse.json({ error: "Invalid academic year format (expected YYYY-YYYY or YYYY-YY)" }, { status: 400 });
-    }
-
-    const supabase = await createClient();
     
-    // Get current authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const parsed = z.object({
+      courseCode: courseCodeSchema,
+      courseName: personNameSchema,
+      semester: semesterSchema,
+      academicYear: academicYearSchema,
+    }).safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid course details" }, { status: 422 });
+    }
+
+    const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
+
+    const auth = await authenticateRequest(req);
+    if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { user, supabase } = auth;
 
     // Get user's class context
     const { data: profile, error: profileError } = await supabase

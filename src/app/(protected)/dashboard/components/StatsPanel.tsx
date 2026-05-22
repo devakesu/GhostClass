@@ -117,7 +117,7 @@ export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: Sta
                 </>
               )}
           </div>
-          <p className="text-xs text-muted-foreground text-right mt-2 font-medium">
+          <div className="text-xs text-muted-foreground text-right mt-2 font-medium">
             {isLoadingAttendance
               ? <Skeleton className="h-3 w-40 ml-auto" />
               : (
@@ -150,7 +150,7 @@ export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: Sta
                   <span>&nbsp;total</span>
                 </>
               )}
-          </p>
+          </div>
         </CardContent>
       </Card>
     </motion.div>

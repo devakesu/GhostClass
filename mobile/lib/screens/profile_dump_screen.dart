@@ -78,7 +78,7 @@ class _ProfileDumpContent extends ConsumerWidget {
       }
       return s;
     } on Object catch (e) {
-      AppLogger.w('ProfileDumpScreen: Failed to format date', e);
+      AppLogger.e('ProfileDumpScreen: Failed to format date', e);
       return s;
     }
   }
@@ -102,7 +102,7 @@ class _ProfileDumpContent extends ConsumerWidget {
               .firstWhere((i) => i.id.toString().trim() == searchId)
               .name;
         } on Object catch (e) {
-          AppLogger.w(
+          AppLogger.e(
             'ProfileDumpScreen: Failed to resolve institution by id',
             e,
           );
@@ -675,27 +675,30 @@ class _InfoRow {
   final IconData? trailingIcon;
 
   Widget _buildRow(BuildContext context) {
-    return GestureDetector(
-      onTap:
-          onTap ??
-          (copyable
-              ? () {
-                  final _ = Clipboard.setData(ClipboardData(text: value));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '$label copied',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+    final effectiveOnTap =
+        onTap ??
+        (copyable
+            ? () {
+                final _ = Clipboard.setData(ClipboardData(text: value));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '$label copied',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                  );
-                }
-              : null),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                );
+              }
+            : null);
+
+    return InkWell(
+      onTap: effectiveOnTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
