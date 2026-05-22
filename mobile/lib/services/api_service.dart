@@ -184,11 +184,7 @@ class ApiService {
         return response;
       } on Object catch (e) {
         AppLogger.e('ApiService: Background sync failed', e);
-        // Return a mock 304 to let downstream continue without hanging
-        return Response<dynamic>(
-          requestOptions: RequestOptions(path: 'sync'),
-          statusCode: 304,
-        );
+        rethrow;
       } finally {
         _syncInFlight = null;
       }

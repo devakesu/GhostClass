@@ -679,7 +679,7 @@ export async function performProfileSync(
     // Step 1: Fetch Profile and Academic Context in parallel
     const [ezygoRes, semRaw, yearRaw] = await fetchAcademicAndProfileData(token, fullSync);
 
-    let { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } = resolveAcademicContext(
+    const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } = resolveAcademicContext(
       semRaw,
       yearRaw,
     );

@@ -747,7 +747,7 @@ describe('performProfileSync', () => {
     }));
   });
 
-  it('overrides academic context and triggers self-heal when there is a mismatch between EzyGo default settings and courses list cohort', async () => {
+  it('keeps EzyGo default academic context as source of truth even when course cohort differs', async () => {
     // 1. Mock EzyGo response returning default settings as "odd" and "2024-25"
     // and course subgroup with "even" and "2024-25"
     vi.mocked(egressFetch).mockImplementation(async (url: unknown) => {
@@ -792,14 +792,13 @@ describe('performProfileSync', () => {
 
     const result = await performProfileSync(mockToken, mockEzygoId, mockAuthId);
 
-    // Verify it overrides the returned academic context to "even"
-    expect(result.academic.current_semester).toBe('even');
+    // Verify returned academic context follows EzyGo default settings (source of truth)
+    expect(result.academic.current_semester).toBe('odd');
     expect(result.academic.current_year).toBe('2024-25');
 
-    // Verify it triggered the self-heal update call to user/setting/default_semester setting it to "even"
+    // Verify no self-heal semester update was triggered
     const calls = vi.mocked(egressFetch).mock.calls;
     const postCall = calls.find(c => c[0] === 'user/setting/default_semester' && c[1]?.method === 'POST');
-    expect(postCall).toBeDefined();
-    expect(JSON.parse(postCall![1]!.body as string)).toEqual({ default_semester: 'even' });
+    expect(postCall).toBeUndefined();
   });
 });

@@ -214,7 +214,7 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
   return 0;
 };
 
-export default function DashboardClient({ serverError }: DashboardClientProps) {
+export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
   const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
@@ -266,15 +266,16 @@ export default function DashboardClient({ serverError }: DashboardClientProps) {
   });
 
   useEffect(() => {
-    if (syncCompleted && profile && !profile.class?.id) {
-      setIsSelectClassOpen(true);
-    } else {
-      setIsSelectClassOpen(false);
-    }
+    const shouldOpen = !!(syncCompleted && profile && !profile.class?.id);
+    const timer = setTimeout(() => {
+      setIsSelectClassOpen(shouldOpen);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [syncCompleted, profile]);
 
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncCompleted,
+    initialData: initialData?.attendance as AttendanceReport ?? undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 
@@ -282,6 +283,7 @@ export default function DashboardClient({ serverError }: DashboardClientProps) {
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted && !!currentSem && !!currentYear,
+    initialData: initialData?.courses as { courses: Record<string, Course> } ?? undefined,
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
 

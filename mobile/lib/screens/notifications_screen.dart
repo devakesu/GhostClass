@@ -2,8 +2,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -164,7 +167,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
           Expanded(
             child: notificationsAsync.when(
               data: (data) => ServiceRefreshIndicator(
-                onRefresh: () => ref.refresh(notificationsProvider.future),
+                onRefresh: () async {
+                  try {
+                    await runUnifiedPullToRefresh(
+                      logLabel: 'NotificationsScreen',
+                      refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                      syncCron: () async {
+                        final supabaseToken = ref
+                            .read(supabaseClientProvider)
+                            .auth
+                            .currentSession
+                            ?.accessToken;
+                        if (supabaseToken == null) return;
+                        await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                      },
+                      refreshData: () async {
+                        final _ = await ref.refresh(notificationsProvider.future);
+                      },
+                    );
+                  } on Object {
+                    if (!context.mounted) rethrow;
+                    ServiceToast.show(context, 'Refresh failed', isError: true);
+                    rethrow;
+                  }
+                },
                 child: _buildList(context, ref, data),
               ),
               loading: () => const Center(child: CircularProgressIndicator()),

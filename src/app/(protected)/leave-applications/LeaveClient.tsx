@@ -87,7 +87,19 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
     icon: Clock,
   };
 
+  const inProgressStatus: StatusInfo = {
+    label: "In Progress",
+    color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+    icon: Clock,
+  };
+
   if (!approvers || approvers.length === 0) return defaultStatus;
+
+  // If any level has rejected, the entire leave is immediately Rejected
+  const hasRejected = approvers.some((a) => a.action_type === "reject");
+  if (hasRejected) {
+    return STATUS_MAP.reject;
+  }
 
   const actedApprovers = [...approvers]
     .filter((a) => a.action_type !== null || a.action_at !== null)
@@ -98,14 +110,37 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
 
   if (actedApprovers.length === 0) return defaultStatus;
 
-  const lastAction = actedApprovers[0].action_type;
-  return (
-    STATUS_MAP[lastAction as string] || {
-      label: "In Progress",
-      color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
-      icon: Clock,
-    }
+  const hasPending = approvers.some(
+    (a) => a.action_type === null && a.action_at === null
   );
+  const lastAction = actedApprovers[0].action_type;
+
+  if (hasPending) {
+    // If there are pending steps, we cannot be fully Approved.
+    if (lastAction === "approve") {
+      return inProgressStatus;
+    }
+    if (lastAction === "forward") {
+      return STATUS_MAP.forward;
+    }
+    if (lastAction === "recommend") {
+      return STATUS_MAP.recommend;
+    }
+    return inProgressStatus;
+  }
+
+  // All levels have acted, and none rejected.
+  if (lastAction === "approve") {
+    return STATUS_MAP.approve;
+  }
+  if (lastAction === "forward") {
+    return STATUS_MAP.forward;
+  }
+  if (lastAction === "recommend") {
+    return STATUS_MAP.recommend;
+  }
+
+  return inProgressStatus;
 };
 
 const formatBytes = (bytes: string | number) => {

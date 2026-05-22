@@ -378,7 +378,7 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                       ? null
                       : () async {
                           await ref.read(authProvider.notifier).logout();
-                          if (mounted) {
+                          if (context.mounted) {
                             Navigator.of(context).pop();
                           }
                         },

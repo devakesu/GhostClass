@@ -294,35 +294,32 @@ const handler = async (
     // fails, fall back to fetching the canonical email from the admin API
     // and retry once.
     let signInEmail = email;
-    let signInData: any = null;
-    try {
-      let signInRes = await supabase.auth.signInWithPassword({
-        email: signInEmail,
-        password: passwordToUse,
-      });
-      if (signInRes.error) {
-        // First attempt failed — try to resolve the canonical email and retry.
-        try {
-          const adminUser = await supabaseAdmin.auth.admin.getUserById(authUserId);
-          const fetchedEmail = (adminUser as any)?.data?.user?.email;
-          if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
-            signInEmail = fetchedEmail;
-            signInRes = await supabase.auth.signInWithPassword({
-              email: signInEmail,
-              password: passwordToUse,
-            });
-          }
-        } catch {
-          // If admin lookup fails, preserve the original sign-in error below.
+    let signInRes = await supabase.auth.signInWithPassword({
+      email: signInEmail,
+      password: passwordToUse,
+    });
+    if (signInRes.error) {
+      // First attempt failed — try to resolve the canonical email and retry.
+      try {
+        const { data: adminUserData } = await supabaseAdmin.auth.admin.getUserById(authUserId);
+        const fetchedEmail = adminUserData?.user?.email;
+        if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
+          signInEmail = fetchedEmail;
+          signInRes = await supabase.auth.signInWithPassword({
+            email: signInEmail,
+            password: passwordToUse,
+          });
         }
+      } catch {
+        // If admin lookup fails, preserve the original sign-in error below.
       }
-
-      signInData = signInRes.data;
-    } catch (e) {
-      // Ensure any unexpected errors during sign-in are surfaced to the
-      // existing error handling path.
-      throw e;
     }
+
+    if (signInRes.error) {
+      throw signInRes.error;
+    }
+
+    const signInData = signInRes.data;
 
     const { iv: tIv, content: tContent } = encrypt(token);
     const updateData: Record<string, unknown> = {

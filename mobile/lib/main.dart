@@ -65,8 +65,8 @@ class _SecurityFailureApp extends StatelessWidget {
               title: 'Security Handshake Failed',
               message: friendlyMessage,
               technicalDetails: technicalDetails,
-              retryLabel: 'Close App',
-              onRetry: () => exit(0),
+              retryLabel: Platform.isAndroid ? 'Close App' : null,
+              onRetry: Platform.isAndroid ? () => exit(0) : null,
             );
           });
           return const Scaffold(
@@ -112,6 +112,19 @@ Future<void> _initializeFirebase() async {
 
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Sentry early to capture all startup exceptions
+  await SentryFlutter.init(
+    (options) {
+      options
+        ..dsn = AppConfig.sentryDsn
+        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
+        ..release = 'ghostclass@${AppConfig.appVersion}'
+        ..environment = kDebugMode ? 'development' : 'production'
+        ..attachStacktrace = true
+        ..enableAutoPerformanceTracing = true;
+    },
+  );
 
   HttpOverrides.global = MyHttpOverrides();
 
@@ -167,24 +180,10 @@ void main() async {
     GoogleFonts.firaCode(),
   ]);
 
-  // Initialize Sentry
-  await SentryFlutter.init(
-    (options) {
-      options
-        ..dsn = AppConfig.sentryDsn
-        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
-        ..release = 'ghostclass@${AppConfig.appVersion}'
-        ..environment = kDebugMode ? 'development' : 'production'
-        ..attachStacktrace = true
-        ..enableAutoPerformanceTracing = true;
-    },
-    appRunner: () {
-      return runApp(
-        ProviderScope(
-          child: SentryWidget(child: const MyApp()),
-        ),
-      );
-    },
+  runApp(
+    ProviderScope(
+      child: SentryWidget(child: const MyApp()),
+    ),
   );
 
   await Sentry.addBreadcrumb(

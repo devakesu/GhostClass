@@ -12,6 +12,7 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/tracking_ui_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
@@ -115,10 +116,24 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     return ServiceRefreshIndicator(
       onRefresh: () async {
         try {
-          final trackingNotifier = ref.read(trackingProvider.notifier);
-          await trackingNotifier.refresh(forceSync: true);
+          await runUnifiedPullToRefresh(
+            logLabel: 'TrackingScreen',
+            refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+            syncCron: () async {
+              final supabaseToken = ref
+                  .read(supabaseClientProvider)
+                  .auth
+                  .currentSession
+                  ?.accessToken;
+              if (supabaseToken == null) return;
+              await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+            },
+            refreshData: () => ref.read(trackingProvider.notifier).refresh(),
+          );
         } on Object catch (e, st) {
           AppLogger.e('TrackingScreen: Pull-to-refresh failed', e, st);
+          if (!mounted) rethrow;
+          ServiceToast.show(context, 'Refresh failed', isError: true);
           await handleError(e, title: 'Refresh Failed');
         }
       },

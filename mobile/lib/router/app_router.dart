@@ -84,11 +84,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     }
   });
 
+  final refreshStream = GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange);
+  ref.onDispose(() {
+    refreshStream.dispose();
+    authRefreshNotifier.dispose();
+  });
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: Listenable.merge([
-      GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+      refreshStream,
       authRefreshNotifier,
     ]),
     observers: [SentryNavigatorObserver(), AnalyticsService.instance.observer],

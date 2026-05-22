@@ -169,7 +169,7 @@ describe("Navbar", () => {
     const menuItems = [
       { text: "Dashboard", path: "/dashboard" },
       { text: "Tracking", path: "/tracking" },
-      { text: "Scores", path: "/scores" },
+      { text: "Internal Marks", path: "/scores" },
       { text: "Leave Applications", path: "/leave-applications" },
       { text: "Profile", path: "/profile" },
       { text: "Help & FAQ", path: "/help" },
@@ -284,7 +284,7 @@ describe("Navbar", () => {
     fireEvent.click(trackingBtn);
     expect(mockRouterPush).toHaveBeenCalledWith("/tracking");
     
-    const scoresBtn = screen.getByRole("button", { name: /Scores/i });
+    const scoresBtn = screen.getByRole("button", { name: /Internal Marks/i });
     fireEvent.click(scoresBtn);
     expect(mockRouterPush).toHaveBeenCalledWith("/scores");
   });

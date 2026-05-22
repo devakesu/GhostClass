@@ -1038,7 +1038,7 @@ export default function ScoresClient() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight mb-1">
-              Scores
+              Internal Marks
             </h1>
             <p className="text-sm text-muted-foreground">
               Your assessments and assignments
@@ -1115,7 +1115,7 @@ export default function ScoresClient() {
               className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
               onClick={() => refetch()}
               disabled={isFetching}
-              aria-label="Refresh scores"
+              aria-label="Refresh internal marks"
             >
               <RefreshCw
                 className={cn("h-4 w-4", isFetching && "animate-spin")}
@@ -1134,7 +1134,7 @@ export default function ScoresClient() {
           >
             <AlertCircle className="h-8 w-8 text-red-400" aria-hidden="true" />
             <p className="text-sm text-muted-foreground">
-              Failed to load scores. Please try again.
+              Failed to load internal marks. Please try again.
             </p>
             <Button
               variant="outline"

@@ -249,7 +249,7 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
 }
 
 (int, int) _parseAcademicYear(String year) {
-  final parts = year.split('-');
+  final parts = year.replaceAll('/', '-').split('-');
 
   // Expand short-form start year: "25-26" → "2025-2026".
   var startPart = parts.isNotEmpty ? parts.first : '';

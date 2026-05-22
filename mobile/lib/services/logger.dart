@@ -168,9 +168,7 @@ class AppLogger {
     }
 
     final sanitizedMessage = sanitizeForExport(message);
-    final sanitizedError = error != null
-        ? sanitizeForExport(error.toString())
-        : null;
+    final sanitizedError = error != null ? sanitizeForExport(error.toString()) : null;
     final sanitizedExtras = <String, dynamic>{};
     if (extras != null) {
       for (final e in extras.entries) {
@@ -188,9 +186,11 @@ class AppLogger {
         uuidRegex.firstMatch(error?.toString() ?? '');
     if (match != null) hashedUserId = _hashString(match.group(0)!);
 
+    final capturedError = error ?? Exception(message);
+
     unawaited(
       Sentry.captureException(
-        error ?? message,
+        capturedError,
         stackTrace: stackTrace,
         withScope: (scope) async {
           await scope.setTag('logger_message', sanitizedMessage);

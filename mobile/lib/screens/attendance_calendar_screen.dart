@@ -292,7 +292,13 @@ class _CalendarContent extends ConsumerWidget {
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
-        await ref.read(dashboardProvider.notifier).refresh();
+        try {
+          await ref.read(dashboardProvider.notifier).refresh();
+        } on Object {
+          if (!context.mounted) rethrow;
+          ServiceToast.show(context, 'Refresh failed', isError: true);
+          rethrow;
+        }
       },
       child: CustomScrollView(
         controller: scrollController,

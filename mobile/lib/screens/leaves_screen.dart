@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
+import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -69,7 +73,28 @@ class LeavesScreen extends ConsumerWidget {
           ),
 
           ServiceRefreshIndicator(
-            onRefresh: () => ref.read(leaveProvider.notifier).refresh(),
+            onRefresh: () async {
+              try {
+                await runUnifiedPullToRefresh(
+                  logLabel: 'LeavesScreen',
+                  refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                  syncCron: () async {
+                    final supabaseToken = ref
+                        .read(supabaseClientProvider)
+                        .auth
+                        .currentSession
+                        ?.accessToken;
+                    if (supabaseToken == null) return;
+                    await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                  },
+                  refreshData: () => ref.read(leaveProvider.notifier).refresh(),
+                );
+              } on Object {
+                if (!context.mounted) rethrow;
+                ServiceToast.show(context, 'Refresh failed', isError: true);
+                rethrow;
+              }
+            },
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
@@ -97,7 +122,20 @@ class LeavesScreen extends ConsumerWidget {
                   error: (err, stack) => SliverFillRemaining(
                     child: ServiceErrorView(
                       error: err,
-                      onRetry: () => ref.read(leaveProvider.notifier).refresh(),
+                      onRetry: () => runUnifiedPullToRefresh(
+                        logLabel: 'LeavesScreen',
+                        refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                        syncCron: () async {
+                          final supabaseToken = ref
+                              .read(supabaseClientProvider)
+                              .auth
+                              .currentSession
+                              ?.accessToken;
+                          if (supabaseToken == null) return;
+                          await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                        },
+                        refreshData: () => ref.read(leaveProvider.notifier).refresh(),
+                      ),
                     ),
                   ),
                 ),
@@ -752,6 +790,12 @@ class LeavesScreen extends ConsumerWidget {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
     }
 
+    // If any level has rejected, the entire leave is immediately Rejected
+    final hasRejected = approvers.any((a) => a.actionType == 'reject');
+    if (hasRejected) {
+      return _LeaveStatus('Rejected', Colors.red, LucideIcons.xCircle);
+    }
+
     final actedApprovers =
         approvers
             .where((a) => a.actionType != null || a.actionAt != null)
@@ -762,11 +806,25 @@ class LeavesScreen extends ConsumerWidget {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
     }
 
+    final hasPending = approvers.any((a) => a.actionType == null && a.actionAt == null);
     final lastAction = actedApprovers.first.actionType;
 
-    if (lastAction == 'reject') {
-      return _LeaveStatus('Rejected', Colors.red, LucideIcons.xCircle);
+    if (hasPending) {
+      // If there are pending steps, we cannot be fully Approved.
+      // If the last active step approved, the status is "In Progress" (awaiting next level).
+      if (lastAction == 'approve') {
+        return _LeaveStatus('In Progress', Colors.lightBlue, LucideIcons.clock);
+      }
+      if (lastAction == 'forward') {
+        return _LeaveStatus('Forwarded', Colors.indigo, LucideIcons.arrowRight);
+      }
+      if (lastAction == 'recommend') {
+        return _LeaveStatus('Recommended', Colors.blue, LucideIcons.arrowRight);
+      }
+      return _LeaveStatus('In Progress', Colors.lightBlue, LucideIcons.clock);
     }
+
+    // All levels have acted, and none rejected.
     if (lastAction == 'approve') {
       return _LeaveStatus(
         'Approved',

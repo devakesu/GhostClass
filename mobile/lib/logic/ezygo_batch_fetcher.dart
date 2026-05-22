@@ -272,8 +272,23 @@ class EzygoBatchFetcher {
     _inFlight.clear();
     _setOutage(false);
     _generation++;
+
+    // Reject all pending completers in the queue with a cancellation error
+    for (final completer in _queue) {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          const AppException(
+            message: 'Ezygo fetch queue cleared.',
+            type: AppExceptionType.network,
+          ),
+        );
+      }
+    }
+    _queue.clear();
+    _activeRequests = 0;
+
     AppLogger.i(
-      'EzygoBatchFetcher: Cache and Outage state cleared. Generation updated to $_generation.',
+      'EzygoBatchFetcher: Cache, Outage, Queue cleared & Requests reset. Generation updated to $_generation.',
     );
   }
 }

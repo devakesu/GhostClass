@@ -183,8 +183,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             '$e\n\n'
             '${appCheckError != null ? "Local Error: $appCheckError" : ""}',
           ),
-          retryLabel: criticalRisk ? 'Close App' : 'Restart App',
-          onRetry: () => exit(0),
+          retryLabel: Platform.isAndroid
+              ? (criticalRisk ? 'Close App' : 'Restart App')
+              : (criticalRisk ? null : 'Retry'),
+          onRetry: Platform.isAndroid
+              ? () => exit(0)
+              : (criticalRisk ? null : _initializeApp),
         );
         return;
       }

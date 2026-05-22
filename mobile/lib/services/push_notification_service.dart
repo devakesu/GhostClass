@@ -41,6 +41,8 @@ class PushNotificationService {
   StreamSubscription<String>? _tokenSub;
   StreamSubscription<RemoteMessage>? _messageSub;
   StreamSubscription<RemoteMessage>? _messageOpenedSub;
+  StreamSubscription<AuthState>? _deferredAuthSub;
+  Timer? _deferredAuthTimer;
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
   SecureStorageService get _storage => _ref.read(secureStorageProvider);
@@ -231,11 +233,12 @@ class PushNotificationService {
       // registration when a session becomes available. This avoids silently
       // dropping device tokens that arrived before login.
       if (currentSession == null) {
-        StreamSubscription<AuthState>? sub;
+        await _deferredAuthSub?.cancel();
+        _deferredAuthTimer?.cancel();
+
         // Defensive timeout: if the user never signs in, cancel the listener
         // after a reasonable period to avoid resource leaks.
-        Timer? timeoutTimer;
-        sub = supabase.auth.onAuthStateChange.listen((data) async {
+        _deferredAuthSub = supabase.auth.onAuthStateChange.listen((data) async {
           final session = data.session;
           if (session != null) {
             try {
@@ -284,16 +287,20 @@ class PushNotificationService {
             } on Object catch (e) {
               AppLogger.e('FCM deferred registration failed', e);
             } finally {
-              await sub?.cancel();
-              timeoutTimer?.cancel();
+              await _deferredAuthSub?.cancel();
+              _deferredAuthSub = null;
+              _deferredAuthTimer?.cancel();
+              _deferredAuthTimer = null;
             }
           }
         });
 
         // Cancel the subscription after 5 minutes if no session event occurs.
-        timeoutTimer = Timer(const Duration(minutes: 5), () async {
+        _deferredAuthTimer = Timer(const Duration(minutes: 5), () async {
           AppLogger.d('FCM deferred registration listener timeout; cancelling');
-          await sub?.cancel();
+          await _deferredAuthSub?.cancel();
+          _deferredAuthSub = null;
+          _deferredAuthTimer = null;
         });
 
         return;
@@ -382,6 +389,8 @@ class PushNotificationService {
     await _tokenSub?.cancel();
     await _messageSub?.cancel();
     await _messageOpenedSub?.cancel();
+    await _deferredAuthSub?.cancel();
+    _deferredAuthTimer?.cancel();
   }
 }
 

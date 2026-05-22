@@ -101,7 +101,7 @@ export async function sendPushNotification({
     const errorMsg = error instanceof Error ? error.message : "Unknown push dispatch failure";
     const safeToken = redact("id", token);
     
-    logger.error(`[push] Failed to send notification to token ${safeToken}:`, errorMsg);
+    logger.error(`[push] Failed to send notification to token ${safeToken}:`, error instanceof Error ? error : errorMsg);
     
     const errorCode = getErrorCode(error);
     const isTerminalTokenError = isTerminalError(errorCode);

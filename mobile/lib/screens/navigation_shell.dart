@@ -747,49 +747,60 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 48),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                          if (!Platform.isIOS || !isCriticalSecurityFailure)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              onPressed: () async {
-                                if (isCriticalSecurityFailure) {
-                                  exit(0);
-                                }
+                                onPressed: () async {
+                                  if (isCriticalSecurityFailure) {
+                                    exit(0);
+                                  }
 
-                                // Clear lock and retry
-                                ref.read(apiServiceProvider).clearCaches();
-                                ref
-                                    .read(securityFailureProvider.notifier)
-                                    .clearFailure();
-                                try {
-                                  await ref
-                                      .read(authProvider.notifier)
-                                      .refreshProfile(force: true);
-                                } on Object {
-                                  // The 401 interceptor will catch it again if it still fails
-                                }
-                              },
-                              child: Text(
-                                isCriticalSecurityFailure
-                                    ? 'Close App'
-                                    : 'Restart App',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black,
+                                  // Clear lock and retry
+                                  ref.read(apiServiceProvider).clearCaches();
+                                  ref
+                                      .read(securityFailureProvider.notifier)
+                                      .clearFailure();
+                                  try {
+                                    await ref
+                                        .read(authProvider.notifier)
+                                        .refreshProfile(force: true);
+                                  } on Object {
+                                    // The 401 interceptor will catch it again if it still fails
+                                  }
+                                },
+                                child: Text(
+                                  isCriticalSecurityFailure
+                                      ? 'Close App'
+                                      : 'Restart App',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black,
+                                  ),
                                 ),
                               ),
+                            )
+                          else
+                            Text(
+                              'Please close the app manually.',
+                              style: GoogleFonts.manrope(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.6),
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,

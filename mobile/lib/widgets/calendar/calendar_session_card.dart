@@ -73,6 +73,14 @@ class CalendarSessionCard extends StatelessWidget {
               ? disabledAccent.withValues(alpha: 0.7)
               : accentColor.withValues(alpha: 0.7));
 
+    final disabledTextColor = isDark
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65);
+
+    final displaySessionColor = event.isDisabled
+        ? disabledTextColor
+        : _getContrastColor(event.color, isDark);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -111,11 +119,7 @@ class CalendarSessionCard extends StatelessWidget {
                       style: GoogleFonts.manrope(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: event.isDisabled
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.4)
-                            : event.color,
+                        color: displaySessionColor,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -125,10 +129,9 @@ class CalendarSessionCard extends StatelessWidget {
                       style: GoogleFonts.manrope(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(
-                              alpha: event.isDisabled ? 0.4 : 1.0,
-                            ),
+                        color: event.isDisabled
+                            ? disabledTextColor
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     if (event.courseCode != null)
@@ -139,7 +142,9 @@ class CalendarSessionCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.4),
+                          ).colorScheme.onSurface.withValues(
+                            alpha: isDark ? 0.6 : 0.65,
+                          ),
                         ),
                       ),
                   ],
@@ -168,9 +173,7 @@ class CalendarSessionCard extends StatelessWidget {
                           Icon(
                             LucideIcons.eyeOff,
                             size: 10,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.4),
+                            color: disabledTextColor,
                           ),
                           const SizedBox(width: 6),
                         ],
@@ -179,7 +182,7 @@ class CalendarSessionCard extends StatelessWidget {
                           style: GoogleFonts.manrope(
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
-                            color: event.color,
+                            color: _getContrastColor(event.color, isDark),
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -216,7 +219,9 @@ class CalendarSessionCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ).colorScheme.onSurface.withValues(
+                    alpha: isDark ? 0.6 : 0.65,
+                  ),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -232,7 +237,7 @@ class CalendarSessionCard extends StatelessWidget {
                   child: _ActionButton(
                     icon: LucideIcons.calendarCheck,
                     label: 'MARK DL',
-                    color: const Color(0xFFF59E0B), // Orange 500
+                    color: const Color(0xFFB45309), // Orange 700
                     onTap: onMarkDl,
                   ),
                 ),
@@ -241,7 +246,7 @@ class CalendarSessionCard extends StatelessWidget {
                   child: _ActionButton(
                     icon: LucideIcons.checkCircle,
                     label: 'MARK PRESENT',
-                    color: const Color(0xFF10B981), // Green 500
+                    color: const Color(0xFF047857), // Green 700
                     onTap: onMarkPresent,
                   ),
                 ),
@@ -283,45 +288,64 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: isFullWidth ? double.infinity : null,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
-            border: isDark
-                ? Border.all(color: color.withValues(alpha: 0.1), width: 1.5)
-                : null,
-            boxShadow: !isDark
-                ? [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 0.8,
+    // Translate label to a user friendly screen reader description
+    var semanticLabel = label;
+    if (label.toUpperCase() == 'MARK DL') {
+      semanticLabel = 'Mark Duty Leave';
+    } else if (label.toUpperCase() == 'MARK PRESENT') {
+      semanticLabel = 'Mark Present';
+    } else if (label.toUpperCase() == 'DELETE RECORD') {
+      semanticLabel = 'Delete Record';
+    }
+
+    final textColor = color.computeLuminance() > 0.45
+        ? const Color(0xFF1F2937)
+        : Colors.white;
+
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticLabel,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: isFullWidth ? double.infinity : null,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(16),
+              border: isDark
+                  ? Border.all(color: color.withValues(alpha: 0.1), width: 1.5)
+                  : null,
+              boxShadow: !isDark
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 14, color: textColor),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -336,6 +360,7 @@ class _CorrectionTag extends StatelessWidget {
   Widget build(BuildContext context) {
     const color = Color(0xFFA855F7);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayColor = _getContrastColor(color, isDark);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -345,14 +370,14 @@ class _CorrectionTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(LucideIcons.rotateCcw, size: 10, color: color),
+          Icon(LucideIcons.rotateCcw, size: 10, color: displayColor),
           const SizedBox(width: 6),
           Text(
             'CORRECTION',
             style: GoogleFonts.manrope(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: color,
+              color: displayColor,
               letterSpacing: 0.5,
             ),
           ),
@@ -369,6 +394,7 @@ class _SelfMarkedTag extends StatelessWidget {
   Widget build(BuildContext context) {
     const color = Color(0xFF6366F1);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayColor = _getContrastColor(color, isDark);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -378,19 +404,51 @@ class _SelfMarkedTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(LucideIcons.mousePointer2, size: 10, color: color),
+          Icon(LucideIcons.mousePointer2, size: 10, color: displayColor),
           const SizedBox(width: 6),
           Text(
             'SELF-MARKED',
             style: GoogleFonts.manrope(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: color,
+              color: displayColor,
               letterSpacing: 0.5,
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+Color _getContrastColor(Color color, bool isDark) {
+  if (isDark) {
+    final luminance = color.computeLuminance();
+    if (luminance >= 0.45) return color;
+    
+    final hsl = HSLColor.fromColor(color);
+    var lightness = hsl.lightness;
+    while (lightness < 1.0) {
+      lightness = (lightness + 0.05).clamp(0.0, 1.0);
+      final candidate = hsl.withLightness(lightness).toColor();
+      if (candidate.computeLuminance() >= 0.45) {
+        return candidate;
+      }
+    }
+    return Colors.white;
+  } else {
+    final luminance = color.computeLuminance();
+    if (luminance <= 0.18) return color;
+    
+    final hsl = HSLColor.fromColor(color);
+    var lightness = hsl.lightness;
+    while (lightness > 0.0) {
+      lightness = (lightness - 0.05).clamp(0.0, 1.0);
+      final candidate = hsl.withLightness(lightness).toColor();
+      if (candidate.computeLuminance() <= 0.18) {
+        return candidate;
+      }
+    }
+    return Colors.black;
   }
 }

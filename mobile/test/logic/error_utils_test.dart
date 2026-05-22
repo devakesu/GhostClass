@@ -218,6 +218,13 @@ void main() {
       );
     });
 
+    test('does not redact URL paths', () {
+      expect(
+        sanitizeTechnicalDetails('Request failed at https://api.example.com/v1/users/123'),
+        'Request failed at https://api.example.com/v1/users/123',
+      );
+    });
+
     test('redacts auth tokens', () {
       expect(
         sanitizeTechnicalDetails('URL parameter token=abcde12345 expired'),

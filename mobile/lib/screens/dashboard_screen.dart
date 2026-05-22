@@ -13,6 +13,7 @@ import 'package:ghostclass/widgets/dashboard/trend_chart.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -107,7 +108,13 @@ class _DashboardContent extends ConsumerWidget {
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
-        await ref.read(dashboardProvider.notifier).refresh();
+        try {
+          await ref.read(dashboardProvider.notifier).refresh();
+        } on Object {
+          if (!context.mounted) rethrow;
+          ServiceToast.show(context, 'Refresh failed', isError: true);
+          rethrow;
+        }
       },
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(

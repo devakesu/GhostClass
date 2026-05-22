@@ -15,6 +15,11 @@ class StatsGridSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = (screenWidth - 40 - 12) / 2;
+    final targetHeight = (cardWidth / 1.8).clamp(96.0, double.infinity);
+    final childAspectRatio = cardWidth / targetHeight;
+
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       sliver: SliverList(
@@ -27,7 +32,7 @@ class StatsGridSection extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.8,
+            childAspectRatio: childAspectRatio,
             children: [
               _StatCard(
                 title: 'Present (+DL)',
@@ -170,6 +175,8 @@ class _StatCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.manrope(
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
@@ -180,45 +187,49 @@ class _StatCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '$value',
-                            style: GoogleFonts.manrope(
-                              fontSize: isFullWidth ? 24 : 18,
-                              fontWeight: FontWeight.w900,
-                              color: color,
-                            ),
-                          ),
-                          if (subtitle != null) ...[
-                            const SizedBox(width: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
                             Text(
-                              subtitle!,
+                              '$value',
                               style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.4),
+                                fontSize: isFullWidth ? 24 : 18,
+                                fontWeight: FontWeight.w900,
+                                color: color,
                               ),
                             ),
-                          ],
-                          ...corrections.map(
-                            (c) => Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Text(
-                                '${c.isNegative ? "-" : "+"}${c.value}',
+                            if (subtitle != null) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                subtitle!,
                                 style: GoogleFonts.manrope(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: c.color,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withValues(alpha: 0.4),
+                                ),
+                              ),
+                            ],
+                            ...corrections.map(
+                              (c) => Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Text(
+                                  '${c.isNegative ? "-" : "+"}${c.value}',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: c.color,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

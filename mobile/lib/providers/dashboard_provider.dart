@@ -14,6 +14,7 @@ import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class DashboardData {
@@ -527,7 +528,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   ) async {
     try {
       final freshData = await _fetchAndProcess(tracking, academic, null);
-      state = AsyncValue.data(freshData);
+      final currentAcademic = ref.read(academicProvider).value;
+      if (academic == currentAcademic) {
+        state = AsyncValue.data(freshData);
+      } else {
+        AppLogger.i(
+          'DashboardNotifier: Discarded stale silent revalidation for '
+          '${academic.semester} ${academic.year} (current: ${currentAcademic?.semester} ${currentAcademic?.year})',
+        );
+      }
     } on Object catch (e) {
       AppLogger.e(
         'DashboardNotifier: Silent background revalidation failed',
@@ -539,42 +548,50 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   Future<void> refresh() async {
     ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
-    final api = ref.read(apiServiceProvider);
-    final supabaseToken = ref
-        .read(supabaseClientProvider)
-        .auth
-        .currentSession
-        ?.accessToken;
 
     // 0. Set local loading state
     state = const AsyncValue.loading();
 
-    if (user != null && supabaseToken != null) {
-      // 1. Trigger the server-side sync (this updates the database)
-      // We await this to ensure the server has latest data before we fetch it back
-      await api.triggerSync(supabaseToken, force: true);
+    Object? refreshError;
+    StackTrace? refreshStackTrace;
 
-      // 2. Fetch the fresh profile from the server
-      await ref.read(authProvider.notifier).refreshProfile(force: true);
-
-      // Clear disk cache for current user/term so refresh is guaranteed fresh
-      final storage = ref.read(secureStorageProvider);
-      final academicAsync = ref.read(academicProvider);
-      final academic = academicAsync.value;
-      if (academic != null) {
-        final suffix =
-            '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-        await Future.wait([
-          storage.deleteCachedData('dashboard_courses_$suffix'),
-          storage.deleteCachedData('dashboard_attendance_$suffix'),
-          storage.deleteCachedData('dashboard_instructors_$suffix'),
-        ]);
+    if (user != null) {
+      try {
+        await runUnifiedPullToRefresh(
+          logLabel: 'DashboardNotifier',
+          refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+          syncCron: () async {
+            final supabaseToken = ref
+                .read(supabaseClientProvider)
+                .auth
+                .currentSession
+                ?.accessToken;
+            if (supabaseToken == null) return;
+            await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+          },
+          refreshData: () => ref.read(trackingProvider.notifier).refresh(),
+        );
+      } on Object catch (e, st) {
+        AppLogger.e('DashboardNotifier: refresh coordinator failed', e, st);
+        refreshError = e;
+        refreshStackTrace = st;
+      } finally {
+        // Clear disk cache even when refresh fails so the next launch or retry
+        // cannot silently reuse stale dashboard data.
+        final storage = ref.read(secureStorageProvider);
+        final academicAsync = ref.read(academicProvider);
+        final academic = academicAsync.value;
+        if (academic != null) {
+          final suffix =
+              '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+          await Future.wait([
+            storage.deleteCachedData('dashboard_courses_$suffix'),
+            storage.deleteCachedData('dashboard_attendance_$suffix'),
+            storage.deleteCachedData('dashboard_instructors_$suffix'),
+          ]);
+        }
       }
     }
-
-    // 3. Refresh Tracking (Official Report + Tracker Records)
-    // We don't need forceSync: true here because we already triggered it above
-    await ref.read(trackingProvider.notifier).refresh();
 
     // 4. Force a rebuild of the dashboard with fresh data
     // We clear local caches to ensure we don't return stale combined data
@@ -586,6 +603,10 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
     ref.invalidateSelf();
     await future;
+
+    if (refreshError != null) {
+      Error.throwWithStackTrace(refreshError, refreshStackTrace ?? StackTrace.current);
+    }
   }
 
   Future<void> refreshAfterCourseAdded() async {

@@ -10,6 +10,7 @@ declare module 'lru-cache' {
     set(key: K, value: V): void;
     delete(key: K): boolean;
     clear(): void;
+    entries(): IterableIterator<[K, V]>;
     readonly size: number;
   }
 }

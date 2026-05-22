@@ -75,8 +75,12 @@ async function getSendPulseToken() {
     const data = await res.json();
     return data.access_token;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(`SendPulse Auth Failed: ${msg}`);
+    if (error instanceof Error) {
+      const wrapped = new Error(`SendPulse Auth Failed: ${error.message}`);
+      (wrapped as Error & { cause?: unknown }).cause = error;
+      throw wrapped;
+    }
+    throw new Error(`SendPulse Auth Failed: ${String(error)}`);
   }
 }
 
@@ -114,8 +118,10 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, to
     const data = await res.json() as { id?: string };
     return { success: true, provider: "SendPulse", id: data.id };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(msg);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
 }
 
@@ -151,8 +157,10 @@ async function sendViaBrevo({ to, subject, html, text, replyTo, fromName, toName
     const data = await res.json() as { messageId?: string };
     return { success: true, provider: "Brevo", id: data.messageId };
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(msg);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
   }
 }
 
@@ -171,17 +179,22 @@ async function executeFailover(
   secondary: ProviderFn,
   props: SendEmailProps,
   sName: "Brevo" | "SendPulse",
-  errMsg: string
+  err: unknown
 ): Promise<ProviderResult> {
+  const errMsg = err instanceof Error ? err.message : String(err);
   try {
     return await secondary(props);
   } catch (err2: unknown) {
     const err2Msg = err2 instanceof Error ? err2.message : String(err2);
     const msg = `All providers failed. P: ${errMsg} | S: ${err2Msg}`;
     logger.error(msg);
-    Sentry.captureException(new Error(msg), {
+    Sentry.captureException(err2 instanceof Error ? err2 : new Error(msg), {
       tags: { type: "email_critical" },
-      extra: { to: redact("email", props.to) }
+      extra: {
+        to: redact("email", props.to),
+        primary_error: errMsg,
+        secondary_error: err2Msg,
+      }
     });
     return { success: false, provider: sName, error: msg };
   }
@@ -207,14 +220,14 @@ export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> 
     return await primary(props);
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    logger.warn(`${pName} failed:`, errMsg);
+    logger.warn(`${pName} failed:`, err instanceof Error ? err : errMsg);
     Sentry.captureMessage(`Failover: ${pName} failed`, {
       level: "warning",
       tags: { provider: pName, location: "sendEmail" },
     });
 
     if (secondary) {
-      return await executeFailover(secondary, props, sName, errMsg);
+      return await executeFailover(secondary, props, sName, err);
     }
     return { success: false, provider: pName, error: errMsg };
   }

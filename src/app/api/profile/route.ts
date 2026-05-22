@@ -274,6 +274,13 @@ function buildUpdatePayload(parsedData: z.infer<typeof patchSchema>) {
 }
 
 const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: unknown }) => {
+  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    const originErr = validateRequestOrigin(req);
+    if (originErr) return originErr;
+  }
+
   const ip = getClientIp(req.headers);
   if (!ip) {
     return NextResponse.json(
