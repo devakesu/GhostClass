@@ -57,6 +57,21 @@ describe("profile hooks", () => {
       expect(axiosInstance.get).toHaveBeenCalledWith("/api/profile", expect.any(Object));
     });
 
+    it("should send sync and force params when requested", async () => {
+      const mockProfile = { id: "1", first_name: "Test" };
+      (axiosInstance.get as any).mockResolvedValueOnce({ data: mockProfile });
+
+      const { result } = renderHook(() => useProfile({ sync: true, force: true }), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(axiosInstance.get).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({ params: { sync: "true", force: "true" } }),
+      );
+    });
+
     it("should use initialData", () => {
       const initialData = { id: "1", first_name: "Initial" } as any;
       const { result } = renderHook(() => useProfile({ initialData }), {

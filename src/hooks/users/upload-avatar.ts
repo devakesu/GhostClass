@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { redact } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { getSupabaseConfig } from "@/lib/supabase/fetch";
 
 /**
  * Strict MIME-type → file-extension whitelist for avatar uploads.
@@ -96,10 +97,7 @@ export async function uploadUserAvatar(file: File) {
       // Guard: getPublicUrl() is synchronous and cannot fail — it constructs the URL
       // client-side from NEXT_PUBLIC_SUPABASE_URL. A misconfigured env var would silently
       // write a wrong-project URL to the DB without this check.
-      const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-      const supabaseProjectUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-        ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-        : process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseProjectUrl = getSupabaseConfig("client").url;
         
       if (supabaseProjectUrl && !publicUrl.startsWith(supabaseProjectUrl)) {
         throw new Error(

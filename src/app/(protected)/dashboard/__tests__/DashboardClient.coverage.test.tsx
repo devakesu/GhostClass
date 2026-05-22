@@ -198,6 +198,20 @@ describe('DashboardClient', () => {
     expect(screen.getAllByText(/ODD 2024-25/i).length).toBeGreaterThan(0);
   });
 
+  it('does not seed the attendance query with initial data', async () => {
+    render(<DashboardClient initialData={{ courses: [], attendance: { studentAttendanceData: { stale: true } } }} />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument();
+    });
+
+    expect(vi.mocked(useAttendanceReport)).toHaveBeenCalledWith(
+      'odd',
+      '2024-25',
+      expect.not.objectContaining({ initialData: expect.anything() }),
+    );
+  });
+
   it('handles serverError by showing a toast', () => {
     render(<DashboardClient serverError="Test error message" />);
     expect(toast.error).toHaveBeenCalledWith('Dashboard Pre-fetch Failed', expect.any(Object));

@@ -6,6 +6,7 @@ import { logger } from "./lib/logger";
 import { isAuthSessionMissingError } from "./lib/security/auth";
 import { decrypt } from "./lib/crypto";
 import { redact } from "./lib/utils.server";
+import { getSupabaseConfig } from "./lib/supabase/fetch";
 
 /**
  * Clears all session-related cookies on a redirect response.
@@ -338,13 +339,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // Initialize Supabase
-  const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-  const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-    : process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
-    ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
-    : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const isProd = process.env.NODE_ENV === "production";
+  const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
   const supabase = createServerClient(
     supabaseUrl!,

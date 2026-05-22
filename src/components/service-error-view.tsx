@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Home, RefreshCcw, MessageSquare, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseConfig } from "@/lib/supabase/fetch";
 
 interface ServiceErrorViewProps {
   title?: string;
@@ -35,13 +36,7 @@ export function ServiceErrorView({
   };
 
   const handleLogout = async () => {
-    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
-      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
     const supabase = createBrowserClient(
       supabaseUrl!,

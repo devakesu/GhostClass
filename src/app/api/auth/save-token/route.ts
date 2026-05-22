@@ -268,13 +268,7 @@ const handler = async (
 
     // C-1: Mirror the isProd guard from proxy.ts so dev/staging sessions are set
     // against the correct Supabase project and match the middleware's session cookies.
-    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY
-      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+    const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
     const supabase = createServerClient(
       supabaseUrl,
@@ -295,10 +289,40 @@ const handler = async (
       }
     );
 
-    const { data: signInData } = await supabase.auth.signInWithPassword({
-      email,
-      password: passwordToUse,
-    });
+    // Attempt to sign in using the constructed email first to avoid an
+    // unnecessary admin API lookup in the common case. If that sign-in
+    // fails, fall back to fetching the canonical email from the admin API
+    // and retry once.
+    let signInEmail = email;
+    let signInData: any = null;
+    try {
+      let signInRes = await supabase.auth.signInWithPassword({
+        email: signInEmail,
+        password: passwordToUse,
+      });
+      if (signInRes.error) {
+        // First attempt failed — try to resolve the canonical email and retry.
+        try {
+          const adminUser = await supabaseAdmin.auth.admin.getUserById(authUserId);
+          const fetchedEmail = (adminUser as any)?.data?.user?.email;
+          if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
+            signInEmail = fetchedEmail;
+            signInRes = await supabase.auth.signInWithPassword({
+              email: signInEmail,
+              password: passwordToUse,
+            });
+          }
+        } catch {
+          // If admin lookup fails, preserve the original sign-in error below.
+        }
+      }
+
+      signInData = signInRes.data;
+    } catch (e) {
+      // Ensure any unexpected errors during sign-in are surfaced to the
+      // existing error handling path.
+      throw e;
+    }
 
     const { iv: tIv, content: tContent } = encrypt(token);
     const updateData: Record<string, unknown> = {
@@ -332,6 +356,7 @@ const handler = async (
 
     if (authType !== "app-check") {
       await setAuthCookie(token);
+
       return NextResponse.json(response);
     }
 

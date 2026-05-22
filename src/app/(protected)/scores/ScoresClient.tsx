@@ -238,9 +238,9 @@ function ScoreCard({
 
         <CardContent className="pt-0 flex flex-col gap-2 sm:gap-3 flex-1">
           {/* Course */}
-          <div className="flex items-start gap-2">
+          <div className="flex min-w-0 items-start gap-2">
             <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-            <span className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+            <span className="min-w-0 flex-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed break-words">
               {getCourseName(exam)}
             </span>
           </div>
@@ -788,12 +788,12 @@ function CourseGroupsSection({
           return (
             <div key={group.id}>
               {/* Course heading */}
-              <div className="flex items-center gap-3 mb-4">
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                 <BookOpen
                   className="h-4 w-4 text-primary shrink-0"
                   aria-hidden="true"
                 />
-                <span className="text-sm font-semibold text-foreground">
+                <span className="min-w-0 text-sm font-semibold text-foreground break-words">
                   {group.label}
                 </span>
                 {isCourseDisabled(
@@ -803,8 +803,8 @@ function CourseGroupsSection({
                     Disabled
                   </Badge>
                 )}
-                <div className="flex-1 h-px bg-foreground/10" />
-                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                <div className="hidden sm:block flex-1 h-px bg-foreground/10" />
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0 sm:whitespace-nowrap">
                   {countLabel}
                 </span>
               </div>

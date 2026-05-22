@@ -7,6 +7,7 @@ import { authRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { withSecurity } from "@/lib/security/app-check";
+import { getSupabaseConfig } from "@/lib/supabase/fetch";
 
 const handler = async (req: NextRequest) => {
   // Rate limiting — prevents flooding the logout endpoint even with a valid CSRF token
@@ -46,10 +47,7 @@ const handler = async (req: NextRequest) => {
   // would otherwise remain. We derive the name from NEXT_PUBLIC_SUPABASE_URL
   // which is always available in the server runtime.
   try {
-    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-    const supabaseUrl = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseUrl = getSupabaseConfig("client").url;
     // URL pattern: https://{project-ref}.supabase.co
     const projectRef = new URL(supabaseUrl || "").hostname.split(".")[0];
     if (projectRef) {

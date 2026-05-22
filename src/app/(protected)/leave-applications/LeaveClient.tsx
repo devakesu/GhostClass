@@ -140,14 +140,16 @@ function WorkflowHistoryItem({ approver }: { approver: LeaveApprover }) {
   const styles = getApproverStyles(approver.action_type);
 
   return (
-    <div className="flex items-center justify-between border-b border-border/20 last:border-0 pb-1.5 last:pb-0">
-      <span className="flex items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium">
+    <div className="flex items-center gap-3 border-b border-border/20 pb-1.5 last:border-0 last:pb-0">
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium">
         <span className={cn("h-5 w-5 rounded-full flex items-center justify-center shrink-0", styles.bg)}>
           <User className={cn("h-3 w-3", styles.text)} />
         </span>
-        {approver.action_by_user?.first_name} {approver.action_by_user?.last_name}
+        <span className="min-w-0 truncate leading-tight">
+          {approver.action_by_user?.first_name} {approver.action_by_user?.last_name}
+        </span>
       </span>
-      <div className="flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
         <Badge
           variant="outline"
           className={cn("text-[9px] uppercase tracking-tighter px-1.5 py-0 h-4 border-none font-bold", statusInfo.color)}
@@ -188,12 +190,12 @@ function WorkflowHistory({ approvers }: { approvers?: LeaveApprover[] | null }) 
   if (validApprovers.length === 0) return null;
 
   return (
-    <div className="px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/2">
+    <div className="px-4 sm:px-6 pt-3.5 pb-4 mt-auto border-t border-border/40 dark:border-white/5 bg-muted/20 dark:bg-white/2">
       <div className="w-full space-y-2.5">
         <span className="block text-[11px] text-muted-foreground uppercase tracking-wider font-bold dark:font-semibold">
           Workflow History
         </span>
-        <div className="flex flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+        <div className="flex min-w-0 flex-col gap-1.5 text-[11px] sm:text-xs text-muted-foreground max-h-56 overflow-y-auto pr-1 custom-scrollbar">
           {validApprovers.map((approver) => (
             <WorkflowHistoryItem key={approver.id} approver={approver} />
           ))}
@@ -253,18 +255,18 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
     )}`;
   }, [sessions]);
 
-  return (
-    <Card className="custom-container hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
-      <CardHeader className="pb-3 border-b border-border/30 dark:border-white/5">
-        <div className="flex justify-between items-start mb-2">
+    return (
+      <Card className="custom-container w-full min-w-0 overflow-hidden hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
+        <CardHeader className="px-4 sm:px-6 pb-3 border-b border-border/30 dark:border-white/5">
+        <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-start sm:justify-between">
           <Badge
             variant="outline"
-            className={cn("flex gap-1.5 items-center", status.color)}
+            className={cn("flex w-fit max-w-full gap-1.5 items-center whitespace-normal break-words", status.color)}
           >
             <StatusIcon className="h-3.5 w-3.5" />
             {status.label}
           </Badge>
-          <span className="text-xs text-muted-foreground font-medium bg-muted/50 dark:bg-white/5 px-2 py-1 rounded-md border border-border/50 dark:border-white/5">
+          <span className="text-xs text-muted-foreground font-medium bg-muted/50 dark:bg-white/5 px-2 py-1 rounded-md border border-border/50 dark:border-white/5 whitespace-normal break-words sm:text-right">
             Type: {leave.attendancetype?.name || "Leave"}
           </span>
         </div>
@@ -279,24 +281,26 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
         )}
       </CardHeader>
 
-      <CardContent className="py-4 space-y-5 flex-1 text-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-muted-foreground">
-          <div>
+        <CardContent className="px-4 sm:px-6 py-4 space-y-5 text-sm min-w-0">
+        <div className="grid grid-cols-1 gap-4 text-muted-foreground sm:grid-cols-2">
+          <div className="min-w-0">
             <span className="block text-[11px] sm:text-xs uppercase tracking-wider opacity-80 dark:opacity-60 mb-1 font-semibold dark:font-normal">
               Applied On
             </span>
-            <div className="flex items-center gap-1.5 text-foreground/80 dark:text-white/80">
+            <div className="flex items-start gap-1.5 text-foreground/80 dark:text-white/80 min-w-0">
               <Calendar className="h-3.5 w-3.5" />
-              {formatDate(leave.created_at || null)}
+              <span className="min-w-0 break-words leading-tight">
+                {formatDate(leave.created_at || null)}
+              </span>
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="block text-[11px] sm:text-xs uppercase tracking-wider opacity-80 dark:opacity-60 mb-1 font-semibold dark:font-normal">
               Leave Dates
             </span>
-            <div className="flex items-center gap-1.5 text-foreground/80 dark:text-white/80">
+            <div className="flex items-start gap-1.5 text-foreground/80 dark:text-white/80 min-w-0">
               <Clock className="h-3.5 w-3.5" />
-              <span className="truncate" title={dateRangeStr}>
+              <span className="min-w-0 break-words leading-tight" title={dateRangeStr}>
                 {dateRangeStr}
               </span>
             </div>
@@ -312,15 +316,15 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
               {sessions.map((session) => (
                 <div
                   key={session.id}
-                  className="flex items-start gap-2 bg-muted/50 dark:bg-white/5 rounded-md p-2 border border-border/50 dark:border-white/5"
+                  className="flex min-w-0 items-start gap-2 bg-muted/50 dark:bg-white/5 rounded-md p-2 border border-border/50 dark:border-white/5"
                 >
                   <Badge
                     variant="outline"
-                    className="bg-muted dark:bg-white/5 text-[10px] sm:text-xs px-1.5 py-0 border-border/50"
+                    className="shrink-0 bg-muted dark:bg-white/5 text-[10px] sm:text-xs px-1.5 py-0 border-border/50 whitespace-nowrap"
                   >
                     S: {session.session?.name}
                   </Badge>
-                  <span className="text-xs text-foreground/80 dark:text-white/80 line-clamp-2 leading-tight flex-1">
+                  <span className="min-w-0 flex-1 text-xs text-foreground/80 dark:text-white/80 line-clamp-2 leading-tight break-words whitespace-normal">
                     {session.course?.name ||
                       session.course?.code ||
                       "Unknown Course"}
@@ -340,16 +344,13 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
               {leave.files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 max-w-full"
+                  className="flex min-w-0 flex-wrap items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 max-w-full"
                 >
                   <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span
-                    className="truncate text-xs text-indigo-700 dark:text-indigo-200 font-medium dark:font-normal"
-                    title={file.file_name}
-                  >
+                <span className="min-w-0 flex-1 break-words text-xs text-indigo-700 dark:text-indigo-200 font-medium dark:font-normal" title={file.file_name}>
                     {file.file_name}
                   </span>
-                  <span className="text-[10px] text-indigo-500/80 dark:text-indigo-400/60 shrink-0 font-medium dark:font-normal">
+                  <span className="text-[10px] text-indigo-500/80 dark:text-indigo-400/60 shrink-0 font-medium dark:font-normal whitespace-nowrap sm:ml-auto">
                     ({formatBytes(file.size_byte || 0)})
                   </span>
                 </div>

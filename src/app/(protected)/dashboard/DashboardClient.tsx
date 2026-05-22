@@ -214,8 +214,8 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
   return 0;
 };
 
-export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
-  const { data: rawProfile, isLoading: isLoadingProfile } = useProfile({ sync: true });
+export default function DashboardClient({ serverError }: DashboardClientProps) {
+  const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
   const setSemesterMutation = useSetSemester();
@@ -257,10 +257,10 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const [isSelectClassOpen, setIsSelectClassOpen] = useState(false);
   const academicShiftLockRef = useRef(false);
 
-  const { syncCompleted } = useSyncOnMount({ 
-    username: profile?.username, 
-    userId: profile?.id ? String(profile.id) : undefined, 
-    enabled: !!profile?.username, 
+  const { syncCompleted } = useSyncOnMount({
+    username: profile?.username,
+    userId: profile?.id ? String(profile.id) : undefined,
+    enabled: !!profile?.username,
     sentryLocation: "DashboardClient",
     sentryTag: "background_sync"
   });
@@ -275,8 +275,6 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncCompleted,
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    initialData: (selectedSemester === null && selectedYear === null) ? (initialData?.attendance as any) : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 
@@ -298,11 +296,11 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncCompleted && !!profile?.class?.id });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
-  const { getCourseCodeById: getCourseCode } = useCourseLookup({ 
-    coursesData, 
-    classCourses, 
+  const { getCourseCodeById: getCourseCode } = useCourseLookup({
+    coursesData,
+    classCourses,
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    attendanceData: attendanceData as any 
+    attendanceData: attendanceData as any
   }) as { getCourseCodeById: (id: string | number) => string };
 
   const courseList = useMemo(() => {
@@ -360,6 +358,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
       setSelectedSemester(pendingChange.semester);
       setSelectedYear(pendingChange.year);
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await refetchProfile();
     } catch (error) {
       logger.error("Update Failed:", error);
       toast.error("Failed to update settings");
@@ -453,12 +452,12 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     }
     if (attendanceData) {
       return (
-        <AttendanceCalendar 
-          attendanceData={attendanceData} 
-          semester={effectiveSemester || undefined} 
-          year={effectiveYear || undefined} 
-          coursesData={{ courses: courseRegistry as unknown as Record<string, Course> }} 
-          classCourses={classCourses} 
+        <AttendanceCalendar
+          attendanceData={attendanceData}
+          semester={effectiveSemester || undefined}
+          year={effectiveYear || undefined}
+          coursesData={{ courses: courseRegistry as unknown as Record<string, Course> }}
+          classCourses={classCourses}
         />
       );
     }
@@ -484,7 +483,6 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                 For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
-                <span className="text-sm font-medium">Academic period</span>
                 <div className="inline-flex items-center rounded-full border border-primary/15 bg-background/80 p-1 shadow-sm backdrop-blur-sm">
                   <button
                     type="button"
@@ -520,25 +518,25 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
           <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
           <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses as Record<string, unknown>[]} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile as unknown as Record<string, unknown>} onEditInstructor={(course: Record<string, unknown>, _name: string, hasCustomName: boolean, customInstructor?: unknown) => {
-              const customInst = customInstructor as CustomInstructor | undefined;
-              setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
-              setIsEditInstructorOpen(true);
-            }} onAddCourse={() => {
-              if (!profile?.class?.id) {
-                toast.error("You have not assigned a class yet.");
-              } else {
-                setIsAddCourseOpen(true);
-              }
-            }} />
+            const customInst = customInstructor as CustomInstructor | undefined;
+            setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
+            setIsEditInstructorOpen(true);
+          }} onAddCourse={() => {
+            if (!profile?.class?.id) {
+              toast.error("You have not assigned a class yet.");
+            } else {
+              setIsAddCourseOpen(true);
+            }
+          }} />
 
           <div className="mb-6">
-              <Card className="custom-container">
-                <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
-                <CardContent>
-                  {renderAttendanceCalendarContent()}
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="custom-container">
+              <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
+              <CardContent>
+                {renderAttendanceCalendarContent()}
+              </CardContent>
+            </Card>
+          </div>
 
           <AlertDialog
             open={showConfirmDialog}

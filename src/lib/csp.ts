@@ -16,6 +16,7 @@
 // - This maintains strong XSS protection while allowing Next.js and Cloudflare to function
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { getSupabaseConfig } from "@/lib/supabase/fetch";
 
 export const getCspHeader = (nonce?: string) => {
   // FORCE_STRICT_CSP / NEXT_PUBLIC_FORCE_STRICT_CSP
@@ -36,10 +37,7 @@ export const getCspHeader = (nonce?: string) => {
   const isActualProduction = process.env.NODE_ENV === "production";
   const isDev = !isActualProduction && !forceStrictCsp;
   const supabaseOrigin = (() => {
-    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-    const urlString = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const { url: urlString } = getSupabaseConfig("client");
 
     if (!urlString) return "";
     try {
@@ -63,10 +61,7 @@ export const getCspHeader = (nonce?: string) => {
   
   // Supabase WebSocket URL for Realtime features
   const supabaseWsUrl = (() => {
-    const isProd = process.env.NODE_ENV === "production" || process.env.FORCE_PROD_SUPABASE === "true";
-    const urlString = (!isProd && process.env.NEXT_PUBLIC_SUPABASE_DEV_URL)
-      ? process.env.NEXT_PUBLIC_SUPABASE_DEV_URL
-      : process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const { url: urlString } = getSupabaseConfig("client");
 
     if (!urlString) return "";
 
