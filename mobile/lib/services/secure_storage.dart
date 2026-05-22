@@ -83,7 +83,9 @@ class SecureStorageService {
   }
 
   Future<void> _selfHeal(Object error) async {
-    AppLogger.e('SecureStorage: Executing self-healing routine due to exception: $error');
+    AppLogger.e(
+      'SecureStorage: Executing self-healing routine due to exception: $error',
+    );
     try {
       await _storage.deleteAll();
     } on Object catch (e, st) {
@@ -130,8 +132,7 @@ class SecureStorageService {
   Future<void> saveSupabaseUserId(String id) =>
       _safeWrite(key: _Keys.supabaseUserId, value: id);
 
-  Future<String?> getSupabaseUserId() =>
-      _safeRead(key: _Keys.supabaseUserId);
+  Future<String?> getSupabaseUserId() => _safeRead(key: _Keys.supabaseUserId);
 
   // ─── EzyGo User ID & Username ────────────────────────────────────────────
 
@@ -278,8 +279,7 @@ class SecureStorageService {
 
   Future<void> deleteSecure(String key) => _safeDelete(key: key);
 
-  Future<void> deleteCachedData(String key) =>
-      _safeDelete(key: 'cache_$key');
+  Future<void> deleteCachedData(String key) => _safeDelete(key: 'cache_$key');
 
   // ─── Full Clear ──────────────────────────────────────────────────────────
 

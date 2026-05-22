@@ -380,6 +380,8 @@ describe("LoginForm – EzyGo credential error message override", () => {
 });
 
 describe("LoginForm – CSRF re-fetch on null token", () => {
+  const originalLocation = window.location;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -387,10 +389,14 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
     vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
     // Restore the default CSRF token after any test that may have overridden it.
     vi.mocked(getCsrfToken).mockReturnValue("test-csrf-token");
+
+    delete (window as any).location;
+    (window as any).location = { ...originalLocation, href: "" };
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    (window as any).location = originalLocation;
   });
 
   it("re-fetches and stores the CSRF token when getCsrfToken returns null, then completes login", async () => {
@@ -416,7 +422,7 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
       fireEvent.submit(passwordInput.closest("form")!);
     });
 
-    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() => expect(window.location.href).toBe("/dashboard"));
     expect(vi.mocked(setCsrfToken)).toHaveBeenCalledWith("refetched-csrf-token");
   });
 

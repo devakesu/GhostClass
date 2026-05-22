@@ -35,6 +35,8 @@ class MockSession extends Mock implements Session {}
 
 class MockFirebaseAnalytics extends Mock implements FirebaseAnalytics {}
 
+class MockGoRouter extends Mock implements GoRouter {}
+
 void main() {
   late MockFirebaseMessaging mockMessaging;
   late MockNotificationSettings mockSettings;
@@ -558,6 +560,7 @@ void main() {
     tester,
   ) async {
     final foregroundMessages = StreamController<RemoteMessage>();
+    final mockGoRouter = MockGoRouter();
 
     when(
       () => mockSettings.authorizationStatus,
@@ -589,6 +592,10 @@ void main() {
       ),
     );
 
+    when(
+      () => mockGoRouter.routerDelegate,
+    ).thenThrow(Exception('RouterDelegate crash'));
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -596,7 +603,7 @@ void main() {
           dioServiceProvider.overrideWithValue(mockDioService),
           secureStorageProvider.overrideWithValue(mockStorage),
           supabaseClientProvider.overrideWithValue(mockSupabase),
-          routerProvider.overrideWith((ref) => throw Exception('Router crash')),
+          routerProvider.overrideWithValue(mockGoRouter),
         ],
         child: const MaterialApp(
           home: Scaffold(body: SizedBox()),

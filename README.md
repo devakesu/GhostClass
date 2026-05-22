@@ -12,19 +12,19 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-16.1.6-black?style=for-the-badge&logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/React-19.2.4-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/Tailwind-CSS%204-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Next.js-16.2.6-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19.2.6-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.0-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/Flutter-3.44.0-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black" alt="Android" />
   <img src="https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Vitest-4.1.5-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
-  <img src="https://img.shields.io/badge/Playwright-1.59.1-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/Vitest-4.1.7-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
+  <img src="https://img.shields.io/badge/Playwright-1.60.0-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
 </p>
 <!-- markdownlint-enable MD033 -->
 
@@ -54,14 +54,14 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 ### Core Framework
 
-- **Next.js 16.1.6** - React 19 with App Router
+- **Next.js 16.2.6** - React 19 with App Router
 - **TypeScript 6.0.3** - Strict mode for type safety
-- **Flutter 3.27+** - Cross-platform native mobile application
+- **Flutter 3.44.0** - Cross-platform native mobile application
 - **Node.js** - v24.14.1+
 
 ### Styling & UI
 
-- **Tailwind CSS 4** - Utility-first styling with custom design system
+- **Tailwind CSS 4.3.0** - Utility-first styling with custom design system
 - **Radix UI** - Accessible, unstyled component primitives
 - **Shadcn UI** - Beautiful pre-styled components
 - **Framer Motion** - Smooth animations and transitions
@@ -141,7 +141,7 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 - **Node.js** - v24.14.1+
 - **npm** - v11.11.0+
 
-- **Flutter SDK** - 3.27+
+- **Flutter SDK** - 3.44.0
 - **Docker** - For containerized deployment (optional)
 
 ### Quick Start (Web)
@@ -153,7 +153,7 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 
 ### Quick Start (Mobile)
 
-1. **Install Flutter**: Ensure Flutter SDK 3.27+ is installed.
+1. **Install Flutter**: Ensure Flutter SDK 3.44.0 is installed.
 2. **Setup**: Navigate to `mobile/` and run `flutter pub get`.
 3. **Secrets**: Copy `app_secrets.dart.example` to `app_secrets.dart` and fill your API keys.
 4. **Run**: Connect a device and run `flutter run`.

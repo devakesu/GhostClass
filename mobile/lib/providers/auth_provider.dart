@@ -1005,7 +1005,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
       if (sem != null) {
         final semesterResponse = await api.updateSemester(sem, storage);
-        if (semesterResponse.statusCode != 200 && semesterResponse.statusCode != 201) {
+        if (semesterResponse.statusCode != 200 &&
+            semesterResponse.statusCode != 201) {
           final resData = semesterResponse.data as Map<String, dynamic>?;
           throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
         }

@@ -146,7 +146,8 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final storage = ref.read(secureStorageProvider);
 
     // 1. Primary source: the academic context already seeded by auth/profile sync.
-    final seededSemester = auth.profile?.currentSemester ?? auth.settings.semester;
+    final seededSemester =
+        auth.profile?.currentSemester ?? auth.settings.semester;
     final seededYear = auth.profile?.currentYear ?? auth.settings.academicYear;
 
     if (seededSemester != null && seededYear != null) {

@@ -140,11 +140,12 @@ class CalendarSessionCard extends StatelessWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(
-                            alpha: isDark ? 0.6 : 0.65,
-                          ),
+                          color:
+                              Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(
+                                alpha: isDark ? 0.6 : 0.65,
+                              ),
                         ),
                       ),
                   ],
@@ -217,11 +218,12 @@ class CalendarSessionCard extends StatelessWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(
-                    alpha: isDark ? 0.6 : 0.65,
-                  ),
+                  color:
+                      Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(
+                        alpha: isDark ? 0.6 : 0.65,
+                      ),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -425,7 +427,7 @@ Color _getContrastColor(Color color, bool isDark) {
   if (isDark) {
     final luminance = color.computeLuminance();
     if (luminance >= 0.45) return color;
-    
+
     final hsl = HSLColor.fromColor(color);
     var lightness = hsl.lightness;
     while (lightness < 1.0) {
@@ -439,7 +441,7 @@ Color _getContrastColor(Color color, bool isDark) {
   } else {
     final luminance = color.computeLuminance();
     if (luminance <= 0.18) return color;
-    
+
     final hsl = HSLColor.fromColor(color);
     var lightness = hsl.lightness;
     while (lightness > 0.0) {

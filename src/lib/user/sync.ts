@@ -114,7 +114,9 @@ function extractAcademicSettingValue(raw: unknown, primaryKey: string, fallbackK
   return null;
 }
 
-function normalizeSemester(semVal: unknown): "even" | "odd" | null {
+type SemesterType = "even" | "odd";
+
+function normalizeSemester(semVal: unknown): SemesterType | null {
   if (!semVal) return null;
   const semStr = String(semVal).toLowerCase();
   if (semStr.includes("odd") || semStr === "1") {
@@ -206,6 +208,281 @@ function cleanClassName(input: string): string {
     .trim();
 }
 
+async function upsertManualClass(
+  pcg: number | null,
+  sem: SemesterType,
+  year: string,
+  formattedName: string
+): Promise<{ id: string; name: string } | null> {
+  const supabaseAdmin = getAdminClient();
+  try {
+    const upsertPayload: Record<string, unknown> = {
+      programme_config_group_id: pcg != null ? Number(pcg) : null,
+      sem,
+      year,
+      name: shortTextSchema.parse(formattedName),
+    };
+
+    const { data: newClass, error: upsertErr } = await supabaseAdmin
+      .from("classes")
+      .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
+      .select("id, name")
+      .single();
+
+    if (upsertErr || !newClass) {
+      logger.error("[sync] detectAndSyncClass: Failed to clone/manual-upsert class", upsertErr);
+      return null;
+    }
+    return newClass;
+  } catch (err) {
+    logger.error("[sync] detectAndSyncClass: Exception cloning manual class", err instanceof Error ? err : new Error(String(err)));
+    return null;
+  }
+}
+
+async function detectClassWithoutCourses(
+  existingUserClassId: string | null | undefined,
+  currentAcademic: { current_semester: string; current_year: string }
+): Promise<{ classId: string | null; classInfo: { id: string; name: string } | null }> {
+  if (!existingUserClassId) {
+    return { classId: null, classInfo: null };
+  }
+
+  const supabaseAdmin = getAdminClient();
+  const { data: currentClass, error } = await supabaseAdmin
+    .from("classes")
+    .select("*")
+    .eq("id", existingUserClassId)
+    .maybeSingle();
+
+  if (error) {
+    logger.error("[sync] detectAndSyncClass: Failed to fetch existing user class", error);
+  }
+
+  if (!currentClass) {
+    return { classId: null, classInfo: null };
+  }
+
+  const currentClassId = currentClass.id ?? currentClass.class_id ?? existingUserClassId ?? null;
+  const currentClassName = typeof currentClass.name === "string" && currentClass.name.trim() !== ""
+    ? currentClass.name
+    : "Class";
+
+  const isCurrentAcademic = currentClass.sem === currentAcademic.current_semester && currentClass.year === currentAcademic.current_year;
+  if (isCurrentAcademic) {
+    return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
+  }
+
+  const hasNoName = typeof currentClass.name !== "string" || currentClass.name.trim() === "";
+  if (hasNoName) {
+    logger.warn("[sync] detectAndSyncClass: Existing class has no name; keeping current class without cloning", {
+      classId: currentClassId,
+    });
+    return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
+  }
+
+  const pcg = currentClass.programme_config_group_id;
+  const sem = normalizeSemester(currentAcademic.current_semester) || "even";
+  const year = currentAcademic.current_year;
+  const name = cleanClassName(currentClass.name);
+  const formattedName = `${name} ${sem} ${year}`.trim().replace(/\s+/g, ' ');
+
+  let query = supabaseAdmin
+    .from("classes")
+    .select("id, name")
+    .eq("sem", sem)
+    .eq("year", year)
+    .eq("name", shortTextSchema.parse(formattedName));
+
+  if (pcg != null) {
+    query = query.eq("programme_config_group_id", Number(pcg));
+  } else {
+    query = query.is("programme_config_group_id", null);
+  }
+
+  const { data: matchClasses } = await query;
+  const found = matchClasses?.[0];
+
+  if (found) {
+    return { classId: found.id, classInfo: { id: found.id, name: found.name } };
+  }
+
+  const newClass = await upsertManualClass(pcg, sem, year, formattedName);
+  if (newClass) {
+    return { classId: newClass.id, classInfo: newClass };
+  }
+
+  return { classId: null, classInfo: null };
+}
+
+function findCourseWithGroup(coursesList: CourseItem[]): CourseItem | undefined {
+  const primary = coursesList.find(
+    c => (c.usersubgroup?.programme_config_group_id != null || c.usersubgroup?.usergroup?.id != null)
+      && c.usersubgroup?.usergroup?.name != null
+  );
+  if (primary) return primary;
+
+  return coursesList.find(
+    c => c.usersubgroup?.programme_config_group_id != null
+      || c.usersubgroup?.usergroup?.id != null
+  );
+}
+
+async function tryUpdateExistingUserClass(
+  existingUserClassId: string | null | undefined,
+  pcg: number,
+  sem: SemesterType,
+  year: string,
+  externalId: number | null,
+  name: string
+): Promise<{ id: string; name: string } | null> {
+  if (!existingUserClassId) {
+    return null;
+  }
+
+  const supabaseAdmin = getAdminClient();
+  const { data: userClass, error: fetchUserClassErr } = await supabaseAdmin
+    .from("classes")
+    .select("*")
+    .eq("id", existingUserClassId)
+    .maybeSingle();
+
+  if (fetchUserClassErr || !userClass) {
+    return null;
+  }
+
+  const matchPcg = userClass.programme_config_group_id === pcg;
+  const matchTerm = userClass.sem === sem && userClass.year === year;
+
+  if (matchPcg && matchTerm) {
+    const updatePayload: Record<string, unknown> = {};
+    if (externalId != null) {
+      updatePayload.external_group_id = externalId;
+    }
+    updatePayload.name = name;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from("classes")
+      .update(updatePayload)
+      .eq("id", userClass.id);
+
+    if (updateErr) {
+      logger.error("[sync] detectAndSyncClass: Failed to update user's existing class with official EzyGo metadata", updateErr);
+    }
+    return { id: userClass.id, name };
+  }
+
+  return null;
+}
+
+async function findOrCreateCohortClass(
+  pcg: number,
+  sem: SemesterType,
+  year: string,
+  externalId: number | null,
+  name: string
+): Promise<{ id: string; name: string } | null> {
+  const supabaseAdmin = getAdminClient();
+
+  const { data: existingClasses, error: fetchErr } = await supabaseAdmin
+    .from("classes")
+    .select("id, name")
+    .eq("programme_config_group_id", pcg)
+    .eq("sem", sem)
+    .eq("year", year)
+    .eq("name", name);
+
+  if (fetchErr) {
+    logger.error("[sync] detectAndSyncClass: Failed to fetch class by cohort", fetchErr);
+  }
+
+  const matchedClass = existingClasses?.[0];
+
+  if (matchedClass) {
+    if (externalId != null) {
+      const { error: updateErr } = await supabaseAdmin
+        .from("classes")
+        .update({ external_group_id: externalId })
+        .eq("id", matchedClass.id);
+      if (updateErr) {
+        logger.error("[sync] detectAndSyncClass: Failed to update class metadata", updateErr);
+      }
+    }
+    return { id: matchedClass.id, name };
+  }
+
+  try {
+    const upsertPayload: Record<string, unknown> = {
+      programme_config_group_id: pcg,
+      sem,
+      year,
+      name,
+    };
+    if (externalId != null) {
+      upsertPayload.external_group_id = externalId;
+    }
+
+    const { data: newClass, error: upsertErr } = await supabaseAdmin
+      .from("classes")
+      .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
+      .select("id, name")
+      .single();
+
+    if (upsertErr || !newClass) {
+      logger.error("[sync] detectAndSyncClass: Failed to upsert new class", upsertErr);
+      return null;
+    }
+    return newClass;
+  } catch (err) {
+    logger.error("[sync] detectAndSyncClass: Exception upserting new class", err instanceof Error ? err : new Error(String(err)));
+    return null;
+  }
+}
+
+async function syncCohortClass(
+  pcg: number,
+  sem: SemesterType,
+  year: string,
+  externalId: number | null,
+  name: string,
+  existingUserClassId: string | null | undefined
+): Promise<{
+  classId: string | null;
+  classInfo: { id: string; name: string } | null;
+  detectedSem?: SemesterType;
+  detectedYear?: string;
+}> {
+  const existingMatched = await tryUpdateExistingUserClass(
+    existingUserClassId,
+    pcg,
+    sem,
+    year,
+    externalId,
+    name
+  );
+
+  if (existingMatched) {
+    return {
+      classId: existingMatched.id,
+      classInfo: existingMatched,
+      detectedSem: sem,
+      detectedYear: year,
+    };
+  }
+
+  const cohortClass = await findOrCreateCohortClass(pcg, sem, year, externalId, name);
+  if (cohortClass) {
+    return {
+      classId: cohortClass.id,
+      classInfo: cohortClass,
+      detectedSem: sem,
+      detectedYear: year,
+    };
+  }
+
+  return { classId: null, classInfo: null };
+}
+
 async function detectAndSyncClass(
   coursesList: CourseItem[],
   _rolesData: unknown,
@@ -214,105 +491,14 @@ async function detectAndSyncClass(
 ): Promise<{
   classId: string | null;
   classInfo: { id: string; name: string } | null;
-  detectedSem?: "even" | "odd" | null;
+  detectedSem?: SemesterType | null;
   detectedYear?: string | null;
 }> {
-  const supabaseAdmin = getAdminClient();
-
   if (coursesList.length === 0) {
-    if (existingUserClassId) {
-      const { data: currentClass, error } = await supabaseAdmin
-        .from("classes")
-        .select("*")
-        .eq("id", existingUserClassId)
-        .maybeSingle();
-
-      if (error) {
-        logger.error("[sync] detectAndSyncClass: Failed to fetch existing user class", error);
-      }
-
-      if (currentClass) {
-        const currentClassId = currentClass.id ?? currentClass.class_id ?? existingUserClassId ?? null;
-        const currentClassName = typeof currentClass.name === "string" && currentClass.name.trim() !== ""
-          ? currentClass.name
-          : "Class";
-
-        if (currentClass.sem === currentAcademic.current_semester && currentClass.year === currentAcademic.current_year) {
-          return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
-        }
-
-        if (typeof currentClass.name !== "string" || currentClass.name.trim() === "") {
-          logger.warn("[sync] detectAndSyncClass: Existing class has no name; keeping current class without cloning", {
-            classId: currentClassId,
-          });
-          return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
-        }
-
-        const pcg = currentClass.programme_config_group_id;
-        const sem = normalizeSemester(currentAcademic.current_semester) || "even";
-        const year = currentAcademic.current_year;
-        const name = cleanClassName(currentClass.name);
-        const formattedName = `${name} ${sem} ${year}`.trim().replace(/\s+/g, ' ');
-
-        let query = supabaseAdmin
-          .from("classes")
-          .select("id, name")
-          .eq("sem", sem)
-          .eq("year", year)
-          .eq("name", shortTextSchema.parse(formattedName));
-
-        if (pcg != null) {
-          query = query.eq("programme_config_group_id", Number(pcg));
-        } else {
-          query = query.is("programme_config_group_id", null);
-        }
-
-        const { data: matchClasses } = await query;
-        const found = matchClasses?.[0];
-
-        if (found) {
-          return { classId: found.id, classInfo: { id: found.id, name: found.name } };
-        }
-
-        try {
-          const upsertPayload: Record<string, unknown> = {
-            programme_config_group_id: pcg != null ? Number(pcg) : null,
-            sem,
-            year,
-            name: shortTextSchema.parse(formattedName),
-          };
-
-          const { data: newClass, error: upsertErr } = await supabaseAdmin
-            .from("classes")
-            .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
-            .select("id, name")
-            .single();
-
-          if (upsertErr || !newClass) {
-            logger.error("[sync] detectAndSyncClass: Failed to clone/manual-upsert class", upsertErr);
-          } else {
-            return { classId: newClass.id, classInfo: newClass };
-          }
-        } catch (err) {
-          logger.error("[sync] detectAndSyncClass: Exception cloning manual class", err instanceof Error ? err : new Error(String(err)));
-        }
-      }
-    }
-    return { classId: null, classInfo: null };
+    return detectClassWithoutCourses(existingUserClassId, currentAcademic);
   }
 
-  let courseWithGroup = coursesList.find(
-    c => (c.usersubgroup?.programme_config_group_id != null || c.usersubgroup?.usergroup?.id != null)
-      && c.usersubgroup?.usergroup?.name != null
-  );
-
-  if (!courseWithGroup) {
-    courseWithGroup = coursesList.find(
-      c => c.usersubgroup?.programme_config_group_id != null
-        || c.usersubgroup?.usergroup?.id != null
-    );
-  }
-
+  const courseWithGroup = findCourseWithGroup(coursesList);
   if (courseWithGroup?.usersubgroup) {
     const sub = courseWithGroup.usersubgroup;
     const pcg = sub.programme_config_group_id ?? sub.usergroup?.id ?? null;
@@ -325,100 +511,16 @@ async function detectAndSyncClass(
 
       logger.info(`[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${nameRaw}`);
 
-      // First check if the user already has a class associated, and if it matches this cohort (program ID and end year)
-      if (existingUserClassId) {
-        const { data: userClass, error: fetchUserClassErr } = await supabaseAdmin
-          .from("classes")
-          .select("*")
-          .eq("id", existingUserClassId)
-          .maybeSingle();
-
-        if (userClass && !fetchUserClassErr) {
-          const matchPcg = userClass.programme_config_group_id === (pcg != null ? Number(pcg) : null);
-          const matchTerm = userClass.sem === sem && userClass.year === year;
-
-          if (matchPcg && matchTerm) {
-            // Update this class with the official EzyGo data. Avoid overwriting external_group_id with null.
-            const updatePayload: Record<string, unknown> = {};
-            if (externalId != null) updatePayload.external_group_id = externalId;
-            updatePayload.name = name;
-
-            if (Object.keys(updatePayload).length > 0) {
-              const { error: updateErr } = await supabaseAdmin
-                .from("classes")
-                .update(updatePayload)
-                .eq("id", userClass.id);
-
-              if (updateErr) {
-                logger.error("[sync] detectAndSyncClass: Failed to update user's existing class with official EzyGo metadata", updateErr);
-              }
-            }
-            return { classId: userClass.id, classInfo: { id: userClass.id, name: name }, detectedSem: sem, detectedYear: year };
-          }
-        }
-      }
-
-      // Fallback: If user has no class associated or it doesn't match the cohort, find/create class by cohort
-      const { data: existingClasses, error: fetchErr } = await supabaseAdmin
-        .from("classes")
-        .select("id, name")
-        .eq("programme_config_group_id", Number(pcg))
-        .eq("sem", sem)
-        .eq("year", year)
-        .eq("name", name);
-
-      if (fetchErr) {
-        logger.error("[sync] detectAndSyncClass: Failed to fetch class by cohort", fetchErr);
-      }
-
-      const matchedClass = existingClasses?.[0];
-
-      if (matchedClass) {
-        try {
-          const updatePayload: Record<string, unknown> = {};
-          if (externalId != null) updatePayload.external_group_id = externalId;
-          if (Object.keys(updatePayload).length > 0) {
-            const { error: updateErr } = await supabaseAdmin
-              .from("classes")
-              .update(updatePayload)
-              .eq("id", matchedClass.id);
-            if (updateErr) {
-              logger.error("[sync] detectAndSyncClass: Failed to update class metadata", updateErr);
-            }
-          }
-        } catch (err) {
-          logger.error("[sync] detectAndSyncClass: Exception updating matched class", err instanceof Error ? err : new Error(String(err)));
-        }
-        return { classId: matchedClass.id, classInfo: { id: matchedClass.id, name: name }, detectedSem: sem, detectedYear: year };
-      } else {
-        try {
-          const upsertPayload: Record<string, unknown> = {
-            programme_config_group_id: Number(pcg),
-            sem,
-            year,
-            name,
-          };
-          if (externalId != null) upsertPayload.external_group_id = externalId;
-
-          const { data: newClass, error: upsertErr } = await supabaseAdmin
-            .from("classes")
-            .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
-            .select("id, name")
-            .single();
-
-          if (upsertErr || !newClass) {
-            logger.error("[sync] detectAndSyncClass: Failed to upsert new class", upsertErr);
-          } else {
-            return { classId: newClass.id, classInfo: newClass, detectedSem: sem, detectedYear: year };
-          }
-        } catch (err) {
-          logger.error("[sync] detectAndSyncClass: Exception upserting new class", err instanceof Error ? err : new Error(String(err)));
-        }
-      }
+      return syncCohortClass(
+        Number(pcg),
+        sem,
+        year,
+        externalId,
+        name,
+        existingUserClassId
+      );
     }
   }
-
-  // No primary subgroup fallback: require cohort data from coursesList to create/identify classes.
 
   return { classId: null, classInfo: null };
 }
@@ -553,7 +655,7 @@ function resolveMergedProfile(
 export interface LightSyncResult {
   academic: {
     year: string | null;
-    semester: "even" | "odd" | null;
+    semester: SemesterType | null;
     current_year: string;
     current_semester: string;
   };

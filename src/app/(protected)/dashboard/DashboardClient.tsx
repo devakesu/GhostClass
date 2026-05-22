@@ -273,9 +273,18 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return () => clearTimeout(timer);
   }, [syncCompleted, profile]);
 
+  const isAttendanceStale =
+    initialData?.attendance &&
+    typeof initialData.attendance === "object" &&
+    "studentAttendanceData" in initialData.attendance &&
+    initialData.attendance.studentAttendanceData &&
+    typeof initialData.attendance.studentAttendanceData === "object" &&
+    "stale" in initialData.attendance.studentAttendanceData &&
+    (initialData.attendance.studentAttendanceData as { stale?: unknown }).stale === true;
+
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncCompleted,
-    initialData: initialData?.attendance as AttendanceReport ?? undefined,
+    initialData: isAttendanceStale ? undefined : (initialData?.attendance as AttendanceReport ?? undefined),
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 

@@ -84,7 +84,9 @@ final routerProvider = Provider<GoRouter>((ref) {
     }
   });
 
-  final refreshStream = GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange);
+  final refreshStream = GoRouterRefreshStream(
+    Supabase.instance.client.auth.onAuthStateChange,
+  );
   ref.onDispose(() {
     refreshStream.dispose();
     authRefreshNotifier.dispose();

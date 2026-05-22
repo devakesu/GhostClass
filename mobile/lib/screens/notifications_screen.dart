@@ -171,7 +171,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                   try {
                     await runUnifiedPullToRefresh(
                       logLabel: 'NotificationsScreen',
-                      refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                      refreshProfile: () => ref
+                          .read(authProvider.notifier)
+                          .refreshProfile(force: true),
                       syncCron: () async {
                         final supabaseToken = ref
                             .read(supabaseClientProvider)
@@ -179,10 +181,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                             .currentSession
                             ?.accessToken;
                         if (supabaseToken == null) return;
-                        await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                        await ref
+                            .read(apiServiceProvider)
+                            .triggerSync(supabaseToken, force: true);
                       },
                       refreshData: () async {
-                        final _ = await ref.refresh(notificationsProvider.future);
+                        final _ = await ref.refresh(
+                          notificationsProvider.future,
+                        );
                       },
                     );
                   } on Object {

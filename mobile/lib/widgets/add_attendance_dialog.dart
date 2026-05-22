@@ -464,7 +464,8 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
 
   Widget _buildSubjectSelectorButton(DashboardData? data, Color primary) {
     final profile = ref.watch(authProvider).value?.profile;
-    final hasNoClass = profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+    final hasNoClass =
+        profile?.classField?.id == null || profile!.classField!.id.isEmpty;
     final hasNoCourses = data == null || data.courses.isEmpty;
 
     if (hasNoClass || hasNoCourses) {
@@ -484,7 +485,9 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
             Icon(
               LucideIcons.bookOpen,
               size: 18,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -493,7 +496,9 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
                 style: GoogleFonts.manrope(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -819,7 +824,8 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
 
   Widget _buildSubmitButton(Color primary) {
     final profile = ref.watch(authProvider).value?.profile;
-    final hasNoClass = profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+    final hasNoClass =
+        profile?.classField?.id == null || profile!.classField!.id.isEmpty;
 
     return SizedBox(
       width: double.infinity,

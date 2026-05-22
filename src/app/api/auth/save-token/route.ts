@@ -194,6 +194,76 @@ async function provisionSupabaseAuthUser(
   return { authUserId: retry.user.id, passwordToUse: canonicalPass, isFirstLogin: true };
 }
 
+async function signInToSupabase(
+  supabase: ReturnType<typeof createServerClient>,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  authUserId: string,
+  email: string,
+  passwordToUse: string
+) {
+  let signInEmail = email;
+  let signInRes = await supabase.auth.signInWithPassword({
+    email: signInEmail,
+    password: passwordToUse,
+  });
+  if (signInRes.error) {
+    // First attempt failed — try to resolve the canonical email and retry.
+    try {
+      const { data: adminUserData } = await supabaseAdmin.auth.admin.getUserById(authUserId);
+      const fetchedEmail = adminUserData?.user?.email;
+      if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
+        signInEmail = fetchedEmail;
+        signInRes = await supabase.auth.signInWithPassword({
+          email: signInEmail,
+          password: passwordToUse,
+        });
+      }
+    } catch {
+      // If admin lookup fails, preserve the original sign-in error below.
+    }
+  }
+
+  if (signInRes.error) {
+    throw signInRes.error;
+  }
+
+  return signInRes.data;
+}
+
+async function upsertUserData(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  payload: {
+    verifiedId: string;
+    username: string | null;
+    token: string;
+    authUserId: string;
+    fcm_token?: string;
+    isFirstLogin: boolean;
+    passwordToUse: string;
+  }
+) {
+  const { verifiedId, username, token, authUserId, fcm_token, isFirstLogin, passwordToUse } = payload;
+  const { iv: tIv, content: tContent } = encrypt(token);
+  const updateData: Record<string, unknown> = {
+    id: verifiedId,
+    username,
+    ezygo_token: tContent,
+    ezygo_iv: tIv,
+    auth_id: authUserId,
+    updated_at: new Date().toISOString(),
+    ...(fcm_token && { fcm_token }),
+  };
+
+  if (isFirstLogin) {
+    const { iv: pIv, content: pContent } = encrypt(passwordToUse);
+    updateData.auth_password = pContent;
+    updateData.auth_password_iv = pIv;
+  }
+
+  const { error: upsertErr } = await supabaseAdmin.from("users").upsert(updateData);
+  if (upsertErr) throw new Error("Upsert failed");
+}
+
 async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean): Promise<NextResponse | null> {
   const originError = await validateOrigin(headerList, isAppCheck);
   if (originError) {
@@ -289,57 +359,23 @@ const handler = async (
       }
     );
 
-    // Attempt to sign in using the constructed email first to avoid an
-    // unnecessary admin API lookup in the common case. If that sign-in
-    // fails, fall back to fetching the canonical email from the admin API
-    // and retry once.
-    let signInEmail = email;
-    let signInRes = await supabase.auth.signInWithPassword({
-      email: signInEmail,
-      password: passwordToUse,
-    });
-    if (signInRes.error) {
-      // First attempt failed — try to resolve the canonical email and retry.
-      try {
-        const { data: adminUserData } = await supabaseAdmin.auth.admin.getUserById(authUserId);
-        const fetchedEmail = adminUserData?.user?.email;
-        if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
-          signInEmail = fetchedEmail;
-          signInRes = await supabase.auth.signInWithPassword({
-            email: signInEmail,
-            password: passwordToUse,
-          });
-        }
-      } catch {
-        // If admin lookup fails, preserve the original sign-in error below.
-      }
-    }
+    const signInData = await signInToSupabase(
+      supabase,
+      supabaseAdmin,
+      authUserId,
+      email,
+      passwordToUse
+    );
 
-    if (signInRes.error) {
-      throw signInRes.error;
-    }
-
-    const signInData = signInRes.data;
-
-    const { iv: tIv, content: tContent } = encrypt(token);
-    const updateData: Record<string, unknown> = {
-      id: verifiedId,
+    await upsertUserData(supabaseAdmin, {
+      verifiedId,
       username: ezyUser.username,
-      ezygo_token: tContent,
-      ezygo_iv: tIv,
-      auth_id: authUserId,
-      updated_at: new Date().toISOString(),
-      ...(fcm_token && { fcm_token }),
-    };
-
-    if (isFirstLogin) {
-      const { iv: pIv, content: pContent } = encrypt(passwordToUse);
-      updateData.auth_password = pContent;
-      updateData.auth_password_iv = pIv;
-    }
-
-    const { error: upsertErr } = await supabaseAdmin.from("users").upsert(updateData);
-    if (upsertErr) throw new Error("Upsert failed");
+      token,
+      authUserId,
+      fcm_token,
+      isFirstLogin,
+      passwordToUse,
+    });
 
     const syncRes = await performProfileSync(token, verifiedId, authUserId);
     const info = calculateCurrentAcademicInfo();

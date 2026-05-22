@@ -138,7 +138,8 @@ class _AddCourseCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(authProvider).value?.profile;
-    final hasNoClass = profile?.classField?.id == null || profile!.classField!.id.isEmpty;
+    final hasNoClass =
+        profile?.classField?.id == null || profile!.classField!.id.isEmpty;
 
     return Semantics(
       button: true,
@@ -169,8 +170,12 @@ class _AddCourseCard extends ConsumerWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.03),
+                    Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.08),
+                    Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.03),
                   ],
                 ),
                 border: Border.all(
@@ -242,7 +247,9 @@ class _AddCourseCard extends ConsumerWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                   letterSpacing: -0.5,
                                 ),
                               ),
@@ -252,9 +259,12 @@ class _AddCourseCard extends ConsumerWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.5,
+                                      ),
                                   height: 1.3,
                                 ),
                               ),

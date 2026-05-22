@@ -285,10 +285,11 @@ class _CalendarContent extends ConsumerWidget {
 
     final events = _getEventsForDay(selectedDay, disabledCodes, context);
 
-    final canMovePrev =
-        focusedDay.year > startDate.year || focusedDay.month > startDate.month;
-    final canMoveNext =
-        focusedDay.year < endDate.year || focusedDay.month < endDate.month;
+    final prevMonthLastDay = DateTime(focusedDay.year, focusedDay.month, 0);
+    final canMovePrev = !prevMonthLastDay.isBefore(startDate);
+
+    final nextMonthFirstDay = DateTime(focusedDay.year, focusedDay.month + 1);
+    final canMoveNext = !nextMonthFirstDay.isAfter(endDate);
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
@@ -316,7 +317,7 @@ class _CalendarContent extends ConsumerWidget {
               } else {
                 ServiceToast.show(
                   context,
-                  'Reached start of ${dashboard.selectedSemester.toUpperCase()} ${dashboard.selectedYear}',
+                  'Start of ${dashboard.selectedSemester.toUpperCase()} semester reached.',
                 );
               }
             },
@@ -326,7 +327,7 @@ class _CalendarContent extends ConsumerWidget {
               } else {
                 ServiceToast.show(
                   context,
-                  'Reached end of ${dashboard.selectedSemester.toUpperCase()} ${dashboard.selectedYear}',
+                  'End of ${dashboard.selectedSemester.toUpperCase()} semester reached.',
                 );
               }
             },

@@ -79,10 +79,24 @@ import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_record_card.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'coverage_helper.dart';
 
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    try {
+      await Supabase.initialize(
+        url: 'https://example.com',
+        anonKey: 'anon',
+      );
+    } on Object catch (_) {
+      // already initialized
+    }
+  });
+
   final mockDashboard = createMockDashboardData();
   final mockUser = createMockUser();
   final mockTracking = TrackingState(

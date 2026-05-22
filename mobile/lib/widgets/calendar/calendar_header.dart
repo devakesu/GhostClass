@@ -129,7 +129,7 @@ class _HeaderNavButton extends StatelessWidget {
       label: icon == LucideIcons.chevronLeft ? 'Previous Month' : 'Next Month',
       enabled: enabled,
       child: InkWell(
-        onTap: enabled ? onTap : null,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),

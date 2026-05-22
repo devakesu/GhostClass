@@ -55,6 +55,7 @@ export function SelectClassDialog({
           setClasses(res);
           setSelectedClassId("");
         } catch (err) {
+          console.error("Failed to load classes:", err);
           toast.error("Failed to load classes");
         } finally {
           setIsLoadingClasses(false);
@@ -78,8 +79,9 @@ export function SelectClassDialog({
       // Invalidate profile query to update UI state
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save class selection");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to save class selection";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

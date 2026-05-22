@@ -1,7 +1,6 @@
 import 'package:ghostclass/services/logger.dart';
 
-Future<void> runUnifiedPullToRefresh(
-  {
+Future<void> runUnifiedPullToRefresh({
   required Future<void> Function() refreshProfile,
   required Future<void> Function() refreshData,
   Future<void> Function()? syncCron,

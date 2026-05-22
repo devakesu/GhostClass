@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/models/user.dart';
@@ -45,51 +44,58 @@ void main() {
   });
 
   group('AcademicNotifier', () {
-    test('uses auth-seeded academic values on startup without duplicate EzyGo fetches', () async {
-      final mockApi = MockApiService();
-      final mockStorage = MockSecureStorageService();
-      final staleAcademic = const AcademicState(
-        semester: 'even',
-        year: '2025-2026',
-      );
-      final freshAcademic = const AcademicState(
-        semester: 'odd',
-        year: '2025-2026',
-      );
-      final user = createMockUser().copyWith(
-        profile: const UserProfile(
-          currentSemester: 'odd',
-          currentYear: '2025-2026',
-        ),
-        settings: UserSettings(
-          bunkCalculatorEnabled: true,
-          targetPercentage: 75,
-          disabledCourses: const {},
-          semester: staleAcademic.semester,
-          academicYear: staleAcademic.year,
-        ),
-      );
+    test(
+      'uses auth-seeded academic values on startup without duplicate EzyGo fetches',
+      () async {
+        final mockApi = MockApiService();
+        final mockStorage = MockSecureStorageService();
+        const staleAcademic = AcademicState(
+          semester: 'even',
+          year: '2025-2026',
+        );
+        const freshAcademic = AcademicState(
+          semester: 'odd',
+          year: '2025-2026',
+        );
+        final user = createMockUser().copyWith(
+          profile: const UserProfile(
+            currentSemester: 'odd',
+            currentYear: '2025-2026',
+          ),
+          settings: UserSettings(
+            bunkCalculatorEnabled: true,
+            targetPercentage: 75,
+            disabledCourses: const {},
+            semester: staleAcademic.semester,
+            academicYear: staleAcademic.year,
+          ),
+        );
 
-      when(() => mockStorage.saveAcademicState(freshAcademic)).thenAnswer((_) async {});
-      when(() => mockStorage.getAcademicState()).thenAnswer((_) async => staleAcademic);
+        when(
+          () => mockStorage.saveAcademicState(freshAcademic),
+        ).thenAnswer((_) async {});
+        when(
+          mockStorage.getAcademicState,
+        ).thenAnswer((_) async => staleAcademic);
 
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(() => MockAuthNotifier(user)),
-          apiServiceProvider.overrideWithValue(mockApi),
-          secureStorageProvider.overrideWithValue(mockStorage),
-        ],
-      );
-      addTearDown(container.dispose);
+        final container = ProviderContainer(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(user)),
+            apiServiceProvider.overrideWithValue(mockApi),
+            secureStorageProvider.overrideWithValue(mockStorage),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final result = await container.read(academicProvider.future);
+        final result = await container.read(academicProvider.future);
 
-      expect(result, freshAcademic);
-      verify(() => mockStorage.saveAcademicState(freshAcademic)).called(1);
-      verifyNever(() => mockApi.clearCaches());
-      verifyNever(() => mockApi.fetchSemester(mockStorage));
-      verifyNever(() => mockApi.fetchAcademicYear(mockStorage));
-      verifyNever(() => mockStorage.getAcademicState());
-    });
+        expect(result, freshAcademic);
+        verify(() => mockStorage.saveAcademicState(freshAcademic)).called(1);
+        verifyNever(mockApi.clearCaches);
+        verifyNever(() => mockApi.fetchSemester(mockStorage));
+        verifyNever(() => mockApi.fetchAcademicYear(mockStorage));
+        verifyNever(mockStorage.getAcademicState);
+      },
+    );
   });
 }

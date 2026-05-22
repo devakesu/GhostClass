@@ -200,21 +200,39 @@ async function executeFailover(
   }
 }
 
-export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
-  const useSP = shouldUseSendPulse();
-  const primary: ProviderFn = useSP ? sendViaSendPulse : sendViaBrevo;
-  let secondary: ProviderFn | null = null;
-  if (hasBrevo && hasSendPulse) {
-    secondary = useSP ? sendViaBrevo : sendViaSendPulse;
-  }
-  const pName: "SendPulse" | "Brevo" = useSP ? "SendPulse" : "Brevo";
-  const sName: "Brevo" | "SendPulse" = useSP ? "Brevo" : "SendPulse";
+interface ProvidersConfig {
+  primary: ProviderFn;
+  secondary: ProviderFn | null;
+  pName: "SendPulse" | "Brevo";
+  sName: "Brevo" | "SendPulse";
+}
 
+function getProviders(useSP: boolean): ProvidersConfig {
+  if (useSP) {
+    return {
+      primary: sendViaSendPulse,
+      secondary: hasBrevo ? sendViaBrevo : null,
+      pName: "SendPulse",
+      sName: "Brevo",
+    };
+  }
+  return {
+    primary: sendViaBrevo,
+    secondary: hasSendPulse ? sendViaSendPulse : null,
+    pName: "Brevo",
+    sName: "SendPulse",
+  };
+}
+
+export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo && !hasSendPulse) {
     const err = new Error("No provider");
     Sentry.captureException(err, { tags: { location: "sendEmail" } });
     throw err;
   }
+
+  const useSP = shouldUseSendPulse();
+  const { primary, secondary, pName, sName } = getProviders(useSP);
 
   try {
     return await primary(props);

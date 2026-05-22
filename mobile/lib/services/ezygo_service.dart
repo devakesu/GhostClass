@@ -160,7 +160,9 @@ class EzygoService {
         throw Exception('Status code: ${res.statusCode}');
       }
     } on Object catch (e) {
-      AppLogger.w('EzygoService: Network fetch failed for $path: $e. No stale-cache fallback is allowed.');
+      AppLogger.w(
+        'EzygoService: Network fetch failed for $path: $e. No stale-cache fallback is allowed.',
+      );
       rethrow;
     }
   }

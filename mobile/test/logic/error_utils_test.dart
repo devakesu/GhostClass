@@ -220,7 +220,9 @@ void main() {
 
     test('does not redact URL paths', () {
       expect(
-        sanitizeTechnicalDetails('Request failed at https://api.example.com/v1/users/123'),
+        sanitizeTechnicalDetails(
+          'Request failed at https://api.example.com/v1/users/123',
+        ),
         'Request failed at https://api.example.com/v1/users/123',
       );
     });

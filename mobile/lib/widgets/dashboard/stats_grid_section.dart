@@ -209,9 +209,12 @@ class _StatCard extends StatelessWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.4),
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
                                 ),
                               ),
                             ],

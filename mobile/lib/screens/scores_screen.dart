@@ -78,7 +78,9 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               try {
                 await runUnifiedPullToRefresh(
                   logLabel: 'ScoresScreen',
-                  refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                  refreshProfile: () => ref
+                      .read(authProvider.notifier)
+                      .refreshProfile(force: true),
                   syncCron: () async {
                     final supabaseToken = ref
                         .read(supabaseClientProvider)
@@ -86,7 +88,9 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                         .currentSession
                         ?.accessToken;
                     if (supabaseToken == null) return;
-                    await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                    await ref
+                        .read(apiServiceProvider)
+                        .triggerSync(supabaseToken, force: true);
                   },
                   refreshData: () => ref.read(scoreProvider.notifier).refresh(),
                 );

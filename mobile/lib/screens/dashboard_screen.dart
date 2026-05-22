@@ -32,8 +32,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (user == null) return;
       final profile = user.profile;
       final isSyncing = user.isSyncing;
-      
-      if (!isSyncing && (profile?.classField?.id == null || profile!.classField!.id.isEmpty)) {
+
+      if (!isSyncing &&
+          (profile?.classField?.id == null ||
+              profile!.classField!.id.isEmpty)) {
         setState(() => _isDialogOpen = true);
         await showDialog<void>(
           context: context,

@@ -168,7 +168,9 @@ class AppLogger {
     }
 
     final sanitizedMessage = sanitizeForExport(message);
-    final sanitizedError = error != null ? sanitizeForExport(error.toString()) : null;
+    final sanitizedError = error != null
+        ? sanitizeForExport(error.toString())
+        : null;
     final sanitizedExtras = <String, dynamic>{};
     if (extras != null) {
       for (final e in extras.entries) {

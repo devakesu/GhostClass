@@ -21,14 +21,21 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authProvider).value?.profile;
-    final isUpdating = ref.watch(academicProvider).isLoading || _academicPeriodChangeLocked;
+    final isUpdating =
+        ref.watch(academicProvider).isLoading || _academicPeriodChangeLocked;
 
     final currentPeriod = _AcademicPeriod(
       semester: widget.data.selectedSemester,
       year: widget.data.selectedYear,
     );
-    final previousPeriod = _shiftAcademicPeriod(currentPeriod, _PeriodDirection.previous);
-    final nextPeriod = _shiftAcademicPeriod(currentPeriod, _PeriodDirection.next);
+    final previousPeriod = _shiftAcademicPeriod(
+      currentPeriod,
+      _PeriodDirection.previous,
+    );
+    final nextPeriod = _shiftAcademicPeriod(
+      currentPeriod,
+      _PeriodDirection.next,
+    );
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -60,14 +67,21 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(100),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.15),
                 ),
               ),
               child: Text(
-                (profile?.classField?.name ?? widget.data.className ?? 'Unassigned').toUpperCase(),
+                (profile?.classField?.name ??
+                        widget.data.className ??
+                        'Unassigned')
+                    .toUpperCase(),
                 style: GoogleFonts.manrope(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
@@ -81,14 +95,17 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
               'For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚',
               style: GoogleFonts.manrope(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
                 fontWeight: FontWeight.w500,
                 fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: 20),
             Semantics(
-              label: 'Current academic period: ${_formatAcademicPeriod(currentPeriod)}. Use the arrows to change it.',
+              label:
+                  'Current academic period: ${_formatAcademicPeriod(currentPeriod)}. Use the arrows to change it.',
               button: true,
               child: _AcademicPeriodSwitcher(
                 currentPeriod: currentPeriod,
@@ -154,7 +171,9 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
     }
 
     try {
-      await ref.read(academicProvider.notifier).setAcademicPeriod(
+      await ref
+          .read(academicProvider.notifier)
+          .setAcademicPeriod(
             targetPeriod.semester,
             targetPeriod.year,
           );
@@ -293,13 +312,17 @@ class _PeriodArrowButton extends StatelessWidget {
             height: 48,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: onTap == null ? scheme.onSurface.withValues(alpha: 0.04) : scheme.primary.withValues(alpha: 0.08),
+              color: onTap == null
+                  ? scheme.onSurface.withValues(alpha: 0.04)
+                  : scheme.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
               icon,
               size: 20,
-              color: onTap == null ? scheme.onSurface.withValues(alpha: 0.28) : scheme.primary,
+              color: onTap == null
+                  ? scheme.onSurface.withValues(alpha: 0.28)
+                  : scheme.primary,
             ),
           ),
         ),
@@ -319,13 +342,22 @@ _AcademicPeriod? _shiftAcademicPeriod(
 
   if (direction == _PeriodDirection.previous) {
     return current.semester.toLowerCase() == 'odd'
-        ? _AcademicPeriod(semester: 'even', year: _formatAcademicYear(startYear - 1))
-        : _AcademicPeriod(semester: 'odd', year: _formatAcademicYear(startYear));
+        ? _AcademicPeriod(
+            semester: 'even',
+            year: _formatAcademicYear(startYear - 1),
+          )
+        : _AcademicPeriod(
+            semester: 'odd',
+            year: _formatAcademicYear(startYear),
+          );
   }
 
   return current.semester.toLowerCase() == 'odd'
       ? _AcademicPeriod(semester: 'even', year: _formatAcademicYear(startYear))
-      : _AcademicPeriod(semester: 'odd', year: _formatAcademicYear(startYear + 1));
+      : _AcademicPeriod(
+          semester: 'odd',
+          year: _formatAcademicYear(startYear + 1),
+        );
 }
 
 int? _parseAcademicYearStart(String year) {

@@ -14,7 +14,8 @@ class ClassSelectionDialog extends ConsumerStatefulWidget {
   const ClassSelectionDialog({super.key});
 
   @override
-  ConsumerState<ClassSelectionDialog> createState() => _ClassSelectionDialogState();
+  ConsumerState<ClassSelectionDialog> createState() =>
+      _ClassSelectionDialogState();
 }
 
 class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
@@ -83,7 +84,8 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
     });
 
     try {
-      final supabaseToken = Supabase.instance.client.auth.currentSession?.accessToken;
+      final supabaseToken =
+          Supabase.instance.client.auth.currentSession?.accessToken;
       if (supabaseToken == null) {
         throw Exception('Session expired. Please log in again.');
       }
@@ -136,7 +138,9 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -150,29 +154,42 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
               ),
               const SizedBox(height: 12),
               Divider(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.05),
               ),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount: _classes.length,
                   itemBuilder: (context, index) {
                     final item = _classes[index];
                     final classId = item['id']?.toString() ?? '';
-                    final className = item['name']?.toString() ?? 'Unnamed Class';
+                    final className =
+                        item['name']?.toString() ?? 'Unnamed Class';
                     final isSelected = classId == _selectedClassId;
 
                     return ListTile(
                       title: Text(
                         className,
                         style: GoogleFonts.manrope(
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                          color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
                         ),
                       ),
                       trailing: isSelected
-                          ? Icon(LucideIcons.check, color: Theme.of(context).colorScheme.primary)
+                          ? Icon(
+                              LucideIcons.check,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
                           : null,
                       onTap: () {
                         setState(() {
@@ -268,12 +285,18 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(LucideIcons.alertCircle, color: Theme.of(context).colorScheme.error, size: 18),
+                        Icon(
+                          LucideIcons.alertCircle,
+                          color: Theme.of(context).colorScheme.error,
+                          size: 18,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -290,10 +313,15 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                   ),
                 ],
                 InkWell(
-                  onTap: _isLoadingClasses || _isSaving ? null : _showClassPicker,
+                  onTap: _isLoadingClasses || _isSaving
+                      ? null
+                      : _showClassPicker,
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: onSurfaceColor.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(14),
@@ -309,11 +337,15 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                           child: Text(
                             _isLoadingClasses
                                 ? 'Loading classes...'
-                                : (_selectedClassName != null ? _selectedClassName! : 'Select Class'),
+                                : (_selectedClassName != null
+                                      ? _selectedClassName!
+                                      : 'Select Class'),
                             style: GoogleFonts.manrope(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: _selectedClassName != null ? onSurfaceColor : onSurfaceColor.withValues(alpha: 0.4),
+                              color: _selectedClassName != null
+                                  ? onSurfaceColor
+                                  : onSurfaceColor.withValues(alpha: 0.4),
                             ),
                           ),
                         ),
@@ -352,7 +384,9 @@ class _ClassSelectionDialogState extends ConsumerState<ClassSelectionDialog> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _selectedClassId == null || _isSaving ? null : _handleConfirm,
+                    onPressed: _selectedClassId == null || _isSaving
+                        ? null
+                        : _handleConfirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,

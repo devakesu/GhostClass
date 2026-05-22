@@ -379,7 +379,10 @@ bool isValidPersonName(String text) {
 bool isValidCourseName(String text) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return false;
-  return RegExp(r"^[\p{L}\p{M}\p{N}.'’&/()+,:;\- ]+$", unicode: true).hasMatch(trimmed);
+  return RegExp(
+    r"^[\p{L}\p{M}\p{N}.'’&/()+,:;\- ]+$",
+    unicode: true,
+  ).hasMatch(trimmed);
 }
 
 String standardizeCourseCode(String input) {

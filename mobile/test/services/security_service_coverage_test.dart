@@ -380,6 +380,21 @@ void main() {
           'cachedAt': DateTime.now().toIso8601String(),
         });
 
+        final options = RequestOptions(path: '/api/security/attestation');
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'verified': true,
+              'latestVersion': AppConfig.appVersion,
+              'minVersion': AppConfig.appVersion,
+            },
+          ),
+        );
+
         when(
           () => mockSecureStorage.getAttestationResult(),
         ).thenAnswer((_) async => cachedJson);

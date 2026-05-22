@@ -77,7 +77,9 @@ class LeavesScreen extends ConsumerWidget {
               try {
                 await runUnifiedPullToRefresh(
                   logLabel: 'LeavesScreen',
-                  refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                  refreshProfile: () => ref
+                      .read(authProvider.notifier)
+                      .refreshProfile(force: true),
                   syncCron: () async {
                     final supabaseToken = ref
                         .read(supabaseClientProvider)
@@ -85,7 +87,9 @@ class LeavesScreen extends ConsumerWidget {
                         .currentSession
                         ?.accessToken;
                     if (supabaseToken == null) return;
-                    await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                    await ref
+                        .read(apiServiceProvider)
+                        .triggerSync(supabaseToken, force: true);
                   },
                   refreshData: () => ref.read(leaveProvider.notifier).refresh(),
                 );
@@ -124,7 +128,9 @@ class LeavesScreen extends ConsumerWidget {
                       error: err,
                       onRetry: () => runUnifiedPullToRefresh(
                         logLabel: 'LeavesScreen',
-                        refreshProfile: () => ref.read(authProvider.notifier).refreshProfile(force: true),
+                        refreshProfile: () => ref
+                            .read(authProvider.notifier)
+                            .refreshProfile(force: true),
                         syncCron: () async {
                           final supabaseToken = ref
                               .read(supabaseClientProvider)
@@ -132,9 +138,12 @@ class LeavesScreen extends ConsumerWidget {
                               .currentSession
                               ?.accessToken;
                           if (supabaseToken == null) return;
-                          await ref.read(apiServiceProvider).triggerSync(supabaseToken, force: true);
+                          await ref
+                              .read(apiServiceProvider)
+                              .triggerSync(supabaseToken, force: true);
                         },
-                        refreshData: () => ref.read(leaveProvider.notifier).refresh(),
+                        refreshData: () =>
+                            ref.read(leaveProvider.notifier).refresh(),
                       ),
                     ),
                   ),
@@ -806,7 +815,9 @@ class LeavesScreen extends ConsumerWidget {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
     }
 
-    final hasPending = approvers.any((a) => a.actionType == null && a.actionAt == null);
+    final hasPending = approvers.any(
+      (a) => a.actionType == null && a.actionAt == null,
+    );
     final lastAction = actedApprovers.first.actionType;
 
     if (hasPending) {
