@@ -33,6 +33,16 @@
 
 GhostClass is the ultimate academic survival tool for students who want to manage their attendance without the main character energy of a professor. Featuring a sleek web dashboard and a native Flutter mobile application with real-time analytics and visual performance charts, it helps you track your classes so you never accidentally ghost your degree. With a built-in "bunk calculator" to tell you exactly how many lectures you can skip before it becomes a canon event, and a dedicated tracker for suspicious absences, GhostClass ensures your attendance stays valid while you live your best life. Built to integrate with existing attendance providers, GhostClass can fetch attendance and leave data from EzyGo and related sources and presents it with a clean, intuitive interface. No more confusing numbers - just clear, actionable insights!
 
+## 📲 Get the Mobile App
+
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <a href="https://play.google.com/store/apps/details?id=com.devakesu.apps.ghostclass" target="_blank" rel="noopener noreferrer">
+    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="260" />
+  </a>
+</p>
+<!-- markdownlint-enable MD033 -->
+
 ## 🎯 Key Vibes
 
 - **Student-First Dashboard** 🎈: A friendly dashboard with quick insights and a cheeky tone that still gets serious about accuracy.
@@ -224,6 +234,7 @@ Release artifacts are generated automatically for both platforms:
 
 - **Android**: Signed App Bundle (`.aab`) and APK.
 - **iOS**: Enterprise-signed or App Store IPA (requires macOS build agent).
+- **Google Play**: [GhostClass on Google Play](https://play.google.com/store/apps/details?id=com.devakesu.apps.ghostclass)
 
 ## ❓ Frequently Asked Questions
 
