@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
  * Environment variables:
  * - SYNC_RATE_LIMIT_REQUESTS / SYNC_RATE_LIMIT_WINDOW   — cron sync endpoint (default 10/10 s)
  * - CONTACT_RATE_LIMIT_REQUESTS / CONTACT_RATE_LIMIT_WINDOW — contact form (default 10/10 s)
+ * - PROFILE_RATE_LIMIT_REQUESTS / PROFILE_RATE_LIMIT_WINDOW — profile GET/PATCH (default 15/60 s)
  * - AUTH_RATE_LIMIT_REQUESTS / AUTH_RATE_LIMIT_WINDOW   — auth endpoints (default 5/60 s)
  * - PROXY_RATE_LIMIT_REQUESTS / PROXY_RATE_LIMIT_WINDOW — high-throughput proxy-style routes (default 300/60 s)
  *
@@ -44,6 +45,17 @@ const CONTACT_WINDOW = parseInt(process.env.CONTACT_RATE_LIMIT_WINDOW   || Strin
 if (!Number.isFinite(CONTACT_LIMIT)  || CONTACT_LIMIT  < 1 || CONTACT_LIMIT  > 1000) throw new Error(`CONTACT_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
 if (!Number.isFinite(CONTACT_WINDOW) || CONTACT_WINDOW < 1 || CONTACT_WINDOW > 3600) throw new Error(`CONTACT_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
 
+// Profile-specific limits (slightly higher to accommodate cache misses and
+// startup sync bursts without affecting auth/logout/csrf budgets).
+const PROFILE_LIMIT = parseInt(process.env.PROFILE_RATE_LIMIT_REQUESTS || "15", 10);
+const PROFILE_WINDOW = parseInt(process.env.PROFILE_RATE_LIMIT_WINDOW || "60", 10);
+if (!Number.isFinite(PROFILE_LIMIT) || PROFILE_LIMIT < 1 || PROFILE_LIMIT > 1000) {
+  throw new Error(`PROFILE_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
+}
+if (!Number.isFinite(PROFILE_WINDOW) || PROFILE_WINDOW < 1 || PROFILE_WINDOW > 3600) {
+  throw new Error(`PROFILE_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+}
+
 // Parse and validate auth rate limit settings
 const AUTH_LIMIT = parseInt(process.env.AUTH_RATE_LIMIT_REQUESTS || "5", 10);
 const AUTH_WINDOW = parseInt(process.env.AUTH_RATE_LIMIT_WINDOW || "60", 10);
@@ -68,6 +80,7 @@ if (!Number.isFinite(PROXY_WINDOW) || PROXY_WINDOW < 1 || PROXY_WINDOW > 3600) {
 
 // Log configuration (logger.dev handles environment-specific suppression)
 logger.dev(`[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`);
+logger.dev(`[Profile Rate Limit] ${PROFILE_LIMIT}/${PROFILE_WINDOW}s`);
 logger.dev(`[Auth Rate Limit] ${AUTH_LIMIT} requests per ${AUTH_WINDOW}s`);
 logger.dev(`[Proxy Rate Limit] ${PROXY_LIMIT} requests per ${PROXY_WINDOW}s`);
 
@@ -86,6 +99,13 @@ const contactLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(CONTACT_LIMIT, `${CONTACT_WINDOW} s`),
   analytics: true,
   prefix: "@ghostclass/contact-ratelimit",
+});
+
+const profileLimiter = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(PROFILE_LIMIT, `${PROFILE_WINDOW} s`),
+  analytics: true,
+  prefix: "@ghostclass/profile-ratelimit",
 });
 
 const authLimiter = new Ratelimit({
@@ -107,6 +127,9 @@ export const syncRateLimiter = syncLimiter;
 
 /** Rate limiter for contact form submissions */
 export const contactRateLimiter = contactLimiter;
+
+/** Rate limiter for profile GET/PATCH operations */
+export const profileRateLimiter = profileLimiter;
 
 /** Stricter rate limiter for authentication endpoints */
 export const authRateLimiter = authLimiter;
