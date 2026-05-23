@@ -169,13 +169,21 @@ class SecurityService {
                     appCheckError.toLowerCase().contains('timeout') ||
                     appCheckError.toLowerCase().contains('too_many_attempts') ||
                     appCheckError.toLowerCase().contains('network') ||
-                    appCheckError.toLowerCase().contains('rate limit'))) ||
+                    appCheckError.toLowerCase().contains('rate limit') ||
+                    appCheckError.toLowerCase().contains('server') ||
+                    appCheckError.toLowerCase().contains('internal error') ||
+                    appCheckError.toLowerCase().contains('-12') ||
+                    appCheckError.toLowerCase().contains('unavailable'))) ||
             (reason.toLowerCase().contains('quota') ||
                 reason.toLowerCase().contains('connection') ||
                 reason.toLowerCase().contains('timeout') ||
                 reason.toLowerCase().contains('too_many_attempts') ||
                 reason.toLowerCase().contains('network') ||
-                reason.toLowerCase().contains('rate limit'));
+                reason.toLowerCase().contains('rate limit') ||
+                reason.toLowerCase().contains('server') ||
+                reason.toLowerCase().contains('internal error') ||
+                reason.toLowerCase().contains('-12') ||
+                reason.toLowerCase().contains('unavailable'));
 
         final isGenuineSecurityFailure = !isConnectionOrQuota;
 
@@ -244,6 +252,8 @@ class SecurityService {
               (data['action'] as String?) ??
               'Please ensure you are using a genuine version of GhostClass from the Play Store.';
           final criticalRisk = data['criticalRisk'] == true;
+          final appCheckError =
+              response.requestOptions.extra['appCheckError'] as String?;
 
           AppLogger.e(
             'SecurityService: Integrity verification failed. Reason: $reason',
@@ -258,6 +268,7 @@ class SecurityService {
               'reason': reason,
               'action': action,
               'criticalRisk': criticalRisk,
+              'appCheckError': ?appCheckError,
             },
           );
         }
