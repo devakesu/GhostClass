@@ -60,7 +60,7 @@ export const useFetchAcademicYear = () => {
   });
 };
 
-export const useSetSemester = () => {
+export const useSetSemester = (options?: { skipInvalidations?: boolean }) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -74,6 +74,8 @@ export const useSetSemester = () => {
     onSuccess: (_data, variables) => {
       // 1. Update the Setting Cache immediately
       queryClient.setQueryData(["semester"], variables.default_semester);
+
+      if (options?.skipInvalidations) return;
 
       // 2. Refresh ALL Dependent Data
       // This ensures courses, attendance, tracking, and scores all switch to the new semester
@@ -97,7 +99,7 @@ export const useSetSemester = () => {
   });
 };
 
-export const useSetAcademicYear = () => {
+export const useSetAcademicYear = (options?: { skipInvalidations?: boolean }) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -113,6 +115,8 @@ export const useSetAcademicYear = () => {
         ["academic-year"],
         variables.default_academic_year
       );
+
+      if (options?.skipInvalidations) return;
 
       // Refresh ALL Dependent Data
       queryClient.invalidateQueries({ queryKey: ["courses"] });

@@ -25,8 +25,6 @@ vi.mock("@/lib/logger", () => ({
 const MOCK_INSTRUCTOR = {
   courseCode: "CS101",
   instructorName: "Dr. Jane Smith",
-  semester: "odd",
-  academicYear: "2024-2025",
 };
 
 describe("POST /api/instructors/upsert", () => {
@@ -108,11 +106,9 @@ describe("POST /api/instructors/upsert", () => {
       class_id: "class-456",
       course_code: "CS101",
       instructor_name: "Dr. Jane Smith",
-      semester: "odd",
-      academic_year: "2024-2025",
       updated_by: "user-123"
     }, {
-      onConflict: "class_id, course_code, semester, academic_year"
+      onConflict: "class_id, course_code"
     });
   });
 

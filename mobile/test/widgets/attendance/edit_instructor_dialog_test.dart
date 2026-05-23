@@ -79,8 +79,6 @@ void main() {
         () => mockApi.upsertInstructor(
           courseCode: any(named: 'courseCode'),
           instructorName: any(named: 'instructorName'),
-          semester: any(named: 'semester'),
-          academicYear: any(named: 'academicYear'),
           supabaseToken: any(named: 'supabaseToken'),
         ),
       ).thenAnswer(
@@ -159,8 +157,6 @@ void main() {
         () => mockApi.upsertInstructor(
           courseCode: 'CS101',
           instructorName: 'Dr. New',
-          semester: 'odd',
-          academicYear: '2024-2025',
           supabaseToken: 'test-supabase-token',
         ),
       ).called(1);

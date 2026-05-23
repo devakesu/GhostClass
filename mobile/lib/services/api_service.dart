@@ -210,8 +210,6 @@ class ApiService {
   Future<Response<dynamic>> addCourse({
     required String courseCode,
     required String courseName,
-    required String semester,
-    required String academicYear,
     required String supabaseToken,
   }) async {
     return client.post(
@@ -219,8 +217,6 @@ class ApiService {
       data: {
         'courseCode': courseCode,
         'courseName': courseName,
-        'semester': semester,
-        'academicYear': academicYear,
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );
@@ -229,8 +225,6 @@ class ApiService {
   Future<Response<dynamic>> upsertInstructor({
     required String courseCode,
     required String instructorName,
-    required String semester,
-    required String academicYear,
     required String supabaseToken,
   }) async {
     return client.post(
@@ -238,8 +232,6 @@ class ApiService {
       data: {
         'courseCode': courseCode,
         'instructorName': instructorName,
-        'semester': semester,
-        'academicYear': academicYear,
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );

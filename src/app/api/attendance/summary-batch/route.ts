@@ -85,9 +85,12 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
   const AttendanceSummarySchema = z.object({
     present: z.number(),
     absent: z.number(),
-    total: z.number(),
-    percentage: z.number(),
-    course: z.object({ id: z.number(), name: z.string(), code: z.string() }),
+    total: z.number().optional(),
+    totel: z.number().optional(),
+    percentage: z.number().optional(),
+    persantage: z.number().optional(),
+    persentage: z.number().optional(),
+    course: z.object({ id: z.number(), name: z.string(), code: z.string() }).optional(),
     error: z.string().optional()
   });
 

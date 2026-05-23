@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, courseNameSchema, semesterSchema } from "@/lib/validation/text";
+import { courseCodeSchema, courseNameSchema } from "@/lib/validation/text";
 
 async function authenticateRequest(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -40,14 +40,10 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
     const rawBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
     const courseCodeValue = rawBody.courseCode;
     const courseNameValue = rawBody.courseName;
-    const semesterValue = rawBody.semester;
-    const academicYearValue = rawBody.academicYear;
 
     if (
       typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-      typeof courseNameValue !== "string" || courseNameValue.trim() === "" ||
-      typeof semesterValue !== "string" || semesterValue.trim() === "" ||
-      typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+      typeof courseNameValue !== "string" || courseNameValue.trim() === ""
     ) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
@@ -55,15 +51,13 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
     const parsed = z.object({
       courseCode: courseCodeSchema,
       courseName: courseNameSchema,
-      semester: semesterSchema,
-      academicYear: academicYearSchema,
     }).safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid course details" }, { status: 422 });
     }
 
-    const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
+    const { courseCode: code, courseName: name } = parsed.data;
 
     const auth = await authenticateRequest(req);
     if (!auth) {
@@ -91,8 +85,6 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
         class_id: profile.class_id,
         course_code: code,
         course_name: name,
-        semester,
-        academic_year: academicYear,
         created_by: user.id
       });
 

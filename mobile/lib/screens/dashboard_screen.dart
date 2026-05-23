@@ -24,6 +24,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isDialogOpen = false;
+  bool _hasSeenSyncing = false;
 
   void _checkAndShowClassDialog() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -56,6 +57,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
 
+    if (isSyncing) {
+      _hasSeenSyncing = true;
+    }
+
     if (dashboardState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -85,7 +90,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    if (user != null && !isSyncing) {
+    if (user != null && !isSyncing && _hasSeenSyncing) {
       _checkAndShowClassDialog();
     }
 

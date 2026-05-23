@@ -52,8 +52,6 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
       final res = await api.addCourse(
         courseCode: _codeController.text.trim().toUpperCase(),
         courseName: _nameController.text.trim().replaceAll(RegExp(r'\s+'), ' '),
-        semester: widget.semester,
-        academicYear: widget.academicYear,
         supabaseToken: supabaseToken,
       );
 

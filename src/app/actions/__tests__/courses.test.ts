@@ -35,15 +35,13 @@ describe("course actions", () => {
       const formData = new FormData();
       formData.append("courseCode", "");
       const result = await addCourseAction(formData);
-      expect(result.error).toBe("Course code, name, semester, and academic year are required");
+      expect(result.error).toBe("Course code and name are required");
     });
 
     it("returns error if turnstile token is missing", async () => {
       const formData = new FormData();
       formData.append("courseCode", "CS101");
       formData.append("courseName", "Intro CS");
-      formData.append("semester", "odd");
-      formData.append("academicYear", "2024-2025");
       const result = await addCourseAction(formData);
       expect(result.error).toContain("Security verification failed");
     });
@@ -52,8 +50,6 @@ describe("course actions", () => {
       const formData = new FormData();
       formData.append("courseCode", "CS101");
       formData.append("courseName", "Intro CS");
-      formData.append("semester", "odd");
-      formData.append("academicYear", "2024-2025");
       formData.append("cf-turnstile-response", "invalid");
 
       vi.mocked(fetch).mockResolvedValue({
@@ -68,8 +64,6 @@ describe("course actions", () => {
       const formData = new FormData();
       formData.append("courseCode", "CS 101");
       formData.append("courseName", "intro to computer science");
-      formData.append("semester", "odd");
-      formData.append("academicYear", "2024-2025");
       formData.append("cf-turnstile-response", "valid");
 
       vi.mocked(fetch).mockResolvedValue({
@@ -102,8 +96,6 @@ describe("course actions", () => {
       const formData = new FormData();
       formData.append("courseCode", "CS101");
       formData.append("courseName", "Intro CS");
-      formData.append("semester", "odd");
-      formData.append("academicYear", "2024-2025");
       formData.append("cf-turnstile-response", "valid");
 
       vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as never);

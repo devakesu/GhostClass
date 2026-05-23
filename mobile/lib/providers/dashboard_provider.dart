@@ -239,8 +239,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               .from('class_courses')
               .select()
               .eq('class_id', classId)
-              .eq('academic_year', academic.year)
-              .eq('semester', academic.semester)
               .then((coursesRes) {
                 if (coursesRes.isNotEmpty) {
                   sharedCourses = (coursesRes as List).map((raw) {
@@ -261,8 +259,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               .from('course_instructors')
               .select()
               .eq('class_id', classId)
-              .eq('semester', academic.semester)
-              .eq('academic_year', academic.year)
               .then((instructorsRes) {
                 if (instructorsRes.isNotEmpty) {
                   sharedInstructors = (instructorsRes as List)
