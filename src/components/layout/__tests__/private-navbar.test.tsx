@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { useProfile } from "@/hooks/users/profile";
 import { useUserSettings } from "@/providers/user-settings";
 import { useInstitutions, useUpdateDefaultInstitutionUser, useDefaultInstitutionUser } from "@/hooks/users/institutions";
 import { useTheme } from "@/providers/theme";
@@ -8,7 +7,7 @@ import { handleLogout } from "@/lib/security/auth";
 import { isValidAvatarUrl } from "@/lib/utils";
 import { Navbar } from "../private-navbar";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React from "react";
 
 // ---------------------------------------------------------------------------
@@ -47,6 +46,7 @@ vi.mock("@/hooks/users/institutions", () => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  useQuery: vi.fn(),
   useQueryClient: vi.fn(),
 }));
 
@@ -140,7 +140,7 @@ describe("Navbar", () => {
     vi.clearAllMocks();
     mockPathname.mockReturnValue("/dashboard");
     
-    vi.mocked(useProfile).mockReturnValue({ 
+    vi.mocked(useQuery).mockReturnValue({ 
       data: { username: "testuser", email: "test@example.com", avatar_url: null }, 
       isLoading: false 
     } as never);
@@ -152,6 +152,9 @@ describe("Navbar", () => {
       isLoading: false,
     } as never);
     
+    vi.mocked(useQuery).mockReturnValue({
+      data: { username: "testuser", email: "test@example.com", avatar_url: null },
+    } as never);
     vi.mocked(useInstitutions).mockReturnValue({ data: [], isLoading: false } as never);
     vi.mocked(useDefaultInstitutionUser).mockReturnValue({ data: null } as never);
     vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate: vi.fn() } as never);
@@ -239,9 +242,8 @@ describe("Navbar", () => {
 
   it("renders avatar image if URL is valid", () => {
     vi.mocked(isValidAvatarUrl).mockReturnValue(true);
-    vi.mocked(useProfile).mockReturnValue({ 
-      data: { avatar_url: "http://example.com/avatar.png", username: "testuser" },
-      isLoading: false 
+    vi.mocked(useQuery).mockReturnValue({
+      data: { avatar_url: "http://example.com/avatar.png", username: "testuser", email: "test@example.com" },
     } as never);
     
     render(<Navbar />);

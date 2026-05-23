@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, vi, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import ProtectedLayout from '../layout';
 
 // Mock all the things
@@ -10,6 +10,7 @@ vi.mock('@/hooks/users/institutions', () => ({
 
 vi.mock('@/hooks/use-csrf-token', () => ({
   useCSRFToken: vi.fn(),
+  ensureCSRFToken: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('framer-motion', async (importOriginal) => {
@@ -52,8 +53,10 @@ describe('ProtectedLayout', () => {
       </ProtectedLayout>
     );
 
-    expect(screen.getByTestId('navbar')).toBeInTheDocument();
-    expect(screen.getByTestId('footer')).toBeInTheDocument();
-    expect(screen.getByTestId('child')).toBeInTheDocument();
+    return waitFor(() => {
+      expect(screen.getByTestId('navbar')).toBeInTheDocument();
+      expect(screen.getByTestId('footer')).toBeInTheDocument();
+      expect(screen.getByTestId('child')).toBeInTheDocument();
+    });
   });
 });
