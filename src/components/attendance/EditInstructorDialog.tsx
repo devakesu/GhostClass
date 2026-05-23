@@ -28,8 +28,6 @@ interface EditInstructorDialogProps {
   courseCode: string;
   courseName: string;
   initialName?: string;
-  semester: string;
-  academicYear: string;
 }
 
 export function EditInstructorDialog({
@@ -38,8 +36,6 @@ export function EditInstructorDialog({
   courseCode,
   courseName,
   initialName = "",
-  semester,
-  academicYear,
 }: EditInstructorDialogProps) {
   const [name, setName] = useState(initialName);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,8 +87,6 @@ export function EditInstructorDialog({
       const formData = new FormData();
       formData.append("courseCode", courseCode);
       formData.append("instructorName", name);
-      formData.append("semester", semester);
-      formData.append("academicYear", academicYear);
       formData.append("cf-turnstile-response", token);
       
       const csrfToken = getCsrfToken();

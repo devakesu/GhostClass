@@ -215,11 +215,11 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
 };
 
 export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
-  const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
+  const { data: rawProfile, isLoading: isLoadingProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
-  const setSemesterMutation = useSetSemester();
-  const setAcademicYearMutation = useSetAcademicYear();
+  const setSemesterMutation = useSetSemester({ skipInvalidations: true });
+  const setAcademicYearMutation = useSetAcademicYear({ skipInvalidations: true });
   const { targetPercentage } = useAttendanceSettings();
 
   const { data: userSettings, isLoading: isSettingsLoading } = useFetchUserSettings();
@@ -273,6 +273,13 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return () => clearTimeout(timer);
   }, [syncCompleted, profile]);
 
+  const isInitialDataValid = useMemo(() => {
+    if (selectedSemester !== null || selectedYear !== null) return false;
+    if (ezygoSemester && ezygoSemester !== effectiveSemester) return false;
+    if (ezygoYear && ezygoYear !== effectiveYear) return false;
+    return true;
+  }, [selectedSemester, selectedYear, ezygoSemester, ezygoYear, effectiveSemester, effectiveYear]);
+
   const isAttendanceStale =
     initialData?.attendance &&
     typeof initialData.attendance === "object" &&
@@ -284,15 +291,38 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncCompleted,
-    initialData: isAttendanceStale ? undefined : (initialData?.attendance as AttendanceReport ?? undefined),
+    initialData: (isInitialDataValid && !isAttendanceStale) ? (initialData?.attendance as AttendanceReport ?? undefined) : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
+
+  const formattedInitialCourses = useMemo(() => {
+    if (!initialData?.courses) return undefined;
+    if (Array.isArray(initialData.courses)) {
+      return {
+        courses: initialData.courses.reduce(
+          (acc: Record<string, Course>, course: Course) => {
+            acc[course.id.toString()] = course;
+            return acc;
+          },
+          {}
+        ),
+      };
+    }
+    if (
+      typeof initialData.courses === "object" &&
+      initialData.courses !== null &&
+      "courses" in initialData.courses
+    ) {
+      return initialData.courses as { courses: Record<string, Course> };
+    }
+    return undefined;
+  }, [initialData]);
 
   const { data: rawCoursesData, isLoading: isLoadingCourses } = useFetchCourses({
     semester: currentSem,
     year: currentYear,
     enabled: syncCompleted && !!currentSem && !!currentYear,
-    initialData: initialData?.courses as { courses: Record<string, Course> } ?? undefined,
+    initialData: isInitialDataValid ? formattedInitialCourses : undefined,
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
 
@@ -332,7 +362,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return Array.from(registry.values());
   }, [coursesData, classCourses]);
 
-  const { data: allCourseSummaries, isLoading: isLoadingAllCourseSummaries } = useAllCourseDetails(syncCompleted ? courseList : []);
+  const { data: allCourseSummaries, isLoading: isLoadingAllCourseSummaries } = useAllCourseDetails(courseList);
 
   const { disabledCodes } = useDisabledCourses({ academicYear: currentYear, semester: currentSem });
 
@@ -358,18 +388,43 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     setShowConfirmDialog(false);
 
     try {
+      const mutations = [];
       if (pendingChange.year !== effectiveYear) {
-        await setAcademicYearMutation.mutateAsync({ default_academic_year: pendingChange.year });
+        mutations.push(
+          setAcademicYearMutation.mutateAsync({
+            default_academic_year: pendingChange.year,
+          })
+        );
+      }
+      if (pendingChange.semester !== effectiveSemester) {
+        mutations.push(
+          setSemesterMutation.mutateAsync({
+            default_semester: pendingChange.semester,
+          })
+        );
       }
 
-      if (pendingChange.semester !== effectiveSemester) {
-        await setSemesterMutation.mutateAsync({ default_semester: pendingChange.semester });
-      }
+      await Promise.all(mutations);
 
       setSelectedSemester(pendingChange.semester);
       setSelectedYear(pendingChange.year);
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      await refetchProfile();
+
+      // Coordinated, single invalidation for all queries affected by the semester/year shift.
+      // This includes resetting the profile query which triggers the background sync once.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] }),
+        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["class_courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["course_instructors"] }),
+        queryClient.invalidateQueries({ queryKey: ["track_data"] }),
+        queryClient.invalidateQueries({ queryKey: ["count"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["exams"] }),
+        queryClient.invalidateQueries({ queryKey: ["exam-answers"] }),
+        queryClient.invalidateQueries({ queryKey: ["exam-questions"] }),
+        queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }),
+      ]);
     } catch (error) {
       logger.error("Update Failed:", error);
       toast.error("Failed to update settings");
@@ -572,7 +627,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
           <AddCourseDialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen} semester={currentSem} academicYear={currentYear} />
           <AddAttendanceDialog open={isAddAttendanceOpen} onOpenChange={setIsAddAttendanceOpen} attendanceData={attendanceData} trackingData={trackingData || []} coursesData={coursesData || undefined} user={profile ? { id: String(profile.id) } : { id: "" }} onSuccess={() => Promise.all([refetchAttendance(), refetchTracking()])} selectedSemester={currentSem} selectedYear={currentYear} />
-          <EditInstructorDialog open={isEditInstructorOpen} onOpenChange={setIsEditInstructorOpen} courseCode={selectedInstructorCourse?.code ?? ""} courseName={selectedInstructorCourse?.name ?? ""} initialName={selectedInstructorCourse?.initialName ?? ""} semester={currentSem || ""} academicYear={currentYear || ""} />
+          <EditInstructorDialog open={isEditInstructorOpen} onOpenChange={setIsEditInstructorOpen} courseCode={selectedInstructorCourse?.code ?? ""} courseName={selectedInstructorCourse?.name ?? ""} initialName={selectedInstructorCourse?.initialName ?? ""} />
           {currentSem && currentYear && (
             <SelectClassDialog
               open={isSelectClassOpen}

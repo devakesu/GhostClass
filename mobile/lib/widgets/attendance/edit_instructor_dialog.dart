@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
-import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -55,9 +54,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
     setState(() => _isSaving = true);
 
     try {
-      final academic = ref.read(academicProvider).value;
       final auth = ref.read(authProvider).value;
-      if (academic == null || auth == null) throw Exception('Missing context');
+      if (auth == null) throw Exception('Missing context');
 
       final apiService = ref.read(apiServiceProvider);
       final client = ref.read(supabaseClientProvider);
@@ -67,8 +65,6 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       await apiService.upsertInstructor(
         courseCode: widget.courseCode,
         instructorName: name,
-        semester: academic.semester,
-        academicYear: academic.year,
         supabaseToken: supabaseToken,
       );
 

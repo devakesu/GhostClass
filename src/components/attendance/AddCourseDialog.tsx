@@ -86,8 +86,6 @@ export function AddCourseDialog({
       const formData = new FormData();
       formData.append("courseCode", courseCode);
       formData.append("courseName", courseName);
-      formData.append("semester", semester || profile?.current_semester || "");
-      formData.append("academicYear", academicYear || profile?.current_year || "");
       formData.append("cf-turnstile-response", token);
       
       const csrfToken = getCsrfToken();

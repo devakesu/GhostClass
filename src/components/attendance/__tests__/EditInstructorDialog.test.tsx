@@ -77,8 +77,6 @@ describe('EditInstructorDialog', () => {
     onOpenChange: vi.fn(),
     courseCode: 'CS101',
     courseName: 'Intro to CS',
-    semester: 'even',
-    academicYear: '2023-24',
   };
 
   beforeEach(() => {

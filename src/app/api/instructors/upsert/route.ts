@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
+import { courseCodeSchema, personNameSchema } from "@/lib/validation/text";
 
 async function authenticateRequest(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -35,14 +35,10 @@ async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: un
     const rawBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
     const courseCodeValue = rawBody.courseCode;
     const instructorNameValue = rawBody.instructorName;
-    const semesterValue = rawBody.semester;
-    const academicYearValue = rawBody.academicYear;
 
     if (
       typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-      typeof instructorNameValue !== "string" || instructorNameValue.trim() === "" ||
-      typeof semesterValue !== "string" || semesterValue.trim() === "" ||
-      typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+      typeof instructorNameValue !== "string" || instructorNameValue.trim() === ""
     ) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
@@ -50,15 +46,13 @@ async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: un
     const parsed = z.object({
       courseCode: courseCodeSchema,
       instructorName: personNameSchema,
-      semester: semesterSchema,
-      academicYear: academicYearSchema,
     }).safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid instructor details" }, { status: 422 });
     }
 
-    const { courseCode, instructorName, semester, academicYear } = parsed.data;
+    const { courseCode, instructorName } = parsed.data;
 
     const auth = await authenticateRequest(req);
     if (!auth) {
@@ -86,11 +80,9 @@ async function handler(req: NextRequest, { decryptedBody }: { decryptedBody?: un
         class_id: profile.class_id,
         course_code: courseCode,
         instructor_name: instructorName,
-        semester,
-        academic_year: academicYear,
         updated_by: user.id
       }, {
-        onConflict: "class_id, course_code, semester, academic_year"
+        onConflict: "class_id, course_code"
       });
 
     if (upsertError) {

@@ -5,43 +5,35 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
+import { courseCodeSchema, personNameSchema } from "@/lib/validation/text";
 
 export async function upsertInstructorAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
   const courseCodeValue = formData.get("courseCode");
   const instructorNameValue = formData.get("instructorName");
-  const semesterValue = formData.get("semester");
-  const academicYearValue = formData.get("academicYear");
 
   if (
     typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-    typeof instructorNameValue !== "string" || instructorNameValue.trim() === "" ||
-    typeof semesterValue !== "string" || semesterValue.trim() === "" ||
-    typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+    typeof instructorNameValue !== "string" || instructorNameValue.trim() === ""
   ) {
-    return { error: "Course code, instructor name, semester, and academic year are required" };
+    return { error: "Course code and instructor name are required" };
   }
 
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
   const parsed = z.object({
     courseCode: courseCodeSchema,
     instructorName: personNameSchema,
-    semester: semesterSchema,
-    academicYear: academicYearSchema,
   }).safeParse({
     courseCode: courseCodeValue,
     instructorName: instructorNameValue,
-    semester: semesterValue,
-    academicYear: academicYearValue,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid instructor details" };
   }
 
-  const { courseCode, instructorName, semester, academicYear } = parsed.data;
+  const { courseCode, instructorName } = parsed.data;
   const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
 
   // 1. Verify Turnstile Security Token
@@ -98,11 +90,9 @@ export async function upsertInstructorAction(
         class_id: profile.class_id,
         course_code: courseCode.toUpperCase().replace(/[\s\u00A0-]/g, ""),
         instructor_name: instructorName,
-        semester,
-        academic_year: academicYear,
         updated_by: user.id
       }, {
-        onConflict: "class_id, course_code, semester, academic_year"
+        onConflict: "class_id, course_code"
       });
 
     if (upsertError) {

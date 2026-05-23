@@ -35,15 +35,13 @@ describe("instructor actions", () => {
       const formData = new FormData();
       formData.append("courseCode", "");
       const result = await upsertInstructorAction(formData);
-      expect(result.error).toBe("Course code, instructor name, semester, and academic year are required");
+      expect(result.error).toBe("Course code and instructor name are required");
     });
 
     it("successfully upserts an instructor", async () => {
       const formData = new FormData();
       formData.append("courseCode", "CS 101");
       formData.append("instructorName", "john doe");
-      formData.append("semester", "odd");
-      formData.append("academicYear", "2024-2025");
       formData.append("cf-turnstile-response", "valid");
 
       vi.mocked(fetch).mockResolvedValue({
@@ -76,8 +74,6 @@ describe("instructor actions", () => {
         const formData = new FormData();
         formData.append("courseCode", "CS101");
         formData.append("instructorName", "John");
-        formData.append("semester", "odd");
-        formData.append("academicYear", "2024-2025");
         formData.append("cf-turnstile-response", "valid");
   
         vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as never);

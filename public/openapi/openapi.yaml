@@ -6,7 +6,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 4.3.8
+  version: 4.3.9
   description: |
     **GhostClass API** provides endpoints for authentication, profile synchronization,
     attendance integrations with EzyGo, telemetry, and build provenance.
@@ -749,7 +749,6 @@ paths:
           description: Too many requests
           content:
             application/json:
-              schema:
                 $ref: "#/components/schemas/RateLimitError"
 
   /api/courses/add:
@@ -773,8 +772,6 @@ paths:
               required:
                 - courseCode
                 - courseName
-                - semester
-                - academicYear
               properties:
                 courseCode:
                   type: string
@@ -784,14 +781,6 @@ paths:
                   type: string
                   description: The name of the course
                   example: "Introduction to Computer Science"
-                semester:
-                  type: string
-                  description: The semester name
-                  example: "Fall 2026"
-                academicYear:
-                  type: string
-                  description: The academic year
-                  example: "2026"
       responses:
         "201":
           description: Course added successfully
@@ -833,7 +822,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
+ 
   /api/instructors/upsert:
     post:
       tags:
@@ -854,8 +843,6 @@ paths:
               required:
                 - courseCode
                 - instructorName
-                - semester
-                - academicYear
               properties:
                 courseCode:
                   type: string
@@ -863,12 +850,6 @@ paths:
                 instructorName:
                   type: string
                   example: "Dr. John Doe"
-                semester:
-                  type: string
-                  example: "Fall 2026"
-                academicYear:
-                  type: string
-                  example: "2026"
       responses:
         "200":
           description: Instructor saved successfully

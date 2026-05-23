@@ -9,8 +9,8 @@ export interface ClassCourse {
   id: number;
   course_code: string;
   course_name: string;
-  semester: string;
-  academic_year: string;
+  semester?: string;
+  academic_year?: string;
 }
 
 interface UseFetchClassCoursesOptions {
@@ -39,10 +39,8 @@ export function useFetchClassCourses(
         const supabase = createClient();
         const { data, error } = await supabase
           .from("class_courses")
-          .select("id, course_code, course_name, semester, academic_year")
-          .eq("class_id", classId!)
-          .eq("semester", semester!)
-          .eq("academic_year", year!);
+          .select("id, course_code, course_name")
+          .eq("class_id", classId!);
 
         if (error) {
           throw error;

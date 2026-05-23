@@ -34,9 +34,7 @@ export function useFetchCourseInstructors(
         const supabase = createClient();
         const { data, error } = await supabase
           .from("course_instructors")
-          .select("course_code, instructor_name, semester, academic_year")
-          .eq("semester", semester!)
-          .eq("academic_year", year!)
+          .select("course_code, instructor_name")
           .eq("class_id", classId!);
 
         if (error) {

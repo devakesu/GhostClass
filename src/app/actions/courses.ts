@@ -5,41 +5,33 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, courseNameSchema, semesterSchema } from "@/lib/validation/text";
+import { courseCodeSchema, courseNameSchema } from "@/lib/validation/text";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
   const courseCodeValue = formData.get("courseCode");
   const courseNameValue = formData.get("courseName");
-  const semesterValue = formData.get("semester");
-  const academicYearValue = formData.get("academicYear");
 
   if (
     typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-    typeof courseNameValue !== "string" || courseNameValue.trim() === "" ||
-    typeof semesterValue !== "string" || semesterValue.trim() === "" ||
-    typeof academicYearValue !== "string" || academicYearValue.trim() === ""
+    typeof courseNameValue !== "string" || courseNameValue.trim() === ""
   ) {
-    return { error: "Course code, name, semester, and academic year are required" };
+    return { error: "Course code and name are required" };
   }
 
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
   const parsed = z.object({
     courseCode: courseCodeSchema,
     courseName: courseNameSchema,
-    semester: semesterSchema,
-    academicYear: academicYearSchema,
   }).safeParse({
     courseCode: courseCodeValue,
     courseName: courseNameValue,
-    semester: semesterValue,
-    academicYear: academicYearValue,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid course details" };
   }
 
-  const { courseCode: code, courseName: name, semester, academicYear } = parsed.data;
+  const { courseCode: code, courseName: name } = parsed.data;
   const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
 
   // 1. Verify Turnstile Security Token
@@ -96,8 +88,6 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
         class_id: profile.class_id,
         course_code: code.toUpperCase().replace(/[\s\u00A0-]/g, ""),
         course_name: name,
-        semester,
-        academic_year: academicYear,
         created_by: user.id
       });
 
