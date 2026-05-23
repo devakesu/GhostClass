@@ -63,21 +63,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _initializeApp() async {
     // 1. Proactively pre-warm security layers while logo is showing
-    final jwePreWarm = JweService.instance.preWarm();
-    final apiPreWarm = ref.read(apiServiceProvider).preWarm();
+    // Keep the splash visible for 2s to improve perceived startup time
     final splashHold = Future<void>.delayed(
-      const Duration(milliseconds: 3000),
+      const Duration(milliseconds: 2000),
       () {
-        AppLogger.i('SplashScreen: 3s delay completed');
+        AppLogger.i('SplashScreen: 2s delay completed');
       },
     );
 
-    try {
-      await jwePreWarm;
-      await apiPreWarm;
-    } on Object catch (e) {
-      AppLogger.e('SplashScreen: JWKS/API pre-warm failed', e);
-    }
+    // Kick off non-critical pre-warms in the background so they do not block
+    AppLogger.safeUnawait(
+      JweService.instance.preWarm().catchError(
+        (Object e, StackTrace st) =>
+            AppLogger.e('SplashScreen: JWE pre-warm failed', e, st),
+      ),
+      'SplashScreen: JWE pre-warm',
+    );
+
+    AppLogger.safeUnawait(
+      ref
+          .read(apiServiceProvider)
+          .preWarm()
+          .catchError(
+            (Object e, StackTrace st) =>
+                AppLogger.e('SplashScreen: API pre-warm failed', e, st),
+          ),
+      'SplashScreen: API pre-warm',
+    );
 
     // 2. Critical Security Check First
     try {
