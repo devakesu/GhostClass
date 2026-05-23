@@ -238,18 +238,57 @@ class ApiService {
   }
 
   // --- Error Handling ---
+  bool _isTransientAppCheckFailure(String? text) {
+    final msg = (text ?? '').toLowerCase();
+    if (msg.isEmpty) return false;
+    return msg.contains('too_many_attempts') ||
+        msg.contains('timeout') ||
+        msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('unavailable') ||
+        msg.contains('rate limit') ||
+        msg.contains('internal google server error') ||
+        msg.contains('google_server_unavailable') ||
+        msg.contains('-12');
+  }
+
   AppException mapDioError(DioException e) {
     final status = e.response?.statusCode;
     var type = AppExceptionType.network;
     var message = formatApiError(e.response?.data, 'ApiService.Dio');
+    final appCheckError = e.requestOptions.extra['appCheckError'] as String?;
+    final requestMarkedTransient =
+        e.requestOptions.extra['appCheckTransient'] == true;
+    final data = e.response?.data;
+    final backendReason = data is Map<String, dynamic>
+        ? (data['reason'] as String?) ??
+              (data['error'] as String?) ??
+              (data['appCheckError'] as String?)
+        : null;
+    final transientAppCheck =
+        requestMarkedTransient ||
+        _isTransientAppCheckFailure(appCheckError) ||
+        _isTransientAppCheckFailure(backendReason);
 
     if (status != null) {
       if (status == 401) {
-        message = 'Session expired. Please log in again.';
-        type = AppExceptionType.unauthorized;
+        if (transientAppCheck) {
+          message =
+              'Device verification is temporarily unavailable. Please retry in a few moments.';
+          type = AppExceptionType.network;
+        } else {
+          message = 'Session expired. Please log in again.';
+          type = AppExceptionType.unauthorized;
+        }
       } else if (status == 403) {
-        message = 'Access denied. Bridge security attestation failed.';
-        type = AppExceptionType.forbidden;
+        if (transientAppCheck) {
+          message =
+              'Device verification service is temporarily unavailable. Please retry.';
+          type = AppExceptionType.network;
+        } else {
+          message = 'Access denied. Bridge security attestation failed.';
+          type = AppExceptionType.forbidden;
+        }
       } else if (status == 429) {
         message =
             'Woah, slow down! EzyGo rate limited your request. Please wait a minute before trying again.';
@@ -267,9 +306,6 @@ class ApiService {
         type = AppExceptionType.server;
       }
     }
-
-    final appCheckError = e.requestOptions.extra['appCheckError'];
-    final data = e.response?.data;
 
     return AppException(
       message: message,

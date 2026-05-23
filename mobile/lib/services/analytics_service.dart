@@ -1,5 +1,6 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// AnalyticsService
 /// Centralized wrapper around `FirebaseAnalytics` that exposes common
@@ -12,6 +13,8 @@ class AnalyticsService {
 
   FirebaseAnalytics? _analytics;
   FirebaseAnalyticsObserver? _observer;
+
+  bool get isInitialized => _analytics != null && _observer != null;
 
   static Future<void> initialize({FirebaseAnalytics? analyticsInstance}) async {
     final svc = AnalyticsService.instance;
@@ -170,5 +173,49 @@ class AnalyticsService {
         parameters: _withEnvParams(params.cast<String, Object>()),
       );
     } on Object catch (_) {}
+  }
+
+  NavigatorObserver get appObserver => DelegatingAnalyticsObserver();
+}
+
+class DelegatingAnalyticsObserver extends NavigatorObserver {
+  NavigatorObserver? get _delegate {
+    if (!AnalyticsService.instance.isInitialized) {
+      return null;
+    }
+    return AnalyticsService.instance.observer;
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _delegate?.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _delegate?.didPop(route, previousRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _delegate?.didRemove(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _delegate?.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+
+  @override
+  void didStartUserGesture(
+    Route<dynamic> route,
+    Route<dynamic>? previousRoute,
+  ) {
+    _delegate?.didStartUserGesture(route, previousRoute);
+  }
+
+  @override
+  void didStopUserGesture() {
+    _delegate?.didStopUserGesture();
   }
 }

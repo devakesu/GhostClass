@@ -9,13 +9,11 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/firebase_options.dart';
 import 'package:ghostclass/logic/network_utils.dart';
 import 'package:ghostclass/logic/security_initializer.dart';
-import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
-import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,54 +42,6 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
-class _SecurityFailureApp extends StatelessWidget {
-  const _SecurityFailureApp({
-    required this.friendlyMessage,
-    required this.technicalDetails,
-  });
-  final String friendlyMessage;
-  final String technicalDetails;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
-      home: Builder(
-        builder: (context) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final _ = SecurityUtils.showSecurityFailureDialog(
-              context,
-              title: 'Security Handshake Failed',
-              message: friendlyMessage,
-              technicalDetails: technicalDetails,
-              retryLabel: Platform.isAndroid ? 'Close App' : null,
-              onRetry: Platform.isAndroid ? () => exit(0) : null,
-            );
-          });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        },
-      ),
-    );
-  }
-}
-
-Future<void> _handleSecurityFailure(Object error) async {
-  final errorMessage = error.toString();
-  final friendlyMessage = errorMessage.contains('-3')
-      ? 'GhostClass encountered a network security issue while verifying your device. This often happens on restricted WiFi or with custom DNS settings.'
-      : "We couldn't verify the integrity of this app. To protect your data, GhostClass requires a secure, unmodified environment.";
-
-  runApp(
-    _SecurityFailureApp(
-      friendlyMessage: friendlyMessage,
-      technicalDetails: errorMessage,
-    ),
-  );
-}
-
 Future<void> _initializeFirebase() async {
   if (Firebase.apps.isNotEmpty) {
     AppLogger.i('🛡️ [FIREBASE SHIELD] Reusing existing Firebase app');
@@ -109,6 +59,8 @@ Future<void> _initializeFirebase() async {
     Firebase.app();
   }
 }
+
+Future<void>? firebaseInitFuture;
 
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
@@ -138,26 +90,27 @@ void main() async {
     return true;
   };
 
-  // Initialize Firebase & App Check
-  try {
-    await _initializeFirebase();
+  // Initialize Firebase & App Check asynchronously in the background
+  firebaseInitFuture = () async {
+    try {
+      await _initializeFirebase();
 
-    // Initialize Analytics after Firebase is ready — do not block startup
-    AppLogger.safeUnawait(
-      AnalyticsService.initialize().catchError(
-        (Object e, StackTrace st) =>
-            AppLogger.e('Analytics initialization failed', e, st),
-      ),
-      'Analytics init',
-    );
+      // Initialize Analytics after Firebase is ready — do not block startup
+      AppLogger.safeUnawait(
+        AnalyticsService.initialize().catchError(
+          (Object e, StackTrace st) =>
+              AppLogger.e('Analytics initialization failed', e, st),
+        ),
+        'Analytics init',
+      );
 
-    AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
-    await SecurityInitializer.initialize();
-  } on Object catch (e) {
-    AppLogger.e('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE', e);
-    await _handleSecurityFailure(e);
-    return;
-  }
+      AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
+      await SecurityInitializer.initialize();
+    } on Object catch (e) {
+      AppLogger.e('🛡️ [FIREBASE SHIELD] CRITICAL FAILURE', e);
+      rethrow;
+    }
+  }();
 
   // Initialize Supabase
   final sUrl = AppConfig.supabaseUrl;
@@ -219,18 +172,6 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize push notification listeners and tokens after layout mounts
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppLogger.safeUnawait(
-        ref.read(pushNotificationServiceProvider).initialize(),
-        'Push init',
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
