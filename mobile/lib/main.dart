@@ -142,12 +142,14 @@ void main() async {
   try {
     await _initializeFirebase();
 
-    // Initialize Analytics after Firebase is ready
-    try {
-      await AnalyticsService.initialize();
-    } on Object catch (_) {
-      AppLogger.e('Analytics initialization failed');
-    }
+    // Initialize Analytics after Firebase is ready — do not block startup
+    AppLogger.safeUnawait(
+      AnalyticsService.initialize().catchError(
+        (Object e, StackTrace st) =>
+            AppLogger.e('Analytics initialization failed', e, st),
+      ),
+      'Analytics init',
+    );
 
     AppLogger.i('🛡️ [FIREBASE SHIELD] Initializing App Check...');
     await SecurityInitializer.initialize();
@@ -175,10 +177,14 @@ void main() async {
   // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
   AppLogger.safeUnawait(JweService.instance.preWarm(), 'JWE pre-warm');
 
-  await GoogleFonts.pendingFonts([
-    GoogleFonts.manrope(),
-    GoogleFonts.firaCode(),
-  ]);
+  // Defer font pre-warm so UI can render faster
+  AppLogger.safeUnawait(
+    GoogleFonts.pendingFonts([
+      GoogleFonts.manrope(),
+      GoogleFonts.firaCode(),
+    ]),
+    'Fonts pre-warm',
+  );
 
   runApp(
     ProviderScope(

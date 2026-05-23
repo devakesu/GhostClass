@@ -109,6 +109,8 @@ class DioService {
   // Futures to deduplicate parallel token requests
   Future<String?>? _tokenFetchInFlight;
   Future<String?>? _limitedTokenFetchInFlight;
+  // Instrumentation: count how many times we requested a limited-use token
+  static int _limitedTokenRequestCount = 0;
 
   void _handle401(RequestOptions options) {
     if (suppress401) return;
@@ -133,6 +135,10 @@ class DioService {
       if (useLimited) {
         var isNew = false;
         if (_limitedTokenFetchInFlight == null) {
+          _limitedTokenRequestCount++;
+          AppLogger.d(
+            'DioService: getLimitedUseToken requested (count: $_limitedTokenRequestCount)',
+          );
           _limitedTokenFetchInFlight = _appCheck.getLimitedUseToken();
           isNew = true;
         }
@@ -141,7 +147,7 @@ class DioService {
         );
         if (isNew) {
           AppLogger.safeUnawait(
-            Future.delayed(const Duration(seconds: 5), () {
+            Future.delayed(const Duration(seconds: 30), () {
               _limitedTokenFetchInFlight = null;
             }).catchError(
               (Object e, StackTrace st) {
