@@ -208,7 +208,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                               ),
                               TextSpan(
                                 text:
-                                    'You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• EzyGo may impose rate limits, security checks, suspensions, or account restrictions at its sole discretion; GhostClass is not responsible for those actions.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\n',
+                                    'You acknowledge that:\n• Official college records are the final authority.\n• Sync delays or API errors may cause discrepancies between GhostClass and EzyGo.\n• You are solely responsible for maintaining the minimum attendance required by your university/institution.\n\n',
                               ),
                               TextSpan(
                                 text: 'Use at Your Own Risk: ',
@@ -224,7 +224,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                               ),
                               TextSpan(
                                 text:
-                                    '. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions or access loss imposed by EzyGo.',
+                                    '. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE CREATORS OF GHOSTCLASS DISCLAIM ALL LIABILITY FOR ANY ACADEMIC CONSEQUENCES, INCLUDING BUT NOT LIMITED TO: grade reductions, exam ineligibility, disciplinary action, loss of academic opportunity, or account restrictions resulting from reliance on this app.',
                               ),
                             ],
                           ),

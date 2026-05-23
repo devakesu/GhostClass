@@ -268,8 +268,25 @@ class ServiceErrorDialog extends StatelessWidget {
                               height: 56,
                               child: ElevatedButton.icon(
                                 onPressed: () {
-                                  Navigator.of(context).pop();
-                                  onRetry!();
+                                  final isExit =
+                                      (retryLabel?.toLowerCase().contains(
+                                            'exit',
+                                          ) ??
+                                          false) ||
+                                      (retryLabel?.toLowerCase().contains(
+                                            'close',
+                                          ) ??
+                                          false) ||
+                                      (retryLabel?.toLowerCase().contains(
+                                            'restart',
+                                          ) ??
+                                          false);
+                                  if (isExit) {
+                                    onRetry!();
+                                  } else {
+                                    Navigator.of(context).pop();
+                                    onRetry!();
+                                  }
                                 },
                                 icon: Icon(
                                   // Use an 'x' icon for exit/close flows (label contains "Exit" or "Close"),

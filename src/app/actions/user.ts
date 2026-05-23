@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -144,12 +145,13 @@ export async function selectUserClassAction(classId: string | null) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
-  
-  const { error } = await supabase
+
+  const supabaseAdmin = getAdminClient();
+  const { error } = await supabaseAdmin
     .from("users")
     .update({ class_id: classId })
     .eq("auth_id", user.id);
-    
+
   if (error) {
     throw new Error(error.message);
   }

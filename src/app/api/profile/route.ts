@@ -126,8 +126,21 @@ async function performSyncAndFetchUser(
 }> {
   try {
     const fullSync = !isDebounced;
-    const syncResult = await performProfileSync(token, String(existingUser.id), userId, fullSync);
-    
+    const syncResult = await performProfileSync(
+      token,
+      String(existingUser.id),
+      userId,
+      fullSync,
+      existingUser,
+    );
+
+    if (!fullSync) {
+      return {
+        updatedUser: existingUser,
+        syncResult,
+      };
+    }
+
     const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", userId).single();
     return {
       updatedUser: updatedUser ?? existingUser,
@@ -173,7 +186,7 @@ async function loadExistingUserBundle(
       }
       if (!syncToken) return;
       try {
-        await performProfileSync(syncToken, String(existingUser.id), userId, true);
+        await performProfileSync(syncToken, String(existingUser.id), userId, true, existingUser);
       } catch (err) { 
         logger.warn("Profile background sync failed", err); 
       }

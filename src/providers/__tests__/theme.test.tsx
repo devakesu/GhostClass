@@ -61,6 +61,23 @@ describe('ThemeProvider', () => {
       expect(screen.getByTestId('theme-value').textContent).toBe('light');
     });
 
+    it('defaults to dark when system preference is dark and no stored preference exists', () => {
+      vi.stubGlobal('window', {
+        ...window,
+        matchMedia: vi.fn().mockImplementation((query: string) => ({
+          matches: query.includes('dark'),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      });
+      render(
+        <ThemeProvider>
+          <ThemeDisplay />
+        </ThemeProvider>
+      );
+      expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+    });
+
     it('reads stored "dark" preference from localStorage', () => {
       localStorageMock.set(THEME_STORAGE_KEY, 'dark');
       render(

@@ -96,68 +96,120 @@ function stripTrailingSlashes(str) {
   return s;
 }
 
-export default {
-  async fetch(request, env) {
-    // ── 1. Config validation ──────────────────────────────────────────────────
-    const rawSupabaseUrl = stripTrailingSlashes(env.SUPABASE_URL ?? "");
-    if (!rawSupabaseUrl) {
-      return new Response("Misconfigured: SUPABASE_URL is not set", { status: 500 });
-    }
+function getSupabaseOrigin(env) {
+  const rawSupabaseUrl = stripTrailingSlashes(env.SUPABASE_URL ?? "");
+  if (!rawSupabaseUrl) {
+    return {
+      error: new Response("Misconfigured: SUPABASE_URL is not set", { status: 500 }),
+      origin: null,
+    };
+  }
 
-    let supabaseOrigin;
-    try {
-      supabaseOrigin = new URL(rawSupabaseUrl).origin;
-    } catch {
-      return new Response("Misconfigured: SUPABASE_URL is not a valid URL", { status: 500 });
-    }
+  try {
+    return { origin: new URL(rawSupabaseUrl).origin, error: null };
+  } catch {
+    return {
+      error: new Response("Misconfigured: SUPABASE_URL is not a valid URL", { status: 500 }),
+      origin: null,
+    };
+  }
+}
 
-    const allowedOrigin = stripTrailingSlashes(env.ALLOWED_ORIGIN ?? "");
+function isPublicStorageGetRequest(request, pathname) {
+  return (
+    (request.method === "GET" || request.method === "HEAD")
+    && pathname.startsWith("/storage/v1/object/public/")
+  );
+}
 
-    const requestOrigin = request.headers.get("origin");
+function validateOrigin(request, allowedOrigin, pathname) {
+  if (!allowedOrigin) {
+    return new Response("Misconfigured: ALLOWED_ORIGIN is not set", {
+      status: 500,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
 
-    // ── 2. Origin check ───────────────────────────────────────────────────────
-    // Reject requests arriving from a different website to prevent quota abuse.
-    // When ALLOWED_ORIGIN is configured, all requests must include an Origin
-    // header that exactly matches the allowed origin.
-    if (!allowedOrigin) {
-      return new Response("Misconfigured: ALLOWED_ORIGIN is not set", {
-        status: 500,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-
-    if (!requestOrigin) {
+  const requestOrigin = request.headers.get("origin");
+  if (!requestOrigin) {
+    if (!isPublicStorageGetRequest(request, pathname)) {
       return new Response("Forbidden: missing Origin header", {
         status: 403,
         headers: { "Content-Type": "text/plain" },
       });
     }
+    return null;
+  }
 
-    // Normalise both sides before comparing.
-    const normReq = stripTrailingSlashes(requestOrigin);
-    const normAllowed = allowedOrigin;
-    if (normReq !== normAllowed) {
-      return new Response("Forbidden: origin not allowed", {
-        status: 403,
-        headers: { "Content-Type": "text/plain" },
-      });
+  const normReq = stripTrailingSlashes(requestOrigin);
+  if (normReq !== allowedOrigin) {
+    return new Response("Forbidden: origin not allowed", {
+      status: 403,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  return null;
+}
+
+function buildTargetUrl(supabaseOrigin, incomingUrl) {
+  const targetUrl = new URL(supabaseOrigin);
+  targetUrl.pathname = incomingUrl.pathname.replace(/\/+/g, "/");
+  targetUrl.search = incomingUrl.search;
+  return targetUrl;
+}
+
+function buildOutboundHeaders(request, supabaseOrigin) {
+  const outHeaders = new Headers();
+  for (const [key, value] of request.headers.entries()) {
+    if (!STRIP_REQUEST_HEADERS.has(key.toLowerCase())) {
+      outHeaders.set(key, value);
     }
-    // Keep the incoming path + query; only replace the origin.
+  }
+  // Correct the Host header for TLS SNI and virtual hosting.
+  outHeaders.set("host", new URL(supabaseOrigin).hostname);
+  return outHeaders;
+}
+
+function buildResponseHeaders(supabaseResponse) {
+  const respHeaders = new Headers();
+  for (const [key, value] of supabaseResponse.headers.entries()) {
+    if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
+      respHeaders.set(key, value);
+    }
+  }
+  return respHeaders;
+}
+
+export default {
+  async fetch(request, env) {
+    // ── 1. Config validation ──────────────────────────────────────────────────
+    const { origin: supabaseOrigin, error: supabaseError } = getSupabaseOrigin(env);
+    if (supabaseError) {
+      return supabaseError;
+    }
+
+    const allowedOrigin = stripTrailingSlashes(env.ALLOWED_ORIGIN ?? "");
     const incomingUrl = new URL(request.url);
+    const incomingPathname = incomingUrl.pathname;
+
+    // ── 2. Origin check ───────────────────────────────────────────────────────
+    // Reject requests arriving from a different website to prevent quota abuse.
+    // When ALLOWED_ORIGIN is configured, all requests must include an Origin
+    // header that exactly matches the allowed origin.
+    // Bypass Origin check for GET/HEAD requests to public storage.
+    // Next.js server-side Image Optimization and mobile clients do not send an Origin header.
+    const originError = validateOrigin(request, allowedOrigin, incomingPathname);
+    if (originError) {
+      return originError;
+    }
+
+    // Keep the incoming path + query; only replace the origin.
     // Use the URL object's pathname property to prevent protocol-relative hijacking (//path).
-    const targetUrl = new URL(supabaseOrigin);
-    targetUrl.pathname = incomingUrl.pathname.replace(/\/+/g, "/");
-    targetUrl.search = incomingUrl.search;
+    const targetUrl = buildTargetUrl(supabaseOrigin, incomingUrl);
 
     // ── 4. Build outbound request headers ────────────────────────────────────
-    const outHeaders = new Headers();
-    for (const [key, value] of request.headers.entries()) {
-      if (!STRIP_REQUEST_HEADERS.has(key.toLowerCase())) {
-        outHeaders.set(key, value);
-      }
-    }
-    // Correct the Host header for TLS SNI and virtual hosting.
-    outHeaders.set("host", new URL(supabaseOrigin).hostname);
+    const outHeaders = buildOutboundHeaders(request, supabaseOrigin);
 
     // ── 5. Forward to Supabase ────────────────────────────────────────────────
     let supabaseResponse;
@@ -178,12 +230,7 @@ export default {
     }
 
     // ── 6. Build response — strip hop-by-hop headers ──────────────────────────
-    const respHeaders = new Headers();
-    for (const [key, value] of supabaseResponse.headers.entries()) {
-      if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
-        respHeaders.set(key, value);
-      }
-    }
+    const respHeaders = buildResponseHeaders(supabaseResponse);
 
     return new Response(supabaseResponse.body, {
       status: supabaseResponse.status,

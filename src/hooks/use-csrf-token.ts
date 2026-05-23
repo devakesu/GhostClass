@@ -12,6 +12,50 @@ const CSRF_REINIT_INTERVAL_MS = 30 * 60 * 1000;
 
 let csrfInitPromise: Promise<void> | null = null;
 
+async function initializeCsrfToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  if (isCsrfFresh()) {
+    return getCsrfToken();
+  }
+
+  if (csrfInitPromise) {
+    try {
+      await csrfInitPromise;
+    } catch {
+      logger.dev("CSRF promise rejected");
+    }
+    const token = getCsrfToken();
+    if (token) return token;
+  }
+
+  csrfInitPromise = (async () => {
+    try {
+      const response = await axios.get("/api/csrf", {
+        baseURL: "",
+        withCredentials: true,
+      });
+
+      if (response.status >= 200 && response.status < 300) {
+        handleInitResponse(response.data);
+      }
+    } catch (error) {
+      logger.error("CSRF init failed", error);
+      throw error;
+    } finally {
+      csrfInitPromise = null;
+    }
+  })();
+
+  try {
+    await csrfInitPromise;
+  } catch (err) {
+    logger.dev("CSRF wait failed", err);
+  }
+
+  return getCsrfToken();
+}
+
 function isCsrfFresh(): boolean {
   const existingToken = getCsrfToken();
   if (!existingToken) return false;
@@ -67,37 +111,9 @@ export function useCSRFToken() {
       if (typeof window === "undefined" || hasInitialized.current) return;
       hasInitialized.current = true;
 
-      if (isCsrfFresh()) return;
-
-      if (csrfInitPromise) {
-        try {
-          await csrfInitPromise;
-        } catch {
-          logger.dev("CSRF promise rejected");
-        }
-        if (getCsrfToken()) return;
-      }
-
-      csrfInitPromise = (async () => {
-        try {
-          const response = await axios.get("/api/csrf", {
-            baseURL: "",
-            withCredentials: true,
-          });
-
-          if (isMounted) {
-            handleInitResponse(response.data);
-          }
-        } catch (error) {
-          if (isMounted) logger.error("CSRF init failed", error);
-          throw error;
-        } finally {
-          csrfInitPromise = null;
-        }
-      })();
-
       try {
-        await csrfInitPromise;
+        await initializeCsrfToken();
+        if (!isMounted) return;
       } catch (err) {
         logger.dev("CSRF wait failed", err);
       }
@@ -108,4 +124,8 @@ export function useCSRFToken() {
       isMounted = false;
     };
   }, []);
+}
+
+export async function ensureCSRFToken(): Promise<string | null> {
+  return initializeCsrfToken();
 }

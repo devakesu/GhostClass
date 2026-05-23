@@ -260,24 +260,13 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: mobile/ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('mobile/ios/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('mobile/pubspec.lock', 'mobile/ios/Podfile') }}
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      - name: Install CocoaPods dependencies
-        if: hashFiles('mobile/ios/Podfile') != ''
-        run: |
-          pushd mobile/ios
-          pod install
-          popd
-
-      - name: Cache DerivedData
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
-        with:
-          path: ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-xcode-deriveddata-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-deriveddata-
+      - name: Configure iOS project for simulator build
+        working-directory: mobile
+        run: flutter build ios --simulator --no-codesign
 
       - name: Initialize CodeQL (Swift)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
@@ -295,8 +284,7 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            -quiet
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Run CodeQL analysis (Swift)
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e

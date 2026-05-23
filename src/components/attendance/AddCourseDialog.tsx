@@ -203,7 +203,7 @@ export function AddCourseDialog({
                 className="py-6 border-2 focus-visible:ring-primary/30"
                 disabled={isSubmitting}
                 autoComplete="off"
-                maxLength={100}
+                maxLength={200}
               />
             </div>
           </div>

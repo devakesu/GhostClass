@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/security_provider.dart';
+import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/security_guard.dart';
 
@@ -40,8 +41,9 @@ class SecurityLockdownListener extends ConsumerWidget {
         'SecurityLockdownListener: wipeAndExit',
       );
     }
+    final navContext = rootNavigatorKey.currentContext ?? context;
     final _ = SecurityUtils.showSecurityFailureDialog(
-      context,
+      navContext,
       title: state.message,
       message: state.reason ?? 'Your device failed the security verification.',
       technicalDetails: state.source ?? 'Unknown security context.',

@@ -270,6 +270,9 @@ class SecureStorageService {
   Future<String?> getAttestationResult() =>
       _safeRead(key: _Keys.attestationResult);
 
+  Future<void> clearAttestationResult() =>
+      _safeDelete(key: _Keys.attestationResult);
+
   // ─── Generic Read/Write (Safe access to _storage) ──────────────────────
 
   Future<void> writeSecure(String key, String value) =>

@@ -493,22 +493,22 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
               <p className="text-xs text-foreground/50 font-medium italic">
                 For students juggling classes, internals, labs, submissions, caffeine, and “I’ll study tomorrow” energy ☕📚
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
-                <div className="inline-flex items-center rounded-full border border-primary/15 bg-background/80 p-1 shadow-sm backdrop-blur-sm">
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center rounded-full border border-primary/25 bg-linear-to-r from-primary/8 via-purple-500/8 to-primary/8 p-1 shadow-md shadow-primary/5 backdrop-blur-md transition-all duration-300 hover:border-primary/45">
                   <button
                     type="button"
                     aria-label="Go to previous academic period"
                     onClick={() => requestAcademicShift("previous")}
                     disabled={isUpdating}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-primary/70 transition-all hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer active:scale-90"
                   >
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                   </button>
-                  <div className="min-w-[11rem] px-3 text-center">
-                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/70">
-                      Current
+                  <div className="min-w-[11rem] px-3 text-center select-none">
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/85">
+                      Academic Term
                     </div>
-                    <div className="mt-1 text-sm font-extrabold uppercase tracking-[0.18em] text-foreground">
+                    <div className="mt-0.5 text-sm font-black uppercase tracking-[0.18em] bg-clip-text text-transparent bg-linear-to-r from-primary via-purple-600 to-indigo-600 dark:from-primary dark:via-purple-400 dark:to-blue-400">
                       {effectiveSemester?.toUpperCase()} {effectiveYear}
                     </div>
                   </div>
@@ -517,9 +517,9 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                     aria-label="Go to next academic period"
                     onClick={() => requestAcademicShift("next")}
                     disabled={isUpdating}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-primary/70 transition-all hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer active:scale-90"
                   >
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>

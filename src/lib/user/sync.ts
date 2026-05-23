@@ -587,6 +587,7 @@ interface ExistingUserData {
   birth_date_iv?: string | null;
   terms_version?: string | null;
   class_id?: string | null;
+  last_synced_at?: string | null;
 }
 
 function safeDecryptField(iv: string | null | undefined, content: string | null | undefined): string | null {
@@ -749,6 +750,7 @@ export async function performProfileSync(
   ezygoId: string,
   authId: string,
   fullSync: false,
+  preFetchedExistingUser?: ExistingUserData | null,
 ): Promise<LightSyncResult>;
 
 export async function performProfileSync(
@@ -756,6 +758,7 @@ export async function performProfileSync(
   ezygoId: string,
   authId: string,
   fullSync?: true,
+  preFetchedExistingUser?: ExistingUserData | null,
 ): Promise<FullSyncResult>;
 
 export async function performProfileSync(
@@ -763,6 +766,7 @@ export async function performProfileSync(
   ezygoId: string,
   authId: string,
   fullSync?: boolean,
+  preFetchedExistingUser?: ExistingUserData | null,
 ): Promise<SyncResult>;
 
 /**
@@ -774,6 +778,7 @@ export async function performProfileSync(
   ezygoId: string,
   authId: string,
   fullSync: boolean = true,
+  preFetchedExistingUser?: ExistingUserData | null,
 ): Promise<SyncResult> {
   const supabaseAdmin = getAdminClient();
 
@@ -804,13 +809,13 @@ export async function performProfileSync(
 
     const { ezygoData, resolvedEzygoId } = await parseProfileResponse(ezygoRes, ezygoId);
 
-    const { data: existingUser } = await supabaseAdmin
+    const existingUser = preFetchedExistingUser ?? (await supabaseAdmin
       .from("users")
       .select(
         "first_name, last_name, phone, phone_iv, gender, gender_iv, birth_date, birth_date_iv, terms_version, class_id, last_synced_at",
       )
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
-      .maybeSingle();
+      .maybeSingle()).data;
 
     let classId: string | null = null;
     let classInfo: { id: string; name: string } | null = null;

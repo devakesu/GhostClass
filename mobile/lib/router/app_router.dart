@@ -26,7 +26,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
@@ -93,7 +93,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   });
 
   return GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: Listenable.merge([
       refreshStream,
@@ -137,14 +137,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Keep authenticated users on splash until auth bootstrap finishes.
       if (isAuth && !authResolved && !isSplash) {
         return '/splash';
-      }
-
-      // Once auth is hydrated, splash becomes the single decision point.
-      if (isAuth && authResolved && isSplash) {
-        if (hydratedUser == null) {
-          return '/login';
-        }
-        return (hydratedUser.termsAccepted) ? '/dashboard' : '/accept-terms';
       }
 
       // ─── Terms Acceptance Redirection ───

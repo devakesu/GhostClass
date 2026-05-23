@@ -929,10 +929,12 @@ jobs:
           SERVER_URL: ${{ github.server_url }}
           CHANGELOG_TEXT: ${{ steps.prev_version.outputs.changelog_text }}
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
+          ANDROID_PACKAGE_NAME: ${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || 'com.devakesu.apps.ghostclass' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
+          PLAY_STORE_URL="https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}"
 
           if [[ "${PLATFORMS}" == *","* ]]; then
             PLATFORM_DESC="Multi-platform Docker images (${PLATFORM_LIST})"
@@ -952,6 +954,14 @@ jobs:
           - 📋 Software Bill of Materials (SBOM) in CycloneDX format
           - ✅ Build provenance attestations
           - 🔍 SHA256 checksums for all artifacts
+
+          ### Mobile App
+
+          [![Get it on Google Play](https://img.shields.io/badge/Get%20it%20on-Google%20Play-34A853?style=for-the-badge&logo=googleplay&logoColor=white)](${PLAY_STORE_URL})
+
+          **Google Play**: ${PLAY_STORE_URL}
+
+          > We recommend downloading from Google Play. GhostClass enforces Firebase App Check (Play Integrity), and Play-distributed builds provide the most reliable attestation path.
 
           ### Docker Images
 

@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getOrCreateClientId } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
+import { CSRF_HEADER } from "@/lib/security/csrf-constants";
+import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 
 /**
  * Client component for automatic event tracking via server-side API
@@ -31,39 +33,29 @@ export function AnalyticsTracker() {
         const queryString = searchParams?.toString();
         const url = `${window.location.origin}${pathname}${queryString ? "?" + queryString : ""}`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-        try {
-          await fetch("/api/analytics/track", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              clientId,
-              events: [
-                {
-                  name: "page_view",
-                  params: {
-                    page_location: url,
-                    page_title: document.title,
-                    page_referrer: (() => {
-                      if (!document.referrer) return "";
-                      try {
-                        const ref = new URL(document.referrer);
-                        return ref.origin + ref.pathname;
-                      } catch {
-                        return "";
-                      }
-                    })(),
-                  },
+        await postAnalyticsBody(
+          JSON.stringify({
+            clientId,
+            events: [
+              {
+                name: "page_view",
+                params: {
+                  page_location: url,
+                  page_title: document.title,
+                  page_referrer: (() => {
+                    if (!document.referrer) return "";
+                    try {
+                      const ref = new URL(document.referrer);
+                      return ref.origin + ref.pathname;
+                    } catch {
+                      return "";
+                    }
+                  })(),
                 },
-              ],
-            }),
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
+              },
+            ],
+          }),
+        );
 
         // Reset scroll tracking on page change
         scrollTracked.current.clear();
@@ -246,6 +238,27 @@ export function AnalyticsTracker() {
   return null; // This component doesn't render anything
 }
 
+async function postAnalyticsBody(body: string) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+  try {
+    const csrfToken = await ensureCSRFToken();
+
+    await fetch("/api/analytics/track", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+      },
+      body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Track custom events
  * Usage: trackEvent('button_click', { button_name: 'signup' })
@@ -256,9 +269,6 @@ export async function trackEvent(
 ) {
   try {
     const clientId = getOrCreateClientId();
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     // Guard against circular references (e.g. DOM nodes accidentally passed as params)
     const seen = new WeakSet();
@@ -271,19 +281,12 @@ export async function trackEvent(
       return value;
     };
 
-    try {
-      await fetch("/api/analytics/track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          { clientId, events: [{ name: eventName, params: eventParams }] },
-          safeReplacer,
-        ),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    await postAnalyticsBody(
+      JSON.stringify(
+        { clientId, events: [{ name: eventName, params: eventParams }] },
+        safeReplacer,
+      ),
+    );
   } catch (error) {
     // Silently fail if analytics fails
     if (error instanceof Error && error.name === "AbortError") return;

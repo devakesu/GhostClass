@@ -10,6 +10,16 @@
 
 GhostClass Mobile is a secure, zero-trust Flutter application that communicates with the GhostClass backend API. Every network request is encrypted with JWE (JSON Web Encryption), device integrity is attested by Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS), and all credentials are stored in hardware-backed secure storage — never in plain SharedPreferences.
 
+## 📲 Download
+
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+   <a href="https://play.google.com/store/apps/details?id=com.devakesu.apps.ghostclass" target="_blank" rel="noopener noreferrer">
+      <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="280" />
+   </a>
+</p>
+<!-- markdownlint-enable MD033 -->
+
 ## ✨ Features
 
 - **Dashboard** 📊 — Attendance overview with stats grid, progress ring, trend chart, and per-course bunk calculator

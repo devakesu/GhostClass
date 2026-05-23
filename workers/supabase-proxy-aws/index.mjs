@@ -106,10 +106,16 @@ function stripTrailingSlashes(str) {
 const SUPABASE_URL   = stripTrailingSlashes(process.env.SUPABASE_URL   ?? "");
 const ALLOWED_ORIGIN = stripTrailingSlashes(process.env.ALLOWED_ORIGIN ?? "");
 
-function validateOrigin(eventHeaders) {
+function validateOrigin(eventHeaders, method, path) {
   const requestOrigin = stripTrailingSlashes(eventHeaders?.["origin"] ?? "");
+  const isPublicStorageGet = (method === "GET" || method === "HEAD") &&
+    path.startsWith("/storage/v1/object/public/");
+
   if (!requestOrigin) {
-    return { statusCode: 403, body: "Forbidden: Origin header is required" };
+    if (!isPublicStorageGet) {
+      return { statusCode: 403, body: "Forbidden: Origin header is required" };
+    }
+    return null;
   }
   if (!ALLOWED_ORIGIN) {
     return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
@@ -176,18 +182,20 @@ export const handler = async (event) => {
     return { statusCode: 500, body: "Misconfigured: SUPABASE_URL is not a valid URL" };
   }
 
+  const rawPath = event.rawPath ?? "/";
+  const method = (event.requestContext?.http?.method ?? "GET").toUpperCase();
+
   // ── 2. Origin check ───────────────────────────────────────────────────────
   // All requests must supply an Origin header that exactly matches ALLOWED_ORIGIN.
   // Allowing origin-less requests would make this an open proxy to your Supabase
   // project — anyone with curl/Postman could relay arbitrary traffic at your cost.
-  const originError = validateOrigin(event.headers);
+  const originError = validateOrigin(event.headers, method, rawPath);
   if (originError) {
     return originError;
   }
 
   // ── 3. Build target URL ───────────────────────────────────────────────────
   // Preserve the incoming path + query; only swap the origin.
-  const rawPath        = event.rawPath        ?? "/";
   const rawQueryString = event.rawQueryString ? `?${event.rawQueryString}` : "";
   const targetUrl      = `${supabaseOrigin}${rawPath}${rawQueryString}`;
 
@@ -209,8 +217,6 @@ export const handler = async (event) => {
       ? Buffer.from(event.body, "base64")
       : event.body;
   }
-
-  const method = (event.requestContext?.http?.method ?? "GET").toUpperCase();
 
   // ── 6. Proxy to Supabase ──────────────────────────────────────────────────
   let response;

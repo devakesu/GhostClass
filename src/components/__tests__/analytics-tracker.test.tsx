@@ -3,6 +3,7 @@ import { render, waitFor, fireEvent } from '@testing-library/react';
 import { AnalyticsTracker, trackEvent } from '../analytics-tracker';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { logger } from '@/lib/logger';
+import * as csrfTokenModule from '@/hooks/use-csrf-token';
 
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(),
@@ -11,6 +12,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/analytics', () => ({
   getOrCreateClientId: vi.fn(() => 'test-client-id'),
+}));
+
+vi.mock('@/hooks/use-csrf-token', () => ({
+  ensureCSRFToken: vi.fn(() => Promise.resolve('test-csrf-token')),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -52,6 +57,7 @@ describe('AnalyticsTracker', () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/analytics/track', expect.objectContaining({
         method: 'POST',
+        headers: expect.objectContaining({ 'x-csrf-token': 'test-csrf-token' }),
         body: expect.stringContaining('page_view'),
       }));
     });
@@ -192,8 +198,34 @@ describe('trackEvent', () => {
     
     expect(global.fetch).toHaveBeenCalledWith('/api/analytics/track', expect.objectContaining({
       method: 'POST',
+      headers: expect.objectContaining({ 'x-csrf-token': 'test-csrf-token' }),
       body: expect.stringContaining('custom_event'),
     }));
+  });
+
+  it('waits for csrf initialization before sending an event', async () => {
+    let resolveToken: ((value: string) => void) | undefined;
+    vi.mocked(csrfTokenModule.ensureCSRFToken).mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveToken = resolve;
+      })
+    );
+
+    const trackPromise = trackEvent('delayed_event', { key: 'value' });
+
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    resolveToken?.('delayed-csrf-token');
+
+    await trackPromise;
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/analytics/track', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-csrf-token': 'delayed-csrf-token' }),
+        body: expect.stringContaining('delayed_event'),
+      }));
+    });
   });
 
   it('safely handles circular references and DOM nodes in params', async () => {
