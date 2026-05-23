@@ -1,6 +1,6 @@
 {
   "name": "ghostclass",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "private": true,
   "engines": {
     "node": ">=22.12.0",

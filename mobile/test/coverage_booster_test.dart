@@ -17,10 +17,15 @@ import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'coverage_helper.dart';
 
 class MockSecurityService extends Mock implements SecurityService {}
+
+class MockSupabaseClient extends Mock implements SupabaseClient {}
+
+class MockGoTrueClient extends Mock implements GoTrueClient {}
 
 void main() {
   final mockDashboard = createMockDashboardData();
@@ -206,6 +211,11 @@ void main() {
       'ghostclass_jwks_time': DateTime.now().toIso8601String(),
     });
 
+    final mockSupabase = MockSupabaseClient();
+    final mockAuth = MockGoTrueClient();
+    when(() => mockSupabase.auth).thenReturn(mockAuth);
+    when(() => mockAuth.currentSession).thenReturn(null);
+
     final mockSecurity = MockSecurityService();
     when(mockSecurity.verifyIntegrity).thenAnswer(
       (_) async => AppVersionCheckResult(
@@ -229,6 +239,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          supabaseClientProvider.overrideWithValue(mockSupabase),
           securityServiceProvider.overrideWithValue(mockSecurity),
           dashboardProvider.overrideWith(
             () => MockDashboardNotifier(mockDashboard),
@@ -252,6 +263,7 @@ void main() {
     // Touch routerProvider for coverage
     final container = ProviderContainer(
       overrides: [
+        supabaseClientProvider.overrideWithValue(mockSupabase),
         authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
       ],
     );
@@ -260,5 +272,9 @@ void main() {
       // Accessing configuration to exercise provider code paths
       r.configuration.routes.length;
     } on Object catch (_) {}
+
+    // Unmount widget tree to cancel repeating animation timers
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 }

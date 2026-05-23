@@ -20,6 +20,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
+import 'package:ghostclass/services/startup_flow_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginException implements Exception {
@@ -414,6 +415,30 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     }
   }
 
+  bool _isTransientAppCheckFailureText(String? text) {
+    final msg = (text ?? '').toLowerCase();
+    if (msg.isEmpty) return false;
+    return msg.contains('too_many_attempts') ||
+        msg.contains('timeout') ||
+        msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('unavailable') ||
+        msg.contains('rate limit') ||
+        msg.contains('internal google server error') ||
+        msg.contains('google_server_unavailable') ||
+        msg.contains('-12');
+  }
+
+  bool _isTransientSecurityPayload(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    final reason = data['reason'] as String?;
+    final error = data['error'] as String?;
+    final appCheckError = data['appCheckError'] as String?;
+    return _isTransientAppCheckFailureText(reason) ||
+        _isTransientAppCheckFailureText(error) ||
+        _isTransientAppCheckFailureText(appCheckError);
+  }
+
   Future<void> _handleSecurityLockdown(Map<String, String> data) async {
     AppLogger.e('AuthNotifier: SECURITY LOCKDOWN TRIGGERED');
 
@@ -563,6 +588,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         cachedUser,
         supabaseToken: token,
         sync: true,
+        force: true,
       );
       _lastRefresh = DateTime.now();
 
@@ -624,12 +650,17 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       if (bridgeResponse.statusCode != 200 &&
           bridgeResponse.statusCode != 201) {
         final data = bridgeResponse.data as Map<String, dynamic>?;
+        final isTransientSecurity = _isTransientSecurityPayload(data);
         final errorMsg = formatApiError(data, 'Secure Session');
         throw AppException(
-          message: errorMsg,
-          type: bridgeResponse.statusCode == 401
-              ? AppExceptionType.unauthorized
-              : AppExceptionType.server,
+          message: isTransientSecurity
+              ? 'Device verification is temporarily unavailable. Please retry in a few moments.'
+              : errorMsg,
+          type: isTransientSecurity
+              ? AppExceptionType.network
+              : (bridgeResponse.statusCode == 401
+                    ? AppExceptionType.unauthorized
+                    : AppExceptionType.server),
           statusCode: bridgeResponse.statusCode,
           details: data,
         );
@@ -776,6 +807,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         try {
           await AnalyticsService.instance.logLogin(method: 'ezygo');
         } on Object catch (_) {}
+        ref
+            .read(startupFlowServiceProvider)
+            .markPostLoginFastPath(supabaseUser.id);
         return;
       }
 
@@ -835,6 +869,10 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           await AnalyticsService.instance.logLogin(method: 'ezygo');
         } on Object catch (_) {}
       }
+
+      ref
+          .read(startupFlowServiceProvider)
+          .markPostLoginFastPath(supabaseUser.id);
     } on AuthException catch (e, st) {
       AppLogger.e('AuthNotifier: SUPABASE AUTH ERROR', e);
       state = AsyncValue.error(e, st);
@@ -1157,30 +1195,56 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     UserSettings? settingsFallback,
   }) async {
     final storage = ref.read(secureStorageProvider);
-    final storedSupabaseUserId = await storage.getSupabaseUserId();
-    final storedEzygoUserId = await storage.getEzygoUserId();
+
+    final identityReads = await Future.wait<String?>([
+      storage.getSupabaseUserId(),
+      storage.getEzygoUserId(),
+    ]);
+    final storedSupabaseUserId = identityReads[0];
+    final storedEzygoUserId = identityReads[1];
 
     final matchesIdentity =
         storedSupabaseUserId == null ||
         storedSupabaseUserId == supabaseUserId ||
         (ezygoIdOverride != null && storedEzygoUserId == ezygoIdOverride);
 
+    Future<String?> usernameFuture() async =>
+        matchesIdentity ? storage.getUsername() : null;
+
+    Future<String?> termsVersionFuture() async =>
+        matchesIdentity ? storage.getTermsVersion() : null;
+
+    Future<UserSettings> settingsFuture() async {
+      if (!matchesIdentity) {
+        return settingsFallback ?? UserSettings.defaults();
+      }
+      return await storage.getSettings() ??
+          settingsFallback ??
+          UserSettings.defaults();
+    }
+
+    Future<UserProfile?> profileFuture() async =>
+        matchesIdentity ? storage.getUserProfile() : null;
+
+    final hydrationReads = await Future.wait<dynamic>([
+      usernameFuture(),
+      termsVersionFuture(),
+      settingsFuture(),
+      profileFuture(),
+    ]);
+    final storedUsername = hydrationReads[0] as String?;
+    final storedTermsVersion = hydrationReads[1] as String?;
+    final hydratedSettings = hydrationReads[2] as UserSettings;
+    final hydratedProfile = hydrationReads[3] as UserProfile?;
+
     return AuthenticatedUser(
       supabaseUserId: supabaseUserId,
       ezygoToken: EncryptedValue.fromPlaintext(ezygoToken),
       ezygoId: ezygoIdOverride ?? (matchesIdentity ? storedEzygoUserId : null),
-      username:
-          usernameOverride ??
-          (matchesIdentity ? await storage.getUsername() : null),
-      termsVersion:
-          termsVersionOverride ??
-          (matchesIdentity ? await storage.getTermsVersion() : null),
-      settings: matchesIdentity
-          ? await storage.getSettings() ??
-                settingsFallback ??
-                UserSettings.defaults()
-          : settingsFallback ?? UserSettings.defaults(),
-      profile: matchesIdentity ? await storage.getUserProfile() : null,
+      username: usernameOverride ?? storedUsername,
+      termsVersion: termsVersionOverride ?? storedTermsVersion,
+      settings: hydratedSettings,
+      profile: hydratedProfile,
     );
   }
 
@@ -1209,9 +1273,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
 
     if (response.statusCode == 401) {
       final data = response.data as Map<String, dynamic>?;
+      final isTransientSecurity = _isTransientSecurityPayload(data);
       throw AppException(
-        message: formatApiError(data, 'Security Verification'),
-        type: AppExceptionType.unauthorized,
+        message: isTransientSecurity
+            ? 'Device verification is temporarily unavailable. Please retry in a few moments.'
+            : formatApiError(data, 'Security Verification'),
+        type: isTransientSecurity
+            ? AppExceptionType.network
+            : AppExceptionType.unauthorized,
         statusCode: 401,
         details: data,
       );
@@ -1326,7 +1395,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     // If the user has logged out while this refresh was in-flight, skip
     // persisting any profile or token changes to avoid reintroducing
     // sensitive data after a forced logout.
-    if (state.value == null) {
+    final currentSession = ref.read(supabaseClientProvider).auth.currentSession;
+    if ((state.value == null && !state.isLoading) || currentSession == null) {
       AppLogger.i(
         'AuthNotifier: Skipping profile apply because user logged out during refresh',
       );

@@ -9,12 +9,16 @@ import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/screens/navigation_shell.dart';
+import 'package:ghostclass/screens/notifications_screen.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'coverage_helper.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final mockDashboard = createMockDashboardData();
   final mockUser = createMockUser();
   final mockTracking = TrackingState(
@@ -92,13 +96,20 @@ void main() {
     // Dashboard content present
     expect(find.text('dashboard'), findsOneWidget);
 
-    // Programmatic navigation: go to calendar and verify content updates
-    router.go('/calendar');
+    // Open and close the notifications sheet through the shell action.
+    await tester.tap(find.byIcon(LucideIcons.bell));
+    await tester.pumpAndSettle();
+    expect(find.byType(NotificationsScreen), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Switch tabs through the bottom navigation and verify route updates.
+    await tester.tap(find.byIcon(LucideIcons.calendar));
     await tester.pumpAndSettle();
     expect(find.text('calendar'), findsOneWidget);
 
-    // Navigate back to dashboard
-    router.go('/dashboard');
+    await tester.tap(find.byIcon(LucideIcons.layoutDashboard));
     await tester.pumpAndSettle();
     expect(find.text('dashboard'), findsOneWidget);
   });

@@ -30,12 +30,25 @@ class AppVersionCheckResult {
 /// ---------------
 /// Manages device integrity checks and security attestation with the GhostClass backend.
 class SecurityService {
-  SecurityService(this._ref);
+  SecurityService(this._ref) {
+    _ref.onDispose(() {
+      _disposed = true;
+    });
+  }
   final Ref _ref;
+  bool _disposed = false;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
   static const Duration _cachedAttestationMaxAge = Duration(hours: 6);
+  static const Duration _blockingAttestationMaxAge = Duration(days: 7);
 
-  Dio get _dio => _ref.read(dioServiceProvider).dio;
+  Dio get _dio {
+    if (_disposed) {
+      throw StateError(
+        'Cannot use SecurityService after it has been disposed.',
+      );
+    }
+    return _ref.read(dioServiceProvider).dio;
+  }
 
   bool _isVersionOlder(String current, String target) {
     final currentParts = current
@@ -57,25 +70,84 @@ class SecurityService {
     return false;
   }
 
+  bool _isTransientAppCheckFailureText(String text) {
+    final msg = text.toLowerCase();
+    return msg.contains('quota') ||
+        msg.contains('connection') ||
+        msg.contains('timeout') ||
+        msg.contains('too_many_attempts') ||
+        msg.contains('network') ||
+        msg.contains('rate limit') ||
+        msg.contains('server') ||
+        msg.contains('internal error') ||
+        msg.contains('-12') ||
+        msg.contains('unavailable');
+  }
+
+  bool _isTransientErrorForFallback(Object e) {
+    if (e is DioException) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.badCertificate) {
+        return true;
+      }
+      final statusCode = e.response?.statusCode;
+      if (statusCode != null && statusCode >= 500) {
+        return true;
+      }
+    }
+
+    if (e is AppException) {
+      if (e.type == AppExceptionType.network) {
+        return true;
+      }
+      final reason = (e.details?['reason'] as String?) ?? e.message;
+      final appCheckError = e.details?['appCheckError'] as String?;
+      final isConnectionOrQuota =
+          (appCheckError != null &&
+              _isTransientAppCheckFailureText(appCheckError)) ||
+          _isTransientAppCheckFailureText(reason);
+      if (isConnectionOrQuota) {
+        return true;
+      }
+    }
+
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('socketexception') ||
+        msg.contains('handshakeexception') ||
+        msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('timeout')) {
+      return true;
+    }
+
+    return false;
+  }
+
   Future<AppVersionCheckResult?> verifyIntegrity() async {
+    if (_disposed) return null;
     final storage = _ref.read(secureStorageProvider);
     final cachedRaw = await storage.getAttestationResult();
+    if (_disposed) return null;
+    Map<String, dynamic>? cachedMap;
 
     if (cachedRaw != null) {
       try {
-        final map = jsonDecode(cachedRaw) as Map<String, dynamic>;
-        final latestVersion = map['latestVersion'] as String;
-        final minVersion = map['minVersion'] as String;
-        final cachedAt = DateTime.tryParse(map['cachedAt'] as String? ?? '');
+        cachedMap = jsonDecode(cachedRaw) as Map<String, dynamic>;
+        final latestVersion = cachedMap['latestVersion'] as String;
+        final minVersion = cachedMap['minVersion'] as String;
+        final cachedAt = DateTime.tryParse(
+          cachedMap['cachedAt'] as String? ?? '',
+        );
         final currentVersion = AppConfig.appVersion;
-        final isFreshCache =
-            cachedAt != null &&
-            DateTime.now().difference(cachedAt) <= _cachedAttestationMaxAge;
 
-        if (isFreshCache) {
-          // Dynamically recompute update flags based on the currently running app version.
-          // This prevents showing stale/incorrect update dialogs (e.g. v4.3.4 -> v4.3.4)
-          // on the first open after an update.
+        final isUnderBlockingLimit =
+            cachedAt != null &&
+            DateTime.now().difference(cachedAt) <= _blockingAttestationMaxAge;
+
+        if (isUnderBlockingLimit) {
           final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
           final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
 
@@ -86,42 +158,75 @@ class SecurityService {
             isForceUpdate: isForceUpdate,
           );
 
-          // Run background verification asynchronously
-          AppLogger.safeUnawait(
-            _runBackgroundIntegrityCheck().catchError(
-              (Object e, StackTrace st) => AppLogger.e(
-                'SecurityService: Background integrity check failed',
-                e,
-                st,
-              ),
-            ),
-            'SecurityService: background integrity check',
-          );
+          final isFreshCache =
+              DateTime.now().difference(cachedAt) <= _cachedAttestationMaxAge;
 
-          AppLogger.d('SecurityService: Returned cached attestation check.');
+          if (!isFreshCache) {
+            // Cache is stale but under blocking limit: return cached result instantly to avoid blocking,
+            // but trigger background integrity check asynchronously to refresh the cache.
+            AppLogger.safeUnawait(
+              _runBackgroundIntegrityCheck().catchError(
+                (Object e, StackTrace st) => AppLogger.e(
+                  'SecurityService: Background integrity check failed',
+                  e,
+                  st,
+                ),
+              ),
+              'SecurityService: background integrity check',
+            );
+          } else {
+            AppLogger.d(
+              'SecurityService: Returned fresh cached attestation check.',
+            );
+          }
+
           return cachedResult;
         }
 
         AppLogger.i(
-          'SecurityService: Cached attestation is stale; refreshing.',
+          'SecurityService: Cached attestation is stale and exceeds blocking limit; refreshing.',
         );
       } on Object catch (e) {
         AppLogger.e('SecurityService: Failed to parse cached attestation', e);
       }
     }
 
-    // Cache miss / first run: Blocking network attestation
+    // Cache miss / stale cache: Blocking network attestation
     try {
       final result = await _performNetworkVerify();
+      if (_disposed) return result;
       if (result != null) {
         await _cacheAttestationResult(result);
       }
       return result;
-    } on Object {
+    } on Object catch (e) {
+      if (cachedMap != null) {
+        final isTransient = _isTransientErrorForFallback(e);
+        if (isTransient) {
+          AppLogger.w(
+            'SecurityService: Network attestation failed transiently ($e). Falling back to stale cached attestation to permit offline access.',
+          );
+          final latestVersion = cachedMap['latestVersion'] as String;
+          final minVersion = cachedMap['minVersion'] as String;
+          final currentVersion = AppConfig.appVersion;
+          final hasUpdate = _isVersionOlder(currentVersion, latestVersion);
+          final isForceUpdate = _isVersionOlder(currentVersion, minVersion);
+
+          return AppVersionCheckResult(
+            latestVersion: latestVersion,
+            minVersion: minVersion,
+            hasUpdate: hasUpdate,
+            isForceUpdate: isForceUpdate,
+          );
+        }
+      }
+
       try {
-        await _ref.read(secureStorageProvider).clearAttestationResult();
-      } on Object catch (e) {
-        AppLogger.e('SecurityService: Failed to clear attestation cache', e);
+        if (!_disposed) {
+          await _ref.read(secureStorageProvider).clearAttestationResult();
+        }
+      } on Object catch (ex) {
+        AppLogger.e('SecurityService: Failed to clear attestation cache', ex);
       }
       rethrow;
     }
@@ -129,6 +234,7 @@ class SecurityService {
 
   Future<void> _cacheAttestationResult(AppVersionCheckResult result) async {
     try {
+      if (_disposed) return;
       final storage = _ref.read(secureStorageProvider);
       final map = {
         'latestVersion': result.latestVersion,
@@ -147,13 +253,16 @@ class SecurityService {
   Future<void> _runBackgroundIntegrityCheck() async {
     try {
       final result = await _performNetworkVerify();
+      if (_disposed) return;
       if (result != null) {
         await _cacheAttestationResult(result);
+        if (_disposed) return;
 
         // Update the reactive update state
         _ref.read(appUpdateProvider.notifier).setCheckResult(result);
       }
     } on AppException catch (e) {
+      if (_disposed) return;
       if (e.details?['type'] == 'security') {
         AppLogger.e(
           'SecurityService: Background attestation failure detected.',
@@ -196,6 +305,7 @@ class SecurityService {
               ex,
             );
           }
+          if (_disposed) return;
 
           // Force logout to wipe active session & user state
           try {
@@ -203,6 +313,7 @@ class SecurityService {
           } on Object catch (ex) {
             AppLogger.e('SecurityService: Forced logout failed', ex);
           }
+          if (_disposed) return;
 
           _ref
               .read(securityFailureProvider.notifier)
@@ -268,7 +379,7 @@ class SecurityService {
               'reason': reason,
               'action': action,
               'criticalRisk': criticalRisk,
-              'appCheckError': ?appCheckError,
+              'appCheckError': appCheckError,
             },
           );
         }

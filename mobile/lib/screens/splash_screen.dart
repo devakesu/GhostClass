@@ -12,6 +12,7 @@ import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/logic/support_helper.dart';
+import 'package:ghostclass/main.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
@@ -22,11 +23,23 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/security_service.dart';
+import 'package:ghostclass/services/startup_flow_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
+
+class _StartupSnapshot {
+  const _StartupSnapshot({
+    required this.user,
+    required this.versionResult,
+  });
+
+  final AuthenticatedUser? user;
+  final AppVersionCheckResult? versionResult;
+}
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -36,82 +49,70 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  void _prewarmAppData() {
-    void prewarm(Future<dynamic> future, String label) {
-      AppLogger.safeUnawait(
-        future.catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
-        }),
-        'SplashScreen: $label prewarm',
+  static Future<_StartupSnapshot>? _startupInFlight;
+  static _StartupSnapshot? _startupCache;
+  static DateTime? _startupCacheAt;
+  static String? _startupCacheSessionKey;
+  static const Duration _startupCacheTtl = Duration(seconds: 20);
+
+  bool _pushInitTriggered = false;
+  Future<void>? _initializeInFlight;
+
+  String _currentSessionKey() {
+    final session = ref.read(supabaseClientProvider).auth.currentSession;
+    return session?.user.id ?? 'anon';
+  }
+
+  bool _canUseStartupCache(String sessionKey) {
+    final cachedAt = _startupCacheAt;
+    if (_startupCache == null || cachedAt == null) return false;
+    if (_startupCacheSessionKey != sessionKey) return false;
+    return DateTime.now().difference(cachedAt) <= _startupCacheTtl;
+  }
+
+  Future<_StartupSnapshot> _runStartupChecksSingleFlight() {
+    final sessionKey = _currentSessionKey();
+    if (_canUseStartupCache(sessionKey)) {
+      return Future<_StartupSnapshot>.value(_startupCache);
+    }
+
+    final inFlight = _startupInFlight;
+    if (inFlight != null && _startupCacheSessionKey == sessionKey) {
+      return inFlight;
+    }
+
+    final api = ref.read(apiServiceProvider);
+    AppLogger.i('SplashScreen: Starting parallel initialization tasks...');
+    final skipIntegrityForPostLogin = ref
+        .read(startupFlowServiceProvider)
+        .consumePostLoginFastPath(sessionKey);
+    if (skipIntegrityForPostLogin) {
+      AppLogger.i(
+        'SplashScreen: Post-login fast-path active. Skipping integrity check for this pass.',
       );
     }
 
-    prewarm(ref.read(dashboardProvider.future), 'dashboard');
-    prewarm(ref.read(trackingProvider.future), 'tracking');
-    prewarm(ref.read(leaveProvider.future), 'leave');
-    prewarm(ref.read(scoreProvider.future), 'scores');
-    prewarm(ref.read(notificationsProvider.future), 'notifications');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final _ = _initializeApp();
-    });
-  }
-
-  Future<void> _initializeApp() async {
-    // 1. Proactively pre-warm security layers while logo is showing
-    // Keep the splash visible for 2s to improve perceived startup time
-    final splashHold = Future<void>.delayed(
-      const Duration(milliseconds: 2000),
-      () {
-        AppLogger.i('SplashScreen: 2s delay completed');
-      },
-    );
-
-    // Kick off non-critical pre-warms in the background so they do not block
-    AppLogger.safeUnawait(
-      JweService.instance.preWarm().catchError(
-        (Object e, StackTrace st) =>
-            AppLogger.e('SplashScreen: JWE pre-warm failed', e, st),
-      ),
-      'SplashScreen: JWE pre-warm',
-    );
-
-    AppLogger.safeUnawait(
-      ref
-          .read(apiServiceProvider)
-          .preWarm()
-          .catchError(
-            (Object e, StackTrace st) =>
-                AppLogger.e('SplashScreen: API pre-warm failed', e, st),
-          ),
-      'SplashScreen: API pre-warm',
-    );
-
-    // 2. Critical Security Check First
-    try {
-      final api = ref.read(apiServiceProvider);
-
-      AppLogger.i('SplashScreen: Starting parallel initialization tasks...');
-
+    final future = () async {
       AppVersionCheckResult? versionResult;
       Object? integrityError;
       StackTrace? integrityStack;
 
-      final integrityTask = api
-          .verifyIntegrity()
-          .then((res) {
-            AppLogger.i('SplashScreen: integrityTask completed');
-            versionResult = res;
-          })
-          .catchError((Object e, StackTrace st) {
-            AppLogger.e('SplashScreen: integrityTask failed', e, st);
-            integrityError = e;
-            integrityStack = st;
-          });
+      Future<void> integrityTask;
+      if (skipIntegrityForPostLogin) {
+        integrityTask = Future<void>.value();
+      } else {
+        integrityTask = api
+            .verifyIntegrity()
+            .then((res) {
+              AppLogger.i('SplashScreen: integrityTask completed');
+              versionResult = res;
+            })
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e('SplashScreen: integrityTask failed', e, st);
+              integrityError = e;
+              integrityStack = st;
+            });
+      }
 
       AuthenticatedUser? user;
       Object? authError;
@@ -129,31 +130,186 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
-      // CLEAR ALL previous app-open caches for a truly fresh start
       api.clearCaches();
-
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
-      // Wait for both critical security attestation & profile sync to resolve (success or failure)
       await Future.wait<dynamic>([
         integrityTask,
         authTask,
       ]);
-
       AppLogger.i('SplashScreen: Future.wait completed');
 
-      // Prioritize attestation/security error over auth/profile sync error
       if (integrityError != null) {
         Error.throwWithStackTrace(
           integrityError!,
           integrityStack ?? StackTrace.current,
         );
       }
-
       if (authError != null) {
         Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
       }
 
-      final finalVersionResult = versionResult;
+      return _StartupSnapshot(user: user, versionResult: versionResult);
+    }();
+
+    _startupCacheSessionKey = sessionKey;
+    _startupInFlight = future;
+
+    return future
+        .then((snapshot) {
+          _startupCache = snapshot;
+          _startupCacheAt = DateTime.now();
+          return snapshot;
+        })
+        .whenComplete(() {
+          if (identical(_startupInFlight, future)) {
+            _startupInFlight = null;
+          }
+        });
+  }
+
+  void _beginInitializeIfIdle() {
+    if (_initializeInFlight != null) return;
+    final future = _initializeApp();
+    _initializeInFlight = future.whenComplete(() {
+      if (identical(_initializeInFlight, future)) {
+        _initializeInFlight = null;
+      }
+    });
+  }
+
+  void _startPushInitInBackgroundAfterSplash(
+    PushNotificationService pushService,
+  ) {
+    if (_pushInitTriggered) return;
+    _pushInitTriggered = true;
+
+    AppLogger.safeUnawait(
+      Future<void>.delayed(const Duration(seconds: 2), () async {
+        await pushService.initialize();
+      }).catchError((Object e, StackTrace st) {
+        AppLogger.e('SplashScreen: Deferred push init failed', e, st);
+      }),
+      'SplashScreen: deferred push init',
+    );
+  }
+
+  void _prewarmAppData({
+    required Future<dynamic> dashboardFuture,
+    required Future<dynamic> trackingFuture,
+    required Future<dynamic> leaveFuture,
+    required Future<dynamic> scoreFuture,
+    required Future<dynamic> notificationsFuture,
+  }) {
+    void prewarm(Future<dynamic> future, String label) {
+      AppLogger.safeUnawait(
+        future.catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
+        }),
+        'SplashScreen: $label prewarm',
+      );
+    }
+
+    prewarm(dashboardFuture, 'dashboard');
+    prewarm(trackingFuture, 'tracking');
+    prewarm(leaveFuture, 'leave');
+    prewarm(scoreFuture, 'scores');
+    prewarm(notificationsFuture, 'notifications');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _beginInitializeIfIdle();
+    });
+  }
+
+  void _startPostNavigationPreloads({
+    required bool isDashboard,
+    required ApiService apiService,
+    required Future<dynamic> dashboardFuture,
+    required Future<dynamic> trackingFuture,
+    required Future<dynamic> leaveFuture,
+    required Future<dynamic> scoreFuture,
+    required Future<dynamic> notificationsFuture,
+  }) {
+    AppLogger.safeUnawait(
+      JweService.instance.preWarm().catchError(
+        (Object e, StackTrace st) =>
+            AppLogger.e('SplashScreen: post-nav JWE pre-warm failed', e, st),
+      ),
+      'SplashScreen: post-nav JWE pre-warm',
+    );
+
+    AppLogger.safeUnawait(
+      apiService.preWarm().catchError((Object e, StackTrace st) {
+        AppLogger.e('SplashScreen: post-nav API pre-warm failed', e, st);
+      }),
+      'SplashScreen: post-nav API pre-warm',
+    );
+
+    if (isDashboard) {
+      _prewarmAppData(
+        dashboardFuture: dashboardFuture,
+        trackingFuture: trackingFuture,
+        leaveFuture: leaveFuture,
+        scoreFuture: scoreFuture,
+        notificationsFuture: notificationsFuture,
+      );
+    }
+  }
+
+  Future<void> _initializeApp() async {
+    // Start JWE key warm-up early so attestation requests can reuse prepared
+    // key material, but do not block startup on this.
+    AppLogger.safeUnawait(
+      JweService.instance.preWarm().catchError((Object e, StackTrace st) {
+        AppLogger.e('SplashScreen: early JWE pre-warm failed', e, st);
+      }),
+      'SplashScreen: early JWE pre-warm',
+    );
+
+    // Keep the splash visible for 1.5s to improve perceived startup time
+    final splashHold = Future<void>.delayed(
+      const Duration(milliseconds: 1500),
+      () {
+        AppLogger.i('SplashScreen: 1.5s delay completed');
+      },
+    );
+
+    // 2. Critical Security Check First
+    try {
+      if (firebaseInitFuture != null) {
+        AppLogger.i(
+          'SplashScreen: Awaiting Firebase & App Check initialization...',
+        );
+        try {
+          await firebaseInitFuture!;
+          AppLogger.i(
+            'SplashScreen: Firebase & App Check initialization completed.',
+          );
+        } on Object catch (initErr) {
+          AppLogger.e(
+            'SplashScreen: Firebase & App Check initialization failed',
+            initErr,
+          );
+          throw AppException(
+            message: 'Security subsystem initialization failed.',
+            type: AppExceptionType.unauthorized,
+            details: {
+              'type': 'security',
+              'reason': 'Device security verification setup failed.',
+              'action':
+                  'Please ensure Google Play Services are enabled and update the app.',
+              'criticalRisk': true,
+              'appCheckError': initErr.toString(),
+            },
+          );
+        }
+      }
+      final snapshot = await _runStartupChecksSingleFlight();
+      if (!mounted) return;
+      final finalVersionResult = snapshot.versionResult;
       if (finalVersionResult != null && finalVersionResult.hasUpdate) {
         ref.read(appUpdateProvider.notifier).setCheckResult(finalVersionResult);
 
@@ -171,8 +327,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
 
       await splashHold;
+      if (!mounted) return;
 
-      final finalUser = user;
+      final finalUser = snapshot.user;
       AppLogger.i(
         'SplashScreen: Initialized user: ${finalUser?.supabaseUserId ?? "null"} (syncing: ${finalUser?.isSyncing ?? "false"})',
       );
@@ -270,7 +427,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               : (isCritical ? null : 'Retry'),
           onRetry: Platform.isAndroid
               ? SystemNavigator.pop
-              : (isCritical ? null : _initializeApp),
+              : (isCritical ? null : _beginInitializeIfIdle),
         );
         return;
       }
@@ -301,9 +458,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               'Technical Details: $technicalDetails\n',
         ),
         onRetry: () {
-          // Trigger a fresh build of the Ref which will re-run _initializeApp
+          // Trigger a fresh build of the Ref which will re-run initialization.
           ref.invalidate(authProvider);
-          final _ = _initializeApp();
+          _beginInitializeIfIdle();
         },
       );
       return;
@@ -314,36 +471,122 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
     final finalUser = ref.read(authProvider).value;
 
+    // Capture services and futures synchronously while mounted is guaranteed true
+    final pushService = ref.read(pushNotificationServiceProvider);
+    final apiService = ref.read(apiServiceProvider);
+    final supabaseClient = ref.read(supabaseClientProvider);
+    final token = supabaseClient.auth.currentSession?.accessToken;
+
+    final dashboardFuture = ref.read(dashboardProvider.future);
+    final trackingFuture = ref.read(trackingProvider.future);
+    final leaveFuture = ref.read(leaveProvider.future);
+    final scoreFuture = ref.read(scoreProvider.future);
+    final notificationsFuture = ref.read(notificationsProvider.future);
+
     if (finalUser != null) {
       if (finalUser.termsAccepted) {
-        _triggerCronSyncAndPrewarm(finalUser);
+        _startPushInitInBackgroundAfterSplash(pushService);
         context.go('/dashboard');
+        AppLogger.safeUnawait(
+          Future<void>.microtask(() async {
+            _triggerCronSyncAndPrewarm(
+              user: finalUser,
+              apiService: apiService,
+              token: token,
+              dashboardFuture: dashboardFuture,
+              trackingFuture: trackingFuture,
+              leaveFuture: leaveFuture,
+              scoreFuture: scoreFuture,
+              notificationsFuture: notificationsFuture,
+            );
+            _startPostNavigationPreloads(
+              isDashboard: true,
+              apiService: apiService,
+              dashboardFuture: dashboardFuture,
+              trackingFuture: trackingFuture,
+              leaveFuture: leaveFuture,
+              scoreFuture: scoreFuture,
+              notificationsFuture: notificationsFuture,
+            );
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e('SplashScreen: post-dashboard preloads failed', e, st);
+          }),
+          'SplashScreen: post-dashboard preloads',
+        );
       } else {
+        _startPushInitInBackgroundAfterSplash(pushService);
         context.go('/accept-terms');
+        AppLogger.safeUnawait(
+          Future<void>.microtask(() async {
+            _startPostNavigationPreloads(
+              isDashboard: false,
+              apiService: apiService,
+              dashboardFuture: dashboardFuture,
+              trackingFuture: trackingFuture,
+              leaveFuture: leaveFuture,
+              scoreFuture: scoreFuture,
+              notificationsFuture: notificationsFuture,
+            );
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e(
+              'SplashScreen: post-accept-terms preloads failed',
+              e,
+              st,
+            );
+          }),
+          'SplashScreen: post-accept-terms preloads',
+        );
       }
     } else {
+      _startPushInitInBackgroundAfterSplash(pushService);
       context.go('/login');
+      AppLogger.safeUnawait(
+        Future<void>.microtask(() async {
+          _startPostNavigationPreloads(
+            isDashboard: false,
+            apiService: apiService,
+            dashboardFuture: dashboardFuture,
+            trackingFuture: trackingFuture,
+            leaveFuture: leaveFuture,
+            scoreFuture: scoreFuture,
+            notificationsFuture: notificationsFuture,
+          );
+        }).catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: post-login preloads failed', e, st);
+        }),
+        'SplashScreen: post-login preloads',
+      );
     }
   }
 
-  void _triggerCronSyncAndPrewarm(AuthenticatedUser user) {
+  void _triggerCronSyncAndPrewarm({
+    required AuthenticatedUser user,
+    required ApiService apiService,
+    required String? token,
+    required Future<dynamic> dashboardFuture,
+    required Future<dynamic> trackingFuture,
+    required Future<dynamic> leaveFuture,
+    required Future<dynamic> scoreFuture,
+    required Future<dynamic> notificationsFuture,
+  }) {
     // 1. Trigger Cron Sync in parallel (fire-and-forget)
-    AppLogger.safeUnawait(
-      () async {
-        final token = ref
-            .read(supabaseClientProvider)
-            .auth
-            .currentSession
-            ?.accessToken;
-        if (token != null) {
-          await ref.read(apiServiceProvider).scheduleSync(token);
-        }
-      }(),
-      'SplashScreen: Cron Sync',
-    );
+    if (token != null) {
+      AppLogger.safeUnawait(
+        apiService.scheduleSync(token).catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: Cron Sync failed', e, st);
+        }),
+        'SplashScreen: Cron Sync',
+      );
+    }
 
     // 2. Prewarm all other screen queries
-    _prewarmAppData();
+    _prewarmAppData(
+      dashboardFuture: dashboardFuture,
+      trackingFuture: trackingFuture,
+      leaveFuture: leaveFuture,
+      scoreFuture: scoreFuture,
+      notificationsFuture: notificationsFuture,
+    );
   }
 
   @override

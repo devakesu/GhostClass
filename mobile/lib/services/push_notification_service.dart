@@ -2,6 +2,7 @@
 // ignore_for_file: unreachable_from_main
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -180,7 +181,25 @@ class PushNotificationService {
         // Retrieve token and execute initial synchronization
         final token = await _messaging.getToken();
         if (token != null) {
-          await _syncTokenWithBackend(token);
+          // Defer backend sync slightly to avoid competing with critical
+          // startup/login security handshakes.
+          AppLogger.safeUnawait(
+            Future<void>.delayed(
+              Platform.environment.containsKey('FLUTTER_TEST')
+                  ? Duration.zero
+                  : const Duration(seconds: 8),
+              () async {
+                await _syncTokenWithBackend(token);
+              },
+            ).catchError((Object e, StackTrace st) {
+              AppLogger.e(
+                'PushNotificationService: deferred initial FCM sync failed',
+                e,
+                st,
+              );
+            }),
+            'PushNotificationService: deferred initial FCM sync',
+          );
           try {
             AppLogger.safeUnawait(
               AnalyticsService.instance
@@ -220,12 +239,14 @@ class PushNotificationService {
   /// Synchronises the secure push token with the backend storage route.
   Future<void> _syncTokenWithBackend(String token) async {
     try {
+      if (!_ref.mounted) return;
       final cachedToken = await _storage.getNormalizedFcmToken();
 
       if (cachedToken == token) {
         return;
       }
 
+      if (!_ref.mounted) return;
       final supabase = _ref.read(supabaseClientProvider);
       final currentSession = supabase.auth.currentSession;
 
@@ -385,15 +406,19 @@ class PushNotificationService {
     }
   }
 
-  Future<void> dispose() async {
-    await _tokenSub?.cancel();
-    await _messageSub?.cancel();
-    await _messageOpenedSub?.cancel();
-    await _deferredAuthSub?.cancel();
+  void dispose() {
+    unawaited(_tokenSub?.cancel());
+    unawaited(_messageSub?.cancel());
+    unawaited(_messageOpenedSub?.cancel());
+    unawaited(_deferredAuthSub?.cancel());
     _deferredAuthTimer?.cancel();
   }
 }
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>(
-  PushNotificationService.new,
+  (ref) {
+    final service = PushNotificationService(ref);
+    ref.onDispose(service.dispose);
+    return service;
+  },
 );

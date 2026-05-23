@@ -14,9 +14,15 @@ import 'package:ghostclass/widgets/add_attendance_dialog.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'coverage_helper.dart';
+
+class MockSupabaseClient extends Mock implements SupabaseClient {}
+
+class MockGoTrueClient extends Mock implements GoTrueClient {}
 
 void main() {
   final mockDashboard = createMockDashboardData();
@@ -52,6 +58,15 @@ void main() {
 
     // Common ProviderScope overrides
     final overrides = [
+      supabaseClientProvider.overrideWithValue(
+        (() {
+          final mockSupabase = MockSupabaseClient();
+          final mockAuth = MockGoTrueClient();
+          when(() => mockSupabase.auth).thenReturn(mockAuth);
+          when(() => mockAuth.currentSession).thenReturn(null);
+          return mockSupabase;
+        })(),
+      ),
       dashboardProvider.overrideWith(
         () => MockDashboardNotifier(mockDashboard),
       ),
@@ -174,6 +189,10 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    // Unmount widget tree to cancel repeating animation timers
+    await tester.pumpWidget(const SizedBox());
     await tester.pump();
   });
 }

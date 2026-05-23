@@ -99,7 +99,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       refreshStream,
       authRefreshNotifier,
     ]),
-    observers: [SentryNavigatorObserver(), AnalyticsService.instance.observer],
+    observers: [
+      SentryNavigatorObserver(),
+      AnalyticsService.instance.appObserver,
+    ],
     redirect: (context, state) {
       final path = state.uri.path;
       final isSplash = path == '/splash';

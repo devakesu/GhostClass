@@ -111,6 +111,7 @@ class DioService {
   Future<String?>? _limitedTokenFetchInFlight;
   // Instrumentation: count how many times we requested a limited-use token
   static int _limitedTokenRequestCount = 0;
+  static const int _maxAppCheckAttempts = 3;
 
   void _handle401(RequestOptions options) {
     if (suppress401) return;
@@ -126,6 +127,62 @@ class DioService {
     _unauthorizedController.add(null);
   }
 
+  bool _isTransientAppCheckFailure(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('too_many_attempts') ||
+        msg.contains('timeout') ||
+        msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('unavailable') ||
+        msg.contains('rate limit') ||
+        msg.contains('internal google server error') ||
+        msg.contains('google_server_unavailable') ||
+        msg.contains('-12');
+  }
+
+  Duration _retryDelayForAttempt(int attempt) {
+    switch (attempt) {
+      case 1:
+        return const Duration(milliseconds: 400);
+      case 2:
+        return const Duration(milliseconds: 1200);
+      default:
+        return const Duration(milliseconds: 2500);
+    }
+  }
+
+  Future<String?> _fetchAppCheckTokenWithRetry({
+    required bool limited,
+  }) async {
+    Object? lastError;
+
+    for (var attempt = 1; attempt <= _maxAppCheckAttempts; attempt++) {
+      try {
+        final tokenFuture = limited
+            ? _appCheck.getLimitedUseToken()
+            : _appCheck.getToken();
+
+        return await tokenFuture.timeout(const Duration(seconds: 10));
+      } on Object catch (e, st) {
+        lastError = e;
+        final isTransient = _isTransientAppCheckFailure(e);
+        AppLogger.e(
+          'DioService: App Check token fetch failed (limited: $limited, attempt: $attempt/$_maxAppCheckAttempts, transient: $isTransient)',
+          e,
+          st,
+        );
+
+        if (!isTransient || attempt >= _maxAppCheckAttempts) {
+          rethrow;
+        }
+
+        await Future<void>.delayed(_retryDelayForAttempt(attempt));
+      }
+    }
+
+    throw Exception('App Check token fetch failed: $lastError');
+  }
+
   Future<void> _addSecurityHeaders(RequestOptions options) async {
     try {
       final useLimited = options.extra['useLimitedToken'] == true;
@@ -139,11 +196,13 @@ class DioService {
           AppLogger.d(
             'DioService: getLimitedUseToken requested (count: $_limitedTokenRequestCount)',
           );
-          _limitedTokenFetchInFlight = _appCheck.getLimitedUseToken();
+          _limitedTokenFetchInFlight = _fetchAppCheckTokenWithRetry(
+            limited: true,
+          );
           isNew = true;
         }
         appCheckToken = await _limitedTokenFetchInFlight!.timeout(
-          const Duration(seconds: 30),
+          const Duration(seconds: 10),
         );
         if (isNew) {
           AppLogger.safeUnawait(
@@ -164,11 +223,13 @@ class DioService {
       } else {
         var isNew = false;
         if (_tokenFetchInFlight == null) {
-          _tokenFetchInFlight = _appCheck.getToken();
+          _tokenFetchInFlight = _fetchAppCheckTokenWithRetry(
+            limited: false,
+          );
           isNew = true;
         }
         appCheckToken = await _tokenFetchInFlight!.timeout(
-          const Duration(seconds: 30),
+          const Duration(seconds: 10),
         );
         if (isNew) {
           AppLogger.safeUnawait(
@@ -206,6 +267,7 @@ class DioService {
 
       AppLogger.e('DioService: Security headers failed: $e');
       options.extra['appCheckError'] = e.toString();
+      options.extra['appCheckTransient'] = _isTransientAppCheckFailure(e);
     }
   }
 
