@@ -13,7 +13,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { handleLogout } from "@/lib/security/auth";
 import { useRouter } from "next/navigation";
-import { useProfile } from "@/hooks/users/profile";
 import { Switch } from "@/components/ui/switch";
 import {
   useDefaultInstitutionUser,
@@ -29,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Building2,
@@ -55,11 +54,11 @@ import { useNotifications } from "@/hooks/notifications/useNotifications";
 import { isValidAvatarUrl } from "@/lib/utils";
 import { useTopLoader } from "nextjs-toploader";
 import { useTheme } from "@/providers/theme";
+import { UserProfile } from "@/types";
 
 export const Navbar = () => {
   const router = useRouter();
   const topLoader = useTopLoader();
-  const { data: profile } = useProfile();
   const { settings, updateBunkCalc, updateTarget, isLoading: settingsLoading } =
     useUserSettings();
   const { theme, toggleTheme } = useTheme();
@@ -76,6 +75,12 @@ export const Navbar = () => {
   const updateDefaultInstitutionUser = useUpdateDefaultInstitutionUser();
   const queryClient = useQueryClient();
   const selectedInstitution = defaultInstitutionUser?.toString() ?? "";
+  const { data: profile } = useQuery<UserProfile | null>({
+    queryKey: ["profile", true],
+    queryFn: async () => null,
+    enabled: false,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const pathname = usePathname();
   // countOnly=true: skips the action-conflict query and infinite feed query (both with

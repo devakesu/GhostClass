@@ -54,7 +54,10 @@ describe("profile hooks", () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockProfile);
-      expect(axiosInstance.get).toHaveBeenCalledWith("/api/profile", expect.any(Object));
+      expect(axiosInstance.get).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({ params: { sync: "true", force: "true" } }),
+      );
     });
 
     it("should send sync and force params when requested", async () => {

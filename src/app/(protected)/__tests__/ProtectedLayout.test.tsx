@@ -10,6 +10,7 @@ vi.mock("@/hooks/users/institutions", () => ({
 }));
 vi.mock("@/hooks/use-csrf-token", () => ({
   useCSRFToken: vi.fn(),
+  ensureCSRFToken: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock components
@@ -72,6 +73,10 @@ describe('ProtectedLayout', () => {
       </ProtectedLayout>
     );
 
+    await waitFor(() => {
+      expect(screen.getByTestId('navbar')).toBeInTheDocument();
+    });
+
     expect(screen.getByTestId('navbar')).toBeInTheDocument();
     expect(screen.getByTestId('footer')).toBeInTheDocument();
     expect(screen.getByTestId('child')).toBeInTheDocument();
@@ -83,6 +88,10 @@ describe('ProtectedLayout', () => {
         <div>Content</div>
       </ProtectedLayout>
     );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('motion-div')).toBeInTheDocument();
+    });
 
     // Initial state: visible
     expect(screen.getByTestId('motion-div').getAttribute('data-animate')).toBe('visible');

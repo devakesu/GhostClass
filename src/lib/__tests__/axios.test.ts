@@ -131,6 +131,26 @@ describe('axios lib', () => {
       expect(resultConfig.headers.get('x-csrf-token')).toBe('a'.repeat(64));
     });
 
+    it('initializes CSRF before internal requests when token is missing', async () => {
+      const config = {
+        url: '/api/profile',
+        method: 'get',
+        headers: new Map(),
+      } as any;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'c'.repeat(64) }),
+      });
+
+      // @ts-expect-error -- accessing private interceptor handler for testing
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const resultConfig = await interceptor(config);
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
+      expect(resultConfig.headers.get('x-csrf-token')).toBe('c'.repeat(64));
+    });
+
     it('encrypts POST request body (JWE)', async () => {
       const config = { 
         url: '/api/mutation', 
@@ -212,6 +232,8 @@ describe('axios lib', () => {
         config: { url: '/api/test', _authRetried: false },
         response: { status: 401 }
       } as any;
+
+      setCsrfToken('d'.repeat(64));
       
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -232,6 +254,8 @@ describe('axios lib', () => {
         config: { url: '/api/test', _authRetried: false },
         response: { status: 401 }
       } as any;
+
+      setCsrfToken('d'.repeat(64));
       
       mockFetch.mockResolvedValueOnce({
         ok: false,

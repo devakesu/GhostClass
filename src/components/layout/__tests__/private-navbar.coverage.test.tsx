@@ -51,6 +51,9 @@ vi.mock('@/hooks/users/institutions', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
+  useQuery: vi.fn(() => ({
+    data: { id: '123', username: 'testuser', email: 'test@example.com', avatar_url: null },
+  })),
   useQueryClient: vi.fn(() => ({
     invalidateQueries: vi.fn(),
   })),

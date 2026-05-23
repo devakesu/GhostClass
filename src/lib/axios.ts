@@ -82,12 +82,13 @@ async function syncSession(): Promise<boolean> {
 
   syncPromise = (async () => {
     try {
-      const csrfToken = getCsrfToken();
+      const csrfToken = getCsrfToken() ?? (await refreshCsrfToken());
+      if (!csrfToken) return false;
       const response = await fetch("/api/auth/sync", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+          [CSRF_HEADER]: csrfToken,
         },
         credentials: "include",
       });
@@ -241,31 +242,43 @@ async function encryptRequestPayload(config: JweAxiosConfig, method: string) {
   }
 }
 
+function isInternalRequest(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch {
+    // Non-parseable values (e.g. bare relative paths like "/api/...") are internal.
+    return !url.startsWith("http");
+  }
+}
+
+function isPublicRequest(url: string): boolean {
+  return url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
+}
+
+async function applyInternalRequestSecurity(config: JweAxiosConfig) {
+  let token = getCsrfToken();
+  if (!token) {
+    token = await refreshCsrfToken();
+  }
+
+  if (token) config.headers.set(CSRF_HEADER, token);
+
+  await encryptRequestPayload(config, config.method?.toLowerCase() || "");
+  config.headers.set("Accept", "application/jose, application/json");
+}
+
 axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
   if (isOutageDetected) return Promise.reject(new Error("Active service outage"));
   if (typeof window === "undefined") return config;
 
-  const token = getCsrfToken();
-  if (token) config.headers.set(CSRF_HEADER, token);
-
   const url = config.url || "";
-  // H-5: Use URL parsing for isInternal detection instead of string heuristics.
+  // H-5: Use URL parsing for internal detection instead of string heuristics.
   // The previous check misclassified proxy paths containing "ezygo.app" as
   // external, causing them to skip CSRF/JWE headers.
-  const isInternal = (() => {
-    try {
-      const parsed = new URL(url, window.location.origin);
-      return parsed.origin === window.location.origin;
-    } catch {
-      // Non-parseable values (e.g. bare relative paths like "/api/...") are internal.
-      return !url.startsWith("http");
-    }
-  })();
-  const isPublic = url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
-
-  if (isInternal && !isPublic) {
-    await encryptRequestPayload(config, config.method?.toLowerCase() || "");
-    config.headers.set("Accept", "application/jose, application/json");
+  const isInternal = isInternalRequest(url);
+  if (isInternal && !isPublicRequest(url)) {
+    await applyInternalRequestSecurity(config);
   }
 
   // Deduplicate slashes in the final URL (path parts)
