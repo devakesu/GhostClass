@@ -81,7 +81,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             try {
               await ref
                   .read(dashboardProvider.future)
-                  .timeout(const Duration(seconds: 10));
+                  .timeout(const Duration(seconds: 30));
             } on Object catch (e, st) {
               AppLogger.e('DashboardScreen: Retry failed', e, st);
             }

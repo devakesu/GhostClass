@@ -176,8 +176,8 @@ class ApiService {
           '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
           options: Options(
             headers: {'Authorization': 'Bearer $supabaseToken'},
-            sendTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(seconds: 15),
+            sendTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 30),
           ),
         );
         _lastSyncTime = DateTime.now();

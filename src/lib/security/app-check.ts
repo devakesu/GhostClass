@@ -195,8 +195,8 @@ async function verifyCsrfAuth(
   const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
   if (!res.isValid) {
     return {
-      isValid: false, error: res.error, reason: "Web security check failed.",
-      action: "Please refresh your browser.", authType: "csrf", isWebRequest: true,
+      isValid: false, error: res.error, reason: "Security check failed.",
+      action: "Please refresh the page or restart the app.", authType: "csrf", isWebRequest: true,
     };
   }
   return { isValid: true, authType: "csrf", isWebRequest: true };
@@ -238,8 +238,8 @@ async function verifyAuthentication(
       return {
         isValid: false,
         error: "Missing CSRF token",
-        reason: "Web security check failed.",
-        action: "Please refresh your browser.",
+        reason: "Security check failed.",
+        action: "Please refresh the page or restart the app.",
         authType: "csrf",
         isWebRequest: true,
       };
