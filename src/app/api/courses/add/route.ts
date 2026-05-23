@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { academicYearSchema, courseCodeSchema, personNameSchema, semesterSchema } from "@/lib/validation/text";
+import { academicYearSchema, courseCodeSchema, courseNameSchema, semesterSchema } from "@/lib/validation/text";
 
 async function authenticateRequest(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -54,7 +54,7 @@ async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknow
     
     const parsed = z.object({
       courseCode: courseCodeSchema,
-      courseName: personNameSchema,
+      courseName: courseNameSchema,
       semester: semesterSchema,
       academicYear: academicYearSchema,
     }).safeParse(body);

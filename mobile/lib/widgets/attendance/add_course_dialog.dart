@@ -200,13 +200,14 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
                   validator: (v) {
                     final value = v?.trim() ?? '';
                     if (value.length < 2) return 'Min 2 characters';
-                    if (value.length > 100) return 'Max 100 characters';
+                    if (value.length > 200) return 'Max 200 characters';
                     if (!utils.isValidCourseName(value)) {
                       return 'Course name contains invalid characters';
                     }
                     return null;
                   },
                   textCapitalization: TextCapitalization.words,
+                  maxLength: 200,
                 ),
                 const SizedBox(height: 32),
 
@@ -267,6 +268,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
     required String hint,
     String? Function(String?)? validator,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    int? maxLength,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,6 +288,7 @@ class _AddCourseDialogState extends ConsumerState<AddCourseDialog> {
           controller: controller,
           validator: validator,
           textCapitalization: textCapitalization,
+          maxLength: maxLength,
           style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
           decoration: InputDecoration(
             hintText: hint,

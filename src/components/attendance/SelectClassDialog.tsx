@@ -95,9 +95,50 @@ export function SelectClassDialog({
     onOpenChange(newOpen);
   };
 
+  let classSelectorContent: React.ReactNode;
+  if (isLoadingClasses) {
+    classSelectorContent = (
+      <Select disabled>
+        <SelectTrigger className="w-full py-6 border-2 focus:ring-primary/30">
+          <SelectValue placeholder="Loading classes..." />
+        </SelectTrigger>
+      </Select>
+    );
+  } else if (classes.length === 0) {
+    classSelectorContent = (
+      <div className="rounded-xl border border-dashed border-primary/20 bg-primary/5 px-4 py-5 text-center">
+        <p className="text-sm font-semibold text-foreground">
+          No classes are available for this term yet.
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Please wait until a class syncs from EzyGo or contact your administrator.
+        </p>
+      </div>
+    );
+  } else {
+    classSelectorContent = (
+      <Select
+        value={selectedClassId}
+        onValueChange={setSelectedClassId}
+        disabled={isSubmitting}
+      >
+        <SelectTrigger className="w-full py-6 border-2 focus:ring-primary/30">
+          <SelectValue placeholder="Choose Class" />
+        </SelectTrigger>
+        <SelectContent>
+          {classes.map((cls) => (
+            <SelectItem key={cls.id} value={cls.id}>
+              {cls.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent 
+      <DialogContent
         className="sm:max-w-md border-2 border-primary/20 bg-background/95 backdrop-blur-sm [&>button]:hidden"
         onPointerDownOutside={(e) => {
           if (!isCloseable) e.preventDefault();
@@ -124,33 +165,18 @@ export function SelectClassDialog({
               <label className="text-sm font-semibold text-muted-foreground ml-1">
                 Select Class
               </label>
-              <Select
-                value={selectedClassId}
-                onValueChange={setSelectedClassId}
-                disabled={isLoadingClasses || isSubmitting}
-              >
-                <SelectTrigger className="w-full py-6 border-2 focus:ring-primary/30">
-                  <SelectValue placeholder={isLoadingClasses ? "Loading classes..." : "Choose Class"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {classSelectorContent}
             </div>
-            <p className="text-sm text-muted-foreground mt-2 text-center">
+            <p className="mt-4 text-center text-sm text-muted-foreground">
               If your class is not listed, please wait until someone else in your class syncs it or until EzyGo is initialized.
             </p>
           </div>
 
-          <DialogFooter className="sm:justify-center flex-col gap-2">
+          <DialogFooter className="!flex !flex-col gap-2 sm:!flex-col sm:!items-stretch">
             <Button
               type="submit"
               className="w-full h-12 text-lg font-bold transition-all hover:scale-[1.02]"
-              disabled={isSubmitting || !selectedClassId}
+                disabled={isSubmitting || !selectedClassId || classes.length === 0}
             >
               {isSubmitting ? (
                 <>

@@ -108,7 +108,7 @@ describe("POST /api/courses/add", () => {
     expect(mockInsert).toHaveBeenCalledWith({
       class_id: "class-456",
       course_code: "CS101",
-      course_name: "Intro To Computer Science",
+      course_name: "Intro to Computer Science",
       semester: "odd",
       academic_year: "2024-2025",
       created_by: "user-123"

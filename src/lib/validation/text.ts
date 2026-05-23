@@ -73,7 +73,7 @@ export const personNameSchema = makeTextSchema({
 
 export const courseNameSchema = makeTextSchema({
   min: 2,
-  max: 100,
+  max: 200,
   pattern: COURSE_NAME_PATTERN,
   error: "Course name contains invalid characters",
 });
