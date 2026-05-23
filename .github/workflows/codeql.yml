@@ -264,9 +264,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      - name: Configure iOS project and install Pods
+      - name: Configure iOS project for simulator build
         working-directory: mobile
-        run: flutter build ios --config-only
+        run: flutter build ios --simulator --no-codesign
 
       - name: Initialize CodeQL (Swift)
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
