@@ -62,7 +62,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             try {
               await ref
                   .read(trackingProvider.future)
-                  .timeout(const Duration(seconds: 10));
+                  .timeout(const Duration(seconds: 30));
             } on Object catch (e, st) {
               AppLogger.e('TrackingScreen: Retry failed', e, st);
             }

@@ -22,7 +22,7 @@ class JweService {
   JweService._internal() {
     const networkTimeout = kDebugMode
         ? Duration(seconds: 40)
-        : Duration(seconds: 20);
+        : Duration(seconds: 30);
 
     _dio = Dio(
       BaseOptions(
