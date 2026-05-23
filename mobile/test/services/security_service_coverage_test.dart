@@ -35,6 +35,9 @@ void main() {
     when(
       () => mockSecureStorage.saveAttestationResult(any()),
     ).thenAnswer((_) async {});
+    when(
+      () => mockSecureStorage.clearAttestationResult(),
+    ).thenAnswer((_) async {});
 
     container = ProviderContainer(
       overrides: [

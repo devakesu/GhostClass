@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,12 @@ export const Navbar = () => {
   const { settings, updateBunkCalc, updateTarget, isLoading: settingsLoading } =
     useUserSettings();
   const { theme, toggleTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional for hydration fix
+    setMounted(true);
+  }, []);
 
   const { data: institutions, isLoading: institutionsLoading } =
     useInstitutions();
@@ -170,6 +177,19 @@ export const Navbar = () => {
           priority
         />
       </div>
+    );
+  };
+
+  const renderThemeIcon = () => {
+    if (!mounted) {
+      return (
+        <div className="h-4 w-4 animate-pulse rounded bg-muted-foreground/20" />
+      );
+    }
+    return theme === "dark" ? (
+      <Moon className="h-4 w-4" aria-hidden="true" />
+    ) : (
+      <Sun className="h-4 w-4" aria-hidden="true" />
     );
   };
 
@@ -475,16 +495,15 @@ export const Navbar = () => {
               <div className="px-2 py-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {theme === "dark"
-                      ? <Moon className="h-4 w-4" aria-hidden="true" />
-                      : <Sun className="h-4 w-4" aria-hidden="true" />}
+                    {renderThemeIcon()}
                     <span id="theme-toggle-label" className="text-sm">
                       Dark Mode
                     </span>
                   </div>
                   <Switch
-                    checked={theme === "dark"}
+                    checked={mounted && theme === "dark"}
                     onCheckedChange={toggleTheme}
+                    disabled={!mounted}
                     aria-labelledby="theme-toggle-label"
                   />
                 </div>

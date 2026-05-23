@@ -33,7 +33,13 @@ function getInitialTheme(): Theme {
   } catch {
     // localStorage may be blocked (e.g. tracking prevention)
   }
-  // No stored preference → always default to light
+  try {
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+  } catch {
+    // matchMedia may be blocked or unsupported
+  }
   return "light";
 }
 

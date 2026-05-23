@@ -6,7 +6,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 4.3.7
+  version: 4.3.8
   description: |
     **GhostClass API** provides endpoints for authentication, profile synchronization,
     attendance integrations with EzyGo, telemetry, and build provenance.
@@ -343,6 +343,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /api/security/attestation:
+    get:
+      tags:
+        - Security
+        - Mobile
+      summary: Get decoded attestation details
+      security: []
+      description: |
+        Returns the decoded security attestation details for the current request's Firebase App Check token.
+        Used by the mobile app for troubleshooting, transparency, and verifying app integrity.
+      operationId: getAttestationDetails
+      responses:
+        "200":
+          description: Attestation details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verified:
+                    type: boolean
+                    description: Whether the App Check token is valid
+                  criticalRisk:
+                    type: boolean
+                    description: Whether a critical integrity risk was detected
+                  appCheck:
+                    type: boolean
+                    description: Alias for verified
+                  appCheckCriticalRisk:
+                    type: boolean
+                    description: Alias for criticalRisk
+                  appCheckError:
+                    type: string
+                    nullable: true
+                    description: Error message if verification failed
+                  appId:
+                    type: string
+                    nullable: true
+                    description: The Firebase App ID associated with the token
+                  details:
+                    type: object
+                    description: Non-sensitive claims and metadata extracted from the token
+                  enforced:
+                    type: boolean
+                    description: Whether App Check verification is currently enforced on the server
+                  reason:
+                    type: string
+                    description: User-friendly explanation of the status
+                  action:
+                    type: string
+                    description: Recommended action if verification failed
+                  latestVersion:
+                    type: string
+                    description: Latest available version of the app
+                  minVersion:
+                    type: string
+                    description: Minimum supported version of the app
+                  type:
+                    type: string
+                    example: "security"
+                  timestamp:
+                    type: string
+                    format: date-time
 
   /api/logout:
     post:
@@ -687,6 +751,233 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RateLimitError"
+
+  /api/courses/add:
+    post:
+      tags:
+        - Mobile
+      summary: Add a new course to class lineup
+      description: |
+        Adds a new course to the user's class lineup.
+        Primarily used by the mobile app to sync or manually add a course.
+      operationId: addCourse
+      security:
+        - SupabaseAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - courseCode
+                - courseName
+                - semester
+                - academicYear
+              properties:
+                courseCode:
+                  type: string
+                  description: The code of the course (e.g. CS101)
+                  example: "CS101"
+                courseName:
+                  type: string
+                  description: The name of the course
+                  example: "Introduction to Computer Science"
+                semester:
+                  type: string
+                  description: The semester name
+                  example: "Fall 2026"
+                academicYear:
+                  type: string
+                  description: The academic year
+                  example: "2026"
+      responses:
+        "201":
+          description: Course added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Course added successfully"
+        "400":
+          description: Bad request - Missing required fields or class association
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Conflict - Course already exists in the class lineup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Validation failed - Invalid field formats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/instructors/upsert:
+    post:
+      tags:
+        - Mobile
+      summary: Save or update course instructor
+      description: |
+        Saves or updates instructor mapping for a specific course, semester, and academic year in the user's class.
+      operationId: upsertInstructor
+      security:
+        - SupabaseAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - courseCode
+                - instructorName
+                - semester
+                - academicYear
+              properties:
+                courseCode:
+                  type: string
+                  example: "CS101"
+                instructorName:
+                  type: string
+                  example: "Dr. John Doe"
+                semester:
+                  type: string
+                  example: "Fall 2026"
+                academicYear:
+                  type: string
+                  example: "2026"
+      responses:
+        "200":
+          description: Instructor saved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Instructor saved successfully"
+        "400":
+          description: Bad request - Missing required fields or class association
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Validation failed - Invalid field formats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/scores/batch:
+    post:
+      tags:
+        - Proxy
+        - Mobile
+      summary: Batch fetch exam questions and answers
+      description: |
+        Fetches exam questions and graded answers for multiple exams in parallel.
+        Optimized for mobile dashboard to replace multiple individual API calls.
+      operationId: batchFetchScores
+      security:
+        - SupabaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - examIds
+              properties:
+                examIds:
+                  type: array
+                  maxItems: 25
+                  description: Array of exam IDs to fetch details for
+                  items:
+                    type: integer
+                  example: [123, 456]
+      responses:
+        "200":
+          description: Batch exam details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    questions:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/ExamQuestion"
+                    answers:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/ExamAnswer"
+                    error:
+                      type: string
+                      nullable: true
+        "400":
+          description: Bad request - Missing IP, invalid format, or invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid session or missing EzyGo token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/csp-report:
     post:
@@ -1158,6 +1449,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/auth/register-fcm:
+    post:
+      tags:
+        - Authentication
+        - Mobile
+      summary: Register mobile FCM push token
+      description: |
+        Registers or updates the Firebase Cloud Messaging (FCM) push token for the authenticated user.
+        Enables sending push notifications to the user's mobile device.
+      operationId: registerFcmToken
+      security:
+        - SupabaseAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fcm_token
+              properties:
+                fcm_token:
+                  type: string
+                  description: The Firebase Cloud Messaging registration token
+                  example: "bk3RNwXXeDY:AP91bH..."
+      responses:
+        "200":
+          description: FCM token registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Bad request - Missing IP or invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized - Invalid session or bearer token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Validation failed - Empty token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/contact:
     post:
       tags:
@@ -1500,6 +1859,55 @@ components:
       required:
         - error
         - retryAfter
+
+    ExamQuestion:
+      type: object
+      properties:
+        id:
+          type: integer
+        question_no:
+          type: string
+        name:
+          type: string
+        maximum_mark:
+          type: string
+        module_id:
+          type: integer
+        exam_id:
+          type: integer
+        institution_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ExamAnswer:
+      type: object
+      properties:
+        id:
+          type: integer
+        answer:
+          type: string
+          nullable: true
+        score:
+          type: string
+          nullable: true
+        choice_id:
+          type: integer
+          nullable: true
+        examquestion_id:
+          type: integer
+        student_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
   securitySchemes:
     BearerAuth:

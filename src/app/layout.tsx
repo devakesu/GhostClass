@@ -97,8 +97,13 @@ export default async function RootLayout({
   const hasGoogleAnalytics = !!gaId && gaId !== 'undefined' && gaId.startsWith('G-');
   
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className="dark">
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className="light">
       <head>
+        <meta name="application-name" content="GhostClass" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="msapplication-TileColor" content="#141414" />
+        <meta name="msapplication-tap-highlight" content="no" />
+        <meta name="theme-color" content="#141414" />
         {/* Blocking script: executes synchronously before any CSS or content is
             painted. Measures the real scrollbar track width by creating a hidden
             div with forced scrollbar (offsetWidth - clientWidth), then sets
@@ -110,14 +115,9 @@ export default async function RootLayout({
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:'dark';if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.add('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.remove('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
           }}
         />
-        <meta name="application-name" content="GhostClass" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="msapplication-TileColor" content="#141414" />
-        <meta name="msapplication-tap-highlight" content="no" />
-        <meta name="theme-color" content="#141414" />
       </head>
       <body
         className={`overflow-x-hidden w-full max-w-screen antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
@@ -131,10 +131,11 @@ export default async function RootLayout({
   wrap.id = 'prehyd-loader';
   wrap.setAttribute('role', 'status');
   wrap.setAttribute('aria-label', 'Loading, please wait');
+  var isDark = document.documentElement.classList.contains('dark');
   Object.assign(wrap.style, {
     position:'fixed', inset:'0', display:'flex', flexDirection:'column',
     alignItems:'center', justifyContent:'center', gap:'24px',
-    background:'var(--background)', zIndex:'99999'
+    background: isDark ? '#050508' : '#f9fafb', zIndex:'99999'
   });
   var ring = document.createElement('div');
   ring.setAttribute('aria-hidden', 'true');

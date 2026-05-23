@@ -126,21 +126,30 @@ export default {
       });
     }
 
-    if (!requestOrigin) {
-      return new Response("Forbidden: missing Origin header", {
-        status: 403,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
+    // Bypass Origin check for GET/HEAD requests to public storage.
+    // Next.js server-side Image Optimization and mobile clients do not send an Origin header.
+    const incomingPathname = new URL(request.url).pathname;
+    const isPublicStorageGet =
+      (request.method === "GET" || request.method === "HEAD") &&
+      incomingPathname.startsWith("/storage/v1/object/public/");
 
-    // Normalise both sides before comparing.
-    const normReq = stripTrailingSlashes(requestOrigin);
-    const normAllowed = allowedOrigin;
-    if (normReq !== normAllowed) {
-      return new Response("Forbidden: origin not allowed", {
-        status: 403,
-        headers: { "Content-Type": "text/plain" },
-      });
+    if (!requestOrigin) {
+      if (!isPublicStorageGet) {
+        return new Response("Forbidden: missing Origin header", {
+          status: 403,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
+    } else {
+      // Normalise both sides before comparing.
+      const normReq = stripTrailingSlashes(requestOrigin);
+      const normAllowed = allowedOrigin;
+      if (normReq !== normAllowed) {
+        return new Response("Forbidden: origin not allowed", {
+          status: 403,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
     }
     // Keep the incoming path + query; only replace the origin.
     const incomingUrl = new URL(request.url);

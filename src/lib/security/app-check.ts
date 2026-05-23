@@ -57,11 +57,11 @@ export interface AppCheckOptions {
 export const SECURITY_ERRORS = {
   MISSING_TOKEN: {
     reason: "Your device is missing the security attestation required to access this service.",
-    action: "Please ensure you have a stable internet connection and are not using an official app.",
+    action: "Please ensure that you have a stable internet connection and are using the official app from Play Store/App Store.",
   },
   UNAUTHORIZED_APP: {
     reason: "This app version is unrecognized or has been modified.",
-    action: "Please reinstall the official GhostClass app.",
+    action: "Please reinstall the official GhostClass app from Play Store/App Store.",
   },
   VERIFICATION_FAILED: {
     reason: "Your device failed the automated security handshake.",
@@ -122,8 +122,8 @@ export async function verifyAppCheckToken(
 
   if (!token) {
     if (process.env.ENFORCE_APP_CHECK === "true") {
-      return { 
-        isValid: false, 
+      return {
+        isValid: false,
         error: "Missing mandatory App Check token",
         reason: SECURITY_ERRORS.MISSING_TOKEN.reason,
         action: SECURITY_ERRORS.MISSING_TOKEN.action,
@@ -150,8 +150,8 @@ export async function verifyAppCheckToken(
     const authIds = [process.env.FIREBASE_APP_ID_ANDROID, process.env.FIREBASE_APP_ID_IOS];
 
     if (!authIds.includes(decodedToken.appId)) {
-      return { 
-        isValid: false, 
+      return {
+        isValid: false,
         error: "Unauthorized Application",
         reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
         action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
@@ -162,8 +162,8 @@ export async function verifyAppCheckToken(
     return { isValid: true, integrity: { appId: decodedToken.appId, ...(decodedToken.token || {}) } };
   } catch (error: unknown) {
     Sentry.captureException(error);
-    return { 
-      isValid: false, 
+    return {
+      isValid: false,
       error: "Security Verification Failed",
       reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
       action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
@@ -333,7 +333,7 @@ export function withSecurity<T = unknown>(
   return async (req: NextRequest, context: any) => {
     const rawParams = context?.params;
     const resolvedParams = rawParams instanceof Promise ? await rawParams : (rawParams ?? {});
-    
+
     let clientIp: string | null = null;
     try { clientIp = getClientIp(await nextHeaders()); } catch (e) { logger.dev("IP check failed", e); }
 
@@ -343,7 +343,7 @@ export function withSecurity<T = unknown>(
 
     const authRes = await verifyAuthentication(req, options);
     if (!authRes.isValid) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: authRes.error || "Unauthenticated", message: authRes.error || "Unauthenticated",
         reason: authRes.reason || SECURITY_ERRORS.DEFAULT.reason, action: authRes.action || SECURITY_ERRORS.DEFAULT.action,
         criticalRisk: authRes.criticalRisk ?? false, type: "security",

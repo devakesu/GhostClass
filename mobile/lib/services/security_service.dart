@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -110,11 +111,20 @@ class SecurityService {
     }
 
     // Cache miss / first run: Blocking network attestation
-    final result = await _performNetworkVerify();
-    if (result != null) {
-      await _cacheAttestationResult(result);
+    try {
+      final result = await _performNetworkVerify();
+      if (result != null) {
+        await _cacheAttestationResult(result);
+      }
+      return result;
+    } on Object {
+      try {
+        await _ref.read(secureStorageProvider).clearAttestationResult();
+      } on Object catch (e) {
+        AppLogger.e('SecurityService: Failed to clear attestation cache', e);
+      }
+      rethrow;
     }
-    return result;
   }
 
   Future<void> _cacheAttestationResult(AppVersionCheckResult result) async {
@@ -148,15 +158,59 @@ class SecurityService {
         AppLogger.e(
           'SecurityService: Background attestation failure detected.',
         );
-        _ref
-            .read(securityFailureProvider.notifier)
-            .setFailure(
-              e.message,
-              criticalRisk: e.details?['criticalRisk'] == true,
-              reason: e.details?['reason'] as String?,
-              action: e.details?['action'] as String?,
-              source: 'BackgroundAttestation',
+
+        final reason = (e.details?['reason'] as String?) ?? e.message;
+        final appCheckError = e.details?['appCheckError'] as String?;
+
+        final isConnectionOrQuota =
+            (appCheckError != null &&
+                (appCheckError.toLowerCase().contains('quota') ||
+                    appCheckError.toLowerCase().contains('connection') ||
+                    appCheckError.toLowerCase().contains('timeout') ||
+                    appCheckError.toLowerCase().contains('too_many_attempts') ||
+                    appCheckError.toLowerCase().contains('network') ||
+                    appCheckError.toLowerCase().contains('rate limit'))) ||
+            (reason.toLowerCase().contains('quota') ||
+                reason.toLowerCase().contains('connection') ||
+                reason.toLowerCase().contains('timeout') ||
+                reason.toLowerCase().contains('too_many_attempts') ||
+                reason.toLowerCase().contains('network') ||
+                reason.toLowerCase().contains('rate limit'));
+
+        final isGenuineSecurityFailure = !isConnectionOrQuota;
+
+        if (isGenuineSecurityFailure) {
+          try {
+            await _ref.read(secureStorageProvider).clearAttestationResult();
+          } on Object catch (ex) {
+            AppLogger.e(
+              'SecurityService: Failed to clear attestation cache',
+              ex,
             );
+          }
+
+          // Force logout to wipe active session & user state
+          try {
+            await _ref.read(authProvider.notifier).logout(force: true);
+          } on Object catch (ex) {
+            AppLogger.e('SecurityService: Forced logout failed', ex);
+          }
+
+          _ref
+              .read(securityFailureProvider.notifier)
+              .setFailure(
+                e.message,
+                criticalRisk: true,
+                reason: e.details?['reason'] as String?,
+                action: e.details?['action'] as String?,
+                source: 'BackgroundAttestation',
+              );
+        } else {
+          AppLogger.e(
+            'SecurityService: Background attestation non-genuine failure (connection/quota/rate-limit). Ignored.',
+            e,
+          );
+        }
       } else {
         AppLogger.e(
           'SecurityService: Background check AppException ignored',

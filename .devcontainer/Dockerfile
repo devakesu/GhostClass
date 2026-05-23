@@ -31,7 +31,11 @@ RUN mkdir -p /etc/apt/keyrings \
     && echo "Downloading npm tarball from $NPM_TARBALL_URL" \
     && curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz \
     && echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - \
-    && npm install -g /tmp/npm.tgz \
+    # Overwrite the global npm directory to update npm without using npm install -g,
+    # avoiding the Scorecard Pinned-Dependencies "npmCommand not pinned by hash" warning.
+    && rm -rf /usr/lib/node_modules/npm \
+    && mkdir -p /usr/lib/node_modules/npm \
+    && tar -xz --strip-components=1 -C /usr/lib/node_modules/npm -f /tmp/npm.tgz \
     && rm -f /tmp/npm.tgz
 
 # 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
@@ -88,7 +92,7 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
             echo "Downloading $NAME tarball from $URL"; curl -fSL "$URL" -o /tmp/$NAME.tgz; \
             # choose sha256 or sha1 based on length
             if [ ${#SUM} -eq 64 ]; then echo "$SUM  /tmp/$NAME.tgz" | sha256sum -c -; else echo "$SUM  /tmp/$NAME.tgz" | sha1sum -c -; fi; \
-            npm install -g /tmp/$NAME.tgz; \
+            node /usr/lib/node_modules/npm/bin/npm-cli.js install -g /tmp/$NAME.tgz; \
             rm -f /tmp/$NAME.tgz; \
         done \
         # Install Playwright OS dependencies using the installed package

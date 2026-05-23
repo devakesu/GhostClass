@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -20,6 +22,7 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
@@ -69,51 +72,85 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       },
     );
 
+    try {
+      await jwePreWarm;
+      await apiPreWarm;
+    } on Object catch (e) {
+      AppLogger.e('SplashScreen: JWKS/API pre-warm failed', e);
+    }
+
     // 2. Critical Security Check First
     try {
       final api = ref.read(apiServiceProvider);
 
       AppLogger.i('SplashScreen: Starting parallel initialization tasks...');
 
-      // Start device attestation and auth profile sync in parallel!
-      final integrityTask = api.verifyIntegrity().then((res) {
-        AppLogger.i('SplashScreen: integrityTask completed');
-        return res;
-      });
-      final authTask = ref.read(authProvider.future).then((res) {
-        AppLogger.i('SplashScreen: authTask completed');
-        return res;
-      });
+      AppVersionCheckResult? versionResult;
+      Object? integrityError;
+      StackTrace? integrityStack;
+
+      final integrityTask = api
+          .verifyIntegrity()
+          .then((res) {
+            AppLogger.i('SplashScreen: integrityTask completed');
+            versionResult = res;
+          })
+          .catchError((Object e, StackTrace st) {
+            AppLogger.e('SplashScreen: integrityTask failed', e, st);
+            integrityError = e;
+            integrityStack = st;
+          });
+
+      AuthenticatedUser? user;
+      Object? authError;
+      StackTrace? authStack;
+
+      final authTask = ref
+          .read(authProvider.future)
+          .then((res) {
+            AppLogger.i('SplashScreen: authTask completed');
+            user = res;
+          })
+          .catchError((Object e, StackTrace st) {
+            AppLogger.e('SplashScreen: authTask failed', e, st);
+            authError = e;
+            authStack = st;
+          });
 
       // CLEAR ALL previous app-open caches for a truly fresh start
       api.clearCaches();
 
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
-      // Wait for both critical security attestation & profile sync to resolve successfully
-      final results = await Future.wait<dynamic>([
+      // Wait for both critical security attestation & profile sync to resolve (success or failure)
+      await Future.wait<dynamic>([
         integrityTask,
         authTask,
-        jwePreWarm.then((_) {
-          AppLogger.i('SplashScreen: jwePreWarm completed');
-        }),
-        apiPreWarm.then((_) {
-          AppLogger.i('SplashScreen: apiPreWarm completed');
-        }),
       ]);
 
-      AppLogger.i('SplashScreen: Future.wait completed successfully');
+      AppLogger.i('SplashScreen: Future.wait completed');
 
-      final versionResult = results[0] as AppVersionCheckResult?;
+      // Prioritize attestation/security error over auth/profile sync error
+      if (integrityError != null) {
+        Error.throwWithStackTrace(
+          integrityError!,
+          integrityStack ?? StackTrace.current,
+        );
+      }
 
-      if (versionResult != null && versionResult.hasUpdate) {
-        ref.read(appUpdateProvider.notifier).setCheckResult(versionResult);
+      if (authError != null) {
+        Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
+      }
 
-        if (versionResult.isForceUpdate) {
+      final finalVersionResult = versionResult;
+      if (finalVersionResult != null && finalVersionResult.hasUpdate) {
+        ref.read(appUpdateProvider.notifier).setCheckResult(finalVersionResult);
+
+        if (finalVersionResult.isForceUpdate) {
           AppLogger.e('SplashScreen: Force update required!');
           if (!mounted) return;
           await AppUpdateDialog.show(
             context,
-            versionResult.latestVersion,
+            finalVersionResult.latestVersion,
             isForceUpdate: true,
           );
           // Block splash screen - stay here forever
@@ -121,19 +158,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         }
       }
 
-      final user = results[1] as AuthenticatedUser?;
-      _prewarmAppData();
-
       await splashHold;
 
+      final finalUser = user;
       AppLogger.i(
-        'SplashScreen: Initialized user: ${user?.supabaseUserId ?? "null"} (syncing: ${user?.isSyncing ?? "false"})',
+        'SplashScreen: Initialized user: ${finalUser?.supabaseUserId ?? "null"} (syncing: ${finalUser?.isSyncing ?? "false"})',
       );
-      if (mounted && user != null && user.profile?.avatarUrl != null) {
+      if (mounted &&
+          finalUser != null &&
+          finalUser.profile?.avatarUrl != null) {
         try {
           final _ = precacheImage(
             NetworkImage(
-              user.profile!.avatarUrl!,
+              finalUser.profile!.avatarUrl!,
               headers: {
                 'Origin': AppConfig.supabaseOrigin,
               },
@@ -153,8 +190,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       // Handle Security Failures specifically
       if (e is AppException && e.details?['type'] == 'security') {
-        final reason = e.details?['reason'] ?? e.message;
-        final action = e.details?['action'] ?? 'Please restart the app.';
+        final reason = (e.details?['reason'] as String?) ?? e.message;
+        final action =
+            (e.details?['action'] as String?) ?? 'Please restart the app.';
         final criticalRisk = e.details?['criticalRisk'] == true;
         final appCheckError = e.details?['appCheckError'] as String?;
 
@@ -163,19 +201,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           e,
         );
 
-        if (criticalRisk) {
+        final isConnectionOrQuota =
+            (appCheckError != null &&
+                (appCheckError.toLowerCase().contains('quota') ||
+                    appCheckError.toLowerCase().contains('connection') ||
+                    appCheckError.toLowerCase().contains('timeout') ||
+                    appCheckError.toLowerCase().contains('too_many_attempts') ||
+                    appCheckError.toLowerCase().contains('network') ||
+                    appCheckError.toLowerCase().contains('rate limit'))) ||
+            (reason.toLowerCase().contains('quota') ||
+                reason.toLowerCase().contains('connection') ||
+                reason.toLowerCase().contains('timeout') ||
+                reason.toLowerCase().contains('too_many_attempts') ||
+                reason.toLowerCase().contains('network') ||
+                reason.toLowerCase().contains('rate limit'));
+
+        final isGenuineSecurityFailure = !isConnectionOrQuota;
+
+        if (isGenuineSecurityFailure) {
           api.clearCaches();
+          try {
+            await ref.read(secureStorageProvider).clearAttestationResult();
+          } on Object catch (e) {
+            AppLogger.e('SplashScreen: Failed to clear attestation cache', e);
+          }
           await ref.read(authProvider.notifier).logout(force: true);
         }
 
         if (!mounted) return;
+
+        final isCritical = criticalRisk || isGenuineSecurityFailure;
 
         // Use backend-provided strings directly for the main message
         final dialogMessage = '$reason\n\n$action';
 
         final _ = SecurityUtils.showSecurityFailureDialog(
           context,
-          title: criticalRisk
+          title: isCritical
               ? 'Security Verification Failed'
               : 'Security Handshake Failed',
           message: dialogMessage,
@@ -184,11 +246,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             '${appCheckError != null ? "Local Error: $appCheckError" : ""}',
           ),
           retryLabel: Platform.isAndroid
-              ? (criticalRisk ? 'Close App' : 'Restart App')
-              : (criticalRisk ? null : 'Retry'),
+              ? (isCritical ? 'Close App' : 'Restart App')
+              : (isCritical ? null : 'Retry'),
           onRetry: Platform.isAndroid
-              ? () => exit(0)
-              : (criticalRisk ? null : _initializeApp),
+              ? SystemNavigator.pop
+              : (isCritical ? null : _initializeApp),
         );
         return;
       }
@@ -234,6 +296,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (finalUser != null) {
       if (finalUser.termsAccepted) {
+        _triggerCronSyncAndPrewarm(finalUser);
         context.go('/dashboard');
       } else {
         context.go('/accept-terms');
@@ -241,6 +304,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     } else {
       context.go('/login');
     }
+  }
+
+  void _triggerCronSyncAndPrewarm(AuthenticatedUser user) {
+    // 1. Trigger Cron Sync in parallel (fire-and-forget)
+    AppLogger.safeUnawait(
+      () async {
+        final token = ref
+            .read(supabaseClientProvider)
+            .auth
+            .currentSession
+            ?.accessToken;
+        if (token != null) {
+          await ref.read(apiServiceProvider).scheduleSync(token);
+        }
+      }(),
+      'SplashScreen: Cron Sync',
+    );
+
+    // 2. Prewarm all other screen queries
+    _prewarmAppData();
   }
 
   @override

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -763,7 +764,12 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                 ),
                                 onPressed: () async {
                                   if (isCriticalSecurityFailure) {
-                                    exit(0);
+                                    if (Platform.isAndroid) {
+                                      await SystemNavigator.pop();
+                                    } else {
+                                      exit(0);
+                                    }
+                                    return;
                                   }
 
                                   // Clear lock and retry
