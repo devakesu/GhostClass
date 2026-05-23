@@ -15,11 +15,11 @@ interface UpdateProfileData {
 
 export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean; force?: boolean }) => {
   return useQuery<UserProfile | null>({
-    queryKey: ["profile", !!options?.sync, !!options?.force],
+    queryKey: ["profile"],
     queryFn: async () => {
       const params: Record<string, string> = {};
-      if (options?.sync) params.sync = "true";
-      if (options?.force) params.force = "true";
+      params.sync = "true";
+      params.force = "true";
 
       const res = await axiosInstance.get<UserProfile>("/api/profile", {
         params: Object.keys(params).length > 0 ? params : undefined,
