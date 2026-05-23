@@ -18,9 +18,10 @@ describe('ratelimit.ts', () => {
   });
 
   it('exports rate limiter instances and logs configuration', async () => {
-    const { syncRateLimiter, contactRateLimiter, authRateLimiter, proxyRateLimiter } = await import('../ratelimit');
+    const { syncRateLimiter, contactRateLimiter, profileRateLimiter, authRateLimiter, proxyRateLimiter } = await import('../ratelimit');
     expect(syncRateLimiter).toBeDefined();
     expect(contactRateLimiter).toBeDefined();
+    expect(profileRateLimiter).toBeDefined();
     expect(authRateLimiter).toBeDefined();
     expect(proxyRateLimiter).toBeDefined();
     

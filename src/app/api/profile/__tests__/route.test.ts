@@ -94,7 +94,7 @@ vi.mock("@/lib/utils.server", () => ({
 // --- Mock rate limiter ---
 const mockRateLimiterLimit = vi.fn();
 vi.mock("@/lib/ratelimit", () => ({
-  authRateLimiter: { limit: mockRateLimiterLimit },
+  profileRateLimiter: { limit: mockRateLimiterLimit },
 }));
 
 // --- Mock sync logic ---

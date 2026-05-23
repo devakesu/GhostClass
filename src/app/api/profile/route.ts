@@ -7,7 +7,7 @@ import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-v
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getClientIp } from "@/lib/utils.server";
-import { authRateLimiter } from "@/lib/ratelimit";
+import { profileRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
 import { performProfileSync } from "@/lib/user/sync";
@@ -210,7 +210,7 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
+  const { success, reset, remaining, limit } = await profileRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -305,7 +305,7 @@ const patchHandler = async (req: NextRequest, { decryptedBody }: { decryptedBody
     );
   }
 
-  const { success, reset, remaining, limit } = await authRateLimiter.limit(ip);
+  const { success, reset, remaining, limit } = await profileRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
