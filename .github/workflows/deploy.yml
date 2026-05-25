@@ -37,7 +37,7 @@ jobs:
         continue-on-error: true
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf
         with:
           version: 2.98.2
 
@@ -206,7 +206,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.validate-aws.outputs.skip != 'true'
-        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
+        uses: aws-actions/configure-aws-credentials@e8614cfbf058de4c6c685b317488ecdec92a4305
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
@@ -278,7 +278,7 @@ jobs:
 
       - name: Configure AWS credentials (Supabase AWS Lambda)
         if: steps.validate-supabase-aws.outputs.skip != 'true' && steps.validate-aws.outputs.skip == 'true'
-        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
+        uses: aws-actions/configure-aws-credentials@e8614cfbf058de4c6c685b317488ecdec92a4305
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}

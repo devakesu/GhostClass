@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Detect path changes
-        uses: dorny/paths-filter@0bc4621a3135347011ad047f9ecf449bf72ce2bd # v3.0.0
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           filters: |
@@ -71,15 +71,15 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize CodeQL (JS)
-        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           languages: javascript
 
       - name: Autobuild (JS)
-        uses: github/codeql-action/autobuild@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/autobuild@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
 
       - name: Run CodeQL analysis (JS)
-        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           category: javascript
 
@@ -207,7 +207,7 @@ jobs:
           packages: 'platform-tools build-tools;33.0.2 platforms;android-33'
 
       - name: Initialize CodeQL (Java + Kotlin)
-        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           languages: java-kotlin
           build-mode: manual
@@ -219,7 +219,7 @@ jobs:
           ./gradlew assembleDebug --no-daemon -Pci
 
       - name: Run CodeQL analysis (Android)
-        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           category: java,kotlin
 
@@ -269,7 +269,7 @@ jobs:
         run: flutter build ios --simulator --no-codesign
 
       - name: Initialize CodeQL (Swift)
-        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           languages: swift
           build-mode: manual
@@ -287,6 +287,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run CodeQL analysis (Swift)
-        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         with:
           category: swift
