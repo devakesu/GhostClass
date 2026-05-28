@@ -130,11 +130,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
+      Object? jweError;
+      StackTrace? jweStack;
+
+      final jweTask = JweService.instance
+          .preWarm()
+          .then((_) {
+            AppLogger.i('SplashScreen: jweTask completed');
+          })
+          .catchError((Object e, StackTrace st) {
+            AppLogger.e('SplashScreen: jweTask failed', e, st);
+            jweError = e;
+            jweStack = st;
+          });
+
       api.clearCaches();
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
       await Future.wait<dynamic>([
         integrityTask,
         authTask,
+        jweTask,
       ]);
       AppLogger.i('SplashScreen: Future.wait completed');
 
@@ -146,6 +161,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
       if (authError != null) {
         Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
+      }
+      if (jweError != null) {
+        Error.throwWithStackTrace(jweError!, jweStack ?? StackTrace.current);
       }
 
       return _StartupSnapshot(user: user, versionResult: versionResult);
@@ -260,15 +278,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Start JWE key warm-up early so attestation requests can reuse prepared
-    // key material, but do not block startup on this.
-    AppLogger.safeUnawait(
-      JweService.instance.preWarm().catchError((Object e, StackTrace st) {
-        AppLogger.e('SplashScreen: early JWE pre-warm failed', e, st);
-      }),
-      'SplashScreen: early JWE pre-warm',
-    );
-
     // Keep the splash visible for 1.5s to improve perceived startup time
     final splashHold = Future<void>.delayed(
       const Duration(milliseconds: 1500),

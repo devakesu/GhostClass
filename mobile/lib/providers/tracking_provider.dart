@@ -79,12 +79,6 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<TrackingState>().future;
-    }
-
     // 2. Initial Load
     return _fetchAndProcess(academic: academic, isInitial: true);
   }

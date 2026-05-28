@@ -4,7 +4,10 @@ import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockSecureStorageService extends Mock implements SecureStorageService {}
+class MockSecureStorageService extends Mock implements SecureStorageService {
+  @override
+  Future<void> clearAllCachedData() async {}
+}
 
 void main() {
   late MockSecureStorageService mockStorage;

@@ -69,9 +69,6 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final user = ref.watch(authProvider).value;
     if (user == null) return NotificationsState.empty();
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (user.isSyncing) return NotificationsState.empty();
-
     return _fetchInitialData(user.supabaseUserId);
   }
 

@@ -7,6 +7,7 @@ import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
+import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -84,6 +85,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
   Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
     final permissionAsync = ref.watch(notificationPermissionProvider);
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
+
+    if (isSyncing) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const LoadingOverlay(isFullScreen: false, showLogo: false),
+      );
+    }
+
     final isDenied = permissionAsync.when(
       data: (v) => v,
       loading: () => false,

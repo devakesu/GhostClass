@@ -36,6 +36,15 @@ class LeavesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leaveState = ref.watch(leaveProvider);
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
+
+    if (isSyncing) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const LoadingOverlay(isFullScreen: false, showLogo: false),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

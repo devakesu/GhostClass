@@ -145,21 +145,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
     }
 
-    // BLOCKER: Do not fire server queries until Cron Sync is finished
-    if (user.isSyncing) {
-      if (_cachedCourses != null && _cachedAttendance != null) {
-        return _processData(
-          _cachedCourses!,
-          _cachedAttendance!,
-          [],
-          academic,
-          _cachedInstructors ?? [],
-        );
-      }
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<DashboardData>().future;
-    }
-
     // 2. Wait for tracking data
     final tracking = await ref.watch(trackingProvider.future);
 

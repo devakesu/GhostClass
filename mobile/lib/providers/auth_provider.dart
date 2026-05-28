@@ -562,11 +562,13 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       ezygoToken: ezygoToken ?? '',
     );
 
-    // Synchronously await critical profile sync to block authProvider initialization
-    // until server profile sync returns 200 successfully.
-    await _runBackgroundStartupHydration(user);
+    // Trigger profile sync in parallel without blocking startup/splash screen
+    AppLogger.safeUnawait(
+      _runBackgroundStartupHydration(user),
+      'AuthNotifier: background startup hydration',
+    );
 
-    return state.value ?? user;
+    return user.copyWith(isSyncing: true);
   }
 
   Future<void> _runBackgroundStartupHydration(
@@ -1486,26 +1488,42 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     ];
     await Future.wait(saves);
 
+    final newSem = profile.currentSemester;
+    final newYear = profile.currentYear;
+    final newClassLabel = profile.classField?.name;
+
+    final oldSem = currentUser.profile?.currentSemester;
+    final oldYear = currentUser.profile?.currentYear;
+    final oldClassLabel = currentUser.profile?.classField?.name;
+
+    final classChanged =
+        oldClassLabel != null && oldClassLabel != newClassLabel;
     final academicChanged =
-        nextAcademic != null &&
-        (currentUser.profile?.currentSemester != nextAcademic.semester ||
-            currentUser.profile?.currentYear != nextAcademic.year);
+        (oldSem != null && oldSem != newSem) ||
+        (oldYear != null && oldYear != newYear);
 
-    if (academicChanged) {
-      ref.read(apiServiceProvider).clearCaches();
-    }
-
-    if (nextAcademic != null) {
-      AppLogger.safeUnawait(
-        Future.delayed(Duration.zero, () {
-          ref.read(academicProvider.notifier).state = AsyncValue.data(
-            nextAcademic,
-          );
-        }).catchError((Object e, StackTrace st) {
-          AppLogger.e('AuthNotifier: Deferred academic set failed', e, st);
-        }),
-        'AuthNotifier: deferred academic set',
+    if (academicChanged || classChanged) {
+      AppLogger.i(
+        'AuthNotifier: Academic context or class changed (sem: $oldSem->$newSem, year: $oldYear->$newYear, class: $oldClassLabel->$newClassLabel). '
+        'Purging caches and invalidating page providers.',
       );
+      ref.read(apiServiceProvider).clearCaches();
+      await storage.clearAllCachedData();
+
+      ref.invalidate(academicProvider);
+    } else {
+      if (nextAcademic != null) {
+        AppLogger.safeUnawait(
+          Future.delayed(Duration.zero, () {
+            ref.read(academicProvider.notifier).state = AsyncValue.data(
+              nextAcademic,
+            );
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e('AuthNotifier: Deferred academic set failed', e, st);
+          }),
+          'AuthNotifier: deferred academic set',
+        );
+      }
     }
 
     if (updateState) state = AsyncValue.data(mergedUser);

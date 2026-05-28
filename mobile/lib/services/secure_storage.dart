@@ -288,6 +288,20 @@ class SecureStorageService {
 
   /// Deletes every key managed by this service. Should be called on logout.
   Future<void> clearAll() => _safeDeleteAll();
+
+  /// Deletes all cached keys starting with "cache_" from secure storage.
+  Future<void> clearAllCachedData() async {
+    try {
+      final all = await _storage.readAll();
+      for (final key in all.keys) {
+        if (key.startsWith('cache_')) {
+          await _safeDelete(key: key);
+        }
+      }
+    } on Object catch (e) {
+      AppLogger.e('SecureStorage: Error clearing cached data', e);
+    }
+  }
 }
 
 final secureStorageProvider = Provider<SecureStorageService>(

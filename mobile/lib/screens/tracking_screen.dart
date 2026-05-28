@@ -43,8 +43,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final dashboardAsync = ref.watch(dashboardProvider);
     final data = trackingState.value;
     final dashboard = dashboardAsync.value;
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
 
-    if (trackingState.isLoading) {
+    if (trackingState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),

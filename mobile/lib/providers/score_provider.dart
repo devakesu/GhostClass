@@ -78,12 +78,6 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
 
     final academic = academicAsync.value;
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<ScoreState>().future;
-    }
-
     return _initialFetch(academic: academic);
   }
 

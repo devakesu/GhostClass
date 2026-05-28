@@ -34,12 +34,6 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
 
     if (authState.value == null || academic == null) return LeaveState.empty();
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<LeaveState>().future;
-    }
-
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 

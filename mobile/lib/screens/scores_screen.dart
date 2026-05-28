@@ -30,8 +30,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
   @override
   Widget build(BuildContext context) {
     final scoreState = ref.watch(scoreProvider);
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
 
-    if (scoreState.isLoading) {
+    if (scoreState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),

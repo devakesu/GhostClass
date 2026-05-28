@@ -160,6 +160,7 @@ void main() {
     when(() => mockStorage.saveEzygoUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveTermsVersion(any())).thenAnswer((_) async {});
     when(() => mockStorage.clearAll()).thenAnswer((_) async {});
+    when(() => mockStorage.clearAllCachedData()).thenAnswer((_) async {});
 
     when(
       () => mockProfileService.hasRenderableLocalProfile(any()),
@@ -533,7 +534,7 @@ void main() {
 
       await notifier.updateAcademicContext('Even', '2025-2026');
 
-      verify(() => mockApi.clearCaches()).called(1);
+      verify(() => mockApi.clearCaches()).called(2);
       expect(refreshCount, equals(1));
 
       final user = container.read(authProvider).value;
