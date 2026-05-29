@@ -334,8 +334,12 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     // --- OUTAGE BARRIER ---
-    final dashboardAsync = ref.watch(dashboardProvider);
-    final trackingAsync = ref.watch(trackingProvider);
+    final dashboardError = ref.watch(
+      dashboardProvider.select((state) => state.error),
+    );
+    final trackingError = ref.watch(
+      trackingProvider.select((state) => state.error),
+    );
 
     // Reactive provider confirms an outage (Global Barrier)
     final showOutageBarrier = ref.watch(outageProvider);
@@ -710,7 +714,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                 child: ColoredBox(
                   color: bg.withValues(alpha: 0.9), // More opaque background
                   child: ServiceErrorView(
-                    error: dashboardAsync.error ?? trackingAsync.error,
+                    error: dashboardError ?? trackingError,
                     onRetry: () async {
                       ref.read(apiServiceProvider).clearCaches();
                       ref

@@ -8,6 +8,7 @@ import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/tracking_ui_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -123,6 +124,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         final trackingNotifier = ref.read(trackingProvider.notifier);
         try {
           await runUnifiedPullToRefresh(
+            invalidateNotifications: () =>
+                ref.invalidate(notificationsProvider),
             logLabel: 'TrackingScreen',
             refreshProfile: () => authNotifier.refreshProfile(force: true),
             syncCron: () async {

@@ -44,8 +44,6 @@ class NotificationsState {
     actionNotifications: [],
     regularNotifications: [],
     unreadCount: 0,
-    hasNextPage: false,
-    isFetchingNextPage: false,
   );
   final List<AppNotification> actionNotifications;
   final List<AppNotification> regularNotifications;
@@ -214,7 +212,9 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
   Future<void> fetchNextPage() async {
     final current = state.value;
-    if (current == null || !current.hasNextPage || current.isFetchingNextPage) return;
+    if (current == null || !current.hasNextPage || current.isFetchingNextPage) {
+      return;
+    }
 
     state = AsyncValue.data(current.copyWith(isFetchingNextPage: true));
     final page = _currentPage + 1;

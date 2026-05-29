@@ -93,74 +93,14 @@ String normalizeDate(dynamic date) {
 
   // 2. Dash-separated (YYYY-MM-DD or DD-MM-YYYY)
   if (base.contains('-')) {
-    final parts = base.split('-');
-    if (parts.length == 3) {
-      final a = parts[0].trim();
-      final b = parts[1].trim();
-      final c = parts[2].trim();
-
-      if (RegExp(r'^\d+$').hasMatch(a) &&
-          RegExp(r'^\d+$').hasMatch(b) &&
-          RegExp(r'^\d+$').hasMatch(c)) {
-        var year = (a.length == 4) ? int.parse(a) : int.parse(c);
-        if (year < 100) year += 2000;
-        final month = int.parse(b);
-        final day = (a.length == 4) ? int.parse(c) : int.parse(a);
-
-        if (month < 1 || month > 12 || day < 1 || day > 31) return '';
-
-        final parsed = DateTime.tryParse(
-          "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
-        );
-        if (parsed == null ||
-            parsed.year != year ||
-            parsed.month != month ||
-            parsed.day != day) {
-          return '';
-        }
-
-        final yearStr = year.toString().padLeft(4, '0');
-        final monthStr = month.toString().padLeft(2, '0');
-        final dayStr = day.toString().padLeft(2, '0');
-        return '$yearStr$monthStr$dayStr';
-      }
-    }
+    final parsedDate = _parseSeparatedDate(base, '-');
+    if (parsedDate != null) return parsedDate;
   }
 
   // 3. Slash-separated (DD/MM/YYYY or YYYY/MM/DD)
   if (base.contains('/')) {
-    final parts = base.split('/');
-    if (parts.length == 3) {
-      final a = parts[0].trim();
-      final b = parts[1].trim();
-      final c = parts[2].trim();
-
-      if (RegExp(r'^\d+$').hasMatch(a) &&
-          RegExp(r'^\d+$').hasMatch(b) &&
-          RegExp(r'^\d+$').hasMatch(c)) {
-        var year = (a.length == 4) ? int.parse(a) : int.parse(c);
-        if (year < 100) year += 2000;
-        final month = int.parse(b);
-        final day = (a.length == 4) ? int.parse(c) : int.parse(a);
-
-        if (month < 1 || month > 12 || day < 1 || day > 31) return '';
-
-        final parsed = DateTime.tryParse(
-          "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
-        );
-        if (parsed == null ||
-            parsed.year != year ||
-            parsed.month != month ||
-            parsed.day != day) {
-          return '';
-        }
-
-        final yearStr = year.toString().padLeft(4, '0');
-        final monthStr = month.toString().padLeft(2, '0');
-        final dayStr = day.toString().padLeft(2, '0');
-        return '$yearStr$monthStr$dayStr';
-      }
-    }
+    final parsedDate = _parseSeparatedDate(base, '/');
+    if (parsedDate != null) return parsedDate;
   }
 
   AppLogger.e(
@@ -168,6 +108,43 @@ String normalizeDate(dynamic date) {
     {'raw': s},
   );
   return '';
+}
+
+String? _parseSeparatedDate(String base, String sep) {
+  final parts = base.split(sep);
+  if (parts.length != 3) return null;
+
+  final a = parts[0].trim();
+  final b = parts[1].trim();
+  final c = parts[2].trim();
+
+  if (!RegExp(r'^\d+$').hasMatch(a) ||
+      !RegExp(r'^\d+$').hasMatch(b) ||
+      !RegExp(r'^\d+$').hasMatch(c)) {
+    return null;
+  }
+
+  var year = (a.length == 4) ? int.parse(a) : int.parse(c);
+  if (year < 100) year += 2000;
+  final month = int.parse(b);
+  final day = (a.length == 4) ? int.parse(c) : int.parse(a);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+
+  final parsed = DateTime.tryParse(
+    "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
+  );
+  if (parsed == null ||
+      parsed.year != year ||
+      parsed.month != month ||
+      parsed.day != day) {
+    return '';
+  }
+
+  final yearStr = year.toString().padLeft(4, '0');
+  final monthStr = month.toString().padLeft(2, '0');
+  final dayStr = day.toString().padLeft(2, '0');
+  return '$yearStr$monthStr$dayStr';
 }
 
 /// Normalizes session identifiers (e.g., "1st Hour", "Session I") to a numeric string.
@@ -386,7 +363,12 @@ bool isValidCourseName(String text) {
 }
 
 String standardizeCourseCode(String input) {
-  return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0-]'), '');
+  return input
+      .trim()
+      .toUpperCase()
+      .replaceAll(RegExp(r'\s'), '')
+      .replaceAll('\u00A0', '')
+      .replaceAll('-', '');
 }
 
 const Set<String> remarkPlaceholders = {

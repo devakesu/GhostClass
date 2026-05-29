@@ -25,15 +25,16 @@ class AuthService {
     if (ezygoResponse.statusCode != 200) return ezygoResponse;
 
     final data = ezygoResponse.data as Map<String, dynamic>?;
-    final ezygoToken = data?['token'] ?? data?['access_token'];
-    if (ezygoToken?.toString().isEmpty ?? true) {
+    final rawToken = data?['token'] ?? data?['access_token'];
+    final ezygoToken = rawToken is String ? rawToken : rawToken?.toString();
+    if (ezygoToken == null || ezygoToken.trim().isEmpty) {
       throw const AppException(
         message: 'Portal returned no token.',
         type: AppExceptionType.unauthorized,
       );
     }
 
-    return provisionGhostClassSession(ezygoToken.toString());
+    return provisionGhostClassSession(ezygoToken);
   }
 
   Future<Response<dynamic>> loginEzygo(String username, String password) async {

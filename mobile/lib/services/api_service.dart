@@ -36,8 +36,9 @@ class ApiService {
 
   // --- GhostClass Sync State ---
   Future<Response<dynamic>>? _syncInFlight;
-  DateTime? _lastSyncTime;
+  DateTime? _lastSyncAt;
   static const _syncCooldown = Duration(minutes: 5);
+  static const _forcedSyncGracePeriod = Duration(seconds: 15);
 
   void clearCaches() => _ezygo.clearCaches();
 
@@ -159,9 +160,22 @@ class ApiService {
 
     // 3. Throttling
     final now = DateTime.now();
+    if (force &&
+        _lastSyncAt != null &&
+        now.difference(_lastSyncAt!) < _forcedSyncGracePeriod) {
+      AppLogger.d(
+        'ApiService: Skipping forced sync due to recent startup sync.',
+      );
+      return Response<dynamic>(
+        requestOptions: RequestOptions(path: 'sync'),
+        statusCode: 304,
+        data: {'message': 'Recently synced'},
+      );
+    }
+
     if (!force &&
-        _lastSyncTime != null &&
-        now.difference(_lastSyncTime!) < _syncCooldown) {
+        _lastSyncAt != null &&
+        now.difference(_lastSyncAt!) < _syncCooldown) {
       AppLogger.d('ApiService: Sync throttled.');
       return Response<dynamic>(
         requestOptions: RequestOptions(path: 'sync'),
@@ -180,7 +194,7 @@ class ApiService {
             receiveTimeout: const Duration(seconds: 30),
           ),
         );
-        _lastSyncTime = DateTime.now();
+        _lastSyncAt = DateTime.now();
         return response;
       } on Object catch (e) {
         AppLogger.e('ApiService: Background sync failed', e);

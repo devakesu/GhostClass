@@ -25,13 +25,22 @@ class EzygoService {
   late final EzygoBatchFetcher _fetcher;
   static final String _ezygoApiRoot = AppConfig.ezygoApiRoot;
 
+  String _requireEzygoToken(String? token) {
+    if (token == null) {
+      throw const AppException(
+        message: 'No EzyGo credentials found. Please log in.',
+        type: AppExceptionType.unauthorized,
+      );
+    }
+    return token;
+  }
+
   void clearCaches() => _fetcher.clearAll();
 
   Future<Response<dynamic>> fetchCourses(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionuser/courses/withusers';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAttendanceReportDetailed(
@@ -39,18 +48,10 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/attendancereports/student/detailed';
-    if (token == null) {
-      return _ref
-          .read(dioServiceProvider)
-          .dio
-          .post(
-            path,
-            data: <String, dynamic>{},
-          );
-    }
+    _requireEzygoToken(token);
     return _fetcher.fetch(
       path: path,
-      token: token,
+      token: token!,
       method: 'POST',
       data: <String, dynamic>{},
     );
@@ -61,8 +62,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionusers/myinstitutions';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> updateDefaultInstitution(
@@ -122,8 +122,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_semester';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAcademicYear(
@@ -131,8 +130,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_academic_year';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<dynamic> _fetchWithCache(
@@ -225,8 +223,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchExams(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamQuestions(
@@ -236,8 +233,7 @@ class EzygoService {
     final token = await storage.getNormalizedEzygoToken();
     final path =
         '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamAnswers(
@@ -246,8 +242,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams/$examId/institutionuser/examanswers';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 }
 

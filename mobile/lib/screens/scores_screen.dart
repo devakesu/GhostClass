@@ -3,12 +3,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -83,6 +85,8 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               final scoreNotifier = ref.read(scoreProvider.notifier);
               try {
                 await runUnifiedPullToRefresh(
+                  invalidateNotifications: () =>
+                      ref.invalidate(notificationsProvider),
                   logLabel: 'ScoresScreen',
                   refreshProfile: () =>
                       authNotifier.refreshProfile(force: true),
@@ -202,13 +206,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                         ),
                   loading: () =>
                       const SliverFillRemaining(child: SizedBox.shrink()),
-                  error: (err, _) => const SliverFillRemaining(
-                    child: Center(
-                      child: Text(
-                        'We encountered an error while loading your scores. Please try again later. If the issue persists, please contact us.',
-                        style: TextStyle(color: Colors.redAccent),
-                        textAlign: TextAlign.center,
-                      ),
+                  error: (err, _) => SliverFillRemaining(
+                    child: ServiceErrorView(
+                      error: err,
+                      onRetry: () => ref.invalidate(scoreProvider),
                     ),
                   ),
                 ),

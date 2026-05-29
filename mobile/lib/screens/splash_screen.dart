@@ -71,7 +71,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final startupFlow = ref.read(startupFlowServiceProvider);
 
     if (_canUseStartupCache(sessionKey, startupFlow)) {
-      return Future<_StartupSnapshot>.value(startupFlow.startupCache as _StartupSnapshot);
+      return Future<_StartupSnapshot>.value(
+        startupFlow.startupCache! as _StartupSnapshot,
+      );
     }
 
     final inFlight = startupFlow.startupInFlight;
@@ -167,13 +169,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return _StartupSnapshot(user: user, versionResult: versionResult);
     }();
 
-    startupFlow.startupCacheSessionKey = sessionKey;
-    startupFlow.startupInFlight = future;
+    startupFlow
+      ..startupCacheSessionKey = sessionKey
+      ..startupInFlight = future;
 
     return future
         .then((snapshot) {
-          startupFlow.startupCache = snapshot;
-          startupFlow.startupCacheAt = DateTime.now();
+          startupFlow
+            ..startupCache = snapshot
+            ..startupCacheAt = DateTime.now();
           return snapshot;
         })
         .whenComplete(() {
@@ -589,7 +593,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               duration: 500.ms,
               curve: Curves.easeInOut,
             )
-            .animate(onPlay: (controller) => controller.repeat())
+            .animate(
+              onPlay: (controller) => controller.repeat(
+                reverse: true,
+                period: 1200.ms,
+              ),
+            )
             .shimmer(
               duration: 600.ms,
               color: Colors.white.withValues(alpha: 0.3),

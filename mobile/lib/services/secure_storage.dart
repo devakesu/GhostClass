@@ -309,11 +309,11 @@ class SecureStorageService {
   Future<void> clearAllCachedData() async {
     try {
       final all = await _storage.readAll();
-      for (final key in all.keys) {
-        if (key.startsWith('cache_')) {
-          await _safeDelete(key: key);
-        }
-      }
+      await Future.wait(
+        all.keys
+            .where((key) => key.startsWith('cache_'))
+            .map((key) => _safeDelete(key: key)),
+      );
     } on Object catch (e) {
       AppLogger.e('SecureStorage: Error clearing cached data', e);
     }

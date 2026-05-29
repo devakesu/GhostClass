@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
@@ -31,6 +32,119 @@ class LeavesScreen extends ConsumerWidget {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1048576).toStringAsFixed(1)} MB';
+  }
+
+  List<Widget> _buildWorkflowHistory(BuildContext context, Leave leave) {
+    final filteredApprovers = <String, LeaveApprover>{};
+
+    for (final approver in leave.approvers) {
+      if (approver.actionByUser == null) continue;
+
+      final actionByUser = approver.actionByUser!;
+      final dedupeKey = [
+        actionByUser.firstName,
+        actionByUser.lastName,
+        approver.actionType,
+        approver.actionAt,
+      ].join('|');
+
+      filteredApprovers.putIfAbsent(dedupeKey, () => approver);
+    }
+
+    final sortedApprovers = filteredApprovers.values.toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    final successGreen =
+        Theme.of(context).extension<GhostColors>()?.successGreen ??
+        const Color(0xFF10B981);
+
+    return sortedApprovers.map((approver) {
+      final isApproved = approver.actionType == 'approve';
+      final isRejected = approver.actionType == 'reject';
+      final isForwarded = approver.actionType == 'forward';
+      final isRecommended = approver.actionType == 'recommend';
+      final color = isApproved
+          ? successGreen
+          : isRejected
+          ? Colors.red
+          : isForwarded
+          ? Colors.indigo
+          : isRecommended
+          ? Colors.blue
+          : Colors.grey;
+      final label = isApproved
+          ? 'Approved'
+          : isForwarded
+          ? 'Forwarded'
+          : isRecommended
+          ? 'Recommended'
+          : isRejected
+          ? 'Rejected'
+          : (approver.actionType ?? 'Action');
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                LucideIcons.user,
+                size: 12,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '${approver.actionByUser!.firstName} ${approver.actionByUser!.lastName}',
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                label.toUpperCase(),
+                style: GoogleFonts.manrope(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatDate(
+                approver.actionAt ?? approver.updatedAt,
+              ),
+              style: GoogleFonts.manrope(
+                fontSize: 11,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -85,6 +199,8 @@ class LeavesScreen extends ConsumerWidget {
             onRefresh: () async {
               try {
                 await runUnifiedPullToRefresh(
+                  invalidateNotifications: () =>
+                      ref.invalidate(notificationsProvider),
                   logLabel: 'LeavesScreen',
                   refreshProfile: () => ref
                       .read(authProvider.notifier)
@@ -136,6 +252,8 @@ class LeavesScreen extends ConsumerWidget {
                     child: ServiceErrorView(
                       error: err,
                       onRetry: () => runUnifiedPullToRefresh(
+                        invalidateNotifications: () =>
+                            ref.invalidate(notificationsProvider),
                         logLabel: 'LeavesScreen',
                         refreshProfile: () => ref
                             .read(authProvider.notifier)
@@ -216,8 +334,11 @@ class LeavesScreen extends ConsumerWidget {
     }
 
     final approvedCount = data.leaves
-        .where((l) => _getLeaveStatus(l.approvers).label == 'Approved')
+        .where((l) => _getLeaveStatus(context, l.approvers).label == 'Approved')
         .length;
+    final successGreen =
+        Theme.of(context).extension<GhostColors>()?.successGreen ??
+        const Color(0xFF10B981);
 
     return SliverPadding(
       padding: const EdgeInsets.all(24),
@@ -238,7 +359,7 @@ class LeavesScreen extends ConsumerWidget {
                 'Approved',
                 approvedCount.toString(),
                 LucideIcons.checkCircle2,
-                const Color(0xFF10B981),
+                successGreen,
               ),
             ],
           ),
@@ -338,7 +459,7 @@ class LeavesScreen extends ConsumerWidget {
     Leave leave,
     List<LeaveSession> sessions,
   ) {
-    final status = _getLeaveStatus(leave.approvers);
+    final status = _getLeaveStatus(context, leave.approvers);
 
     // Unique dates
     final uniqueDates = sessions.map((s) => s.date).toSet().toList()..sort();
@@ -375,6 +496,7 @@ class LeavesScreen extends ConsumerWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
+        clipBehavior: Clip.antiAlias,
         children: [
           // Content
           Padding(
@@ -626,113 +748,7 @@ class LeavesScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ...() {
-                    final filteredApprovers = <LeaveApprover>[];
-                    for (final a in leave.approvers) {
-                      if (a.actionByUser == null) continue;
-                      final isDuplicate = filteredApprovers.any(
-                        (item) =>
-                            item.actionByUser?.firstName ==
-                                a.actionByUser?.firstName &&
-                            item.actionByUser?.lastName ==
-                                a.actionByUser?.lastName &&
-                            item.actionType == a.actionType &&
-                            item.actionAt == a.actionAt,
-                      );
-                      if (!isDuplicate) filteredApprovers.add(a);
-                    }
-                    filteredApprovers.sort(
-                      (a, b) => b.updatedAt.compareTo(a.updatedAt),
-                    );
-
-                    return filteredApprovers.map((approver) {
-                      final isApproved = approver.actionType == 'approve';
-                      final isRejected = approver.actionType == 'reject';
-                      final isForwarded = approver.actionType == 'forward';
-                      final isRecommended = approver.actionType == 'recommend';
-                      final color = isApproved
-                          ? const Color(0xFF10B981)
-                          : isRejected
-                          ? Colors.red
-                          : isForwarded
-                          ? Colors.indigo
-                          : isRecommended
-                          ? Colors.blue
-                          : Colors.grey;
-                      final label = isApproved
-                          ? 'Approved'
-                          : isForwarded
-                          ? 'Forwarded'
-                          : isRecommended
-                          ? 'Recommended'
-                          : isRejected
-                          ? 'Rejected'
-                          : (approver.actionType ?? 'Action');
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                LucideIcons.user,
-                                size: 12,
-                                color: color,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                '${approver.actionByUser!.firstName} ${approver.actionByUser!.lastName}',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                label.toUpperCase(),
-                                style: GoogleFonts.manrope(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  color: color,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDate(
-                                approver.actionAt ?? approver.updatedAt,
-                              ),
-                              style: GoogleFonts.manrope(
-                                fontSize: 11,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  }(),
+                  ..._buildWorkflowHistory(context, leave),
                 ],
               ],
             ),
@@ -803,7 +819,14 @@ class LeavesScreen extends ConsumerWidget {
     );
   }
 
-  _LeaveStatus _getLeaveStatus(List<LeaveApprover> approvers) {
+  _LeaveStatus _getLeaveStatus(
+    BuildContext context,
+    List<LeaveApprover> approvers,
+  ) {
+    final successGreen =
+        Theme.of(context).extension<GhostColors>()?.successGreen ??
+        const Color(0xFF10B981);
+
     if (approvers.isEmpty) {
       return _LeaveStatus('Pending', Colors.amber, LucideIcons.clock);
     }
@@ -848,7 +871,7 @@ class LeavesScreen extends ConsumerWidget {
     if (lastAction == 'approve') {
       return _LeaveStatus(
         'Approved',
-        const Color(0xFF10B981),
+        successGreen,
         LucideIcons.checkCircle2,
       );
     }

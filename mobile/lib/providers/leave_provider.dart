@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
@@ -67,7 +66,6 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
     ref.invalidateSelf();
     await future;
   }

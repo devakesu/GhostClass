@@ -49,6 +49,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   AttendanceReportDetailed? _cachedAttendance;
   List<CourseInstructor>? _cachedInstructors;
   AcademicState? _lastAcademic;
+  AttendanceReportDetailed? _pendingTrackedAttendance;
 
   bool _needsRevalidate = true;
 
@@ -206,6 +207,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final storage = ref.read(secureStorageProvider);
 
       final classId = ref.read(authProvider).value?.profile?.classField?.id;
+      final attendanceToUse = trackedAttendance ?? _pendingTrackedAttendance;
+      _pendingTrackedAttendance = null;
 
       late final Response<dynamic> coursesResponse;
       late final AttendanceReportDetailed attendance;
@@ -214,8 +217,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
       await Future.wait([
         api.fetchCourses(storage).then((res) => coursesResponse = res),
-        (trackedAttendance != null
-                ? Future.value(trackedAttendance)
+        (attendanceToUse != null
+                ? Future.value(attendanceToUse)
                 : _fetchAttendanceOnce(api: api, storage: storage))
             .then((res) {
               if (res == null) throw Exception('No attendance data');
@@ -421,15 +424,19 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // Pre-calculate sorting criteria to avoid redundant math during sort
     final target = (auth?.settings.targetPercentage ?? 75).toDouble();
 
-    final metaMap = <String, ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})>{
-      for (final c in courses)
-        c.safeId: _computeCourseMeta(
-          course: c,
-          stats: stats,
-          disabledCodes: disabledCodes,
-          targetPercentage: target,
-        ),
-    };
+    final metaMap =
+        <
+          String,
+          ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})
+        >{
+          for (final c in courses)
+            c.safeId: _computeCourseMeta(
+              course: c,
+              stats: stats,
+              disabledCodes: disabledCodes,
+              targetPercentage: target,
+            ),
+        };
 
     final sortedCourses = List<CourseDetails>.from(courses)
       ..sort((a, b) {
@@ -470,9 +477,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   }
 
   ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})
-      _computeCourseMeta({
+  _computeCourseMeta({
     required CourseDetails course,
-    required AttendanceReportStats stats,
+    required DashboardStats stats,
     required Set<String> disabledCodes,
     required double targetPercentage,
   }) {
@@ -547,7 +554,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
 
     // 0. Set local loading state
@@ -559,6 +565,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     if (user != null) {
       try {
         await runUnifiedPullToRefresh(
+          invalidateNotifications: () => ref.invalidate(notificationsProvider),
           logLabel: 'DashboardNotifier',
           refreshProfile: () =>
               ref.read(authProvider.notifier).refreshProfile(force: true),
@@ -575,6 +582,10 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           },
           refreshData: () => ref.read(trackingProvider.notifier).refresh(),
         );
+        _pendingTrackedAttendance = ref
+            .read(trackingProvider)
+            .value
+            ?.officialReport;
       } on Object catch (e, st) {
         AppLogger.e('DashboardNotifier: refresh coordinator failed', e, st);
         refreshError = e;

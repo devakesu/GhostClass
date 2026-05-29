@@ -5,7 +5,6 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
@@ -167,13 +166,25 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         pendingCount: pending,
       );
 
-      return _applyFilter(state, 'all');
+      return _applyFilter(
+        state,
+        'all',
+        totalExams: visibleExams.length,
+        scoredCount: scored,
+        pendingCount: pending,
+      );
     } on Object catch (e) {
       throw Exception('Failed to load internal marks: $e');
     }
   }
 
-  ScoreState _applyFilter(ScoreState baseState, String type) {
+  ScoreState _applyFilter(
+    ScoreState baseState,
+    String type, {
+    int? totalExams,
+    int? scoredCount,
+    int? pendingCount,
+  }) {
     var filtered = baseState.rawExams;
     if (type != 'all') {
       filtered = baseState.rawExams
@@ -190,11 +201,13 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         .map((entry) => CourseGroup(label: entry.key, exams: entry.value))
         .toList();
 
-    final total = filtered.length;
-    final scored = filtered
-        .where((e) => baseState.resolvedScores.containsKey(e.id))
-        .length;
-    final pending = total - scored;
+    final total = totalExams ?? filtered.length;
+    final scored =
+        scoredCount ??
+        filtered
+            .where((e) => baseState.resolvedScores.containsKey(e.id))
+            .length;
+    final pending = pendingCount ?? (total - scored);
 
     return baseState.copyWith(
       filterType: type,
@@ -212,7 +225,6 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final academic = academicAsync.value;
     state = const AsyncValue.loading();

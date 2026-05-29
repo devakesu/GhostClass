@@ -348,32 +348,54 @@ void main() {
     });
 
     group('Self-Healing & Error Handling', () {
-      test('Transient error on read (e.g., interaction not allowed) does not purge and rethrows', () async {
-        final transientError = Exception('Keychain error: -25308 (interaction not allowed)');
-        when(() => mockStorage.read(key: any(named: 'key'))).thenThrow(transientError);
-        when(() => mockStorage.deleteAll()).thenAnswer((_) async {});
+      test(
+        'Transient error on read (e.g., interaction not allowed) does not purge and rethrows',
+        () async {
+          final transientError = Exception(
+            'Keychain error: -25308 (interaction not allowed)',
+          );
+          when(
+            () => mockStorage.read(key: any(named: 'key')),
+          ).thenThrow(transientError);
+          when(() => mockStorage.deleteAll()).thenAnswer((_) async {});
 
-        expect(
-          () => service.getEzygoToken(),
-          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('-25308'))),
-        );
+          expect(
+            () => service.getEzygoToken(),
+            throwsA(
+              isA<Exception>().having(
+                (e) => e.toString(),
+                'message',
+                contains('-25308'),
+              ),
+            ),
+          );
 
-        verifyNever(() => mockStorage.deleteAll());
-      });
+          verifyNever(() => mockStorage.deleteAll());
+        },
+      );
 
-      test('Unrecoverable error on read (e.g., storage_key_error) purges and returns null', () async {
-        final unrecoverableError = Exception('PlatformException(storage_key_error, Keystore corrupted, null, null)');
-        when(() => mockStorage.read(key: any(named: 'key'))).thenThrow(unrecoverableError);
-        when(() => mockStorage.deleteAll()).thenAnswer((_) async {});
+      test(
+        'Unrecoverable error on read (e.g., storage_key_error) purges and returns null',
+        () async {
+          final unrecoverableError = Exception(
+            'PlatformException(storage_key_error, Keystore corrupted, null, null)',
+          );
+          when(
+            () => mockStorage.read(key: any(named: 'key')),
+          ).thenThrow(unrecoverableError);
+          when(() => mockStorage.deleteAll()).thenAnswer((_) async {});
 
-        final result = await service.getEzygoToken();
+          final result = await service.getEzygoToken();
 
-        expect(result, isNull);
-        verify(() => mockStorage.deleteAll()).called(1);
-      });
+          expect(result, isNull);
+          verify(() => mockStorage.deleteAll()).called(1);
+        },
+      );
 
       test('Transient error on write does not purge and rethrows', () async {
-        final transientError = Exception('Keychain error: -25308 (interaction not allowed)');
+        final transientError = Exception(
+          'Keychain error: -25308 (interaction not allowed)',
+        );
         when(
           () => mockStorage.write(
             key: any(named: 'key'),
@@ -384,14 +406,22 @@ void main() {
 
         expect(
           () => service.saveEzygoToken('test'),
-          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('-25308'))),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              contains('-25308'),
+            ),
+          ),
         );
 
         verifyNever(() => mockStorage.deleteAll());
       });
 
       test('Unrecoverable error on write purges and rethrows', () async {
-        final unrecoverableError = Exception('PlatformException(storage_key_error, Keystore corrupted, null, null)');
+        final unrecoverableError = Exception(
+          'PlatformException(storage_key_error, Keystore corrupted, null, null)',
+        );
         when(
           () => mockStorage.write(
             key: any(named: 'key'),
@@ -402,7 +432,13 @@ void main() {
 
         expect(
           () => service.saveEzygoToken('test'),
-          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('storage_key_error'))),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              contains('storage_key_error'),
+            ),
+          ),
         );
 
         verify(() => mockStorage.deleteAll()).called(1);

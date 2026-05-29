@@ -284,12 +284,12 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
               const AttendanceDialogLabel(text: 'Session'),
               _buildSessionSelector(primary),
               if (_isBlocked)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6, left: 4),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
                   child: Text(
                     'Session occupied',
                     style: TextStyle(
-                      color: Colors.redAccent,
+                      color: Theme.of(context).colorScheme.error,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),

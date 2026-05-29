@@ -6,7 +6,6 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -52,11 +51,6 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
-
-  String _canonicalTrackerCourseCode(String courseId) {
-    return utils.standardizeCourseCode(courseId);
-  }
-
   @override
   FutureOr<TrackingState> build() async {
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
@@ -200,7 +194,6 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   /// DashboardNotifier.refresh() already handles the primary sync, so pass
   /// forceSync: false when calling from that context to avoid redundant requests.
   Future<void> refresh({bool forceSync = false}) async {
-    ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
     final supabaseToken = ref
@@ -240,7 +233,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final academic = academicAsync.value;
     if (auth == null || academic == null) return;
 
-    final canonicalCourseId = _canonicalTrackerCourseCode(courseId);
+    final canonicalCourseId = utils.standardizeCourseCode(courseId);
 
     try {
       final response = await ref
