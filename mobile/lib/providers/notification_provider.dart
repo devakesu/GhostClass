@@ -37,22 +37,42 @@ class NotificationsState {
     required this.regularNotifications,
     required this.unreadCount,
     this.hasNextPage = false,
+    this.isFetchingNextPage = false,
   });
 
   factory NotificationsState.empty() => const NotificationsState(
     actionNotifications: [],
     regularNotifications: [],
     unreadCount: 0,
+    hasNextPage: false,
+    isFetchingNextPage: false,
   );
   final List<AppNotification> actionNotifications;
   final List<AppNotification> regularNotifications;
   final int unreadCount;
   final bool hasNextPage;
+  final bool isFetchingNextPage;
 
   List<AppNotification> get allNotifications => [
     ...actionNotifications,
     ...regularNotifications,
   ];
+
+  NotificationsState copyWith({
+    List<AppNotification>? actionNotifications,
+    List<AppNotification>? regularNotifications,
+    int? unreadCount,
+    bool? hasNextPage,
+    bool? isFetchingNextPage,
+  }) {
+    return NotificationsState(
+      actionNotifications: actionNotifications ?? this.actionNotifications,
+      regularNotifications: regularNotifications ?? this.regularNotifications,
+      unreadCount: unreadCount ?? this.unreadCount,
+      hasNextPage: hasNextPage ?? this.hasNextPage,
+      isFetchingNextPage: isFetchingNextPage ?? this.isFetchingNextPage,
+    );
+  }
 }
 
 final notificationsProvider =
@@ -63,12 +83,22 @@ final notificationsProvider =
 class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   int _currentPage = 0;
   static const _pageSize = 20;
+  final _toggleReadInFlight = <int>{};
+  String? _lastUserId;
 
   @override
   Future<NotificationsState> build() async {
     final user = ref.watch(authProvider).value;
-    if (user == null) return NotificationsState.empty();
+    if (user == null) {
+      _lastUserId = null;
+      return NotificationsState.empty();
+    }
 
+    if (_lastUserId == user.supabaseUserId && state.hasValue) {
+      return state.value!;
+    }
+
+    _lastUserId = user.supabaseUserId;
     return _fetchInitialData(user.supabaseUserId);
   }
 
@@ -182,113 +212,121 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     );
   }
 
-  bool _isFetchingNextPage = false;
   Future<void> fetchNextPage() async {
     final current = state.value;
-    if (current == null || !current.hasNextPage || _isFetchingNextPage) return;
+    if (current == null || !current.hasNextPage || current.isFetchingNextPage) return;
 
-    _isFetchingNextPage = true;
+    state = AsyncValue.data(current.copyWith(isFetchingNextPage: true));
     final page = _currentPage + 1;
     try {
       final nextState = await _fetchNextPage(page: page);
-      // Only advance the current page after a successful fetch to avoid
-      // skipping pages when a network call fails.
+      if (!ref.mounted) return;
       _currentPage = page;
-      state = AsyncValue.data(nextState);
+      state = AsyncValue.data(nextState.copyWith(isFetchingNextPage: false));
     } finally {
-      _isFetchingNextPage = false;
+      if (ref.mounted && (state.value?.isFetchingNextPage ?? false)) {
+        final latest = state.value ?? current;
+        state = AsyncValue.data(latest.copyWith(isFetchingNextPage: false));
+      }
     }
   }
 
   Future<void> toggleRead(int id, {required bool wasRead}) async {
-    final previousState = state.value;
-    if (previousState == null) return;
-
-    final newIsRead = !wasRead;
-
-    // 1. Update in actionNotifications
-    final updatedActions = <AppNotification>[];
-    AppNotification? movedToRegular;
-
-    for (final n in previousState.actionNotifications) {
-      if (n.id == id) {
-        final updated = AppNotification(
-          id: n.id,
-          title: n.title,
-          description: n.description,
-          createdAt: n.createdAt,
-          topic: n.topic,
-          isRead: newIsRead,
-        );
-        if (newIsRead) {
-          movedToRegular = updated;
-        } else {
-          updatedActions.add(updated);
-        }
-      } else {
-        updatedActions.add(n);
-      }
-    }
-
-    // 2. Update in regularNotifications
-    final updatedRegular = <AppNotification>[];
-    AppNotification? movedToAction;
-
-    for (final n in previousState.regularNotifications) {
-      if (n.id == id) {
-        final updated = AppNotification(
-          id: n.id,
-          title: n.title,
-          description: n.description,
-          createdAt: n.createdAt,
-          topic: n.topic,
-          isRead: newIsRead,
-        );
-
-        // If a conflict is marked as UNREAD, it must move back to actionNotifications
-        if (!newIsRead &&
-            (n.topic?.toLowerCase().contains('conflict') ?? false)) {
-          movedToAction = updated;
-        } else {
-          updatedRegular.add(updated);
-        }
-      } else {
-        updatedRegular.add(n);
-      }
-    }
-
-    if (movedToAction != null) {
-      updatedActions
-        ..insert(0, movedToAction)
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    }
-
-    if (movedToRegular != null) {
-      updatedRegular
-        ..insert(0, movedToRegular)
-        // Re-sort regular by date if needed, but inserting at 0 is fine for now
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    }
-
-    final unreadChange = wasRead ? 1 : -1;
-    state = AsyncValue.data(
-      NotificationsState(
-        actionNotifications: updatedActions,
-        regularNotifications: updatedRegular,
-        unreadCount: previousState.unreadCount + unreadChange,
-        hasNextPage: previousState.hasNextPage,
-      ),
-    );
+    if (_toggleReadInFlight.contains(id)) return;
+    _toggleReadInFlight.add(id);
 
     try {
-      final supabase = Supabase.instance.client;
-      await supabase
-          .from('notification')
-          .update({'is_read': newIsRead})
-          .eq('id', id);
-    } on Object catch (_) {
-      state = AsyncValue.data(previousState);
-      rethrow;
+      final previousState = state.value;
+      if (previousState == null) return;
+
+      final newIsRead = !wasRead;
+
+      // 1. Update in actionNotifications
+      final updatedActions = <AppNotification>[];
+      AppNotification? movedToRegular;
+
+      for (final n in previousState.actionNotifications) {
+        if (n.id == id) {
+          final updated = AppNotification(
+            id: n.id,
+            title: n.title,
+            description: n.description,
+            createdAt: n.createdAt,
+            topic: n.topic,
+            isRead: newIsRead,
+          );
+          if (newIsRead) {
+            movedToRegular = updated;
+          } else {
+            updatedActions.add(updated);
+          }
+        } else {
+          updatedActions.add(n);
+        }
+      }
+
+      // 2. Update in regularNotifications
+      final updatedRegular = <AppNotification>[];
+      AppNotification? movedToAction;
+
+      for (final n in previousState.regularNotifications) {
+        if (n.id == id) {
+          final updated = AppNotification(
+            id: n.id,
+            title: n.title,
+            description: n.description,
+            createdAt: n.createdAt,
+            topic: n.topic,
+            isRead: newIsRead,
+          );
+
+          // If a conflict is marked as UNREAD, it must move back to actionNotifications
+          if (!newIsRead &&
+              (n.topic?.toLowerCase().contains('conflict') ?? false)) {
+            movedToAction = updated;
+          } else {
+            updatedRegular.add(updated);
+          }
+        } else {
+          updatedRegular.add(n);
+        }
+      }
+
+      if (movedToAction != null) {
+        updatedActions
+          ..insert(0, movedToAction)
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+
+      if (movedToRegular != null) {
+        updatedRegular
+          ..insert(0, movedToRegular)
+          // Re-sort regular by date if needed, but inserting at 0 is fine for now
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+
+      final unreadChange = wasRead ? 1 : -1;
+      state = AsyncValue.data(
+        NotificationsState(
+          actionNotifications: updatedActions,
+          regularNotifications: updatedRegular,
+          unreadCount: previousState.unreadCount + unreadChange,
+          hasNextPage: previousState.hasNextPage,
+        ),
+      );
+
+      try {
+        final supabase = Supabase.instance.client;
+        await supabase
+            .from('notification')
+            .update({'is_read': newIsRead})
+            .eq('id', id);
+      } on Object catch (_) {
+        state = AsyncValue.data(previousState);
+        rethrow;
+      }
+    } finally {
+      _toggleReadInFlight.remove(id);
     }
   }
 

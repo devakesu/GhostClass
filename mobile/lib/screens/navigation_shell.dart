@@ -240,6 +240,78 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     return true;
   }
 
+  int _calculateSelectedIndex(String location) {
+    if (location.startsWith('/dashboard')) return 0;
+    if (location.startsWith('/calendar')) return 1;
+    if (location.startsWith('/scores')) return 2;
+    if (location.startsWith('/leaves')) return 3;
+    if (location.startsWith('/ghostclass') ||
+        location.startsWith('/profile-dump')) {
+      return 4;
+    }
+    return 0;
+  }
+
+  void _onTabTapped(int index) {
+    switch (index) {
+      case 0:
+        context.go('/dashboard');
+      case 1:
+        context.go('/calendar');
+      case 2:
+        context.go('/scores');
+      case 3:
+        context.go('/leaves');
+      case 4:
+        context.go('/ghostclass');
+    }
+  }
+
+  Future<void> _showTrackingOverlay() async {
+    ref.read(uiModalOpenProvider.notifier).setOpen(true);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) => const TrackingScreen(),
+    );
+    if (mounted) {
+      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    }
+  }
+
+  Future<void> _showNotificationsOverlay() async {
+    ref.read(uiModalOpenProvider.notifier).setOpen(true);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) => const NotificationsScreen(),
+    );
+    if (mounted) {
+      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    }
+  }
+
+  Future<void> _showAddAttendanceDialog() async {
+    ref.read(uiModalOpenProvider.notifier).setOpen(true);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => const AddAttendanceDialog(),
+    );
+    if (mounted) {
+      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
@@ -257,68 +329,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
 
     final location = GoRouterState.of(context).uri.path;
 
-    int calculateSelectedIndex(String location) {
-      if (location.startsWith('/dashboard')) return 0;
-      if (location.startsWith('/calendar')) return 1;
-      if (location.startsWith('/scores')) return 2;
-      if (location.startsWith('/leaves')) return 3;
-      if (location.startsWith('/ghostclass') ||
-          location.startsWith('/profile-dump')) {
-        return 4;
-      }
-      return 0;
-    }
-
-    final selectedIndex = calculateSelectedIndex(location);
-
-    void onTabTapped(int index) {
-      switch (index) {
-        case 0:
-          context.go('/dashboard');
-        case 1:
-          context.go('/calendar');
-        case 2:
-          context.go('/scores');
-        case 3:
-          context.go('/leaves');
-        case 4:
-          context.go('/ghostclass');
-      }
-    }
-
-    Future<void> showTrackingOverlay() async {
-      ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        builder: (context) => const TrackingScreen(),
-      );
-      if (mounted) {
-        ref.read(uiModalOpenProvider.notifier).setOpen(false);
-      }
-    }
-
-    Future<void> showNotificationsOverlay() async {
-      ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        builder: (context) => const NotificationsScreen(),
-      );
-      if (mounted) {
-        ref.read(uiModalOpenProvider.notifier).setOpen(false);
-      }
-    }
+    final selectedIndex = _calculateSelectedIndex(location);
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -334,17 +345,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     final showSecurityBarrier = securityFailure != null;
     final securityMessage = securityFailure?.message ?? '';
     final isCriticalSecurityFailure = securityFailure?.criticalRisk ?? false;
-
-    Future<void> showAddAttendanceDialog() async {
-      ref.read(uiModalOpenProvider.notifier).setOpen(true);
-      await showDialog<void>(
-        context: context,
-        builder: (context) => const AddAttendanceDialog(),
-      );
-      if (mounted) {
-        ref.read(uiModalOpenProvider.notifier).setOpen(false);
-      }
-    }
 
     final mainScaffold = Scaffold(
       backgroundColor: bg,
@@ -377,7 +377,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       button: true,
                       label: 'Notifications',
                       child: InkWell(
-                        onTap: showNotificationsOverlay,
+                        onTap: _showNotificationsOverlay,
                         splashColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         child: Stack(
@@ -449,7 +449,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                       button: true,
                       label: 'Tracking',
                       child: InkWell(
-                        onTap: showTrackingOverlay,
+                        onTap: _showTrackingOverlay,
                         splashColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         child: Container(
@@ -592,7 +592,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   icon: LucideIcons.layoutDashboard,
                   label: 'Dashboard',
                   isSelected: selectedIndex == 0,
-                  onTap: () => onTabTapped(0),
+                  onTap: () => _onTabTapped(0),
                 ),
               ),
               Expanded(
@@ -600,7 +600,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   icon: LucideIcons.calendar,
                   label: 'Calendar',
                   isSelected: selectedIndex == 1,
-                  onTap: () => onTabTapped(1),
+                  onTap: () => _onTabTapped(1),
                 ),
               ),
               Expanded(
@@ -608,7 +608,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   icon: LucideIcons.graduationCap,
                   label: 'Scores',
                   isSelected: selectedIndex == 2,
-                  onTap: () => onTabTapped(2),
+                  onTap: () => _onTabTapped(2),
                 ),
               ),
               Expanded(
@@ -616,7 +616,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   icon: LucideIcons.clipboardList,
                   label: 'Leaves',
                   isSelected: selectedIndex == 3,
-                  onTap: () => onTabTapped(3),
+                  onTap: () => _onTabTapped(3),
                 ),
               ),
               Expanded(
@@ -624,7 +624,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   icon: LucideIcons.ghost,
                   label: 'GhostClass',
                   isSelected: selectedIndex == 4,
-                  onTap: () => onTabTapped(4),
+                  onTap: () => _onTabTapped(4),
                 ),
               ),
             ],
@@ -676,7 +676,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   child: Material(
                     type: MaterialType.transparency,
                     child: InkWell(
-                      onTap: showAddAttendanceDialog,
+                      onTap: _showAddAttendanceDialog,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(72),
                       ),

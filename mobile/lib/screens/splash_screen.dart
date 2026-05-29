@@ -49,10 +49,6 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  static Future<_StartupSnapshot>? _startupInFlight;
-  static _StartupSnapshot? _startupCache;
-  static DateTime? _startupCacheAt;
-  static String? _startupCacheSessionKey;
   static const Duration _startupCacheTtl = Duration(seconds: 20);
 
   bool _pushInitTriggered = false;
@@ -63,22 +59,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     return session?.user.id ?? 'anon';
   }
 
-  bool _canUseStartupCache(String sessionKey) {
-    final cachedAt = _startupCacheAt;
-    if (_startupCache == null || cachedAt == null) return false;
-    if (_startupCacheSessionKey != sessionKey) return false;
+  bool _canUseStartupCache(String sessionKey, StartupFlowService startupFlow) {
+    final cachedAt = startupFlow.startupCacheAt;
+    if (startupFlow.startupCache == null || cachedAt == null) return false;
+    if (startupFlow.startupCacheSessionKey != sessionKey) return false;
     return DateTime.now().difference(cachedAt) <= _startupCacheTtl;
   }
 
   Future<_StartupSnapshot> _runStartupChecksSingleFlight() {
     final sessionKey = _currentSessionKey();
-    if (_canUseStartupCache(sessionKey)) {
-      return Future<_StartupSnapshot>.value(_startupCache);
+    final startupFlow = ref.read(startupFlowServiceProvider);
+
+    if (_canUseStartupCache(sessionKey, startupFlow)) {
+      return Future<_StartupSnapshot>.value(startupFlow.startupCache as _StartupSnapshot);
     }
 
-    final inFlight = _startupInFlight;
-    if (inFlight != null && _startupCacheSessionKey == sessionKey) {
-      return inFlight;
+    final inFlight = startupFlow.startupInFlight;
+    if (inFlight != null && startupFlow.startupCacheSessionKey == sessionKey) {
+      return inFlight.then((val) => val as _StartupSnapshot);
     }
 
     final api = ref.read(apiServiceProvider);
@@ -169,18 +167,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return _StartupSnapshot(user: user, versionResult: versionResult);
     }();
 
-    _startupCacheSessionKey = sessionKey;
-    _startupInFlight = future;
+    startupFlow.startupCacheSessionKey = sessionKey;
+    startupFlow.startupInFlight = future;
 
     return future
         .then((snapshot) {
-          _startupCache = snapshot;
-          _startupCacheAt = DateTime.now();
+          startupFlow.startupCache = snapshot;
+          startupFlow.startupCacheAt = DateTime.now();
           return snapshot;
         })
         .whenComplete(() {
-          if (identical(_startupInFlight, future)) {
-            _startupInFlight = null;
+          if (identical(startupFlow.startupInFlight, future)) {
+            startupFlow.startupInFlight = null;
           }
         });
   }
@@ -245,11 +243,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   void _startPostNavigationPreloads({
     required bool isDashboard,
     required ApiService apiService,
-    required Future<dynamic> dashboardFuture,
-    required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
+    Future<dynamic>? dashboardFuture,
+    Future<dynamic>? trackingFuture,
+    Future<dynamic>? leaveFuture,
+    Future<dynamic>? scoreFuture,
+    Future<dynamic>? notificationsFuture,
   }) {
     AppLogger.safeUnawait(
       JweService.instance.preWarm().catchError(
@@ -268,11 +266,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (isDashboard) {
       _prewarmAppData(
-        dashboardFuture: dashboardFuture,
-        trackingFuture: trackingFuture,
-        leaveFuture: leaveFuture,
-        scoreFuture: scoreFuture,
-        notificationsFuture: notificationsFuture,
+        dashboardFuture: dashboardFuture!,
+        trackingFuture: trackingFuture!,
+        leaveFuture: leaveFuture!,
+        scoreFuture: scoreFuture!,
+        notificationsFuture: notificationsFuture!,
       );
     }
   }
@@ -380,27 +378,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         );
 
         final isConnectionOrQuota =
-            (appCheckError != null &&
-                (appCheckError.toLowerCase().contains('quota') ||
-                    appCheckError.toLowerCase().contains('connection') ||
-                    appCheckError.toLowerCase().contains('timeout') ||
-                    appCheckError.toLowerCase().contains('too_many_attempts') ||
-                    appCheckError.toLowerCase().contains('network') ||
-                    appCheckError.toLowerCase().contains('rate limit') ||
-                    appCheckError.toLowerCase().contains('server') ||
-                    appCheckError.toLowerCase().contains('internal error') ||
-                    appCheckError.toLowerCase().contains('-12') ||
-                    appCheckError.toLowerCase().contains('unavailable'))) ||
-            (reason.toLowerCase().contains('quota') ||
-                reason.toLowerCase().contains('connection') ||
-                reason.toLowerCase().contains('timeout') ||
-                reason.toLowerCase().contains('too_many_attempts') ||
-                reason.toLowerCase().contains('network') ||
-                reason.toLowerCase().contains('rate limit') ||
-                reason.toLowerCase().contains('server') ||
-                reason.toLowerCase().contains('internal error') ||
-                reason.toLowerCase().contains('-12') ||
-                reason.toLowerCase().contains('unavailable'));
+            SecurityService.isTransientAppCheckFailureText(appCheckError) ||
+            SecurityService.isTransientAppCheckFailureText(reason);
 
         final isGenuineSecurityFailure = !isConnectionOrQuota;
 
@@ -486,14 +465,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final supabaseClient = ref.read(supabaseClientProvider);
     final token = supabaseClient.auth.currentSession?.accessToken;
 
-    final dashboardFuture = ref.read(dashboardProvider.future);
-    final trackingFuture = ref.read(trackingProvider.future);
-    final leaveFuture = ref.read(leaveProvider.future);
-    final scoreFuture = ref.read(scoreProvider.future);
-    final notificationsFuture = ref.read(notificationsProvider.future);
-
     if (finalUser != null) {
       if (finalUser.termsAccepted) {
+        final dashboardFuture = ref.read(dashboardProvider.future);
+        final trackingFuture = ref.read(trackingProvider.future);
+        final leaveFuture = ref.read(leaveProvider.future);
+        final scoreFuture = ref.read(scoreProvider.future);
+        final notificationsFuture = ref.read(notificationsProvider.future);
+
         _startPushInitInBackgroundAfterSplash(pushService);
         context.go('/dashboard');
         AppLogger.safeUnawait(
@@ -530,11 +509,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             _startPostNavigationPreloads(
               isDashboard: false,
               apiService: apiService,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
           }).catchError((Object e, StackTrace st) {
             AppLogger.e(
@@ -554,11 +528,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           _startPostNavigationPreloads(
             isDashboard: false,
             apiService: apiService,
-            dashboardFuture: dashboardFuture,
-            trackingFuture: trackingFuture,
-            leaveFuture: leaveFuture,
-            scoreFuture: scoreFuture,
-            notificationsFuture: notificationsFuture,
           );
         }).catchError((Object e, StackTrace st) {
           AppLogger.e('SplashScreen: post-login preloads failed', e, st);

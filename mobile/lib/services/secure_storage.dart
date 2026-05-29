@@ -59,7 +59,10 @@ class SecureStorageService {
     } on Object catch (e, st) {
       AppLogger.e('SecureStorage: Error during read of key: $key', e, st);
       await _selfHeal(e);
-      return null;
+      if (_isUnrecoverableError(e)) {
+        return null;
+      }
+      rethrow;
     }
   }
 
@@ -82,9 +85,22 @@ class SecureStorageService {
     }
   }
 
+  bool _isUnrecoverableError(Object error) {
+    final errStr = error.toString();
+    return errStr.contains('storage_key_error') ||
+        errStr.contains('KeyStoreException') ||
+        errStr.contains('javax.crypto.AEADBadTagException');
+  }
+
   Future<void> _selfHeal(Object error) async {
+    if (!_isUnrecoverableError(error)) {
+      AppLogger.e(
+        'SecureStorage: Transient error detected ($error), skipping self-heal.',
+      );
+      return;
+    }
     AppLogger.e(
-      'SecureStorage: Executing self-healing routine due to exception: $error',
+      'SecureStorage: Executing self-healing routine due to unrecoverable exception: $error',
     );
     try {
       await _storage.deleteAll();

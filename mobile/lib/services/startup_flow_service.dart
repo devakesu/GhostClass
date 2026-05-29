@@ -7,6 +7,12 @@ class StartupFlowService {
   DateTime? _postLoginMarkedAt;
   static const Duration _postLoginFastPathTtl = Duration(seconds: 45);
 
+  // SplashScreen startup checks cache
+  Object? startupCache;
+  DateTime? startupCacheAt;
+  String? startupCacheSessionKey;
+  Future<dynamic>? startupInFlight;
+
   void markPostLoginFastPath(String sessionKey) {
     _postLoginSessionKey = sessionKey;
     _postLoginMarkedAt = DateTime.now();

@@ -73,7 +73,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<ScoreState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final academic = academicAsync.value;
@@ -85,7 +88,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     AcademicState? academic,
     bool bypassCache = false,
   }) async {
-    final authState = ref.watch(authProvider);
+    final authState = ref.read(authProvider);
     final user = authState.value;
     if (user == null) throw Exception('Unauthorized');
 
@@ -263,10 +266,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       qsData = results[0].data;
       ansData = results[1].data;
 
-      if (results[0].statusCode == 200 && qsData != null) {
+      if (results[0].statusCode == 200 && qsData is List) {
         await storage.saveCachedData(cacheKeyQs, qsData);
       }
-      if (results[1].statusCode == 200 && ansData != null) {
+      if (results[1].statusCode == 200 && ansData is List) {
         await storage.saveCachedData(cacheKeyAns, ansData);
       }
     }

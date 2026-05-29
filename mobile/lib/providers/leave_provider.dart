@@ -27,7 +27,10 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<LeaveState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final academic = academicAsync.value;
@@ -65,7 +68,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
 
   Future<void> refresh() async {
     ref.invalidate(notificationsProvider);
-    state = const AsyncValue.loading();
     ref.invalidateSelf();
+    await future;
   }
 }

@@ -141,7 +141,7 @@ class EzygoService {
     SecureStorageService storage, {
     Duration ttl = const Duration(days: 7),
   }) async {
-    final cacheKey = 'ezygo_static_${path.hashCode}';
+    final cacheKey = 'ezygo_static_${Uri.encodeFull(path)}';
     try {
       final cached = await storage.getCachedData(cacheKey);
       if (cached != null) {

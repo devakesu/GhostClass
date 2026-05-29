@@ -894,7 +894,8 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     await ref.read(cacheManagerProvider).clearAllCaches();
     ref
       ..invalidate(institutionsProvider)
-      ..invalidate(academicProvider);
+      ..invalidate(academicProvider)
+      ..invalidate(startupFlowServiceProvider);
 
     state = const AsyncValue.data(null);
     // Stop periodic refreshes and prevent in-flight refresh continuations

@@ -52,7 +52,6 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
-  static bool _isSyncingExternal = false;
 
   String _canonicalTrackerCourseCode(String courseId) {
     return utils.standardizeCourseCode(courseId);
@@ -65,7 +64,10 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<TrackingState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final academic = academicAsync.value;
@@ -101,23 +103,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    var syncCompleted = false;
-    if (forceSync) {
-      if (_isSyncingExternal) {
-        syncCompleted = true;
-      } else {
-        _isSyncingExternal = true;
-        try {
-          // Sync is now primarily triggered by DashboardNotifier.refresh
-          // or NavigationShell. Individual triggers here are redundant.
-        } finally {
-          _isSyncingExternal = false;
-          syncCompleted = true;
-        }
-      }
-    } else {
-      syncCompleted = true;
-    }
+    const syncCompleted = true;
 
     late final AttendanceReportDetailed officialReport;
     final records = <TrackingRecord>[];

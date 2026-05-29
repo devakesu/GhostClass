@@ -70,6 +70,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       final state = ref.read(notificationsProvider).value;
       if (state != null &&
           state.hasNextPage &&
+          !state.isFetchingNextPage &&
           !ref.read(notificationsProvider).isLoading) {
         AppLogger.safeUnawait(
           notifier.fetchNextPage().catchError((Object e, StackTrace st) {
