@@ -42,7 +42,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
     final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
     final rawSessions =
-        studentLeaves['student_leave_sessions'] as Map<dynamic, dynamic>? ?? {};
+        studentLeaves['student_leave_sessions'] as List<dynamic>? ?? [];
 
     final leaves = rawLeaves
         .whereType<Map<dynamic, dynamic>>()
@@ -55,15 +55,10 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
         .toList();
 
     final sessions = <int, List<LeaveSession>>{};
-    rawSessions.forEach((key, value) {
-      final parsedKey = int.tryParse(key.toString());
-      if (parsedKey != null && value is List<dynamic>) {
-        sessions[parsedKey] = value
-            .whereType<Map<dynamic, dynamic>>()
-            .map((s) => LeaveSession.fromJson(s.cast<String, dynamic>()))
-            .toList();
-      }
-    });
+    for (final raw in rawSessions.whereType<Map<dynamic, dynamic>>()) {
+      final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
+      sessions.putIfAbsent(session.leaveId, () => []).add(session);
+    }
 
     return LeaveState(leaves: leaves, sessions: sessions);
   }

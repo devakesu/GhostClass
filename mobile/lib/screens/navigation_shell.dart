@@ -48,6 +48,10 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   bool _criticalSecurityLogoutStarted = false;
   final List<ProviderSubscription<Object?>> _subscriptions = [];
 
+  // Tracks the timestamp of the first back-press on the dashboard tab,
+  // used to implement double-back-to-exit behaviour.
+  DateTime? _lastBackPressOnDashboard;
+
   AcademicState? _asyncValueOrNull(AsyncValue<AcademicState?> value) {
     return value.hasValue ? value.value : null;
   }
@@ -184,6 +188,56 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     }
     _subscriptions.clear();
     super.dispose();
+  }
+
+  /// Handles back-button presses intercepted by [BackButtonListener].
+  ///
+  /// [BackButtonListener] registers a [ChildBackButtonDispatcher] that takes
+  /// PRIORITY over go_router's [RootBackButtonDispatcher], so this callback
+  /// fires before go_router attempts to pop any navigator — reliably on all
+  /// Android versions including predictive back (Android 13+).
+  ///
+  /// Returns `true`  → back consumed (app stays open, we navigate ourselves).
+  /// Returns `false` → delegate to go_router's default back handling.
+  Future<bool> _handleBackPress(int selectedIndex) async {
+    AppLogger.i(
+      'NavigationShell: _handleBackPress called with selectedIndex=$selectedIndex',
+    );
+    if (selectedIndex != 0) {
+      AppLogger.i(
+        'NavigationShell: selectedIndex != 0, navigating to /dashboard',
+      );
+      context.go('/dashboard');
+      return true;
+    }
+
+    // Dashboard → double-back-to-exit.
+    final now = DateTime.now();
+    final last = _lastBackPressOnDashboard;
+    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+      // Second back within 2 s → exit.
+      await SystemNavigator.pop();
+      return true;
+    }
+    _lastBackPressOnDashboard = now;
+
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Press back again to exit',
+            style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+        ),
+      );
+    return true;
   }
 
   @override
@@ -579,182 +633,252 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       ),
     );
 
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        ExcludeSemantics(
-          excluding: showSecurityBarrier,
-          child: mainScaffold,
-        ),
-        // The Semicircle Button (Positioned at bottom center, above everything)
-        Positioned(
-          bottom: 75 + bottomPadding, // Account for bottom safe area/notch
-          child: ExcludeSemantics(
-            excluding:
-                isModalOpen ||
-                (selectedIndex > 1) ||
-                showOutageBarrier ||
-                showSecurityBarrier,
-            child: IgnorePointer(
-              ignoring:
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        AppLogger.i(
+          'NavigationShell: onPopInvokedWithResult called with didPop=$didPop',
+        );
+        if (didPop) return;
+        unawaited(_handleBackPress(selectedIndex));
+      },
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          ExcludeSemantics(
+            excluding: showSecurityBarrier,
+            child: mainScaffold,
+          ),
+          // The Semicircle Button (Positioned at bottom center, above everything)
+          Positioned(
+            bottom: 75 + bottomPadding, // Account for bottom safe area/notch
+            child: ExcludeSemantics(
+              excluding:
                   isModalOpen ||
                   (selectedIndex > 1) ||
                   showOutageBarrier ||
                   showSecurityBarrier,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity:
-                    (isModalOpen ||
-                        (selectedIndex > 1) ||
-                        showOutageBarrier ||
-                        showSecurityBarrier)
-                    ? 0
-                    : 1,
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: InkWell(
-                    onTap: showAddAttendanceDialog,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(72),
-                    ),
-                    child: Container(
-                      width: 72,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: primary,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(72),
+              child: IgnorePointer(
+                ignoring:
+                    isModalOpen ||
+                    (selectedIndex > 1) ||
+                    showOutageBarrier ||
+                    showSecurityBarrier,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity:
+                      (isModalOpen ||
+                          (selectedIndex > 1) ||
+                          showOutageBarrier ||
+                          showSecurityBarrier)
+                      ? 0
+                      : 1,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      onTap: showAddAttendanceDialog,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(72),
+                      ),
+                      child: Container(
+                        width: 72,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: primary,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(72),
+                          ),
+                        ),
+                        child: Icon(
+                          LucideIcons.plus,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          size: 24,
                         ),
                       ),
-                      child: Icon(
-                        LucideIcons.plus,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        size: 24,
-                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ).animate().slideY(begin: 3.5, end: 0, curve: Curves.easeOutBack),
+          ).animate().slideY(begin: 3.5, end: 0, curve: Curves.easeOutBack),
 
-        // --- GLOBAL OUTAGE OVERLAY ---
-        if (showOutageBarrier)
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: ColoredBox(
-                color: bg.withValues(alpha: 0.9), // More opaque background
-                child: ServiceErrorView(
-                  error: dashboardAsync.error ?? trackingAsync.error,
-                  onRetry: () async {
-                    ref.read(apiServiceProvider).clearCaches();
-                    ref
-                      ..invalidate(dashboardProvider)
-                      ..invalidate(trackingProvider)
-                      ..invalidate(academicProvider);
+          // --- GLOBAL OUTAGE OVERLAY ---
+          if (showOutageBarrier)
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: ColoredBox(
+                  color: bg.withValues(alpha: 0.9), // More opaque background
+                  child: ServiceErrorView(
+                    error: dashboardAsync.error ?? trackingAsync.error,
+                    onRetry: () async {
+                      ref.read(apiServiceProvider).clearCaches();
+                      ref
+                        ..invalidate(dashboardProvider)
+                        ..invalidate(trackingProvider)
+                        ..invalidate(academicProvider);
 
-                    // Wait for critical providers to finish (success or new error)
-                    // We add a 10s timeout so the UI doesn't feel 'stuck' if network hangs
-                    AppLogger.d(
-                      'NavigationShell: Starting outage recovery retry...',
-                    );
-                    try {
-                      await Future.wait([
-                        ref.read(dashboardProvider.future),
-                        ref.read(trackingProvider.future),
-                      ]).timeout(const Duration(seconds: 30));
-                      AppLogger.i(
-                        'NavigationShell: Outage recovery wait completed (or partial success).',
+                      // Wait for critical providers to finish (success or new error)
+                      // We add a 10s timeout so the UI doesn't feel 'stuck' if network hangs
+                      AppLogger.d(
+                        'NavigationShell: Starting outage recovery retry...',
                       );
-                    } on Object catch (e) {
-                      AppLogger.e(
-                        'NavigationShell: Outage recovery wait timed out or failed ($e). Re-enabling UI.',
-                      );
-                    }
-                  },
+                      try {
+                        await Future.wait([
+                          ref.read(dashboardProvider.future),
+                          ref.read(trackingProvider.future),
+                        ]).timeout(const Duration(seconds: 30));
+                        AppLogger.i(
+                          'NavigationShell: Outage recovery wait completed (or partial success).',
+                        );
+                      } on Object catch (e) {
+                        AppLogger.e(
+                          'NavigationShell: Outage recovery wait timed out or failed ($e). Re-enabling UI.',
+                        );
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-          ).animate().fadeIn(duration: 300.ms),
+            ).animate().fadeIn(duration: 300.ms),
 
-        // --- GLOBAL SECURITY BARRIER ---
-        if (showSecurityBarrier)
-          Positioned.fill(
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              label: securityMessage.isEmpty
-                  ? 'Security verification failed.'
-                  : 'Security verification failed. $securityMessage',
-              child: Stack(
-                children: [
-                  const ModalBarrier(
-                    dismissible: false,
-                    color: Colors.black,
-                    semanticsLabel: 'Security verification failed',
-                  ),
-                  BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.red.withValues(alpha: 0.3),
+          // --- GLOBAL SECURITY BARRIER ---
+          if (showSecurityBarrier)
+            Positioned.fill(
+              child: Semantics(
+                container: true,
+                liveRegion: true,
+                label: securityMessage.isEmpty
+                    ? 'Security verification failed.'
+                    : 'Security verification failed. $securityMessage',
+                child: Stack(
+                  children: [
+                    const ModalBarrier(
+                      dismissible: false,
+                      color: Colors.black,
+                      semanticsLabel: 'Security verification failed',
+                    ),
+                    BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.red.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    LucideIcons.shieldAlert,
+                                    size: 48,
+                                    color: Colors.red,
+                                  ),
+                                )
+                                .animate(
+                                  onPlay: (controller) =>
+                                      controller.repeat(reverse: true),
+                                )
+                                .scale(
+                                  begin: const Offset(1, 1),
+                                  end: const Offset(1.1, 1.1),
+                                  duration: 1000.ms,
+                                ),
+                            const SizedBox(height: 32),
+                            Text(
+                              'Security Verification Failed',
+                              style: GoogleFonts.manrope(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              securityMessage,
+                              style: GoogleFonts.manrope(
+                                fontSize: 15,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 48),
+                            if (!Platform.isIOS || !isCriticalSecurityFailure)
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    if (isCriticalSecurityFailure) {
+                                      if (Platform.isAndroid) {
+                                        await SystemNavigator.pop();
+                                      } else {
+                                        exit(0);
+                                      }
+                                      return;
+                                    }
+
+                                    // Clear lock and retry
+                                    ref.read(apiServiceProvider).clearCaches();
+                                    ref
+                                        .read(securityFailureProvider.notifier)
+                                        .clearFailure();
+                                    try {
+                                      await ref
+                                          .read(authProvider.notifier)
+                                          .refreshProfile(force: true);
+                                    } on Object {
+                                      // The 401 interceptor will catch it again if it still fails
+                                    }
+                                  },
+                                  child: Text(
+                                    isCriticalSecurityFailure
+                                        ? 'Close App'
+                                        : 'Restart App',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
-                                child: const Icon(
-                                  LucideIcons.shieldAlert,
-                                  size: 48,
-                                  color: Colors.red,
+                              )
+                            else
+                              Text(
+                                'Please close the app manually.',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
-                              )
-                              .animate(
-                                onPlay: (controller) =>
-                                    controller.repeat(reverse: true),
-                              )
-                              .scale(
-                                begin: const Offset(1, 1),
-                                end: const Offset(1.1, 1.1),
-                                duration: 1000.ms,
+                                textAlign: TextAlign.center,
                               ),
-                          const SizedBox(height: 32),
-                          Text(
-                            'Security Verification Failed',
-                            style: GoogleFonts.manrope(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            securityMessage,
-                            style: GoogleFonts.manrope(
-                              fontSize: 15,
-                              color: Colors.white.withValues(alpha: 0.7),
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 48),
-                          if (!Platform.isIOS || !isCriticalSecurityFailure)
+                            const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                  ),
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 16,
                                   ),
@@ -762,110 +886,50 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
-                                onPressed: () async {
-                                  if (isCriticalSecurityFailure) {
-                                    if (Platform.isAndroid) {
-                                      await SystemNavigator.pop();
-                                    } else {
-                                      exit(0);
-                                    }
-                                    return;
-                                  }
-
-                                  // Clear lock and retry
-                                  ref.read(apiServiceProvider).clearCaches();
-                                  ref
-                                      .read(securityFailureProvider.notifier)
-                                      .clearFailure();
-                                  try {
-                                    await ref
-                                        .read(authProvider.notifier)
-                                        .refreshProfile(force: true);
-                                  } on Object {
-                                    // The 401 interceptor will catch it again if it still fails
-                                  }
-                                },
-                                child: Text(
-                                  isCriticalSecurityFailure
-                                      ? 'Close App'
-                                      : 'Restart App',
+                                onPressed: () => SupportHelper.contactViaEmail(
+                                  subject:
+                                      'Security Failure Report [v${AppConfig.appVersion}]',
+                                  customBody:
+                                      'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
+                                      '-- SUMMARY --\n'
+                                      'Message: $securityMessage\n\n'
+                                      '-- PERSISTENCE --\n'
+                                      '${SupportHelper.persistenceMessage}\n',
+                                ),
+                                icon: const Icon(LucideIcons.mail, size: 18),
+                                label: Text(
+                                  'Contact Support',
                                   style: GoogleFonts.manrope(
-                                    fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.black,
                                   ),
                                 ),
                               ),
-                            )
-                          else
-                            Text(
-                              'Please close the app manually.',
-                              style: GoogleFonts.manrope(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.6),
-                              ),
-                              textAlign: TextAlign.center,
                             ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: BorderSide(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                            if (!isCriticalSecurityFailure) ...[
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: () =>
+                                    ref.read(authProvider.notifier).logout(),
+                                child: Text(
+                                  'Logout of GhostClass',
+                                  style: GoogleFonts.manrope(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                              onPressed: () => SupportHelper.contactViaEmail(
-                                subject:
-                                    'Security Failure Report [v${AppConfig.appVersion}]',
-                                customBody:
-                                    'Hi Support,\n\nI encountered a security failure while using the app.\n\n'
-                                    '-- SUMMARY --\n'
-                                    'Message: $securityMessage\n\n'
-                                    '-- PERSISTENCE --\n'
-                                    '${SupportHelper.persistenceMessage}\n',
-                              ),
-                              icon: const Icon(LucideIcons.mail, size: 18),
-                              label: Text(
-                                'Contact Support',
-                                style: GoogleFonts.manrope(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (!isCriticalSecurityFailure) ...[
-                            const SizedBox(height: 16),
-                            TextButton(
-                              onPressed: () =>
-                                  ref.read(authProvider.notifier).logout(),
-                              child: Text(
-                                'Logout of GhostClass',
-                                style: GoogleFonts.manrope(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ).animate().fadeIn(duration: 400.ms),
-      ],
-    );
+            ).animate().fadeIn(duration: 400.ms),
+        ],
+      ), // Stack
+    ); // PopScope
   }
 }
 

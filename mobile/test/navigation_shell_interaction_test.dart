@@ -113,4 +113,71 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('dashboard'), findsOneWidget);
   });
+
+  testWidgets('NavigationShell back button intercept on calendar tab', (
+    tester,
+  ) async {
+    final overrides = [
+      dashboardProvider.overrideWith(
+        () => MockDashboardNotifier(mockDashboard),
+      ),
+      authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
+      trackingProvider.overrideWith(() => MockTrackingNotifier(mockTracking)),
+      academicProvider.overrideWith(() => MockAcademicNotifier(mockAcademic)),
+      notificationsProvider.overrideWith(
+        () => MockNotificationNotifier(mockNotifications),
+      ),
+      outageProvider.overrideWith(() => MockOutageNotifier(data: false)),
+      securityFailureProvider.overrideWith(
+        () => MockSecurityFailureNotifier(null),
+      ),
+    ];
+
+    final router = GoRouter(
+      initialLocation: '/dashboard',
+      routes: [
+        ShellRoute(
+          builder: (context, state, child) => NavigationShell(child: child),
+          routes: [
+            GoRoute(
+              path: '/dashboard',
+              pageBuilder: (c, s) =>
+                  const MaterialPage(child: Center(child: Text('dashboard'))),
+            ),
+            GoRoute(
+              path: '/calendar',
+              pageBuilder: (c, s) =>
+                  const MaterialPage(child: Center(child: Text('calendar'))),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp.router(
+          theme: AppTheme.darkTheme,
+          routerConfig: router,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Go to calendar
+    await tester.tap(find.byIcon(LucideIcons.calendar));
+    await tester.pumpAndSettle();
+    expect(find.text('calendar'), findsOneWidget);
+
+    // Simulate system back button
+    final handled = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    // We expect the back press to be handled by our back press listener,
+    // which should navigate to dashboard.
+    expect(handled, isTrue);
+    expect(find.text('dashboard'), findsOneWidget);
+  });
 }

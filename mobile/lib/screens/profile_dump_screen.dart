@@ -96,19 +96,16 @@ class _ProfileDumpContent extends ConsumerWidget {
         if (user.ezygoId == null) {
           return insts.isNotEmpty ? insts.first.name : '—';
         }
-        try {
-          final searchId = user.ezygoId!.trim();
-          return insts
-              .firstWhere((i) => i.id.toString().trim() == searchId)
-              .name;
-        } on Object catch (e) {
-          AppLogger.e(
-            'ProfileDumpScreen: Failed to resolve institution by id',
-            e,
-          );
-          // Fallback to first available for UI consistency, similar to GhostClassScreen
-          return insts.isNotEmpty ? insts.first.name : 'Unknown';
-        }
+        final searchId = user.ezygoId!.trim();
+        final matched = insts
+            .where((i) => i.id.toString().trim() == searchId)
+            .firstOrNull;
+        if (matched != null) return matched.name;
+        // ezygoId present but not in the institutions list — fall back gracefully
+        AppLogger.w(
+          'ProfileDumpScreen: No institution found for ezygoId $searchId, falling back to first',
+        );
+        return insts.isNotEmpty ? insts.first.name : 'Unknown';
       },
       loading: () => '...',
       error: (err, stack) => 'Error',

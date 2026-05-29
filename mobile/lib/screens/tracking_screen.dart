@@ -117,23 +117,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
+        final authNotifier = ref.read(authProvider.notifier);
+        final supabaseClient = ref.read(supabaseClientProvider);
+        final apiService = ref.read(apiServiceProvider);
+        final trackingNotifier = ref.read(trackingProvider.notifier);
         try {
           await runUnifiedPullToRefresh(
             logLabel: 'TrackingScreen',
-            refreshProfile: () =>
-                ref.read(authProvider.notifier).refreshProfile(force: true),
+            refreshProfile: () => authNotifier.refreshProfile(force: true),
             syncCron: () async {
-              final supabaseToken = ref
-                  .read(supabaseClientProvider)
-                  .auth
-                  .currentSession
-                  ?.accessToken;
+              final supabaseToken =
+                  supabaseClient.auth.currentSession?.accessToken;
               if (supabaseToken == null) return;
-              await ref
-                  .read(apiServiceProvider)
-                  .triggerSync(supabaseToken, force: true);
+              await apiService.triggerSync(supabaseToken, force: true);
             },
-            refreshData: () => ref.read(trackingProvider.notifier).refresh(),
+            refreshData: trackingNotifier.refresh,
           );
         } on Object catch (e, st) {
           AppLogger.e('TrackingScreen: Pull-to-refresh failed', e, st);

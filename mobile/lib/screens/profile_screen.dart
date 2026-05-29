@@ -37,6 +37,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? _selectedGender;
   DateTime? _selectedBirthDate;
   bool _isUploadingAvatar = false;
+  bool _isPickingImage = false;
 
   @override
   void initState() {
@@ -116,13 +117,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Future<void> _pickAndUploadAvatar() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 85,
-    );
+    if (_isPickingImage || _isUploadingAvatar) return;
+    if (mounted) setState(() => _isPickingImage = true);
+    final XFile? image;
+    try {
+      final picker = ImagePicker();
+      image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+    } on Object catch (e, st) {
+      AppLogger.e('ProfileScreen: Image picker failed', e, st);
+      return;
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
     if (image == null) return;
     setState(() => _isUploadingAvatar = true);
     try {

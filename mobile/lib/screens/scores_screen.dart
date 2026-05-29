@@ -77,24 +77,22 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
           ServiceRefreshIndicator(
             useOverlay: false,
             onRefresh: () async {
+              final authNotifier = ref.read(authProvider.notifier);
+              final supabaseClient = ref.read(supabaseClientProvider);
+              final apiService = ref.read(apiServiceProvider);
+              final scoreNotifier = ref.read(scoreProvider.notifier);
               try {
                 await runUnifiedPullToRefresh(
                   logLabel: 'ScoresScreen',
-                  refreshProfile: () => ref
-                      .read(authProvider.notifier)
-                      .refreshProfile(force: true),
+                  refreshProfile: () =>
+                      authNotifier.refreshProfile(force: true),
                   syncCron: () async {
-                    final supabaseToken = ref
-                        .read(supabaseClientProvider)
-                        .auth
-                        .currentSession
-                        ?.accessToken;
+                    final supabaseToken =
+                        supabaseClient.auth.currentSession?.accessToken;
                     if (supabaseToken == null) return;
-                    await ref
-                        .read(apiServiceProvider)
-                        .triggerSync(supabaseToken, force: true);
+                    await apiService.triggerSync(supabaseToken, force: true);
                   },
-                  refreshData: () => ref.read(scoreProvider.notifier).refresh(),
+                  refreshData: scoreNotifier.refresh,
                 );
               } on Object {
                 if (!context.mounted) rethrow;

@@ -100,11 +100,14 @@ class AppLogger {
   static void safeUnawait(Future<dynamic> future, [String? context]) {
     unawaited(
       future.catchError(
-        (Object e, StackTrace st) => AppLogger.e(
-          'SafeUnawait${context != null ? ': $context' : ''}',
-          e,
-          st,
-        ),
+        (Object e, StackTrace st) {
+          AppLogger.e(
+            'SafeUnawait${context != null ? ': $context' : ''}',
+            e,
+            st,
+          );
+          return null;
+        },
       ),
     );
   }

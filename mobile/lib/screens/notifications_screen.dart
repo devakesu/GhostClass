@@ -179,27 +179,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
             child: notificationsAsync.when(
               data: (data) => ServiceRefreshIndicator(
                 onRefresh: () async {
+                  final authNotifier = ref.read(authProvider.notifier);
+                  final supabaseClient = ref.read(supabaseClientProvider);
+                  final apiService = ref.read(apiServiceProvider);
+                  // ref.invalidate is synchronous — safe to call before awaits.
+                  // Capture it as a closure so it's invoked at the right time.
+                  void invalidateNotifications() =>
+                      ref.invalidate(notificationsProvider);
                   try {
                     await runUnifiedPullToRefresh(
                       logLabel: 'NotificationsScreen',
-                      refreshProfile: () => ref
-                          .read(authProvider.notifier)
-                          .refreshProfile(force: true),
+                      refreshProfile: () =>
+                          authNotifier.refreshProfile(force: true),
                       syncCron: () async {
-                        final supabaseToken = ref
-                            .read(supabaseClientProvider)
-                            .auth
-                            .currentSession
-                            ?.accessToken;
+                        final supabaseToken =
+                            supabaseClient.auth.currentSession?.accessToken;
                         if (supabaseToken == null) return;
-                        await ref
-                            .read(apiServiceProvider)
-                            .triggerSync(supabaseToken, force: true);
+                        await apiService.triggerSync(
+                          supabaseToken,
+                          force: true,
+                        );
                       },
                       refreshData: () async {
-                        final _ = await ref.refresh(
-                          notificationsProvider.future,
-                        );
+                        invalidateNotifications();
+                        await ref.read(notificationsProvider.future);
                       },
                     );
                   } on Object {

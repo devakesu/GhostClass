@@ -149,6 +149,7 @@ class UserSubgroup {
 class LeaveSession {
   LeaveSession({
     required this.id,
+    required this.leaveId,
     required this.date,
     this.session,
     this.course,
@@ -157,6 +158,7 @@ class LeaveSession {
   factory LeaveSession.fromJson(Map<String, dynamic> json) {
     return LeaveSession(
       id: int.parse(json['id'].toString()),
+      leaveId: int.parse(json['student_leave_id'].toString()),
       date: json['date'] as String,
       session: json['session'] != null
           ? Session.fromJson(json['session'] as Map<String, dynamic>)
@@ -167,6 +169,7 @@ class LeaveSession {
     );
   }
   final int id;
+  final int leaveId;
   final String date;
   final Session? session;
   final Course? course;
