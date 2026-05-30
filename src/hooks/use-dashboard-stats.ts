@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { generateSlotKey } from "@/lib/utils";
+import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
 import {
   isPositive,
   getOfficialSessionRaw,
@@ -71,34 +71,27 @@ function createCodeResolver(coursesData: UseDashboardStatsOptions["coursesData"]
       /* eslint-disable-next-line security/detect-object-injection */
       const target = courses[id];
       const codeStr = target?.code || id;
-      return codeStr.toUpperCase().replace(/[\s\u00A0-]/g, "");
+      return normalizeCourseCode(codeStr);
     }
-    return id.toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(id);
   };
 }
 
-function initFromCoursesData(
-  coursesData: UseDashboardStatsOptions["coursesData"],
-  resolveCode: (id: string) => string,
-  map: Map<string, CourseStat>
-) {
-  if (coursesData?.courses) {
-    for (const id of Object.keys(coursesData.courses)) {
-      const key = resolveCode(id);
-      if (!map.has(key)) map.set(key, createEmptyCourseStat());
-    }
+function addCourseStatIfMissing(map: Map<string, CourseStat>, key: string) {
+  if (key && !map.has(key)) {
+    map.set(key, createEmptyCourseStat());
   }
 }
 
-function initFromClassCourses(
-  classCourses: UseDashboardStatsOptions["classCourses"],
-  map: Map<string, CourseStat>
+function populateClassCourseStats(
+  map: Map<string, CourseStat>,
+  classCourses: UseDashboardStatsOptions["classCourses"]
 ) {
-  if (classCourses) {
-    for (const cc of classCourses) {
-      const key = cc.course_code ? cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") : "";
-      if (key && !map.has(key)) map.set(key, createEmptyCourseStat());
-    }
+  if (!classCourses) return;
+
+  for (const cc of classCourses) {
+    const key = cc.course_code ? normalizeCourseCode(cc.course_code) : "";
+    addCourseStatIfMissing(map, key);
   }
 }
 
@@ -108,8 +101,18 @@ function initCourseStatsMap(
   resolveCode: (id: string) => string
 ): Map<string, CourseStat> {
   const map = new Map<string, CourseStat>();
-  initFromCoursesData(coursesData, resolveCode, map);
-  initFromClassCourses(classCourses, map);
+
+  // Populate from catalog courses (resolveCode to normalize)
+  if (coursesData?.courses) {
+    for (const id of Object.keys(coursesData.courses)) {
+      const key = resolveCode(id);
+      addCourseStatIfMissing(map, key);
+    }
+  }
+
+  // Populate from class courses (already contain course_code strings)
+  populateClassCourseStats(map, classCourses);
+
   return map;
 }
 
@@ -311,7 +314,7 @@ export function useDashboardStats({
     const resolveCode = createCodeResolver(coursesData);
 
     const normalizedDisabledCodes = new Set(
-      Array.from(disabledCodes).map((c) => c.toUpperCase().replace(/[\s\u00A0-]/g, ""))
+      Array.from(disabledCodes).map((c) => normalizeCourseCode(c))
     );
 
     const officialStats: OfficialAccumulator = { present: 0, absent: 0, dl: 0, total: 0 };

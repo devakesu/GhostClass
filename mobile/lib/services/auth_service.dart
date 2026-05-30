@@ -34,7 +34,16 @@ class AuthService {
       );
     }
 
-    return provisionGhostClassSession(ezygoToken);
+    final bridgeResponse = await provisionGhostClassSession(ezygoToken);
+    final bridgeData = bridgeResponse.data;
+    if (bridgeData is Map<String, dynamic>) {
+      bridgeResponse.data = {
+        ...bridgeData,
+        'ezygo_token': ezygoToken.trim(),
+      };
+    }
+
+    return bridgeResponse;
   }
 
   Future<Response<dynamic>> loginEzygo(String username, String password) async {

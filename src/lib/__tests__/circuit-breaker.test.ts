@@ -23,7 +23,7 @@ describe('CircuitBreaker', () => {
     const fn = vi.fn().mockResolvedValue('success');
     const result = await ezygoCircuitBreaker.execute(fn);
     expect(result).toBe('success');
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('CLOSED');
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('CLOSED');
   });
 
   it('increments failures and opens after threshold', async () => {
@@ -31,15 +31,15 @@ describe('CircuitBreaker', () => {
     
     // 1st failure
     await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow('fail');
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(1);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(1);
     
     // 2nd failure
     await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow('fail');
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(2);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(2);
     
     // 3rd failure - should open
     await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow('fail');
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('OPEN');
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('OPEN');
     expect(Sentry.captureMessage).toHaveBeenCalled();
   });
 
@@ -50,7 +50,7 @@ describe('CircuitBreaker', () => {
       await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow();
     }
     
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('OPEN');
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('OPEN');
     
     // Next request should fail fast
     const fn2 = vi.fn();
@@ -71,7 +71,7 @@ describe('CircuitBreaker', () => {
     const fn2 = vi.fn().mockResolvedValue('half-open-success');
     const result = await ezygoCircuitBreaker.execute(fn2);
     expect(result).toBe('half-open-success');
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('HALF_OPEN');
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('HALF_OPEN');
   });
 
   it('closes after enough successes in HALF_OPEN', async () => {
@@ -84,13 +84,13 @@ describe('CircuitBreaker', () => {
     
     // 1st success in HALF_OPEN
     await ezygoCircuitBreaker.execute(() => Promise.resolve('ok'));
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('HALF_OPEN');
-    expect(ezygoCircuitBreaker.getStatus().successCount).toBe(1);
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('HALF_OPEN');
+    expect((await ezygoCircuitBreaker.getStatus()).successCount).toBe(1);
     
     // 2nd success in HALF_OPEN - should close
     await ezygoCircuitBreaker.execute(() => Promise.resolve('ok'));
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('CLOSED');
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(0);
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('CLOSED');
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(0);
   });
 
   it('reopens if a request fails in HALF_OPEN', async () => {
@@ -104,7 +104,7 @@ describe('CircuitBreaker', () => {
     // Failure in HALF_OPEN
     const fnFail = vi.fn().mockRejectedValue(new Error('still failing'));
     await expect(ezygoCircuitBreaker.execute(fnFail)).rejects.toThrow('still failing');
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('OPEN');
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('OPEN');
   });
 
   it('limits concurrent requests in HALF_OPEN', async () => {
@@ -135,8 +135,8 @@ describe('CircuitBreaker', () => {
     const fn = vi.fn().mockRejectedValue(new NonBreakerError('404 Not Found'));
     
     await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow(NonBreakerError);
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(0);
-    expect(ezygoCircuitBreaker.getStatus().state).toBe('CLOSED');
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(0);
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe('CLOSED');
   });
 
   it('NonBreakerError counts as success in HALF_OPEN', async () => {
@@ -150,7 +150,7 @@ describe('CircuitBreaker', () => {
     // NonBreakerError in HALF_OPEN
     const fn404 = vi.fn().mockRejectedValue(new NonBreakerError('404'));
     await expect(ezygoCircuitBreaker.execute(fn404)).rejects.toThrow(NonBreakerError);
-    expect(ezygoCircuitBreaker.getStatus().successCount).toBe(1);
+    expect((await ezygoCircuitBreaker.getStatus()).successCount).toBe(1);
   });
 
   it('UpstreamServerError carries status and body', () => {
@@ -162,19 +162,19 @@ describe('CircuitBreaker', () => {
   it('resets failures on success in CLOSED state', async () => {
     const fnFail = vi.fn().mockRejectedValue(new Error('fail'));
     await expect(ezygoCircuitBreaker.execute(fnFail)).rejects.toThrow();
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(1);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(1);
     
     await ezygoCircuitBreaker.execute(() => Promise.resolve('ok'));
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(0);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(0);
   });
 
   it('handles success when failures are already 0', async () => {
     await ezygoCircuitBreaker.execute(() => Promise.resolve('ok'));
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(0);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(0);
   });
 
   it('handles non-Error failures', async () => {
     await expect(ezygoCircuitBreaker.execute(() => Promise.reject('string error'))).rejects.toBe('string error');
-    expect(ezygoCircuitBreaker.getStatus().failures).toBe(1);
+    expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(1);
   });
 });

@@ -11,7 +11,7 @@ import { ezygoCircuitBreaker } from "@/lib/circuit-breaker";
  */
 export async function GET() {
   const rateLimiterStats = getRateLimiterStats();
-  const circuitBreakerStatus = ezygoCircuitBreaker.getStatus();
+  const circuitBreakerStatus = await ezygoCircuitBreaker.getStatus();
   
   const hasBacklog = rateLimiterStats.queueLength > 0;
   

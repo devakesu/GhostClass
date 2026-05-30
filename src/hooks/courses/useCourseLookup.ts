@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { normalizeCourseCode } from "@/lib/utils";
 import { Course } from "@/types";
 
 interface UseCourseLookupProps {
@@ -14,8 +15,7 @@ export function useCourseLookup({
   classCourses,
   attendanceData,
 }: UseCourseLookupProps) {
-  const normalize = (s?: string) =>
-    (s || "").trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const normalize = (s?: string) => normalizeCourseCode(s);
 
   const getCourseCodeById = useCallback(
     (id: string): string => {

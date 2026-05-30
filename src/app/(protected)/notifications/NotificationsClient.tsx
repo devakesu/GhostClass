@@ -96,7 +96,7 @@ export default function NotificationsPage() {
   // Use mountId-based sync logic (now managed inside useSyncOnMount)
 
   // Sync attendance data on mount; deduplication handled by the hook.
-  const { isSyncing, syncCompleted } = useSyncOnMount({
+  const { isSyncing, syncSettled, syncFailed } = useSyncOnMount({
     username: user?.username,
     userId: user?.id,
     sentryLocation: "NotificationsClient",
@@ -115,6 +115,8 @@ export default function NotificationsPage() {
     },
   });
 
+  const syncSuccess = !!(syncSettled && !syncFailed);
+
   const { 
     actionNotifications, 
     regularNotifications, 
@@ -125,7 +127,7 @@ export default function NotificationsPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage
-  } = useNotifications(syncCompleted);
+  } = useNotifications(syncSuccess);
 
   const [readingId, setReadingId] = useState<number | null>(null);
 
@@ -232,7 +234,7 @@ export default function NotificationsPage() {
   }, [toggleRead, readingId, rowVirtualizer, user?.id]);
 
   // Block rendering until user is available, data has loaded, and initial sync has completed.
-  if (!user?.id || isLoading || isSyncing || !syncCompleted) return <Loading />;
+  if (!user?.id || isLoading || isSyncing || !syncSuccess) return <Loading />;
 
   const isEmpty = virtualItems.length === 0;
 

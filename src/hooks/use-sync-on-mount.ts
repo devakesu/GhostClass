@@ -31,17 +31,43 @@ export interface UseSyncOnMountOptions {
 
 export interface UseSyncOnMountReturn {
   isSyncing: boolean;
-  syncCompleted: boolean;
+  // True when a sync attempt has settled (either success or failure)
+  syncSettled: boolean;
+  // True when the last sync attempt failed
+  syncFailed: boolean;
 }
 
-// Module-level global state to persist sync status and promise across all component mounts/unmounts
+// Module-level global state to persist sync status and promise across all component mounts/unmounts.
+// Use a `globalThis`-backed singleton so Fast Refresh / HMR doesn't reset this state in development.
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown
-let lastSyncSuccessTime = 0;
-let lastSyncUsername: string | null = null;
-let activeSyncPromise: {
+type ActiveSyncHandle = {
   username: string;
   promise: Promise<{ data: SyncResponse; status: number }>;
-} | null = null;
+} | null;
+
+interface SyncMountState {
+  lastSyncSuccessTime: number;
+  lastSyncUsername: string | null;
+  activeSyncPromise: ActiveSyncHandle;
+}
+
+declare global {
+  var __ghostclass_useSyncOnMount_state_v1: SyncMountState | undefined;
+}
+
+const _global = globalThis.__ghostclass_useSyncOnMount_state_v1 ??= {
+  lastSyncSuccessTime: 0,
+  lastSyncUsername: null,
+  activeSyncPromise: null,
+};
+
+// Local aliases for clarity; always read/write to `_global` to persist across HMR
+const getLastSyncSuccessTime = () => _global.lastSyncSuccessTime;
+const setLastSyncSuccessTime = (v: number) => { _global.lastSyncSuccessTime = v; };
+const getLastSyncUsername = () => _global.lastSyncUsername;
+const setLastSyncUsername = (v: string | null) => { _global.lastSyncUsername = v; };
+const getActiveSyncPromise = () => _global.activeSyncPromise;
+const setActiveSyncPromise = (v: ActiveSyncHandle) => { _global.activeSyncPromise = v; };
 
 async function executeGlobalSync() {
   const res = await axios.get<SyncResponse>(`/api/cron/sync`, {
@@ -96,7 +122,8 @@ export function useSyncOnMount({
   });
 
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncCompleted, setSyncCompleted] = useState(false);
+  const [syncSettled, setSyncSettled] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
 
   useEffect(() => {
     if (!enabled || !username) return;
@@ -104,10 +131,10 @@ export function useSyncOnMount({
     // Check if successfully synced within cooldown period
     const now = Date.now();
     const isAlreadySynced =
-      lastSyncUsername === username && (now - lastSyncSuccessTime) < SYNC_COOLDOWN_MS;
+      getLastSyncUsername() === username && (now - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS;
 
     if (isAlreadySynced || syncFinishedRef.current) {
-      setSyncCompleted(true);
+      setSyncSettled(true);
       return;
     }
 
@@ -116,8 +143,12 @@ export function useSyncOnMount({
     const finalizeSync = (status: number, data: SyncResponse) => {
       if (isCleanedUp) return;
       syncFinishedRef.current = true;
-      lastSyncSuccessTime = Date.now();
-      lastSyncUsername = username;
+      setLastSyncSuccessTime(Date.now());
+      setLastSyncUsername(username);
+
+      // mark settled and clear failure state on success
+      setSyncSettled(true);
+      setSyncFailed(false);
 
       if (status === 207) {
         captureSentryMessage(`Partial sync failure in ${sentryLocation}`, {
@@ -140,15 +171,15 @@ export function useSyncOnMount({
     const runSync = async () => {
       // Re-check inside async run to handle concurrent mounts firing in the same tick
       const innerNow = Date.now();
-      if (lastSyncUsername === username && (innerNow - lastSyncSuccessTime) < SYNC_COOLDOWN_MS) {
-        setSyncCompleted(true);
+      if (getLastSyncUsername() === username && (innerNow - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS) {
+        setSyncSettled(true);
         return;
       }
 
       setIsSyncing(true);
 
       try {
-        if (!activeSyncPromise || activeSyncPromise.username !== username) {
+        if (!getActiveSyncPromise() || getActiveSyncPromise()!.username !== username) {
           logger.dev(`[${sentryLocation}] Initiating global EzyGo sync request`);
           // H-6: Use a shared object reference so the promise identity is captured
           // before any async continuation (catch/finally) fires. The previous pattern
@@ -159,32 +190,35 @@ export function useSyncOnMount({
             try {
               return await executeGlobalSync();
             } catch (err) {
-              if (activeSyncPromise?.promise === syncHandle.promise) {
-                activeSyncPromise = null;
+              if (getActiveSyncPromise()?.promise === syncHandle.promise) {
+                setActiveSyncPromise(null);
               }
               throw err;
             } finally {
-              if (activeSyncPromise?.promise === syncHandle.promise) {
-                activeSyncPromise = null;
+              if (getActiveSyncPromise()?.promise === syncHandle.promise) {
+                setActiveSyncPromise(null);
               }
             }
           })();
           syncHandle.promise = promise;
-          activeSyncPromise = { username, promise };
+          setActiveSyncPromise({ username, promise });
         } else {
           logger.dev(`[${sentryLocation}] Awaiting existing active EzyGo sync request`);
         }
 
-        const result = await activeSyncPromise.promise;
+        const result = await getActiveSyncPromise()!.promise;
         if (isCleanedUp) return;
         finalizeSync(result.status, result.data);
       } catch (error: unknown) {
         if (isCleanedUp) return;
+        // mark failure for callers that need to know
+        setSyncFailed(true);
         handleSyncError(error, sentryLocation, sentryTag, userId, setIsSyncing);
       } finally {
         if (!isCleanedUp) {
           setIsSyncing(false);
-          setSyncCompleted(true);
+          // Mark the sync attempt as settled even on failure (intentional fail-open)
+          setSyncSettled(true);
         }
       }
     };
@@ -195,15 +229,15 @@ export function useSyncOnMount({
     };
   }, [enabled, username, userId, sentryLocation, sentryTag]);
 
-  const isComplete = syncCompleted || (!username && !!userId);
+  const effectiveSettled = syncSettled || (!username && !!userId);
 
-  return { isSyncing, syncCompleted: isComplete };
+  return { isSyncing, syncSettled: effectiveSettled, syncFailed };
 }
 
 /** TEST ONLY: Reset module-level singleton state. */
 export function _resetModuleState() {
-  lastSyncSuccessTime = 0;
-  lastSyncUsername = null;
-  activeSyncPromise = null;
+  setLastSyncSuccessTime(0);
+  setLastSyncUsername(null);
+  setActiveSyncPromise(null);
 }
 

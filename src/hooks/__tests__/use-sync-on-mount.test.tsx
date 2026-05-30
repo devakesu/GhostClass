@@ -51,7 +51,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(axios.get).toHaveBeenCalledWith("/api/cron/sync", expect.any(Object));
@@ -61,7 +61,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, enabled: false }));
 
     expect(result.current.isSyncing).toBe(false);
-    expect(result.current.syncCompleted).toBe(false);
+    expect(result.current.syncSettled).toBe(false);
     expect(axios.get).not.toHaveBeenCalled();
   });
 
@@ -69,7 +69,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, username: undefined }));
 
     expect(result.current.isSyncing).toBe(false);
-    expect(result.current.syncCompleted).toBe(true);
+    expect(result.current.syncSettled).toBe(true);
     expect(axios.get).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(logger.error).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(logger.error).toHaveBeenCalled();
@@ -167,8 +167,8 @@ describe("useSyncOnMount", () => {
     const { result: r2 } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(r1.current.syncCompleted).toBe(true);
-      expect(r2.current.syncCompleted).toBe(true);
+      expect(r1.current.syncSettled).toBe(true);
+      expect(r2.current.syncSettled).toBe(true);
     });
 
     expect(axios.get).toHaveBeenCalledTimes(1);

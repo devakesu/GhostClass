@@ -113,7 +113,9 @@ export const reasonTextSchema = makeTextSchema({
 
 export const emailSchema = z.string().trim().email("Invalid email format").max(255, "Email too long").transform((value) => value.toLowerCase());
 
-export const courseCodeSchema = z.string().trim().min(1, "Course code is required").max(32, "Course code too long").transform((value) => value.toUpperCase().replace(/[\s\u00A0-]/g, ""));
+import { normalizeCourseCode } from "@/lib/utils";
+
+export const courseCodeSchema = z.string().trim().min(1, "Course code is required").max(32, "Course code too long").transform((value) => normalizeCourseCode(value));
 
 export const academicYearSchema = z.string().trim().regex(/^\d{4}-(\d{4}|\d{2})$/, "Invalid academic year format (expected YYYY-YYYY or YYYY-YY)");
 

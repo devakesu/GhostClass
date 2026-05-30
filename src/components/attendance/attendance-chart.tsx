@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { AttendanceReport, TrackAttendance, Course } from "@/types";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
-import { generateSlotKey } from "@/lib/utils";
+import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
 import { BarChart3 } from "lucide-react";
 import { ATTENDANCE_STATUS } from "@/lib/logic/attendance-reconciliation";
 
@@ -256,7 +256,7 @@ function computeAttendanceChartData(
 
   // 1. Initialize Courses
   Object.entries(coursesData.courses).forEach(([key, course]) => {
-    const codeKey = (course.code || key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    const codeKey = normalizeCourseCode(course.code || key);
     idToCodeMap.set(key, codeKey);
 
     if (!courseAttendance.has(codeKey)) {

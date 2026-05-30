@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { egressFetch, redact } from "@/lib/utils.server";
+import { normalizeCourseCode } from "@/lib/utils";
 import { decrypt, encrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
 import { safeResponseJson } from "@/lib/json";
@@ -86,7 +87,7 @@ async function processCoursesData(coursesRes: Response): Promise<{ coursesMap: R
           entries.push([String(c.id), c]);
         }
         if (c.code) {
-          const normalized = String(c.code).toUpperCase().replace(/[\s\u00A0-]/g, "");
+          const normalized = normalizeCourseCode(String(c.code));
           entries.push([normalized, c]);
         }
       }
@@ -534,7 +535,7 @@ async function populateCourseCatalogAndMigrateTrackers(
     .filter(c => c.id !== undefined && c.id !== null && c.code)
     .map(c => ({
       ezygo_id: String(c.id),
-      university_code: String(c.code).toUpperCase().replace(/[\s\u00A0-]/g, ""),
+      university_code: normalizeCourseCode(String(c.code)),
       course_name: c.name,
       last_seen_at: new Date().toISOString(),
     }));

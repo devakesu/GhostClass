@@ -105,9 +105,12 @@ const loadPrefetchedSettings = (currentUserId: string | null): UserSettings | nu
     return {
       bunk_calculator_enabled: storedBunk === "true",
       target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
-      disabled_courses: (storedDisabled && typeof storedDisabled === "string") 
-        ? JSON.parse(storedDisabled) 
-        : {},
+      disabled_courses: (() => {
+        if (!storedDisabled || typeof storedDisabled !== "string") return {};
+
+        const disabledCourses = disabledCoursesSchema.safeParse(JSON.parse(storedDisabled));
+        return disabledCourses.success ? disabledCourses.data : {};
+      })(),
     };
   } catch (err) {
     logger.error("Failed to load prefetched settings:", err);

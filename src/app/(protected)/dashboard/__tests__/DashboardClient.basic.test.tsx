@@ -141,7 +141,7 @@ vi.mock('@/hooks/courses/useCourseLookup', () => ({
 }));
 
 vi.mock('@/hooks/use-sync-on-mount', () => ({
-  useSyncOnMount: vi.fn(() => ({ syncCompleted: true, isSyncing: false })),
+  useSyncOnMount: vi.fn(() => ({ isSyncing: false, syncSettled: true, syncFailed: false })),
 }));
 
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({

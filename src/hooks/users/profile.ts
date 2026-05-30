@@ -11,6 +11,7 @@ interface UpdateProfileData {
   last_name?: string | null;
   gender?: string | null;
   birth_date?: string | null;
+  class_id?: string | null;
 }
 
 export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean; force?: boolean }) => {
@@ -45,7 +46,7 @@ export function useUpdateProfile() {
       const res = await axiosInstance.patch<UpdateProfileData>("/api/profile", data, {
         baseURL: "", // Override baseURL to hit top-level /api/profile
       });
-      return res.data;
+      return res.data as UpdateProfileData;
     },
     // Optimistic Update: Update UI instantly
     // 1. SNAPSHOT & OPTIMISTIC UPDATE
@@ -80,9 +81,20 @@ export function useUpdateProfile() {
     },
 
     // 3. FINAL VERIFICATION
-    onSettled: () => {
+    onSettled: (data) => {
       // Always refetch from server at the end to ensure 100% consistency
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      // If the returned payload included a class assignment change, invalidate
+      // class-specific caches so the UI doesn't show stale courses.
+      try {
+        if (data && (data as UpdateProfileData).class_id !== undefined) {
+          queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+          queryClient.invalidateQueries({ queryKey: ["courses"] });
+        }
+      } catch {
+        // Swallow - this is best-effort cache maintenance
+      }
     },
   });
 }

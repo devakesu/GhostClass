@@ -56,7 +56,7 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
-import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
+import { formatSessionName, generateSlotKey, normalizeCourseCode, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
 import { isLegacyRemark } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useQueryClient } from "@tanstack/react-query";
@@ -155,31 +155,31 @@ function resolveCourseCode(
   classCourses?: ClassCourse[],
   attendanceData?: AttendanceReport
 ): string {
-  const normalizedInput = id.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const normalizedInput = normalizeCourseCode(id.trim());
 
   // eslint-disable-next-line security/detect-object-injection
   const dictCourse = coursesData?.courses?.[id];
   if (dictCourse) {
-    return (dictCourse.code || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(dictCourse.code || id);
   }
 
   const course = Object.values(coursesData?.courses || {}).find(c => 
-    String(c.id) === id || (c.code && c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput)
+    String(c.id) === id || (c.code && normalizeCourseCode(c.code) === normalizedInput)
   );
   if (course?.code) {
-    return course.code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(course.code);
   }
   
   const custom = classCourses?.find(cc => 
-    cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput
+    normalizeCourseCode(cc.course_code) === normalizedInput
   );
   if (custom) {
-    return custom.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(custom.course_code);
   }
 
   // eslint-disable-next-line security/detect-object-injection
   const altCourse = attendanceData?.courses?.[id];
-  return (altCourse?.code ?? id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+  return normalizeCourseCode(altCourse?.code ?? id);
 }
 
 function resolveCourseName(
@@ -198,9 +198,9 @@ function resolveCourseName(
     return course.name;
   }
 
-  const normalizedId = id.toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const normalizedId = normalizeCourseCode(id);
   const custom = classCourses?.find(cc => 
-    cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedId
+    normalizeCourseCode(cc.course_code) === normalizedId
   );
   if (custom) {
     return custom.course_name || custom.course_code;

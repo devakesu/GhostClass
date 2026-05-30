@@ -77,7 +77,8 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/hooks/use-sync-on-mount', () => ({
   useSyncOnMount: vi.fn(() => ({
     isSyncing: false,
-    syncCompleted: true,
+    syncSettled: true,
+    syncFailed: false,
   })),
 }));
 
@@ -498,7 +499,7 @@ describe('NotificationsClient', () => {
       let partialSyncCallback: any;
       vi.mocked(useSyncOnMount).mockImplementation(({ onPartialSync }: any) => {
         partialSyncCallback = onPartialSync;
-        return { isSyncing: false, syncCompleted: true };
+          return { isSyncing: false, syncSettled: true, syncFailed: false };
       });
 
       const { toast } = await import('sonner');
@@ -512,7 +513,7 @@ describe('NotificationsClient', () => {
       let successCallback: any;
       vi.mocked(useSyncOnMount).mockImplementation(({ onSuccess }: any) => {
         successCallback = onSuccess;
-        return { isSyncing: false, syncCompleted: true };
+        return { isSyncing: false, syncSettled: true, syncFailed: false };
       });
 
       const { toast } = await import('sonner');

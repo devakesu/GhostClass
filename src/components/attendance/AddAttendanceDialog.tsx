@@ -44,7 +44,7 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, normalizeCourseCode } from "@/lib/utils";
 import { optionalReasonSchema } from "@/lib/validation/text";
 import {
   Popover,
@@ -124,8 +124,8 @@ function computeSortedCourses(
   
   if (classCourses) {
     classCourses.forEach(cc => {
-      const code = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-      if (!courses.some(c => c.key.toUpperCase().replace(/[\s\u00A0-]/g, "") === code)) {
+      const code = normalizeCourseCode(cc.course_code);
+      if (!courses.some(c => normalizeCourseCode(c.key) === code)) {
         courses.push({ key: cc.course_code, name: cc.course_name });
       }
     });
@@ -471,11 +471,11 @@ export function AddAttendanceDialog({
         return;
       }
 
-      let courseIdToSave = courseId.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+      let courseIdToSave = normalizeCourseCode(courseId.trim());
       // eslint-disable-next-line security/detect-object-injection
       const selectedCourse = coursesData?.courses?.[courseId];
       if (selectedCourse?.code) {
-        courseIdToSave = selectedCourse.code.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+        courseIdToSave = normalizeCourseCode(selectedCourse.code.trim());
       }
 
       const finalRemarks = optionalReasonSchema.parse(remarks);

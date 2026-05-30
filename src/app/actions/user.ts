@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
@@ -85,7 +86,7 @@ export async function setTermsVersionCookie(version: string): Promise<void> {
     path: "/",
     maxAge: 31536000, // 1 year
     sameSite: "lax",
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     httpOnly: true, // Secure cookie - checked server-side in proxy.ts
   });
 }
@@ -103,7 +104,7 @@ export async function clearTermsVersionCookie() {
     path: "/",
     maxAge: 0,
     sameSite: "lax",
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     httpOnly: true,
   });
 }
@@ -121,7 +122,7 @@ export async function clearTermsRedirectCountCookie() {
     path: "/",
     maxAge: 0,
     sameSite: "strict",
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     httpOnly: true,
   });
 }

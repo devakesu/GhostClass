@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   LazyMotion,
@@ -207,7 +207,12 @@ function ScoreCard({
         onClick={onClick}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         aria-label={`View details for ${exam.name}`}
       >
         <CardHeader className="pb-2 sm:pb-3">
@@ -563,6 +568,59 @@ function ExamDetailDrawer({
     };
   }, []);
 
+  // Focus trap: constrain keyboard focus within the drawer while open.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = panelRef.current;
+    if (!node) return;
+
+    const focusableSelector = 'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"]), [contenteditable]';
+    const elements = Array.from(node.querySelectorAll<HTMLElement>(focusableSelector)).filter((el) => el.offsetParent !== null || el.getAttribute('tabindex') !== '-1');
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+
+    const prevActive = document.activeElement as HTMLElement | null;
+    // If there's a dedicated close button it has autoFocus, otherwise focus the panel or first element.
+    if (!first) {
+      node.focus?.();
+    } else {
+      // Ensure something inside is focused so screen readers announce dialog content
+      // but do not steal focus if the close button already focused it (autoFocus).
+      if (document.activeElement === document.body && first) first.focus();
+    }
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (elements.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (!active || active === first || !node.contains(active)) {
+          e.preventDefault();
+          last?.focus();
+        }
+      } else {
+        if (!active || active === last || !node.contains(active)) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      // Restore previous focus when drawer closes
+      try {
+        prevActive?.focus?.();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
   const isAssessment = exam.activity_type === "assessment";
 
   return (
@@ -587,6 +645,7 @@ function ExamDetailDrawer({
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
         className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-card border-l-2 border-border shadow-[-8px_0_32px_rgba(0,0,0,0.35)]"
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={`Exam details: ${exam.name}`}

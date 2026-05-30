@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearAuthCookie } from "@/lib/security/auth-cookie";
+import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { removeCsrfToken } from "@/lib/security/csrf";
 import { clearTermsVersionCookie, clearTermsRedirectCountCookie } from "@/app/actions/user";
 import { authRateLimiter } from "@/lib/ratelimit";
@@ -57,7 +58,7 @@ const handler = async (req: NextRequest) => {
         path: "/",
         expires: new Date(0),
         sameSite: "lax",
-        secure: process.env.HTTPS === "true" || process.env.NODE_ENV === "production",
+        secure: isCookieSecure(),
       });
       // @supabase/ssr may also write a chunked variant: sb-{ref}-auth-token.0, .1 …
       // Clear any chunks present in the current request cookies.
@@ -68,7 +69,7 @@ const handler = async (req: NextRequest) => {
             path: "/",
             expires: new Date(0),
             sameSite: "lax",
-            secure: process.env.HTTPS === "true" || process.env.NODE_ENV === "production",
+            secure: isCookieSecure(),
           });
         }
       }

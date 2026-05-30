@@ -7,8 +7,37 @@ import { logger } from '@/lib/logger';
  * @throws {Error} If required environment variables are missing
  */
 function createRedisClient(): Redis {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // During unit tests (Vitest) we avoid making network calls to Upstash.
+  // Provide a lightweight in-memory mock that implements the small subset
+  // of Redis operations used by the application. This keeps tests hermetic
+  // and avoids requiring real UPSTASH credentials in CI or local environments.
+  if (process.env.VITEST === 'true') {
+    const store = new Map<string, string>();
+    const mock: Partial<Redis> = {
+      get: async <TData>(key: string): Promise<TData | null> => {
+        return store.has(key) ? (store.get(key) as unknown as TData) : null;
+      },
+      set: async <TData>(key: string, value: TData): Promise<"OK" | TData | null> => {
+        store.set(key, String(value));
+        return 'OK';
+      },
+      incr: async (key: string): Promise<number> => {
+        const cur = parseInt(store.get(key) ?? '0', 10) || 0;
+        const next = cur + 1;
+        store.set(key, String(next));
+        return next;
+      },
+      decr: async (key: string): Promise<number> => {
+        const cur = parseInt(store.get(key) ?? '0', 10) || 0;
+        const next = Math.max(0, cur - 1);
+        store.set(key, String(next));
+        return next;
+      },
+    };
+    return mock as unknown as Redis;
+  }
+  const url = process.env["UPSTASH_REDIS_REST_URL"];
+  const token = process.env["UPSTASH_REDIS_REST_TOKEN"];
   
   if (!url) {
     throw new Error(

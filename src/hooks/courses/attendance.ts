@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { logger } from "@/lib/logger";
 import { useMemo } from "react";
 import { AttendanceReport, CourseDetail } from "@/types";
+import { normalizeCourseCode } from "@/lib/utils";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
 import { useFetchSemester, useFetchAcademicYear } from "../users/settings";
 
@@ -151,7 +152,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   const uniqueCourses = useMemo(() => {
     const seen = new Set<string>();
     return courses.filter((c: { code: string; id: number; name: string }) => {
-      const code = c.code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+      const code = normalizeCourseCode(c.code);
       if (!code || seen.has(code)) return false;
       seen.add(code);
       return true;
@@ -159,7 +160,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   }, [courses]);
 
   const sortedCodes = useMemo(() => 
-    uniqueCourses.map(c => c.code.toUpperCase().replace(/[\s\u00A0-]/g, "")).sort(),
+    uniqueCourses.map(c => normalizeCourseCode(c.code)).sort(),
     [uniqueCourses]
   );
 
@@ -185,7 +186,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
 
           const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
           if (course) {
-            const normalizedCode = code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+            const normalizedCode = normalizeCourseCode(code);
             queryClient.setQueryData(["attendance-report", normalizedCode, Number(course.id)], detail);
           }
         }

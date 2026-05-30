@@ -19,41 +19,64 @@
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 // Detect test environment via the VITEST env var (set automatically by Vitest runner).
-// NOTE: vitest.config.ts sets NODE_ENV='development' (not 'test') so we use VITEST instead.
 const isTest = process.env.VITEST === "true";
 
+function buildStructuredPayload(level: string, args: unknown[]) {
+  const timestamp = new Date().toISOString();
+
+  let meta: unknown = null;
+  const message = typeof args[0] === "string" ? String(args[0]) : "";
+
+  if (args.length > 0) {
+    if (typeof args[0] === "string") {
+      if (args.length > 1) meta = args.slice(1);
+    } else if (args.length === 1) {
+      // single non-string argument — treat as meta
+      meta = args[0];
+    } else {
+      meta = args;
+    }
+  }
+
+  const payload: Record<string, unknown> = {
+    ts: timestamp,
+    level,
+  };
+  if (message) payload.msg = message;
+  if (meta !== null) payload.meta = meta;
+  return JSON.stringify(payload);
+}
+
 export const logger = {
-  /**
-   * Development-only logging
-   * Suppressed in production to keep logs clean
-   */
   dev: (...args: unknown[]) => {
     if (isDevelopment) {
       console.log(...args);
     }
   },
 
-  /**
-   * Warning messages - always logged (suppressed in test to avoid noisy CI output)
-   * Use for non-critical issues that should be investigated
-   */
   warn: (...args: unknown[]) => {
-    if (!isTest) console.warn(...args);
+    if (isTest) return;
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(buildStructuredPayload('warn', args));
+    } else {
+      console.warn(...args);
+    }
   },
 
-  /**
-   * Error messages - always logged (suppressed in test to avoid noisy CI output)
-   * Use for errors that need immediate attention
-   */
   error: (...args: unknown[]) => {
-    if (!isTest) console.error(...args);
+    if (isTest) return;
+    if (process.env.NODE_ENV === 'production') {
+      console.error(buildStructuredPayload('error', args));
+    } else {
+      console.error(...args);
+    }
   },
 
-  /**
-   * Info messages - always logged for important production events
-   * Uses console.info (semantically distinct from logger.dev/console.log)
-   */
   info: (...args: unknown[]) => {
-    console.info(...args);
+    if (process.env.NODE_ENV === 'production') {
+      console.info(buildStructuredPayload('info', args));
+    } else {
+      console.info(...args);
+    }
   },
 };

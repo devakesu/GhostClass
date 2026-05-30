@@ -87,6 +87,7 @@ import { headers, cookies } from "next/headers";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { egressFetch } from "@/lib/utils.server";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { __resetAllowedHostsCache } from "@/lib/security/origin-validation";
 
 describe("POST /api/auth/save-token", () => {
   const mockHeaders = {
@@ -100,6 +101,7 @@ describe("POST /api/auth/save-token", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetAllowedHostsCache();
     vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true, limit: 10, reset: 0, remaining: 9 } as any);
     mockHeaders.get.mockImplementation((name) => {
       if (name === "x-csrf-token") return "valid-csrf";
@@ -127,6 +129,44 @@ describe("POST /api/auth/save-token", () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.message).toBe("Invalid origin");
+  });
+
+  it("accepts requests behind a proxy when x-forwarded-host matches the app domain", async () => {
+    mockHeaders.get.mockImplementation((name) => {
+      if (name === "origin") return null;
+      if (name === "sec-fetch-site") return "same-origin";
+      if (name === "x-forwarded-host") return "localhost:3000";
+      if (name === "host") return "internal-container:3000";
+      return "valid-csrf";
+    });
+
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({ username: "proxyuser", id: "99999", email: "proxy@example.com" }),
+    } as any);
+
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn(() => Promise.resolve({ data: { user: { id: "proxy-auth-id" } }, error: null })),
+        },
+      },
+      from: vi.fn(() => ({
+        upsert: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn(() => Promise.resolve({ data: { id: "99999" }, error: null })),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
+      })),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const response = await POST(req, {} as any);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.userId).toBe("proxy-auth-id");
   });
 
   it("returns 429 when rate limited", async () => {
@@ -176,6 +216,7 @@ describe("POST /api/auth/save-token", () => {
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.userId).toBe("new-auth-id");
+    expect(body.ezygo_token).toBeUndefined();
   });
 
   it("handles existing user login", async () => {

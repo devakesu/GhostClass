@@ -1337,7 +1337,7 @@ export default function TrackingClient() {
 
 
   // --- AUTO SYNC ---
-  const { isSyncing, syncCompleted } = useSyncOnMount({
+  const { isSyncing, syncSettled, syncFailed } = useSyncOnMount({
     username: profile?.username,
     userId: profile?.id,
     sentryLocation: "TrackingClient",
@@ -1371,6 +1371,8 @@ export default function TrackingClient() {
       ]);
     },
   });
+
+  const syncSuccess = !!(syncSettled && !syncFailed);
 
   // --- 1. GROUP AND SORT DATA ---
   const groupedAllData = useMemo(
@@ -1465,7 +1467,7 @@ export default function TrackingClient() {
 
   // Block rendering until tracking is enabled, base data has loaded, and initial sync has completed.
   const isInitialLoading = !enabled || isDataLoading || isSyncing ||
-    !syncCompleted;
+    !syncSuccess;
 
   const hasBaseErrors = isTrackingError || isCountError || isCoursesError ||
     isAttendanceError || isSemesterError || isAcademicYearError;

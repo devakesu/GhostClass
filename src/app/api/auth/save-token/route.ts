@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { headers, cookies } from "next/headers";
@@ -14,6 +14,7 @@ import { performProfileSync } from "@/lib/user/sync";
 import { withSecurity } from "@/lib/security/app-check";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 import { getAuthLock, releaseAuthLock as releaseAuthLockUtil } from "@/lib/security/auth-lock";
+import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -44,21 +45,30 @@ const AUTH_LOCK_TTL = (() => {
 async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (isMobileApp || process.env.NODE_ENV === "development") return null;
 
-  const origin = headerList.get("origin");
-  const host = headerList.get("host");
-  if (!origin || !host) return "Invalid origin";
+  let allowedHosts: Set<string> | null;
+  try {
+    allowedHosts = getAllowedHosts();
+  } catch {
+    return "Server configuration error";
+  }
+  if (!allowedHosts) return "Server configuration error";
 
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-  if (!appDomain?.trim() || appDomain.includes("://")) return "Server configuration error";
+  const origin = headerList.get("origin");
+  if (!origin) {
+    const secFetchSite = headerList.get("sec-fetch-site")?.toLowerCase();
+    const requestHostname = resolveRequestHostname({
+      headers: headerList,
+      nextUrl: { hostname: headerList.get("host") ?? "" },
+    } as NextRequest);
+    if (!(secFetchSite === "same-origin" && !!requestHostname && allowedHosts.has(requestHostname))) {
+      return "Invalid origin";
+    }
+    return null;
+  }
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
-    const headerHostname = new URL(`http://${host}`).hostname.toLowerCase();
-    if (originHostname !== headerHostname) return "Invalid origin";
-
-    const appDomainHostname = new URL(`https://${appDomain.trim()}`).hostname
-      .toLowerCase();
-    if (originHostname !== appDomainHostname) return "Invalid origin";
+    if (!allowedHosts.has(originHostname)) return "Invalid origin";
   } catch {
     return "Invalid origin";
   }
@@ -185,6 +195,7 @@ async function provisionSupabaseAuthUser(
     email,
     password: canonicalPass,
     email_confirm: true,
+    user_metadata: { ezygo_id: verifiedId },
   });
 
   if (retryError || !retry.user) {
@@ -396,7 +407,6 @@ const handler = async (
     return NextResponse.json({
       ...response,
       session: signInData.session,
-      ezygo_token: token,
     });
 
   } catch (error: unknown) {

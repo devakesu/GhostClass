@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
+import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { redact } from "@/lib/utils.server";
 
 import { redis } from "@/lib/redis";
@@ -13,7 +14,7 @@ export async function setAuthCookie(token: string, days = 31) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   (await cookies()).set("ezygo_access_token", token, {
     httpOnly: true,
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     sameSite: "lax",
     path: "/",
     expires,

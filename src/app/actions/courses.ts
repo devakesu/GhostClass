@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { courseCodeSchema, courseNameSchema } from "@/lib/validation/text";
+import { normalizeCourseCode } from "@/lib/utils";
 
 export async function addCourseAction(formData: FormData): Promise<{ error?: string }> {
   const courseCodeValue = formData.get("courseCode");
@@ -86,7 +87,7 @@ export async function addCourseAction(formData: FormData): Promise<{ error?: str
       .from("class_courses")
       .insert({
         class_id: profile.class_id,
-        course_code: code.toUpperCase().replace(/[\s\u00A0-]/g, ""),
+        course_code: normalizeCourseCode(code),
         course_name: name,
         created_by: user.id
       });

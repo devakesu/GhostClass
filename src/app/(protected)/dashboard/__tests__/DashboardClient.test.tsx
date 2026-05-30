@@ -72,7 +72,7 @@ vi.mock('@/hooks/use-dashboard-stats', () => ({
 }));
 
 vi.mock('@/hooks/use-sync-on-mount', () => ({
-  useSyncOnMount: vi.fn(() => ({ syncCompleted: true })),
+  useSyncOnMount: vi.fn(() => ({ syncSettled: true, syncFailed: false })),
 }));
 
 vi.mock('../components/CourseGrid', () => ({
@@ -204,7 +204,7 @@ const queryClient = new QueryClient({
 describe('DashboardClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(syncHooks.useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false });
+    vi.mocked(syncHooks.useSyncOnMount).mockReturnValue({ isSyncing: false, syncSettled: true, syncFailed: false });
     vi.mocked(profileHooks.useProfile).mockReturnValue({ 
       data: { first_name: 'Test', last_name: 'User', username: 'testuser', id: 1, class: { name: 'Test Class' } }, 
       isLoading: false, 

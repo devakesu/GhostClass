@@ -56,11 +56,12 @@ import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { normalizeCourseCode } from "@/lib/utils";
 import { AttendanceReport, Course, TrackAttendance, UserProfile } from "@/types";
 
 import { StatsPanel } from "./components/StatsPanel";
 import { DashboardCharts } from "./components/DashboardCharts";
-import { CourseGrid } from "./components/CourseGrid";
+import { CourseGrid, DashboardCourse } from "./components/CourseGrid";
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
@@ -138,6 +139,36 @@ const shiftAcademicPeriod = (
 
 const formatAcademicPeriod = (period: AcademicPeriod) => `${period.semester.toUpperCase()} ${period.year}`;
 
+function computeInitialDataValidity(
+  initialData: InitialDashboardData | undefined,
+  selectedSemester: AcademicSemester | null,
+  selectedYear: string | null,
+  ezygoSemester: AcademicSemester | undefined,
+  ezygoYear: string | undefined,
+  effectiveSemester: AcademicSemester | undefined,
+  effectiveYear: string | undefined
+): { isInitialDataValid: boolean; isAttendanceStale: boolean } {
+  const isInitial = (() => {
+    if (selectedSemester !== null || selectedYear !== null) return false;
+    if (ezygoSemester && ezygoSemester !== effectiveSemester) return false;
+    if (ezygoYear && ezygoYear !== effectiveYear) return false;
+    return true;
+  })();
+
+  const attendance = initialData?.attendance;
+  const isAttendanceStale = !!(
+    attendance &&
+    typeof attendance === "object" &&
+    "studentAttendanceData" in attendance &&
+    attendance.studentAttendanceData &&
+    typeof attendance.studentAttendanceData === "object" &&
+    "stale" in (attendance.studentAttendanceData as { stale?: unknown }) &&
+    (attendance.studentAttendanceData as { stale?: unknown }).stale === true
+  );
+
+  return { isInitialDataValid: isInitial, isAttendanceStale };
+}
+
 interface DashboardClientProps {
   initialData?: InitialDashboardData;
   serverError?: string | null;
@@ -180,12 +211,12 @@ const getActiveCourseStats = (
   const catalogCodes = new Set<string>();
   if (coursesData?.courses) {
     Object.values(coursesData.courses).forEach((c) => {
-      catalogCodes.add(c.code ? c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") : String(c.id).toUpperCase());
+      catalogCodes.add(normalizeCourseCode(c.code ?? String(c.id)));
     });
   }
   if (classCourses) {
     classCourses.forEach((cc) => {
-      catalogCodes.add(cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, ""));
+      catalogCodes.add(normalizeCourseCode(cc.course_code ?? ""));
     });
   }
 
@@ -193,7 +224,7 @@ const getActiveCourseStats = (
   const disabledWithDataCodes = new Set<string>();
 
   activeIds.forEach((id) => {
-    const code = String(getCourseCode(id) || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    const code = normalizeCourseCode(String(getCourseCode(id) || id));
     if (code !== "" && catalogCodes.has(code)) {
       if (disabledCodes.has(code)) disabledWithDataCodes.add(code);
       else activeCodes.add(code);
@@ -236,16 +267,17 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const currentSem = effectiveSemester || undefined;
   const currentYear = effectiveYear || undefined;
 
+  const isRateLimitError = serverError ? (serverError.toLowerCase().includes("rate limit") || serverError.includes("429")) : false;
+
   useEffect(() => {
     if (serverError) {
-      const isRateLimit = serverError.toLowerCase().includes("rate limit") || serverError.includes("429");
-      toast.error(isRateLimit ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed", {
-        description: isRateLimit ? "Too many requests. Please wait." : "Failed to pre-load your data.",
+      toast.error(isRateLimitError ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed", {
+        description: isRateLimitError ? "Too many requests. Please wait." : "Failed to pre-load your data.",
         duration: 8000,
         action: { label: "Retry", onClick: () => window.location.reload() },
       });
     }
-  }, [serverError]);
+  }, [serverError, isRateLimitError]);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
@@ -257,7 +289,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const [isSelectClassOpen, setIsSelectClassOpen] = useState(false);
   const academicShiftLockRef = useRef(false);
 
-  const { syncCompleted } = useSyncOnMount({
+  const { syncSettled, syncFailed } = useSyncOnMount({
     username: profile?.username,
     userId: profile?.id ? String(profile.id) : undefined,
     enabled: !!profile?.username,
@@ -265,32 +297,31 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     sentryTag: "background_sync"
   });
 
+  const syncSuccess = !!(syncSettled && !syncFailed);
+
   useEffect(() => {
-    const shouldOpen = !!(syncCompleted && profile && !profile.class?.id);
+    const shouldOpen = !!(syncSuccess && profile && !profile.class?.id);
     const timer = setTimeout(() => {
       setIsSelectClassOpen(shouldOpen);
     }, 0);
     return () => clearTimeout(timer);
-  }, [syncCompleted, profile]);
+  }, [syncSuccess, profile]);
 
-  const isInitialDataValid = useMemo(() => {
-    if (selectedSemester !== null || selectedYear !== null) return false;
-    if (ezygoSemester && ezygoSemester !== effectiveSemester) return false;
-    if (ezygoYear && ezygoYear !== effectiveYear) return false;
-    return true;
-  }, [selectedSemester, selectedYear, ezygoSemester, ezygoYear, effectiveSemester, effectiveYear]);
-
-  const isAttendanceStale =
-    initialData?.attendance &&
-    typeof initialData.attendance === "object" &&
-    "studentAttendanceData" in initialData.attendance &&
-    initialData.attendance.studentAttendanceData &&
-    typeof initialData.attendance.studentAttendanceData === "object" &&
-    "stale" in initialData.attendance.studentAttendanceData &&
-    (initialData.attendance.studentAttendanceData as { stale?: unknown }).stale === true;
+  const { isInitialDataValid, isAttendanceStale } = useMemo(() =>
+    computeInitialDataValidity(
+      initialData,
+      selectedSemester,
+      selectedYear,
+      (ezygoSemester === "even" || ezygoSemester === "odd") ? ezygoSemester : undefined,
+      ezygoYear ?? undefined,
+      (effectiveSemester === "even" || effectiveSemester === "odd") ? effectiveSemester : undefined,
+      effectiveYear,
+    ),
+    [initialData, selectedSemester, selectedYear, ezygoSemester, ezygoYear, effectiveSemester, effectiveYear]
+  );
 
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
-    enabled: syncCompleted,
+    enabled: syncSuccess,
     initialData: (isInitialDataValid && !isAttendanceStale) ? (initialData?.attendance as AttendanceReport ?? undefined) : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
@@ -321,7 +352,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawCoursesData, isLoading: isLoadingCourses } = useFetchCourses({
     semester: currentSem,
     year: currentYear,
-    enabled: syncCompleted && !!currentSem && !!currentYear,
+    enabled: syncSuccess && !!currentSem && !!currentYear,
     initialData: isInitialDataValid ? formattedInitialCourses : undefined,
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
@@ -329,12 +360,12 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawTrackingData, refetch: refetchTracking } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
-    enabled: syncCompleted,
+    enabled: syncSuccess,
   });
   const trackingData = rawTrackingData as TrackAttendance[] | undefined;
 
-  const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: syncCompleted });
-  const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncCompleted && !!profile?.class?.id });
+  const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: syncSuccess });
+  const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncSuccess && !!profile?.class?.id });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
   const { getCourseCodeById: getCourseCode } = useCourseLookup({
@@ -344,22 +375,43 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     attendanceData: attendanceData as any
   }) as { getCourseCodeById: (id: string | number) => string };
 
-  const courseList = useMemo(() => {
-    const registry = new Map<string, { code: string; id: number; name: string }>();
+  const { courseList, courseRegistry } = useMemo(() => {
+    const listMap = new Map<string, { code: string; id: number; name: string }>();
+    const registry = new Map<string, MergedCourse>();
+
     if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([code, c]) => {
-        const actualCode = c.code ?? code;
-        const key = actualCode.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        registry.set(key, { code: actualCode, id: Number(c.id), name: c.name || "" });
+      Object.entries(coursesData.courses).forEach(([id, course]) => {
+        const courseCode = course.code ?? String(id);
+        const item = { code: courseCode, id: Number(course.id), name: course.name || "" };
+
+        // Deduplicate list by normalized code
+        const norm = normalizeCourseCode(courseCode || "");
+        if (norm && !listMap.has(norm)) listMap.set(norm, item);
+
+        // Populate registry keyed by id and by normalized code key
+        const basic: MergedCourse = { id: course.id || id, code: course.code, name: course.name, key: id };
+        registry.set(String(id), basic);
+        const codeKey = normalizeCourseCode(course.code || "");
+        if (codeKey && !registry.has(codeKey)) registry.set(codeKey, basic);
       });
     }
+
     if (classCourses) {
       classCourses.forEach((cc) => {
-        const key = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (!registry.has(key)) registry.set(key, { code: cc.course_code, id: 0, name: cc.course_name || cc.course_code });
+        const norm = normalizeCourseCode(cc.course_code);
+        if (!listMap.has(norm)) listMap.set(norm, { code: cc.course_code, id: 0, name: cc.course_name || cc.course_code });
+
+        const codeKey = normalizeCourseCode(cc.course_code);
+        if (!registry.has(codeKey)) {
+          registry.set(codeKey, { id: 0, code: cc.course_code, name: cc.course_name || cc.course_code, key: codeKey });
+        }
       });
     }
-    return Array.from(registry.values());
+
+    return {
+      courseList: Array.from(listMap.values()),
+      courseRegistry: Object.fromEntries(registry),
+    };
   }, [coursesData, classCourses]);
 
   const { data: allCourseSummaries, isLoading: isLoadingAllCourseSummaries } = useAllCourseDetails(courseList);
@@ -370,15 +422,25 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const requestAcademicShift = (direction: "previous" | "next") => {
     if (!effectiveSemester || !effectiveYear || isUpdating || academicShiftLockRef.current) return;
-
     const nextPeriod = shiftAcademicPeriod(effectiveSemester, effectiveYear, direction);
     if (!nextPeriod) {
       toast.error("Could not compute the next academic period.");
       return;
     }
 
+    // Clamp forward navigation to at most one academic year ahead of current
+    const currentStart = parseAcademicYearStart(defaultAcademicInfo.current_year) ?? new Date().getFullYear();
+    const maxAllowedStart = currentStart + 1;
+    const nextStart = parseAcademicYearStart(nextPeriod.year);
+    let clampedNext = nextPeriod;
+    if (direction === "next" && nextStart !== null && nextStart > maxAllowedStart) {
+      // clamp to the maximum allowed academic year
+      clampedNext = { semester: nextPeriod.semester, year: formatAcademicYear(maxAllowedStart) };
+      toast.info("Clamped to the nearest future academic period");
+    }
+
     academicShiftLockRef.current = true;
-    setPendingChange(nextPeriod);
+    setPendingChange(clampedNext);
     setShowConfirmDialog(true);
   };
 
@@ -454,31 +516,12 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const stats = useDashboardStats({ coursesData, attendanceData, trackingData, classCourses, disabledCodes, selectedSemester: effectiveSemester, selectedYear: effectiveYear });
 
-  const courseRegistry = useMemo(() => {
-    const registry = new Map<string, MergedCourse>();
-    if (coursesData?.courses) {
-      Object.entries(coursesData.courses).forEach(([id, course]) => {
-        const basic: MergedCourse = { id: course.id || id, code: course.code, name: course.name, key: id };
-        registry.set(id, basic);
-        const codeKey = (course.code || "").toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (codeKey && !registry.has(codeKey)) registry.set(codeKey, basic);
-      });
-    }
-    if (classCourses) {
-      classCourses.forEach((cc) => {
-        const codeKey = cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
-        if (!registry.has(codeKey)) {
-          registry.set(codeKey, { id: 0, code: cc.course_code, name: cc.course_name || cc.course_code, key: codeKey });
-        }
-      });
-    }
-    return Object.fromEntries(registry);
-  }, [coursesData, classCourses]);
+  
 
-  const sortedCourses = useMemo(() => {
+  const sortedCourses = useMemo<DashboardCourse[]>(() => {
     const seen = new Set<string>();
     const unique = Object.values(courseRegistry).filter((c) => {
-      const key = (c.code || c.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+      const key = normalizeCourseCode(String(c.code || c.key));
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -488,7 +531,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     const summariesMap = new Map(allCourseSummaries ? Object.entries(allCourseSummaries) : []);
 
     return unique.map((course) => {
-      const codeKey = (course.code || course.key).toUpperCase().replace(/[\s\u00A0-]/g, "");
+      const codeKey = normalizeCourseCode(String(course.code || course.key));
       const courseCode = String(course.code || "");
       const activeDetails = summariesMap.get(courseCode);
       const stat = statsMap.get(codeKey) || statsMap.get(course.key) || { present: 0, total: 0, officialPresent: 0, officialTotal: 0 };
@@ -498,15 +541,24 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
       const safeRes = isNew ? { canBunk: 0 } : calculateAttendance(stat.officialPresent, stat.officialTotal, targetPercentage);
 
       return {
-        ...course, currentPercentage: stat.total > 0 ? Math.round((stat.present / stat.total) * 100) : 0, bunkable: res.canBunk, safeBunkable: safeRes.canBunk, required: res.requiredToAttend, isNew, isDisabled: disabledCodes.has(codeKey), ...stat, activeCourseDetails: activeDetails, name: String(course.name || "")
-      };
+        ...course,
+        currentPercentage: stat.total > 0 ? Math.round((stat.present / stat.total) * 100) : 0,
+        bunkable: res.canBunk,
+        safeBunkable: safeRes.canBunk,
+        required: res.requiredToAttend,
+        isNew,
+        isDisabled: disabledCodes.has(codeKey),
+        ...stat,
+        activeCourseDetails: activeDetails,
+        name: String(course.name || "")
+      } as DashboardCourse;
     }).sort((a, b) => {
       const tA = getSortPriority(a);
       const tB = getSortPriority(b);
       if (tA !== tB) return tA - tB;
       if (tA === 0) {
-        if (b.bunkable !== a.bunkable) return b.bunkable - a.bunkable;
-        if (a.required !== b.required) return a.required - b.required;
+        if ((b.bunkable ?? 0) !== (a.bunkable ?? 0)) return (b.bunkable ?? 0) - (a.bunkable ?? 0);
+        if ((a.required ?? 0) !== (b.required ?? 0)) return (a.required ?? 0) - (b.required ?? 0);
       }
       return a.name.localeCompare(b.name);
     });
@@ -530,15 +582,30 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return <div className="h-50 flex items-center justify-center">No data</div>;
   };
 
-  if ((!profile && !isLoadingProfile) || !currentSem || !currentYear || !syncCompleted) return <CompLoading />;
+  if (!profile || isLoadingProfile || !currentSem || !currentYear || !syncSuccess) return <CompLoading />;
 
-  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncCompleted;
+  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncSuccess;
 
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex flex-col bg-background font-manrope relative min-h-screen">
         <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
+        <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
+
         <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
+          {serverError && (
+            <div className="mb-4">
+              <div role="alert" className="w-full flex items-center justify-between gap-4 p-3 rounded-md border bg-amber-50 border-amber-200 text-amber-800">
+                <div className="text-sm">
+                  <strong className="font-semibold">{isRateLimitError ? "EzyGo Rate Limit" : "Data prefetch failed"}</strong>
+                  <div className="text-xs mt-0.5">{isRateLimitError ? "Too many requests. Some data may be unavailable." : "Failed to preload dashboard data. You can retry or continue."}</div>
+                </div>
+                <div className="flex-shrink-0">
+                  <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center px-3 py-1.5 rounded-md bg-amber-600 text-white text-sm font-semibold">Retry</button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="mb-6 flex flex-col lg:flex-row gap-6 lg:items-end justify-between">
             <div className="flex flex-col gap-3 flex-1">
               <h1 className="text-2xl font-bold">Welcome back, <span className="gradient-name">{profile?.first_name} {profile?.last_name}!</span></h1>
@@ -563,8 +630,20 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                     <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/85">
                       Academic Term
                     </div>
-                    <div className="mt-0.5 text-sm font-black uppercase tracking-[0.18em] bg-clip-text text-transparent bg-linear-to-r from-primary via-purple-600 to-indigo-600 dark:from-primary dark:via-purple-400 dark:to-blue-400">
-                      {effectiveSemester?.toUpperCase()} {effectiveYear}
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <div className="text-sm font-black uppercase tracking-[0.18em] bg-clip-text text-transparent bg-linear-to-r from-primary via-purple-600 to-indigo-600 dark:from-primary dark:via-purple-400 dark:to-blue-400">
+                        {effectiveSemester?.toUpperCase()} {effectiveYear}
+                      </div>
+                      {(() => {
+                        const currentStart = parseAcademicYearStart(defaultAcademicInfo.current_year) ?? new Date().getFullYear();
+                        const viewedStart = parseAcademicYearStart(String(effectiveYear)) ?? currentStart;
+                        if (viewedStart > currentStart) {
+                          return (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-100/40 px-2 py-0.5 rounded-full border border-amber-200">Future</span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                   <button
@@ -583,9 +662,9 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
           </div>
 
           <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
-          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses as Record<string, unknown>[]} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile as unknown as Record<string, unknown>} onEditInstructor={(course: Record<string, unknown>, _name: string, hasCustomName: boolean, customInstructor?: unknown) => {
+          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile ?? null} onEditInstructor={(course: DashboardCourse, _name: string, hasCustomName: boolean, customInstructor?: { instructor_name?: string | null } | undefined | null) => {
             const customInst = customInstructor as CustomInstructor | undefined;
-            setSelectedInstructorCourse({ code: String(course.code || course.id).toUpperCase().replace(/[\s\u00A0-]/g, ""), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
+            setSelectedInstructorCourse({ code: normalizeCourseCode(String(course.code || course.id)), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
             setIsEditInstructorOpen(true);
           }} onAddCourse={() => {
             if (!profile?.class?.id) {
