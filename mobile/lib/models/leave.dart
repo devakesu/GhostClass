@@ -158,7 +158,9 @@ class LeaveSession {
   factory LeaveSession.fromJson(Map<String, dynamic> json) {
     return LeaveSession(
       id: int.parse(json['id'].toString()),
-      leaveId: int.parse(json['student_leave_id'].toString()),
+      leaveId: json['student_leave_id'] != null
+          ? int.parse(json['student_leave_id'].toString())
+          : 0,
       date: json['date'] as String,
       session: json['session'] != null
           ? Session.fromJson(json['session'] as Map<String, dynamic>)

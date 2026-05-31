@@ -43,7 +43,8 @@ class AppConfig {
 
   /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
   /// Spoofed to match the official app domain.
-  static String get supabaseOrigin => webUrl;
+  static String get supabaseOrigin =>
+      AppSecrets.isDev ? 'https://localhost:3000' : webUrl;
 
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 

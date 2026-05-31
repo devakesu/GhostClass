@@ -142,10 +142,18 @@ export const useCourseDetails = (
  * Batch-prefetch all course summaries.
  * Accepts an array of objects containing code, id, and name to handle suppression and naming.
  */
-export const useAllCourseDetails = (courses: { code: string; id: number; name: string }[]) => {
+export const useAllCourseDetails = (
+  courses: { code: string; id: number; name: string }[],
+  semester?: string | null,
+  year?: string | null,
+  options?: { enabled?: boolean }
+) => {
   const queryClient = useQueryClient();
-  const { data: semester } = useFetchSemester();
-  const { data: year } = useFetchAcademicYear();
+  const { data: defaultSemester } = useFetchSemester();
+  const { data: defaultYear } = useFetchAcademicYear();
+
+  const activeSemester = semester !== undefined ? semester : (defaultSemester ?? null);
+  const activeYear = year !== undefined ? year : (defaultYear ?? null);
   
   // Explicitly deduplicate courses by code to prevent redundant batching.
   // This ensures the queryKey remains stable and the API receives a clean list.
@@ -165,7 +173,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
   );
 
   return useQuery<Record<string, CourseDetail>>({
-    queryKey: ["attendance-report-all", sortedCodes, semester ?? null, year ?? null],
+    queryKey: ["attendance-report-all", sortedCodes, activeSemester, activeYear],
     queryFn: async () => {
       const res = await axios.post("/api/attendance/summary-batch", { courses: uniqueCourses }, { baseURL: "" });
       if (!res || !res.data) throw new Error("Failed to fetch batch course details");
@@ -194,7 +202,7 @@ export const useAllCourseDetails = (courses: { code: string; id: number; name: s
 
       return data;
     },
-    enabled: uniqueCourses.length > 0,
+    enabled: options?.enabled !== false && uniqueCourses.length > 0,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnReconnect: true,

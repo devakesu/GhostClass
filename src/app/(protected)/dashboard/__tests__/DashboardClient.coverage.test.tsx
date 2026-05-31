@@ -61,7 +61,9 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(() => ({
     invalidateQueries: vi.fn(),
+    refetchQueries: vi.fn().mockResolvedValue({}),
     cancelQueries: vi.fn(),
+    setQueryData: vi.fn(),
   })),
 }));
 

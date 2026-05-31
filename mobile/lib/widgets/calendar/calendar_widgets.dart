@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
+import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/theme/app_theme.dart';
@@ -112,11 +114,9 @@ class AttendanceCalendarWidget extends StatelessWidget {
                                   Theme.of(context).colorScheme.primary)
                             : isToday
                             ? (Theme.of(
-                                            context,
-                                          )
-                                          .extension<GhostColors>()
-                                          ?.brandPrimary ??
-                                      Theme.of(context).colorScheme.primary)
+                                        context,
+                                      ).extension<GhostColors>()?.brandPurple ??
+                                      const Color(0xFF7C3AED))
                                   .withValues(alpha: 0.2)
                             : _getStatusBg(status, context),
                         shape: BoxShape.circle,
@@ -127,10 +127,8 @@ class AttendanceCalendarWidget extends StatelessWidget {
                                                   context,
                                                 )
                                                 .extension<GhostColors>()
-                                                ?.brandPrimary ??
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.primary)
+                                                ?.brandPurple ??
+                                            const Color(0xFF7C3AED))
                                         .withValues(alpha: 0.4),
                                 width: 1.5,
                               )
@@ -153,11 +151,9 @@ class AttendanceCalendarWidget extends StatelessWidget {
                                 ? Colors.white
                                 : isToday
                                 ? (Theme.of(
-                                            context,
-                                          )
-                                          .extension<GhostColors>()
-                                          ?.brandPrimary ??
-                                      Theme.of(context).colorScheme.primary)
+                                        context,
+                                      ).extension<GhostColors>()?.brandPurple ??
+                                      const Color(0xFF7C3AED))
                                 : status != null
                                 ? _getStatusColor(status, context)
                                 : Theme.of(context).colorScheme.onSurface
@@ -179,36 +175,158 @@ class AttendanceCalendarWidget extends StatelessWidget {
   String? _getDayStatus(DateTime date, BuildContext context) {
     final dateStr = DateFormat('yyyyMMdd').format(date);
     final dbDate = DateFormat('yyyy-MM-dd').format(date);
-    final sessions = dashboard.attendance.studentAttendanceData[dateStr];
-    final extraTracking = tracking.groupedByCourse.values
-        .expand((e) => e)
-        .where((t) => t.date == dbDate && t.status == 'extra')
-        .toList();
 
-    if (sessions == null && extraTracking.isEmpty) return null;
+    String resolveSafeId(String rawId) {
+      final normRaw = rawId.trim().toUpperCase();
+      for (final c in dashboard.courses) {
+        if (c.safeId.trim().toUpperCase() == normRaw ||
+            (c.code ?? '').trim().toUpperCase() == normRaw) {
+          return c.safeId;
+        }
+      }
+      final numericId = int.tryParse(rawId);
+      if (numericId != null) {
+        for (final c in dashboard.courses) {
+          if (c.id == numericId) return c.safeId;
+        }
+      }
+      return rawId;
+    }
 
     var hasAbsent = false;
     var hasDutyLeave = false;
     var hasOtherLeave = false;
     var hasPresent = false;
 
+    final sessions = dashboard.attendance.studentAttendanceData[dateStr];
     if (sessions != null) {
-      sessions.forEach((_, s) {
-        final status = AttendanceStatus.fromCode(s.attendance);
-        if (status == AttendanceStatus.absent) hasAbsent = true;
-        if (status == AttendanceStatus.dutyLeave) hasDutyLeave = true;
-        if (status == AttendanceStatus.otherLeave) hasOtherLeave = true;
-        if (status == AttendanceStatus.present) hasPresent = true;
+      var idx = 0;
+      sessions.forEach((key, sData) {
+        final rawId = sData.course.toString();
+        final safeId = resolveSafeId(rawId);
+        final normSafeId = safeId.trim().toUpperCase();
+
+        final courseDetails = dashboard.courses.firstWhere(
+          (c) =>
+              c.safeId.trim().toUpperCase() == normSafeId ||
+              (c.code ?? '').trim().toUpperCase() == normSafeId,
+          orElse: () => CourseDetails(id: 0, name: safeId),
+        );
+
+        final officialCourse = dashboard.attendance.courses[rawId];
+        if (officialCourse == null &&
+            courseDetails.id == 0 &&
+            courseDetails.name == safeId) {
+          idx++;
+          return;
+        }
+
+        var displaySessionName = sData.session?.toString() ?? key;
+        final sNumKey = int.tryParse(key);
+        if ((sData.session == null || sData.session.toString() == 'null') &&
+            sNumKey != null &&
+            sNumKey > 20) {
+          displaySessionName = (idx + 1).toString();
+        }
+
+        final resolvedCode = utils.resolveCourseDisplayCode(
+          courseKey: rawId,
+          mergedCourse: courseDetails,
+          officialReport: dashboard.attendance,
+        );
+
+        final isDisabled = disabledCodes.contains(
+          (resolvedCode ?? '').toUpperCase(),
+        );
+        final status = AttendanceStatus.fromCode(sData.attendance);
+
+        final trackerCourseCode =
+            (resolvedCode != null && resolvedCode.trim().isNotEmpty)
+            ? resolvedCode.replaceAll(RegExp(r'\s+'), '').toUpperCase()
+            : safeId.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+
+        final trackingKeys = {
+          rawId.trim().toUpperCase(),
+          safeId.trim().toUpperCase(),
+          trackerCourseCode.trim().toUpperCase(),
+        };
+        final trackingRecords = tracking.groupedByCourse.entries
+            .where(
+              (entry) => trackingKeys.contains(entry.key.trim().toUpperCase()),
+            )
+            .expand((entry) => entry.value)
+            .toList();
+
+        TrackingRecord? override;
+        final normDisplaySession = utils.normalizeSession(displaySessionName);
+        final normRawSession = utils.normalizeSession(key);
+        for (final t in trackingRecords) {
+          if (t.date != dbDate) continue;
+          final tNorm = utils.normalizeSession(t.session);
+          if (tNorm == normDisplaySession || tNorm == normRawSession) {
+            override = t;
+            break;
+          }
+        }
+
+        final isCorrection =
+            override != null && override.status == 'correction';
+
+        final currentStatus = isCorrection
+            ? AttendanceStatus.fromCode(override.attendance)
+            : status;
+
+        if (isDisabled) {
+          if (currentStatus == AttendanceStatus.present) {
+            hasPresent = true;
+          }
+          idx++;
+          return;
+        }
+
+        if (currentStatus == AttendanceStatus.absent) hasAbsent = true;
+        if (currentStatus == AttendanceStatus.dutyLeave) hasDutyLeave = true;
+        if (currentStatus == AttendanceStatus.otherLeave) hasOtherLeave = true;
+        if (currentStatus == AttendanceStatus.present) hasPresent = true;
+
+        idx++;
       });
     }
 
-    for (final t in extraTracking) {
-      final status = AttendanceStatus.fromCode(t.attendance);
-      if (status == AttendanceStatus.absent) hasAbsent = true;
-      if (status == AttendanceStatus.dutyLeave) hasDutyLeave = true;
-      if (status == AttendanceStatus.otherLeave) hasOtherLeave = true;
-      if (status == AttendanceStatus.present) hasPresent = true;
-    }
+    tracking.groupedByCourse.forEach((courseKey, list) {
+      final normKey = courseKey.trim().toUpperCase();
+      final courseDetails = dashboard.courses.firstWhere(
+        (c) =>
+            c.safeId.trim().toUpperCase() == normKey ||
+            (c.code ?? '').trim().toUpperCase() == normKey,
+        orElse: () => CourseDetails(id: 0, name: courseKey),
+      );
+
+      final displayCode = utils.resolveCourseDisplayCode(
+        courseKey: courseKey,
+        mergedCourse: courseDetails,
+        officialReport: dashboard.attendance,
+      );
+      final isDisabled = disabledCodes.contains(
+        (displayCode ?? '').toUpperCase(),
+      );
+
+      for (final tr in list) {
+        if (tr.date == dbDate && tr.status == 'extra') {
+          final trStatus = AttendanceStatus.fromCode(tr.attendance);
+          if (isDisabled) {
+            if (trStatus == AttendanceStatus.present) {
+              hasPresent = true;
+            }
+            continue;
+          }
+          if (trStatus == AttendanceStatus.absent) hasAbsent = true;
+          if (trStatus == AttendanceStatus.dutyLeave) hasDutyLeave = true;
+          if (trStatus == AttendanceStatus.otherLeave) hasOtherLeave = true;
+          if (trStatus == AttendanceStatus.present) hasPresent = true;
+        }
+      }
+    });
 
     if (hasAbsent) return 'absent';
     if (hasDutyLeave) return 'dutyLeave';
@@ -298,6 +416,10 @@ class CalendarLegend extends StatelessWidget {
         runSpacing: 12,
         alignment: WrapAlignment.center,
         children: [
+          _LegendItem(
+            label: 'Today',
+            color: ghostColors?.brandPurple ?? const Color(0xFF7C3AED),
+          ),
           _LegendItem(
             label: 'Present',
             color: ghostColors?.successGreen ?? const Color(0xFF10B981),

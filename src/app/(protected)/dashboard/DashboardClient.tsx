@@ -137,6 +137,13 @@ const shiftAcademicPeriod = (
     : { semester: "odd", year: formatAcademicYear(startYear + 1) };
 };
 
+const getPeriodIndex = (semester: string, year: string): number | null => {
+  const startYear = parseAcademicYearStart(year);
+  if (startYear === null) return null;
+  const sem = semester.toLowerCase();
+  return startYear * 2 + (sem === "even" ? 1 : 0);
+};
+
 const formatAcademicPeriod = (period: AcademicPeriod) => `${period.semester.toUpperCase()} ${period.year}`;
 
 function computeInitialDataValidity(
@@ -246,9 +253,19 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
 };
 
 export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
-  const { data: rawProfile, isLoading: isLoadingProfile } = useProfile({ sync: true, force: true });
+  const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
+
+  // The force variant uses its own ["profile", "synced"] query key to avoid
+  // deduplication with the navbar's no-force fetch. Once the EzyGo sync resolves,
+  // backfill the shared ["profile"] cache so the navbar and all other components
+  // see the latest data without needing their own round-trip.
+  useEffect(() => {
+    if (rawProfile) {
+      queryClient.setQueryData(["profile"], rawProfile);
+    }
+  }, [rawProfile, queryClient]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
   const setAcademicYearMutation = useSetAcademicYear({ skipInvalidations: true });
   const { targetPercentage } = useAttendanceSettings();
@@ -286,6 +303,8 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const [isEditInstructorOpen, setIsEditInstructorOpen] = useState(false);
   const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<{ code: string; name: string; initialName: string } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isShifting, setIsShifting] = useState(false);
+  const [hasRefetchedAllCourses, setHasRefetchedAllCourses] = useState(false);
   const [isSelectClassOpen, setIsSelectClassOpen] = useState(false);
   const academicShiftLockRef = useRef(false);
 
@@ -320,7 +339,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     [initialData, selectedSemester, selectedYear, ezygoSemester, ezygoYear, effectiveSemester, effectiveYear]
   );
 
-  const { data: rawAttendanceData, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
+  const { data: rawAttendanceData, isLoading: isLoadingAttendance, isFetching: isFetchingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
     enabled: syncSuccess,
     initialData: (isInitialDataValid && !isAttendanceStale) ? (initialData?.attendance as AttendanceReport ?? undefined) : undefined,
   });
@@ -349,7 +368,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return undefined;
   }, [initialData]);
 
-  const { data: rawCoursesData, isLoading: isLoadingCourses } = useFetchCourses({
+  const { data: rawCoursesData, isLoading: isLoadingCourses, isFetching: isFetchingCourses } = useFetchCourses({
     semester: currentSem,
     year: currentYear,
     enabled: syncSuccess && !!currentSem && !!currentYear,
@@ -365,7 +384,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const trackingData = rawTrackingData as TrackAttendance[] | undefined;
 
   const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: syncSuccess });
-  const { data: rawClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncSuccess && !!profile?.class?.id });
+  const { data: rawClassCourses, isFetching: isFetchingClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncSuccess && !!profile?.class?.id });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
   const { getCourseCodeById: getCourseCode } = useCourseLookup({
@@ -414,7 +433,86 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     };
   }, [coursesData, classCourses]);
 
-  const { data: allCourseSummaries, isLoading: isLoadingAllCourseSummaries } = useAllCourseDetails(courseList);
+  const isAllCourseDetailsEnabled =
+    !isUpdating &&
+    (!isShifting ||
+      (!isFetchingCourses && !isFetchingAttendance && !isFetchingClassCourses));
+
+  const {
+    data: allCourseSummaries,
+    isLoading: isLoadingAllCourseSummaries,
+    isFetching: isFetchingAllCourseSummaries,
+  } = useAllCourseDetails(courseList, currentSem, currentYear, { enabled: isAllCourseDetailsEnabled });
+
+  useEffect(() => {
+    if (!isShifting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional state reset when shifting ends
+      setHasRefetchedAllCourses(false);
+      return;
+    }
+
+    if (
+      !isUpdating &&
+      !isFetchingCourses &&
+      !isFetchingAttendance &&
+      !isFetchingClassCourses &&
+      !isLoadingProfile &&
+      !hasRefetchedAllCourses
+    ) {
+      setHasRefetchedAllCourses(true);
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+    }
+  }, [
+    isShifting,
+    isUpdating,
+    isFetchingCourses,
+    isFetchingAttendance,
+    isFetchingClassCourses,
+    isLoadingProfile,
+    hasRefetchedAllCourses,
+    queryClient,
+  ]);
+
+  useEffect(() => {
+    if (
+      isShifting &&
+      !isUpdating &&
+      hasRefetchedAllCourses &&
+      !isFetchingCourses &&
+      !isFetchingAttendance &&
+      !isFetchingClassCourses &&
+      !isFetchingAllCourseSummaries
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional state reset when transition finishes
+      setIsShifting(false);
+    }
+  }, [
+    isShifting,
+    isUpdating,
+    hasRefetchedAllCourses,
+    isFetchingCourses,
+    isFetchingAttendance,
+    isFetchingClassCourses,
+    isFetchingAllCourseSummaries,
+  ]);
+
+  useEffect(() => {
+    if (selectedSemester !== null || selectedYear !== null) {
+      // Invalidate all active queries affected by the semester/year shift.
+      // Since they are now active under the new term parameters, this forces them
+      // to reload the fresh data.
+      queryClient.invalidateQueries({ queryKey: ["courses", currentSem, currentYear], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report", currentSem, currentYear], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+      queryClient.invalidateQueries({ queryKey: ["course_instructors", currentSem, currentYear], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["track_data"] });
+      queryClient.invalidateQueries({ queryKey: ["count"] });
+      queryClient.invalidateQueries({ queryKey: ["exams", currentSem, currentYear], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["exam-answers"] });
+      queryClient.invalidateQueries({ queryKey: ["exam-questions"] });
+      queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] });
+    }
+  }, [selectedSemester, selectedYear, currentSem, currentYear, queryClient]);
 
   const { disabledCodes } = useDisabledCourses({ academicYear: currentYear, semester: currentSem });
 
@@ -428,14 +526,30 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
       return;
     }
 
-    // Clamp forward navigation to at most one academic year ahead of current
-    const currentStart = parseAcademicYearStart(defaultAcademicInfo.current_year) ?? new Date().getFullYear();
-    const maxAllowedStart = currentStart + 1;
-    const nextStart = parseAcademicYearStart(nextPeriod.year);
+    // Clamp forward navigation to at most one academic term ahead of current (date-based) period
     let clampedNext = nextPeriod;
-    if (direction === "next" && nextStart !== null && nextStart > maxAllowedStart) {
-      // clamp to the maximum allowed academic year
-      clampedNext = { semester: nextPeriod.semester, year: formatAcademicYear(maxAllowedStart) };
+    let wasClamped = false;
+    if (direction === "next") {
+      const currentIndex = getPeriodIndex(defaultAcademicInfo.current_semester, defaultAcademicInfo.current_year);
+      const nextIndex = getPeriodIndex(nextPeriod.semester, nextPeriod.year);
+      if (currentIndex !== null && nextIndex !== null && nextIndex > currentIndex + 1) {
+        const maxAllowedIndex = currentIndex + 1;
+        const maxAllowedStartYear = Math.floor(maxAllowedIndex / 2);
+        const maxAllowedSemester: AcademicSemester = maxAllowedIndex % 2 === 1 ? "even" : "odd";
+        clampedNext = {
+          semester: maxAllowedSemester,
+          year: formatAcademicYear(maxAllowedStartYear),
+        };
+        wasClamped = true;
+      }
+    }
+
+    if (clampedNext.semester === effectiveSemester && clampedNext.year === effectiveYear) {
+      toast.info("You cannot view past the maximum allowed academic period");
+      return;
+    }
+
+    if (wasClamped) {
       toast.info("Clamped to the nearest future academic period");
     }
 
@@ -447,49 +561,37 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const handleConfirmChange = async () => {
     if (!pendingChange || !profile?.username || isUpdating) return;
     setIsUpdating(true);
+    setIsShifting(true);
     setShowConfirmDialog(false);
 
     try {
-      const mutations = [];
       if (pendingChange.year !== effectiveYear) {
-        mutations.push(
-          setAcademicYearMutation.mutateAsync({
-            default_academic_year: pendingChange.year,
-          })
-        );
+        await setAcademicYearMutation.mutateAsync({
+          default_academic_year: pendingChange.year,
+        });
       }
       if (pendingChange.semester !== effectiveSemester) {
-        mutations.push(
-          setSemesterMutation.mutateAsync({
-            default_semester: pendingChange.semester,
-          })
-        );
+        await setSemesterMutation.mutateAsync({
+          default_semester: pendingChange.semester,
+        });
       }
 
-      await Promise.all(mutations);
+      // Perform a full profile refetch with force=true (which triggers EzyGo sync under the hood)
+      // to resolve the class assignment and other metadata for the new semester/year.
+      // We call refetchProfile directly (from the hook with sync+force options) rather than
+      // queryClient.refetchQueries, to guarantee the force-sync query function runs.
+      try {
+        await refetchProfile();
+      } catch (err) {
+        logger.error("Profile sync failed during transition, proceeding:", err);
+      }
 
       setSelectedSemester(pendingChange.semester);
       setSelectedYear(pendingChange.year);
-
-      // Coordinated, single invalidation for all queries affected by the semester/year shift.
-      // This includes resetting the profile query which triggers the background sync once.
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["courses"] }),
-        queryClient.invalidateQueries({ queryKey: ["attendance-report"] }),
-        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] }),
-        queryClient.invalidateQueries({ queryKey: ["class_courses"] }),
-        queryClient.invalidateQueries({ queryKey: ["course_instructors"] }),
-        queryClient.invalidateQueries({ queryKey: ["track_data"] }),
-        queryClient.invalidateQueries({ queryKey: ["count"] }),
-        queryClient.invalidateQueries({ queryKey: ["profile"] }),
-        queryClient.invalidateQueries({ queryKey: ["exams"] }),
-        queryClient.invalidateQueries({ queryKey: ["exam-answers"] }),
-        queryClient.invalidateQueries({ queryKey: ["exam-questions"] }),
-        queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }),
-      ]);
     } catch (error) {
       logger.error("Update Failed:", error);
       toast.error("Failed to update settings");
+      setIsShifting(false);
     } finally {
       setIsUpdating(false);
       setPendingChange(null);
@@ -516,7 +618,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const stats = useDashboardStats({ coursesData, attendanceData, trackingData, classCourses, disabledCodes, selectedSemester: effectiveSemester, selectedYear: effectiveYear });
 
-  
+
 
   const sortedCourses = useMemo<DashboardCourse[]>(() => {
     const seen = new Set<string>();
@@ -584,7 +686,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   if (!profile || isLoadingProfile || !currentSem || !currentYear || !syncSuccess) return <CompLoading />;
 
-  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncSuccess;
+  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncSuccess || isShifting;
 
   return (
     <LazyMotion features={domAnimation}>
@@ -630,7 +732,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                     <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/85">
                       Academic Term
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2">
+                    <div className="mt-0.5 flex items-center justify-center gap-2">
                       <div className="text-sm font-black uppercase tracking-[0.18em] bg-clip-text text-transparent bg-linear-to-r from-primary via-purple-600 to-indigo-600 dark:from-primary dark:via-purple-400 dark:to-blue-400">
                         {effectiveSemester?.toUpperCase()} {effectiveYear}
                       </div>
@@ -662,7 +764,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
           </div>
 
           <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
-          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries} sortedCourses={sortedCourses} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile ?? null} onEditInstructor={(course: DashboardCourse, _name: string, hasCustomName: boolean, customInstructor?: { instructor_name?: string | null } | undefined | null) => {
+          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries || !isAllCourseDetailsEnabled} sortedCourses={sortedCourses} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile ?? null} onEditInstructor={(course: DashboardCourse, _name: string, hasCustomName: boolean, customInstructor?: { instructor_name?: string | null } | undefined | null) => {
             const customInst = customInstructor as CustomInstructor | undefined;
             setSelectedInstructorCourse({ code: normalizeCourseCode(String(course.code || course.id)), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
             setIsEditInstructorOpen(true);

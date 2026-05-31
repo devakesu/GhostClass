@@ -79,6 +79,22 @@ const STATUS_MAP: Record<string, StatusInfo> = {
   },
 };
 
+const normalizeActionType = (type?: string | null): string => {
+  if (!type) return "";
+  const t = type.toLowerCase();
+  if (t === "reject" || t === "rejected") return "reject";
+  if (t === "approve" || t === "approved") return "approve";
+  if (t === "forward" || t === "forwarded") return "forward";
+  if (t === "recommend" || t === "recommended") return "recommend";
+  if (t === "pending") return "pending";
+  return t;
+};
+
+const isActed = (a: LeaveApprover) => 
+  (a.action_at !== null && a.action_at !== undefined && a.action_at !== "") ||
+  (a.action_by !== null && a.action_by !== undefined && a.action_by !== "") ||
+  (a.action_by_user !== null && a.action_by_user !== undefined);
+
 const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
   const defaultStatus: StatusInfo = {
     label: "Pending",
@@ -96,13 +112,18 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
   if (!approvers || approvers.length === 0) return defaultStatus;
 
   // If any level has rejected, the entire leave is immediately Rejected
-  const hasRejected = approvers.some((a) => a.action_type === "reject");
+  const hasRejected = approvers.some(
+    (a) => normalizeActionType(a.action_type) === "reject" && isActed(a)
+  );
   if (hasRejected) {
     return STATUS_MAP.reject;
   }
 
   const actedApprovers = [...approvers]
-    .filter((a) => a.action_type !== null || a.action_at !== null)
+    .filter((a) => {
+      const norm = normalizeActionType(a.action_type);
+      return isActed(a) && norm !== "pending" && norm !== "";
+    })
     .sort(
       (a, b) =>
         new Date(b.updated_at || "").getTime() - new Date(a.updated_at || "").getTime()
@@ -110,10 +131,11 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
 
   if (actedApprovers.length === 0) return defaultStatus;
 
-  const hasPending = approvers.some(
-    (a) => a.action_type === null && a.action_at === null
-  );
-  const lastAction = actedApprovers[0].action_type;
+  const hasPending = approvers.some((a) => {
+    const norm = normalizeActionType(a.action_type);
+    return norm === "pending" || (!isActed(a) && norm !== "reject");
+  });
+  const lastAction = normalizeActionType(actedApprovers[0].action_type);
 
   if (hasPending) {
     // If there are pending steps, we cannot be fully Approved.
@@ -152,26 +174,37 @@ const formatBytes = (bytes: string | number) => {
 };
 
 function getApproverStyles(type?: string | null) {
-  if (type === "approve") {
+  const norm = normalizeActionType(type);
+  if (norm === "approve") {
     return { bg: "bg-emerald-500/15", text: "text-emerald-600" };
   }
-  if (type === "reject") {
+  if (norm === "reject") {
     return { bg: "bg-red-500/15", text: "text-red-600" };
   }
-  if (type === "forward") {
+  if (norm === "forward") {
     return { bg: "bg-indigo-500/15", text: "text-indigo-600" };
   }
-  if (type === "recommend") {
+  if (norm === "recommend") {
     return { bg: "bg-blue-500/15", text: "text-blue-600" };
   }
   return { bg: "bg-primary/10", text: "text-primary" };
 }
 
 function WorkflowHistoryItem({ approver }: { approver: LeaveApprover }) {
-  const statusInfo = STATUS_MAP[approver.action_type || ""] || {
-    label: approver.action_type || "Unknown",
+  const norm = normalizeActionType(approver.action_type);
+  let statusInfo = {
+    label: approver.action_type || "Pending",
     color: "bg-muted text-muted-foreground",
   };
+  if (norm === "reject") {
+    statusInfo = STATUS_MAP.reject;
+  } else if (norm === "approve") {
+    statusInfo = STATUS_MAP.approve;
+  } else if (norm === "forward") {
+    statusInfo = STATUS_MAP.forward;
+  } else if (norm === "recommend") {
+    statusInfo = STATUS_MAP.recommend;
+  }
   const styles = getApproverStyles(approver.action_type);
 
   return (
@@ -420,6 +453,7 @@ export default function LeaveClient({
   }, [initialData, semesterData, academicYearData]);
 
   const allSessions = initialData?.studentLeaves?.student_leave_sessions || {};
+
   const approvedCount = useMemo(
     () =>
       leaves.filter((l) => getLeaveStatus(l.approvers).label === "Approved")

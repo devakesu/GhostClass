@@ -610,7 +610,7 @@ class _ScoreCard extends StatelessWidget {
                       Text(
                         resolved!.isMaxUnresolvable
                             ? ' (max unknown)'
-                            : ' / ${resolved!.maxMark.toStringAsFixed(0)}',
+                            : ' / ${resolved!.maxMark.toStringAsFixed(resolved!.maxMark % 1 == 0 ? 0 : 1)}',
                         style: GoogleFonts.manrope(
                           fontSize: resolved!.isMaxUnresolvable ? 12 : 16,
                           fontWeight: FontWeight.w700,
@@ -969,7 +969,7 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
                       Text(
                         widget.resolved!.isMaxUnresolvable
                             ? ' (max unknown)'
-                            : ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
+                            : ' / ${widget.resolved!.maxMark.toStringAsFixed(widget.resolved!.maxMark % 1 == 0 ? 0 : 1)}',
                         style: GoogleFonts.manrope(
                           fontSize: widget.resolved!.isMaxUnresolvable
                               ? 11
@@ -1063,7 +1063,7 @@ class _QuestionRow extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          '/${question.maximumMark.toStringAsFixed(0)}',
+          '/${question.maximumMark.toStringAsFixed(question.maximumMark % 1 == 0 ? 0 : 1)}',
           style: GoogleFonts.manrope(
             fontSize: 11,
             fontWeight: FontWeight.bold,

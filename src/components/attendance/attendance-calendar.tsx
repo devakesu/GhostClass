@@ -330,16 +330,26 @@ function checkEventStatusForDate(
   let hasAbsent = false;
   let hasDutyLeave = false;
   let hasOtherLeave = false;
+  let hasPresent = false;
 
   if (dateEvents.length > 0) {
     dateEvents.forEach(ev => {
       const finalStatus = ev.status;
-      if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) {
+      const isDisabled = isCourseDisabled(getCourseCodeById(ev.courseId));
+      if (isDisabled) {
+        if (finalStatus === "Present") {
+          hasPresent = true;
+        }
+        return;
+      }
+      if (finalStatus === "Absent") {
         hasAbsent = true;
       } else if (finalStatus === "Duty Leave") {
         hasDutyLeave = true;
       } else if (finalStatus.includes("Leave")) {
         hasOtherLeave = true;
+      } else if (finalStatus === "Present") {
+        hasPresent = true;
       }
     });
   } else if (hasExtra) {
@@ -351,21 +361,28 @@ function checkEventStatusForDate(
       if (Number(t.attendance) === 111) { label = "Absent"; }
       else if (Number(t.attendance) === 225) { label = "Duty Leave"; }
       
-      if (label === "Absent" && !isCourseDisabled(getCourseCodeById(String(t.course)))) {
+      const isDisabled = isCourseDisabled(getCourseCodeById(String(t.course)));
+      if (isDisabled) {
+        if (label === "Present") {
+          hasPresent = true;
+        }
+        return;
+      }
+      if (label === "Absent") {
         hasAbsent = true;
       } else if (label === "Duty Leave") {
         hasDutyLeave = true;
+      } else if (label === "Present") {
+        hasPresent = true;
       }
     });
   }
 
-  if (dateEvents.length === 0 && !hasExtra) {
-    return null;
-  }
   if (hasAbsent) { return "absent"; }
   if (hasDutyLeave) { return "dutyLeave"; }
   if (hasOtherLeave) { return "otherLeave"; }
-  return "present";
+  if (hasPresent) { return "present"; }
+  return null;
 }
 
 function mapOfficialEventsWithOverrides(
@@ -587,7 +604,7 @@ function computeCellClassName(
   }
 
   if (isTodayLocal) { 
-    baseClass += " ring-2 ring-offset-1 ring-offset-background ring-primary"; 
+    baseClass += " ring-2 ring-offset-1 ring-offset-background ring-violet-600 dark:ring-violet-500"; 
   }
   return baseClass;
 }
@@ -1219,7 +1236,7 @@ export function AttendanceCalendar({
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-blue-500/20 border border-blue-500/30" /><span>other leave</span></div>
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/30" /><span>duty leave</span></div>
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-emerald-500/20 border border-emerald-500/30" /><span>present</span></div>
-            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full ring-2 ring-primary ring-offset-1" /><span>today</span></div>
+            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full ring-2 ring-violet-600 dark:ring-violet-500 ring-offset-1" /><span>today</span></div>
           </div>
         </CardContent>
       </Card>

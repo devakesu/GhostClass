@@ -201,6 +201,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
+                  Text(
+                    'These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -220,17 +231,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.',
-                    style: GoogleFonts.manrope(
-                      fontSize: 12,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.4),
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ],
               ),

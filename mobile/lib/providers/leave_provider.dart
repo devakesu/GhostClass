@@ -43,8 +43,32 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final data = res.data as Map<String, dynamic>? ?? {};
     final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
     final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
-    final rawSessions =
-        studentLeaves['student_leave_sessions'] as List<dynamic>? ?? [];
+
+    final rawSessionsRaw = studentLeaves['student_leave_sessions'];
+    final sessions = <int, List<LeaveSession>>{};
+    if (rawSessionsRaw is Map) {
+      for (final entry in rawSessionsRaw.entries) {
+        final keyStr = entry.key.toString();
+        final leaveId = int.tryParse(keyStr);
+        if (leaveId == null) continue;
+
+        final value = entry.value;
+        if (value is List) {
+          for (final raw in value.whereType<Map<dynamic, dynamic>>()) {
+            final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
+            sessions.putIfAbsent(leaveId, () => []).add(session);
+          }
+        } else if (value is Map) {
+          final session = LeaveSession.fromJson(value.cast<String, dynamic>());
+          sessions.putIfAbsent(leaveId, () => []).add(session);
+        }
+      }
+    } else if (rawSessionsRaw is List) {
+      for (final raw in rawSessionsRaw.whereType<Map<dynamic, dynamic>>()) {
+        final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
+        sessions.putIfAbsent(session.leaveId, () => []).add(session);
+      }
+    }
 
     final leaves = rawLeaves
         .whereType<Map<dynamic, dynamic>>()
@@ -55,12 +79,6 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
               l.userSubgroup?.academicYear == academic.year,
         )
         .toList();
-
-    final sessions = <int, List<LeaveSession>>{};
-    for (final raw in rawSessions.whereType<Map<dynamic, dynamic>>()) {
-      final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
-      sessions.putIfAbsent(session.leaveId, () => []).add(session);
-    }
 
     return LeaveState(leaves: leaves, sessions: sessions);
   }

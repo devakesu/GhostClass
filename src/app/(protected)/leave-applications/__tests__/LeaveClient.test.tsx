@@ -136,6 +136,156 @@ describe('LeaveClient', () => {
     expect(screen.queryByText('Test Reason 4')).not.toBeInTheDocument()
   })
 
+  it('renders correctly for past-tense EzyGo action types (approved, rejected, forwarded, recommended, pending)', () => {
+    const initialData = {
+      studentLeaves: {
+        student_leaves: [
+          createMockLeave(1, 'approved'), // Approved
+          createMockLeave(2, 'rejected'),  // Rejected
+          createMockLeave(3, 'recommended'), // Recommended
+          createMockLeave(4, 'forwarded'), // Forwarded
+          createMockLeave(5, 'pending', {
+            approvers: [
+              {
+                id: 50,
+                action_type: 'approved',
+                action_by: 'user-1',
+                action_by_user: { first_name: 'A', last_name: 'B' },
+                action_at: '2026-03-26T10:00:00Z',
+                updated_at: '2026-03-26T10:00:00Z',
+              },
+              {
+                id: 51,
+                action_type: 'pending',
+                action_by: 'user-2',
+                action_by_user: { first_name: 'C', last_name: 'D' },
+                action_at: null,
+                updated_at: '2026-03-27T10:00:00Z',
+              }
+            ]
+          }), // In Progress (due to pending step)
+        ],
+        student_leave_sessions: {}
+      }
+    }
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
+
+    // Total should be 5
+    expect(screen.getAllByText('5').length).toBeGreaterThan(0)
+    // Approved count should be 1
+    expect(screen.getAllByText('1').length).toBeGreaterThan(0)
+
+    // Status badges should exist
+    expect(screen.getAllByText('Approved').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Recommended').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Forwarded').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0)
+  })
+
+  it('ignores unacted placeholder actions (such as reject with null action_at/by)', () => {
+    const initialData = {
+      studentLeaves: {
+        student_leaves: [
+          createMockLeave(1, null, {
+            leave_reason: 'Approved Leave with Reject Placeholder',
+            approvers: [
+              {
+                id: 10,
+                action_type: 'reject',
+                action_by: null,
+                action_at: null,
+                action_by_user: null,
+                updated_at: '2026-03-25T14:00:50.000000Z',
+              },
+              {
+                id: 11,
+                action_type: 'forward',
+                action_by: 5744,
+                action_at: '2026-04-01',
+                action_by_user: { first_name: 'Sony', last_name: 'P' },
+                updated_at: '2026-04-01T07:44:59.000000Z',
+              },
+              {
+                id: 12,
+                action_type: 'recommend',
+                action_by: 20045,
+                action_at: '2026-04-06',
+                action_by_user: { first_name: 'Sinu', last_name: 'T S' },
+                updated_at: '2026-04-06T04:58:06.000000Z',
+              },
+              {
+                id: 13,
+                action_type: 'approve',
+                action_by: 6053,
+                action_at: '2026-04-07',
+                action_by_user: { first_name: 'Dr Binu', last_name: 'V P' },
+                updated_at: '2026-04-07T06:31:20.000000Z',
+              }
+            ]
+          }),
+          createMockLeave(2, null, {
+            leave_reason: 'Forwarded Leave with Reject Placeholder',
+            approvers: [
+              {
+                id: 20,
+                action_type: 'reject',
+                action_by: null,
+                action_at: null,
+                action_by_user: null,
+                updated_at: '2026-03-25T14:00:50.000000Z',
+              },
+              {
+                id: 21,
+                action_type: 'forward',
+                action_by: 5744,
+                action_at: '2026-04-01',
+                action_by_user: { first_name: 'Sony', last_name: 'P' },
+                updated_at: '2026-04-01T07:44:59.000000Z',
+              }
+            ]
+          }),
+          createMockLeave(3, null, {
+            leave_reason: 'Fully Pending Leave',
+            approvers: [
+              {
+                id: 30,
+                action_type: 'reject',
+                action_by: null,
+                action_at: null,
+                action_by_user: null,
+                updated_at: '2026-03-25T14:00:50.000000Z',
+              },
+              {
+                id: 31,
+                action_type: 'approve',
+                action_by: null,
+                action_at: null,
+                action_by_user: null,
+                updated_at: '2026-03-25T14:00:50.000000Z',
+              }
+            ]
+          })
+        ],
+        student_leave_sessions: {}
+      }
+    }
+    renderWithClient(<LeaveClient initialData={initialData as any} />)
+
+    // Total should be 3
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
+
+    // Verify status badges are mapped correctly:
+    // Leave 1 is Approved
+    // Leave 2 is Forwarded
+    // Leave 3 is Pending
+    // Crucially, NO "Rejected" badge should exist since the reject placeholders are unacted!
+    expect(screen.getAllByText('Approved').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Forwarded').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Pending').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Rejected')).not.toBeInTheDocument()
+  })
+
   it('renders files when provided', () => {
     const initialData = {
       studentLeaves: {

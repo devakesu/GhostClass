@@ -15,12 +15,24 @@ interface UpdateProfileData {
 }
 
 export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean; force?: boolean }) => {
+  // Force callers (e.g. dashboard) use a separate query key so they are never
+  // deduplicated with the navbar's no-force fetch. When both share the same key,
+  // React Query merges observers into one in-flight request and the navbar's
+  // queryFn (no sync/force params) wins — the EzyGo sync never runs.
+  // staleTime:0 on the force key means it is always considered stale and always
+  // re-fetches on mount, regardless of what the shared ["profile"] cache holds.
+  const queryKey: unknown[] = options?.force ? ["profile", "synced"] : ["profile"];
+
   return useQuery<UserProfile | null>({
-    queryKey: ["profile"],
+    queryKey,
     queryFn: async () => {
       const params: Record<string, string> = {};
-      params.sync = "true";
-      params.force = "true";
+      // Only request a full EzyGo sync when the caller explicitly opts in.
+      // Without force=true the server uses its debounce window (5 min) and
+      // returns the locally-cached DB row immediately — the avatar URL is
+      // already stored there, so it loads without waiting for an EzyGo round-trip.
+      if (options?.sync) params.sync = "true";
+      if (options?.force) params.force = "true";
 
       const res = await axiosInstance.get<UserProfile>("/api/profile", {
         params: Object.keys(params).length > 0 ? params : undefined,
@@ -29,8 +41,9 @@ export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean
       return res.data;
     },
     initialData: options?.initialData,
-    // Cache for 5 mins to avoid spamming the sync logic
-    staleTime: 1000 * 60 * 5,
+    // Force variant: staleTime 0 so it always re-fetches on mount.
+    // Normal variant: 5-min cache to avoid hammering the sync logic.
+    staleTime: options?.force ? 0 : 1000 * 60 * 5,
     gcTime: 30 * 60 * 1000,
     // Never retry 4xx errors (rate limit, auth, bad request) — retrying a 429
     // would waste a rate-limit slot. Retries once for 5xx / network errors.

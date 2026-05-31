@@ -881,12 +881,12 @@ export function AddAttendanceDialog({
             className={cn(
               "custom-button transition-colors min-w-[120px]",
               statusType === "Present" &&
-                "bg-green-600 hover:bg-green-700 text-white",
+                "bg-green-600! hover:bg-green-700! text-white! border-none!",
               statusType === "Absent" &&
-                "bg-red-600 hover:bg-red-700 text-white",
+                "bg-red-600! hover:bg-red-700! text-white! border-none!",
               statusType === "Duty Leave" &&
-                "bg-yellow-600 hover:bg-yellow-700 text-white",
-              "disabled:opacity-100 disabled:bg-muted disabled:text-muted-foreground disabled:border-border/70",
+                "bg-yellow-600! hover:bg-yellow-700! text-white! border-none!",
+              "disabled:opacity-100 disabled:!bg-muted disabled:!text-muted-foreground disabled:border-border/70",
             )}
           >
             {isSubmitting

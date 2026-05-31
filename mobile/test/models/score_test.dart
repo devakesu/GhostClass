@@ -58,6 +58,38 @@ void main() {
       expect(exam.date, isNull);
     });
 
+    test(
+      'fromJson prioritizes settings questionPaperMaximumMark over maximum_mark',
+      () {
+        final exam = Exam.fromJson({
+          'id': 1,
+          'maximum_mark': 100,
+          'settings': {'questionPaperMaximumMark': 80},
+        });
+
+        expect(exam.maximumMark, 80);
+      },
+    );
+
+    test(
+      'fromJson falls back to maximum_mark if settings questionPaperMaximumMark is 0 or null',
+      () {
+        final exam1 = Exam.fromJson({
+          'id': 1,
+          'maximum_mark': 100,
+          'settings': {'questionPaperMaximumMark': 0},
+        });
+        expect(exam1.maximumMark, 100);
+
+        final exam2 = Exam.fromJson({
+          'id': 2,
+          'maximum_mark': 100,
+          'settings': {'questionPaperMaximumMark': null},
+        });
+        expect(exam2.maximumMark, 100);
+      },
+    );
+
     test('courseName falls back when course list is empty', () {
       final exam = Exam(
         id: 1,

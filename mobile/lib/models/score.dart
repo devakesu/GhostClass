@@ -47,6 +47,7 @@ class Exam {
         .toList();
 
     final settingsMap = json['settings'] as Map<String, dynamic>? ?? {};
+    final fromSettings = _toDouble(settingsMap['questionPaperMaximumMark']);
 
     return Exam(
       id: toInt(json['id']) ?? 0,
@@ -60,9 +61,9 @@ class Exam {
       endsAt: json['end_at'] != null
           ? DateTime.tryParse(json['end_at'] as String)
           : null,
-      maximumMark:
-          _toDouble(json['maximum_mark']) ??
-          _toDouble(settingsMap['questionPaperMaximumMark']),
+      maximumMark: (fromSettings != null && fromSettings != 0.0)
+          ? fromSettings
+          : _toDouble(json['maximum_mark']),
       apiScore: pivotScore,
       courses: coursesList,
     );

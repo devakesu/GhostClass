@@ -819,6 +819,11 @@ class LeavesScreen extends ConsumerWidget {
     );
   }
 
+  bool _isActed(LeaveApprover a) {
+    return (a.actionAt != null && a.actionAt!.isNotEmpty) ||
+        a.actionByUser != null;
+  }
+
   _LeaveStatus _getLeaveStatus(
     BuildContext context,
     List<LeaveApprover> approvers,
@@ -832,14 +837,16 @@ class LeavesScreen extends ConsumerWidget {
     }
 
     // If any level has rejected, the entire leave is immediately Rejected
-    final hasRejected = approvers.any((a) => a.actionType == 'reject');
+    final hasRejected = approvers.any(
+      (a) => a.actionType == 'reject' && _isActed(a),
+    );
     if (hasRejected) {
       return _LeaveStatus('Rejected', Colors.red, LucideIcons.xCircle);
     }
 
     final actedApprovers =
         approvers
-            .where((a) => a.actionType != null || a.actionAt != null)
+            .where((a) => _isActed(a) && a.actionType != 'pending')
             .toList()
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -848,7 +855,9 @@ class LeavesScreen extends ConsumerWidget {
     }
 
     final hasPending = approvers.any(
-      (a) => a.actionType == null && a.actionAt == null,
+      (a) =>
+          a.actionType == 'pending' ||
+          (!_isActed(a) && a.actionType != 'reject'),
     );
     final lastAction = actedApprovers.first.actionType;
 

@@ -80,7 +80,7 @@
     "date-fns": "^4.1.0",
     "firebase-admin": "^13.8.0",
     "framer-motion": "^12.34.3",
-    "googleapis": "^172.0.0",
+    "googleapis": "^173.0.0",
     "jose": "^6.2.2",
     "ldrs": "^1.1.9",
     "lodash-es": "^4.17.23",

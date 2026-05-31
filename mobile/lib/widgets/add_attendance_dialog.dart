@@ -722,12 +722,14 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
                                       ],
                                     ),
                                   ),
-                                  if (isSelected)
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 12),
                                     Icon(
                                       LucideIcons.checkCircle2,
                                       color: primary,
                                       size: 18,
                                     ),
+                                  ],
                                 ],
                               ),
                             ),

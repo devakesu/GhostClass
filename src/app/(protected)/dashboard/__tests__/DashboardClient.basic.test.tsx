@@ -82,6 +82,8 @@ vi.mock('@/hooks/users/profile', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(() => ({ 
     invalidateQueries: vi.fn(),
+    refetchQueries: vi.fn().mockResolvedValue({}),
+    setQueryData: vi.fn(),
     clear: vi.fn(),
   })),
 }));
