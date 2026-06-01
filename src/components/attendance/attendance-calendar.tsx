@@ -56,7 +56,7 @@ import { useTrackingData } from "@/hooks/tracker/useTrackingData";
 import { useTrackingCount } from "@/hooks/tracker/useTrackingCount";
 import { isDutyLeaveConstraintError, getDutyLeaveErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
-import { formatSessionName, generateSlotKey, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
+import { formatSessionName, generateSlotKey, normalizeCourseCode, normalizeSession, toRoman, normalizeToISODate, cn } from "@/lib/utils";
 import { isLegacyRemark } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useQueryClient } from "@tanstack/react-query";
@@ -155,31 +155,31 @@ function resolveCourseCode(
   classCourses?: ClassCourse[],
   attendanceData?: AttendanceReport
 ): string {
-  const normalizedInput = id.trim().toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const normalizedInput = normalizeCourseCode(id.trim());
 
   // eslint-disable-next-line security/detect-object-injection
   const dictCourse = coursesData?.courses?.[id];
   if (dictCourse) {
-    return (dictCourse.code || id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(dictCourse.code || id);
   }
 
   const course = Object.values(coursesData?.courses || {}).find(c => 
-    String(c.id) === id || (c.code && c.code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput)
+    String(c.id) === id || (c.code && normalizeCourseCode(c.code) === normalizedInput)
   );
   if (course?.code) {
-    return course.code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(course.code);
   }
   
   const custom = classCourses?.find(cc => 
-    cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedInput
+    normalizeCourseCode(cc.course_code) === normalizedInput
   );
   if (custom) {
-    return custom.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "");
+    return normalizeCourseCode(custom.course_code);
   }
 
   // eslint-disable-next-line security/detect-object-injection
   const altCourse = attendanceData?.courses?.[id];
-  return (altCourse?.code ?? id).toUpperCase().replace(/[\s\u00A0-]/g, "");
+  return normalizeCourseCode(altCourse?.code ?? id);
 }
 
 function resolveCourseName(
@@ -198,9 +198,9 @@ function resolveCourseName(
     return course.name;
   }
 
-  const normalizedId = id.toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const normalizedId = normalizeCourseCode(id);
   const custom = classCourses?.find(cc => 
-    cc.course_code.toUpperCase().replace(/[\s\u00A0-]/g, "") === normalizedId
+    normalizeCourseCode(cc.course_code) === normalizedId
   );
   if (custom) {
     return custom.course_name || custom.course_code;
@@ -330,16 +330,26 @@ function checkEventStatusForDate(
   let hasAbsent = false;
   let hasDutyLeave = false;
   let hasOtherLeave = false;
+  let hasPresent = false;
 
   if (dateEvents.length > 0) {
     dateEvents.forEach(ev => {
       const finalStatus = ev.status;
-      if (finalStatus === "Absent" && !isCourseDisabled(getCourseCodeById(ev.courseId))) {
+      const isDisabled = isCourseDisabled(getCourseCodeById(ev.courseId));
+      if (isDisabled) {
+        if (finalStatus === "Present") {
+          hasPresent = true;
+        }
+        return;
+      }
+      if (finalStatus === "Absent") {
         hasAbsent = true;
       } else if (finalStatus === "Duty Leave") {
         hasDutyLeave = true;
       } else if (finalStatus.includes("Leave")) {
         hasOtherLeave = true;
+      } else if (finalStatus === "Present") {
+        hasPresent = true;
       }
     });
   } else if (hasExtra) {
@@ -351,21 +361,28 @@ function checkEventStatusForDate(
       if (Number(t.attendance) === 111) { label = "Absent"; }
       else if (Number(t.attendance) === 225) { label = "Duty Leave"; }
       
-      if (label === "Absent" && !isCourseDisabled(getCourseCodeById(String(t.course)))) {
+      const isDisabled = isCourseDisabled(getCourseCodeById(String(t.course)));
+      if (isDisabled) {
+        if (label === "Present") {
+          hasPresent = true;
+        }
+        return;
+      }
+      if (label === "Absent") {
         hasAbsent = true;
       } else if (label === "Duty Leave") {
         hasDutyLeave = true;
+      } else if (label === "Present") {
+        hasPresent = true;
       }
     });
   }
 
-  if (dateEvents.length === 0 && !hasExtra) {
-    return null;
-  }
   if (hasAbsent) { return "absent"; }
   if (hasDutyLeave) { return "dutyLeave"; }
   if (hasOtherLeave) { return "otherLeave"; }
-  return "present";
+  if (hasPresent) { return "present"; }
+  return null;
 }
 
 function mapOfficialEventsWithOverrides(
@@ -587,7 +604,7 @@ function computeCellClassName(
   }
 
   if (isTodayLocal) { 
-    baseClass += " ring-2 ring-offset-1 ring-offset-background ring-primary"; 
+    baseClass += " ring-2 ring-offset-1 ring-offset-background ring-violet-600 dark:ring-violet-500"; 
   }
   return baseClass;
 }
@@ -1219,7 +1236,7 @@ export function AttendanceCalendar({
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-blue-500/20 border border-blue-500/30" /><span>other leave</span></div>
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/30" /><span>duty leave</span></div>
             <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-emerald-500/20 border border-emerald-500/30" /><span>present</span></div>
-            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full ring-2 ring-primary ring-offset-1" /><span>today</span></div>
+            <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full ring-2 ring-violet-600 dark:ring-violet-500 ring-offset-1" /><span>today</span></div>
           </div>
         </CardContent>
       </Card>

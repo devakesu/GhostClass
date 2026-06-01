@@ -16,9 +16,9 @@ class JweInterceptor extends Interceptor {
   JweService get _jweService => _serviceOverride ?? JweService.instance;
 
   // Use a map to store RCEKs for concurrent requests with self-pruning timestamps
-  static final Map<String, _RcekEntry> _rcekMap = {};
+  final Map<String, _RcekEntry> _rcekMap = {};
 
-  static void _pruneExpiredRceks() {
+  void _pruneExpiredRceks() {
     final now = DateTime.now();
     // Prune entries older than 2 minutes (120 seconds) to prevent any unbounded leak
     _rcekMap.removeWhere(

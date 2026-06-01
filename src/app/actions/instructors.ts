@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { courseCodeSchema, personNameSchema } from "@/lib/validation/text";
+import { normalizeCourseCode } from "@/lib/utils";
 
 export async function upsertInstructorAction(
   formData: FormData,
@@ -88,7 +89,7 @@ export async function upsertInstructorAction(
       .from("course_instructors")
       .upsert({
         class_id: profile.class_id,
-        course_code: courseCode.toUpperCase().replace(/[\s\u00A0-]/g, ""),
+        course_code: normalizeCourseCode(courseCode),
         instructor_name: instructorName,
         updated_by: user.id
       }, {

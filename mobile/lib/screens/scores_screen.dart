@@ -3,12 +3,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,8 +32,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
   @override
   Widget build(BuildContext context) {
     final scoreState = ref.watch(scoreProvider);
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
 
-    if (scoreState.isLoading) {
+    if (scoreState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -75,24 +79,24 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
           ServiceRefreshIndicator(
             useOverlay: false,
             onRefresh: () async {
+              final authNotifier = ref.read(authProvider.notifier);
+              final supabaseClient = ref.read(supabaseClientProvider);
+              final apiService = ref.read(apiServiceProvider);
+              final scoreNotifier = ref.read(scoreProvider.notifier);
               try {
                 await runUnifiedPullToRefresh(
+                  invalidateNotifications: () =>
+                      ref.invalidate(notificationsProvider),
                   logLabel: 'ScoresScreen',
-                  refreshProfile: () => ref
-                      .read(authProvider.notifier)
-                      .refreshProfile(force: true),
+                  refreshProfile: () =>
+                      authNotifier.refreshProfile(force: true),
                   syncCron: () async {
-                    final supabaseToken = ref
-                        .read(supabaseClientProvider)
-                        .auth
-                        .currentSession
-                        ?.accessToken;
+                    final supabaseToken =
+                        supabaseClient.auth.currentSession?.accessToken;
                     if (supabaseToken == null) return;
-                    await ref
-                        .read(apiServiceProvider)
-                        .triggerSync(supabaseToken, force: true);
+                    await apiService.triggerSync(supabaseToken, force: true);
                   },
-                  refreshData: () => ref.read(scoreProvider.notifier).refresh(),
+                  refreshData: scoreNotifier.refresh,
                 );
               } on Object {
                 if (!context.mounted) rethrow;
@@ -202,13 +206,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                         ),
                   loading: () =>
                       const SliverFillRemaining(child: SizedBox.shrink()),
-                  error: (err, _) => const SliverFillRemaining(
-                    child: Center(
-                      child: Text(
-                        'We encountered an error while loading your scores. Please try again later. If the issue persists, please contact us.',
-                        style: TextStyle(color: Colors.redAccent),
-                        textAlign: TextAlign.center,
-                      ),
+                  error: (err, _) => SliverFillRemaining(
+                    child: ServiceErrorView(
+                      error: err,
+                      onRetry: () => ref.invalidate(scoreProvider),
                     ),
                   ),
                 ),
@@ -609,7 +610,7 @@ class _ScoreCard extends StatelessWidget {
                       Text(
                         resolved!.isMaxUnresolvable
                             ? ' (max unknown)'
-                            : ' / ${resolved!.maxMark.toStringAsFixed(0)}',
+                            : ' / ${resolved!.maxMark.toStringAsFixed(resolved!.maxMark % 1 == 0 ? 0 : 1)}',
                         style: GoogleFonts.manrope(
                           fontSize: resolved!.isMaxUnresolvable ? 12 : 16,
                           fontWeight: FontWeight.w700,
@@ -968,7 +969,7 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
                       Text(
                         widget.resolved!.isMaxUnresolvable
                             ? ' (max unknown)'
-                            : ' / ${widget.resolved!.maxMark.toStringAsFixed(0)}',
+                            : ' / ${widget.resolved!.maxMark.toStringAsFixed(widget.resolved!.maxMark % 1 == 0 ? 0 : 1)}',
                         style: GoogleFonts.manrope(
                           fontSize: widget.resolved!.isMaxUnresolvable
                               ? 11
@@ -1062,7 +1063,7 @@ class _QuestionRow extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          '/${question.maximumMark.toStringAsFixed(0)}',
+          '/${question.maximumMark.toStringAsFixed(question.maximumMark % 1 == 0 ? 0 : 1)}',
           style: GoogleFonts.manrope(
             fontSize: 11,
             fontWeight: FontWeight.bold,

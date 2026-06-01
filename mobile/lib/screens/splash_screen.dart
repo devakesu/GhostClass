@@ -25,6 +25,7 @@ import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/services/security_guard.dart';
 import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/services/startup_flow_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
@@ -49,10 +50,6 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  static Future<_StartupSnapshot>? _startupInFlight;
-  static _StartupSnapshot? _startupCache;
-  static DateTime? _startupCacheAt;
-  static String? _startupCacheSessionKey;
   static const Duration _startupCacheTtl = Duration(seconds: 20);
 
   bool _pushInitTriggered = false;
@@ -63,22 +60,34 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     return session?.user.id ?? 'anon';
   }
 
-  bool _canUseStartupCache(String sessionKey) {
-    final cachedAt = _startupCacheAt;
-    if (_startupCache == null || cachedAt == null) return false;
-    if (_startupCacheSessionKey != sessionKey) return false;
+  bool _canUseStartupCache(String sessionKey, StartupFlowService startupFlow) {
+    final cachedAt = startupFlow.startupCacheAt;
+    final cache = startupFlow.startupCache;
+    if (cache == null || cache is! _StartupSnapshot || cachedAt == null) {
+      return false;
+    }
+    if (startupFlow.startupCacheSessionKey != sessionKey) return false;
     return DateTime.now().difference(cachedAt) <= _startupCacheTtl;
   }
 
   Future<_StartupSnapshot> _runStartupChecksSingleFlight() {
     final sessionKey = _currentSessionKey();
-    if (_canUseStartupCache(sessionKey)) {
-      return Future<_StartupSnapshot>.value(_startupCache);
+    final startupFlow = ref.read(startupFlowServiceProvider);
+
+    final cache = startupFlow.startupCache;
+    if (cache is _StartupSnapshot &&
+        _canUseStartupCache(sessionKey, startupFlow)) {
+      return Future<_StartupSnapshot>.value(cache);
     }
 
-    final inFlight = _startupInFlight;
-    if (inFlight != null && _startupCacheSessionKey == sessionKey) {
-      return inFlight;
+    final inFlight = startupFlow.startupInFlight;
+    if (inFlight != null && startupFlow.startupCacheSessionKey == sessionKey) {
+      return inFlight.then((val) {
+        if (val is _StartupSnapshot) return val;
+        throw StateError(
+          'Invalid in-flight startup snapshot type: ${val.runtimeType}',
+        );
+      });
     }
 
     final api = ref.read(apiServiceProvider);
@@ -130,11 +139,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
+      Object? jweError;
+      StackTrace? jweStack;
+
+      final jweTask = JweService.instance
+          .preWarm()
+          .then((_) {
+            AppLogger.i('SplashScreen: jweTask completed');
+          })
+          .catchError((Object e, StackTrace st) {
+            AppLogger.e('SplashScreen: jweTask failed', e, st);
+            jweError = e;
+            jweStack = st;
+          });
+
       api.clearCaches();
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
       await Future.wait<dynamic>([
         integrityTask,
         authTask,
+        jweTask,
       ]);
       AppLogger.i('SplashScreen: Future.wait completed');
 
@@ -147,22 +171,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (authError != null) {
         Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
       }
+      if (jweError != null) {
+        Error.throwWithStackTrace(jweError!, jweStack ?? StackTrace.current);
+      }
 
       return _StartupSnapshot(user: user, versionResult: versionResult);
     }();
 
-    _startupCacheSessionKey = sessionKey;
-    _startupInFlight = future;
+    startupFlow
+      ..startupCacheSessionKey = sessionKey
+      ..startupInFlight = future;
 
     return future
         .then((snapshot) {
-          _startupCache = snapshot;
-          _startupCacheAt = DateTime.now();
+          startupFlow
+            ..startupCache = snapshot
+            ..startupCacheAt = DateTime.now();
           return snapshot;
         })
         .whenComplete(() {
-          if (identical(_startupInFlight, future)) {
-            _startupInFlight = null;
+          if (identical(startupFlow.startupInFlight, future)) {
+            startupFlow.startupInFlight = null;
           }
         });
   }
@@ -225,13 +254,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   void _startPostNavigationPreloads({
-    required bool isDashboard,
     required ApiService apiService,
-    required Future<dynamic> dashboardFuture,
-    required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
   }) {
     AppLogger.safeUnawait(
       JweService.instance.preWarm().catchError(
@@ -247,28 +270,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }),
       'SplashScreen: post-nav API pre-warm',
     );
-
-    if (isDashboard) {
-      _prewarmAppData(
-        dashboardFuture: dashboardFuture,
-        trackingFuture: trackingFuture,
-        leaveFuture: leaveFuture,
-        scoreFuture: scoreFuture,
-        notificationsFuture: notificationsFuture,
-      );
-    }
   }
 
   Future<void> _initializeApp() async {
-    // Start JWE key warm-up early so attestation requests can reuse prepared
-    // key material, but do not block startup on this.
-    AppLogger.safeUnawait(
-      JweService.instance.preWarm().catchError((Object e, StackTrace st) {
-        AppLogger.e('SplashScreen: early JWE pre-warm failed', e, st);
-      }),
-      'SplashScreen: early JWE pre-warm',
-    );
-
     // Keep the splash visible for 1.5s to improve perceived startup time
     final splashHold = Future<void>.delayed(
       const Duration(milliseconds: 1500),
@@ -371,27 +375,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         );
 
         final isConnectionOrQuota =
-            (appCheckError != null &&
-                (appCheckError.toLowerCase().contains('quota') ||
-                    appCheckError.toLowerCase().contains('connection') ||
-                    appCheckError.toLowerCase().contains('timeout') ||
-                    appCheckError.toLowerCase().contains('too_many_attempts') ||
-                    appCheckError.toLowerCase().contains('network') ||
-                    appCheckError.toLowerCase().contains('rate limit') ||
-                    appCheckError.toLowerCase().contains('server') ||
-                    appCheckError.toLowerCase().contains('internal error') ||
-                    appCheckError.toLowerCase().contains('-12') ||
-                    appCheckError.toLowerCase().contains('unavailable'))) ||
-            (reason.toLowerCase().contains('quota') ||
-                reason.toLowerCase().contains('connection') ||
-                reason.toLowerCase().contains('timeout') ||
-                reason.toLowerCase().contains('too_many_attempts') ||
-                reason.toLowerCase().contains('network') ||
-                reason.toLowerCase().contains('rate limit') ||
-                reason.toLowerCase().contains('server') ||
-                reason.toLowerCase().contains('internal error') ||
-                reason.toLowerCase().contains('-12') ||
-                reason.toLowerCase().contains('unavailable'));
+            SecurityService.isTransientAppCheckFailureText(appCheckError) ||
+            SecurityService.isTransientAppCheckFailureText(reason);
 
         final isGenuineSecurityFailure = !isConnectionOrQuota;
 
@@ -422,12 +407,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             '$e\n\n'
             '${appCheckError != null ? "Local Error: $appCheckError" : ""}',
           ),
-          retryLabel: Platform.isAndroid
-              ? (isCritical ? 'Close App' : 'Restart App')
-              : (isCritical ? null : 'Retry'),
-          onRetry: Platform.isAndroid
-              ? SystemNavigator.pop
-              : (isCritical ? null : _beginInitializeIfIdle),
+          retryLabel: isCritical
+              ? 'Close App'
+              : (Platform.isAndroid ? 'Restart App' : 'Retry'),
+          onRetry: isCritical
+              ? () => ref.read(securityGuardProvider).wipeAndExit()
+              : (Platform.isAndroid
+                    ? SystemNavigator.pop
+                    : _beginInitializeIfIdle),
         );
         return;
       }
@@ -477,14 +464,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final supabaseClient = ref.read(supabaseClientProvider);
     final token = supabaseClient.auth.currentSession?.accessToken;
 
-    final dashboardFuture = ref.read(dashboardProvider.future);
-    final trackingFuture = ref.read(trackingProvider.future);
-    final leaveFuture = ref.read(leaveProvider.future);
-    final scoreFuture = ref.read(scoreProvider.future);
-    final notificationsFuture = ref.read(notificationsProvider.future);
-
     if (finalUser != null) {
       if (finalUser.termsAccepted) {
+        final dashboardFuture = ref.read(dashboardProvider.future);
+        final trackingFuture = ref.read(trackingProvider.future);
+        final leaveFuture = ref.read(leaveProvider.future);
+        final scoreFuture = ref.read(scoreProvider.future);
+        final notificationsFuture = ref.read(notificationsProvider.future);
+
         _startPushInitInBackgroundAfterSplash(pushService);
         context.go('/dashboard');
         AppLogger.safeUnawait(
@@ -500,13 +487,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               notificationsFuture: notificationsFuture,
             );
             _startPostNavigationPreloads(
-              isDashboard: true,
               apiService: apiService,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
           }).catchError((Object e, StackTrace st) {
             AppLogger.e('SplashScreen: post-dashboard preloads failed', e, st);
@@ -519,13 +500,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         AppLogger.safeUnawait(
           Future<void>.microtask(() async {
             _startPostNavigationPreloads(
-              isDashboard: false,
               apiService: apiService,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
           }).catchError((Object e, StackTrace st) {
             AppLogger.e(
@@ -543,13 +518,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       AppLogger.safeUnawait(
         Future<void>.microtask(() async {
           _startPostNavigationPreloads(
-            isDashboard: false,
             apiService: apiService,
-            dashboardFuture: dashboardFuture,
-            trackingFuture: trackingFuture,
-            leaveFuture: leaveFuture,
-            scoreFuture: scoreFuture,
-            notificationsFuture: notificationsFuture,
           );
         }).catchError((Object e, StackTrace st) {
           AppLogger.e('SplashScreen: post-login preloads failed', e, st);
@@ -604,16 +573,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               curve: Curves.easeOutCubic,
             )
             .then() // Chain effects after the entrance
-            .animate(onPlay: (controller) => controller.repeat(reverse: true))
+            .animate(
+              onPlay: (controller) => controller.repeat(
+                reverse: true,
+                period: 1200.ms,
+              ),
+            )
             .scale(
               begin: const Offset(1, 1),
               end: const Offset(1.05, 1.05),
-              duration: 500.ms,
+              duration: 1200.ms,
               curve: Curves.easeInOut,
             )
-            .animate(onPlay: (controller) => controller.repeat())
             .shimmer(
-              duration: 600.ms,
+              duration: 1200.ms,
               color: Colors.white.withValues(alpha: 0.3),
             ),
       ),

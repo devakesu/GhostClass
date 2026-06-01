@@ -61,7 +61,9 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(() => ({
     invalidateQueries: vi.fn(),
+    refetchQueries: vi.fn().mockResolvedValue({}),
     cancelQueries: vi.fn(),
+    setQueryData: vi.fn(),
   })),
 }));
 
@@ -182,7 +184,7 @@ describe('DashboardClient', () => {
     vi.mocked(useDisabledCourses).mockReturnValue({ disabledCodes: new Set() } as any);
     vi.mocked(useCourseLookup).mockReturnValue({ getCourseCodeById: vi.fn((id) => id) } as any);
     vi.mocked(useAllCourseDetails).mockReturnValue({ data: [], isLoading: false, isFetching: false } as any);
-    vi.mocked(useSyncOnMount).mockReturnValue({ syncCompleted: true, isSyncing: false } as any);
+    vi.mocked(useSyncOnMount).mockReturnValue({ isSyncing: false, syncSettled: true, syncFailed: false } as any);
     vi.mocked(useSetSemester).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
     vi.mocked(useSetAcademicYear).mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false } as any);
   });

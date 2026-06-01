@@ -96,7 +96,7 @@ export default function NotificationsPage() {
   // Use mountId-based sync logic (now managed inside useSyncOnMount)
 
   // Sync attendance data on mount; deduplication handled by the hook.
-  const { isSyncing, syncCompleted } = useSyncOnMount({
+  const { isSyncing, syncSettled, syncFailed } = useSyncOnMount({
     username: user?.username,
     userId: user?.id,
     sentryLocation: "NotificationsClient",
@@ -125,7 +125,7 @@ export default function NotificationsPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage
-  } = useNotifications(syncCompleted);
+  } = useNotifications(true);
 
   const [readingId, setReadingId] = useState<number | null>(null);
 
@@ -134,28 +134,28 @@ export default function NotificationsPage() {
     const items: VirtualItem[] = [];
 
     // 1. ACTION REQUIRED (Unread Conflicts)
-    const unreadActions = actionNotifications.filter(n => !n.is_read);
+    const unreadActions = actionNotifications.filter((n: Notification) => !n.is_read);
     if (unreadActions.length > 0) {
       items.push({ type: 'header', id: 'action-header', label: 'ACTION REQUIRED' });
-      unreadActions.forEach(n => {
+      unreadActions.forEach((n: Notification) => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
 
     // 2. UNREAD (Unread Regular)
-    const unreadRegular = regularNotifications.filter(n => !n.is_read);
+    const unreadRegular = regularNotifications.filter((n: Notification) => !n.is_read);
     if (unreadRegular.length > 0) {
       items.push({ type: 'header', id: 'unread-header', label: 'UNREAD' });
-      unreadRegular.forEach(n => {
+      unreadRegular.forEach((n: Notification) => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
 
     // 3. EARLIER (All Read Notifications)
-    const readNotifications = regularNotifications.filter(n => n.is_read);
+    const readNotifications = regularNotifications.filter((n: Notification) => n.is_read);
     if (readNotifications.length > 0) {
       items.push({ type: 'header', id: 'earlier-header', label: 'EARLIER' });
-      readNotifications.forEach(n => {
+      readNotifications.forEach((n: Notification) => {
         items.push({ type: 'notification', id: n.id, data: n });
       });
     }
@@ -231,8 +231,8 @@ export default function NotificationsPage() {
       }
   }, [toggleRead, readingId, rowVirtualizer, user?.id]);
 
-  // Block rendering until user is available, data has loaded, and initial sync has completed.
-  if (!user?.id || isLoading || isSyncing || !syncCompleted) return <Loading />;
+  // Block rendering only on auth/data readiness; sync runs in the background.
+  if (!user?.id || isLoading) return <Loading />;
 
   const isEmpty = virtualItems.length === 0;
 
@@ -252,6 +252,12 @@ export default function NotificationsPage() {
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-600 dark:text-blue-400 animate-pulse">
                   <Loader2 size={10} className="animate-spin" />
                   <span>Syncing</span>
+                </div>
+              )}
+              {syncSettled && syncFailed && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                  <AlertCircle size={10} />
+                  <span>Showing cached data</span>
                 </div>
               )}
             </h1>

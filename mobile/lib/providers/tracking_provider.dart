@@ -6,7 +6,6 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -52,12 +51,6 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
-  static bool _isSyncingExternal = false;
-
-  String _canonicalTrackerCourseCode(String courseId) {
-    return utils.standardizeCourseCode(courseId);
-  }
-
   @override
   FutureOr<TrackingState> build() async {
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
@@ -65,7 +58,10 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<TrackingState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final academic = academicAsync.value;
@@ -77,12 +73,6 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         isSyncing: false,
         syncCompleted: false,
       );
-    }
-
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<TrackingState>().future;
     }
 
     // 2. Initial Load
@@ -107,23 +97,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    var syncCompleted = false;
-    if (forceSync) {
-      if (_isSyncingExternal) {
-        syncCompleted = true;
-      } else {
-        _isSyncingExternal = true;
-        try {
-          // Sync is now primarily triggered by DashboardNotifier.refresh
-          // or NavigationShell. Individual triggers here are redundant.
-        } finally {
-          _isSyncingExternal = false;
-          syncCompleted = true;
-        }
-      }
-    } else {
-      syncCompleted = true;
-    }
+    const syncCompleted = true;
 
     late final AttendanceReportDetailed officialReport;
     final records = <TrackingRecord>[];
@@ -220,7 +194,6 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
   /// DashboardNotifier.refresh() already handles the primary sync, so pass
   /// forceSync: false when calling from that context to avoid redundant requests.
   Future<void> refresh({bool forceSync = false}) async {
-    ref.invalidate(notificationsProvider);
     final academicAsync = ref.read(academicProvider);
     final user = ref.read(authProvider).value;
     final supabaseToken = ref
@@ -260,7 +233,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final academic = academicAsync.value;
     if (auth == null || academic == null) return;
 
-    final canonicalCourseId = _canonicalTrackerCourseCode(courseId);
+    final canonicalCourseId = utils.standardizeCourseCode(courseId);
 
     try {
       final response = await ref

@@ -43,7 +43,8 @@ class AppConfig {
 
   /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
   /// Spoofed to match the official app domain.
-  static String get supabaseOrigin => webUrl;
+  static String get supabaseOrigin =>
+      AppSecrets.isDev ? 'https://localhost:3000' : webUrl;
 
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ class AppConfig {
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.4.5');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.4.6');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
@@ -188,6 +189,9 @@ class AppConfig {
 
       return decoded;
     } on Object {
+      if (!AppSecrets.isDev) {
+        assert(false, 'AppConfig._d: value appears to be unencoded: $encoded');
+      }
       // Return the raw string as fallback if it's not actually base64
       // This allows migration and reduces breakage for unencoded dev strings
       final fallback = encoded.trim();

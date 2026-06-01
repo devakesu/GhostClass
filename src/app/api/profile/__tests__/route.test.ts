@@ -856,4 +856,98 @@ describe("Edge Case & Branch Coverage", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Failed to update profile" });
   });
+
+  it("backgrounds the profile sync when class sem/year match expected academic settings (no conflict)", async () => {
+    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const expected = calculateCurrentAcademicInfo();
+    
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { 
+            id: 1, 
+            first_name: "Alice", 
+            auth_id: MOCK_USER.id,
+            class: { 
+              id: "class-id", 
+              name: "Test Class", 
+              sem: expected.current_semester, 
+              year: expected.current_year 
+            }
+          },
+          error: null,
+        }),
+      }),
+    }));
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    expect(mockPerformProfileSync).not.toHaveBeenCalled();
   });
+
+  it("performs blocking profile sync synchronously when class sem/year do not match expected settings (conflict)", async () => {
+    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const expected = calculateCurrentAcademicInfo();
+    const wrongSem = expected.current_semester === "even" ? "odd" : "even";
+    
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { 
+            id: 1, 
+            first_name: "Alice", 
+            auth_id: MOCK_USER.id,
+            class: { 
+              id: "class-id", 
+              name: "Test Class", 
+              sem: wrongSem, 
+              year: expected.current_year 
+            }
+          },
+          error: null,
+        }),
+      }),
+    }));
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    expect(mockPerformProfileSync).toHaveBeenCalledOnce();
+  });
+
+  it("performs blocking profile sync synchronously when force=true even when class sem/year match expected settings (no conflict)", async () => {
+    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const expected = calculateCurrentAcademicInfo();
+    
+    mockAdminSelect.mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { 
+            id: 1, 
+            first_name: "Alice", 
+            auth_id: MOCK_USER.id,
+            class: { 
+              id: "class-id", 
+              name: "Test Class", 
+              sem: expected.current_semester, 
+              year: expected.current_year 
+            }
+          },
+          error: null,
+        }),
+      }),
+    }));
+    
+    const { GET } = await import("../route");
+    const req = new NextRequest("http://localhost/api/profile?sync=true&force=true");
+    const res = await GET(req, { params: {} });
+    
+    expect(res.status).toBe(200);
+    expect(mockPerformProfileSync).toHaveBeenCalledOnce();
+  });
+});

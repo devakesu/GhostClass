@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,7 +55,13 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
           message: dialogMessage,
           technicalDetails: error.message,
           retryLabel: isCritical ? 'Close App' : 'Restart App',
-          onRetry: SystemNavigator.pop,
+          onRetry: () async {
+            if (Platform.isAndroid) {
+              await SystemNavigator.pop();
+            } else {
+              exit(0);
+            }
+          },
         );
         return;
       }
@@ -78,7 +86,13 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
             technicalDetails:
                 '${error.type.name.toUpperCase()}: ${error.message}',
             retryLabel: 'Restart App',
-            onRetry: SystemNavigator.pop,
+            onRetry: () async {
+              if (Platform.isAndroid) {
+                await SystemNavigator.pop();
+              } else {
+                exit(0);
+              }
+            },
           );
           return;
         }

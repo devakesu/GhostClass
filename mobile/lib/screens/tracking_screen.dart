@@ -8,6 +8,7 @@ import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/tracking_ui_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -43,8 +44,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final dashboardAsync = ref.watch(dashboardProvider);
     final data = trackingState.value;
     final dashboard = dashboardAsync.value;
+    final user = ref.watch(authProvider).value;
+    final isSyncing = user?.isSyncing ?? false;
 
-    if (trackingState.isLoading) {
+    if (trackingState.isLoading || isSyncing) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -115,23 +118,23 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
+        final authNotifier = ref.read(authProvider.notifier);
+        final supabaseClient = ref.read(supabaseClientProvider);
+        final apiService = ref.read(apiServiceProvider);
+        final trackingNotifier = ref.read(trackingProvider.notifier);
         try {
           await runUnifiedPullToRefresh(
+            invalidateNotifications: () =>
+                ref.invalidate(notificationsProvider),
             logLabel: 'TrackingScreen',
-            refreshProfile: () =>
-                ref.read(authProvider.notifier).refreshProfile(force: true),
+            refreshProfile: () => authNotifier.refreshProfile(force: true),
             syncCron: () async {
-              final supabaseToken = ref
-                  .read(supabaseClientProvider)
-                  .auth
-                  .currentSession
-                  ?.accessToken;
+              final supabaseToken =
+                  supabaseClient.auth.currentSession?.accessToken;
               if (supabaseToken == null) return;
-              await ref
-                  .read(apiServiceProvider)
-                  .triggerSync(supabaseToken, force: true);
+              await apiService.triggerSync(supabaseToken, force: true);
             },
-            refreshData: () => ref.read(trackingProvider.notifier).refresh(),
+            refreshData: trackingNotifier.refresh,
           );
         } on Object catch (e, st) {
           AppLogger.e('TrackingScreen: Pull-to-refresh failed', e, st);
@@ -198,6 +201,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
+                  Text(
+                    'These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -217,17 +231,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.',
-                    style: GoogleFonts.manrope(
-                      fontSize: 12,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.4),
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ],
               ),

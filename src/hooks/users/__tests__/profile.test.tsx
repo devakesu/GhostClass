@@ -56,11 +56,11 @@ describe("profile hooks", () => {
       expect(result.current.data).toEqual(mockProfile);
       expect(axiosInstance.get).toHaveBeenCalledWith(
         "/api/profile",
-        expect.objectContaining({ params: { sync: "true", force: "true" } }),
+        expect.objectContaining({ params: undefined }),
       );
     });
 
-    it("should send sync and force params when requested", async () => {
+    it("should send sync and force params when explicitly requested (uses separate query key)", async () => {
       const mockProfile = { id: "1", first_name: "Test" };
       (axiosInstance.get as any).mockResolvedValueOnce({ data: mockProfile });
 

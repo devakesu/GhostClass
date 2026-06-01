@@ -16,7 +16,10 @@ class MockDio extends Mock implements Dio {}
 
 class MockDioService extends Mock implements DioService {}
 
-class MockSecureStorageService extends Mock implements SecureStorageService {}
+class MockSecureStorageService extends Mock implements SecureStorageService {
+  @override
+  Future<void> clearAllCachedData() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

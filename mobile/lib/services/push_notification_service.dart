@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -59,6 +60,10 @@ class PushNotificationService {
       await _tokenSub?.cancel();
       await _messageSub?.cancel();
       await _messageOpenedSub?.cancel();
+      await _deferredAuthSub?.cancel();
+      _deferredAuthTimer?.cancel();
+      _deferredAuthSub = null;
+      _deferredAuthTimer = null;
       // Request permissions natively on iOS and Android targets
       final settings = await _messaging.requestPermission();
 
@@ -133,14 +138,18 @@ class PushNotificationService {
                   ?.overlay
                   ?.context;
               if (context != null && context.mounted) {
-                ServiceToast.showNotification(
-                  context,
-                  title: notification.title!,
-                  body: notification.body ?? '',
-                  onTap: () {
-                    router.go('/notifications');
-                  },
-                );
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) {
+                    ServiceToast.showNotification(
+                      context,
+                      title: notification.title!,
+                      body: notification.body ?? '',
+                      onTap: () {
+                        router.go('/notifications');
+                      },
+                    );
+                  }
+                });
               }
             } on Object catch (e) {
               AppLogger.e(
@@ -264,15 +273,7 @@ class PushNotificationService {
           if (session != null) {
             try {
               final accessToken = session.accessToken;
-              final baseUrl = AppConfig.ghostclassApiUrl;
-              final response = await _dio.post<dynamic>(
-                '$baseUrl/auth/register-fcm',
-                data: {'fcm_token': token.trim()},
-                options: Options(
-                  headers: {'Authorization': 'Bearer $accessToken'},
-                  validateStatus: (s) => s != null && s < 600,
-                ),
-              );
+              final response = await _registerTokenHttp(token, accessToken);
               if (response.statusCode == 200) {
                 AppLogger.i('FCM push token registered on auth event');
                 try {
@@ -328,16 +329,7 @@ class PushNotificationService {
       }
 
       final accessToken = currentSession.accessToken;
-      final baseUrl = AppConfig.ghostclassApiUrl;
-
-      final response = await _dio.post<dynamic>(
-        '$baseUrl/auth/register-fcm',
-        data: {'fcm_token': token.trim()},
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-          validateStatus: (s) => s != null && s < 600,
-        ),
-      );
+      final response = await _registerTokenHttp(token, accessToken);
 
       if (response.statusCode == 200) {
         AppLogger.i('FCM push token securely registered with backend services');
@@ -404,6 +396,21 @@ class PushNotificationService {
         );
       } on Object catch (_) {}
     }
+  }
+
+  Future<Response<dynamic>> _registerTokenHttp(
+    String token,
+    String accessToken,
+  ) {
+    final baseUrl = AppConfig.ghostclassApiUrl;
+    return _dio.post<dynamic>(
+      '$baseUrl/auth/register-fcm',
+      data: {'fcm_token': token.trim()},
+      options: Options(
+        headers: {'Authorization': 'Bearer $accessToken'},
+        validateStatus: (s) => s != null && s < 600,
+      ),
+    );
   }
 
   void dispose() {

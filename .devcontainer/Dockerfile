@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04@sha256:81380e4c9c14e8a629
 USER root
 
 # Copy pinned artifacts so they can be used as defaults when build-args are not provided
-COPY .devcontainer/pinned-artifacts.json /tmp/pinned-artifacts.json
+COPY pinned-artifacts.json /tmp/pinned-artifacts.json
 
 # 1. System Dependencies, Java 17, and SSH Setup
 RUN apt-get update && apt-get install -y \

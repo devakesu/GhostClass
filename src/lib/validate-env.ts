@@ -415,7 +415,13 @@ function validateGaAndLimits(errors: string[], warnings: string[]) {
   }
 
   checkRateLimitVar(process.env.NEXT_PUBLIC_ATTENDANCE_TARGET_MIN, 1, 100, "❌ NEXT_PUBLIC_ATTENDANCE_TARGET_MIN must be a number between 1 and 100 (default: 75)", errors);
-  checkRateLimitVar(process.env.AUTH_LOCK_TTL, 15, 60, "❌ AUTH_LOCK_TTL must be a number between 15 and 60 seconds (default: 20)", errors);
+  // Explicitly reject '0' because code-level logic treats non-positive values as a fallback default (20s).
+  // This avoids the silent mismatch where AUTH_LOCK_TTL=0 would be interpreted as default 20 at runtime.
+  if (process.env.AUTH_LOCK_TTL && process.env.AUTH_LOCK_TTL.trim() === "0") {
+    errors.push("❌ AUTH_LOCK_TTL must be between 15 and 60 seconds — setting 0 is not allowed");
+  } else {
+    checkRateLimitVar(process.env.AUTH_LOCK_TTL, 15, 60, "❌ AUTH_LOCK_TTL must be a number between 15 and 60 seconds (default: 20)", errors);
+  }
 
   const sentryReplayRate = process.env.NEXT_PUBLIC_SENTRY_REPLAY_RATE;
   if (sentryReplayRate) {

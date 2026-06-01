@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart'
+    show calculateCurrentAcademicInfo;
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -36,6 +39,19 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
       currentPeriod,
       _PeriodDirection.next,
     );
+
+    final currentAcademic = calculateCurrentAcademicInfo();
+    final curSem = currentAcademic['current_semester']!;
+    final curYear = currentAcademic['current_year']!;
+    final currentIndex = _getPeriodIndex(curSem, curYear);
+
+    var isNextAllowed = true;
+    if (nextPeriod != null && currentIndex != null) {
+      final nextIndex = _getPeriodIndex(nextPeriod.semester, nextPeriod.year);
+      if (nextIndex != null && nextIndex > currentIndex + 1) {
+        isNextAllowed = false;
+      }
+    }
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -121,6 +137,7 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
                   context,
                   currentPeriod: currentPeriod,
                   targetPeriod: nextPeriod,
+                  isAllowed: isNextAllowed,
                 ),
               ),
             ),
@@ -134,8 +151,19 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
     BuildContext context, {
     required _AcademicPeriod currentPeriod,
     required _AcademicPeriod? targetPeriod,
+    bool isAllowed = true,
   }) async {
-    if (_academicPeriodChangeLocked || targetPeriod == null) return;
+    if (_academicPeriodChangeLocked) return;
+
+    if (!isAllowed) {
+      ServiceToast.show(
+        context,
+        'You cannot view past the maximum allowed academic period',
+      );
+      return;
+    }
+
+    if (targetPeriod == null) return;
 
     setState(() {
       _academicPeriodChangeLocked = true;
@@ -375,4 +403,11 @@ String _formatAcademicYear(int startYear) {
 
 String _formatAcademicPeriod(_AcademicPeriod period) {
   return '${period.semester.toUpperCase()} ${period.year}';
+}
+
+int? _getPeriodIndex(String semester, String year) {
+  final startYear = _parseAcademicYearStart(year);
+  if (startYear == null) return null;
+  final sem = semester.toLowerCase();
+  return startYear * 2 + (sem.contains('even') ? 1 : 0);
 }

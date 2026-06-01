@@ -13,6 +13,7 @@ import { withSecurity } from "@/lib/security/app-check";
 import { performProfileSync } from "@/lib/user/sync";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
 import { birthDateSchema, genderSchema, optionalPersonNameSchema, personNameSchema } from "@/lib/validation/text";
+import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +142,7 @@ async function performSyncAndFetchUser(
       };
     }
 
-    const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", userId).single();
+    const { data: updatedUser } = await supabaseAdmin.from("users").select("*, class:classes(id, name, sem, year)").eq("auth_id", userId).single();
     return {
       updatedUser: updatedUser ?? existingUser,
       syncResult,
@@ -233,15 +234,27 @@ const getHandler = async (req: NextRequest) => {
   const user = await authenticateUser(req, supabaseAdmin);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
 
-  const { data: existingUserRaw } = await supabaseAdmin.from("users").select("*, class:classes(id, name)").eq("auth_id", user.id).maybeSingle();
+  const { data: existingUserRaw } = await supabaseAdmin.from("users").select("*, class:classes(id, name, sem, year)").eq("auth_id", user.id).maybeSingle();
   const searchParams = req.nextUrl.searchParams;
-  const shouldSync = searchParams.get("sync") === "true";
+  let shouldSync = searchParams.get("sync") === "true";
   const force = searchParams.get("force") === "true";
   if (existingUserRaw && existingUserRaw.first_name) {
     const lastSyncedAtStr = existingUserRaw.last_synced_at as string | null | undefined;
     const lastSyncedAt = lastSyncedAtStr ? new Date(lastSyncedAtStr) : new Date(0);
     const minutesSinceSync = (Date.now() - lastSyncedAt.getTime()) / 60000;
     const isDebounced = !force && minutesSinceSync < 5;
+
+    // Check if semester/year has changed since last sync
+    const userClass = existingUserRaw.class as { sem?: string; year?: string } | null | undefined;
+    const expectedAcademic = calculateCurrentAcademicInfo();
+    const hasAcademicConflict = !userClass || 
+      userClass.sem !== expectedAcademic.current_semester || 
+      userClass.year !== expectedAcademic.current_year;
+
+    // If there is no conflict/change, we can optimize and do the profile sync in the background (non-blocking)
+    if (shouldSync && !hasAcademicConflict && !force) {
+      shouldSync = false;
+    }
 
     return loadExistingUserBundle(existingUserRaw, user.id, shouldSync, isDebounced, supabaseAdmin);
   }

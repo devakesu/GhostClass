@@ -82,6 +82,8 @@ vi.mock('@/hooks/users/profile', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(() => ({ 
     invalidateQueries: vi.fn(),
+    refetchQueries: vi.fn().mockResolvedValue({}),
+    setQueryData: vi.fn(),
     clear: vi.fn(),
   })),
 }));
@@ -141,7 +143,7 @@ vi.mock('@/hooks/courses/useCourseLookup', () => ({
 }));
 
 vi.mock('@/hooks/use-sync-on-mount', () => ({
-  useSyncOnMount: vi.fn(() => ({ syncCompleted: true, isSyncing: false })),
+  useSyncOnMount: vi.fn(() => ({ isSyncing: false, syncSettled: true, syncFailed: false })),
 }));
 
 vi.mock('@/hooks/courses/useDisabledCourses', () => ({

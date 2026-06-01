@@ -170,14 +170,6 @@ class CalendarSessionCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (event.isDisabled) ...[
-                          Icon(
-                            LucideIcons.eyeOff,
-                            size: 10,
-                            color: disabledTextColor,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
                         Text(
                           event.status.toUpperCase(),
                           style: GoogleFonts.manrope(
@@ -190,6 +182,10 @@ class CalendarSessionCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (event.isDisabled) ...[
+                    const SizedBox(height: 6),
+                    const _DisabledTag(),
+                  ],
                   if (event.isCorrection) ...[
                     const SizedBox(height: 6),
                     const _CorrectionTag(),
@@ -350,6 +346,45 @@ class _ActionButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DisabledTag extends StatelessWidget {
+  const _DisabledTag();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayColor = isDark
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65);
+    final color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.4);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.1 : 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.eyeOff, size: 10, color: displayColor),
+          const SizedBox(width: 6),
+          Text(
+            'DISABLED',
+            style: GoogleFonts.manrope(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              color: displayColor,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }

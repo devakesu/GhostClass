@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
@@ -27,18 +26,15 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<LeaveState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final academic = academicAsync.value;
 
     if (authState.value == null || academic == null) return LeaveState.empty();
-
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<LeaveState>().future;
-    }
 
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
@@ -47,8 +43,32 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final data = res.data as Map<String, dynamic>? ?? {};
     final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
     final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
-    final rawSessions =
-        studentLeaves['student_leave_sessions'] as Map<dynamic, dynamic>? ?? {};
+
+    final rawSessionsRaw = studentLeaves['student_leave_sessions'];
+    final sessions = <int, List<LeaveSession>>{};
+    if (rawSessionsRaw is Map) {
+      for (final entry in rawSessionsRaw.entries) {
+        final keyStr = entry.key.toString();
+        final leaveId = int.tryParse(keyStr);
+        if (leaveId == null) continue;
+
+        final value = entry.value;
+        if (value is List) {
+          for (final raw in value.whereType<Map<dynamic, dynamic>>()) {
+            final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
+            sessions.putIfAbsent(leaveId, () => []).add(session);
+          }
+        } else if (value is Map) {
+          final session = LeaveSession.fromJson(value.cast<String, dynamic>());
+          sessions.putIfAbsent(leaveId, () => []).add(session);
+        }
+      }
+    } else if (rawSessionsRaw is List) {
+      for (final raw in rawSessionsRaw.whereType<Map<dynamic, dynamic>>()) {
+        final session = LeaveSession.fromJson(raw.cast<String, dynamic>());
+        sessions.putIfAbsent(session.leaveId, () => []).add(session);
+      }
+    }
 
     final leaves = rawLeaves
         .whereType<Map<dynamic, dynamic>>()
@@ -60,23 +80,11 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
         )
         .toList();
 
-    final sessions = <int, List<LeaveSession>>{};
-    rawSessions.forEach((key, value) {
-      final parsedKey = int.tryParse(key.toString());
-      if (parsedKey != null && value is List<dynamic>) {
-        sessions[parsedKey] = value
-            .whereType<Map<dynamic, dynamic>>()
-            .map((s) => LeaveSession.fromJson(s.cast<String, dynamic>()))
-            .toList();
-      }
-    });
-
     return LeaveState(leaves: leaves, sessions: sessions);
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
-    state = const AsyncValue.loading();
     ref.invalidateSelf();
+    await future;
   }
 }

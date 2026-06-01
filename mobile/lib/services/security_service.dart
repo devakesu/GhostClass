@@ -41,13 +41,15 @@ class SecurityService {
   static const Duration _cachedAttestationMaxAge = Duration(hours: 6);
   static const Duration _blockingAttestationMaxAge = Duration(days: 7);
 
+  late final Dio _cachedDio = _ref.read(dioServiceProvider).dio;
+
   Dio get _dio {
     if (_disposed) {
       throw StateError(
         'Cannot use SecurityService after it has been disposed.',
       );
     }
-    return _ref.read(dioServiceProvider).dio;
+    return _cachedDio;
   }
 
   bool _isVersionOlder(String current, String target) {
@@ -70,7 +72,8 @@ class SecurityService {
     return false;
   }
 
-  bool _isTransientAppCheckFailureText(String text) {
+  static bool isTransientAppCheckFailureText(String? text) {
+    if (text == null) return false;
     final msg = text.toLowerCase();
     return msg.contains('quota') ||
         msg.contains('connection') ||
@@ -89,8 +92,7 @@ class SecurityService {
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.badCertificate) {
+          e.type == DioExceptionType.connectionError) {
         return true;
       }
       final statusCode = e.response?.statusCode;
@@ -106,17 +108,24 @@ class SecurityService {
       final reason = (e.details?['reason'] as String?) ?? e.message;
       final appCheckError = e.details?['appCheckError'] as String?;
       final isConnectionOrQuota =
-          (appCheckError != null &&
-              _isTransientAppCheckFailureText(appCheckError)) ||
-          _isTransientAppCheckFailureText(reason);
+          isTransientAppCheckFailureText(appCheckError) ||
+          isTransientAppCheckFailureText(reason);
       if (isConnectionOrQuota) {
         return true;
       }
     }
 
     final msg = e.toString().toLowerCase();
-    if (msg.contains('socketexception') ||
+
+    // Security/certificate/handshake validation failures are not transient.
+    if (msg.contains('badcertificate') ||
         msg.contains('handshakeexception') ||
+        msg.contains('certverify') ||
+        msg.contains('certificate')) {
+      return false;
+    }
+
+    if (msg.contains('socketexception') ||
         msg.contains('network') ||
         msg.contains('connection') ||
         msg.contains('timeout')) {
@@ -272,27 +281,8 @@ class SecurityService {
         final appCheckError = e.details?['appCheckError'] as String?;
 
         final isConnectionOrQuota =
-            (appCheckError != null &&
-                (appCheckError.toLowerCase().contains('quota') ||
-                    appCheckError.toLowerCase().contains('connection') ||
-                    appCheckError.toLowerCase().contains('timeout') ||
-                    appCheckError.toLowerCase().contains('too_many_attempts') ||
-                    appCheckError.toLowerCase().contains('network') ||
-                    appCheckError.toLowerCase().contains('rate limit') ||
-                    appCheckError.toLowerCase().contains('server') ||
-                    appCheckError.toLowerCase().contains('internal error') ||
-                    appCheckError.toLowerCase().contains('-12') ||
-                    appCheckError.toLowerCase().contains('unavailable'))) ||
-            (reason.toLowerCase().contains('quota') ||
-                reason.toLowerCase().contains('connection') ||
-                reason.toLowerCase().contains('timeout') ||
-                reason.toLowerCase().contains('too_many_attempts') ||
-                reason.toLowerCase().contains('network') ||
-                reason.toLowerCase().contains('rate limit') ||
-                reason.toLowerCase().contains('server') ||
-                reason.toLowerCase().contains('internal error') ||
-                reason.toLowerCase().contains('-12') ||
-                reason.toLowerCase().contains('unavailable'));
+            isTransientAppCheckFailureText(appCheckError) ||
+            isTransientAppCheckFailureText(reason);
 
         final isGenuineSecurityFailure = !isConnectionOrQuota;
 

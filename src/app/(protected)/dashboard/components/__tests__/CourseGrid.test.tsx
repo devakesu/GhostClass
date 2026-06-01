@@ -49,8 +49,8 @@ describe('CourseGrid', () => {
     isLoadingCourses: false,
     isLoadingAllCourseSummaries: false,
     sortedCourses: [
-      { id: 1, code: 'CS101', key: '1', institution_users: [] },
-      { id: 2, code: 'CS102', key: '2', institution_users: [] },
+      { id: 1, name: 'Computer Science 1', code: 'CS101', key: '1', institution_users: [] },
+      { id: 2, name: 'Computer Science 2', code: 'CS102', key: '2', institution_users: [] },
     ],
     customInstructors: [],
     allCourseSummaries: {},

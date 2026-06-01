@@ -84,25 +84,6 @@ const PASSWORD_VALIDATION = {
   MAX_LENGTH: 128, // Prevent DOS attacks
 } as const;
 
-const validatePassword = (password: string): string | null => {
-  // 1. Check empty
-  if (!password || password.trim().length === 0) {
-    return "Password is required";
-  }
-  
-  // 2. Check minimum length
-  if (password.length < PASSWORD_VALIDATION.MIN_LENGTH) {
-    return `Password must be at least ${PASSWORD_VALIDATION.MIN_LENGTH} characters`;
-  }
-  
-  // 3. Check maximum length (prevent DOS)
-  if (password.length > PASSWORD_VALIDATION.MAX_LENGTH) {
-    return `Password must be less than ${PASSWORD_VALIDATION.MAX_LENGTH} characters`;
-  }
-  
-  return null; // Valid
-};
-
 const detectLoginMethod = (value: string): LoginMethod => {
   const trimmedValue = value.trim();
 
@@ -124,6 +105,7 @@ function clearLocalUserStorage(): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.clear();
+
       sessionStorage.removeItem("prefetchedSettings");
     } catch {
       // Ignore
@@ -353,19 +335,15 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     NProgress.start();
 
     try {
-      const passwordError = validatePassword(formData.password);
-      if (passwordError) {
-        setError(passwordError);
-        setIsLoading(false);
-        return;
-      }
+      // Password is validated in real-time and the submit button is disabled
+      // while `passwordError` is present. No need to re-validate here.
 
       await ensureCsrfTokenPreloaded();
 
       // 1. Login to Ezygo (public endpoint)
       const response = await axios.post("login", {
         username: formData.username.trim(),
-        password: formData.password.trim(),
+        password: formData.password,
         stay_logged_in: true
       });
       
@@ -412,7 +390,13 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
          Sentry.captureException(error, { tags: { type: "network_error", location: "LoginForm/handleSubmit" } });
       }
       setError(errorMsg);
-      announceToScreenReader(errorMsg);
+      // Avoid double-announcing password validation/auth errors to screen readers.
+      // Inline error text is linked via aria-describedby and will be announced
+      // by the browser/screen reader on focus change. Reserve the live region
+      // for other unexpected/global errors.
+      if (err.response?.status !== 401) {
+        announceToScreenReader(errorMsg);
+      }
       logger.error("Login failed:", err);
     }
   };

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "GhostClass",
   "short_name": "GhostClass",
-  "description": "GhostClass — Smart Attendance Tracker",
+  "description": "GhostClass - Smart Attendance Tracker",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

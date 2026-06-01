@@ -32,6 +32,12 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
   double _pullDistance = 0;
   bool _isRefreshing = false;
 
+  /// True only when the current drag gesture started while the list was
+  /// already at (or above) the very top. This prevents fast upward flings
+  /// from the middle/bottom of the list accidentally triggering a refresh
+  /// when they overshoot past pixels = 0.
+  bool _dragStartedAtTop = false;
+
   void _safeSetState(VoidCallback fn) {
     if (mounted) {
       setState(fn);
@@ -101,14 +107,25 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
 
         final metrics = notification.metrics;
 
+        // Track whether each new drag gesture started from the very top of the
+        // scroll view. Only gestures that begin at the top are eligible to
+        // trigger pull-to-refresh. A fast upward fling from the middle/bottom
+        // may overshoot past pixels=0, but _dragStartedAtTop will be false, so
+        // the overscroll is ignored.
+        if (notification is ScrollStartNotification) {
+          _dragStartedAtTop = metrics.pixels <= 0;
+        }
+
         if (notification is ScrollUpdateNotification && !_isRefreshing) {
-          if (metrics.pixels < 0) {
-            final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
+          if (_dragStartedAtTop && metrics.pixels < 0) {
+            // Divisor 160 → full progress at 160 px; threshold 0.85 → triggers at ~136 px.
+            final distance = (metrics.pixels.abs() / 160).clamp(0.0, 1.0);
             _safeSetState(() => _pullDistance = distance);
 
             // Trigger refresh exactly when user releases (dragDetails becomes null)
             // and we are past the threshold.
-            if (notification.dragDetails == null && distance >= 0.8) {
+            if (notification.dragDetails == null && distance >= 0.85) {
+              _dragStartedAtTop = false;
               final _ = _handleRefresh();
             }
           } else if (_pullDistance > 0) {
@@ -117,11 +134,12 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
         }
 
         if (notification is OverscrollNotification && !_isRefreshing) {
-          if (metrics.pixels < 0) {
-            final distance = (metrics.pixels.abs() / 100).clamp(0.0, 1.0);
+          if (_dragStartedAtTop && metrics.pixels < 0) {
+            final distance = (metrics.pixels.abs() / 160).clamp(0.0, 1.0);
             _safeSetState(() => _pullDistance = distance);
 
-            if (notification.dragDetails == null && distance >= 0.8) {
+            if (notification.dragDetails == null && distance >= 0.85) {
+              _dragStartedAtTop = false;
               final _ = _handleRefresh();
             }
           }
@@ -130,12 +148,14 @@ class _AestheticRefreshIndicatorState extends State<AestheticRefreshIndicator> {
         if (notification is UserScrollNotification &&
             notification.direction == ScrollDirection.idle) {
           if (!_isRefreshing) {
+            _dragStartedAtTop = false;
             _safeSetState(() => _pullDistance = 0.0);
           }
         }
 
         if (notification is ScrollEndNotification) {
           if (!_isRefreshing) {
+            _dragStartedAtTop = false;
             _safeSetState(() => _pullDistance = 0.0);
           }
         }

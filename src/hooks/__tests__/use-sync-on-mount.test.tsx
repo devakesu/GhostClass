@@ -51,7 +51,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(axios.get).toHaveBeenCalledWith("/api/cron/sync", expect.any(Object));
@@ -61,7 +61,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, enabled: false }));
 
     expect(result.current.isSyncing).toBe(false);
-    expect(result.current.syncCompleted).toBe(false);
+    expect(result.current.syncSettled).toBe(false);
     expect(axios.get).not.toHaveBeenCalled();
   });
 
@@ -69,7 +69,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, username: undefined }));
 
     expect(result.current.isSyncing).toBe(false);
-    expect(result.current.syncCompleted).toBe(true);
+    expect(result.current.syncSettled).toBe(true);
     expect(axios.get).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(logger.error).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe("useSyncOnMount", () => {
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(result.current.syncCompleted).toBe(true);
+      expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
     expect(logger.error).toHaveBeenCalled();
@@ -167,8 +167,8 @@ describe("useSyncOnMount", () => {
     const { result: r2 } = renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(r1.current.syncCompleted).toBe(true);
-      expect(r2.current.syncCompleted).toBe(true);
+      expect(r1.current.syncSettled).toBe(true);
+      expect(r2.current.syncSettled).toBe(true);
     });
 
     expect(axios.get).toHaveBeenCalledTimes(1);
@@ -181,6 +181,10 @@ describe("useSyncOnMount", () => {
     }));
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
+    
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalled();
+    });
     
     unmount();
     
@@ -204,6 +208,10 @@ describe("useSyncOnMount", () => {
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalled();
+    });
+    
     unmount();
     
     // Fail axios after unmount
@@ -213,5 +221,38 @@ describe("useSyncOnMount", () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     // Verify no log error was recorded since the component had unmounted
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("should defer sync until the load event if document is not fully loaded", async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      status: 200,
+      data: { success: true },
+    });
+
+    const originalReadyState = document.readyState;
+    Object.defineProperty(document, "readyState", {
+      get() {
+        return "loading";
+      },
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useSyncOnMount(defaultOptions));
+
+    expect(result.current.isSyncing).toBe(false);
+    expect(axios.get).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event("load"));
+
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalledTimes(1);
+    }, { timeout: 10000 });
+
+    Object.defineProperty(document, "readyState", {
+      get() {
+        return originalReadyState;
+      },
+      configurable: true,
+    });
   });
 });

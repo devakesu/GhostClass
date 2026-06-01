@@ -230,6 +230,15 @@ export const formatCourseCode = (code: string): string => {
   return code.toUpperCase().replace(/[\s\u00A0-]/g, "");
 };
 
+/**
+ * Alias for `formatCourseCode` kept for semantic clarity.
+ * Use this when normalizing course codes across the codebase.
+ */
+export const normalizeCourseCode = (code: string | undefined | null): string => {
+  if (!code) return "";
+  return formatCourseCode(String(code));
+};
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

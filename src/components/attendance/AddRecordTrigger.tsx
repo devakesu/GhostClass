@@ -40,13 +40,13 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   const { data: selectedSemester } = useFetchSemester();
   const { data: selectedYear } = useFetchAcademicYear();
   
-  const { data: attendanceData, refetch: refetchAttendance } = useAttendanceReport(
+  const { data: attendanceData } = useAttendanceReport(
     selectedSemester ?? undefined,
     selectedYear ?? undefined,
     { enabled: isOpen },
   );
   
-  const { data: trackingData, refetch: refetchTracking } = useTrackingData(user, { 
+  const { data: trackingData } = useTrackingData(user, { 
     enabled: isOpen 
   });
   
@@ -62,8 +62,7 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
     queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
     queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
     queryClient.invalidateQueries({ queryKey: ["track_data"] });
-    
-    await Promise.all([refetchAttendance(), refetchTracking()]);
+
     await onSuccess();
   };
 

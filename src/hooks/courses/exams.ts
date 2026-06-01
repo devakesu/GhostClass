@@ -140,7 +140,7 @@ export const useAllExamAnswers = (examIds: number[]) => {
         if (!res) throw new Error("Failed to fetch exam answers");
         return res.data as ExamAnswer[];
       },
-      staleTime: 0,
+      staleTime: 10 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       retry: retryOnce,
     })),

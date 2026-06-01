@@ -279,5 +279,62 @@ void main() {
       final results = await futures;
       expect(results.length, 4);
     });
+
+    test(
+      'isolates state (caches/in-flight) between separate fetcher instances',
+      () async {
+        final fetcher1 = EzygoBatchFetcher(
+          mockDio,
+          getOutage: () => outageState,
+          setOutage: (val) => outageState = val,
+          isBackendUnauthorized: () => backendUnauthorized,
+        );
+        final fetcher2 = EzygoBatchFetcher(
+          mockDio,
+          getOutage: () => outageState,
+          setOutage: (val) => outageState = val,
+          isBackendUnauthorized: () => backendUnauthorized,
+        );
+
+        final res1 = Response<dynamic>(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 200,
+          data: {'instance': 1},
+        );
+        final res2 = Response<dynamic>(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 200,
+          data: {'instance': 2},
+        );
+
+        var callCount = 0;
+        when(
+          () => mockDio.request<dynamic>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async {
+          callCount++;
+          return callCount == 1 ? res1 : res2;
+        });
+
+        final r1 = await fetcher1.fetch(path: '/test', token: 'token');
+        expect(r1.data, {'instance': 1});
+
+        // If they shared static state, fetcher2 would hit fetcher1's cache.
+        // With isolated instance fields, fetcher2 will make its own request.
+        final r2 = await fetcher2.fetch(path: '/test', token: 'token');
+        expect(r2.data, {'instance': 2});
+
+        verify(
+          () => mockDio.request<dynamic>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).called(2);
+      },
+    );
   });
 }

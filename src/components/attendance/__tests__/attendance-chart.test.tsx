@@ -14,6 +14,7 @@ vi.mock('@/providers/attendance-settings', () => ({
 vi.mock('@/lib/utils', () => ({
   generateSlotKey: (courseId: string, date: string, session: string) =>
     `${courseId}-${date}-${session}`,
+  normalizeCourseCode: (code: string | undefined | null) => String(code ?? '').toUpperCase().replace(/[\s\u00A0-]/g, ''),
 }));
 
 vi.mock('lucide-react', () => ({

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 import { OutageProvider } from "@/providers/outage-provider";
+import { Loading as CompLoading } from "@/components/loading";
 
 function ProtectedChrome({ children }: { children: React.ReactNode }) {
   const [isHidden, setIsHidden] = useState(false);
@@ -70,12 +71,7 @@ function ProtectedChrome({ children }: { children: React.ReactNode }) {
                 isHidden ? "pointer-events-none" : "pointer-events-auto"
               )}
               style={{ paddingRight: "var(--scrollbar-width, 0px)" }}
-              {...((isHidden &&
-                typeof HTMLElement !== "undefined" &&
-                HTMLElement?.prototype &&
-                "inert" in HTMLElement.prototype
-                  ? { inert: true }
-                  : {}) as unknown as { inert?: boolean })}
+              {...((isHidden && typeof HTMLElement !== "undefined") ? { inert: true } : {}) as { inert?: boolean }}
             >
               <Navbar />
             </motion.div>
@@ -112,7 +108,7 @@ export default function ProtectedLayout({
     };
   }, []);
 
-  if (!isCsrfReady) return null;
+  if (!isCsrfReady) return <CompLoading />;
 
   return <ProtectedChrome>{children}</ProtectedChrome>;
 }

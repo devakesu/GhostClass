@@ -57,6 +57,7 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { logger } from "@/lib/logger";
+import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { redis } from "@/lib/redis";
 
 // Configuration
@@ -134,7 +135,7 @@ export async function setCsrfCookie(token: string): Promise<void> {
     name: CSRF_COOKIE_NAME,
     value: token,
     httpOnly: true, // Server-side validation token (not accessible to JavaScript)
-    secure: process.env.HTTPS === 'true' || process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     sameSite: "strict",
     maxAge: CSRF_COOKIE_MAX_AGE,
     path: "/",

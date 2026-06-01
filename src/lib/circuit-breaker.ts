@@ -305,7 +305,13 @@ class CircuitBreaker {
         await this.clearHalfOpenInFlight();
       }
     } else {
-      // Reset failure count on success
+      // Optimize: avoid a Redis read on every successful request by checking
+      // the local mirror first. Successful requests are the common case when
+      // the circuit is CLOSED and localFailures will typically be 0.
+      if (this.localFailures === 0 && this.localLastFailTime === 0) return;
+
+      // If local mirror indicates failures > 0, read authoritative value
+      // from Redis and reset it if needed.
       const failures = await this.getFailures();
       if (failures > 0) {
         logger.dev('[Circuit Breaker] Resetting failure count', {
@@ -366,22 +372,31 @@ class CircuitBreaker {
   /**
    * Get current circuit breaker status (for monitoring).
    *
-   * Raw lastFailTime (Unix ms) is omitted — it would leak information about
-   * when EzyGo last failed if this object is ever surfaced via a health endpoint.
-   * timeUntilReset is the only operationally useful derivative and carries no
-   * additional timing information beyond what the client already knows.
+   * Status is read from Redis first so monitoring sees the authoritative
+   * breaker state even after a process restart. Raw lastFailTime (Unix ms) is
+   * omitted — it would leak information about when EzyGo last failed if this
+   * object is ever surfaced via a health endpoint. timeUntilReset is the only
+   * operationally useful derivative and carries no additional timing
+   * information beyond what the client already knows.
    */
-  getStatus() {
+  async getStatus() {
+    const [state, failures, lastFailTime, successCount] = await Promise.all([
+      this.getState(),
+      this.getFailures(),
+      this.getLastFailTime(),
+      this.getRedisValue('circuit:success_count', val => parseInt(val, 10), this.localSuccessCount),
+    ]);
+
     const timeUntilReset =
-      this.localState === 'OPEN'
-        ? Math.max(0, Math.ceil((this.resetTimeout - (Date.now() - this.localLastFailTime)) / 1000))
+      state === 'OPEN'
+        ? Math.max(0, Math.ceil((this.resetTimeout - (Date.now() - lastFailTime)) / 1000))
         : 0;
     return {
-      state: this.localState,
-      failures: this.localFailures,
+      state,
+      failures,
       timeUntilReset,
-      successCount: this.localSuccessCount,
-      isOpen: this.localState === 'OPEN',
+      successCount,
+      isOpen: state === 'OPEN',
     };
   }
   

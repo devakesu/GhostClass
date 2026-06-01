@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/services/auth_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
@@ -12,6 +13,7 @@ import 'package:ghostclass/services/ezygo_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/security_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// ApiService
 /// ----------
@@ -36,8 +38,9 @@ class ApiService {
 
   // --- GhostClass Sync State ---
   Future<Response<dynamic>>? _syncInFlight;
-  DateTime? _lastSyncTime;
+  DateTime? _lastSyncAt;
   static const _syncCooldown = Duration(minutes: 5);
+  static const _forcedSyncGracePeriod = Duration(seconds: 15);
 
   void clearCaches() => _ezygo.clearCaches();
 
@@ -159,9 +162,22 @@ class ApiService {
 
     // 3. Throttling
     final now = DateTime.now();
+    if (force &&
+        _lastSyncAt != null &&
+        now.difference(_lastSyncAt!) < _forcedSyncGracePeriod) {
+      AppLogger.d(
+        'ApiService: Skipping forced sync due to recent startup sync.',
+      );
+      return Response<dynamic>(
+        requestOptions: RequestOptions(path: 'sync'),
+        statusCode: 304,
+        data: {'message': 'Recently synced'},
+      );
+    }
+
     if (!force &&
-        _lastSyncTime != null &&
-        now.difference(_lastSyncTime!) < _syncCooldown) {
+        _lastSyncAt != null &&
+        now.difference(_lastSyncAt!) < _syncCooldown) {
       AppLogger.d('ApiService: Sync throttled.');
       return Response<dynamic>(
         requestOptions: RequestOptions(path: 'sync'),
@@ -180,7 +196,7 @@ class ApiService {
             receiveTimeout: const Duration(seconds: 30),
           ),
         );
-        _lastSyncTime = DateTime.now();
+        _lastSyncAt = DateTime.now();
         return response;
       } on Object catch (e) {
         AppLogger.e('ApiService: Background sync failed', e);
@@ -235,6 +251,16 @@ class ApiService {
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );
+  }
+
+  Future<List<dynamic>> fetchClassCourses(String classId) async {
+    final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
+    return supabase.from('class_courses').select().eq('class_id', classId);
+  }
+
+  Future<List<dynamic>> fetchCourseInstructors(String classId) async {
+    final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
+    return supabase.from('course_instructors').select().eq('class_id', classId);
   }
 
   // --- Error Handling ---

@@ -5,9 +5,23 @@ import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.view.MotionEvent
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.devakesu.apps.ghostclass/security"
+    private var isCurrentWindowObscured = false
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            isCurrentWindowObscured = false
+        }
+        val isObscured = (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 ||
+                (event.flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
+        if (isObscured) {
+            isCurrentWindowObscured = true
+        }
+        return super.dispatchTouchEvent(event)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -33,7 +47,7 @@ class MainActivity : FlutterActivity() {
                     System.exit(0)
                 }
                 "isWindowObscured" -> {
-                    result.success(false) 
+                    result.success(isCurrentWindowObscured) 
                 }
                 else -> {
                     result.notImplemented()
@@ -42,3 +56,4 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
+

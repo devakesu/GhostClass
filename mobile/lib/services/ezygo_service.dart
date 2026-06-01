@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -14,24 +15,28 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// and deduplication to optimize performance and reduce backend load.
 class EzygoService {
   EzygoService(this._ref) {
-    _fetcher = EzygoBatchFetcher(
-      _ref.read(dioServiceProvider).dio,
-      getOutage: () => _ref.read(outageProvider),
-      setOutage: (v) => _ref.read(outageProvider.notifier).update(v),
-      isBackendUnauthorized: () => false,
-    );
+    _fetcher = _ref.read(ezygoBatchFetcherProvider);
   }
   final Ref _ref;
   late final EzygoBatchFetcher _fetcher;
   static final String _ezygoApiRoot = AppConfig.ezygoApiRoot;
+
+  String _requireEzygoToken(String? token) {
+    if (token == null) {
+      throw const AppException(
+        message: 'No EzyGo credentials found. Please log in.',
+        type: AppExceptionType.unauthorized,
+      );
+    }
+    return token;
+  }
 
   void clearCaches() => _fetcher.clearAll();
 
   Future<Response<dynamic>> fetchCourses(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionuser/courses/withusers';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAttendanceReportDetailed(
@@ -39,18 +44,10 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/attendancereports/student/detailed';
-    if (token == null) {
-      return _ref
-          .read(dioServiceProvider)
-          .dio
-          .post(
-            path,
-            data: <String, dynamic>{},
-          );
-    }
+    _requireEzygoToken(token);
     return _fetcher.fetch(
       path: path,
-      token: token,
+      token: token!,
       method: 'POST',
       data: <String, dynamic>{},
     );
@@ -61,8 +58,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionusers/myinstitutions';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> updateDefaultInstitution(
@@ -122,8 +118,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_semester';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAcademicYear(
@@ -131,8 +126,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_academic_year';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<dynamic> _fetchWithCache(
@@ -141,7 +135,7 @@ class EzygoService {
     SecureStorageService storage, {
     Duration ttl = const Duration(days: 7),
   }) async {
-    final cacheKey = 'ezygo_static_${path.hashCode}';
+    final cacheKey = 'ezygo_static_${Uri.encodeFull(path)}';
     try {
       final cached = await storage.getCachedData(cacheKey);
       if (cached != null) {
@@ -225,8 +219,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchExams(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamQuestions(
@@ -236,8 +229,7 @@ class EzygoService {
     final token = await storage.getNormalizedEzygoToken();
     final path =
         '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamAnswers(
@@ -246,9 +238,31 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams/$examId/institutionuser/examanswers';
-    if (token == null) return _ref.read(dioServiceProvider).dio.get(path);
-    return _fetcher.fetch(path: path, token: token);
+    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 }
 
-final ezygoServiceProvider = Provider<EzygoService>(EzygoService.new);
+final ezygoBatchFetcherProvider = Provider<EzygoBatchFetcher>((ref) {
+  // Watch supabaseUserId to automatically invalidate and recreate the fetcher on session login/logout boundaries
+  ref.watch(
+    authProvider.select((asyncUser) => asyncUser.value?.supabaseUserId),
+  );
+
+  final fetcher = EzygoBatchFetcher(
+    ref.read(dioServiceProvider).dio,
+    getOutage: () => ref.read(outageProvider),
+    setOutage: (v) => ref.read(outageProvider.notifier).update(v),
+    isBackendUnauthorized: () => false,
+  );
+
+  ref.onDispose(() {
+    fetcher.clearAll(setOutageState: false);
+  });
+
+  return fetcher;
+});
+
+final ezygoServiceProvider = Provider<EzygoService>((ref) {
+  ref.watch(ezygoBatchFetcherProvider);
+  return EzygoService(ref);
+});

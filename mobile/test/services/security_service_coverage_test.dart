@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -408,6 +409,104 @@ void main() {
         expect(result.minVersion, AppConfig.appVersion);
         expect(result.hasUpdate, isFalse); // Recomputed dynamically
         expect(result.isForceUpdate, isFalse); // Recomputed dynamically
+      },
+    );
+
+    test(
+      'verifyIntegrity clears cache and rethrows on non-transient badCertificate exception',
+      () async {
+        final cachedJson = jsonEncode({
+          'latestVersion': AppConfig.appVersion,
+          'minVersion': AppConfig.appVersion,
+          'cachedAt': DateTime.now()
+              .subtract(const Duration(days: 8))
+              .toIso8601String(),
+        });
+
+        final options = RequestOptions(path: '/api/security/attestation');
+        final dioError = DioException(
+          requestOptions: options,
+          type: DioExceptionType.badCertificate,
+          message: 'Certificate verification failed',
+        );
+
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenThrow(dioError);
+
+        when(
+          () => mockSecureStorage.getAttestationResult(),
+        ).thenAnswer((_) async => cachedJson);
+
+        await expectLater(
+          () => securityService.verifyIntegrity(),
+          throwsA(isA<DioException>()),
+        );
+
+        verify(() => mockSecureStorage.clearAttestationResult()).called(1);
+      },
+    );
+
+    test(
+      'verifyIntegrity clears cache and rethrows on HandshakeException',
+      () async {
+        final cachedJson = jsonEncode({
+          'latestVersion': AppConfig.appVersion,
+          'minVersion': AppConfig.appVersion,
+          'cachedAt': DateTime.now()
+              .subtract(const Duration(days: 8))
+              .toIso8601String(),
+        });
+
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenThrow(
+          const HandshakeException('OS Error: CERTIFICATE_VERIFY_FAILED'),
+        );
+
+        when(
+          () => mockSecureStorage.getAttestationResult(),
+        ).thenAnswer((_) async => cachedJson);
+
+        await expectLater(
+          () => securityService.verifyIntegrity(),
+          throwsA(isA<HandshakeException>()),
+        );
+
+        verify(() => mockSecureStorage.clearAttestationResult()).called(1);
+      },
+    );
+
+    test(
+      'verifyIntegrity falls back to stale cache on connectionTimeout transient error',
+      () async {
+        final cachedJson = jsonEncode({
+          'latestVersion': AppConfig.appVersion,
+          'minVersion': AppConfig.appVersion,
+          'cachedAt': DateTime.now()
+              .subtract(const Duration(days: 8))
+              .toIso8601String(),
+        });
+
+        final options = RequestOptions(path: '/api/security/attestation');
+        final dioError = DioException(
+          requestOptions: options,
+          type: DioExceptionType.connectionTimeout,
+          message: 'Connection timed out',
+        );
+
+        when(
+          () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
+        ).thenThrow(dioError);
+
+        when(
+          () => mockSecureStorage.getAttestationResult(),
+        ).thenAnswer((_) async => cachedJson);
+
+        final result = await securityService.verifyIntegrity();
+        expect(result, isNotNull);
+        expect(result!.latestVersion, AppConfig.appVersion);
+        verifyNever(() => mockSecureStorage.clearAttestationResult());
       },
     );
   });

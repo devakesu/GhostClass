@@ -5,8 +5,8 @@ import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
-import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 final scoreProvider = AsyncNotifierProvider<ScoreNotifier, ScoreState>(
@@ -73,28 +73,27 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     final academicAsync = ref.watch(academicProvider);
 
     if (authState.isLoading || academicAsync.isLoading) {
-      return Completer<ScoreState>().future;
+      await Future.wait([
+        if (authState.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
+    }
+
+    final user = authState.value;
+    if (user == null) {
+      throw Exception('Unauthorized');
     }
 
     final academic = academicAsync.value;
 
-    // BLOCKER: Do not fire queries until Cron Sync is finished
-    if (authState.value?.isSyncing == true) {
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<ScoreState>().future;
-    }
-
-    return _initialFetch(academic: academic);
+    return _initialFetch(user: user, academic: academic);
   }
 
   Future<ScoreState> _initialFetch({
+    required AuthenticatedUser user,
     AcademicState? academic,
     bool bypassCache = false,
   }) async {
-    final authState = ref.watch(authProvider);
-    final user = authState.value;
-    if (user == null) throw Exception('Unauthorized');
-
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
@@ -128,15 +127,25 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         final slice = targetExams.skip(i).take(poolSize);
         await Future.wait(
           slice.map(
-            (exam) => _loadExamDetails(
-              exam: exam,
-              api: api,
-              storage: storage,
-              questionsMap: questionsMap,
-              answersMap: answersMap,
-              resolvedScores: resolvedScores,
-              bypassCache: bypassCache,
-            ),
+            (exam) async {
+              try {
+                await _loadExamDetails(
+                  exam: exam,
+                  api: api,
+                  storage: storage,
+                  questionsMap: questionsMap,
+                  answersMap: answersMap,
+                  resolvedScores: resolvedScores,
+                  bypassCache: bypassCache,
+                );
+              } on Object catch (err, st) {
+                AppLogger.e(
+                  'Failed to load details for exam ${exam.id}',
+                  err,
+                  st,
+                );
+              }
+            },
           ),
         );
       }
@@ -170,13 +179,25 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         pendingCount: pending,
       );
 
-      return _applyFilter(state, 'all');
+      return _applyFilter(
+        state,
+        'all',
+        totalExams: visibleExams.length,
+        scoredCount: scored,
+        pendingCount: pending,
+      );
     } on Object catch (e) {
       throw Exception('Failed to load internal marks: $e');
     }
   }
 
-  ScoreState _applyFilter(ScoreState baseState, String type) {
+  ScoreState _applyFilter(
+    ScoreState baseState,
+    String type, {
+    int? totalExams,
+    int? scoredCount,
+    int? pendingCount,
+  }) {
     var filtered = baseState.rawExams;
     if (type != 'all') {
       filtered = baseState.rawExams
@@ -193,11 +214,13 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         .map((entry) => CourseGroup(label: entry.key, exams: entry.value))
         .toList();
 
-    final total = filtered.length;
-    final scored = filtered
-        .where((e) => baseState.resolvedScores.containsKey(e.id))
-        .length;
-    final pending = total - scored;
+    final total = totalExams ?? filtered.length;
+    final scored =
+        scoredCount ??
+        filtered
+            .where((e) => baseState.resolvedScores.containsKey(e.id))
+            .length;
+    final pending = pendingCount ?? (total - scored);
 
     return baseState.copyWith(
       filterType: type,
@@ -215,12 +238,16 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
+    final user = ref.read(authProvider).value;
+    if (user == null) {
+      state = AsyncValue.error(Exception('Unauthorized'), StackTrace.current);
+      return;
+    }
     final academicAsync = ref.read(academicProvider);
     final academic = academicAsync.value;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => _initialFetch(academic: academic, bypassCache: true),
+      () => _initialFetch(user: user, academic: academic, bypassCache: true),
     );
   }
 
@@ -269,10 +296,10 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       qsData = results[0].data;
       ansData = results[1].data;
 
-      if (results[0].statusCode == 200 && qsData != null) {
+      if (results[0].statusCode == 200 && qsData is List) {
         await storage.saveCachedData(cacheKeyQs, qsData);
       }
-      if (results[1].statusCode == 200 && ansData != null) {
+      if (results[1].statusCode == 200 && ansData is List) {
         await storage.saveCachedData(cacheKeyAns, ansData);
       }
     }

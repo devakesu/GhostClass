@@ -49,6 +49,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   AttendanceReportDetailed? _cachedAttendance;
   List<CourseInstructor>? _cachedInstructors;
   AcademicState? _lastAcademic;
+  AttendanceReportDetailed? _pendingTrackedAttendance;
 
   bool _needsRevalidate = true;
 
@@ -57,11 +58,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
     final userAsync = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
+    final trackingFuture = ref.watch(trackingProvider.future);
 
     // If either core dependency is actively reloading (e.g. changing semester),
     // suspend the dashboard build to prevent showing a split-second stale UI.
     if (userAsync.isLoading || academicAsync.isLoading) {
-      return Completer<DashboardData>().future;
+      await Future.wait([
+        if (userAsync.isLoading) ref.watch(authProvider.future),
+        if (academicAsync.isLoading) ref.watch(academicProvider.future),
+      ]);
     }
 
     final user = userAsync.value;
@@ -145,23 +150,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
     }
 
-    // BLOCKER: Do not fire server queries until Cron Sync is finished
-    if (user.isSyncing) {
-      if (_cachedCourses != null && _cachedAttendance != null) {
-        return _processData(
-          _cachedCourses!,
-          _cachedAttendance!,
-          [],
-          academic,
-          _cachedInstructors ?? [],
-        );
-      }
-      // Return a future that will be replaced once isSyncing changes
-      return Completer<DashboardData>().future;
-    }
-
     // 2. Wait for tracking data
-    final tracking = await ref.watch(trackingProvider.future);
+    final tracking = await trackingFuture;
 
     // Proactively update official report cache if tracking has a fresher one (e.g. from a sync)
     if (tracking.officialReport != null) {
@@ -217,6 +207,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final storage = ref.read(secureStorageProvider);
 
       final classId = ref.read(authProvider).value?.profile?.classField?.id;
+      final attendanceToUse = trackedAttendance ?? _pendingTrackedAttendance;
+      _pendingTrackedAttendance = null;
 
       late final Response<dynamic> coursesResponse;
       late final AttendanceReportDetailed attendance;
@@ -225,8 +217,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
       await Future.wait([
         api.fetchCourses(storage).then((res) => coursesResponse = res),
-        (trackedAttendance != null
-                ? Future.value(trackedAttendance)
+        (attendanceToUse != null
+                ? Future.value(attendanceToUse)
                 : _fetchAttendanceOnce(api: api, storage: storage))
             .then((res) {
               if (res == null) throw Exception('No attendance data');
@@ -234,42 +226,32 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             }),
         if (classId != null) ...[
           // Fetch Class Courses
-          ref
-              .read(supabaseClientProvider)
-              .from('class_courses')
-              .select()
-              .eq('class_id', classId)
-              .then((coursesRes) {
-                if (coursesRes.isNotEmpty) {
-                  sharedCourses = (coursesRes as List).map((raw) {
-                    final c = raw as Map<String, dynamic>;
-                    return CourseDetails(
-                      id: 0, // Mark as shared/custom
-                      name: c['course_name'] as String? ?? 'Unnamed Course',
-                      code: c['course_code'] as String?,
-                      academicYear: academic.year,
-                      academicSemester: academic.semester,
-                    );
-                  }).toList();
-                }
-              }),
+          api.fetchClassCourses(classId).then((coursesRes) {
+            if (coursesRes.isNotEmpty) {
+              sharedCourses = coursesRes.map((raw) {
+                final c = raw as Map<String, dynamic>;
+                return CourseDetails(
+                  id: 0, // Mark as shared/custom
+                  name: c['course_name'] as String? ?? 'Unnamed Course',
+                  code: c['course_code'] as String?,
+                  academicYear: academic.year,
+                  academicSemester: academic.semester,
+                );
+              }).toList();
+            }
+          }),
           // Fetch Instructor Mappings
-          ref
-              .read(supabaseClientProvider)
-              .from('course_instructors')
-              .select()
-              .eq('class_id', classId)
-              .then((instructorsRes) {
-                if (instructorsRes.isNotEmpty) {
-                  sharedInstructors = (instructorsRes as List)
-                      .map(
-                        (json) => CourseInstructor.fromJson(
-                          json as Map<String, dynamic>,
-                        ),
-                      )
-                      .toList();
-                }
-              }),
+          api.fetchCourseInstructors(classId).then((instructorsRes) {
+            if (instructorsRes.isNotEmpty) {
+              sharedInstructors = instructorsRes
+                  .map(
+                    (json) => CourseInstructor.fromJson(
+                      json as Map<String, dynamic>,
+                    ),
+                  )
+                  .toList();
+            }
+          }),
         ],
       ]);
 
@@ -432,52 +414,18 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // Pre-calculate sorting criteria to avoid redundant math during sort
     final target = (auth?.settings.targetPercentage ?? 75).toDouble();
 
-    int getTier(CourseStat? s, {required bool disabled}) {
-      if (disabled) return 2; // Absolute bottom
-      if (s == null || s.finalTotal == 0) return 1;
-      return 0;
-    }
-
     final metaMap =
         <
           String,
           ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})
         >{
           for (final c in courses)
-            c.safeId: (() {
-              final s = stats.courseStats[c.safeId];
-              final disabled = disabledCodes.contains(
-                utils.standardizeCourseCode(c.code ?? ''),
-              );
-              final tier = getTier(s, disabled: disabled);
-
-              if (s == null) {
-                return (
-                  tier: tier,
-                  canBunk: 0,
-                  safeCanBunk: 0,
-                  requiredToAttend: 0,
-                );
-              }
-
-              final bunkRes = utils.calculateAttendance(
-                s.finalPresent,
-                s.finalTotal,
-                targetPercentage: target,
-              );
-              final safeRes = utils.calculateAttendance(
-                s.officialPresent,
-                s.officialTotal,
-                targetPercentage: target,
-              );
-
-              return (
-                tier: tier,
-                canBunk: bunkRes.canBunk,
-                safeCanBunk: safeRes.canBunk,
-                requiredToAttend: bunkRes.requiredToAttend,
-              );
-            })(),
+            c.safeId: _computeCourseMeta(
+              course: c,
+              stats: stats,
+              disabledCodes: disabledCodes,
+              targetPercentage: target,
+            ),
         };
 
     final sortedCourses = List<CourseDetails>.from(courses)
@@ -518,14 +466,69 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     );
   }
 
+  ({int tier, int canBunk, int safeCanBunk, int requiredToAttend})
+  _computeCourseMeta({
+    required CourseDetails course,
+    required DashboardStats stats,
+    required Set<String> disabledCodes,
+    required double targetPercentage,
+  }) {
+    final s = stats.courseStats[course.safeId];
+    final disabled = disabledCodes.contains(
+      utils.standardizeCourseCode(course.code ?? ''),
+    );
+
+    final int tier;
+    if (disabled) {
+      tier = 2; // Absolute bottom
+    } else if (s == null || s.finalTotal == 0) {
+      tier = 1;
+    } else {
+      tier = 0;
+    }
+
+    if (s == null) {
+      return (
+        tier: tier,
+        canBunk: 0,
+        safeCanBunk: 0,
+        requiredToAttend: 0,
+      );
+    }
+
+    final bunkRes = utils.calculateAttendance(
+      s.finalPresent,
+      s.finalTotal,
+      targetPercentage: targetPercentage,
+    );
+    final safeRes = utils.calculateAttendance(
+      s.officialPresent,
+      s.officialTotal,
+      targetPercentage: targetPercentage,
+    );
+
+    return (
+      tier: tier,
+      canBunk: bunkRes.canBunk,
+      safeCanBunk: safeRes.canBunk,
+      requiredToAttend: bunkRes.requiredToAttend,
+    );
+  }
+
   Future<void> _silentRevalidate(
     List<TrackingRecord> tracking,
     AcademicState academic,
   ) async {
     try {
-      final freshData = await _fetchAndProcess(tracking, academic, null);
+      final trackingState = ref.read(trackingProvider).value;
+      final freshData = await _fetchAndProcess(
+        tracking,
+        academic,
+        trackingState?.officialReport,
+      );
       final currentAcademic = ref.read(academicProvider).value;
-      if (academic == currentAcademic) {
+      if (academic.semester == currentAcademic?.semester &&
+          academic.year == currentAcademic?.year) {
         state = AsyncValue.data(freshData);
       } else {
         AppLogger.i(
@@ -542,7 +545,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   }
 
   Future<void> refresh() async {
-    ref.invalidate(notificationsProvider);
     final user = ref.read(authProvider).value;
 
     // 0. Set local loading state
@@ -554,6 +556,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     if (user != null) {
       try {
         await runUnifiedPullToRefresh(
+          invalidateNotifications: () => ref.invalidate(notificationsProvider),
           logLabel: 'DashboardNotifier',
           refreshProfile: () =>
               ref.read(authProvider.notifier).refreshProfile(force: true),
@@ -570,24 +573,30 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           },
           refreshData: () => ref.read(trackingProvider.notifier).refresh(),
         );
+        _pendingTrackedAttendance = ref
+            .read(trackingProvider)
+            .value
+            ?.officialReport;
       } on Object catch (e, st) {
         AppLogger.e('DashboardNotifier: refresh coordinator failed', e, st);
         refreshError = e;
         refreshStackTrace = st;
       } finally {
-        // Clear disk cache even when refresh fails so the next launch or retry
-        // cannot silently reuse stale dashboard data.
-        final storage = ref.read(secureStorageProvider);
-        final academicAsync = ref.read(academicProvider);
-        final academic = academicAsync.value;
-        if (academic != null) {
-          final suffix =
-              '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-          await Future.wait([
-            storage.deleteCachedData('dashboard_courses_$suffix'),
-            storage.deleteCachedData('dashboard_attendance_$suffix'),
-            storage.deleteCachedData('dashboard_instructors_$suffix'),
-          ]);
+        // Clear disk cache only when refresh succeeds to avoid leaving the app
+        // with no fallback data during connectivity issues.
+        if (refreshError == null) {
+          final storage = ref.read(secureStorageProvider);
+          final academicAsync = ref.read(academicProvider);
+          final academic = academicAsync.value;
+          if (academic != null) {
+            final suffix =
+                '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+            await Future.wait([
+              storage.deleteCachedData('dashboard_courses_$suffix'),
+              storage.deleteCachedData('dashboard_attendance_$suffix'),
+              storage.deleteCachedData('dashboard_instructors_$suffix'),
+            ]);
+          }
         }
       }
     }

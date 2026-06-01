@@ -76,7 +76,7 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
       
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "CLOSED",
         failures: 0,
         isOpen: false,
@@ -153,7 +153,7 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
       
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 5,
         isOpen: true,
@@ -175,7 +175,7 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
       
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "CLOSED",
         failures: 0,
         isOpen: false,
@@ -207,7 +207,7 @@ describe("EzyGo Health Check API Route", () => {
       
       // Re-import circuit breaker after resetModules to get the fresh mocked instance
       const { ezygoCircuitBreaker: prodCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(prodCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(prodCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 3,
         isOpen: true,
@@ -225,7 +225,7 @@ describe("EzyGo Health Check API Route", () => {
       
       // Re-import circuit breaker after resetModules to get the fresh mocked instance
       const { ezygoCircuitBreaker: devCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(devCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(devCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 3,
         isOpen: true,
@@ -257,7 +257,7 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
       
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 5,
         isOpen: true,
@@ -279,7 +279,7 @@ describe("EzyGo Health Check API Route", () => {
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
       const { getRateLimiterStats } = await import("@/lib/ezygo-batch-fetcher");
       
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+      vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "CLOSED",
         failures: 0,
         isOpen: false,
@@ -308,7 +308,7 @@ describe("EzyGo Health Check API Route", () => {
       const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
       const { getRateLimiterStats } = await import("@/lib/ezygo-batch-fetcher");
       
-      vi.mocked(ezygoCircuitBreaker.getStatus).mockReturnValue({
+        vi.mocked(ezygoCircuitBreaker.getStatus).mockResolvedValue({
         state: "CLOSED",
         failures: 0,
         isOpen: false,

@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { normalizeCourseCode } from "@/lib/utils";
 
 /**
  * Extended Course interface with additional attendance statistics.
@@ -361,7 +362,7 @@ export function CourseCard({
   onEditInstructor,
   supabaseUserId
 }: CourseCardProps) {
-  const courseCodeNormalized = (course.code || String(course.id)).toUpperCase().replace(/[\s\u00A0-]/g, "");
+  const courseCodeNormalized = normalizeCourseCode(course.code || String(course.id));
   const { data: courseDetails, isLoading } = useCourseDetails(
     courseCodeNormalized,
     Number(course.id),

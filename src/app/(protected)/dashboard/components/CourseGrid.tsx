@@ -1,20 +1,32 @@
-import { CourseCard } from "@/components/attendance/course-card";
+import { CourseCard, ExtendedCourse } from "@/components/attendance/course-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { m as motion } from "framer-motion";
 import { Plus } from "lucide-react";
+import { normalizeCourseCode } from "@/lib/utils";
+
+export type DashboardCourse = ExtendedCourse & {
+  key: string | number;
+  isNew?: boolean;
+  isDisabled?: boolean;
+  currentPercentage?: number;
+  bunkable?: number;
+  safeBunkable?: number;
+  required?: number;
+  activeCourseDetails?: { present: number; absent: number; total: number } | null;
+};
 
 interface CourseGridProps {
   isLoadingCourses: boolean;
   isLoadingAllCourseSummaries: boolean;
-  sortedCourses: Array<Record<string, unknown>>;
+  sortedCourses: DashboardCourse[];
   customInstructors: Array<{ course_code: string; instructor_name?: string | null }>;
   allCourseSummaries: Record<string, unknown> | null;
   profile: { auth_id?: string | null } | null;
   onEditInstructor: (
-    course: Record<string, unknown>,
+    course: DashboardCourse,
     instructorName: string,
     hasCustomName: boolean,
-    customInstructor: unknown,
+    customInstructor: { instructor_name?: string | null } | undefined | null,
   ) => void;
   onAddCourse: () => void;
 }
@@ -42,9 +54,7 @@ export function CourseGrid({
       return (
         <>
           {sortedCourses.map((course) => {
-            const courseCodeNormalized =
-              (String(course.code || "") || String(course.id))
-                .toUpperCase().replace(/[\s\u00A0-]/g, "");
+            const courseCodeNormalized = normalizeCourseCode(String(course.code || course.id));
             const customInstructor = customInstructors
               ?.find(
                 (ci) => ci.course_code === courseCodeNormalized,
@@ -69,13 +79,13 @@ export function CourseGrid({
               instructorName = `${ezygoInstructors[0].first_name} ${ezygoInstructors[0].last_name}`;
             }
 
+              const initialCourseDetails = allCourseSummaries?.[String(course.code || "")] as DashboardCourse["activeCourseDetails"];
+
             return (
               <div key={String(course.key)}>
-                <CourseCard
-                  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-                  course={course as any}
-                  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-                  initialCourseDetails={allCourseSummaries?.[String(course.code || "")] as any}
+                  <CourseCard
+                  course={course}
+                    initialCourseDetails={initialCourseDetails}
                   isBatchLoading={isLoadingAllCourseSummaries}
                   instructorName={instructorName}
                   hasCustomInstructor={hasCustomName}

@@ -262,6 +262,8 @@ vi.mock('@/hooks/use-sync-on-mount', () => ({
   useSyncOnMount: vi.fn(() => ({
     isSyncing: false,
     syncCompleted: true,
+    syncSettled: true,
+    syncFailed: false,
   })),
 }));
 

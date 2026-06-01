@@ -25,10 +25,11 @@ vi.mock("@/hooks/users/user", () => ({
 }));
 
 vi.mock("@/hooks/use-sync-on-mount", () => ({
-  useSyncOnMount: vi.fn(() => ({
-    isSyncing: false,
-    syncCompleted: true,
-  })),
+    useSyncOnMount: vi.fn(() => ({
+      isSyncing: false,
+      syncSettled: true,
+      syncFailed: false,
+    })),
 }));
 
 vi.mock("@/hooks/notifications/use-notification-virtualizer", () => ({
