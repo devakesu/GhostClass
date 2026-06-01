@@ -46,11 +46,14 @@ class AuthService {
       );
     }
 
+    final provisionStartMs = flowWatch.elapsedMilliseconds;
     final bridgeResponse = await _provisionGhostClassSessionWithRetry(
       ezygoToken,
     );
+    final provisionDurationMs =
+        flowWatch.elapsedMilliseconds - provisionStartMs;
     AppLogger.d(
-      'AuthService: provisionGhostClassSession completed in ${flowWatch.elapsedMilliseconds}ms (status: ${bridgeResponse.statusCode})',
+      'AuthService: provisionGhostClassSession completed in ${provisionDurationMs}ms (status: ${bridgeResponse.statusCode})',
     );
     final bridgeData = bridgeResponse.data;
     if (bridgeData is Map<String, dynamic>) {
