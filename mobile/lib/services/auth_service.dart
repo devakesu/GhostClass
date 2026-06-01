@@ -30,9 +30,11 @@ class AuthService {
     final flowWatch = Stopwatch()..start();
 
     AppLogger.d('AuthService: loginAndProvision start');
+    final loginStartMs = flowWatch.elapsedMilliseconds;
     final ezygoResponse = await loginEzygo(username, password);
+    final loginDurationMs = flowWatch.elapsedMilliseconds - loginStartMs;
     AppLogger.d(
-      'AuthService: loginEzygo completed in ${flowWatch.elapsedMilliseconds}ms (status: ${ezygoResponse.statusCode})',
+      'AuthService: loginEzygo completed in ${loginDurationMs}ms (status: ${ezygoResponse.statusCode})',
     );
     if (ezygoResponse.statusCode != 200) return ezygoResponse;
 
