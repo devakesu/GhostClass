@@ -29,7 +29,7 @@ class MyHttpOverrides extends HttpOverrides {
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context)
       ..connectionTimeout = kDebugMode
-          ? const Duration(seconds: 40)
+          ? const Duration(seconds: 45)
           : const Duration(seconds: 30);
 
     // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.

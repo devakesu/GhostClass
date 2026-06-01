@@ -16,7 +16,7 @@ import 'package:sentry_dio/sentry_dio.dart';
 /// Configures interceptors for JWE, Sentry, and authentication headers.
 class DioService {
   DioService(this._ref) {
-    const timeout = kDebugMode ? Duration(seconds: 40) : Duration(seconds: 30);
+    const timeout = kDebugMode ? Duration(seconds: 45) : Duration(seconds: 30);
 
     dio = Dio(
       BaseOptions(
@@ -162,7 +162,11 @@ class DioService {
             ? _appCheck.getLimitedUseToken()
             : _appCheck.getToken();
 
-        return await tokenFuture.timeout(const Duration(seconds: 10));
+        return await tokenFuture.timeout(
+          kDebugMode
+              ? const Duration(seconds: 45)
+              : const Duration(seconds: 30),
+        );
       } on Object catch (e, st) {
         lastError = e;
         final isTransient = _isTransientAppCheckFailure(e);
@@ -202,7 +206,9 @@ class DioService {
           isNew = true;
         }
         appCheckToken = await _limitedTokenFetchInFlight!.timeout(
-          const Duration(seconds: 10),
+          kDebugMode
+              ? const Duration(seconds: 45)
+              : const Duration(seconds: 30),
         );
         if (isNew) {
           AppLogger.safeUnawait(
@@ -229,7 +235,9 @@ class DioService {
           isNew = true;
         }
         appCheckToken = await _tokenFetchInFlight!.timeout(
-          const Duration(seconds: 10),
+          kDebugMode
+              ? const Duration(seconds: 45)
+              : const Duration(seconds: 30),
         );
         if (isNew) {
           AppLogger.safeUnawait(

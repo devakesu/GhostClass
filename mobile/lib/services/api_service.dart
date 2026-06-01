@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -192,8 +193,12 @@ class ApiService {
           '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
           options: Options(
             headers: {'Authorization': 'Bearer $supabaseToken'},
-            sendTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(seconds: 30),
+            sendTimeout: kDebugMode
+                ? const Duration(seconds: 45)
+                : const Duration(seconds: 30),
+            receiveTimeout: kDebugMode
+                ? const Duration(seconds: 45)
+                : const Duration(seconds: 30),
           ),
         );
         _lastSyncAt = DateTime.now();

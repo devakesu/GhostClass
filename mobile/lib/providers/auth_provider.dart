@@ -279,7 +279,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         );
         syncRes = await api
             .syncMobileAuth(supabaseToken)
-            .timeout(const Duration(seconds: 30));
+            .timeout(
+              kDebugMode
+                  ? const Duration(seconds: 45)
+                  : const Duration(seconds: 30),
+            );
       } on TimeoutException catch (e, st) {
         AppLogger.e(
           'AuthNotifier [HEAL-$healAttemptId]: syncMobileAuth timed out (attempt 1)',
@@ -298,7 +302,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           );
           syncRes = await api
               .syncMobileAuth(supabaseToken)
-              .timeout(const Duration(seconds: 30));
+              .timeout(
+                kDebugMode
+                    ? const Duration(seconds: 45)
+                    : const Duration(seconds: 30),
+              );
         } on Object catch (e, st) {
           AppLogger.e(
             'AuthNotifier [HEAL-$healAttemptId]: syncMobileAuth retry failed',
@@ -1541,7 +1549,11 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             .read(supabaseClientProvider)
             .auth
             .refreshSession()
-            .timeout(const Duration(seconds: 30));
+            .timeout(
+              kDebugMode
+                  ? const Duration(seconds: 45)
+                  : const Duration(seconds: 30),
+            );
         return res.session?.accessToken;
       }
       return session.accessToken;
