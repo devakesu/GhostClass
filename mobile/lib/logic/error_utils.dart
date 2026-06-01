@@ -33,6 +33,13 @@ String formatApiError(dynamic response, String context) {
   } else if (response is DioException) {
     status = response.response?.statusCode;
     final data = response.response?.data;
+
+    if (response.type == DioExceptionType.connectionTimeout ||
+        response.type == DioExceptionType.sendTimeout ||
+        response.type == DioExceptionType.receiveTimeout) {
+      return 'The server is taking longer than expected. Please try again in a moment.';
+    }
+
     if (data is Map) {
       code = (data['code'] ?? '').toString();
       message = (data['message'] ?? data['error'] ?? data['detail'] ?? '')
