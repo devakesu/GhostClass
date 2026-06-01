@@ -21,7 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class JweService {
   JweService._internal() {
     const networkTimeout = kDebugMode
-        ? Duration(seconds: 40)
+        ? Duration(seconds: 45)
         : Duration(seconds: 30);
 
     _dio = Dio(

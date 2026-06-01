@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,7 +66,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             try {
               await ref
                   .read(trackingProvider.future)
-                  .timeout(const Duration(seconds: 30));
+                  .timeout(
+                    kDebugMode
+                        ? const Duration(seconds: 45)
+                        : const Duration(seconds: 30),
+                  );
             } on Object catch (e, st) {
               AppLogger.e('TrackingScreen: Retry failed', e, st);
             }

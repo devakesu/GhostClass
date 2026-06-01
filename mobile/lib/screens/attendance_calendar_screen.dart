@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
@@ -126,7 +127,11 @@ class _AttendanceCalendarScreenState
                 ref.read(dashboardProvider.future),
                 ref.read(trackingProvider.future),
                 ref.read(academicProvider.future),
-              ]).timeout(const Duration(seconds: 30));
+              ]).timeout(
+                kDebugMode
+                    ? const Duration(seconds: 45)
+                    : const Duration(seconds: 30),
+              );
             } on Object catch (e, st) {
               AppLogger.e('AttendanceCalendarScreen: Retry failed', e, st);
             }
