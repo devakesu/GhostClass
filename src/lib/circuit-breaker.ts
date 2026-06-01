@@ -308,7 +308,7 @@ class CircuitBreaker {
       // Optimize: avoid a Redis read on every successful request by checking
       // the local mirror first. Successful requests are the common case when
       // the circuit is CLOSED and localFailures will typically be 0.
-      if (this.localFailures === 0) return;
+      if (this.localFailures === 0 && this.localLastFailTime === 0) return;
 
       // If local mirror indicates failures > 0, read authoritative value
       // from Redis and reset it if needed.

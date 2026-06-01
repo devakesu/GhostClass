@@ -21,6 +21,14 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Detect test environment via the VITEST env var (set automatically by Vitest runner).
 const isTest = process.env.VITEST === "true";
 
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, (_key, v) => (typeof v === 'bigint' ? v.toString() : v));
+  } catch {
+    return '"[unserializable]"';
+  }
+}
+
 function buildStructuredPayload(level: string, args: unknown[]) {
   const timestamp = new Date().toISOString();
 
@@ -44,7 +52,7 @@ function buildStructuredPayload(level: string, args: unknown[]) {
   };
   if (message) payload.msg = message;
   if (meta !== null) payload.meta = meta;
-  return JSON.stringify(payload);
+  return safeStringify(payload);
 }
 
 export const logger = {
