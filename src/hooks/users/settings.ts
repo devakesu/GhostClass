@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { makeRetryFn } from "@/lib/query-utils";
+import { UserProfile } from "@/types";
 
 type SemesterData = {
   default_semester: "even" | "odd";
@@ -24,17 +25,90 @@ export type UserSettings = {
 // Shared retry logic for settings queries — skip all 4xx, retry twice for 5xx/network
 const settingsRetryFn = makeRetryFn(2);
 
+function extractClassField<T extends string>(
+  uClass: { sem?: string; year?: string } | null | undefined,
+  field: "sem" | "year"
+): T | null {
+  if (!uClass) return null;
+  if (field === "sem" && uClass.sem) return uClass.sem as T;
+  if (field === "year" && uClass.year) return uClass.year as T;
+  return null;
+}
+
+async function resolveSettingFromProfileQuery<T extends string>(
+  queryClient: ReturnType<typeof useQueryClient>,
+  field: "sem" | "year",
+  fallbackApiCall: () => Promise<T | null>
+): Promise<T | null> {
+  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) || queryClient.getQueryData<UserProfile>(["profile", "synced"]);
+  const userClass = cachedProfile?.class as { sem?: string; year?: string } | null | undefined;
+  const cachedValue = extractClassField<T>(userClass, field);
+  if (cachedValue) {
+    return cachedValue;
+  }
+
+  const syncedState = queryClient.getQueryState(["profile", "synced"]);
+  const normalState = queryClient.getQueryState(["profile"]);
+  const isSyncedPending = syncedState && syncedState.status === "pending";
+  const isNormalPending = normalState && normalState.status === "pending";
+
+  if (isSyncedPending || isNormalPending) {
+    const targetKey = isSyncedPending ? "synced" : "normal";
+    return new Promise<T | null>((resolve) => {
+      let isSettled = false;
+      const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+        const key = event.query.queryKey;
+        const matchesKey = targetKey === "synced"
+          ? (key[0] === "profile" && key[1] === "synced")
+          : (key[0] === "profile" && key.length === 1);
+
+        if (matchesKey) {
+          if (event.query.state.status === "success") {
+            unsubscribe();
+            isSettled = true;
+            const profile = event.query.state.data as UserProfile | null;
+            const uClass = profile?.class as { sem?: string; year?: string } | null | undefined;
+            const value = extractClassField<T>(uClass, field);
+            if (value) {
+              resolve(value);
+            } else {
+              fallbackApiCall().then(resolve).catch(() => resolve(null));
+            }
+          } else if (event.query.state.status === "error") {
+            unsubscribe();
+            isSettled = true;
+            fallbackApiCall().then(resolve).catch(() => resolve(null));
+          }
+        }
+      });
+      // Safety timeout to prevent hanging if the profile sync fails/hangs
+      setTimeout(() => {
+        if (!isSettled) {
+          unsubscribe();
+          fallbackApiCall().then(resolve).catch(() => resolve(null));
+        }
+      }, 30000);
+    });
+  }
+
+  return fallbackApiCall();
+}
+
 export const useFetchSemester = () => {
+  const queryClient = useQueryClient();
+
   return useQuery<"even" | "odd" | null>({
     queryKey: ["semester"],
     queryFn: async () => {
-      try {
-        const res = await axios.get("/user/setting/default_semester");
-        return res.data;
-      } catch (error: unknown) {
-        if (isAxiosError(error) && error.response?.status === 404) return null;
-        throw error;
-      }
+      return resolveSettingFromProfileQuery(queryClient, "sem", async () => {
+        try {
+          const res = await axios.get("/user/setting/default_semester");
+          return res.data;
+        } catch (error: unknown) {
+          if (isAxiosError(error) && error.response?.status === 404) return null;
+          throw error;
+        }
+      });
     },
     retry: settingsRetryFn,
     staleTime: 1000 * 60 * 5, 
@@ -43,16 +117,20 @@ export const useFetchSemester = () => {
 };
 
 export const useFetchAcademicYear = () => {
+  const queryClient = useQueryClient();
+
   return useQuery<string | null>({
     queryKey: ["academic-year"],
     queryFn: async () => {
-      try {
-        const res = await axios.get("/user/setting/default_academic_year");
-        return res.data;
-      } catch (error: unknown) {
-        if (isAxiosError(error) && error.response?.status === 404) return null;
-        throw error;
-      }
+      return resolveSettingFromProfileQuery(queryClient, "year", async () => {
+        try {
+          const res = await axios.get("/user/setting/default_academic_year");
+          return res.data;
+        } catch (error: unknown) {
+          if (isAxiosError(error) && error.response?.status === 404) return null;
+          throw error;
+        }
+      });
     },
     retry: settingsRetryFn,
     staleTime: 1000 * 60 * 5, 

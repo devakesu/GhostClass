@@ -36,7 +36,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  int _consecutiveFailures = 0;
+  Timer? _cooldownTimer;
+  int _cooldownSecondsRemaining = 0;
+
   late final SecurityGuard _securityGuard;
+
+  void _startCooldown() {
+    _cooldownSecondsRemaining = 30;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_cooldownSecondsRemaining > 1) {
+          _cooldownSecondsRemaining--;
+        } else {
+          _cooldownSecondsRemaining = 0;
+          _consecutiveFailures = 0;
+          _cooldownTimer?.cancel();
+          _cooldownTimer = null;
+        }
+      });
+    });
+  }
 
   void _checkAndShowUpdateDialog() {
     final updateState = ref.read(appUpdateProvider);
@@ -72,6 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     // Disable screen protection when leaving the Login screen
     final _ = _securityGuard.setSecureScreen(enabled: false);
     _usernameController.dispose();
@@ -81,6 +107,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
+
+    if (_cooldownSecondsRemaining > 0) return;
 
     if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
       const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
@@ -108,15 +136,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
     }
 
-    final errors = <String>[];
-    if (_usernameController.text.trim().isEmpty) {
-      errors.add('Username, email, or phone number is required.');
-    }
-    if (_passwordController.text.isEmpty) {
-      errors.add('Password is required.');
-    }
-    if (errors.isNotEmpty) {
-      await handleError(errors.join('\n'), title: 'Missing Fields');
+    if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
 
@@ -125,26 +145,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     LoadingOverlay.show(context, message: 'Waking up EzyGo...');
 
     try {
-      try {
-        AppLogger.safeUnawait(
-          AnalyticsService.instance
-              .logCustom('login_attempt', {
-                'username_length': _usernameController.text.trim().length,
-              })
-              .catchError(
-                (Object e, StackTrace st) => AppLogger.e(
-                  'LoginScreen: Analytics login_attempt failed',
-                  e,
-                  st,
-                ),
+      AppLogger.safeUnawait(
+        AnalyticsService.instance
+            .logCustom('login_attempt', {
+              'username_length': _usernameController.text.trim().length,
+            })
+            .catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'LoginScreen: Analytics login_attempt failed',
+                e,
+                st,
               ),
-          'LoginScreen: analytics login_attempt',
-        );
-      } on Object catch (_) {}
+            ),
+        'LoginScreen: analytics login_attempt',
+      );
 
       await ref
           .read(authProvider.notifier)
           .login(_usernameController.text.trim(), _passwordController.text);
+
+      _consecutiveFailures = 0;
 
       if (mounted) {
         LoadingOverlay.hide(context);
@@ -153,40 +173,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } on LoginException catch (e) {
       if (!mounted) return;
       LoadingOverlay.hide(context);
-      try {
-        AppLogger.safeUnawait(
-          AnalyticsService.instance
-              .logCustom('login_failed', {
-                'reason': e.message,
-              })
-              .catchError(
-                (Object e, StackTrace st) => AppLogger.e(
-                  'LoginScreen: Analytics login_failed failed',
-                  e,
-                  st,
-                ),
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 3) {
+        _startCooldown();
+      }
+      AppLogger.safeUnawait(
+        AnalyticsService.instance
+            .logCustom('login_failed', {
+              'reason': e.message,
+            })
+            .catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'LoginScreen: Analytics login_failed failed',
+                e,
+                st,
               ),
-          'LoginScreen: analytics login_failed',
-        );
-      } on Object catch (_) {}
+            ),
+        'LoginScreen: analytics login_failed',
+      );
       await handleError(e.message, title: 'Login Failed');
     } on Object catch (e) {
       if (!mounted) return;
       LoadingOverlay.hide(context);
-      try {
-        AppLogger.safeUnawait(
-          AnalyticsService.instance
-              .logError(e.toString())
-              .catchError(
-                (Object e, StackTrace st) => AppLogger.e(
-                  'LoginScreen: Analytics logError failed',
-                  e,
-                  st,
-                ),
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 3) {
+        _startCooldown();
+      }
+      AppLogger.safeUnawait(
+        AnalyticsService.instance
+            .logError(e.toString())
+            .catchError(
+              (Object e, StackTrace st) => AppLogger.e(
+                'LoginScreen: Analytics logError failed',
+                e,
+                st,
               ),
-          'LoginScreen: analytics logError',
-        );
-      } on Object catch (_) {}
+            ),
+        'LoginScreen: analytics logError',
+      );
       await handleError(e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -329,6 +353,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               AutofillHints.username,
                               AutofillHints.email,
                             ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Username, email, or phone number is required.';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
 
@@ -405,6 +435,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             textInputAction: TextInputAction.done,
                             autofillHints: const [AutofillHints.password],
                             onFieldSubmitted: (_) => _handleLogin(),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Password is required.';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 24),
 
@@ -439,7 +475,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
-                                  onPressed: _isLoading ? null : _handleLogin,
+                                  onPressed:
+                                      (_isLoading ||
+                                          _cooldownSecondsRemaining > 0)
+                                      ? null
+                                      : _handleLogin,
                                   child: _isLoading
                                       ? const SizedBox(
                                           height: 22,
@@ -449,9 +489,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                             color: Colors.white,
                                           ),
                                         )
-                                      : const Text(
-                                          'Login',
-                                          style: TextStyle(
+                                      : Text(
+                                          _cooldownSecondsRemaining > 0
+                                              ? 'Retry in ${_cooldownSecondsRemaining}s'
+                                              : 'Login',
+                                          style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 0.5,

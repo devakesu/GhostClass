@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as profileHooks from '@/hooks/users/profile';
 import * as coursesHooks from '@/hooks/courses/courses';
 import * as syncHooks from '@/hooks/use-sync-on-mount';
+import * as attendanceHooks from '@/hooks/courses/attendance';
 
 type MockCourse = {
   id: number;
@@ -250,5 +251,32 @@ describe('DashboardClient', () => {
     fireEvent.click(editButton);
 
     expect(screen.getByTestId('edit-instructor-dialog')).toBeInTheDocument();
+  });
+
+  it('shows loading message when attendance is loading but profile has loaded', async () => {
+    vi.mocked(attendanceHooks.useAttendanceReport).mockReturnValue({
+      data: null,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DashboardClient />
+      </QueryClientProvider>
+    );
+
+    // Welcome message with name is visible
+    expect(await screen.findByText(/Welcome back,/i)).toBeInTheDocument();
+    expect(screen.getByText(/Test User!/i)).toBeInTheDocument();
+
+    // Data panels and charts are NOT visible
+    expect(screen.queryByTestId('stats-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-charts')).not.toBeInTheDocument();
+
+    // Loader is visible
+    expect(screen.getByTestId('loading')).toBeInTheDocument();
   });
 });

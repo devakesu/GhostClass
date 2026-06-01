@@ -594,9 +594,8 @@ class _NotificationCard extends ConsumerWidget {
     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
   }
 
-  String _formatRelativeTime(String dateString) {
+  String _formatRelativeTime(DateTime date) {
     try {
-      final date = DateTime.parse(dateString);
       final now = DateTime.now();
       final diff = now.difference(date);
 

@@ -53,7 +53,8 @@ export const useFetchCourses = (options?: {
 
       return formattedData;
     },
-    enabled: options?.enabled,
+    // Default to enabled unless caller explicitly disables.
+    enabled: options?.enabled !== false,
     initialData: options?.initialData ?? undefined,
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,

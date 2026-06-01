@@ -18,7 +18,6 @@ Future<void> runUnifiedPullToRefresh({
             await syncCron();
           } on Object catch (e, st) {
             AppLogger.e('$logLabel: cron sync failed', e, st);
-            rethrow;
           }
         }();
 

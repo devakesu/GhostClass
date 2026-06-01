@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_utils.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/services/auth_service.dart';
 import 'package:ghostclass/services/dio_service.dart';
@@ -12,6 +13,7 @@ import 'package:ghostclass/services/ezygo_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/security_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// ApiService
 /// ----------
@@ -249,6 +251,16 @@ class ApiService {
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );
+  }
+
+  Future<List<dynamic>> fetchClassCourses(String classId) async {
+    final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
+    return supabase.from('class_courses').select().eq('class_id', classId);
+  }
+
+  Future<List<dynamic>> fetchCourseInstructors(String classId) async {
+    final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
+    return supabase.from('course_instructors').select().eq('class_id', classId);
   }
 
   // --- Error Handling ---

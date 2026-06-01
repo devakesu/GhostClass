@@ -226,42 +226,32 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             }),
         if (classId != null) ...[
           // Fetch Class Courses
-          ref
-              .read(supabaseClientProvider)
-              .from('class_courses')
-              .select()
-              .eq('class_id', classId)
-              .then((coursesRes) {
-                if (coursesRes.isNotEmpty) {
-                  sharedCourses = (coursesRes as List).map((raw) {
-                    final c = raw as Map<String, dynamic>;
-                    return CourseDetails(
-                      id: 0, // Mark as shared/custom
-                      name: c['course_name'] as String? ?? 'Unnamed Course',
-                      code: c['course_code'] as String?,
-                      academicYear: academic.year,
-                      academicSemester: academic.semester,
-                    );
-                  }).toList();
-                }
-              }),
+          api.fetchClassCourses(classId).then((coursesRes) {
+            if (coursesRes.isNotEmpty) {
+              sharedCourses = coursesRes.map((raw) {
+                final c = raw as Map<String, dynamic>;
+                return CourseDetails(
+                  id: 0, // Mark as shared/custom
+                  name: c['course_name'] as String? ?? 'Unnamed Course',
+                  code: c['course_code'] as String?,
+                  academicYear: academic.year,
+                  academicSemester: academic.semester,
+                );
+              }).toList();
+            }
+          }),
           // Fetch Instructor Mappings
-          ref
-              .read(supabaseClientProvider)
-              .from('course_instructors')
-              .select()
-              .eq('class_id', classId)
-              .then((instructorsRes) {
-                if (instructorsRes.isNotEmpty) {
-                  sharedInstructors = (instructorsRes as List)
-                      .map(
-                        (json) => CourseInstructor.fromJson(
-                          json as Map<String, dynamic>,
-                        ),
-                      )
-                      .toList();
-                }
-              }),
+          api.fetchCourseInstructors(classId).then((instructorsRes) {
+            if (instructorsRes.isNotEmpty) {
+              sharedInstructors = instructorsRes
+                  .map(
+                    (json) => CourseInstructor.fromJson(
+                      json as Map<String, dynamic>,
+                    ),
+                  )
+                  .toList();
+            }
+          }),
         ],
       ]);
 
@@ -537,7 +527,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         trackingState?.officialReport,
       );
       final currentAcademic = ref.read(academicProvider).value;
-      if (academic == currentAcademic) {
+      if (academic.semester == currentAcademic?.semester &&
+          academic.year == currentAcademic?.year) {
         state = AsyncValue.data(freshData);
       } else {
         AppLogger.i(

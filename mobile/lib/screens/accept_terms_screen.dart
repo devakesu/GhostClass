@@ -298,64 +298,69 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
               const SizedBox(height: 32),
 
               // Acceptance
-              InkWell(
-                onTap: () => setState(() => _accepted = !_accepted),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: _accepted
-                        ? primary.withValues(alpha: 0.05)
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.02),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
+              Semantics(
+                checked: _accepted,
+                label:
+                    'I have read and accept the above Disclaimer and all Policies.',
+                child: InkWell(
+                  onTap: () => setState(() => _accepted = !_accepted),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
                       color: _accepted
-                          ? primary.withValues(alpha: 0.2)
+                          ? primary.withValues(alpha: 0.05)
                           : Theme.of(
                               context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.08),
+                            ).colorScheme.onSurface.withValues(alpha: 0.02),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _accepted
+                            ? primary.withValues(alpha: 0.2)
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.08),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: _accepted ? primary : Colors.transparent,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _accepted
-                                ? primary
-                                : Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.45),
-                            width: 2,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: _accepted ? primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: _accepted
+                                  ? primary
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.45),
+                              width: 2,
+                            ),
+                          ),
+                          child: _accepted
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'I have read and accept the above Disclaimer and all Policies.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.7),
+                              height: 1.4,
+                            ),
                           ),
                         ),
-                        child: _accepted
-                            ? const Icon(
-                                Icons.check,
-                                size: 14,
-                                color: Colors.white,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          'I have read and accept the above Disclaimer and all Policies.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.7),
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

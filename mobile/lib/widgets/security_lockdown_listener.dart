@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/security_utils.dart';
@@ -34,23 +32,20 @@ class SecurityLockdownListener extends ConsumerWidget {
     WidgetRef ref,
     SecurityFailureState state,
   ) {
-    if (Platform.isIOS) {
-      // Wipe storage immediately on iOS since we won't show the exit button
-      AppLogger.safeUnawait(
-        ref.read(securityGuardProvider).wipeAndExit(),
-        'SecurityLockdownListener: wipeAndExit',
-      );
-    }
+    // Wipe storage immediately for security
+    AppLogger.safeUnawait(
+      ref.read(securityGuardProvider).storage.clearAll(),
+      'SecurityLockdownListener: clearAll',
+    );
+
     final navContext = rootNavigatorKey.currentContext ?? context;
     final _ = SecurityUtils.showSecurityFailureDialog(
       navContext,
       title: state.message,
       message: state.reason ?? 'Your device failed the security verification.',
       technicalDetails: state.source ?? 'Unknown security context.',
-      retryLabel: Platform.isAndroid ? 'Close App' : null,
-      onRetry: Platform.isAndroid
-          ? () => ref.read(securityGuardProvider).wipeAndExit()
-          : null,
+      retryLabel: 'Close App',
+      onRetry: () => ref.read(securityGuardProvider).wipeAndExit(),
     );
   }
 }

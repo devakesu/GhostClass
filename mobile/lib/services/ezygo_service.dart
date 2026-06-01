@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/ezygo_batch_fetcher.dart';
+import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -14,12 +15,7 @@ import 'package:ghostclass/services/secure_storage.dart';
 /// and deduplication to optimize performance and reduce backend load.
 class EzygoService {
   EzygoService(this._ref) {
-    _fetcher = EzygoBatchFetcher(
-      _ref.read(dioServiceProvider).dio,
-      getOutage: () => _ref.read(outageProvider),
-      setOutage: (v) => _ref.read(outageProvider.notifier).update(v),
-      isBackendUnauthorized: () => false,
-    );
+    _fetcher = _ref.read(ezygoBatchFetcherProvider);
   }
   final Ref _ref;
   late final EzygoBatchFetcher _fetcher;
@@ -246,4 +242,27 @@ class EzygoService {
   }
 }
 
-final ezygoServiceProvider = Provider<EzygoService>(EzygoService.new);
+final ezygoBatchFetcherProvider = Provider<EzygoBatchFetcher>((ref) {
+  // Watch supabaseUserId to automatically invalidate and recreate the fetcher on session login/logout boundaries
+  ref.watch(
+    authProvider.select((asyncUser) => asyncUser.value?.supabaseUserId),
+  );
+
+  final fetcher = EzygoBatchFetcher(
+    ref.read(dioServiceProvider).dio,
+    getOutage: () => ref.read(outageProvider),
+    setOutage: (v) => ref.read(outageProvider.notifier).update(v),
+    isBackendUnauthorized: () => false,
+  );
+
+  ref.onDispose(() {
+    fetcher.clearAll(setOutageState: false);
+  });
+
+  return fetcher;
+});
+
+final ezygoServiceProvider = Provider<EzygoService>((ref) {
+  ref.watch(ezygoBatchFetcherProvider);
+  return EzygoService(ref);
+});

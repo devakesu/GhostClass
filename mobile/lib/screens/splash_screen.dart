@@ -25,6 +25,7 @@ import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
+import 'package:ghostclass/services/security_guard.dart';
 import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/services/startup_flow_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
@@ -61,7 +62,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   bool _canUseStartupCache(String sessionKey, StartupFlowService startupFlow) {
     final cachedAt = startupFlow.startupCacheAt;
-    if (startupFlow.startupCache == null || cachedAt == null) return false;
+    final cache = startupFlow.startupCache;
+    if (cache == null || cache is! _StartupSnapshot || cachedAt == null) {
+      return false;
+    }
     if (startupFlow.startupCacheSessionKey != sessionKey) return false;
     return DateTime.now().difference(cachedAt) <= _startupCacheTtl;
   }
@@ -70,15 +74,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final sessionKey = _currentSessionKey();
     final startupFlow = ref.read(startupFlowServiceProvider);
 
-    if (_canUseStartupCache(sessionKey, startupFlow)) {
-      return Future<_StartupSnapshot>.value(
-        startupFlow.startupCache! as _StartupSnapshot,
-      );
+    final cache = startupFlow.startupCache;
+    if (cache is _StartupSnapshot &&
+        _canUseStartupCache(sessionKey, startupFlow)) {
+      return Future<_StartupSnapshot>.value(cache);
     }
 
     final inFlight = startupFlow.startupInFlight;
     if (inFlight != null && startupFlow.startupCacheSessionKey == sessionKey) {
-      return inFlight.then((val) => val as _StartupSnapshot);
+      return inFlight.then((val) {
+        if (val is _StartupSnapshot) return val;
+        throw StateError(
+          'Invalid in-flight startup snapshot type: ${val.runtimeType}',
+        );
+      });
     }
 
     final api = ref.read(apiServiceProvider);
@@ -245,13 +254,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   void _startPostNavigationPreloads({
-    required bool isDashboard,
     required ApiService apiService,
-    Future<dynamic>? dashboardFuture,
-    Future<dynamic>? trackingFuture,
-    Future<dynamic>? leaveFuture,
-    Future<dynamic>? scoreFuture,
-    Future<dynamic>? notificationsFuture,
   }) {
     AppLogger.safeUnawait(
       JweService.instance.preWarm().catchError(
@@ -267,16 +270,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }),
       'SplashScreen: post-nav API pre-warm',
     );
-
-    if (isDashboard) {
-      _prewarmAppData(
-        dashboardFuture: dashboardFuture!,
-        trackingFuture: trackingFuture!,
-        leaveFuture: leaveFuture!,
-        scoreFuture: scoreFuture!,
-        notificationsFuture: notificationsFuture!,
-      );
-    }
   }
 
   Future<void> _initializeApp() async {
@@ -414,12 +407,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             '$e\n\n'
             '${appCheckError != null ? "Local Error: $appCheckError" : ""}',
           ),
-          retryLabel: Platform.isAndroid
-              ? (isCritical ? 'Close App' : 'Restart App')
-              : (isCritical ? null : 'Retry'),
-          onRetry: Platform.isAndroid
-              ? SystemNavigator.pop
-              : (isCritical ? null : _beginInitializeIfIdle),
+          retryLabel: isCritical
+              ? 'Close App'
+              : (Platform.isAndroid ? 'Restart App' : 'Retry'),
+          onRetry: isCritical
+              ? () => ref.read(securityGuardProvider).wipeAndExit()
+              : (Platform.isAndroid
+                    ? SystemNavigator.pop
+                    : _beginInitializeIfIdle),
         );
         return;
       }
@@ -492,13 +487,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               notificationsFuture: notificationsFuture,
             );
             _startPostNavigationPreloads(
-              isDashboard: true,
               apiService: apiService,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
           }).catchError((Object e, StackTrace st) {
             AppLogger.e('SplashScreen: post-dashboard preloads failed', e, st);
@@ -511,7 +500,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         AppLogger.safeUnawait(
           Future<void>.microtask(() async {
             _startPostNavigationPreloads(
-              isDashboard: false,
               apiService: apiService,
             );
           }).catchError((Object e, StackTrace st) {
@@ -530,7 +518,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       AppLogger.safeUnawait(
         Future<void>.microtask(() async {
           _startPostNavigationPreloads(
-            isDashboard: false,
             apiService: apiService,
           );
         }).catchError((Object e, StackTrace st) {
@@ -586,21 +573,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               curve: Curves.easeOutCubic,
             )
             .then() // Chain effects after the entrance
-            .animate(onPlay: (controller) => controller.repeat(reverse: true))
-            .scale(
-              begin: const Offset(1, 1),
-              end: const Offset(1.05, 1.05),
-              duration: 500.ms,
-              curve: Curves.easeInOut,
-            )
             .animate(
               onPlay: (controller) => controller.repeat(
                 reverse: true,
                 period: 1200.ms,
               ),
             )
+            .scale(
+              begin: const Offset(1, 1),
+              end: const Offset(1.05, 1.05),
+              duration: 1200.ms,
+              curve: Curves.easeInOut,
+            )
             .shimmer(
-              duration: 600.ms,
+              duration: 1200.ms,
               color: Colors.white.withValues(alpha: 0.3),
             ),
       ),

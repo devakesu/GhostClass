@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -33,20 +34,26 @@ class EzygoBatchFetcher {
   static const Duration _cacheTtl = Duration(seconds: 60);
 
   // In-flight request map for deduplication
-  static final Map<String, Future<Response<dynamic>>> _inFlight = {};
+  final Map<String, Future<Response<dynamic>>> _inFlight = {};
 
   // Rate limiting (parity with Next.js MAX_CONCURRENT = 3)
   static const int _maxConcurrent = 3;
-  static int _activeRequests = 0;
-  static final List<Completer<void>> _queue = [];
+  int _activeRequests = 0;
+  final List<Completer<void>> _queue = [];
 
   // Local result cache
-  static final Map<String, _CacheEntry> _cache = {};
+  final Map<String, _CacheEntry> _cache = {};
 
   // Tracker for log throttling
-  static DateTime? _lastCircuitBreakerLog;
+  DateTime? _lastCircuitBreakerLog;
 
-  static int _generation = 0;
+  int _generation = 0;
+
+  String _hashToken(String token) {
+    if (token.isEmpty) return '';
+    final bytes = utf8.encode(token);
+    return sha256.convert(bytes).toString();
+  }
 
   /// Executes an authenticated request with deduplication and caching.
   ///
@@ -63,7 +70,8 @@ class EzygoBatchFetcher {
     // Generate a unique cache key based on the request identity
     // We include method, path, token, and a hash of the body data to avoid collisions.
     final dataKey = data != null ? _encodeStableRequestData(data) : '';
-    final cacheKey = '$method|$path|$token|$dataKey';
+    final hashedToken = _hashToken(token);
+    final cacheKey = '$method|$path|$hashedToken|$dataKey';
     final startGeneration = _generation;
 
     // 0. Security Barrier: If the backend connection is compromised, block immediately.
@@ -233,7 +241,7 @@ class EzygoBatchFetcher {
   }
 
   void _releaseSlot() {
-    _activeRequests--;
+    _activeRequests = (_activeRequests - 1).clamp(0, _maxConcurrent);
     if (_queue.isNotEmpty) {
       _activeRequests++;
       _queue.removeAt(0).complete();
@@ -267,10 +275,12 @@ class EzygoBatchFetcher {
   }
 
   /// Manually clears the local cache (e.g. on logout or manual refresh).
-  void clearAll() {
+  void clearAll({bool setOutageState = true}) {
     _cache.clear();
     _inFlight.clear();
-    _setOutage(false);
+    if (setOutageState) {
+      _setOutage(false);
+    }
     _generation++;
 
     // Reject all pending completers in the queue with a cancellation error

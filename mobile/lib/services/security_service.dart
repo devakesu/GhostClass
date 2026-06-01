@@ -92,8 +92,7 @@ class SecurityService {
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.badCertificate) {
+          e.type == DioExceptionType.connectionError) {
         return true;
       }
       final statusCode = e.response?.statusCode;
@@ -117,8 +116,16 @@ class SecurityService {
     }
 
     final msg = e.toString().toLowerCase();
-    if (msg.contains('socketexception') ||
+
+    // Security/certificate/handshake validation failures are not transient.
+    if (msg.contains('badcertificate') ||
         msg.contains('handshakeexception') ||
+        msg.contains('certverify') ||
+        msg.contains('certificate')) {
+      return false;
+    }
+
+    if (msg.contains('socketexception') ||
         msg.contains('network') ||
         msg.contains('connection') ||
         msg.contains('timeout')) {

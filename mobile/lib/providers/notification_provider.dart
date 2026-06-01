@@ -4,7 +4,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppNotification {
-  const AppNotification({
+  AppNotification({
     required this.id,
     required this.title,
     required this.description,
@@ -18,7 +18,7 @@ class AppNotification {
       id: json['id'] as int,
       title: json['title'] as String? ?? 'Notification',
       description: json['description'] as String? ?? '',
-      createdAt: json['created_at'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
       topic: json['topic'] as String?,
       isRead: json['is_read'] as bool? ?? false,
     );
@@ -26,7 +26,7 @@ class AppNotification {
   final int id;
   final String title;
   final String description;
-  final String createdAt;
+  final DateTime createdAt;
   final String? topic;
   final bool isRead;
 }
@@ -331,11 +331,11 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   }
 
   Future<void> markAllAsRead() async {
-    final previousState = state.value;
-    if (previousState == null) return;
+    final snapshotBeforeUpdate = state.value;
+    if (snapshotBeforeUpdate == null) return;
 
     // Move all unread actions to regular notifications as read
-    final readActions = previousState.actionNotifications
+    final readActions = snapshotBeforeUpdate.actionNotifications
         .map(
           (n) => AppNotification(
             id: n.id,
@@ -348,7 +348,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         )
         .toList();
 
-    final readRegular = previousState.regularNotifications
+    final readRegular = snapshotBeforeUpdate.regularNotifications
         .map(
           (n) => AppNotification(
             id: n.id,
@@ -364,14 +364,14 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     final allReadRegular = [...readActions, ...readRegular]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    state = AsyncValue.data(
-      NotificationsState(
-        actionNotifications: [],
-        regularNotifications: allReadRegular,
-        unreadCount: 0,
-        hasNextPage: previousState.hasNextPage,
-      ),
+    final optimisticState = NotificationsState(
+      actionNotifications: [],
+      regularNotifications: allReadRegular,
+      unreadCount: 0,
+      hasNextPage: snapshotBeforeUpdate.hasNextPage,
     );
+
+    state = AsyncValue.data(optimisticState);
 
     try {
       final supabase = Supabase.instance.client;
@@ -384,7 +384,49 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           .eq('auth_user_id', userId)
           .eq('is_read', false);
     } on Object catch (_) {
-      state = AsyncValue.data(previousState);
+      final currentState = state.value;
+      if (currentState == null || currentState == optimisticState) {
+        state = AsyncValue.data(snapshotBeforeUpdate);
+      } else {
+        // State mutated concurrently (e.g. fetchNextPage).
+        // Revert the read status of notifications that were present in snapshotBeforeUpdate
+        // and restore actionNotifications.
+        final originalActionIds = snapshotBeforeUpdate.actionNotifications
+            .map((n) => n.id)
+            .toSet();
+
+        final originalIsRead = {
+          for (final n in snapshotBeforeUpdate.allNotifications) n.id: n.isRead,
+        };
+
+        final revertedRegular = currentState.regularNotifications
+            .where((n) => !originalActionIds.contains(n.id))
+            .map((n) {
+              final wasRead = originalIsRead[n.id];
+              if (wasRead != null) {
+                return AppNotification(
+                  id: n.id,
+                  title: n.title,
+                  description: n.description,
+                  createdAt: n.createdAt,
+                  topic: n.topic,
+                  isRead: wasRead,
+                );
+              }
+              return n;
+            })
+            .toList();
+
+        state = AsyncValue.data(
+          NotificationsState(
+            actionNotifications: snapshotBeforeUpdate.actionNotifications,
+            regularNotifications: revertedRegular,
+            unreadCount: snapshotBeforeUpdate.unreadCount,
+            hasNextPage: currentState.hasNextPage,
+            isFetchingNextPage: currentState.isFetchingNextPage,
+          ),
+        );
+      }
       rethrow;
     }
   }

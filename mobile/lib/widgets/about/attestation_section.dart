@@ -20,16 +20,47 @@ class AttestationSection extends ConsumerStatefulWidget {
   ConsumerState<AttestationSection> createState() => _AttestationSectionState();
 }
 
+class AboutAttestationState {
+  const AboutAttestationState({this.data, this.lastVerifiedAt});
+  final Map<String, dynamic>? data;
+  final DateTime? lastVerifiedAt;
+}
+
+class AboutAttestationNotifier extends Notifier<AboutAttestationState?> {
+  @override
+  AboutAttestationState? build() => null;
+
+  void update(AboutAttestationState newState) {
+    if (state != newState) {
+      state = newState;
+    }
+  }
+}
+
+final aboutAttestationProvider =
+    NotifierProvider<AboutAttestationNotifier, AboutAttestationState?>(
+      AboutAttestationNotifier.new,
+    );
+
 class _AttestationSectionState extends ConsumerState<AttestationSection> {
   bool _isLoading = false;
   Map<String, dynamic>? _data;
   String? _error;
+  DateTime? _lastVerifiedAt;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final _ = _verify();
+      final cached = ref.read(aboutAttestationProvider);
+      if (cached != null) {
+        setState(() {
+          _data = cached.data;
+          _lastVerifiedAt = cached.lastVerifiedAt;
+        });
+      } else {
+        final _ = _verify();
+      }
     });
   }
 
@@ -49,7 +80,20 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          setState(() => _data = response.data as Map<String, dynamic>?);
+          final now = DateTime.now();
+          final data = response.data as Map<String, dynamic>?;
+          setState(() {
+            _data = data;
+            _lastVerifiedAt = now;
+          });
+          ref
+              .read(aboutAttestationProvider.notifier)
+              .update(
+                AboutAttestationState(
+                  data: data,
+                  lastVerifiedAt: now,
+                ),
+              );
         }
       } else {
         if (mounted) {
@@ -173,19 +217,40 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
           ),
           const SizedBox(height: 8),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(
-                LucideIcons.shieldCheck,
-                size: 10,
-                color: theme.colorScheme.onSecondary,
+              Row(
+                children: [
+                  Icon(
+                    LucideIcons.shieldCheck,
+                    size: 10,
+                    color: theme.colorScheme.onSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Last verified: ${_lastVerifiedAt != null ? "${_lastVerifiedAt!.hour}:${_lastVerifiedAt!.minute.toString().padLeft(2, '0')}" : "Never"}',
+                    style: GoogleFonts.manrope(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSecondary,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              Text(
-                'Last verified: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-                style: GoogleFonts.manrope(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSecondary,
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: _isLoading ? null : _verify,
+                icon: const Icon(LucideIcons.refreshCw, size: 10),
+                label: Text(
+                  'Verify Again',
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

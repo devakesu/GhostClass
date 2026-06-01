@@ -1372,8 +1372,6 @@ export default function TrackingClient() {
     },
   });
 
-  const syncSuccess = !!(syncSettled && !syncFailed);
-
   // --- 1. GROUP AND SORT DATA ---
   const groupedAllData = useMemo(
     () => groupAndSortTrackingData(trackingData, semesterData ?? undefined, academicYearData ?? undefined),
@@ -1465,9 +1463,8 @@ export default function TrackingClient() {
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
   const officialSessionsMap = useMemo(() => buildOfficialSessionsMap(attendanceData), [attendanceData]);
 
-  // Block rendering until tracking is enabled, base data has loaded, and initial sync has completed.
-  const isInitialLoading = !enabled || isDataLoading || isSyncing ||
-    !syncSuccess;
+  // Block rendering only on base data readiness; sync runs in the background.
+  const isInitialLoading = !enabled || isDataLoading;
 
   const hasBaseErrors = isTrackingError || isCountError || isCoursesError ||
     isAttendanceError || isSemesterError || isAcademicYearError;
@@ -1558,6 +1555,17 @@ export default function TrackingClient() {
             >
               <Loader2 size={12} className="animate-spin" />
               Syncing with EzyGo...
+            </m.div>
+          )}
+          {syncSettled && syncFailed && (
+            <m.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-700 dark:text-amber-300"
+            >
+              <CircleAlert size={12} />
+              Showing cached data until sync recovers.
             </m.div>
           )}
 

@@ -6,6 +6,7 @@ import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 final scoreProvider = AsyncNotifierProvider<ScoreNotifier, ScoreState>(
@@ -78,19 +79,21 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       ]);
     }
 
+    final user = authState.value;
+    if (user == null) {
+      throw Exception('Unauthorized');
+    }
+
     final academic = academicAsync.value;
 
-    return _initialFetch(academic: academic);
+    return _initialFetch(user: user, academic: academic);
   }
 
   Future<ScoreState> _initialFetch({
+    required AuthenticatedUser user,
     AcademicState? academic,
     bool bypassCache = false,
   }) async {
-    final authState = ref.read(authProvider);
-    final user = authState.value;
-    if (user == null) throw Exception('Unauthorized');
-
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
@@ -124,15 +127,25 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         final slice = targetExams.skip(i).take(poolSize);
         await Future.wait(
           slice.map(
-            (exam) => _loadExamDetails(
-              exam: exam,
-              api: api,
-              storage: storage,
-              questionsMap: questionsMap,
-              answersMap: answersMap,
-              resolvedScores: resolvedScores,
-              bypassCache: bypassCache,
-            ),
+            (exam) async {
+              try {
+                await _loadExamDetails(
+                  exam: exam,
+                  api: api,
+                  storage: storage,
+                  questionsMap: questionsMap,
+                  answersMap: answersMap,
+                  resolvedScores: resolvedScores,
+                  bypassCache: bypassCache,
+                );
+              } on Object catch (err, st) {
+                AppLogger.e(
+                  'Failed to load details for exam ${exam.id}',
+                  err,
+                  st,
+                );
+              }
+            },
           ),
         );
       }
@@ -225,11 +238,16 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
   }
 
   Future<void> refresh() async {
+    final user = ref.read(authProvider).value;
+    if (user == null) {
+      state = AsyncValue.error(Exception('Unauthorized'), StackTrace.current);
+      return;
+    }
     final academicAsync = ref.read(academicProvider);
     final academic = academicAsync.value;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => _initialFetch(academic: academic, bypassCache: true),
+      () => _initialFetch(user: user, academic: academic, bypassCache: true),
     );
   }
 

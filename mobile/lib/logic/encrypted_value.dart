@@ -60,11 +60,12 @@ class EncryptedValue {
   /// Overwrite entropy buffers to reduce risk of key reconstruction after logout.
   /// Call this when the app is performing a full logout or memory wipe.
   static void clearEntropy() {
+    final random = Random.secure();
     for (var i = 0; i < _entropyA.length; i++) {
-      _entropyA[i] = 0;
+      _entropyA[i] = random.nextInt(256);
     }
     for (var i = 0; i < _entropyB.length; i++) {
-      _entropyB[i] = 0;
+      _entropyB[i] = random.nextInt(256);
     }
   }
 

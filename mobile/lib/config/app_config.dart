@@ -189,6 +189,9 @@ class AppConfig {
 
       return decoded;
     } on Object {
+      if (!AppSecrets.isDev) {
+        assert(false, 'AppConfig._d: value appears to be unencoded: $encoded');
+      }
       // Return the raw string as fallback if it's not actually base64
       // This allows migration and reduces breakage for unencoded dev strings
       final fallback = encoded.trim();

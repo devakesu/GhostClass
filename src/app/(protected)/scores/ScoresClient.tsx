@@ -27,6 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loading } from "@/components/loading";
 import { useExams, useExamAnswers, useExamQuestions, useBatchExamDetails } from "@/hooks/courses/exams";
 import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
@@ -245,7 +246,7 @@ function ScoreCard({
           {/* Course */}
           <div className="flex min-w-0 items-start gap-2">
             <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-            <span className="min-w-0 flex-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed break-words">
+            <span className="min-w-0 flex-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed wrap-break-word">
               {getCourseName(exam)}
             </span>
           </div>
@@ -466,11 +467,13 @@ function ExamDetailDrawer({
   const computedTotal = useMemo(() => {
     if (!answers || answers.length === 0) return null;
     // Deduplicate by unique answer ID to prevent inflation from API duplicates
-    const uniqueAnswers = Array.from(new Map(answers.map((a) => [a.id, a])).values());
-    const hasAnyScore = uniqueAnswers.some((a) => a.score != null);
+    const uniqueAnswers = Array.from(
+      new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a])).values()
+    );
+    const hasAnyScore = uniqueAnswers.some((a: ExamAnswer) => a.score != null);
     if (!hasAnyScore) return null;
-    return uniqueAnswers.reduce(
-      (sum, a) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
+    return uniqueAnswers.reduce<number>(
+      (sum: number, a: ExamAnswer) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
       0
     );
   }, [answers]);
@@ -496,23 +499,25 @@ function ExamDetailDrawer({
     if (!questions || questions.length === 0) return null;
     
     // Deduplicate by unique question ID
-    const uniqueQuestions = Array.from(new Map(questions.map((q) => [q.id, q])).values());
+    const uniqueQuestions = Array.from(
+      new Map<number, ExamQuestion>(questions.map((q: ExamQuestion) => [q.id, q])).values()
+    );
     
     // Identify parents to find leaves
     const parentIds = new Set(
       uniqueQuestions
-        .map((q) => q.subquestion_parent_id)
+        .map((q: ExamQuestion) => q.subquestion_parent_id)
         .filter((id): id is number => id !== null)
     );
-    const leaves = uniqueQuestions.filter((q) => !parentIds.has(q.id));
+    const leaves = uniqueQuestions.filter((q: ExamQuestion) => !parentIds.has(q.id));
     
     // Priority 3: Only sum leaves that have been graded (have a non-null score).
     // This is the most reliable way to handle flexible papers in EzyGo,
     // where unattempted optional questions are returned but shouldn't count.
     const gradedQuestionIds = new Set(
-      answers?.filter((a) => a.score !== null).map((a) => a.examquestion_id) || []
+      answers?.filter((a: ExamAnswer) => a.score !== null).map((a: ExamAnswer) => a.examquestion_id) || []
     );
-    const gradedLeaves = leaves.filter((q) => gradedQuestionIds.has(q.id));
+    const gradedLeaves = leaves.filter((q: ExamQuestion) => gradedQuestionIds.has(q.id));
     
     const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
     
@@ -747,7 +752,7 @@ function ExamDetailDrawer({
         </div>
 
         {/* Footer — computed total (only for marked exams) */}
-        {computedTotal !== null && totalPossible !== null && (
+        {computedTotal != null && totalPossible != null && (
           <div className="border-t border-border px-5 py-5 pb-6">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">
@@ -852,7 +857,7 @@ function CourseGroupsSection({
                   className="h-4 w-4 text-primary shrink-0"
                   aria-hidden="true"
                 />
-                <span className="min-w-0 text-sm font-semibold text-foreground break-words">
+                <span className="min-w-0 text-sm font-semibold text-foreground wrap-break-word">
                   {group.label}
                 </span>
                 {isCourseDisabled(
@@ -894,6 +899,7 @@ function CourseGroupsSection({
 export default function ScoresClient() {
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } = useExams();
@@ -902,7 +908,7 @@ export default function ScoresClient() {
   const panel = searchParams.get("panel");
   const selectedExam = useMemo(() => {
     if (!panel) return null;
-    return exams?.find((e) => e.id.toString() === panel) ?? null;
+    return exams?.find((e: Exam) => e.id.toString() === panel) ?? null;
   }, [panel, exams]);
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
@@ -918,12 +924,31 @@ export default function ScoresClient() {
   const examIds = useMemo(
     () =>
       exams
-        ?.filter((e) => e.participants && e.participants.length > 0)
-        .map((e) => e.id) ?? [],
+        ?.filter((e: Exam) => e.participants && e.participants.length > 0)
+        .map((e: Exam) => e.id) ?? [],
     [exams]
   );
   // Pre-fetch all exam answers in parallel on load via a single batch request.
   const batchQuery = useBatchExamDetails(examIds);
+
+  useEffect(() => {
+    if (!batchQuery.data) return;
+
+    for (const [idStr, detailsVal] of Object.entries(batchQuery.data)) {
+      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
+      const examId = Number.parseInt(idStr, 10);
+      if (!Number.isFinite(examId)) continue;
+
+      queryClient.setQueryData(
+        ["exam-answers", examId, semesterData, academicYearData],
+        details.answers,
+      );
+      queryClient.setQueryData(
+        ["exam-questions", examId, semesterData, academicYearData],
+        details.questions,
+      );
+    }
+  }, [batchQuery.data, queryClient, semesterData, academicYearData]);
 
   // Block render until exams list + batch details have settled.
   const isLoading = examsLoading || batchQuery.isPending;
@@ -936,19 +961,20 @@ export default function ScoresClient() {
     const resMap = new Map<number, number>();
     if (!batchQuery.data) return resMap;
 
-    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+    Object.entries(batchQuery.data).forEach(([idStr, detailsVal]) => {
+      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
       const id = parseInt(idStr, 10);
       const answers = details.answers;
       if (answers && answers.length > 0) {
         const uniqueAnswers = Array.from(
-          new Map(answers.map((a) => [a.id, a])).values(),
+          new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a])).values(),
         );
-        const hasAnyScore = uniqueAnswers.some((a) => a.score != null);
+        const hasAnyScore = uniqueAnswers.some((a: ExamAnswer) => a.score != null);
         if (hasAnyScore) {
           resMap.set(
             id,
-            uniqueAnswers.reduce(
-              (sum, a) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
+            uniqueAnswers.reduce<number>(
+              (sum: number, a: ExamAnswer) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
               0,
             ),
           );
@@ -967,9 +993,10 @@ export default function ScoresClient() {
     const resMap = new Map<number, number>();
     if (!batchQuery.data) return resMap;
 
-    Object.entries(batchQuery.data).forEach(([idStr, details]) => {
+    Object.entries(batchQuery.data).forEach(([idStr, detailsVal]) => {
+      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
       const id = parseInt(idStr, 10);
-      const exam = exams?.find((e) => e.id === id);
+      const exam = exams?.find((e: Exam) => e.id === id);
       const qData = details.questions;
 
       if (id !== undefined) {
@@ -1020,7 +1047,7 @@ export default function ScoresClient() {
    */
   const participatedExams = useMemo(() => {
     if (!exams) return [];
-    return exams.filter((e) => {
+    return exams.filter((e: Exam) => {
       if (!e.participants || e.participants.length === 0) return false;
       if (e.activity_type === "assignment") {
         const details = batchQuery.data?.[e.id];
@@ -1036,7 +1063,7 @@ export default function ScoresClient() {
     const base =
       filter === "all"
         ? participatedExams
-        : participatedExams.filter((e) => e.activity_type === filter);
+        : participatedExams.filter((e: Exam) => e.activity_type === filter);
     // Marked (has resolved score) first, then pending
     return [...base].sort((a, b) => {
       const aScored = resolvedScores.has(a.id) || getScore(a) !== null ? 1 : 0;
@@ -1048,8 +1075,8 @@ export default function ScoresClient() {
   const counts: Record<ActivityFilter, number> = useMemo(() => {
     return {
       all: participatedExams.length,
-      assessment: participatedExams.filter((e) => e.activity_type === "assessment").length,
-      assignment: participatedExams.filter((e) => e.activity_type === "assignment").length,
+      assessment: participatedExams.filter((e: Exam) => e.activity_type === "assessment").length,
+      assignment: participatedExams.filter((e: Exam) => e.activity_type === "assignment").length,
     };
   }, [participatedExams]);
 

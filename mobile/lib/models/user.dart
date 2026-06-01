@@ -127,20 +127,21 @@ class UserProfile {
           classField == other.classField;
 
   @override
-  int get hashCode =>
-      firstName.hashCode ^
-      lastName.hashCode ^
-      avatarUrl.hashCode ^
-      email.hashCode ^
-      phone.hashCode ^
-      birthDate.hashCode ^
-      gender.hashCode ^
-      lastSyncedAt.hashCode ^
-      currentSemester.hashCode ^
-      currentYear.hashCode ^
-      createdAt.hashCode ^
-      ezygoCreatedAt.hashCode ^
-      classField.hashCode;
+  int get hashCode => Object.hash(
+    firstName,
+    lastName,
+    avatarUrl,
+    email,
+    phone,
+    birthDate,
+    gender,
+    lastSyncedAt,
+    currentSemester,
+    currentYear,
+    createdAt,
+    ezygoCreatedAt,
+    classField,
+  );
 
   Map<String, dynamic> toJson() => {
     'first_name': firstName,
@@ -273,12 +274,13 @@ class UserSettings {
           _mapsEqual(disabledCourses, other.disabledCourses);
 
   @override
-  int get hashCode =>
-      bunkCalculatorEnabled.hashCode ^
-      targetPercentage.hashCode ^
-      semester.hashCode ^
-      academicYear.hashCode ^
-      disabledCourses.hashCode;
+  int get hashCode => Object.hash(
+    bunkCalculatorEnabled,
+    targetPercentage,
+    semester,
+    academicYear,
+    disabledCourses,
+  );
 
   bool _mapsEqual(Map<dynamic, dynamic> m1, Map<dynamic, dynamic> m2) {
     if (m1.length != m2.length) return false;

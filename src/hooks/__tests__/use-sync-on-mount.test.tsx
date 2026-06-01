@@ -182,6 +182,10 @@ describe("useSyncOnMount", () => {
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalled();
+    });
+    
     unmount();
     
     // Complete axios after unmount
@@ -204,6 +208,10 @@ describe("useSyncOnMount", () => {
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
     
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalled();
+    });
+    
     unmount();
     
     // Fail axios after unmount
@@ -213,5 +221,38 @@ describe("useSyncOnMount", () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     // Verify no log error was recorded since the component had unmounted
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("should defer sync until the load event if document is not fully loaded", async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      status: 200,
+      data: { success: true },
+    });
+
+    const originalReadyState = document.readyState;
+    Object.defineProperty(document, "readyState", {
+      get() {
+        return "loading";
+      },
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useSyncOnMount(defaultOptions));
+
+    expect(result.current.isSyncing).toBe(false);
+    expect(axios.get).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event("load"));
+
+    await waitFor(() => {
+      expect(axios.get).toHaveBeenCalledTimes(1);
+    }, { timeout: 10000 });
+
+    Object.defineProperty(document, "readyState", {
+      get() {
+        return originalReadyState;
+      },
+      configurable: true,
+    });
   });
 });

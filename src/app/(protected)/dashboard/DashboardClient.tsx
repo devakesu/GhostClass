@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
   AnimatePresence,
   domAnimation,
@@ -146,6 +146,144 @@ const getPeriodIndex = (semester: string, year: string): number | null => {
 
 const formatAcademicPeriod = (period: AcademicPeriod) => `${period.semester.toUpperCase()} ${period.year}`;
 
+function planAcademicShift(
+  direction: "previous" | "next",
+  effectiveSemester: AcademicSemester,
+  effectiveYear: string,
+  defaultAcademicInfo: { current_semester: AcademicSemester; current_year: string },
+): { next: AcademicPeriod | null; errorMessage?: string; infoMessage?: string } {
+  const nextPeriod = shiftAcademicPeriod(effectiveSemester, effectiveYear, direction);
+  if (!nextPeriod) {
+    return { next: null, errorMessage: "Could not compute the next academic period." };
+  }
+
+  let clampedNext = nextPeriod;
+  let wasClamped = false;
+
+  if (direction === "next") {
+    const currentIndex = getPeriodIndex(defaultAcademicInfo.current_semester, defaultAcademicInfo.current_year);
+    const nextIndex = getPeriodIndex(nextPeriod.semester, nextPeriod.year);
+
+    if (currentIndex !== null && nextIndex !== null && nextIndex > currentIndex + 1) {
+      const maxAllowedIndex = currentIndex + 1;
+      const maxAllowedStartYear = Math.floor(maxAllowedIndex / 2);
+      const maxAllowedSemester: AcademicSemester = maxAllowedIndex % 2 === 1 ? "even" : "odd";
+      clampedNext = {
+        semester: maxAllowedSemester,
+        year: formatAcademicYear(maxAllowedStartYear),
+      };
+      wasClamped = true;
+    }
+  }
+
+  if (clampedNext.semester === effectiveSemester && clampedNext.year === effectiveYear) {
+    return { next: null, infoMessage: "You cannot view past the maximum allowed academic period" };
+  }
+
+  if (wasClamped) {
+    return { next: clampedNext, infoMessage: "Clamped to the nearest future academic period" };
+  }
+
+  return { next: clampedNext };
+}
+
+function useDashboardServerErrorToast(serverError: string | null | undefined, isRateLimitError: boolean) {
+  useEffect(() => {
+    if (!serverError) return;
+
+    toast.error(isRateLimitError ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed", {
+      description: isRateLimitError ? "Too many requests. Please wait." : "Failed to pre-load your data.",
+      duration: 8000,
+      action: { label: "Retry", onClick: () => window.location.reload() },
+    });
+  }, [serverError, isRateLimitError]);
+}
+
+function useDashboardSyncFailureToast(syncSettled: boolean, syncFailed: boolean) {
+  const hasShownSyncWarningRef = useRef(false);
+
+  useEffect(() => {
+    if (!syncSettled || !syncFailed || hasShownSyncWarningRef.current) return;
+
+    hasShownSyncWarningRef.current = true;
+    toast.warning("Background sync delayed", {
+      description: "Showing cached data. Latest attendance updates will appear when sync recovers.",
+    });
+  }, [syncSettled, syncFailed]);
+}
+
+async function executeAcademicChange(params: {
+  pendingChange: AcademicPeriod | null;
+  profileUsername: string | undefined;
+  isUpdating: boolean;
+  effectiveYear: string | null;
+  effectiveSemester: AcademicSemester | null;
+  setAcademicYearMutation: { mutateAsync: (payload: { default_academic_year: string }) => Promise<unknown> };
+  setSemesterMutation: { mutateAsync: (payload: { default_semester: AcademicSemester }) => Promise<unknown> };
+  refetchProfile: () => Promise<unknown>;
+  setSelectedSemester: Dispatch<SetStateAction<AcademicSemester | null>>;
+  setSelectedYear: Dispatch<SetStateAction<string | null>>;
+  setIsUpdating: Dispatch<SetStateAction<boolean>>;
+  setIsShifting: Dispatch<SetStateAction<boolean>>;
+  setShowConfirmDialog: Dispatch<SetStateAction<boolean>>;
+  setPendingChange: Dispatch<SetStateAction<AcademicPeriod | null>>;
+  academicShiftLockRef: MutableRefObject<boolean>;
+}) {
+  const {
+    pendingChange,
+    profileUsername,
+    isUpdating,
+    effectiveYear,
+    effectiveSemester,
+    setAcademicYearMutation,
+    setSemesterMutation,
+    refetchProfile,
+    setSelectedSemester,
+    setSelectedYear,
+    setIsUpdating,
+    setIsShifting,
+    setShowConfirmDialog,
+    setPendingChange,
+    academicShiftLockRef,
+  } = params;
+
+  if (!pendingChange || !profileUsername || isUpdating) return;
+
+  setIsUpdating(true);
+  setIsShifting(true);
+  setShowConfirmDialog(false);
+
+  try {
+    if (pendingChange.year !== effectiveYear) {
+      await setAcademicYearMutation.mutateAsync({
+        default_academic_year: pendingChange.year,
+      });
+    }
+    if (pendingChange.semester !== effectiveSemester) {
+      await setSemesterMutation.mutateAsync({
+        default_semester: pendingChange.semester,
+      });
+    }
+
+    try {
+      await refetchProfile();
+    } catch (err) {
+      logger.error("Profile sync failed during transition, proceeding:", err);
+    }
+
+    setSelectedSemester(pendingChange.semester);
+    setSelectedYear(pendingChange.year);
+  } catch (error) {
+    logger.error("Update Failed:", error);
+    toast.error("Failed to update settings");
+    setIsShifting(false);
+  } finally {
+    setIsUpdating(false);
+    setPendingChange(null);
+    academicShiftLockRef.current = false;
+  }
+}
+
 function computeInitialDataValidity(
   initialData: InitialDashboardData | undefined,
   selectedSemester: AcademicSemester | null,
@@ -181,6 +319,52 @@ interface DashboardClientProps {
   serverError?: string | null;
 }
 
+const ACTIVE_ATTENDANCE_CODES = new Set([110, 111, 225, 112]);
+
+const isActiveAttendanceSession = (session: { attendance?: unknown; class_type?: unknown; course?: unknown }) => {
+  const attCode = Number(session.attendance);
+  return ACTIVE_ATTENDANCE_CODES.has(attCode) && session.class_type !== "Revision" && !!session.course;
+};
+
+const isActiveTrackingRecord = (
+  record: TrackAttendance,
+  selectedSemester: string | null,
+  selectedYear: string | null,
+) => {
+  const isSameSemester = !selectedSemester || record.semester === selectedSemester;
+  const isSameYear = !selectedYear || record.year === selectedYear;
+  return !!record.course && isSameSemester && isSameYear && record.attendance != null;
+};
+
+const buildCatalogCodes = (
+  coursesData: { courses: Record<string, Course> } | undefined | null,
+  classCourses: ClassCourse[],
+) => {
+  const catalogCodes = new Set<string>();
+
+  if (coursesData?.courses) {
+    Object.values(coursesData.courses).forEach((c) => {
+      catalogCodes.add(normalizeCourseCode(c.code ?? String(c.id)));
+    });
+  }
+
+  classCourses.forEach((cc) => {
+    catalogCodes.add(normalizeCourseCode(cc.course_code ?? ""));
+  });
+
+  return catalogCodes;
+};
+
+const countNoDataCodes = (
+  catalogCodes: Set<string>,
+  activeCodes: Set<string>,
+  disabledWithDataCodes: Set<string>,
+  disabledCodes: Set<string>,
+) => Array.from(catalogCodes).reduce((count, code) => {
+  const hasNoData = !activeCodes.has(code) && !disabledWithDataCodes.has(code) && !disabledCodes.has(code);
+  return hasNoData ? count + 1 : count;
+}, 0);
+
 const getActiveCourseStats = (
   attendanceData: AttendanceReport | undefined | null,
   trackingData: TrackAttendance[],
@@ -197,8 +381,7 @@ const getActiveCourseStats = (
     Object.values(attendanceData.studentAttendanceData).forEach((sessions) => {
       if (!sessions) return;
       Object.values(sessions).forEach((s) => {
-        const attCode = Number(s.attendance);
-        if ([110, 111, 225, 112].includes(attCode) && s.class_type !== "Revision" && s.course) {
+        if (isActiveAttendanceSession(s)) {
           activeIds.add(String(s.course));
         }
       });
@@ -207,25 +390,13 @@ const getActiveCourseStats = (
 
   if (trackingData) {
     trackingData.forEach((t) => {
-      const isSameSemester = !selectedSemester || t.semester === selectedSemester;
-      const isSameYear = !selectedYear || t.year === selectedYear;
-      if (t.course && isSameSemester && isSameYear && t.attendance != null) {
+      if (isActiveTrackingRecord(t, selectedSemester, selectedYear)) {
         activeIds.add(String(t.course));
       }
     });
   }
 
-  const catalogCodes = new Set<string>();
-  if (coursesData?.courses) {
-    Object.values(coursesData.courses).forEach((c) => {
-      catalogCodes.add(normalizeCourseCode(c.code ?? String(c.id)));
-    });
-  }
-  if (classCourses) {
-    classCourses.forEach((cc) => {
-      catalogCodes.add(normalizeCourseCode(cc.course_code ?? ""));
-    });
-  }
+  const catalogCodes = buildCatalogCodes(coursesData, classCourses);
 
   const activeCodes = new Set<string>();
   const disabledWithDataCodes = new Set<string>();
@@ -238,10 +409,7 @@ const getActiveCourseStats = (
     }
   });
 
-  let noDataCount = 0;
-  catalogCodes.forEach((code) => {
-    if (!activeCodes.has(code) && !disabledWithDataCodes.has(code) && !disabledCodes.has(code)) noDataCount++;
-  });
+  const noDataCount = countNoDataCodes(catalogCodes, activeCodes, disabledWithDataCodes, disabledCodes);
 
   return { active: activeCodes.size, noData: noDataCount, disabled: disabledCodes.size, total: catalogCodes.size };
 };
@@ -252,6 +420,7 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
   return 0;
 };
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- This component orchestrates multiple guarded async data flows and UI states in one page-level boundary.
 export default function DashboardClient({ initialData, serverError }: DashboardClientProps) {
   const { data: rawProfile, isLoading: isLoadingProfile, refetch: refetchProfile } = useProfile({ sync: true, force: true });
   const profile = rawProfile as UserProfile | undefined;
@@ -264,6 +433,16 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   useEffect(() => {
     if (rawProfile) {
       queryClient.setQueryData(["profile"], rawProfile);
+      
+      const userClass = rawProfile.class as { sem?: string; year?: string } | null | undefined;
+      if (userClass) {
+        if (userClass.sem) {
+          queryClient.setQueryData(["semester"], userClass.sem);
+        }
+        if (userClass.year) {
+          queryClient.setQueryData(["academic-year"], userClass.year);
+        }
+      }
     }
   }, [rawProfile, queryClient]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
@@ -283,18 +462,10 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const currentSem = effectiveSemester || undefined;
   const currentYear = effectiveYear || undefined;
+  const isProfileReady = !!profile?.username && !isLoadingProfile;
 
   const isRateLimitError = serverError ? (serverError.toLowerCase().includes("rate limit") || serverError.includes("429")) : false;
-
-  useEffect(() => {
-    if (serverError) {
-      toast.error(isRateLimitError ? "EzyGo Rate Limit Reached" : "Dashboard Pre-fetch Failed", {
-        description: isRateLimitError ? "Too many requests. Please wait." : "Failed to pre-load your data.",
-        duration: 8000,
-        action: { label: "Retry", onClick: () => window.location.reload() },
-      });
-    }
-  }, [serverError, isRateLimitError]);
+  useDashboardServerErrorToast(serverError, isRateLimitError);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
@@ -305,6 +476,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const [isUpdating, setIsUpdating] = useState(false);
   const [isShifting, setIsShifting] = useState(false);
   const [hasRefetchedAllCourses, setHasRefetchedAllCourses] = useState(false);
+  const [hasSyncedAndLoaded, setHasSyncedAndLoaded] = useState(false);
   const [isSelectClassOpen, setIsSelectClassOpen] = useState(false);
   const academicShiftLockRef = useRef(false);
 
@@ -313,18 +485,27 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     userId: profile?.id ? String(profile.id) : undefined,
     enabled: !!profile?.username,
     sentryLocation: "DashboardClient",
-    sentryTag: "background_sync"
+    sentryTag: "background_sync",
+    onSuccess: async (data) => {
+      const changed = (data.deletions ?? 0) + (data.updates ?? 0) + (data.conflicts ?? 0);
+      if (changed > 0) {
+        toast.info("Dashboard Updated", {
+          description: "Background sync applied latest attendance changes.",
+        });
+      }
+    },
   });
 
-  const syncSuccess = !!(syncSettled && !syncFailed);
+  const isSyncSettled = !profile?.username || syncSettled;
+  useDashboardSyncFailureToast(syncSettled, syncFailed);
 
   useEffect(() => {
-    const shouldOpen = !!(syncSuccess && profile && !profile.class?.id);
+    const shouldOpen = !!(isSyncSettled && profile && !profile.class?.id);
     const timer = setTimeout(() => {
       setIsSelectClassOpen(shouldOpen);
     }, 0);
     return () => clearTimeout(timer);
-  }, [syncSuccess, profile]);
+  }, [isSyncSettled, profile]);
 
   const { isInitialDataValid, isAttendanceStale } = useMemo(() =>
     computeInitialDataValidity(
@@ -340,7 +521,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   );
 
   const { data: rawAttendanceData, isLoading: isLoadingAttendance, isFetching: isFetchingAttendance, refetch: refetchAttendance } = useAttendanceReport(currentSem, currentYear, {
-    enabled: syncSuccess,
+    enabled: isProfileReady && !!currentSem && !!currentYear,
     initialData: (isInitialDataValid && !isAttendanceStale) ? (initialData?.attendance as AttendanceReport ?? undefined) : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
@@ -371,7 +552,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawCoursesData, isLoading: isLoadingCourses, isFetching: isFetchingCourses } = useFetchCourses({
     semester: currentSem,
     year: currentYear,
-    enabled: syncSuccess && !!currentSem && !!currentYear,
+    enabled: isProfileReady && !!currentSem && !!currentYear,
     initialData: isInitialDataValid ? formattedInitialCourses : undefined,
   });
   const coursesData = rawCoursesData as { courses: Record<string, Course> } | undefined;
@@ -379,12 +560,12 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
   const { data: rawTrackingData, refetch: refetchTracking } = useTrackingData(profile, {
     semester: currentSem,
     year: currentYear,
-    enabled: syncSuccess,
+    enabled: isProfileReady,
   });
   const trackingData = rawTrackingData as TrackAttendance[] | undefined;
 
-  const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: syncSuccess });
-  const { data: rawClassCourses, isFetching: isFetchingClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: syncSuccess && !!profile?.class?.id });
+  const { data: customInstructors } = useFetchCourseInstructors({ semester: currentSem, year: currentYear, enabled: isProfileReady && !!currentSem && !!currentYear });
+  const { data: rawClassCourses, isFetching: isFetchingClassCourses } = useFetchClassCourses({ semester: currentSem, year: currentYear, enabled: isProfileReady && !!currentSem && !!currentYear && !!profile?.class?.id });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
   const { getCourseCodeById: getCourseCode } = useCourseLookup({
@@ -443,6 +624,21 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     isLoading: isLoadingAllCourseSummaries,
     isFetching: isFetchingAllCourseSummaries,
   } = useAllCourseDetails(courseList, currentSem, currentYear, { enabled: isAllCourseDetailsEnabled });
+
+  useEffect(() => {
+    if (syncSettled) {
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+    }
+  }, [syncSettled, queryClient]);
+
+  useEffect(() => {
+    if (syncSettled && !isFetchingAttendance && !isFetchingAllCourseSummaries) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional state update after sync completes and queries resolve
+      setHasSyncedAndLoaded(true);
+    }
+  }, [syncSettled, isFetchingAttendance, isFetchingAllCourseSummaries]);
 
   useEffect(() => {
     if (!isShifting) {
@@ -520,83 +716,39 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
 
   const requestAcademicShift = (direction: "previous" | "next") => {
     if (!effectiveSemester || !effectiveYear || isUpdating || academicShiftLockRef.current) return;
-    const nextPeriod = shiftAcademicPeriod(effectiveSemester, effectiveYear, direction);
-    if (!nextPeriod) {
-      toast.error("Could not compute the next academic period.");
+    const plan = planAcademicShift(direction, effectiveSemester, effectiveYear, defaultAcademicInfo);
+    if (plan.errorMessage) {
+      toast.error(plan.errorMessage);
       return;
     }
-
-    // Clamp forward navigation to at most one academic term ahead of current (date-based) period
-    let clampedNext = nextPeriod;
-    let wasClamped = false;
-    if (direction === "next") {
-      const currentIndex = getPeriodIndex(defaultAcademicInfo.current_semester, defaultAcademicInfo.current_year);
-      const nextIndex = getPeriodIndex(nextPeriod.semester, nextPeriod.year);
-      if (currentIndex !== null && nextIndex !== null && nextIndex > currentIndex + 1) {
-        const maxAllowedIndex = currentIndex + 1;
-        const maxAllowedStartYear = Math.floor(maxAllowedIndex / 2);
-        const maxAllowedSemester: AcademicSemester = maxAllowedIndex % 2 === 1 ? "even" : "odd";
-        clampedNext = {
-          semester: maxAllowedSemester,
-          year: formatAcademicYear(maxAllowedStartYear),
-        };
-        wasClamped = true;
-      }
+    if (plan.infoMessage) {
+      toast.info(plan.infoMessage);
     }
-
-    if (clampedNext.semester === effectiveSemester && clampedNext.year === effectiveYear) {
-      toast.info("You cannot view past the maximum allowed academic period");
-      return;
-    }
-
-    if (wasClamped) {
-      toast.info("Clamped to the nearest future academic period");
-    }
+    if (!plan.next) return;
 
     academicShiftLockRef.current = true;
-    setPendingChange(clampedNext);
+    setPendingChange(plan.next);
     setShowConfirmDialog(true);
   };
 
   const handleConfirmChange = async () => {
-    if (!pendingChange || !profile?.username || isUpdating) return;
-    setIsUpdating(true);
-    setIsShifting(true);
-    setShowConfirmDialog(false);
-
-    try {
-      if (pendingChange.year !== effectiveYear) {
-        await setAcademicYearMutation.mutateAsync({
-          default_academic_year: pendingChange.year,
-        });
-      }
-      if (pendingChange.semester !== effectiveSemester) {
-        await setSemesterMutation.mutateAsync({
-          default_semester: pendingChange.semester,
-        });
-      }
-
-      // Perform a full profile refetch with force=true (which triggers EzyGo sync under the hood)
-      // to resolve the class assignment and other metadata for the new semester/year.
-      // We call refetchProfile directly (from the hook with sync+force options) rather than
-      // queryClient.refetchQueries, to guarantee the force-sync query function runs.
-      try {
-        await refetchProfile();
-      } catch (err) {
-        logger.error("Profile sync failed during transition, proceeding:", err);
-      }
-
-      setSelectedSemester(pendingChange.semester);
-      setSelectedYear(pendingChange.year);
-    } catch (error) {
-      logger.error("Update Failed:", error);
-      toast.error("Failed to update settings");
-      setIsShifting(false);
-    } finally {
-      setIsUpdating(false);
-      setPendingChange(null);
-      academicShiftLockRef.current = false;
-    }
+    await executeAcademicChange({
+      pendingChange,
+      profileUsername: profile?.username,
+      isUpdating,
+      effectiveYear,
+      effectiveSemester,
+      setAcademicYearMutation,
+      setSemesterMutation,
+      refetchProfile,
+      setSelectedSemester,
+      setSelectedYear,
+      setIsUpdating,
+      setIsShifting,
+      setShowConfirmDialog,
+      setPendingChange,
+      academicShiftLockRef,
+    });
   };
 
   const activeCourseCount = useMemo(() => getActiveCourseStats(attendanceData, trackingData || [], coursesData, classCourses || [], disabledCodes, effectiveSemester, effectiveYear, getCourseCode), [attendanceData, trackingData, coursesData, classCourses, disabledCodes, effectiveSemester, effectiveYear, getCourseCode]);
@@ -684,15 +836,16 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     return <div className="h-50 flex items-center justify-center">No data</div>;
   };
 
-  if (!profile || isLoadingProfile || !currentSem || !currentYear || !syncSuccess) return <CompLoading />;
+  if (!profile || isLoadingProfile || !currentSem || !currentYear) return <CompLoading />;
 
-  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || !syncSuccess || isShifting;
+  const isDataLoading = !syncSettled || !hasSyncedAndLoaded || isSettingsLoading || isLoadingAttendance || (isAllCourseDetailsEnabled && isLoadingAllCourseSummaries);
+
+  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading || setSemesterMutation.isPending || setAcademicYearMutation.isPending || isShifting;
 
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex flex-col bg-background font-manrope relative min-h-screen">
-        <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
-        <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
+        <AnimatePresence>{isGlobalLoading && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md transition-all duration-300"><div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" /><motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 text-center px-6"><h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-primary to-purple-400">Syncing...</h2></motion.div></motion.div>)}</AnimatePresence>
 
         <main className="flex-1 container mx-auto px-4 md:px-6 pt-4 md:pt-6">
           {serverError && (
@@ -702,7 +855,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                   <strong className="font-semibold">{isRateLimitError ? "EzyGo Rate Limit" : "Data prefetch failed"}</strong>
                   <div className="text-xs mt-0.5">{isRateLimitError ? "Too many requests. Some data may be unavailable." : "Failed to preload dashboard data. You can retry or continue."}</div>
                 </div>
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center px-3 py-1.5 rounded-md bg-amber-600 text-white text-sm font-semibold">Retry</button>
                 </div>
               </div>
@@ -728,7 +881,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                   >
                     <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                   </button>
-                  <div className="min-w-[11rem] px-3 text-center select-none">
+                  <div className="min-w-44 px-3 text-center select-none">
                     <div className="text-[9px] font-black uppercase tracking-[0.25em] text-primary/85">
                       Academic Term
                     </div>
@@ -760,30 +913,40 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
                 </div>
               </div>
             </div>
-            <StatsPanel stats={stats} isLoadingAttendance={isLoadingAttendance} targetPercentage={targetPercentage || 75} />
+            {!isDataLoading && (
+              <StatsPanel stats={stats} isLoadingAttendance={isLoadingAttendance} targetPercentage={targetPercentage || 75} />
+            )}
           </div>
 
-          <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
-          <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries || !isAllCourseDetailsEnabled} sortedCourses={sortedCourses} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile ?? null} onEditInstructor={(course: DashboardCourse, _name: string, hasCustomName: boolean, customInstructor?: { instructor_name?: string | null } | undefined | null) => {
-            const customInst = customInstructor as CustomInstructor | undefined;
-            setSelectedInstructorCourse({ code: normalizeCourseCode(String(course.code || course.id)), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
-            setIsEditInstructorOpen(true);
-          }} onAddCourse={() => {
-            if (!profile?.class?.id) {
-              toast.error("You have not assigned a class yet.");
-            } else {
-              setIsAddCourseOpen(true);
-            }
-          }} />
+          {isDataLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-20 min-h-[400px]">
+              <CompLoading minimal message="Loading dashboard statistics and course details..." />
+            </div>
+          ) : (
+            <>
+              <DashboardCharts stats={stats} isLoadingAttendance={isLoadingAttendance} attendanceData={attendanceData} filteredChartData={filteredChartData} trackingData={trackingData} courseRegistry={courseRegistry} disabledCodes={disabledCodes} activeCourseCount={activeCourseCount} isLoadingCourses={isLoadingCourses} />
+              <CourseGrid isLoadingCourses={isLoadingCourses} isLoadingAllCourseSummaries={isLoadingAllCourseSummaries || !isAllCourseDetailsEnabled} sortedCourses={sortedCourses} customInstructors={customInstructors || []} allCourseSummaries={allCourseSummaries as Record<string, unknown>} profile={profile ?? null} onEditInstructor={(course: DashboardCourse, _name: string, hasCustomName: boolean, customInstructor?: { instructor_name?: string | null } | undefined | null) => {
+                const customInst = customInstructor as CustomInstructor | undefined;
+                setSelectedInstructorCourse({ code: normalizeCourseCode(String(course.code || course.id)), name: String(course.name || ""), initialName: hasCustomName ? (customInst?.instructor_name ?? "") : "" });
+                setIsEditInstructorOpen(true);
+              }} onAddCourse={() => {
+                if (!profile?.class?.id) {
+                  toast.error("You have not assigned a class yet.");
+                } else {
+                  setIsAddCourseOpen(true);
+                }
+              }} />
 
-          <div className="mb-6">
-            <Card className="custom-container">
-              <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
-              <CardContent>
-                {renderAttendanceCalendarContent()}
-              </CardContent>
-            </Card>
-          </div>
+              <div className="mb-6">
+                <Card className="custom-container">
+                  <CardHeader><CardTitle>Attendance Calendar</CardTitle></CardHeader>
+                  <CardContent>
+                    {renderAttendanceCalendarContent()}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
 
           <AlertDialog
             open={showConfirmDialog}

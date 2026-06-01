@@ -223,9 +223,64 @@ export function useSyncOnMount({
       }
     };
 
-    runSync();
+    let deferHandle: number | null = null;
+    let idleHandle: number | null = null;
+
+    const scheduleSync = () => {
+      if (typeof window !== "undefined") {
+        const win = window as unknown as Window & {
+          requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+          cancelIdleCallback?: (id: number) => void;
+        };
+        if (win.requestIdleCallback) {
+          idleHandle = win.requestIdleCallback(() => {
+            if (!isCleanedUp) runSync();
+          }, { timeout: 1000 });
+        } else {
+          deferHandle = setTimeout(() => {
+            if (!isCleanedUp) runSync();
+          }, 200) as unknown as number;
+        }
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      if (document.readyState === "complete") {
+        scheduleSync();
+      } else {
+        const handleLoad = () => {
+          scheduleSync();
+        };
+        const win = window as unknown as Window & {
+          cancelIdleCallback?: (id: number) => void;
+        };
+        win.addEventListener("load", handleLoad);
+        return () => {
+          isCleanedUp = true;
+          win.removeEventListener("load", handleLoad);
+          if (idleHandle !== null && win.cancelIdleCallback) {
+            win.cancelIdleCallback(idleHandle);
+          }
+          if (deferHandle !== null) {
+            clearTimeout(deferHandle);
+          }
+        };
+      }
+    }
+
     return () => {
       isCleanedUp = true;
+      if (typeof window !== "undefined") {
+        const win = window as unknown as Window & {
+          cancelIdleCallback?: (id: number) => void;
+        };
+        if (idleHandle !== null && win.cancelIdleCallback) {
+          win.cancelIdleCallback(idleHandle);
+        }
+        if (deferHandle !== null) {
+          clearTimeout(deferHandle);
+        }
+      }
     };
   }, [enabled, username, userId, sentryLocation, sentryTag]);
 
