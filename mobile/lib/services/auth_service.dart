@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 /// AuthService
@@ -14,6 +16,10 @@ class AuthService {
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
   static final String _ezygoAuthUrl = AppConfig.ezygoAuthUrl;
+  static const Duration _loginTimeout = kDebugMode
+      ? Duration(seconds: 45)
+      : Duration(seconds: 30);
+  static const Duration _provisionRetryBackoff = Duration(milliseconds: 500);
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
 
@@ -21,7 +27,15 @@ class AuthService {
     required String username,
     required String password,
   }) async {
+    final flowWatch = Stopwatch()..start();
+
+    AppLogger.d('AuthService: loginAndProvision start');
+    final loginStartMs = flowWatch.elapsedMilliseconds;
     final ezygoResponse = await loginEzygo(username, password);
+    final loginDurationMs = flowWatch.elapsedMilliseconds - loginStartMs;
+    AppLogger.d(
+      'AuthService: loginEzygo completed in ${loginDurationMs}ms (status: ${ezygoResponse.statusCode})',
+    );
     if (ezygoResponse.statusCode != 200) return ezygoResponse;
 
     final data = ezygoResponse.data as Map<String, dynamic>?;
@@ -34,7 +48,15 @@ class AuthService {
       );
     }
 
-    final bridgeResponse = await provisionGhostClassSession(ezygoToken);
+    final provisionStartMs = flowWatch.elapsedMilliseconds;
+    final bridgeResponse = await _provisionGhostClassSessionWithRetry(
+      ezygoToken,
+    );
+    final provisionDurationMs =
+        flowWatch.elapsedMilliseconds - provisionStartMs;
+    AppLogger.d(
+      'AuthService: provisionGhostClassSession completed in ${provisionDurationMs}ms (status: ${bridgeResponse.statusCode})',
+    );
     final bridgeData = bridgeResponse.data;
     if (bridgeData is Map<String, dynamic>) {
       bridgeResponse.data = {
@@ -46,6 +68,35 @@ class AuthService {
     return bridgeResponse;
   }
 
+  bool _isTransientProvisionFailure(Object error) {
+    if (error is DioException) {
+      return error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.unknown;
+    }
+    return false;
+  }
+
+  Future<Response<dynamic>> _provisionGhostClassSessionWithRetry(
+    String ezygoToken,
+  ) async {
+    try {
+      return await provisionGhostClassSession(ezygoToken);
+    } on Object catch (e, st) {
+      if (!_isTransientProvisionFailure(e)) rethrow;
+
+      AppLogger.e(
+        'AuthService: provisionGhostClassSession transient failure. Retrying once...',
+        e,
+        st,
+      );
+      await Future<void>.delayed(_provisionRetryBackoff);
+      return provisionGhostClassSession(ezygoToken);
+    }
+  }
+
   Future<Response<dynamic>> loginEzygo(String username, String password) async {
     return _dio.post(
       _ezygoAuthUrl,
@@ -54,7 +105,13 @@ class AuthService {
         'password': password,
         'stay_logged_in': true,
       },
-      options: Options(validateStatus: (s) => s != null && s < 600),
+      options: Options(
+        connectTimeout: _loginTimeout,
+        receiveTimeout: _loginTimeout,
+        sendTimeout: _loginTimeout,
+        persistentConnection: false,
+        validateStatus: (s) => s != null && s < 600,
+      ),
     );
   }
 
@@ -65,6 +122,10 @@ class AuthService {
       '$_ghostclassBaseUrl/auth/save-token',
       data: {'token': ezygoToken.trim()},
       options: Options(
+        connectTimeout: _loginTimeout,
+        receiveTimeout: _loginTimeout,
+        sendTimeout: _loginTimeout,
+        persistentConnection: false,
         extra: {'useLimitedToken': true},
         validateStatus: (s) => s != null && s < 600,
       ),
