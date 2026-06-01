@@ -487,7 +487,7 @@ export default function DashboardClient({ initialData, serverError }: DashboardC
     sentryLocation: "DashboardClient",
     sentryTag: "background_sync",
     onSuccess: async (data) => {
-      const changed = (data.deletions ?? 0) + (data.updates ?? 0) + (data.conflicts ?? 0);
+      const changed = (data.deletions ?? 0) + (data.updates ?? 0);
       if (changed > 0) {
         toast.info("Dashboard Updated", {
           description: "Background sync applied latest attendance changes.",

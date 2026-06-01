@@ -82,22 +82,17 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   int _currentPage = 0;
   static const _pageSize = 20;
   final _toggleReadInFlight = <int>{};
-  String? _lastUserId;
 
   @override
   Future<NotificationsState> build() async {
-    final user = ref.watch(authProvider).value;
-    if (user == null) {
-      _lastUserId = null;
+    final userId = ref.watch(
+      authProvider.select((v) => v.value?.supabaseUserId),
+    );
+    if (userId == null) {
       return NotificationsState.empty();
     }
 
-    if (_lastUserId == user.supabaseUserId && state.hasValue) {
-      return state.value!;
-    }
-
-    _lastUserId = user.supabaseUserId;
-    return _fetchInitialData(user.supabaseUserId);
+    return _fetchInitialData(userId);
   }
 
   Future<NotificationsState> _fetchInitialData(String userId) async {

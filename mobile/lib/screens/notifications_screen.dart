@@ -226,40 +226,43 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     NotificationsState data,
   ) {
     if (data.allNotifications.isEmpty) {
-      return CustomScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    LucideIcons.bellOff,
-                    size: 64,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.2),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('All caught up!'),
-                  Text(
-                    'You have no new notifications.',
-                    style: TextStyle(
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.bellOff,
+                      size: 64,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ).colorScheme.onSurface.withValues(alpha: 0.2),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    const Text('All caught up!'),
+                    Text(
+                      'You have no new notifications.',
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
@@ -334,12 +337,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       );
     }
 
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: slivers,
       ),
-      slivers: slivers,
     );
   }
 
@@ -530,7 +536,9 @@ class _NotificationCard extends ConsumerWidget {
                     color: Theme.of(context).colorScheme.primary,
                     shape: BoxShape.circle,
                   ),
-                ),
+                )
+              else
+                const SizedBox(width: 18),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
