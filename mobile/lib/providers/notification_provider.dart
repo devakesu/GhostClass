@@ -375,8 +375,15 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
     try {
       final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) return;
+      final userId =
+          ref.read(authProvider).value?.supabaseUserId ??
+          supabase.auth.currentUser?.id;
+      if (userId == null) {
+        // If there's no authenticated user, treat this as an error so callers/tests
+        // observing failure semantics can react accordingly instead of silently
+        // returning and leaving optimistic state applied.
+        throw Exception('No authenticated user for markAllAsRead');
+      }
 
       await supabase
           .from('notification')
