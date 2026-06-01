@@ -416,10 +416,9 @@ class SecurityService {
             (data?['error'] as String?) ??
             (data?['appCheckError'] as String?);
 
-        if (isSecurityType ||
-            (e.response?.statusCode == 403 && appCheckError != null)) {
+        if (isSecurityType) {
           final action =
-              data?['action'] ??
+              data['action'] ??
               'Please ensure your device is not rooted, you are using the official app, and you have a stable internet connection.';
 
           final finalReason =
@@ -436,7 +435,7 @@ class SecurityService {
                 : (backendReason ?? 'Security verification failed'),
             type: AppExceptionType.unauthorized,
             details: {
-              ...?data,
+              ...data,
               'type': 'security',
               'reason': finalReason,
               'appCheckError': appCheckError,

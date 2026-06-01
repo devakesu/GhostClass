@@ -6,7 +6,7 @@ openapi: 3.1.0
 
 info:
   title: GhostClass API
-  version: 4.4.8
+  version: 4.4.9
   description: |
     **GhostClass API** provides endpoints for authentication, profile synchronization,
     attendance integrations with EzyGo, telemetry, and build provenance.

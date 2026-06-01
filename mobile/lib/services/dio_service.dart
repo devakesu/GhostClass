@@ -65,7 +65,13 @@ class DioService {
             // lockdown event so security flows can react (e.g. forced logout).
             final appCheckError =
                 err.requestOptions.extra['appCheckError'] as String?;
-            if (err.response?.statusCode == 403 && appCheckError != null) {
+            final responseData = err.response?.data;
+            final isSecurityType =
+                responseData is Map<String, dynamic> &&
+                responseData['type'] == 'security';
+            if (err.response?.statusCode == 403 &&
+                isSecurityType &&
+                appCheckError != null) {
               AppLogger.e(
                 'DioService: 403 + App Check error detected. Triggering security lockdown.',
                 Exception(appCheckError),

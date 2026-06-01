@@ -108,7 +108,10 @@ void main() {
           response: Response(
             requestOptions: options,
             statusCode: 403,
-            data: {'error': 'Forbidden'},
+            data: {
+              'error': 'Forbidden',
+              'type': 'security',
+            },
           ),
           type: DioExceptionType.badResponse,
         );
