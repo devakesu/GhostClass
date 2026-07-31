@@ -3,19 +3,21 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
-version: 2
+version: 3
 
 multi-ecosystem-groups:
   all-dependencies:
     schedule:
       interval: "daily"
+    open-pull-requests-limit: 0
 
 updates:
   - package-ecosystem: "npm"
     directory: "/"
+    schedule:
+      interval: "weekly"
     patterns:
       - "*"
-    multi-ecosystem-group: "all-dependencies"
     ignore:
       # ESLint v10 is not yet supported by typescript-eslint
       # Keep ESLint at v9 until typescript-eslint adds v10 support
@@ -23,21 +25,30 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
+    multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "docker"
     directory: "/"
+    schedule:
+      interval: "weekly"
     patterns:
       - "*"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    schedule:
+      interval: "weekly"
     patterns:
       - "*"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pub"
     directory: "/mobile"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0

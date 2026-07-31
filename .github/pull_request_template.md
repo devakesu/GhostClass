@@ -54,7 +54,6 @@ Relates to #
 - [ ] Flutter tests pass (`flutter test`)
 - [ ] Manual testing on Android (Emulator/Physical)
 - [ ] Manual testing on iOS (Simulator/Physical)
-- [ ] JWE encryption/decryption verified
 - [ ] EzyGo direct access verified (mobile)
 
 ### Test Coverage

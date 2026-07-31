@@ -25,7 +25,7 @@ void main() {
     try {
       await Supabase.initialize(
         url: 'https://placeholder-domain.supabase.co',
-        anonKey: 'placeholder-anon-key',
+        publishableKey: 'placeholder-anon-key',
       );
     } on Object catch (_) {
       // already initialized

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
+const fs = require('node:fs');
+const { generateFirebaseJson } = require('./generate-firebase-json.js');
 
 /**
  * Authenticates with Infisical using Universal Auth.
@@ -153,6 +154,7 @@ async function main() {
   const projectId = await resolveProjectId(apiBaseUrl, accessToken, projectSlugOrId);
   const secrets = await fetchSecrets(apiBaseUrl, accessToken, projectId, envSlug, secretPath);
   exportSecrets(secrets);
+  generateFirebaseJson(secrets);
 }
 
 main().catch(err => {

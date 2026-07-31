@@ -1,5 +1,7 @@
 import { logger } from "@/lib/logger";
-import * as admin from "firebase-admin";
+import { initializeApp, getApps, getApp, cert } from "firebase-admin/app";
+import { getAppCheck as getAdminAppCheck } from "firebase-admin/app-check";
+import { getMessaging as getAdminMessaging, type Messaging } from "firebase-admin/messaging";
 
 export interface DecodedAppCheckToken {
   appId: string;
@@ -20,7 +22,7 @@ export interface AppCheckVerifier {
 export function getAppCheck(): AppCheckVerifier | null {
   try {
     // Check if Firebase Admin is already initialized
-    const firebaseApp = admin.apps.length > 0 ? admin.app() : initializeFirebaseAdmin();
+    const firebaseApp = getApps().length > 0 ? getApp() : initializeFirebaseAdmin();
     
     if (!firebaseApp) {
       logger.warn("Firebase Admin App Check: Failed to initialize Firebase Admin");
@@ -30,7 +32,7 @@ export function getAppCheck(): AppCheckVerifier | null {
     return {
       async verifyToken(token: string) {
         try {
-          const appCheckService = admin.appCheck();
+          const appCheckService = getAdminAppCheck(firebaseApp);
           const decodedToken = await appCheckService.verifyToken(token);
           return { 
             appId: decodedToken.appId,
@@ -53,16 +55,16 @@ export function getAppCheck(): AppCheckVerifier | null {
  * Initialize and return Firebase Admin Messaging service
  * Returns null if Firebase Admin is not properly configured
  */
-export function getMessaging(): admin.messaging.Messaging | null {
+export function getMessaging(): Messaging | null {
   try {
-    const firebaseApp = admin.apps.length > 0 ? admin.app() : initializeFirebaseAdmin();
+    const firebaseApp = getApps().length > 0 ? getApp() : initializeFirebaseAdmin();
     
     if (!firebaseApp) {
       logger.warn("Firebase Admin Messaging: Failed to initialize Firebase Admin");
       return null;
     }
 
-    return admin.messaging();
+    return getAdminMessaging(firebaseApp);
   } catch (error) {
     logger.error("Firebase Admin Messaging initialization failed:", error);
     return null;
@@ -89,8 +91,8 @@ function initializeFirebaseAdmin() {
       credentials = JSON.parse(Buffer.from(serviceAccountJson, "base64").toString("utf-8")) as Record<string, unknown>;
     }
 
-    const app = admin.initializeApp({
-      credential: admin.credential.cert(credentials),
+    const app = initializeApp({
+      credential: cert(credentials),
       projectId: credentials.project_id as string,
     });
 

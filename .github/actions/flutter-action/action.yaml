@@ -102,28 +102,38 @@ runs:
     - name: Set action inputs
       id: flutter-action
       shell: bash
+      env:
+        INPUT_FLUTTER_VERSION: ${{ inputs.flutter-version }}
+        INPUT_FLUTTER_VERSION_FILE: ${{ inputs.flutter-version-file }}
+        INPUT_ARCHITECTURE: ${{ inputs.architecture }}
+        INPUT_CACHE_KEY: ${{ inputs.cache-key }}
+        INPUT_CACHE_PATH: ${{ inputs.cache-path }}
+        INPUT_PUB_CACHE_KEY: ${{ inputs.pub-cache-key }}
+        INPUT_PUB_CACHE_PATH: ${{ inputs.pub-cache-path }}
+        INPUT_GIT_SOURCE: ${{ inputs.git-source }}
+        INPUT_CHANNEL: ${{ inputs.channel }}
       run: |
         $GITHUB_ACTION_PATH/setup.sh -p \
-          -n '${{ inputs.flutter-version }}' \
-          -f '${{ inputs.flutter-version-file }}' \
-          -a '${{ inputs.architecture }}' \
-          -k '${{ inputs.cache-key }}' \
-          -c '${{ inputs.cache-path }}' \
-          -l '${{ inputs.pub-cache-key }}' \
-          -d '${{ inputs.pub-cache-path }}' \
-          -g '${{ inputs.git-source }}' \
-          ${{ inputs.channel }}
+          -n "$INPUT_FLUTTER_VERSION" \
+          -f "$INPUT_FLUTTER_VERSION_FILE" \
+          -a "$INPUT_ARCHITECTURE" \
+          -k "$INPUT_CACHE_KEY" \
+          -c "$INPUT_CACHE_PATH" \
+          -l "$INPUT_PUB_CACHE_KEY" \
+          -d "$INPUT_PUB_CACHE_PATH" \
+          -g "$INPUT_GIT_SOURCE" \
+          "$INPUT_CHANNEL"
 
     - name: Cache Flutter
       id: cache-flutter
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.3
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
       if: ${{ inputs.cache == 'true' }}
       with:
         path: ${{ steps.flutter-action.outputs.CACHE-PATH }}
         key: ${{ steps.flutter-action.outputs.CACHE-KEY }}
 
     - name: Cache pub dependencies
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.3
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
       id: cache-pub
       if: ${{ (inputs.pub-cache == '' && inputs.cache == 'true') || inputs.pub-cache == 'true' }}
       with:
@@ -133,10 +143,16 @@ runs:
     - name: Run setup script
       shell: bash
       if: ${{ inputs.dry-run != 'true' && inputs.dry-run != true }}
+      env:
+        OUTPUT_VERSION: ${{ steps.flutter-action.outputs.VERSION }}
+        OUTPUT_ARCHITECTURE: ${{ steps.flutter-action.outputs.ARCHITECTURE }}
+        OUTPUT_CACHE_PATH: ${{ steps.flutter-action.outputs.CACHE-PATH }}
+        OUTPUT_PUB_CACHE_PATH: ${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}
+        OUTPUT_CHANNEL: ${{ steps.flutter-action.outputs.CHANNEL }}
       run: |
         $GITHUB_ACTION_PATH/setup.sh \
-          -n '${{ steps.flutter-action.outputs.VERSION }}' \
-          -a '${{ steps.flutter-action.outputs.ARCHITECTURE }}' \
-          -c '${{ steps.flutter-action.outputs.CACHE-PATH }}' \
-          -d '${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}' \
-          ${{ steps.flutter-action.outputs.CHANNEL }}
+          -n "$OUTPUT_VERSION" \
+          -a "$OUTPUT_ARCHITECTURE" \
+          -c "$OUTPUT_CACHE_PATH" \
+          -d "$OUTPUT_PUB_CACHE_PATH" \
+          "$OUTPUT_CHANNEL"

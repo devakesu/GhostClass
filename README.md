@@ -13,9 +13,9 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-16.2.6-black?style=for-the-badge&logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/React-19.2.6-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.0-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Next.js-16.2.12-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19.2.8-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.3-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 <p align="center">
@@ -24,8 +24,8 @@
   <img src="https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Vitest-4.1.7-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
-  <img src="https://img.shields.io/badge/Playwright-1.60.0-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/Vitest-4.1.10-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
+  <img src="https://img.shields.io/badge/Playwright-1.62.1-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
 </p>
 <!-- markdownlint-enable MD033 -->
 
@@ -65,14 +65,14 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 ### Core Framework
 
-- **Next.js 16.2.6** - React 19 with App Router
+- **Next.js 16.2.12** - React 19 with App Router
 - **TypeScript 6.0.3** - Strict mode for type safety
 - **Flutter 3.44.0** - Cross-platform native mobile application
-- **Node.js** - v24.14.1+
+- **Node.js** - v24.18.1+
 
 ### Styling & UI
 
-- **Tailwind CSS 4.3.0** - Utility-first styling with custom design system
+- **Tailwind CSS 4.3.3** - Utility-first styling with custom design system
 - **Radix UI** - Accessible, unstyled component primitives
 - **Shadcn UI** - Beautiful pre-styled components
 - **Framer Motion** - Smooth animations and transitions
@@ -149,25 +149,221 @@ For the full mathematical derivation, duty leave limits (5 per course), and pseu
 
 ### Prerequisites
 
-- **Node.js** - v24.14.1+
-- **npm** - v11.11.0+
+- **Docker Desktop** (with WSL2 backend enabled)
+- **WSL2** (Linux distribution such as Ubuntu/Debian)
+- **VS Code or Antigravity IDE/any IDE with WSL/Docker Support**
 
-- **Flutter SDK** - 3.44.0
-- **Docker** - For containerized deployment (optional)
+## 🐳 Dev Container Environment Setup (Recommended)
 
-### Quick Start (Web)
+GhostClass provides an isolated, reproducible Dev Container (`.devcontainer/Dockerfile`) equipped with Node 24, Flutter SDK 3.44, Deno, Playwright, Supabase, Firebase, Infisical CLI tools, and automatic IDE extension syncing.
 
-1. **Setup**: `git clone` the repo and run `npm install --legacy-peer-deps`.
-2. **Database**: Link your project and run `npx supabase db push`.
-3. **Environment**: Install the Infisical CLI, authenticate via `infisical login`, and organize secrets inside `/build-time`, `/runtime`, and `/ci` path folders.
-4. **Run**: Inject variables securely in-memory using `infisical run -- npm run dev` and visit `http://localhost:3000`.
+### 1. Initialize and Configure WSL2 (Windows Host)
 
-### Quick Start (Mobile)
+To ensure optimal networking, memory utilization, and loopback connectivity, configure WSL2 on the Windows host.
 
-1. **Install Flutter**: Ensure Flutter SDK 3.44.0 is installed.
-2. **Setup**: Navigate to `mobile/` and run `flutter pub get`.
-3. **Secrets**: Copy `app_secrets.dart.example` to `app_secrets.dart` and fill your API keys.
-4. **Run**: Connect a device and run `flutter run`.
+#### Option A: Using the WSL Settings GUI (Recommended)
+
+Open the WSL Settings application (search for "WSL Settings" in the Windows Start menu) or launch it by running the following command in PowerShell:
+
+```powershell
+wsl --settings
+```
+
+In the settings interface, configure the following:
+
+- **Networking Mode**: `Mirrored`
+- **Host Address Loopback**: `Enabled`
+- **Automatic Memory Reclaim**: `Gradual`
+
+#### Option B: Using the `.wslconfig` File
+
+Create or edit `%USERPROFILE%\.wslconfig` in Windows (e.g., `C:\Users\<YourUsername>\.wslconfig`) and add the following settings:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+hostAddressLoopback=true
+autoMemoryReclaim=gradual
+```
+
+After configuring via either option, restart WSL2 by running the following command in Windows PowerShell:
+
+```powershell
+wsl --shutdown
+```
+
+### 2. Enable Windows SSH Agent (Host)
+
+Run PowerShell as Administrator or user to enable the OpenSSH agent service and load your SSH/signing keys:
+
+```powershell
+Set-Service -Name ssh-agent -StartupType Automatic
+Start-Service ssh-agent
+ssh-add $env:USERPROFILE\.ssh\id_ed25519
+```
+
+### 3. Bridge SSH Agent to WSL2
+
+In WSL2, install `socat`, download `npiperelay`, and bridge the Windows SSH pipe to Linux:
+
+```bash
+sudo apt update && sudo apt install -y socat
+
+# Download npiperelay to bridge Windows named pipes to Linux sockets
+curl -s https://api.github.com/repos/jstarks/npiperelay/releases/latest | grep "browser_download_url.*zip" | cut -d : -f 2,3 | tr -d \" | wget -qi - -O /tmp/npiperelay.zip
+
+sudo unzip -o /tmp/npiperelay.zip npiperelay.exe -d /usr/local/bin/
+sudo chmod +x /usr/local/bin/npiperelay.exe
+rm /tmp/npiperelay.zip
+
+# Self-healing SSH relay script to your ~/.bashrc
+cat << 'EOF' >> ~/.bashrc
+# --- SSH AGENT RELAY ---
+export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+
+# Test if SSH agent is actually responding end-to-end
+ssh-add -l >/dev/null 2>&1
+if [ $? -eq 2 ]; then
+    # Kill stale relay processes and clean up socket/directory glitches
+    pkill -f "npiperelay.exe" 2>/dev/null || true
+    pkill -f "$SSH_AUTH_SOCK" 2>/dev/null || true
+    rm -rf "$SSH_AUTH_SOCK"
+    mkdir -p "$HOME/.ssh"
+    # Spawn fresh relay
+    if command -v npiperelay.exe >/dev/null 2>&1; then
+        (nohup socat UNIX-LISTEN:"$SSH_AUTH_SOCK",fork EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &)
+    fi
+fi
+EOF
+
+# Clean up potential Docker dummy directories & init socket
+rm -rf ~/.ssh/agent.sock
+source ~/.bashrc
+```
+
+### 4. Clone Repository in WSL2
+
+Clone the repository in your WSL2 home or projects directory:
+
+```bash
+git clone https://github.com/devakesu/GhostClass.git
+cd GhostClass
+```
+
+### 5. Build & Run Sandbox Container
+
+Build the dev container image and launch the sandbox container with mapped ports and volume mounts:
+
+```bash
+# 1. Verify SSH agent connection (must return your keys, not an error)
+ssh-add -l
+
+# 2. Build dev container image
+docker build -t ghostclass-sandbox -f .devcontainer/Dockerfile .
+
+# 3. Launch sandbox container
+docker run -d --name GhostClass_Sandbox \
+  --restart unless-stopped \
+  -v "$(pwd):/ghostclass" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$HOME/.ssh/agent.sock:/run/host-services/ssh-auth.sock" \
+  -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
+  -p 3000:3000 -p 8000:8000 -p 8080:8080 -p 4000:4000 -p 5001:5001 \
+  -p 8081:8081 -p 8085:8085 -p 9099:9099 \
+  -p 54321:54321 -p 54322:54322 -p 54323:54323 \
+  ghostclass-sandbox
+```
+
+### 6. Attach IDE & Initialize Workspace
+
+1. Open VS Code or Antigravity IDE.
+2. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → select **Attach to Running Container** → `GhostClass_Sandbox`.
+3. Open directory `/ghostclass` inside the container.
+4. Run workspace initialization script in the integrated terminal:
+
+   ```bash
+   ~/init_workspace.sh
+   ```
+
+   _(Enter Git Name and Email when prompted to configure local commit signing and SSH identity)._
+
+5. Run **Developer: Reload Window** in VS Code / Antigravity to refresh environment variables and extension integrations.
+
+### 7. Android Emulator Setup & Subsequent Development Startups
+
+To run and debug the mobile app on an Android Emulator or Physical Device:
+
+#### Android Emulator Setup
+
+Create an Android Virtual Device (AVD) named `Medium_Phone_API_36.1` in Android Studio's AVD Manager. _(Note: If using a different AVD name, edit the `-avd` target in `.devcontainer/Start.ps1`)_.
+
+#### Subsequent Starts via `Start.ps1` (Windows Host)
+
+On subsequent development startups (after initial `docker run`), execute the startup script from a Windows PowerShell terminal on the host:
+
+```powershell
+.\.devcontainer\Start.ps1
+```
+
+Select `[1] Emulator` (or pass `-Mode Emulator`).
+
+The script automatically ensures `GhostClass_Sandbox` container is running, launches the host Android emulator (`Medium_Phone_API_36.1`), bridges Windows ADB (`5555`) to Docker network (`host.docker.internal:5555`).
+
+Press **ENTER** in the PowerShell terminal when finished to gracefully shut down the emulator and clean up portproxy rules.
+
+### 🔐 Secret Management & Database Initialization
+
+Before starting the API server or mobile client, authenticate with Infisical and link your Supabase database project:
+
+```bash
+# Authenticate Infisical CLI
+infisical login
+
+# Authenticate Supabase CLI and link schema
+supabase login
+supabase link --project-ref <your-supabase-project-ref>
+supabase db push
+```
+
+### 🐍 Running Web Application / API Server
+
+Once Infisical and Supabase are authenticated:
+
+Run API / Web Server with Injected Secrets:
+
+```bash
+infisical run --env=dev --projectId=xxxx --path=/build-time --path=/runtime -- npm run dev:https
+```
+
+Visit `https://localhost:3000` (or `http://localhost:3000`) for the web dashboard.
+
+### 📱 Running Mobile App
+
+Navigate to Mobile Directory and execute:
+
+```bash
+cd mobile
+flutter pub get
+
+infisical run --env=dev --projectId=xxxx --path=/build-time -- sh -c '
+  export DART_VM_OPTIONS="--bind-address=0.0.0.0"
+  flutter run \
+    --dart-define=APP_DOMAIN="$APP_DOMAIN" \
+    --dart-define=APP_VERSION="$APP_VERSION" \
+    --dart-define=APP_COMMIT_SHA="$APP_COMMIT_SHA" \
+    --dart-define=BUILD_TIMESTAMP="$BUILD_TIMESTAMP" \
+    --dart-define=GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+    --dart-define=GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
+    --dart-define=AUTHOR_NAME="$AUTHOR_NAME" \
+    --dart-define=AUTHOR_URL="$AUTHOR_URL" \
+    --dart-define=GITHUB_URL="$GITHUB_URL" \
+    --dart-define=DONATE_URL="$DONATE_URL" \
+    --dart-define=APP_NAME="$APP_NAME" \
+    --dart-define=ANDROID_PACKAGE_NAME="$ANDROID_PACKAGE_NAME" \
+    --dart-define=IOS_APP_ID="$IOS_APP_ID" \
+    --dart-define=GHOSTCLASS_DEV_URL="$GHOSTCLASS_DEV_URL"
+'
+```
 
 For contribution rules and environment configurations, please refer to **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** and **[SECURITY.md](SECURITY.md)**.
 
@@ -257,4 +453,4 @@ We welcome contributions! GhostClass uses an **automatic version bumping system*
 
 This project is licensed under the **[GNU General Public License v3.0](LICENSE)**.
 
-***Thank you for your interest in GhostClass! Bunk classes & enjoy, but don't forget to study!! 😝🤝***
+_**Thank you for your interest in GhostClass! Bunk classes & enjoy, but don't forget to study!! 😝🤝**_

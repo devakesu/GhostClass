@@ -45,7 +45,7 @@ void main() {
 
     await Supabase.initialize(
       url: 'https://example.com',
-      anonKey: 'anon',
+      publishableKey: 'anon',
     );
 
     final container = ProviderContainer(

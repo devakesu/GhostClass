@@ -2,8 +2,6 @@
 
 Thank you for your interest in contributing to GhostClass! This guide will help you understand our development workflow and contribution process.
 
-> **👋 For External Contributors**: You don't need GPG keys, PAT tokens, or any special setup! Just fork, code, and submit a PR. The version bump workflow will guide you through a simple script. See [Quick Setup](#quick-setup) below.
-
 ## Table of Contents
 
 - [Getting Started](#getting-started)
@@ -19,33 +17,11 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 ### Prerequisites
 
-- **Node.js**: 24.14.1+
-- **npm**: 11.11.0+
-- **Flutter SDK**: 3.27+ (for mobile development)
-- **Dart SDK**: ^3.11.4 (bundled with Flutter)
-- **Git**: Latest version
+- **Docker Desktop** (with WSL2 backend enabled)
+- **WSL2** (Linux distribution such as Ubuntu/Debian)
+- **VS Code or Antigravity IDE / any IDE with WSL/Docker Support**
 
-**That's it!** External contributors don't need GPG keys, GitHub PAT tokens, or access to secrets.
-
-### Quick Setup
-
-```bash
-# 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/GhostClass.git
-cd GhostClass
-
-# 2. Install dependencies
-npm install --legacy-peer-deps
-
-# 3. Create feature branch
-git checkout -b feature/your-feature-name
-
-# 4. Start development
-npm run dev      # Web development
-cd mobile && flutter run  # Mobile development
-```
-
-**That's all you need to start developing!** For advanced maintainer setup (GPG, PAT tokens, deployment), see [For Maintainers Only](#for-maintainers-only) at the bottom of this guide.
+Complete step-by-step dev container environment setup: **[Getting Started / Dev Container Setup](../README.md#-getting-started)**.
 
 ## Development Workflow
 
@@ -173,11 +149,11 @@ docker build \
 
 ### CI/CD Build Times
 
-| Build Type | Platforms | Time | Use Case |
-| --- | --- | --- | --- |
-| Cached build | AMD64 | ~3-5 min | Incremental changes |
-| Cold build | AMD64 | ~6-8 min | Fresh build |
-| Multi-arch | AMD64 + ARM64 | ~10-15 min | Production releases |
+| Build Type   | Platforms     | Time       | Use Case            |
+| ------------ | ------------- | ---------- | ------------------- |
+| Cached build | AMD64         | ~3-5 min   | Incremental changes |
+| Cold build   | AMD64         | ~6-8 min   | Fresh build         |
+| Multi-arch   | AMD64 + ARM64 | ~10-15 min | Production releases |
 
 ### Performance Features
 

@@ -1,6 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs";
-import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
+import type { NextConfig } from "next";
 
 if (process.env.NODE_ENV === "production") {
   process.env.SERWIST_SUPPRESS_TURBOPACK_WARNING = "1";
@@ -28,7 +28,9 @@ const withSerwist = withSerwistInit({
   // AND
   // 2. The dev SW flag is NOT set to true
   // This ensures production builds ALWAYS generate the service worker
-  disable: process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV !== "true",
+  disable:
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV !== "true",
   // Must be false: caching navigation (document) responses breaks Next.js streaming SSR.
   // All protected pages use `export const dynamic = 'force-dynamic'`. When this is true,
   // Serwist wraps the response in a NetworkFirst/StaleWhileRevalidate strategy that buffers
@@ -42,9 +44,9 @@ const withSerwist = withSerwistInit({
 // Allowing both production and development hostnames ensures images work across environments.
 const allowedImageHostnames = (() => {
   const hosts = [
-    "lh3.googleusercontent.com",     // Google
+    "lh3.googleusercontent.com", // Google
     "avatars.githubusercontent.com", // GitHub
-    "secure.gravatar.com",           // Gravatar
+    "secure.gravatar.com", // Gravatar
   ];
 
   const envUrls = [
@@ -67,8 +69,8 @@ const allowedImageHostnames = (() => {
 
   if (!envUrls.some(Boolean)) {
     throw new Error(
-      '[next.config.ts] At least one Supabase URL or Supabase Proxy URL ' +
-      'is required at build time for images.remotePatterns.'
+      "[next.config.ts] At least one Supabase URL or Supabase Proxy URL " +
+        "is required at build time for images.remotePatterns.",
     );
   }
 
@@ -88,7 +90,7 @@ const nextConfig = {
   // regardless of this setting.
   productionBrowserSourceMaps: true,
 
-  async headers() {
+  headers() {
     // 1. Define headers common to all environments
     const headersList = [
       {
@@ -126,7 +128,7 @@ const nextConfig = {
     ];
 
     // 2. Only add HSTS in Production to prevent local SSL errors
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === "production") {
       // 2-year max-age (63072000 seconds = 2 years) satisfies Lighthouse "max-age too low" audit (minimum recommended: 63072000).
       // preload qualifies the domain for HSTS preload lists (https://hstspreload.org).
       headersList.push({
@@ -191,36 +193,39 @@ const nextConfig = {
 
   experimental: {
     optimizePackageImports: [
-      'lucide-react',
-      'date-fns',
-      'framer-motion',
-      'recharts',
-      '@radix-ui/react-alert-dialog',
-      '@radix-ui/react-avatar',
-      '@radix-ui/react-checkbox',
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-label',
-      '@radix-ui/react-popover',
-      '@radix-ui/react-progress',
-      '@radix-ui/react-radio-group',
-      '@radix-ui/react-scroll-area',
-      '@radix-ui/react-select',
-      '@radix-ui/react-separator',
-      '@radix-ui/react-slot',
-      '@radix-ui/react-switch',
-      '@radix-ui/react-tabs',
+      "lucide-react",
+      "date-fns",
+      "framer-motion",
+      "recharts",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-label",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-progress",
+      "@radix-ui/react-radio-group",
+      "@radix-ui/react-scroll-area",
+      "@radix-ui/react-select",
+      "@radix-ui/react-separator",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-tabs",
     ],
   },
 
   // Performance: Minimize JavaScript bundle
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'], // Preserve console.error and console.warn; strip log/info from production
-    } : false,
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? {
+            exclude: ["error", "warn"], // Preserve console.error and console.warn; strip log/info from production
+          }
+        : false,
   },
-  
-  generateBuildId: async () => {
+
+  generateBuildId: () => {
     // Prefer the commit SHA injected by CI/CD for stable, traceable build IDs.
     // Fall back to a random UUID so that two builds without APP_COMMIT_SHA still get
     // different IDs — preventing Next.js static-asset cache collisions across deployments.
@@ -232,26 +237,28 @@ const nextConfig = {
   },
 
   images: {
-    formats: ['image/avif', 'image/webp'],
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       ...allowedImageHostnames.map((hostname: string) => {
-        const isSupabase = hostname.includes('supabase');
+        const isSupabase = hostname.includes("supabase");
         return {
-          protocol: 'https' as const,
+          protocol: "https" as const,
           hostname,
-          port: '',
+          port: "",
           // Supabase storage is strictly nested under /storage/v1/object/public/
           // while OAuth providers (Google, GitHub) serve images from various root paths.
-          pathname: isSupabase ? '/storage/v1/object/public/**' : '/**',
+          pathname: isSupabase ? "/storage/v1/object/public/**" : "/**",
         };
       }),
     ],
   },
   // eslint-disable-next-line sonarjs/no-hardcoded-ip
-  allowedDevOrigins: ['192.168.0.103']
+  allowedDevOrigins: ["192.168.0.103"],
 } satisfies NextConfig;
 
-const sentryCompatibleConfig = withSerwist(nextConfig) as Parameters<typeof withSentryConfig>[0];
+const sentryCompatibleConfig = withSerwist(nextConfig) as Parameters<
+  typeof withSentryConfig
+>[0];
 
 const sentryPluginOptions = {
   org: process.env.SENTRY_ORG,
@@ -289,7 +296,7 @@ const sentryPluginOptions = {
   },
 
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring"
+  tunnelRoute: "/monitoring",
 } satisfies Parameters<typeof withSentryConfig>[1];
 
 export default withSentryConfig(sentryCompatibleConfig, sentryPluginOptions);

@@ -1,158 +1,268 @@
-# Base Image
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04@sha256:81380e4c9c14e8a629ff39029639e4b7893e67400246fa7782a0fe7dc193a02a
+# syntax=docker/dockerfile:1.4
+
+# Main Base Image (Ubuntu 24.04 GLIBC compatible)
+FROM mcr.microsoft.com/devcontainers/base:2.1.7-ubuntu24.04@sha256:4bcb1b466771b1ba1ea110e2a27daea2f6093f9527fb75ee59703ec89b5561cb
 
 USER root
 
-# Copy pinned artifacts so they can be used as defaults when build-args are not provided
-COPY pinned-artifacts.json /tmp/pinned-artifacts.json
+# 1. Consolidated System Dependencies & Docker Repos
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    acl \
+    adb \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    gnupg \
+    jq \
+    openjdk-25-jdk-headless \
+    socat \
+    tk-dev \
+    unzip \
+    wget \
+    libbz2-dev \
+    libexpat1-dev \
+    libffi-dev \
+    libgdbm-dev \
+    liblzma-dev \
+    libncurses-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    zlib1g-dev \
+    && install -m 0755 -d /etc/apt/keyrings \
+    # NodeSource Setup (Node 24)
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && chmod 644 /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    # Docker CE Setup
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod 644 /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list \
+    # Single final update and installation pass
+    && apt-get update && apt-get install -y --no-install-recommends \
+    docker-buildx-plugin \
+    docker-ce-cli \
+    docker-compose-plugin \
+    nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 1. System Dependencies, Java 17, and SSH Setup
-RUN apt-get update && apt-get install -y \
-    openssh-server curl git unzip wget adb openjdk-17-jdk-headless apt-transport-https jq \
-    && mkdir /var/run/sshd \
-    && echo 'vscode:root' | chpasswd \
-    && echo 'root:root' | chpasswd \
-    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
-    && sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+COPY .devcontainer/pinned-artifacts.json* pinned-artifacts.json* /tmp/
 
-# 2. Node.js 24.14.1 + npm 11.11.0
+# 2. CLI Tools (Npm, Supabase, Firebase, Infisical, Playwright)
 ARG NPM_TARBALL_URL
 ARG NPM_SHASUM
-
-RUN mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update && apt-get install -y nodejs \
-    && if [ -f /tmp/pinned-artifacts.json ]; then \
-        NPM_TARBALL_URL=${NPM_TARBALL_URL:-$(jq -r '.npm.url' /tmp/pinned-artifacts.json)}; \
-        NPM_SHASUM=${NPM_SHASUM:-$(jq -r '.npm.shasum' /tmp/pinned-artifacts.json)}; \
-    fi \
-    && if [ -z "$NPM_TARBALL_URL" ] || [ -z "$NPM_SHASUM" ]; then echo "Missing URL or SHASUM for npm" >&2; exit 1; fi \
-    && echo "Downloading npm tarball from $NPM_TARBALL_URL" \
-    && curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz \
-    && echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - \
-    # Overwrite the global npm directory to update npm without using npm install -g,
-    # avoiding the Scorecard Pinned-Dependencies "npmCommand not pinned by hash" warning.
-    && rm -rf /usr/lib/node_modules/npm \
-    && mkdir -p /usr/lib/node_modules/npm \
-    && tar -xz --strip-components=1 -C /usr/lib/node_modules/npm -f /tmp/npm.tgz \
-    && rm -f /tmp/npm.tgz
-
-# 3. Docker CLI, GitHub CLI, Supabase CLI, Playwright, and Firebase CLI
 ARG PLAYWRIGHT_TARBALL_URL
 ARG PLAYWRIGHT_SHASUM
 ARG FIREBASE_TARBALL_URL
 ARG FIREBASE_SHASUM
-ARG SUPABASE_TARBALL_URL
-ARG SUPABASE_SHA256
 ARG INFISICAL_TARBALL_URL
 ARG INFISICAL_SHASUM
+ARG SUPABASE_TARBALL_URL
+ARG SUPABASE_SHA256
 
-RUN apt-get update && apt-get install -y ca-certificates curl gnupg jq \
-     && install -m 0755 -d /etc/apt/keyrings \
-     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-     && chmod a+r /etc/apt/keyrings/docker.gpg \
-     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
-     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-     && apt-get update && apt-get install -y \
-         docker-ce-cli \
-         docker-buildx-plugin \
-         docker-compose-plugin \
-         gh \
-        && if [ -f /tmp/pinned-artifacts.json ]; then \
-            PLAYWRIGHT_TARBALL_URL=${PLAYWRIGHT_TARBALL_URL:-$(jq -r '.playwright.url' /tmp/pinned-artifacts.json)}; \
-            PLAYWRIGHT_SHASUM=${PLAYWRIGHT_SHASUM:-$(jq -r '.playwright.shasum' /tmp/pinned-artifacts.json)}; \
-            FIREBASE_TARBALL_URL=${FIREBASE_TARBALL_URL:-$(jq -r '.firebase.url' /tmp/pinned-artifacts.json)}; \
-            FIREBASE_SHASUM=${FIREBASE_SHASUM:-$(jq -r '.firebase.shasum' /tmp/pinned-artifacts.json)}; \
-            SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url' /tmp/pinned-artifacts.json)}; \
-            SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256' /tmp/pinned-artifacts.json)}; \
-            INFISICAL_TARBALL_URL=${INFISICAL_TARBALL_URL:-$(jq -r '.infisical.url' /tmp/pinned-artifacts.json)}; \
-            INFISICAL_SHASUM=${INFISICAL_SHASUM:-$(jq -r '.infisical.shasum' /tmp/pinned-artifacts.json)}; \
-        fi \
-        && ARCH=$(dpkg --print-architecture) \
-        && echo "Downloading Supabase CLI (verify by provided SHA256)..." \
-        && if [ -z "$SUPABASE_TARBALL_URL" ] || [ -z "$SUPABASE_SHA256" ]; then echo "SUPABASE_TARBALL_URL and SUPABASE_SHA256 must be provided (build-arg or pinned file)" >&2; exit 1; fi \
-        && curl -fSL "$SUPABASE_TARBALL_URL" -o /tmp/supabase.tar.gz \
-        && echo "$SUPABASE_SHA256  /tmp/supabase.tar.gz" | sha256sum -c - \
-        && tar -xzf /tmp/supabase.tar.gz -C /tmp \
-        && mv /tmp/supabase /usr/local/bin/ \
-        && chmod +x /usr/local/bin/supabase \
-        && rm -f /tmp/supabase.tar.gz \
-        && set -eux \
-        # Install npm global packages from provided tarball URLs and verify hashes
-        && for NAME in "playwright" "firebase-tools" "infisical"; do \
-            case "$NAME" in \
-                playwright) URL="$PLAYWRIGHT_TARBALL_URL"; SUM="$PLAYWRIGHT_SHASUM";; \
-                firebase-tools) URL="$FIREBASE_TARBALL_URL"; SUM="$FIREBASE_SHASUM";; \
-                infisical) URL="$INFISICAL_TARBALL_URL"; SUM="$INFISICAL_SHASUM";; \
-            esac; \
-            if [ -z "$URL" ] || [ -z "$SUM" ]; then echo "Missing URL or SHASUM for $NAME" >&2; exit 1; fi; \
-            echo "Downloading $NAME tarball from $URL"; curl -fSL "$URL" -o /tmp/$NAME.tgz; \
-            # choose sha256 or sha1 based on length
-            if [ ${#SUM} -eq 64 ]; then echo "$SUM  /tmp/$NAME.tgz" | sha256sum -c -; else echo "$SUM  /tmp/$NAME.tgz" | sha1sum -c -; fi; \
-            node /usr/lib/node_modules/npm/bin/npm-cli.js install -g /tmp/$NAME.tgz; \
-            rm -f /tmp/$NAME.tgz; \
-        done \
-        # Install Playwright OS dependencies using the installed package
-        && playwright install-deps
+RUN set -eu; \
+    if [ -f /tmp/pinned-artifacts.json ]; then \
+        NPM_TARBALL_URL=${NPM_TARBALL_URL:-$(jq -r '.npm.url // empty' /tmp/pinned-artifacts.json)}; \
+        NPM_SHASUM=${NPM_SHASUM:-$(jq -r '.npm.shasum // empty' /tmp/pinned-artifacts.json)}; \
+        PLAYWRIGHT_TARBALL_URL=${PLAYWRIGHT_TARBALL_URL:-$(jq -r '.playwright.url // empty' /tmp/pinned-artifacts.json)}; \
+        PLAYWRIGHT_SHASUM=${PLAYWRIGHT_SHASUM:-$(jq -r '.playwright.shasum // empty' /tmp/pinned-artifacts.json)}; \
+        FIREBASE_TARBALL_URL=${FIREBASE_TARBALL_URL:-$(jq -r '.firebase.url // empty' /tmp/pinned-artifacts.json)}; \
+        FIREBASE_SHASUM=${FIREBASE_SHASUM:-$(jq -r '.firebase.shasum // empty' /tmp/pinned-artifacts.json)}; \
+        INFISICAL_TARBALL_URL=${INFISICAL_TARBALL_URL:-$(jq -r '.infisical.url // empty' /tmp/pinned-artifacts.json)}; \
+        INFISICAL_SHASUM=${INFISICAL_SHASUM:-$(jq -r '.infisical.shasum // empty' /tmp/pinned-artifacts.json)}; \
+        SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url // empty' /tmp/pinned-artifacts.json)}; \
+        SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256 // empty' /tmp/pinned-artifacts.json)}; \
+    fi; \
+    # 1. Install NPM (requires SHASUM)
+    if [ -n "${NPM_TARBALL_URL:-}" ]; then \
+        if [ -z "${NPM_SHASUM:-}" ]; then echo "ERROR: NPM_SHASUM missing for $NPM_TARBALL_URL" >&2; exit 1; fi; \
+        curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz; \
+        echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for npm" >&2; exit 1; }; \
+        npm install -g /tmp/npm.tgz; \
+        rm -f /tmp/npm.tgz; \
+    fi; \
+    # 2. Install Supabase CLI (requires SHA256 binary)
+    if [ -n "${SUPABASE_TARBALL_URL:-}" ]; then \
+        if [ -z "${SUPABASE_SHA256:-}" ]; then echo "ERROR: SUPABASE_SHA256 missing for $SUPABASE_TARBALL_URL" >&2; exit 1; fi; \
+        curl -fSL "$SUPABASE_TARBALL_URL" -o /tmp/supabase.tar.gz; \
+        echo "$SUPABASE_SHA256  /tmp/supabase.tar.gz" | sha256sum -c - || { echo "ERROR: Checksum verification failed for supabase" >&2; exit 1; }; \
+        tar -xzf /tmp/supabase.tar.gz -C /tmp; \
+        find /tmp -type f -name "supabase" -exec mv {} /usr/local/bin/ \; ; \
+        chmod +x /usr/local/bin/supabase; \
+        rm -f /tmp/supabase.tar.gz; \
+    fi; \
+    # 3. Install NPM CLI tool tarballs with path-matched --allow-scripts
+    for NAME in "playwright" "firebase-tools" "infisical"; do \
+        case "$NAME" in \
+            playwright) URL="${PLAYWRIGHT_TARBALL_URL:-}"; SHASUM="${PLAYWRIGHT_SHASUM:-}" ;; \
+            firebase-tools) URL="${FIREBASE_TARBALL_URL:-}"; SHASUM="${FIREBASE_SHASUM:-}" ;; \
+            infisical) URL="${INFISICAL_TARBALL_URL:-}"; SHASUM="${INFISICAL_SHASUM:-}" ;; \
+        esac; \
+        if [ -n "$URL" ]; then \
+            if [ -z "$SHASUM" ]; then echo "ERROR: SHASUM missing for $NAME ($URL)" >&2; exit 1; fi; \
+            curl -fSL "$URL" -o "/tmp/$NAME.tgz"; \
+            echo "$SHASUM  /tmp/$NAME.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for $NAME" >&2; exit 1; }; \
+            npm install -g --allow-scripts="/tmp/$NAME.tgz" "/tmp/$NAME.tgz"; \
+            rm -f "/tmp/$NAME.tgz"; \
+        fi; \
+    done; \
+    # 4. Playwright dependencies & cleanup
+    if command -v playwright >/dev/null 2>&1; then \
+        playwright install-deps; \
+    fi; \
+    apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    npm cache clean --force
 
 # Switch to vscode user for user-space SDKs
 USER vscode
 ENV HOME="/home/vscode"
 ENV FLUTTER_HOME="$HOME/flutter-sdk"
+ENV ANDROID_HOME="$HOME/android-sdk"
+ENV DENO_INSTALL="$HOME/.deno"
 ENV NODE_OPTIONS="--max-old-space-size=9216"
-ENV PATH="$PATH:$FLUTTER_HOME/bin"
+ENV PATH="$PATH:$FLUTTER_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$DENO_INSTALL/bin:$HOME/.pub-cache/bin"
 
-# 4. Flutter SDK Pre-cache
-RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
-    && $FLUTTER_HOME/bin/flutter precache
+# 3. Bake IDE Settings & Cross-IDE Extension Symlinks
+RUN mkdir -p $HOME/.antigravity-server/data/Machine \
+             $HOME/.antigravity-ide-server/data/Machine \
+             $HOME/.vscode-server/data/Machine \
+             $HOME/.vscode-server/extensions \
+    && ln -s $HOME/.vscode-server/extensions $HOME/.antigravity-server/extensions \
+    && ln -s $HOME/.vscode-server/extensions $HOME/.antigravity-ide-server/extensions \
+    && SETTINGS='{ \
+        "remote.forwardAgent": false, \
+        "editor.formatOnSave": true, \
+        "editor.codeActionsOnSave": { \
+            "source.organizeImports": "explicit", \
+            "source.fixAll.eslint": "explicit" \
+        }, \
+        "editor.defaultFormatter": "esbenp.prettier-vscode", \
+        "typescript.tsdk": "node_modules/typescript/lib", \
+        "typescript.inlayHints.variableTypes.enabled": true, \
+        "typescript.inlayHints.functionLikeReturnTypes.enabled": true, \
+        "typescript.inlayHints.parameterNames.enabled": "all", \
+        "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"], \
+        "errorlens.enabled": true, \
+        "dart.flutterSdkPath": "/home/vscode/flutter-sdk", \
+        "dart.openDevTools": "never", \
+        "deno.path": "/home/vscode/.deno/bin/deno", \
+        "deno.enable": true \
+    }' \
+    && echo "$SETTINGS" > $HOME/.antigravity-server/data/Machine/settings.json \
+    && echo "$SETTINGS" > $HOME/.antigravity-ide-server/data/Machine/settings.json \
+    && echo "$SETTINGS" > $HOME/.vscode-server/data/Machine/settings.json
 
-# 5. Workspace Injector Script
-# Switch to root to safely write and change file ownership
+# 4. Android SDK Setup
+ARG ANDROID_CMDLINE_TOOLS_URL
+ARG ANDROID_CMDLINE_TOOLS_SHA256
+RUN if [ -f /tmp/pinned-artifacts.json ]; then \
+        ANDROID_CMDLINE_TOOLS_URL=${ANDROID_CMDLINE_TOOLS_URL:-$(jq -r '.android_cmdline_tools.url // empty' /tmp/pinned-artifacts.json)}; \
+        ANDROID_CMDLINE_TOOLS_SHA256=${ANDROID_CMDLINE_TOOLS_SHA256:-$(jq -r '.android_cmdline_tools.sha256 // empty' /tmp/pinned-artifacts.json)}; \
+    fi \
+    && ANDROID_CMDLINE_TOOLS_URL=${ANDROID_CMDLINE_TOOLS_URL:-"https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"} \
+    && mkdir -p $ANDROID_HOME/cmdline-tools \
+    && wget "$ANDROID_CMDLINE_TOOLS_URL" -O /tmp/cmdline-tools.zip \
+    && if [ -n "$ANDROID_CMDLINE_TOOLS_SHA256" ]; then echo "$ANDROID_CMDLINE_TOOLS_SHA256 /tmp/cmdline-tools.zip" | sha256sum -c -; fi \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip \
+    && yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses \
+    && $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+# 5. Flutter SDK Pre-cache
+ARG FLUTTER_URL
+ARG FLUTTER_SHA256
+RUN if [ -f /tmp/pinned-artifacts.json ]; then \
+        FLUTTER_URL=${FLUTTER_URL:-$(jq -r '.flutter.url // empty' /tmp/pinned-artifacts.json)}; \
+        FLUTTER_SHA256=${FLUTTER_SHA256:-$(jq -r '.flutter.sha256 // empty' /tmp/pinned-artifacts.json)}; \
+    fi \
+    && if [ -n "$FLUTTER_URL" ]; then \
+        mkdir -p $FLUTTER_HOME \
+        && curl -fSL "$FLUTTER_URL" -o /tmp/flutter.tar.xz \
+        && if [ -n "$FLUTTER_SHA256" ]; then echo "$FLUTTER_SHA256 /tmp/flutter.tar.xz" | sha256sum -c -; fi \
+        && tar -xJf /tmp/flutter.tar.xz -C /tmp \
+        && rm -rf $FLUTTER_HOME \
+        && mv /tmp/flutter $FLUTTER_HOME \
+        && rm -f /tmp/flutter.tar.xz; \
+    else \
+        git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME; \
+    fi \
+    && $FLUTTER_HOME/bin/flutter precache \
+    && flutter config --android-sdk $ANDROID_HOME
+
+# 6. Initialization Script Creation
 USER root
-RUN cat << 'EOF' > /home/vscode/init_workspace.sh
+COPY --chown=vscode:vscode --chmod=755 <<"EOF" /home/vscode/init_workspace.sh
 #!/bin/bash
-echo "🚀 Starting Full Environment Setup..."
-
-# 1. Git Configuration
-# Tell Git to use a writeable file for global settings instead of the busy mount
-export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"
-export NODE_OPTIONS="--max-old-space-size=9216"
-
-if [ ! -f "$GIT_CONFIG_GLOBAL" ]; then
-    cp /home/vscode/.gitconfig "$GIT_CONFIG_GLOBAL" 2>/dev/null || touch "$GIT_CONFIG_GLOBAL"
+echo "🚀 Starting GhostClass Workspace Setup..."
+# --- 1. GIT CONFIG DIVERSION ---
+if [ ! -L "/home/vscode/.gitconfig" ]; then
+    if [ -f "/home/vscode/.gitconfig" ]; then
+        mv /home/vscode/.gitconfig /home/vscode/.gitconfig_local
+    else
+        touch /home/vscode/.gitconfig_local
+    fi
+    ln -sf /home/vscode/.gitconfig_local /home/vscode/.gitconfig
 fi
+chmod 644 /home/vscode/.gitconfig_local 2>/dev/null || true
 
-if ! grep -q "GIT_CONFIG_GLOBAL" ~/.bashrc; then
-    echo 'export GIT_CONFIG_GLOBAL="/home/vscode/.gitconfig_local"' >> ~/.bashrc
-fi
+# --- 2. SSH AGENT & SIGNING SETUP ---
+echo "🔑 Checking SSH Agent Forwarding..."
 
-git config --global --add safe.directory /workspace
+HAS_SSH_KEY=false
+if [ -S "$SSH_AUTH_SOCK" ] && ssh-add -L >/dev/null 2>&1; then
+    CLEAN_KEY=$(ssh-add -L 2>/dev/null | tr -d '\r' | grep -i "ghost" | head -n 1)
+    if [ -z "$CLEAN_KEY" ]; then
+        CLEAN_KEY=$(ssh-add -L 2>/dev/null | tr -d '\r' | head -n 1)
+    fi
 
-# 2. Secure Local SSH Key Setup
-MOUNTED_KEY="/home/vscode/.ssh/id_ed25519"
-LOCAL_KEY="/home/vscode/.ssh/id_ed25519_local"
-
-# Use sudo to ensure we can create/fix the directory
-sudo mkdir -p /home/vscode/.ssh
-sudo chown -R vscode:vscode /home/vscode/.ssh
-chmod 700 /home/vscode/.ssh
-
-if [ -f "$MOUNTED_KEY" ]; then
-    cp "$MOUNTED_KEY" "$LOCAL_KEY"
-    chmod 600 "$LOCAL_KEY"
-    
-    git config --global user.signingkey "$LOCAL_KEY"
-    git config --global gpg.format ssh
-    git config --global commit.gpgsign true
-    echo "✅ Dedicated Sub-key secured and Git signing configured."
+    if [ -n "$CLEAN_KEY" ]; then
+        HAS_SSH_KEY=true
+        git config --global user.signingkey "$CLEAN_KEY"
+        git config --global gpg.format ssh
+        git config --global commit.gpgsign true
+        echo "✅ SSH signing enabled."
+    fi
 else
-    echo "❌ Private key mount missing at $MOUNTED_KEY!"
+    echo "⚠️ SSH Agent is not active or has no keys loaded."
 fi
 
-# 3. Deno Setup
+# --- 3. GIT IDENTITY ---
+CURRENT_NAME=$(git config --global user.name 2>/dev/null)
+CURRENT_EMAIL=$(git config --global user.email 2>/dev/null)
+
+if [ -z "$CURRENT_NAME" ] || [ -z "$CURRENT_EMAIL" ]; then
+    if [ -t 0 ]; then
+        echo "👤 Setting up Git identity..."
+        [ -z "$CURRENT_NAME" ] && read -rp "Enter Git Name: " CURRENT_NAME && git config --global user.name "$CURRENT_NAME"
+        [ -z "$CURRENT_EMAIL" ] && read -rp "Enter Git Email: " CURRENT_EMAIL && git config --global user.email "$CURRENT_EMAIL"
+    else
+        AUTO_EMAIL=$(ssh-add -L 2>/dev/null | awk '{print $3}' | grep "@" | head -n 1)
+        [ -z "$CURRENT_NAME" ] && git config --global user.name "${GIT_NAME:-User}"
+        [ -z "$CURRENT_EMAIL" ] && git config --global user.email "${GIT_EMAIL:-${AUTO_EMAIL:-dev@example.com}}"
+        echo "ℹ️ Auto-configured Git identity: $(git config --global user.name) <$(git config --global user.email)>"
+    fi
+fi
+
+# --- 4. POPULATE ALLOWED SIGNERS (AFTER IDENTITY IS FINALIZED) ---
+if [ "$HAS_SSH_KEY" = true ]; then
+    FINAL_EMAIL=$(git config --global user.email)
+    ALLOWED_SIGNERS_FILE="/home/vscode/.ssh/allowed_signers"
+    
+    mkdir -p /home/vscode/.ssh && chmod 700 /home/vscode/.ssh
+    
+    # Prepend the finalized email to the clean public key
+    echo "${FINAL_EMAIL:-*} ${CLEAN_KEY}" > "$ALLOWED_SIGNERS_FILE"
+    chmod 600 "$ALLOWED_SIGNERS_FILE"
+    
+    git config --global gpg.ssh.allowedSignersFile "$ALLOWED_SIGNERS_FILE"
+    echo "✅ Local SSH signature verification configured for ${FINAL_EMAIL:-*}"
+fi
+
+git config --global --add safe.directory /ghostclass
+
+# --- 5. DENO SETUP ---
 export DENO_INSTALL="/home/vscode/.deno"
 export PATH="$DENO_INSTALL/bin:$PATH"
 
@@ -172,96 +282,70 @@ if ! grep -q "DENO_INSTALL" ~/.bashrc; then
     echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
 fi
 
-mkdir -p ~/.vscode-server/data/Machine
-
-if [ ! -f ~/.vscode-server/data/Machine/settings.json ]; then
-    echo '{}' > ~/.vscode-server/data/Machine/settings.json
+# --- 6. NPM & FLUTTER SETUP ---
+if [ -f "/ghostclass/package.json" ]; then 
+    echo "📦 Synchronizing NPM packages..."
+    cd /ghostclass && npm ci --legacy-peer-deps
+fi
+if [ -d "/ghostclass/mobile" ]; then 
+    echo "🐦 Fetching Flutter dependencies..."
+    cd /ghostclass/mobile && flutter pub get
 fi
 
-grep -q '"deno.path"' ~/.vscode-server/data/Machine/settings.json || \
-sed -i 's|}|,\n  "deno.path": "/home/vscode/.deno/bin/deno",\n  "deno.enable": true\n}|' \
-~/.vscode-server/data/Machine/settings.json
-
-# 4. Android SDK Setup
-export ANDROID_HOME="/home/vscode/android-sdk"
-export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-export PATH="$PATH":"$HOME/.pub-cache/bin"
-
-# Download Linux cmdline-tools if missing
-if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-    echo "⬇️ Downloading Linux Android SDK Command-line Tools..."
-    mkdir -p "/home/vscode/android-sdk/cmdline-tools"
-    
-    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
-    unzip -q /tmp/cmdline-tools.zip -d "/home/vscode/android-sdk/cmdline-tools"
-    
-    mv "/home/vscode/android-sdk/cmdline-tools/cmdline-tools" "/home/vscode/android-sdk/cmdline-tools/latest"
-    rm /tmp/cmdline-tools.zip
-    
-    echo "📦 Installing Android Platform Tools..."
-    yes | /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-    /home/vscode/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-fi
-
-if ! grep -q "ANDROID_HOME" ~/.bashrc; then
-    echo "export ANDROID_HOME=\"/home/vscode/android-sdk\"" >> ~/.bashrc
-    echo "export PATH=\"\$PATH:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools\"" >> ~/.bashrc
-fi
-
-# 5. Flutter SDK Setup
-export FLUTTER_HOME="/home/vscode/flutter-sdk"
-export PATH="$PATH:$FLUTTER_HOME/bin"
-
-if ! grep -q "flutter-sdk" ~/.bashrc; then
-    echo "📝 Updating ~/.bashrc..."
-    echo 'export FLUTTER_HOME="/home/vscode/flutter-sdk"' >> ~/.bashrc
-    echo "export PATH=\"\$PATH:\$FLUTTER_HOME/bin\"" >> ~/.bashrc
-fi
-
-flutter config --android-sdk "$ANDROID_HOME"
-
-# 6. Workspace Dependencies
-if [ -f "/workspace/package.json" ]; then
-    echo "📦 Installing NPM dependencies..."
-    cd /workspace && npm ci --legacy-peer-deps
-fi
-
-if [ -d "/workspace/mobile" ]; then
-    echo "🐦 Running flutter pub get..."
-    cd /workspace/mobile && flutter pub get
-fi
-
-# 7. IDE Extensions Installation
 EXTENSIONS=(
   "Dart-Code.flutter" "Dart-Code.dart-code" "dsznajder.es7-react-js-snippets"
   "esbenp.prettier-vscode" "bradlc.vscode-tailwindcss" "formulahendry.auto-rename-tag"
   "christian-kohler.path-intellisense" "christian-kohler.npm-intellisense" "vitest.explorer"
   "ms-playwright.playwright" "ms-edgedevtools.vscode-edge-devtools" "davidanson.vscode-markdownlint"
-  "meezilla.json" "ms-vscode.vscode-typescript-next" "oderwat.indent-rainbow"
-  "dbaeumer.vscode-eslint" "usernamehw.errorlens" "supabase.vscode-supabase-extension"
-  "denoland.vscode-deno"
+  "ms-vscode.vscode-typescript-next" "oderwat.indent-rainbow"
+  "dbaeumer.vscode-eslint" "usernamehw.errorlens"
 )
 
-for CLI_PATH in \
-    $(find ~/.vscode-server/bin ~/.antigravity-server/bin \
-    -type f \( -name "code-server" -o -name "antigravity-server" \) \
-    -executable 2>/dev/null); do
+echo "🔍 Searching for valid IDE server binaries..."
+VALID_CLIS=()
 
-    echo "Using $CLI_PATH"
+while IFS= read -r binary_path; do
+    if [ -n "$binary_path" ]; then
+        if "$binary_path" --version >/dev/null 2>&1; then
+            VALID_CLIS+=("$binary_path")
+        fi
+    fi
+done < <(find ~ -type f -executable \( -name "code-server" -o -name "antigravity-server" -o -name "antigravity-ide-server" -o -name "cursor-server" \) -not -path "*/node_modules/*" 2>/dev/null || true)
 
-    for ext in "${EXTENSIONS[@]}"; do
-        "$CLI_PATH" --install-extension "$ext" --force --telemetry-level off
+if [ ${#VALID_CLIS[@]} -eq 0 ]; then
+    echo "⚠️ No active IDE server binaries found yet."
+else
+    UNIQUE_CLIS=($(echo "${VALID_CLIS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+    for CLI in "${UNIQUE_CLIS[@]}"; do
+        echo "🔧 Synchronizing extensions via binary: $CLI"
+        
+        INSTALLED_EXTS=$("$CLI" --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]')
+
+        for ext in "${EXTENSIONS[@]}"; do
+            EXT_LOWER=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+            
+            if echo "$INSTALLED_EXTS" | grep -q "^${EXT_LOWER}$"; then
+                echo "  🔹 $ext is already installed."
+            else
+                "$CLI" --install-extension "$ext" >/dev/null 2>&1
+                
+                UPDATED_EXTS=$("$CLI" --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]')
+                if echo "$UPDATED_EXTS" | grep -q "^${EXT_LOWER}$"; then
+                    echo "  ✅ Installed $ext"
+                else
+                    echo "  ❌ Failed to install $ext"
+                fi
+            fi
+        done
     done
-done
+fi
 
-hash -r
-echo "🎯 All systems go!"
+echo "🎯 Initialization Complete!"
 EOF
+RUN sed -i 's/\r$//' /home/vscode/init_workspace.sh && chmod +x /home/vscode/init_workspace.sh
 
-# Fix permissions so vscode owns the script
-RUN chmod +x /home/vscode/init_workspace.sh && chown vscode:vscode /home/vscode/init_workspace.sh
-
-# Start the SSH Daemon
-WORKDIR /workspace
-EXPOSE 22 3000
-CMD ["/usr/sbin/sshd", "-D"]
+# 7. User Environment Defaults & Entrypoint
+USER vscode
+WORKDIR /ghostclass
+EXPOSE 3000 8000 8080 4000 5001 8081 8085 9099 54321 54322 54323
+CMD ["sleep", "infinity"]

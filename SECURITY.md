@@ -112,7 +112,7 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Dev-only (used by build tools: Sentry, Serwist)
 - **Status**: ✅ Up-to-date
 
-#### source-map: ^0.7.6
+#### source-map: ^0.8.0
 
 - **Reason**: Dependency resolution conflicts and stability improvements
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
@@ -131,11 +131,43 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 - **Scope**: Transitive dependency (used by various dev tools)
 - **Status**: ✅ Up-to-date
 
+#### @tootallnate/once: ^3.0.1
+
+- **Reason**: Memory leak prevention and event listener security hardening in legacy HTTP agent wrappers
+- **Scope**: Dev-only / transitive dependency
+- **Status**: ✅ Up-to-date
+
 #### postcss: ^8.5.14
 
 - **Reason**: Security hardening and dependency stability
 - **Scope**: Transitive dependency (used by Tailwind CSS)
 - **Status**: ✅ Up-to-date
+
+#### sharp: ^0.35.0
+
+- **Reason**: Native memory safety hardening and libvips security patches
+- **Scope**: Production dependency (used by Next.js image optimization)
+- **Status**: ✅ Up-to-date
+
+#### uuid: ^14.0.1
+
+- **Reason**: CSPRNG generation hardening and prototype protection in v14+
+- **Scope**: Production & transitive dependency
+- **Status**: ✅ Up-to-date
+
+### Egress Worker Overrides (workers/package.json)
+
+#### undici: ^8.4.2
+
+- **Reason**: HTTP request smuggling and header injection protection in Worker fetch engine
+- **Scope**: Proxy worker dependency
+- **Status**: ✅ Patched
+
+#### ws: ^8.20.1
+
+- **Reason**: Resource exhaustion DoS vulnerability fix (CVE-2024-37890)
+- **Scope**: Proxy worker dependency
+- **Status**: ✅ Patched
 
 ### Maintenance Policy
 

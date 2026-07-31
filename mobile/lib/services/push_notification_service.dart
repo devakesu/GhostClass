@@ -1,5 +1,4 @@
 // Service is dynamically resolved or used in background isolates
-// ignore_for_file: unreachable_from_main
 
 import 'dart:async';
 import 'dart:io';

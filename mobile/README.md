@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.44.0-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.12.0-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.11.4-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -40,7 +40,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 | Package | Version | Purpose |
 | :--- | :--- | :--- |
 | **Flutter** | 3.44.0 | Cross-platform UI framework |
-| **Dart** | 3.12.0 | Language |
+| **Dart** | 3.11.4 | Language |
 
 ### State Management
 
@@ -69,14 +69,14 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 | `firebase_core` | ^4.7.0 | Firebase SDK |
 | `firebase_app_check` | ^0.4.3 | Device integrity & API protection |
 | `flutter_secure_storage` | ^10.0.0 | Hardware-backed credential storage |
-| `jose` + `pointycastle` | ^0.3.5 / ^3.9.1 | JWE key parsing + RSA operations |
+| `jose` + `pointycastle` | ^0.3.5+1 / ^3.9.1 | JWE key parsing + RSA operations |
 | `encrypt` | ^5.0.3 | AES-256 symmetric encryption |
 
 ### UI & Charts
 
 | Package | Version | Purpose |
 | :--- | :--- | :--- |
-| `lucide_icons` | ^0.257.0 | Icon set (matches web) |
+| `lucide_icons_flutter` | ^3.1.14+1 | Icon set (matches web) |
 | `google_fonts` | ^8.0.2 | Typography |
 | `flutter_animate` | ^4.5.2 | Declarative animations |
 | `fl_chart` | ^1.2.0 | Attendance trend charts |
@@ -211,7 +211,7 @@ mobile/
 ### Prerequisites
 
 - **Flutter SDK** — 3.44.0 ([install](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** — 3.12.0 (bundled with Flutter)
+- **Dart SDK** — 3.11.4 (bundled with Flutter)
 - **Android Studio / Xcode** — for emulator/simulator
 - **Firebase CLI** — for App Check configuration
 - **A GhostClass backend** — see the [root README](../README.md) for web setup

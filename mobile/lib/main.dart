@@ -119,7 +119,7 @@ void main() async {
 
   await Supabase.initialize(
     url: sUrl,
-    anonKey: sKey,
+    publishableKey: sKey,
     headers: {
       'Origin': sOrigin,
     },
