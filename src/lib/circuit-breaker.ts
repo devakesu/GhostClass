@@ -75,6 +75,9 @@ class CircuitBreaker {
   private localSuccessCount = 0;
   private localHalfOpenInFlight = 0;
 
+  private lastRedisCheck = 0;
+  private readonly redisCheckInterval = 5000; // 5 seconds
+
   // Conservative thresholds for single-IP deployment
   // Opens circuit after just 3 failures to protect against extended outages
   private readonly failureThreshold = 3; // Lower threshold for faster protection
@@ -107,16 +110,27 @@ class CircuitBreaker {
     }
   }
 
-  private getState(): Promise<CircuitState> {
-    return this.getRedisValue(
+  private async getState(): Promise<CircuitState> {
+    const now = Date.now();
+    if (
+      this.localState === "CLOSED" &&
+      now - this.lastRedisCheck < this.redisCheckInterval
+    ) {
+      return this.localState;
+    }
+    this.lastRedisCheck = now;
+    const state = await this.getRedisValue(
       "circuit:state",
       (val) => val as CircuitState,
       this.localState,
     );
+    this.localState = state;
+    return state;
   }
 
   private async setState(state: CircuitState): Promise<void> {
     this.localState = state;
+    this.lastRedisCheck = Date.now();
     await this.setRedisValue("circuit:state", state);
   }
 
@@ -462,6 +476,7 @@ class CircuitBreaker {
     this.localLastFailTime = 0;
     this.localSuccessCount = 0;
     this.localHalfOpenInFlight = 0;
+    this.lastRedisCheck = 0;
     await this.resetBreakerStateInRedis().catch((error) => {
       logger.dev("Redis error in circuit breaker manual reset", error);
     });

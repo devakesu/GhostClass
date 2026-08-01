@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DashboardDataLoader } from "../DashboardDataLoader";
 import { fetchDashboardData } from "@/lib/ezygo-batch-fetcher";
+import { getProfileBundle } from "@/lib/user/profile-bundle";
 
 type DashboardClientProps = {
   initialData?: unknown;
@@ -21,6 +22,10 @@ vi.mock("@/lib/ezygo-batch-fetcher", () => ({
   fetchDashboardData: vi.fn(),
 }));
 
+vi.mock("@/lib/user/profile-bundle", () => ({
+  getProfileBundle: vi.fn(),
+}));
+
 vi.mock("@/lib/logger", () => ({
   logger: {
     dev: vi.fn(),
@@ -31,6 +36,10 @@ vi.mock("@/lib/logger", () => ({
 describe("DashboardDataLoader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getProfileBundle).mockResolvedValue({
+      id: "user-123",
+      username: "test-user",
+    } as any);
   });
 
   it("renders DashboardClient with data on success", async () => {

@@ -129,7 +129,7 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     vi.restoreAllMocks();
   });
 
-  it("routes Supabase requests through CF proxy origin when CF is set", async () => {
+  it("routes Supabase requests through direct origin first when proxy is set", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
@@ -142,11 +142,11 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {});
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toMatch(new RegExp(`^${CF_PROXY}`));
+    expect(calledUrl).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
     expect(calledUrl).toContain("/auth/v1/user");
   });
 
-  it("preserves query string through proxy", async () => {
+  it("preserves query string through fetch", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
@@ -183,12 +183,11 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await tieredFetch(requestInput);
 
-    // The proxied call should use the CF proxy origin, not the Supabase origin.
     const [calledInput, calledInit] = mockFetch.mock.calls[0] as [
       string,
       RequestInit,
     ];
-    expect(calledInput).toMatch(new RegExp(`^${CF_PROXY}`));
+    expect(calledInput).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
     expect(calledInput).toContain("/auth/v1/user");
 
     // Method and Authorization header from the original Request must be preserved.
@@ -208,7 +207,7 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
     vi.restoreAllMocks();
   });
 
-  it("fails over from CF to direct on 502 for GET", async () => {
+  it("fails over from direct to CF on 502 for GET", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
@@ -224,12 +223,12 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    // Second call should go to the real Supabase origin (direct).
+    // Second call should go to the CF proxy origin.
     const secondUrl = mockFetch.mock.calls[1][0] as string;
-    expect(secondUrl).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
+    expect(secondUrl).toMatch(new RegExp(`^${CF_PROXY}`));
   });
 
-  it("fails over CF → AWS → direct on 503 for GET when all three tiers configured", async () => {
+  it("fails over direct → CF → AWS on 503 for GET when all three tiers configured", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", AWS_PROXY);
 
@@ -246,13 +245,16 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch.mock.calls[0][0]).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
+    expect(mockFetch.mock.calls[1][0]).toMatch(new RegExp(`^${CF_PROXY}`));
+    expect(mockFetch.mock.calls[2][0]).toMatch(new RegExp(`^${AWS_PROXY}`));
   });
 
-  it("does NOT fail over on 502 for AWS-only config when CF returns 502 — returns 502 as-is on last tier", async () => {
+  it("does NOT fail over on 502 for AWS-only config when direct returns 502 — fails over to AWS and returns 502 as-is on last tier", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", AWS_PROXY);
 
-    // AWS → 502 → failover to direct → 502 again (last tier returns as-is)
+    // direct → 502 → failover to AWS → 502 again (last tier returns as-is)
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(new Response("", { status: 502 }))
       .mockResolvedValueOnce(new Response("", { status: 502 }));
@@ -535,16 +537,16 @@ describe("buildSupabaseTieredFetch — API Gateway stage path preservation", () 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", awsWithStage);
 
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response("{}", { status: 200 }),
-    );
+    const mockFetch = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/token`, { method: "POST" });
 
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
-    // The stage prefix must be present and must NOT be doubled.
+    const calledUrl = mockFetch.mock.calls[1][0] as string;
+    // The stage prefix must be present and must NOT be doubled on failover.
     expect(calledUrl).toBe(`${AWS_PROXY}/prod/auth/v1/token`);
   });
 
@@ -552,15 +554,15 @@ describe("buildSupabaseTieredFetch — API Gateway stage path preservation", () 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", `${CF_PROXY}/`);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response("{}", { status: 200 }),
-    );
+    const mockFetch = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {});
 
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    const calledUrl = mockFetch.mock.calls[1][0] as string;
     expect(calledUrl).not.toContain("//auth"); // must not double-slash
     expect(calledUrl).toBe(`${CF_PROXY}/auth/v1/user`);
   });

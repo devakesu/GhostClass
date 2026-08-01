@@ -387,17 +387,20 @@ function checkEventStatusForDate(
   year: string | null | undefined,
   isCourseDisabled: (code: string) => boolean,
   getCourseCodeById: (id: string) => string,
+  eventsByDateMap?: Map<string, ExtendedAttendanceEvent[]>,
+  trackingByDateMap?: Map<string, TrackerRecord[]>,
 ): string | null {
-  const dateEvents = rawEvents.filter((event) =>
-    isSameDayLocal(event.date, date)
-  );
   const dbDateStr = formatDateForDB(date);
-  const hasExtra = normalizedTrackingData.some(
-    (t) =>
-      t._isoDate === dbDateStr &&
-      t.status === "extra" &&
-      t.semester === semester &&
-      t.year === year,
+  const dateEvents = eventsByDateMap
+    ? (eventsByDateMap.get(dbDateStr) ?? [])
+    : rawEvents.filter((event) => isSameDayLocal(event.date, date));
+
+  const dayTracking = trackingByDateMap
+    ? (trackingByDateMap.get(dbDateStr) ?? [])
+    : normalizedTrackingData.filter((t) => t._isoDate === dbDateStr);
+
+  const hasExtra = dayTracking.some(
+    (t) => t.status === "extra" && t.semester === semester && t.year === year,
   );
 
   let hasAbsent = false;
@@ -426,12 +429,8 @@ function checkEventStatusForDate(
       }
     });
   } else if (hasExtra) {
-    const dayExtras = normalizedTrackingData.filter(
-      (t) =>
-        t._isoDate === dbDateStr &&
-        t.status === "extra" &&
-        t.semester === semester &&
-        t.year === year,
+    const dayExtras = dayTracking.filter(
+      (t) => t.status === "extra" && t.semester === semester && t.year === year,
     );
     dayExtras.forEach((t) => {
       let label = "Present";
@@ -1250,6 +1249,35 @@ export function AttendanceCalendar({
     }
   };
 
+  const eventsByDateMap = useMemo(() => {
+    const map = new Map<string, ExtendedAttendanceEvent[]>();
+    for (const ev of rawEvents) {
+      const key = formatDateForDB(ev.date);
+      let list = map.get(key);
+      if (!list) {
+        list = [];
+        map.set(key, list);
+      }
+      list.push(ev);
+    }
+    return map;
+  }, [rawEvents]);
+
+  const trackingByDateMap = useMemo(() => {
+    const map = new Map<string, TrackerRecord[]>();
+    for (const t of normalizedTrackingData) {
+      if (t._isoDate) {
+        let list = map.get(t._isoDate);
+        if (!list) {
+          list = [];
+          map.set(t._isoDate, list);
+        }
+        list.push(t);
+      }
+    }
+    return map;
+  }, [normalizedTrackingData]);
+
   const getEventStatus = useCallback(
     (date: Date): string | null => {
       return checkEventStatusForDate(
@@ -1260,6 +1288,8 @@ export function AttendanceCalendar({
         year,
         isCourseDisabled,
         getCourseCodeById,
+        eventsByDateMap,
+        trackingByDateMap,
       );
     },
     [
@@ -1269,6 +1299,8 @@ export function AttendanceCalendar({
       year,
       isCourseDisabled,
       getCourseCodeById,
+      eventsByDateMap,
+      trackingByDateMap,
     ],
   );
 

@@ -1,9 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
-import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,9 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useQueryClient } from "@tanstack/react-query";
-import { handleLogout } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
+import { handleLogout } from "@/lib/security/auth";
+import { createClient } from "@/lib/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 async function cleanupUserAvatars(
   supabase: ReturnType<typeof createClient>,
@@ -50,7 +50,9 @@ async function cleanupUserAvatars(
         break;
       }
 
-      allPaths.push(...files.map((f) => `${userId}/${f.name}`));
+      allPaths.push(
+        ...files.map((f: { name: string }) => `${userId}/${f.name}`),
+      );
 
       // If we received fewer than `limit` files, we've reached the last page.
       if (files.length < limit) {
@@ -76,7 +78,8 @@ async function cleanupUserAvatars(
     // Best-effort cleanup: log and continue with account deletion even if storage throws.
     const errObj = storageError as { name?: string };
     if (
-      storageError && typeof storageError === "object" &&
+      storageError &&
+      typeof storageError === "object" &&
       errObj.name === "AbortError"
     ) {
       logger.warn(
@@ -107,7 +110,9 @@ export function DeleteAccount() {
       // 1. Delete storage objects (avatars) using the Storage API helper.
       // Direct deletion from storage.objects is blocked by Supabase; the JS client
       // is the correct way to remove files before the account RPC runs.
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         await cleanupUserAvatars(supabase, user.id);
       }
@@ -157,7 +162,7 @@ export function DeleteAccount() {
               Delete Account
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent className="max-w-[400px] rounded-[24px] border-destructive/20 shadow-2xl">
+          <AlertDialogContent className="max-w-100 rounded-3xl border-destructive/20 shadow-2xl">
             <AlertDialogHeader className="flex flex-col items-center text-center pt-2">
               <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4 animate-pulse">
                 <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -184,8 +189,7 @@ export function DeleteAccount() {
                 htmlFor="confirm"
                 className="text-sm text-muted-foreground"
               >
-                Type <span className="font-bold text-foreground">DELETE</span>
-                {" "}
+                Type <span className="font-bold text-foreground">DELETE</span>{" "}
                 to confirm
               </Label>
               <Input
@@ -212,19 +216,17 @@ export function DeleteAccount() {
                 disabled={confirmation !== "DELETE" || isDeleting}
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl px-6"
               >
-                {isDeleting
-                  ? (
-                    <>
-                      <Loader2
-                        className="mr-2 h-4 w-4 animate-spin"
-                        aria-label="Deleting account"
-                      />
-                      Deleting...
-                    </>
-                  )
-                  : (
-                    "Permanently Delete"
-                  )}
+                {isDeleting ? (
+                  <>
+                    <Loader2
+                      className="mr-2 h-4 w-4 animate-spin"
+                      aria-label="Deleting account"
+                    />
+                    Deleting...
+                  </>
+                ) : (
+                  "Permanently Delete"
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

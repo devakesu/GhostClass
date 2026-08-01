@@ -19,13 +19,13 @@ import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
 import { performProfileSync } from "@/lib/user/sync";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
+import { invalidateEzygoCacheForUser } from "@/lib/ezygo-batch-fetcher";
 import {
   birthDateSchema,
   genderSchema,
   optionalPersonNameSchema,
   personNameSchema,
 } from "@/lib/validation/text";
-import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 
 export const dynamic = "force-dynamic";
 
@@ -236,11 +236,14 @@ async function loadExistingUserBundle(
   if (shouldSync) {
     resolvedToken = await resolveAuthToken(existingUserRaw);
     if (resolvedToken) {
+      // Purge EzyGo batch-fetcher cache for the user to guarantee fresh settings, sem and year
+      invalidateEzygoCacheForUser(resolvedToken);
+
       const sync = await performSyncAndFetchUser(
         resolvedToken,
         userId,
         existingUser,
-        isDebounced,
+        false, // Always run full sync when explicitly requested to update class and academic settings
         supabaseAdmin,
       );
       existingUser = sync.updatedUser;
@@ -336,7 +339,7 @@ const getHandler = async (req: NextRequest) => {
     "*, class:classes(id, name, sem, year)",
   ).eq("auth_id", user.id).maybeSingle();
   const searchParams = req.nextUrl.searchParams;
-  let shouldSync = searchParams.get("sync") === "true";
+  const shouldSync = searchParams.get("sync") === "true";
   const force = searchParams.get("force") === "true";
   if (existingUserRaw && existingUserRaw.first_name) {
     const lastSyncedAtStr = existingUserRaw.last_synced_at as
@@ -348,21 +351,6 @@ const getHandler = async (req: NextRequest) => {
       : new Date(0);
     const minutesSinceSync = (Date.now() - lastSyncedAt.getTime()) / 60000;
     const isDebounced = !force && minutesSinceSync < 5;
-
-    // Check if semester/year has changed since last sync
-    const userClass = existingUserRaw.class as
-      | { sem?: string; year?: string }
-      | null
-      | undefined;
-    const expectedAcademic = calculateCurrentAcademicInfo();
-    const hasAcademicConflict = !userClass ||
-      userClass.sem !== expectedAcademic.current_semester ||
-      userClass.year !== expectedAcademic.current_year;
-
-    // If there is no conflict/change, we can optimize and do the profile sync in the background (non-blocking)
-    if (shouldSync && !hasAcademicConflict && !force) {
-      shouldSync = false;
-    }
 
     return loadExistingUserBundle(
       existingUserRaw,

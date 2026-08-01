@@ -908,7 +908,7 @@ describe("Edge Case & Branch Coverage", () => {
     expect(await res.json()).toEqual({ error: "Failed to update profile" });
   });
 
-  it("backgrounds the profile sync when class sem/year match expected academic settings (no conflict)", async () => {
+  it("performs synchronous profile sync when class sem/year match expected settings but sync=true is requested", async () => {
     const { calculateCurrentAcademicInfo } = await import(
       "@/lib/logic/academic"
     );
@@ -938,7 +938,7 @@ describe("Edge Case & Branch Coverage", () => {
     const res = await GET(req, { params: {} });
 
     expect(res.status).toBe(200);
-    expect(mockPerformProfileSync).not.toHaveBeenCalled();
+    expect(mockPerformProfileSync).toHaveBeenCalledOnce();
   });
 
   it("performs blocking profile sync synchronously when class sem/year do not match expected settings (conflict)", async () => {

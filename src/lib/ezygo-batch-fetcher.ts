@@ -14,7 +14,7 @@ import "server-only";
 import { LRUCache } from "lru-cache";
 import { logger } from "./logger";
 import { ezygoCircuitBreaker, NonBreakerError } from "./circuit-breaker";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import { egressFetch } from "./utils.server";
 
 /**
@@ -180,6 +180,35 @@ function releaseSlot(slotGeneration: number) {
 }
 
 /**
+ * Helper to determine endpoint-specific cache TTLs (in milliseconds)
+ */
+function getTtlForEndpoint(endpoint: string): number {
+  const clean = endpoint.replace(/^\/+/, "");
+
+  // 1. Institution settings & lookup lists (1 hour)
+  if (
+    clean.includes("institution/setting") ||
+    clean.includes("attendancetypes") ||
+    clean.includes("usersubgroups")
+  ) {
+    return 60 * 60 * 1000; // 1 hour
+  }
+
+  // 2. Exam questions (2 hours)
+  if (clean.includes("/examquestions")) {
+    return 2 * 60 * 60 * 1000; // 2 hours
+  }
+
+  // 3. Exam answers / grades (15 minutes)
+  if (clean.includes("/examanswers")) {
+    return 15 * 60 * 1000; // 15 minutes
+  }
+
+  // 4. Default TTL (60 seconds)
+  return 60000;
+}
+
+/**
  * Smart fetch with deduplication and rate limiting
  *
  * @param endpoint - API endpoint path (e.g., '/myprofile')
@@ -226,9 +255,13 @@ export function fetchEzygoData<T>(
     rejectDeferred = reject;
   });
 
-  // Set the deferred promise in cache immediately
-  // This ensures eviction works even if waitForSlot() throws synchronously
-  requestCache.set(cacheKey, deferredPromise);
+  const ttl = getTtlForEndpoint(normalizedEndpoint);
+  const cacheSet = requestCache.set as (
+    key: string,
+    value: Promise<unknown>,
+    options?: { ttl?: number },
+  ) => LRUCache<string, Promise<unknown>>;
+  cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
 
   // Execute the actual request asynchronously
   (async () => {

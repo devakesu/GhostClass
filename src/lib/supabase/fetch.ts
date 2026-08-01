@@ -226,9 +226,9 @@ async function extractBodyOverride(
  * Builds a tiered custom fetch function for Supabase requests.
  *
  * Tier order (only included when the corresponding env var is set):
- *   Tier 1 — CF Worker   (NEXT_PUBLIC_SUPABASE_CF_PROXY_URL)
- *   Tier 2 — AWS Lambda  (NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL)
- *   Tier 3 — Direct      (real supabase.co URL — always present)
+ *   Tier 1 — Direct      (real supabase.co URL — always present)
+ *   Tier 2 — CF Worker   (NEXT_PUBLIC_SUPABASE_CF_PROXY_URL)
+ *   Tier 3 — AWS Lambda  (NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL)
  */
 export function buildSupabaseTieredFetch(
   supabaseOrigin: string,
@@ -267,10 +267,10 @@ export function buildSupabaseTieredFetch(
     if (devBase) tiers.push({ base: devBase, name: "DevProxy" });
     tiers.push({ base: supabaseOrigin, name: "direct" });
   } else {
-    // Production: Use tiered failover (CF -> AWS -> direct)
+    // Production: Direct first, with CF and AWS proxies as failover fallbacks
+    tiers.push({ base: supabaseOrigin, name: "direct" });
     if (cfBase) tiers.push({ base: cfBase, name: "CF" });
     if (awsBase) tiers.push({ base: awsBase, name: "AWS" });
-    tiers.push({ base: supabaseOrigin, name: "direct" });
   }
 
   if (tiers.length === 1) return undefined;

@@ -16,6 +16,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -167,7 +168,10 @@ function useUserSettingsState() {
   // Subscribe to auth state changes to re-fetch settings on login/logout
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (
+        event: unknown,
+        session: { user?: { id?: string | null } | null } | null,
+      ) => {
         const currentUserId = session?.user?.id ?? null;
         const previousUserId = currentUserIdRef.current;
         currentUserIdRef.current = currentUserId;
@@ -376,38 +380,65 @@ function useUserSettingsState() {
   // Public API
   // ---------------------------------------------------------------------------
 
-  const updateBunkCalc = (enabled: boolean) =>
-    mutation.mutate({ bunk_calculator_enabled: enabled });
-  const updateTarget = (percentage: number) =>
-    mutation.mutate({ target_percentage: normalizeTarget(percentage) });
-  const updateDisabledCourses = (map: Record<string, Record<string, string>>) =>
-    mutation.mutate({ disabled_courses: map });
-  const updateCourseTarget = (courseCode: string, target: number) => {
-    const currentTargets = dbSettings?.course_targets || {};
-    const updated = {
-      ...currentTargets,
-      [courseCode]: normalizeTarget(target),
-    };
-    mutation.mutate({ course_targets: updated });
-  };
-  const updateCourseTargets = (map: Record<string, number>) => {
-    const normalizedMap: Record<string, number> = {};
-    Object.entries(map).forEach(([code, val]) => {
-      /* eslint-disable-next-line security/detect-object-injection */
-      normalizedMap[code] = normalizeTarget(val);
-    });
-    mutation.mutate({ course_targets: normalizedMap });
-  };
+  const updateBunkCalc = useCallback(
+    (enabled: boolean) => mutation.mutate({ bunk_calculator_enabled: enabled }),
+    [mutation],
+  );
+  const updateTarget = useCallback(
+    (percentage: number) =>
+      mutation.mutate({ target_percentage: normalizeTarget(percentage) }),
+    [mutation],
+  );
+  const updateDisabledCourses = useCallback(
+    (map: Record<string, Record<string, string>>) =>
+      mutation.mutate({ disabled_courses: map }),
+    [mutation],
+  );
+  const updateCourseTarget = useCallback(
+    (courseCode: string, target: number) => {
+      const currentTargets = dbSettings?.course_targets || {};
+      const updated = {
+        ...currentTargets,
+        [courseCode]: normalizeTarget(target),
+      };
+      mutation.mutate({ course_targets: updated });
+    },
+    [dbSettings?.course_targets, mutation],
+  );
+  const updateCourseTargets = useCallback(
+    (map: Record<string, number>) => {
+      const normalizedMap: Record<string, number> = {};
+      Object.entries(map).forEach(([code, val]) => {
+        /* eslint-disable-next-line security/detect-object-injection */
+        normalizedMap[code] = normalizeTarget(val);
+      });
+      mutation.mutate({ course_targets: normalizedMap });
+    },
+    [mutation],
+  );
 
-  return {
-    settings: dbSettings ?? null,
-    isLoading: isLoading || isFetching,
-    updateBunkCalc,
-    updateTarget,
-    updateDisabledCourses,
-    updateCourseTarget,
-    updateCourseTargets,
-  };
+  const isSettingsLoading = isLoading || isFetching;
+
+  return useMemo(
+    () => ({
+      settings: dbSettings ?? null,
+      isLoading: isSettingsLoading,
+      updateBunkCalc,
+      updateTarget,
+      updateDisabledCourses,
+      updateCourseTarget,
+      updateCourseTargets,
+    }),
+    [
+      dbSettings,
+      isSettingsLoading,
+      updateBunkCalc,
+      updateTarget,
+      updateDisabledCourses,
+      updateCourseTarget,
+      updateCourseTargets,
+    ],
+  );
 }
 
 // ---------------------------------------------------------------------------

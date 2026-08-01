@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 import { OutageProvider } from "@/providers/outage-provider";
-import { Loading as CompLoading } from "@/components/loading";
 
 function ProtectedChrome({ children }: { children: React.ReactNode }) {
   const [isHidden, setIsHidden] = useState(false);
@@ -102,20 +101,9 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isCsrfReady, setIsCsrfReady] = useState(false);
-
   useEffect(() => {
-    let cancelled = false;
-    ensureCSRFToken().finally(() => {
-      if (!cancelled) setIsCsrfReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    void ensureCSRFToken();
   }, []);
-
-  if (!isCsrfReady) return <CompLoading />;
 
   return <ProtectedChrome>{children}</ProtectedChrome>;
 }

@@ -34,12 +34,28 @@ import { _customFetch, getSupabaseConfig } from "./fetch";
  * const { data } = await supabase.from('users').select();
  * ```
  */
-export function createClient() {
-  const { url, key } = getSupabaseConfig("client");
+let clientSingleton: ReturnType<typeof createBrowserClient> | undefined;
 
-  return createBrowserClient(
+export function createClient() {
+  if (typeof window !== "undefined" && clientSingleton) {
+    return clientSingleton;
+  }
+
+  const { url, key } = getSupabaseConfig("client");
+  const client = createBrowserClient(
     url,
     key,
     _customFetch ? { global: { fetch: _customFetch } } : undefined,
   );
+
+  if (typeof window !== "undefined") {
+    clientSingleton = client;
+  }
+
+  return client;
+}
+
+/** Reset browser client singleton instance (for testing only). */
+export function _resetClientSingleton() {
+  clientSingleton = undefined;
 }

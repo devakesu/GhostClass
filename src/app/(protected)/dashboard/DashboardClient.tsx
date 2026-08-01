@@ -353,17 +353,26 @@ async function executeAcademicChange(params: {
 
 function computeInitialDataValidity(
   initialData: InitialDashboardData | undefined,
+  initialProfile: UserProfile | null | undefined,
   selectedSemester: AcademicSemester | null,
   selectedYear: string | null,
-  ezygoSemester: AcademicSemester | undefined,
-  ezygoYear: string | undefined,
   effectiveSemester: AcademicSemester | undefined,
   effectiveYear: string | undefined,
 ): { isInitialDataValid: boolean; isAttendanceStale: boolean } {
   const isInitial = (() => {
     if (selectedSemester !== null || selectedYear !== null) return false;
-    if (ezygoSemester && ezygoSemester !== effectiveSemester) return false;
-    if (ezygoYear && ezygoYear !== effectiveYear) return false;
+    if (!initialProfile) return false;
+
+    const userClass = initialProfile.class as
+      | { sem?: string; year?: string }
+      | null
+      | undefined;
+    const initialSem = userClass?.sem;
+    const initialYear = userClass?.year;
+
+    if (initialSem && initialSem !== effectiveSemester) return false;
+    if (initialYear && initialYear !== effectiveYear) return false;
+
     return true;
   })();
 
@@ -383,6 +392,7 @@ function computeInitialDataValidity(
 
 interface DashboardClientProps {
   initialData?: InitialDashboardData;
+  initialProfile?: UserProfile | null;
   serverError?: string | null;
 }
 
@@ -514,15 +524,22 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
 // eslint-disable-next-line sonarjs/cognitive-complexity -- This component orchestrates multiple guarded async data flows and UI states in one page-level boundary.
 export default function DashboardClient({
   initialData,
+  initialProfile,
   serverError,
 }: DashboardClientProps) {
   const {
     data: rawProfile,
     isLoading: isLoadingProfile,
+    isFetching: isFetchingProfile,
     refetch: refetchProfile,
-  } = useProfile({ sync: true, force: true });
+  } = useProfile({
+    sync: true,
+    force: false,
+    initialData: initialProfile || undefined,
+  });
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
+  const prevIsProfileFetchingRef = useRef(false);
 
   // The force variant uses its own ["profile", "synced"] query key to avoid
   // deduplication with the navbar's no-force fetch. Once the EzyGo sync resolves,
@@ -546,6 +563,19 @@ export default function DashboardClient({
       }
     }
   }, [rawProfile, queryClient]);
+
+  useEffect(() => {
+    if (prevIsProfileFetchingRef.current && !isFetchingProfile) {
+      logger.info(
+        "[Dashboard] Profile sync completed. Invalidating attendance, courses, and class courses to force fresh load.",
+      );
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+    }
+    prevIsProfileFetchingRef.current = isFetchingProfile;
+  }, [isFetchingProfile, queryClient]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
   const setAcademicYearMutation = useSetAcademicYear({
     skipInvalidations: true,
@@ -611,7 +641,19 @@ export default function DashboardClient({
         toast.info("Dashboard Updated", {
           description: "Background sync applied latest attendance changes.",
         });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+        queryClient.invalidateQueries({ queryKey: ["courses"] });
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
+        queryClient.invalidateQueries({ queryKey: ["profile", "synced"] });
       }
+    },
+    onPartialSync: async () => {
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profile", "synced"] });
     },
   });
 
@@ -630,12 +672,9 @@ export default function DashboardClient({
     () =>
       computeInitialDataValidity(
         initialData,
+        initialProfile,
         selectedSemester,
         selectedYear,
-        ezygoSemester === "even" || ezygoSemester === "odd"
-          ? ezygoSemester
-          : undefined,
-        ezygoYear ?? undefined,
         effectiveSemester === "even" || effectiveSemester === "odd"
           ? effectiveSemester
           : undefined,
@@ -643,10 +682,9 @@ export default function DashboardClient({
       ),
     [
       initialData,
+      initialProfile,
       selectedSemester,
       selectedYear,
-      ezygoSemester,
-      ezygoYear,
       effectiveSemester,
       effectiveYear,
     ],
@@ -807,13 +845,8 @@ export default function DashboardClient({
     enabled: isAllCourseDetailsEnabled,
   });
 
-  useEffect(() => {
-    if (syncSettled) {
-      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-    }
-  }, [syncSettled, queryClient]);
+  // Avoid invalidating queries on every mount. Instead, invalidations are triggered
+  // inside useSyncOnMount callbacks only when actual EzyGo updates are detected.
 
   useEffect(() => {
     if (syncSettled && !isFetchingAttendance && !isFetchingAllCourseSummaries) {

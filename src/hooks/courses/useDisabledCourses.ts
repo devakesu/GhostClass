@@ -61,6 +61,8 @@ export interface UseDisabledCoursesReturn {
  * }
  * ```
  */
+const EMPTY_DISABLED_SET = new Set<string>();
+
 export function useDisabledCourses({
   academicYear,
   semester,
@@ -82,9 +84,11 @@ export function useDisabledCourses({
     if (
       !semKey ||
       !Object.prototype.hasOwnProperty.call(disabledCoursesMap, semKey)
-    ) return new Set<string>();
+    ) return EMPTY_DISABLED_SET;
     const semMap = Reflect.get(disabledCoursesMap, semKey) ?? {};
-    return new Set(Object.keys(semMap).map((c) => c.toUpperCase()));
+    const keys = Object.keys(semMap);
+    if (keys.length === 0) return EMPTY_DISABLED_SET;
+    return new Set(keys.map((c) => c.toUpperCase()));
   }, [semKey, disabledCoursesMap]);
 
   const isDisabled = useCallback(
