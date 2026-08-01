@@ -100,7 +100,7 @@ class CircuitBreaker {
     }
   }
 
-  private async getState(): Promise<CircuitState> {
+  private getState(): Promise<CircuitState> {
     return this.getRedisValue('circuit:state', val => val as CircuitState, this.localState);
   }
 
@@ -109,7 +109,7 @@ class CircuitBreaker {
     await this.setRedisValue('circuit:state', state);
   }
 
-  private async getFailures(): Promise<number> {
+  private getFailures(): Promise<number> {
     return this.getRedisValue('circuit:failures', val => parseInt(val, 10), this.localFailures);
   }
 
@@ -128,7 +128,7 @@ class CircuitBreaker {
     }
   }
 
-  private async getLastFailTime(): Promise<number> {
+  private getLastFailTime(): Promise<number> {
     return this.getRedisValue('circuit:last_fail_time', val => parseInt(val, 10), this.localLastFailTime);
   }
 

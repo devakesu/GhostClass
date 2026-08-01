@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getCspHeader } from "./lib/csp";
-import { TERMS_VERSION } from "./app/config/legal";
-import { logger } from "./lib/logger";
-import { isAuthSessionMissingError } from "./lib/security/auth";
-import { decrypt } from "./lib/crypto";
-import { redact } from "./lib/utils.server";
-import { getSupabaseConfig } from "./lib/supabase/fetch";
+import { getCspHeader } from "./lib/csp.ts";
+import { TERMS_VERSION } from "./app/config/legal.ts";
+import { logger } from "./lib/logger.ts";
+import { isAuthSessionMissingError } from "./lib/security/auth.ts";
+import { decrypt } from "./lib/crypto.ts";
+import { redact } from "./lib/utils.server.ts";
+import { getSupabaseConfig } from "./lib/supabase/fetch.ts";
 
 /**
  * Clears all session-related cookies on a redirect response.

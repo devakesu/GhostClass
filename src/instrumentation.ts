@@ -1,4 +1,4 @@
-import { validateEnvironment } from "@/lib/validate-env";
+import { validateEnvironment } from "./lib/validate-env.ts";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -11,11 +11,11 @@ export async function register() {
     if (!isBuildPhase) {
       validateEnvironment();
     }
-    await import("./instrumentation-server");
+    await import("./instrumentation-server.ts");
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {
-    await import("./instrumentation-edge");
+    await import("./instrumentation-edge.ts");
   }
 }
 

@@ -95,5 +95,5 @@ export async function getJwks() {
     }
   })();
 
-  return jwksPromise;
+  return await jwksPromise;
 }

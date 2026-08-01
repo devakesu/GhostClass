@@ -40,8 +40,8 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 let csrfRefreshPromise: Promise<string | null> | null = null;
 
-async function refreshCsrfToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
+function refreshCsrfToken(): Promise<string | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
   if (csrfRefreshPromise) return csrfRefreshPromise;
 
   csrfRefreshPromise = (async () => {
@@ -76,8 +76,8 @@ async function refreshCsrfToken(): Promise<string | null> {
 
 let syncPromise: Promise<boolean> | null = null;
 
-async function syncSession(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
+function syncSession(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
   if (syncPromise) return syncPromise;
 
   syncPromise = (async () => {
@@ -201,7 +201,7 @@ axiosInstance.interceptors.response.use(
     const status = errObj?.response?.status;
     if ((status === 500 || status === 503) && !isOutageDetected) {
       isOutageDetected = true;
-      window.dispatchEvent(new CustomEvent("gc:outage", {
+      globalThis.dispatchEvent(new CustomEvent("gc:outage", {
         detail: {
           messages: ["EzyGo servers are down."],
           details: `Error ${status}: ${errObj?.response?.statusText || ""}`,

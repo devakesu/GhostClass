@@ -3,7 +3,7 @@ import { encrypt, decrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { headers, cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { z } from "zod";
 import { getClientIp, egressFetch } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
@@ -42,7 +42,7 @@ const AUTH_LOCK_TTL = (() => {
   return Math.max(15, Math.min(parsed, 60));
 })();
 
-async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
+function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (isMobileApp || process.env.NODE_ENV === "development") return null;
 
   let allowedHosts: Set<string> | null;
@@ -276,7 +276,7 @@ async function upsertUserData(
 }
 
 async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean): Promise<NextResponse | null> {
-  const originError = await validateOrigin(headerList, isAppCheck);
+  const originError = validateOrigin(headerList, isAppCheck);
   if (originError) {
     const status = originError === "Server configuration error" ? 500 : 403;
     return NextResponse.json({ message: originError }, { status });

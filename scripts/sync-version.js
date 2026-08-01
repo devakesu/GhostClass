@@ -1,9 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const { execFileSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 // 1. Determine running mode and target version
-let isPreCommit = process.argv.includes('--pre-commit');
+const isPreCommit = process.argv.includes('--pre-commit');
 let targetVersion = process.env.NEXT_PUBLIC_APP_VERSION;
 
 if (!targetVersion && !isPreCommit && process.argv[2]) {
@@ -86,7 +86,7 @@ updateFile(pubspecPath, (content) => {
 ['.example.env', '.env', '.env.local'].forEach(file => {
   const filePath = path.join(__dirname, '..', file);
   updateFile(filePath, (content) => {
-    let res = content.replace(
+    const res = content.replace(
       /^(NEXT_PUBLIC_APP_VERSION=)\d+\.\d+\.\d+/gm,
       `$1${targetVersion}`
     );

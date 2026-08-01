@@ -14,24 +14,24 @@ function createRedisClient(): Redis {
   if (process.env.VITEST === 'true') {
     const store = new Map<string, string>();
     const mock: Partial<Redis> = {
-      get: async <TData>(key: string): Promise<TData | null> => {
-        return store.has(key) ? (store.get(key) as unknown as TData) : null;
+      get: <TData>(key: string): Promise<TData | null> => {
+        return Promise.resolve(store.has(key) ? (store.get(key) as unknown as TData) : null);
       },
-      set: async <TData>(key: string, value: TData): Promise<"OK" | TData | null> => {
+      set: <TData>(key: string, value: TData): Promise<"OK" | TData | null> => {
         store.set(key, String(value));
-        return 'OK';
+        return Promise.resolve('OK');
       },
-      incr: async (key: string): Promise<number> => {
+      incr: (key: string): Promise<number> => {
         const cur = parseInt(store.get(key) ?? '0', 10) || 0;
         const next = cur + 1;
         store.set(key, String(next));
-        return next;
+        return Promise.resolve(next);
       },
-      decr: async (key: string): Promise<number> => {
+      decr: (key: string): Promise<number> => {
         const cur = parseInt(store.get(key) ?? '0', 10) || 0;
         const next = Math.max(0, cur - 1);
         store.set(key, String(next));
-        return next;
+        return Promise.resolve(next);
       },
     };
     return mock as unknown as Redis;

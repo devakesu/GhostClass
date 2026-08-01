@@ -4,22 +4,28 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
+/**
  * Helper to retrieve variable from secrets array or process.env.
  * @param {string} key
  * @param {Record<string, string>} envMap
  * @returns {string}
  */
 function getVar(key, envMap) {
-  return envMap[key] || process.env[key] || '';
+  if (envMap && typeof envMap === 'object') {
+    const val = Object.getOwnPropertyDescriptor(envMap, key);
+    if (val && val.value) return val.value;
+  }
+  const envVal = Object.getOwnPropertyDescriptor(process.env, key);
+  if (envVal && envVal.value) return envVal.value;
+  return '';
 }
 
 /**
  * Dynamically generates mobile/lib/firebase_options.dart from Infisical secrets or process.env.
- * @param {Array<{secretKey: string, secretValue: string}>} [secrets=[]]
  * @param {string} [targetFile]
  * @returns {boolean}
  */
-function generateFirebaseOptionsDart(_secrets = [], targetFile) {
+function generateFirebaseOptionsDart(targetFile) {
 
   const dartContent = `// File generated dynamically during build workflow.
 // ignore_for_file: type=lint
@@ -51,7 +57,7 @@ class DefaultFirebaseOptions {
         );
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux.',
+          'DefaultFirebaseOptions are not supported for this platform.',
         );
       default:
         throw UnsupportedError(
@@ -92,6 +98,49 @@ class DefaultFirebaseOptions {
     console.warn(`⚠️ Could not write ${targetPath}:`, err.message);
     return false;
   }
+}
+
+/**
+ * Helper to build Dart configurations object for flutter firebase.json.
+ */
+function buildDartConfigurations(projectId, appIds) {
+  const { androidAppIdDefault, iosAppIdDefault, androidAppIdNexus, iosAppIdNexus, androidAppIdNexusMec, iosAppIdNexusMec } = appIds;
+  const dartConfigurations = {};
+
+  // Standard lib/firebase_options.dart target
+  if (androidAppIdDefault || (!androidAppIdNexus && !androidAppIdNexusMec)) {
+    dartConfigurations['lib/firebase_options.dart'] = {
+      projectId: projectId,
+      configurations: {
+        android: androidAppIdDefault,
+        ios: iosAppIdDefault
+      }
+    };
+  }
+
+  // Flavor target: Nexus
+  if (androidAppIdNexus) {
+    dartConfigurations['lib/firebase_options_nexus.dart'] = {
+      projectId: projectId,
+      configurations: {
+        android: androidAppIdNexus,
+        ios: iosAppIdNexus || androidAppIdNexus
+      }
+    };
+  }
+
+  // Flavor target: Nexus MEC
+  if (androidAppIdNexusMec || (androidAppIdNexus && iosAppIdNexusMec)) {
+    dartConfigurations['lib/firebase_options_nexus_mec.dart'] = {
+      projectId: projectId,
+      configurations: {
+        android: androidAppIdNexusMec || androidAppIdNexus,
+        ios: iosAppIdNexusMec || iosAppIdNexus || androidAppIdNexus
+      }
+    };
+  }
+
+  return dartConfigurations;
 }
 
 /**
@@ -137,40 +186,14 @@ function generateFirebaseJson(secrets = [], targetFile) {
   }
 
   const defaultAndroidAppId = androidAppIdNexus || androidAppIdDefault;
-  const dartConfigurations = {};
-
-  // Standard lib/firebase_options.dart target
-  if (androidAppIdDefault || (!androidAppIdNexus && !androidAppIdNexusMec)) {
-    dartConfigurations['lib/firebase_options.dart'] = {
-      projectId: projectId,
-      configurations: {
-        android: androidAppIdDefault,
-        ios: iosAppIdDefault
-      }
-    };
-  }
-
-  // Flavor target: Nexus
-  if (androidAppIdNexus) {
-    dartConfigurations['lib/firebase_options_nexus.dart'] = {
-      projectId: projectId,
-      configurations: {
-        android: androidAppIdNexus,
-        ios: iosAppIdNexus || androidAppIdNexus
-      }
-    };
-  }
-
-  // Flavor target: Nexus MEC
-  if (androidAppIdNexusMec || (androidAppIdNexus && iosAppIdNexusMec)) {
-    dartConfigurations['lib/firebase_options_nexus_mec.dart'] = {
-      projectId: projectId,
-      configurations: {
-        android: androidAppIdNexusMec || androidAppIdNexus,
-        ios: iosAppIdNexusMec || iosAppIdNexus || androidAppIdNexus
-      }
-    };
-  }
+  const dartConfigurations = buildDartConfigurations(projectId, {
+    androidAppIdDefault,
+    iosAppIdDefault,
+    androidAppIdNexus,
+    iosAppIdNexus,
+    androidAppIdNexusMec,
+    iosAppIdNexusMec
+  });
 
   const firebaseJson = {
     flutter: {
@@ -197,7 +220,7 @@ function generateFirebaseJson(secrets = [], targetFile) {
     console.log(`✓ Dynamically generated ${targetPath}`);
 
     // Also generate firebase_options.dart with dynamic secret values
-    generateFirebaseOptionsDart(secrets);
+    generateFirebaseOptionsDart();
 
     return true;
   } catch (err) {

@@ -49,8 +49,8 @@ if (typeof window !== 'undefined') {
 }
 
 // Mock ResizeObserver
-if (typeof window !== 'undefined' && !window.ResizeObserver) {
-  window.ResizeObserver = class ResizeObserver {
+if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
     observe() {}
     unobserve() {}
     disconnect() {}

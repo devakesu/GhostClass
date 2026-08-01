@@ -496,7 +496,7 @@ async function detectAndSyncClass(
   detectedYear?: string | null;
 }> {
   if (coursesList.length === 0) {
-    return detectClassWithoutCourses(existingUserClassId, currentAcademic);
+    return await detectClassWithoutCourses(existingUserClassId, currentAcademic);
   }
 
   const courseWithGroup = findCourseWithGroup(coursesList);
@@ -512,7 +512,7 @@ async function detectAndSyncClass(
 
       logger.info(`[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${nameRaw}`);
 
-      return syncCohortClass(
+      return await syncCohortClass(
         Number(pcg),
         sem,
         year,

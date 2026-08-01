@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -13,53 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  detect-changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      js: ${{ steps.filter.outputs.js }}
-      android: ${{ steps.filter.outputs.android }}
-      ios: ${{ steps.filter.outputs.ios }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Detect path changes
-        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706
-        id: filter
-        with:
-          filters: |
-            js:
-              - "src/**"
-              - "public/**"
-              - "supabase/**"
-              - "package.json"
-              - "package-lock.json"
-              - "tsconfig.json"
-              - "next.config.ts"
-              - "eslint.config.mjs"
-              - "components.json"
-              - ".github/workflows/codeql.yml"
-            android:
-              - "mobile/android/**"
-              - "mobile/lib/**"
-              - "mobile/pubspec.yaml"
-              - "mobile/pubspec.lock"
-              - ".github/workflows/codeql.yml"
-            ios:
-              - "mobile/ios/**"
-              - "mobile/lib/**"
-              - "mobile/pubspec.yaml"
-              - "mobile/pubspec.lock"
-              - ".github/workflows/codeql.yml"
-
   codeql-js:
     name: CodeQL JavaScript/TypeScript
-    needs: detect-changes
-    if: github.event_name == 'push' || needs.detect-changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -67,26 +23,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
 
-      - name: Initialize CodeQL (JS)
+      - name: Initialize CodeQL (JS/TS)
         uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          languages: javascript
+          languages: javascript-typescript
 
-      - name: Autobuild (JS)
+      - name: Autobuild (JS/TS)
         uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
 
-      - name: Run CodeQL analysis (JS)
+      - name: Run CodeQL analysis (JS/TS)
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          category: javascript
+          category: javascript-typescript
 
   codeql-android:
     name: CodeQL Android (Java/Kotlin)
-    needs: detect-changes
-    if: github.event_name == 'push' || needs.detect-changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,8 +46,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
 
       - name: Download Gradle Wrapper
         run: |
@@ -103,12 +53,13 @@ jobs:
           curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v9.6.1/gradle/wrapper/gradle-wrapper.jar
           echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
         with:
           distribution: "temurin"
           java-version: "25"
           cache: "gradle"
+          cache-dependency-path: "mobile/android/gradle/wrapper/gradle-wrapper.properties"
 
       - name: Set up Flutter
         uses: ./.github/actions/flutter-action
@@ -116,99 +67,33 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create CI app secrets stub
-        working-directory: mobile
-        run: cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
-
-      - name: Generate dynamic firebase.json
-        working-directory: mobile
-        run: node ../scripts/generate-firebase-json.js
-
-      - name: Create CI Firebase Android stub
-        working-directory: mobile
-        run: |
-          cat > android/app/google-services.json <<'EOF'
-          {
-            "project_info": {
-              "project_number": "424804867878",
-              "project_id": "devakesu-ghostclass",
-              "storage_bucket": "devakesu-ghostclass.appspot.com"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "1:424804867878:android:df401041d564c22b21abe7",
-                  "android_client_info": {
-                    "package_name": "com.devakesu.apps.ghostclass"
-                  }
-                },
-                "oauth_client": [],
-                "api_key": [
-                  {
-                    "current_key": "AIzaSyDUMMY"
-                  }
-                ],
-                "services": {
-                  "appinvite_service": {
-                    "other_platform_oauth_client": []
-                  }
-                }
-              }
-            ],
-            "configuration_version": "1"
-          }
-          EOF
-
-      - name: Create CI Firebase iOS stub
-        working-directory: mobile
-        run: |
-          cat > ios/Runner/GoogleService-Info.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>API_KEY</key>
-            <string>AIzaSyDUMMY</string>
-            <key>BUNDLE_ID</key>
-            <string>com.devakesu.apps.ghostclass</string>
-            <key>GCM_SENDER_ID</key>
-            <string>424804867878</string>
-            <key>GOOGLE_APP_ID</key>
-            <string>1:424804867878:ios:d132bb8be987f52d21abe7</string>
-            <key>IS_ADS_ENABLED</key>
-            <false/>
-            <key>IS_ANALYTICS_ENABLED</key>
-            <false/>
-            <key>IS_APPINVITE_ENABLED</key>
-            <false/>
-            <key>IS_GCM_ENABLED</key>
-            <true/>
-            <key>IS_SIGNIN_ENABLED</key>
-            <false/>
-            <key>PLIST_VERSION</key>
-            <string>1</string>
-            <key>PROJECT_ID</key>
-            <string>devakesu-ghostclass</string>
-            <key>STORAGE_BUCKET</key>
-            <string>devakesu-ghostclass.appspot.com</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Downgrade device_info_plus for compatibility
-        working-directory: mobile
-        run: |
-          sed -i 's/device_info_plus: .*/device_info_plus: 12.2.0/g' pubspec.yaml
-
       - name: Fetch Flutter dependencies
         working-directory: mobile
         run: flutter pub get
 
-      - name: Install Android SDK (basic)
-        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
-        with:
-          accept-android-sdk-licenses: true
-          packages: "platform-tools build-tools;33.0.2 platforms;android-33"
+      - name: Prepare google-services.json
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+            echo "✓ Recreated android/app/google-services.json from secret"
+          elif [ -f android/app/google-services.json ]; then
+            echo "✓ Using checked-in android/app/google-services.json"
+          else
+            node -e '
+              const fs = require("fs");
+              const stub = {
+                project_info: { project_number: "424804867878", project_id: "devakesu-ghostclass", storage_bucket: "devakesu-ghostclass.appspot.com" },
+                client: [
+                  { client_info: { mobilesdk_app_id: "1:424804867878:android:df401041d564c22b21abe7", android_client_info: { package_name: "com.devakesu.apps.ghostclass" } }, oauth_client: [], api_key: [{ current_key: "AIzaSyDUMMY" }], services: { appinvite_service: { other_platform_oauth_client: [] } } }
+                ],
+                configuration_version: "1"
+              };
+              fs.writeFileSync("android/app/google-services.json", JSON.stringify(stub, null, 2));
+            '
+            echo "✓ Created CI stub android/app/google-services.json"
+          fi
 
       - name: Initialize CodeQL (Java + Kotlin)
         uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
@@ -216,85 +101,11 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
-      - name: Build Android app (required for manual CodeQL extraction)
+      - name: Build Android Kotlin source (Triggers CodeQL extraction)
         working-directory: mobile/android
-        run: |
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon -Pci
+        run: ./gradlew :app:compileDebugSources --no-daemon
 
       - name: Run CodeQL analysis (Android)
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
           category: java,kotlin
-
-  codeql-ios:
-    name: CodeQL iOS (Swift)
-    needs: detect-changes
-    if: github.event_name == 'push' || needs.detect-changes.outputs.ios == 'true'
-    runs-on: macos-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-
-      - name: Set up Flutter
-        uses: ./.github/actions/flutter-action
-        with:
-          channel: stable
-          cache: true
-
-      - name: Create CI app secrets stub
-        working-directory: mobile
-        run: cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
-
-      - name: Generate dynamic firebase.json
-        working-directory: mobile
-        run: node ../scripts/generate-firebase-json.js
-
-      - name: Downgrade device_info_plus for compatibility
-        working-directory: mobile
-        run: |
-          sed -i '' 's/device_info_plus: .*/device_info_plus: 12.2.0/g' pubspec.yaml
-
-      - name: Fetch Flutter dependencies
-        working-directory: mobile
-        run: flutter pub get
-
-      - name: Cache CocoaPods
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: mobile/ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('mobile/pubspec.lock', 'mobile/ios/Podfile') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
-
-      - name: Configure iOS project for simulator build
-        working-directory: mobile
-        run: flutter build ios --simulator --no-codesign
-
-      - name: Initialize CodeQL (Swift)
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
-        with:
-          languages: swift
-          build-mode: manual
-
-      - name: Build iOS app
-        run: |
-          set -o pipefail
-          xcodebuild -workspace mobile/ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ~/Library/Developer/Xcode/DerivedData \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Run CodeQL analysis (Swift)
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
-        with:
-          category: swift

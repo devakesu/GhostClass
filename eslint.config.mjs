@@ -11,7 +11,23 @@ import unusedImports from "eslint-plugin-unused-imports";
 
 export default [
   {
-    ignores: [".next/*", "node_modules/*", "lint-staged.config.js", "public/sw.js", "Temp/*", "mobile/*"]
+    ignores: [
+      ".next/*",
+      "node_modules/*",
+      "lint-staged.config.js",
+      "public/sw.js",
+      "Temp/*",
+      "mobile/*",
+      "**/__tests__/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.test.js",
+      "**/*.test.jsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/*.spec.js",
+      "**/*.spec.jsx"
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

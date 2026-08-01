@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Buffer } from "buffer";
+import { Buffer } from "node:buffer";
 import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { withSecurity } from "@/lib/security/app-check";
 import {
@@ -57,7 +57,7 @@ function getSanitizedHeaders(headers: Headers) {
   return map;
 }
 
-async function validateOrigin(req: NextRequest, fullPath: string, isPublic: boolean, isMobileApp: boolean) {
+function validateOrigin(req: NextRequest, fullPath: string, isPublic: boolean, isMobileApp: boolean) {
   if (isPublic || isMobileApp || !IS_PRODUCTION) return null;
 
   const allowedHosts = getAllowedHosts();
@@ -105,6 +105,7 @@ interface EgressResult {
   text: string;
   egressName: string;
 }
+
 
 function validateProxyRequestPath(path?: string[]): { fullPath: string; errorResponse: NextResponse | null } {
   if (!BASE_API_URL) {
@@ -356,7 +357,7 @@ async function forward(
   }
 }
 
-export const GET = withSecurity(async (req, { params, authType }) => {
+export const GET = withSecurity((req, { params, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "GET", path, undefined, authType);
 });
@@ -371,22 +372,22 @@ export const POST = withSecurity(async (req, { params, decryptedBody, authType }
   return res;
 }, { consume: true });
 
-export const PUT = withSecurity(async (req, { params, decryptedBody, authType }) => {
+export const PUT = withSecurity((req, { params, decryptedBody, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
 }, { consume: true });
 
-export const PATCH = withSecurity(async (req, { params, decryptedBody, authType }) => {
+export const PATCH = withSecurity((req, { params, decryptedBody, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "PATCH", path, decryptedBody, authType);
 }, { consume: true });
 
-export const DELETE = withSecurity(async (req, { params, authType }) => {
+export const DELETE = withSecurity((req, { params, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "DELETE", path, undefined, authType);
 }, { consume: true });
 
-export const HEAD = withSecurity(async (req, { params, authType }) => {
+export const HEAD = withSecurity((req, { params, authType }) => {
   const { path } = params as { path: string[] };
   return forward(req as NextRequest, "HEAD", path, undefined, authType);
 });

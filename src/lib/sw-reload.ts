@@ -47,11 +47,9 @@ function activateAndRun(
   onReady: () => void
 ): void {
   let done = false;
-  // eslint-disable-next-line prefer-const -- declared before `finish()` which closes over it; cannot use const
-  let activationTimeout: ReturnType<typeof setTimeout> | undefined;
   let controllerChangeHandler: (() => void) | undefined;
 
-  const finish = () => {
+  function finish() {
     if (!done) {
       done = true;
       clearTimeout(activationTimeout);
@@ -67,7 +65,9 @@ function activateAndRun(
       }
       onReady();
     }
-  };
+  }
+
+  const activationTimeout = setTimeout(finish, ACTIVATION_TIMEOUT_MS);
 
   // Primary signal: SW finished claiming the tab.
   // Use a named wrapper so `controllerChangeHandler` can be removed by the
@@ -90,7 +90,6 @@ function activateAndRun(
   });
 
   // Safety net: if neither signal arrives within the timeout, proceed anyway.
-  activationTimeout = setTimeout(finish, ACTIVATION_TIMEOUT_MS);
 
   waitingWorker.postMessage({ type: "SKIP_WAITING" });
 }

@@ -110,7 +110,7 @@ function createEmptyStats(): SyncStats {
   return { processed: 0, deletions: 0, conflicts: 0, updates: 0, errors: 0 };
 }
 
-async function handleAuthentication(req: Request, authType: string): Promise<{ isCron: boolean; errorResponse?: NextResponse }> {
+function handleAuthentication(req: Request, authType: string): { isCron: boolean; errorResponse?: NextResponse } {
   const authHeader = req.headers.get("authorization");
   const isMobile = authType === "app-check";
 
@@ -542,7 +542,7 @@ async function syncUser(
 export const GET = withSecurity(async (req, { authType }) => {
   const supabaseAdmin = getAdminClient();
   
-  const auth = await handleAuthentication(req, authType!);
+  const auth = handleAuthentication(req, authType!);
   if (auth.errorResponse) return auth.errorResponse;
 
   const { searchParams } = new URL(req.url);

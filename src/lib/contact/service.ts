@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
 import { 
   renderContactAdminEmail, 
@@ -77,10 +78,8 @@ const getContactEmail = () => {
  * 4. Transactional Rollback (Delete from DB if emails fail)
  */
 export async function processContactSubmission(
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _supabase: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabaseAdmin: any, // Required for rollback if RLS is strict
+  _supabase: SupabaseClient,
+  supabaseAdmin: SupabaseClient, // Required for rollback if RLS is strict
   payload: z.infer<typeof contactSchema>,
   ctx: ContactContext = {},
 ): Promise<ContactInsertResult> {

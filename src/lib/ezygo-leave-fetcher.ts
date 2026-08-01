@@ -58,7 +58,7 @@ export async function fetchLeaveData(token: string) {
 export async function fetchLeaveAttendanceDetails(token: string, startDate: string, uptoDate: string) {
   // Fail-fast: propagate errors instead of returning null
   // Partial/missing leave data can lead to incorrect leave calculations
-  return fetchEzygoData<unknown>('/attendancereports/student/detailed', token, 'POST', {
+  return await fetchEzygoData<unknown>('/attendancereports/student/detailed', token, 'POST', {
     start_date: startDate,
     upto_date: uptoDate,
     from_student_leave_application: true

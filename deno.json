@@ -1,0 +1,31 @@
+{
+  "lint": {
+    "include": [
+      "src/lib",
+      "src/app/api"
+    ],
+    "exclude": [
+      "**/__tests__/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.test.js",
+      "**/*.test.jsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/*.spec.js",
+      "**/*.spec.jsx",
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/mobile/**",
+      "**/Temp/**",
+      "**/public/sw.js",
+      "**/api/.well-known/jwks.json/__tests__/**"
+    ],
+    "rules": {
+      "exclude": [
+        "no-sloppy-imports",
+        "no-window"
+      ]
+    }
+  }
+}

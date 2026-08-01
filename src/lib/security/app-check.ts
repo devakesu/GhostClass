@@ -222,11 +222,11 @@ async function verifyAuthentication(
   }
 
   if (hasAppCheckToken) {
-    return verifyAppCheckAuth(req, options);
+    return await verifyAppCheckAuth(req, options);
   }
 
   if (csrfToken) {
-    return verifyCsrfAuth(headerList);
+    return await verifyCsrfAuth(headerList);
   }
 
   // State-changing web requests MUST have a CSRF token.
@@ -329,8 +329,7 @@ export function withSecurity<T = unknown>(
   ) => Promise<Response>,
   options: AppCheckOptions = {},
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return async (req: NextRequest, context: any) => {
+  return async (req: NextRequest, context: { params?: unknown } | undefined) => {
     const rawParams = context?.params;
     const resolvedParams = rawParams instanceof Promise ? await rawParams : (rawParams ?? {});
 

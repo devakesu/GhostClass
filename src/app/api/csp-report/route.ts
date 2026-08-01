@@ -80,7 +80,7 @@ function extractLogFields(text: string): Record<string, unknown> {
  * Handle GET requests gracefully.
  * Browsers only POST to this endpoint; GETs are usually manual visits or crawlers.
  */
-export async function GET() {
+export function GET() {
   return NextResponse.json(
     {
       status: "operational",

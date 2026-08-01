@@ -8,10 +8,10 @@
  * Always returns false in SSR / non-browser environments.
  */
 export function isStandalonePWA(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof globalThis.window === "undefined") return false;
   return (
-    (typeof window.matchMedia === "function" &&
-      window.matchMedia("(display-mode: standalone)").matches) ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    (typeof globalThis.matchMedia === "function" &&
+      globalThis.matchMedia("(display-mode: standalone)").matches) ||
+    (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }

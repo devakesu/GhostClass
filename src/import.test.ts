@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect } from 'vitest';
-import ScoresClient from './app/(protected)/scores/ScoresClient';
+import ScoresClient from './app/(protected)/scores/ScoresClient.tsx';
 
 
 
