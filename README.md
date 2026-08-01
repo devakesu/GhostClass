@@ -56,7 +56,7 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 
 ### 🔐 Security & Reliability
 
-- **Zero-Trust Bridge**: Every mobile-to-server and server-to-server request is encrypted with **JWE** (RSA-OAEP + AES-GCM).
+- **Zero-Trust Bridge**: Authenticated mobile-to-server and server-to-server communication with TLS and CSRF protection.
 - **Device Attestation**: App Check with Play Integrity (Android) and DeviceCheck (iOS) prevents bot abuse.
 - **Multi-Device Support**: Stay logged in on multiple devices simultaneously without session conflicts.
 - **Build Transparency**: Full SLSA Level 3 provenance and mobile binary verification.
@@ -101,7 +101,6 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 ### Security & Monitoring
 
 - **AES-256-GCM Encryption** - Secure token storage at rest
-- **JWE (JSON Web Encryption)** - Secure cross-platform payload encryption for mobile-to-server and server-to-server communication
 - **CSRF Protection** - Custom token-based protection for web
 - **App Check / Play Integrity** - Device attestation to prevent bot abuse and tampering on mobile
 - **Upstash Redis** - Rate limiting with `@upstash/ratelimit`
@@ -123,12 +122,12 @@ GhostClass is the ultimate academic survival tool for students who want to manag
 ## 📁 Project Structure
 
 ```text
-mobile/                # Native Flutter application (Riverpod, JWE, SecureStorage)
+mobile/                # Native Flutter application (Riverpod, SecureStorage)
 ├── lib/
 │   ├── logic/         # Core business logic and bunk algorithm parity
 │   ├── providers/     # Riverpod reactive state management handlers
 │   ├── screens/       # Application views and dashboard UI
-│   ├── services/      # Encrypted storage, JWE client, and direct API egress
+│   ├── services/      # Encrypted storage and direct API egress
 │   └── widgets/       # Native UI components (FL Chart, custom layout items)
 src/                   # Next.js web application (React 19, Tailwind 4, TanStack Query)
 ├── app/               # Pages, layouts, and API route handlers
@@ -391,7 +390,7 @@ GhostClass maintains a comprehensive test suite with over **250+ test files** ac
 
 - ✅ **Core Logic**: `npm run test` (Vitest)
 - ✅ **End-to-End**: `npm run test:e2e` (Playwright)
-- ✅ **Security**: AES-256-GCM, JWE, and CSRF isolation tests.
+- ✅ **Security**: AES-256-GCM and CSRF isolation tests.
 
 ### 📱 Mobile Testing (Flutter)
 
@@ -401,7 +400,7 @@ GhostClass maintains a comprehensive test suite with over **250+ test files** ac
 ### 🛡️ Coverage Highlights
 
 - ✅ **Algorithm**: 100% logic coverage for bunk and parity calculations.
-- ✅ **Security**: Verified implementation of JWE, App Check, and RSA-OAEP.
+- ✅ **Security**: Verified implementation of App Check and Device Attestation.
 - ✅ **Performance**: Benchmarked egress proxies and Riverpod cache deduplication.
 - ✅ **UI/UX**: Full interaction testing for dashboard and manual tracking flows.
 
@@ -411,7 +410,6 @@ GhostClass implements multiple layers of security:
 
 - **AES-256-GCM Encryption** - All sensitive tokens and credentials encrypted at rest.
 - **Multi-Device Session Security** - Concurrent logins without session invalidation.
-- **Zero-Trust Bridge Security** - **JWE (JSON Web Encryption)** for mobile-to-server and server-to-server communication.
 - **Device Attestation** - Play Integrity / App Check to ensure genuine device requests.
 - **Secure Storage** - Hardware-backed **SecureStorage** (Android Keystore / iOS Keychain) for mobile.
 

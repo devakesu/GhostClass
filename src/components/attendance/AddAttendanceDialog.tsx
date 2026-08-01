@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import * as Sentry from "@sentry/nextjs";
-import { logger } from "@/lib/logger";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -19,18 +24,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
+import { useProfile } from "@/hooks/users/profile";
 import {
-  BookOpen,
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
-import { toast } from "sonner";
+  getDutyLeaveErrorMessage,
+  getHumanReadableError,
+  isDutyLeaveConstraintError,
+} from "@/lib/error-handling";
+import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/client";
+import {
+  cn,
+  formatSessionName,
+  normalizeCourseCode,
+  normalizeDate,
+  normalizeSession,
+  toRoman,
+} from "@/lib/utils";
+import { optionalReasonSchema } from "@/lib/validation/text";
+import { AttendanceReport, Course, TrackAttendance } from "@/types";
+import * as Sentry from "@sentry/nextjs";
 import {
   addMonths,
   eachDayOfInterval,
@@ -44,29 +59,15 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { cn, normalizeCourseCode } from "@/lib/utils";
-import { optionalReasonSchema } from "@/lib/validation/text";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  formatSessionName,
-  normalizeDate,
-  normalizeSession,
-  toRoman,
-} from "@/lib/utils";
-import {
-  getHumanReadableError,
-  getDutyLeaveErrorMessage,
-  isDutyLeaveConstraintError,
-} from "@/lib/error-handling";
-import { AttendanceReport, Course, TrackAttendance } from "@/types";
-import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
-import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
-import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
-import { useProfile } from "@/hooks/users/profile";
+  BookOpen,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 interface User {
   id: string | number;
@@ -112,20 +113,20 @@ function computeSortedCourses(
   coursesData: { courses: Record<string, Course> } | undefined,
   classCourses: { course_code: string; course_name: string }[] | undefined,
   isDisabled: (code: string) => boolean,
-  getCourseCodeById: (id: string) => string
+  getCourseCodeById: (id: string) => string,
 ) {
   const courses: { key: string; name: string }[] = [];
-  
+
   if (coursesData?.courses) {
     Object.entries(coursesData.courses).forEach(([key, c]) => {
       courses.push({ key, name: c.name });
     });
   }
-  
+
   if (classCourses) {
-    classCourses.forEach(cc => {
+    classCourses.forEach((cc) => {
       const code = normalizeCourseCode(cc.course_code);
-      if (!courses.some(c => normalizeCourseCode(c.key) === code)) {
+      if (!courses.some((c) => normalizeCourseCode(c.key) === code)) {
         courses.push({ key: cc.course_code, name: cc.course_name });
       }
     });
@@ -142,7 +143,10 @@ function computeSortedCourses(
   });
 }
 
-function computeSemesterBounds(selectedSemester?: "odd" | "even", selectedYear?: string) {
+function computeSemesterBounds(
+  selectedSemester?: "odd" | "even",
+  selectedYear?: string,
+) {
   if (!selectedYear || !selectedSemester) {
     return { min: undefined, max: undefined };
   }
@@ -170,7 +174,12 @@ function computeSemesterBounds(selectedSemester?: "odd" | "even", selectedYear?:
   }
 }
 
-function computeAutoSession(open: boolean, attendanceData: AttendanceReport | undefined, trackingData: TrackAttendance[], date: Date) {
+function computeAutoSession(
+  open: boolean,
+  attendanceData: AttendanceReport | undefined,
+  trackingData: TrackAttendance[],
+  date: Date,
+) {
   if (!open || !attendanceData) return "";
   const occupiedSessions = new Set<string>();
   const dateKey = normalizeDate(date);
@@ -181,16 +190,20 @@ function computeAutoSession(open: boolean, attendanceData: AttendanceReport | un
     Object.entries(officialDay).forEach(([key, s], index) => {
       const slot = s as AttendanceSlot;
       if (
-        slot.course == null || slot.course === "null" ||
-        slot.course === 0 || slot.course === "0"
-      ) return;
+        slot.course == null ||
+        slot.course === "null" ||
+        slot.course === 0 ||
+        slot.course === "0"
+      )
+        return;
 
       // eslint-disable-next-line security/detect-object-injection
       let name = attendanceData.sessions?.[key]?.name;
-      if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+      if (!name && slot.session && slot.session !== "null")
+        name = String(slot.session);
       if (!name) {
         const keyInt = parseInt(key);
-        name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+        name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
       }
       if (name) occupiedSessions.add(normalizeSession(name));
     });
@@ -207,10 +220,10 @@ function computeAutoSession(open: boolean, attendanceData: AttendanceReport | un
 }
 
 function computeBestCourse(
-  session: string, 
-  date: Date, 
-  attendanceData: AttendanceReport | undefined, 
-  getCourseCodeById: (id: string) => string
+  session: string,
+  date: Date,
+  attendanceData: AttendanceReport | undefined,
+  getCourseCodeById: (id: string) => string,
 ) {
   if (!session || !attendanceData?.studentAttendanceData) return "";
   const dayOfWeek = date.getDay();
@@ -225,14 +238,21 @@ function computeBestCourse(
       if (new Date(y, m, d).getDay() === dayOfWeek) {
         Object.entries(sessions).forEach(([key, s], index) => {
           const slot = s as AttendanceSlot;
-          if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
+          if (
+            slot.course == null ||
+            slot.course === "null" ||
+            slot.course === 0 ||
+            slot.course === "0"
+          )
+            return;
 
           // eslint-disable-next-line security/detect-object-injection
           let name = attendanceData.sessions?.[key]?.name;
-          if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+          if (!name && slot.session && slot.session !== "null")
+            name = String(slot.session);
           if (!name) {
             const keyInt = parseInt(key);
-            name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+            name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
           }
           if (name && normalizeSession(name) === target) {
             const cid = getCourseCodeById(String(slot.course));
@@ -247,16 +267,19 @@ function computeBestCourse(
   let best = "";
   let max = 0;
   Object.entries(frequencyMap).forEach(([cid, count]) => {
-    if (count > max) { max = count; best = cid; }
+    if (count > max) {
+      max = count;
+      best = cid;
+    }
   });
   return best;
 }
 
 function checkIfSessionBlocked(
-  session: string, 
-  date: Date, 
-  attendanceData: AttendanceReport | undefined, 
-  trackingData: TrackAttendance[]
+  session: string,
+  date: Date,
+  attendanceData: AttendanceReport | undefined,
+  trackingData: TrackAttendance[],
 ) {
   if (!session) return false;
 
@@ -271,7 +294,9 @@ function checkIfSessionBlocked(
       const slot = s as AttendanceSlot;
 
       if (
-        slot.course == null || slot.course === "null" || slot.course === 0 ||
+        slot.course == null ||
+        slot.course === "null" ||
+        slot.course === 0 ||
         slot.course === "0"
       ) {
         return false;
@@ -286,9 +311,7 @@ function checkIfSessionBlocked(
 
       if (!effectiveName) {
         const keyInt = parseInt(key);
-        effectiveName = (!isNaN(keyInt) && keyInt < 20)
-          ? key
-          : String(index + 1);
+        effectiveName = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
       }
 
       if (effectiveName && normalizeSession(effectiveName) === targetSession) {
@@ -301,7 +324,8 @@ function checkIfSessionBlocked(
   if (!isBlocked && trackingData) {
     const targetDbDate = normalizeDate(date);
     isBlocked = trackingData.some((t) => {
-      const isMatch = normalizeDate(t.date) === targetDbDate &&
+      const isMatch =
+        normalizeDate(t.date) === targetDbDate &&
         normalizeSession(t.session) === targetSession;
       return isMatch;
     });
@@ -376,7 +400,12 @@ export function AddAttendanceDialog({
   });
 
   const sortedCourses = useMemo(() => {
-    return computeSortedCourses(coursesData, classCourses, isDisabled, getCourseCodeById);
+    return computeSortedCourses(
+      coursesData,
+      classCourses,
+      isDisabled,
+      getCourseCodeById,
+    );
   }, [coursesData, classCourses, isDisabled, getCourseCodeById]);
 
   // 1. CALCULATE SEMESTER BOUNDS
@@ -407,7 +436,7 @@ export function AddAttendanceDialog({
         setStatusType("Present");
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, semesterBounds.min, semesterBounds.max]);
 
   // --- 3. SMART DEFAULTS (Occupancy Check) ---
@@ -422,7 +451,7 @@ export function AddAttendanceDialog({
         setSession(autoSession);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, getDateKey(date), attendanceData, autoSession]);
 
   // --- 4. PREFILL COURSE ---
@@ -438,9 +467,8 @@ export function AddAttendanceDialog({
         else if (sortedCourses.length > 0) setCourseId(sortedCourses[0].key);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, date.getDay(), session, bestCourse, sortedCourses]);
-
 
   // --- 5. VALIDATION (Is Session Blocked?) ---
   const isSessionBlocked = useMemo(() => {
@@ -464,7 +492,9 @@ export function AddAttendanceDialog({
       if (statusType === "Duty Leave") attCode = 225;
 
       const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
 
       if (!authUser) {
         toast.error("You must be logged in");
@@ -480,19 +510,17 @@ export function AddAttendanceDialog({
 
       const finalRemarks = optionalReasonSchema.parse(remarks);
 
-      const { error } = await supabase
-        .from("tracker")
-        .insert({
-          auth_user_id: authUser.id,
-          course: courseIdToSave,
-          date: format(date, "yyyy-MM-dd"),
-          session: toRoman(session),
-          semester: selectedSemester,
-          year: selectedYear,
-          status: "extra",
-          attendance: attCode,
-          remarks: finalRemarks,
-        });
+      const { error } = await supabase.from("tracker").insert({
+        auth_user_id: authUser.id,
+        course: courseIdToSave,
+        date: format(date, "yyyy-MM-dd"),
+        session: toRoman(session),
+        semester: selectedSemester,
+        year: selectedYear,
+        status: "extra",
+        attendance: attCode,
+        remarks: finalRemarks,
+      });
 
       if (error) {
         if (isDutyLeaveConstraintError(error)) {
@@ -564,9 +592,10 @@ export function AddAttendanceDialog({
                     className={cn(
                       "w-full justify-start text-left font-normal bg-accent/20 border-border/50 hover:bg-accent/30",
                     )}
-                    aria-label={`Selected date: ${
-                      format(date, "MMMM d, yyyy")
-                    }. Click to change date`}
+                    aria-label={`Selected date: ${format(
+                      date,
+                      "MMMM d, yyyy",
+                    )}. Click to change date`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                     {format(date, "PPP")}
@@ -586,7 +615,8 @@ export function AddAttendanceDialog({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() =>
-                            setCurrentMonth(subMonths(currentMonth, 1))}
+                            setCurrentMonth(subMonths(currentMonth, 1))
+                          }
                           aria-label="Previous month"
                         >
                           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -599,7 +629,8 @@ export function AddAttendanceDialog({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() =>
-                            setCurrentMonth(addMonths(currentMonth, 1))}
+                            setCurrentMonth(addMonths(currentMonth, 1))
+                          }
                           aria-label="Next month"
                         >
                           <ChevronRight
@@ -611,16 +642,16 @@ export function AddAttendanceDialog({
 
                       {/* Days Header */}
                       <div className="grid grid-cols-7 text-center mb-1">
-                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((
-                          dayLabel,
-                        ) => (
-                          <div
-                            key={dayLabel}
-                            className="text-[0.8rem] text-muted-foreground font-medium py-1"
-                          >
-                            {dayLabel}
-                          </div>
-                        ))}
+                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(
+                          (dayLabel) => (
+                            <div
+                              key={dayLabel}
+                              className="text-[0.8rem] text-muted-foreground font-medium py-1"
+                            >
+                              {dayLabel}
+                            </div>
+                          ),
+                        )}
                       </div>
 
                       {/* Days Grid */}
@@ -635,7 +666,8 @@ export function AddAttendanceDialog({
                           // CHECK IF DATE IS VALID
                           let isDisabled = false;
                           if (semesterBounds.min && semesterBounds.max) {
-                            isDisabled = isBefore(day, semesterBounds.min) ||
+                            isDisabled =
+                              isBefore(day, semesterBounds.min) ||
                               isAfter(day, semesterBounds.max);
                           }
 
@@ -661,9 +693,13 @@ export function AddAttendanceDialog({
                                     "hover:bg-accent hover:text-foreground cursor-pointer",
                                   isSelected &&
                                     "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm scale-105 font-medium",
-                                  !isSelected && isTodayDate && !isDisabled &&
+                                  !isSelected &&
+                                    isTodayDate &&
+                                    !isDisabled &&
                                     "bg-accent/50 text-accent-foreground font-medium border border-border/50",
-                                  !isSelected && !isTodayDate && !isDisabled &&
+                                  !isSelected &&
+                                    !isTodayDate &&
+                                    !isDisabled &&
                                     "text-foreground",
                                   isDisabled &&
                                     "text-muted-foreground/30 cursor-not-allowed pointer-events-none",
@@ -751,11 +787,17 @@ export function AddAttendanceDialog({
                         courseId ? "text-primary" : "text-muted-foreground",
                       )}
                     />
-                    <SelectValue placeholder={!profile?.class?.id || sortedCourses.length === 0 ? "No courses available" : "Select Subject"} />
+                    <SelectValue
+                      placeholder={
+                        !profile?.class?.id || sortedCourses.length === 0
+                          ? "No courses available"
+                          : "Select Subject"
+                      }
+                    />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
-                  {sortedCourses.map((c: { key: string; name: string; }) => {
+                  {sortedCourses.map((c: { key: string; name: string }) => {
                     const code = getCourseCodeById(c.key);
                     const isCourseDisabled = isDisabled(code);
                     return (
@@ -845,12 +887,15 @@ export function AddAttendanceDialog({
                 id="remarks-dialog"
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                placeholder={statusType === "Duty Leave"
-                  ? "Required for Duty Leave"
-                  : "Optional notes"}
+                placeholder={
+                  statusType === "Duty Leave"
+                    ? "Required for Duty Leave"
+                    : "Optional notes"
+                }
                 className={cn(
                   "bg-accent/20 border-border/50",
-                  statusType === "Duty Leave" && remarks.length === 0 &&
+                  statusType === "Duty Leave" &&
+                    remarks.length === 0 &&
                     "border-red-500/50 focus-visible:ring-red-500",
                 )}
                 required={statusType === "Duty Leave"}
@@ -876,30 +921,35 @@ export function AddAttendanceDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !courseId || !session || isSessionBlocked ||
-              (statusType === "Duty Leave" && remarks.trim().length === 0)}
+            disabled={
+              isSubmitting ||
+              !courseId ||
+              !session ||
+              isSessionBlocked ||
+              (statusType === "Duty Leave" && remarks.trim().length === 0)
+            }
             className={cn(
-              "custom-button transition-colors min-w-[120px]",
+              "custom-button transition-colors min-w-30",
               statusType === "Present" &&
                 "bg-green-600! hover:bg-green-700! text-white! border-none!",
               statusType === "Absent" &&
                 "bg-red-600! hover:bg-red-700! text-white! border-none!",
               statusType === "Duty Leave" &&
                 "bg-yellow-600! hover:bg-yellow-700! text-white! border-none!",
-              "disabled:opacity-100 disabled:!bg-muted disabled:!text-muted-foreground disabled:border-border/70",
+              "disabled:opacity-100 disabled:bg-muted! disabled:text-muted-foreground! disabled:border-border/70",
             )}
           >
-            {isSubmitting
-              ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Saving
-                </>
-              )
-              : "Save Record"}
+            {isSubmitting ? (
+              <>
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+                Saving
+              </>
+            ) : (
+              "Save Record"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

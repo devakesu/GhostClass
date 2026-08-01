@@ -5,19 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/dio_service.dart';
-import 'package:ghostclass/services/jwe_interceptor.dart';
-import 'package:ghostclass/services/jwe_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAppCheck extends Mock implements FirebaseAppCheck {}
-
-class MockJweService extends Mock implements JweService {}
 
 class MockHttpClientAdapter extends Mock implements HttpClientAdapter {}
 
 void main() {
   late MockFirebaseAppCheck mockAppCheck;
-  late MockJweService mockJweService;
   late MockHttpClientAdapter mockAdapter;
   late ProviderContainer container;
   late DioService dioService;
@@ -28,19 +23,11 @@ void main() {
 
   setUp(() {
     mockAppCheck = MockFirebaseAppCheck();
-    mockJweService = MockJweService();
     mockAdapter = MockHttpClientAdapter();
-
-    when(
-      () => mockJweService.encryptHeaderKey(),
-    ).thenAnswer((_) async => (jwe: 'mock-key', rcek: 'mock-rcek'));
 
     container = ProviderContainer(
       overrides: [
         appCheckProvider.overrideWithValue(mockAppCheck),
-        jweInterceptorProvider.overrideWithValue(
-          JweInterceptor(mockJweService),
-        ),
       ],
     );
     dioService = container.read(dioServiceProvider);

@@ -4,7 +4,6 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
-import 'package:ghostclass/services/jwe_interceptor.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:sentry_dio/sentry_dio.dart';
@@ -13,7 +12,7 @@ import 'package:sentry_dio/sentry_dio.dart';
 /// ----------
 /// Centralized network client for the application.
 ///
-/// Configures interceptors for JWE, Sentry, and authentication headers.
+/// Configures interceptors for Sentry and authentication headers.
 class DioService {
   DioService(this._ref) {
     const timeout = kDebugMode ? Duration(seconds: 45) : Duration(seconds: 30);
@@ -28,9 +27,6 @@ class DioService {
     );
 
     dio.addSentry();
-
-    // Attach JWE Layer first
-    dio.interceptors.add(_ref.read(jweInterceptorProvider));
 
     // Auth & Security Interceptor
     dio.interceptors.add(
@@ -296,8 +292,4 @@ final dioServiceProvider = Provider<DioService>(DioService.new);
 
 final appCheckProvider = Provider<FirebaseAppCheck>(
   (ref) => FirebaseAppCheck.instance,
-);
-
-final jweInterceptorProvider = Provider<JweInterceptor>(
-  (ref) => JweInterceptor(),
 );

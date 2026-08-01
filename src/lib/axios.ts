@@ -1,14 +1,9 @@
 // Axios instance with base URL and auth token
 // src/lib/axios.ts
 
-import axios, { InternalAxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import { CSRF_HEADER } from "@/lib/security/csrf-constants";
 import { logger } from "@/lib/logger";
-import { encryptRequest, encryptHeader, decryptResponse } from "@/lib/security/jwe-client";
-
-interface JweAxiosConfig extends InternalAxiosRequestConfig {
-  _jweCek?: Uint8Array;
-}
 
 const axiosInstance = axios.create({
   baseURL: "/api/backend/",
@@ -142,15 +137,6 @@ let isOutageDetected = false;
 export const isGlobalOutageDetected = () => isOutageDetected;
 export const resetOutageDetection = () => { isOutageDetected = false; };
 
-async function handleJweDecryption(response: AxiosResponse) {
-  const contentType = String(response.headers["content-type"] || "");
-  const config = response.config as JweAxiosConfig;
-  if (contentType.includes("application/jose") && config._jweCek) {
-    response.data = await decryptResponse(response.data, config._jweCek);
-  }
-  return response;
-}
-
 async function handleCsrfRetry(error: unknown) {
   const errObj = error as { config?: RetryableRequestConfig; response?: { status?: number; data?: Record<string, unknown> } } | undefined;
   if (!errObj || !errObj.config) return null;
@@ -187,7 +173,7 @@ async function handleAuthRetry(error: unknown) {
 }
 
 axiosInstance.interceptors.response.use(
-  (res) => handleJweDecryption(res),
+  (res) => res,
   async (err: unknown) => {
     if (typeof window === "undefined") return Promise.reject(err);
     
@@ -222,26 +208,6 @@ if (typeof document !== "undefined") {
   });
 }
 
-async function encryptRequestPayload(config: JweAxiosConfig, method: string) {
-  if (["post", "put", "patch"].includes(method) && config.data) {
-    if (!(typeof config.data === "string" && config.data.split(".").length === 5)) {
-      try {
-        const { jwe, cek } = await encryptRequest(config.data);
-        config.data = jwe;
-        config._jweCek = cek;
-        config.headers.set("Content-Type", "application/jose");
-      } catch (error) {
-        logger.error("[axios] JWE request encryption failed", error);
-        throw error;
-      }
-    }
-  } else if (method === "get") {
-    const { jwe, cek } = await encryptHeader();
-    config.headers.set("X-JWE-Key", jwe);
-    config._jweCek = cek;
-  }
-}
-
 function isInternalRequest(url: string): boolean {
   try {
     const parsed = new URL(url, window.location.origin);
@@ -253,29 +219,24 @@ function isInternalRequest(url: string): boolean {
 }
 
 function isPublicRequest(url: string): boolean {
-  return url.includes("/api/csrf") || url.includes("/api/.well-known/jwks.json");
+  return url.includes("/api/csrf");
 }
 
-async function applyInternalRequestSecurity(config: JweAxiosConfig) {
+async function applyInternalRequestSecurity(config: InternalAxiosRequestConfig) {
   let token = getCsrfToken();
   if (!token) {
     token = await refreshCsrfToken();
   }
 
   if (token) config.headers.set(CSRF_HEADER, token);
-
-  await encryptRequestPayload(config, config.method?.toLowerCase() || "");
-  config.headers.set("Accept", "application/jose, application/json");
+  config.headers.set("Accept", "application/json");
 }
 
-axiosInstance.interceptors.request.use(async (config: JweAxiosConfig) => {
+axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   if (isOutageDetected) return Promise.reject(new Error("Active service outage"));
   if (typeof window === "undefined") return config;
 
   const url = config.url || "";
-  // H-5: Use URL parsing for internal detection instead of string heuristics.
-  // The previous check misclassified proxy paths containing "ezygo.app" as
-  // external, causing them to skip CSRF/JWE headers.
   const isInternal = isInternalRequest(url);
   if (isInternal && !isPublicRequest(url)) {
     await applyInternalRequestSecurity(config);

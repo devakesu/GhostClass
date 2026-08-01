@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +41,7 @@ import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/screens/splash_screen.dart';
 import 'package:ghostclass/screens/static_screen.dart';
 import 'package:ghostclass/screens/tracking_screen.dart';
+import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/about/about_widgets.dart';
@@ -79,10 +81,13 @@ import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_record_card.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'coverage_helper.dart';
+
+class MockFirebaseAppCheck extends Mock implements FirebaseAppCheck {}
 
 void main() {
   setUpAll(() async {
@@ -115,6 +120,7 @@ void main() {
   final mockLeave = createMockLeaveState();
 
   final overrides = [
+    appCheckProvider.overrideWithValue(MockFirebaseAppCheck()),
     dashboardProvider.overrideWith(() => MockDashboardNotifier(mockDashboard)),
     authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
     trackingProvider.overrideWith(() => MockTrackingNotifier(mockTracking)),

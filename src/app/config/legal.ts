@@ -37,7 +37,6 @@ To provide the GhostClass service, we collect and process specific categories of
 **2. Security & Encryption Standards**
 We employ industry-standard security measures to protect your data:
 * **AES-256 Encryption:** All sensitive tokens are encrypted using **AES-256** before being written to our database.
-* **JWE (Mobile App):** Mobile API payloads and responses are wrapped using JSON Web Encryption.
 * **Secure Device Storage:** Sensitive mobile tokens are stored in OS-provided secure storage (Keychain/Keystore).
 * **In-Memory Processing:** Decryption of credentials occurs only in ephemeral server memory (RAM) for the duration of the API request and is never written to disk logs.
 * **HTTPS/TLS:** All data transmission occurs over secure, encrypted channels.

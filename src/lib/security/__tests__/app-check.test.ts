@@ -3,7 +3,6 @@ import { verifyAppCheckToken, withSecurity } from '../app-check';
 import { getAppCheck } from '@/lib/firebase/admin';
 import { headers, cookies } from 'next/headers';
 import { validateCsrfToken } from '@/lib/security/csrf';
-import { decryptRequest, encryptResponse } from '@/lib/security/jwe';
 import { getClientIp } from '@/lib/utils.server';
 
 // Create a stable mock result that we can control
@@ -40,11 +39,6 @@ vi.mock('@/lib/redis', () => ({
     redis: {
         get: vi.fn(),
     },
-}));
-
-vi.mock('@/lib/security/jwe', () => ({
-    decryptRequest: vi.fn(),
-    encryptResponse: vi.fn(),
 }));
 
 vi.mock('@/lib/utils.server', () => ({
@@ -225,30 +219,6 @@ describe('app-check logic', () => {
 
         expect(res.status).toBe(200);
         expect(await res.text()).toBe('ok');
-    });
-  });
-
-  describe('JWE Response Encryption', () => {
-    it('encrypts response for mobile requests when rcek is present', async () => {
-        const h = new Headers({
-            'X-Firebase-AppCheck': 'valid-token',
-            'X-JWE-Key': 'cek-jwe'
-        });
-        vi.mocked(headers).mockResolvedValue(h);
-        const mockAppCheck = { verifyToken: vi.fn().mockResolvedValue({ appId: 'android-id' }) };
-        vi.mocked(getAppCheck).mockReturnValue(mockAppCheck as any);
-        
-        vi.mocked(decryptRequest).mockResolvedValue({ rcek: 'response-cek' });
-        vi.mocked(encryptResponse).mockResolvedValue('encrypted-blob');
-
-        const handler = vi.fn().mockResolvedValue(new Response('{"data":"secret"}'));
-        const wrapped = withSecurity(handler);
-        const req = new Request('https://test.com', { headers: h });
-        const res = await wrapped(req as any, { params: {} });
-
-        expect(res.status).toBe(200);
-        expect(res.headers.get('Content-Type')).toBe('application/jose');
-        expect(await res.text()).toBe('encrypted-blob');
     });
   });
 

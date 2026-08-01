@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axiosInstance, { getCookie, getCsrfToken, setCsrfToken } from '../axios';
 import { logger } from '@/lib/logger';
-import { encryptRequest, encryptHeader, decryptResponse } from '@/lib/security/jwe-client';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -14,12 +13,6 @@ vi.mock('@/lib/logger', () => ({
     error: vi.fn(),
     info: vi.fn(),
   },
-}));
-
-vi.mock('@/lib/security/jwe-client', () => ({
-  encryptRequest: vi.fn().mockResolvedValue({ jwe: 'mocked-jwe-body', cek: new Uint8Array([1, 2, 3]) }),
-  encryptHeader: vi.fn().mockResolvedValue({ jwe: 'mocked-jwe-header', cek: new Uint8Array([4, 5, 6]) }),
-  decryptResponse: vi.fn().mockResolvedValue({ decrypted: 'data' }),
 }));
 
 vi.mock('@/lib/security/auth', () => ({
@@ -150,58 +143,9 @@ describe('axios lib', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
       expect(resultConfig.headers.get('x-csrf-token')).toBe('c'.repeat(64));
     });
-
-    it('encrypts POST request body (JWE)', async () => {
-      const config = { 
-        url: '/api/mutation', 
-        method: 'post', 
-        data: { foo: 'bar' },
-        headers: new Map() 
-      } as any;
-      
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
-      const resultConfig = await interceptor(config);
-      
-      expect(encryptRequest).toHaveBeenCalledWith({ foo: 'bar' });
-      expect(resultConfig.data).toBe('mocked-jwe-body');
-      expect((resultConfig as any)._jweCek).toEqual(new Uint8Array([1, 2, 3]));
-      expect(resultConfig.headers.get('Content-Type')).toBe('application/jose');
-    });
-
-    it('encrypts GET request header (JWE)', async () => {
-      const config = { 
-        url: '/api/data', 
-        method: 'get', 
-        headers: new Map() 
-      } as any;
-      
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
-      const resultConfig = await interceptor(config);
-      
-      expect(encryptHeader).toHaveBeenCalled();
-      expect(resultConfig.headers.get('X-JWE-Key')).toBe('mocked-jwe-header');
-      expect((resultConfig as any)._jweCek).toEqual(new Uint8Array([4, 5, 6]));
-    });
   });
 
   describe('Response Interceptor', () => {
-    it('decrypts application/jose response', async () => {
-      const response = {
-        headers: { 'content-type': 'application/jose' },
-        data: 'encrypted-data',
-        config: { _jweCek: new Uint8Array([1, 2, 3]) }
-      } as any;
-      
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.response.handlers[0].fulfilled;
-      const result = await interceptor(response);
-      
-      expect(decryptResponse).toHaveBeenCalledWith('encrypted-data', expect.any(Uint8Array));
-      expect(result.data).toEqual({ decrypted: 'data' });
-    });
-
     it('handles 403 CSRF error by refreshing token and retrying', async () => {
       const error = {
         config: { url: '/api/test', _csrfRetried: false, headers: new Map() },
@@ -273,24 +217,6 @@ describe('axios lib', () => {
       }
       
       expect(handleLogout).toHaveBeenCalled();
-    });
-  });
-
-  describe('Encryption Errors', () => {
-    it('logs error if JWE encryption fails', async () => {
-      const config = { 
-        url: '/api/mutation', 
-        method: 'post', 
-        data: { foo: 'bar' },
-        headers: new Map() 
-      } as any;
-      
-      vi.mocked(encryptRequest).mockRejectedValueOnce(new Error('Cipher error'));
-
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
-      await expect(interceptor(config)).rejects.toThrow('Cipher error');
-      expect(logger.error).toHaveBeenCalledWith('[axios] JWE request encryption failed', expect.any(Error));
     });
   });
 });

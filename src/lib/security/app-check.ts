@@ -2,7 +2,6 @@ import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
-import { decryptRequest, encryptResponse } from "@/lib/security/jwe";
 import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
@@ -272,52 +271,6 @@ async function handleRateLimit(req: NextRequest, clientIp: string | null) {
   }
 }
 
-async function handleDecryption<T>(req: NextRequest): Promise<{ decryptedBody?: T; responseCek: string | null; error?: Response }> {
-  const contentType = (req.headers.get("content-type") || "").toLowerCase();
-  const jweKeyHeader = req.headers.get("X-JWE-Key");
-  let decryptedBody: T | undefined;
-  let responseCek: string | null = null;
-
-  try {
-    if (contentType.includes("application/jose") && ["POST", "PUT", "PATCH"].includes(req.method.toUpperCase())) {
-      const jwe = await req.text();
-      if (!jwe || jwe.split(".").length !== 5) return { responseCek: null, error: NextResponse.json({ error: "Invalid secure payload" }, { status: 400 }) };
-      const decrypted = (await decryptRequest(jwe)) as Record<string, unknown> | undefined;
-      if (decrypted && typeof decrypted === "object") {
-        decryptedBody = (decrypted.payload ?? decrypted) as T;
-        const payloadObj = decrypted.payload as Record<string, unknown> | undefined;
-        responseCek = (decrypted.rcek as string | undefined) ?? (payloadObj?.rcek as string | undefined) ?? null;
-      }
-    } else if (jweKeyHeader) {
-      const decrypted = (await decryptRequest(jweKeyHeader)) as Record<string, unknown> | undefined;
-      if (decrypted && typeof decrypted === "object") {
-        const payloadObj = decrypted.payload as Record<string, unknown> | undefined;
-        responseCek = (decrypted.rcek as string | undefined) ?? (payloadObj?.rcek as string | undefined) ?? null;
-      }
-    }
-    return { decryptedBody, responseCek };
-  } catch (e) {
-    logger.error("JWE Decryption error", e);
-    return { responseCek: null, error: NextResponse.json({ error: "Security Handshake Failed" }, { status: 400 }) };
-  }
-}
-
-async function handleEncryption(response: Response, responseCek: string | null) {
-  if (!responseCek || !response.ok) return response;
-  try {
-    const text = await response.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = text; }
-    const encrypted = await encryptResponse(data, responseCek);
-    const headers = new Headers(response.headers);
-    headers.set("Content-Type", "application/jose");
-    return new Response(encrypted, { status: response.status, headers });
-  } catch (e) {
-    logger.error("Encryption failure", e);
-    return NextResponse.json({ error: "Secure Transmission Failed" }, { status: 500 });
-  }
-}
-
 export function withSecurity<T = unknown>(
   handler: (
     req: NextRequest,
@@ -349,15 +302,17 @@ export function withSecurity<T = unknown>(
       }, { status: authRes.authType === "csrf" ? 403 : 401 });
     }
 
-    const { decryptedBody, responseCek, error: decErr } = await handleDecryption<T>(req);
-    if (decErr) return decErr;
-
-    const response = await handler(req, { ...context, params: resolvedParams as Record<string, string | string[]>, decryptedBody, authType: authRes.authType });
+    const response = await handler(req, {
+      ...context,
+      params: resolvedParams as Record<string, string | string[]>,
+      decryptedBody: (context as { decryptedBody?: T } | undefined)?.decryptedBody,
+      authType: authRes.authType,
+    });
     if (!response) {
       Sentry.captureException(new Error("Handler no response"));
       return NextResponse.json({ error: "Internal security error" }, { status: 500 });
     }
 
-    return handleEncryption(response, responseCek);
+    return response;
   };
 }

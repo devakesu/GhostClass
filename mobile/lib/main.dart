@@ -12,7 +12,6 @@ import 'package:ghostclass/logic/security_initializer.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/analytics_service.dart';
-import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
@@ -126,9 +125,6 @@ void main() async {
   );
 
   await ThemeNotifier.preload();
-
-  // Eagerly pre-warm cryptographic services concurrently while other SDKs/Fonts initialize
-  AppLogger.safeUnawait(JweService.instance.preWarm(), 'JWE pre-warm');
 
   // Defer font pre-warm so UI can render faster
   AppLogger.safeUnawait(

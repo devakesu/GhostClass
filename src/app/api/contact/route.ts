@@ -15,13 +15,15 @@ export const dynamic = "force-dynamic";
 
 /**
  * Unified API for contact form submissions.
- * Optimized for Mobile App usage (Flutter) with Zero-Trust security (JWE + App Check).
- * Now triggers the same email notification and confirmation flow as the web app.
- *
- * Security layers:
+ * Optimized for Mobile App usage (Flutter) with Zero-Trust security (App Check).
+ * 
+ * Flow:
+ * - App Check for mobile callers (via withSecurity)
+ * - Rate limited via withSecurity
+ * - Turnstile CAPTCHA optional check for web callers
+ * - Server-side validation using Zod
  * - Rate limiting (per-IP via contactRateLimiter)
  * - CSRF validation for non-mobile (web) callers
- * - App Check + JWE for mobile callers (via withSecurity)
  */
 export const POST = withSecurity(async (req, { decryptedBody }) => {
   const request = req as NextRequest;
@@ -55,7 +57,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     );
   }
 
-  // 2. Resolve Payload (JWE or JSON)
+  // 2. Resolve Payload (JSON)
   let body = decryptedBody;
   if (!body) {
     try {

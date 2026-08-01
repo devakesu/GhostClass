@@ -21,7 +21,6 @@ import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
-import 'package:ghostclass/services/jwe_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
@@ -139,26 +138,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
-      Object? jweError;
-      StackTrace? jweStack;
-
-      final jweTask = JweService.instance
-          .preWarm()
-          .then((_) {
-            AppLogger.i('SplashScreen: jweTask completed');
-          })
-          .catchError((Object e, StackTrace st) {
-            AppLogger.e('SplashScreen: jweTask failed', e, st);
-            jweError = e;
-            jweStack = st;
-          });
-
       api.clearCaches();
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
       await Future.wait<dynamic>([
         integrityTask,
         authTask,
-        jweTask,
       ]);
       AppLogger.i('SplashScreen: Future.wait completed');
 
@@ -170,9 +154,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
       if (authError != null) {
         Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
-      }
-      if (jweError != null) {
-        Error.throwWithStackTrace(jweError!, jweStack ?? StackTrace.current);
       }
 
       return _StartupSnapshot(user: user, versionResult: versionResult);
@@ -256,14 +237,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   void _startPostNavigationPreloads({
     required ApiService apiService,
   }) {
-    AppLogger.safeUnawait(
-      JweService.instance.preWarm().catchError(
-        (Object e, StackTrace st) =>
-            AppLogger.e('SplashScreen: post-nav JWE pre-warm failed', e, st),
-      ),
-      'SplashScreen: post-nav JWE pre-warm',
-    );
-
     AppLogger.safeUnawait(
       apiService.preWarm().catchError((Object e, StackTrace st) {
         AppLogger.e('SplashScreen: post-nav API pre-warm failed', e, st);

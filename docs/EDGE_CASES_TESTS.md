@@ -331,18 +331,7 @@ After 3 timeouts → Circuit OPENS
 
 ---
 
-## Mobile Edge Case 11: JWE Decryption Failure
-
-**Scenario:** Client receives a payload encrypted with a stale or mismatched RSA key
-
-**Expected Behavior:**
-
-- Client fails to decrypt the payload
-- `JweService` throws a `DecryptionException`
-- `ApiService` interceptor catches the error
-- User sees a "Security mismatch" error and is prompted to refresh or re-login
-
-## Mobile Edge Case 12: Play Integrity / App Check Failure
+## Mobile Edge Case 11: Play Integrity / App Check Failure
 
 **Scenario:** User runs the app on a rooted device or an unauthorized emulator
 
@@ -354,7 +343,7 @@ After 3 timeouts → Circuit OPENS
 - User sees a "Device not supported" or "Security violation" dialog
 - App blocks further access to sensitive attendance data
 
-## Mobile Edge Case 13: Biometric/Credential Storage Timeout
+## Mobile Edge Case 12: Biometric/Credential Storage Timeout
 
 **Scenario:** `flutter_secure_storage` takes too long to respond (common on some Android devices)
 
@@ -367,19 +356,6 @@ After 3 timeouts → Circuit OPENS
 ---
 
 ## Additional Test Scenarios
-
-### Test 9: Mobile JWE Round-trip
-
-**Setup:**
-
-- Mock the Next.js backend to return a JWE-encrypted response
-- Ensure the mobile app has the corresponding private key
-
-**Assertions:**
-
-- `ApiService` successfully decrypts the response
-- Data is correctly hydrated into the UI
-- No cleartext attendance data is visible in the network logs (only JWE tokens)
 
 ### Test 10: App Check Enforcement
 

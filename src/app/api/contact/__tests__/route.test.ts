@@ -155,7 +155,7 @@ describe("POST /api/contact", () => {
   });
 
   it("uses decryptedBody if provided by withSecurity", async () => {
-    (processContactSubmission as any).mockResolvedValueOnce({ success: true, id: "msg-jwe" });
+    (processContactSubmission as any).mockResolvedValueOnce({ success: true, id: "msg-contact" });
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/contact", { method: "POST" });
     // withSecurity passes decryptedBody as second argument

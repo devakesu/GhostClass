@@ -20,10 +20,6 @@ function validateSecurityEnv(errors: string[]) {
   if (!process.env.CRON_SECRET) {
     errors.push("❌ CRON_SECRET is required");
   }
-
-  if (!process.env.JWE_PRIVATE_KEY) {
-    errors.push("❌ JWE_PRIVATE_KEY is required for mobile communication");
-  }
 }
 
 function validateSupabaseEnv(errors: string[]) {

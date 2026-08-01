@@ -42,10 +42,7 @@ void main() {
 
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
-    SharedPreferences.setMockInitialValues({
-      'ghostclass_jwks_cache': '{"keys": []}',
-      'ghostclass_jwks_time': DateTime.now().toIso8601String(),
-    });
+    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('Shallow render important widgets', (tester) async {

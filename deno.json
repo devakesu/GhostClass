@@ -18,8 +18,7 @@
       "**/.next/**",
       "**/mobile/**",
       "**/Temp/**",
-      "**/public/sw.js",
-      "**/api/.well-known/jwks.json/__tests__/**"
+      "**/public/sw.js"
     ],
     "rules": {
       "exclude": [

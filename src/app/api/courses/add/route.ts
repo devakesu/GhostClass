@@ -32,7 +32,7 @@ async function authenticateRequest(req: Request) {
 /**
  * API Route for adding a new course to a class lineup.
  * Primarily used by the mobile app which bypasses the Turnstile check 
- * but uses JWE/AppCheck/PlayIntegrity for security.
+ * but uses AppCheck/PlayIntegrity for security.
  */
 async function handler(req: Request, { decryptedBody }: { decryptedBody?: unknown }) {
   try {

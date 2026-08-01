@@ -62,7 +62,7 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
     return NextResponse.json({ error: "EzyGo token missing" }, { status: 401 });
   }
 
-  // 4. Parse request body (handle both JWE and plain JSON)
+  // 4. Parse request body (plain JSON)
   let body = decryptedBody;
   if (!body) {
     try {
@@ -157,5 +157,5 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
   return NextResponse.json(results);
 };
 
-// Wrap with security HOF to handle App Check and JWE decryption for mobile clients
+// Wrap with security HOF to handle App Check for mobile clients
 export const POST = withSecurity<BatchRequest>(handler);

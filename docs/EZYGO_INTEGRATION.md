@@ -572,7 +572,7 @@ GhostClass Mobile implements the same three-layer protection system as the web a
 
 Unlike the web app which uses `httpOnly` cookies, the mobile app:
 
-1. **Authenticates** with a `MOBILE_API_SECRET` and JWE-encrypted payload.
+1. **Authenticates** with a `MOBILE_API_SECRET` and App Check.
 2. **Stores tokens** in the hardware-backed **SecureStorage** (Keystore/Keychain).
 3. **Calls EzyGo directly** for attendance data to minimize latency, while using the GhostClass backend for security nonces and session provisioning.
 
@@ -585,4 +585,4 @@ For implementation details and code examples, see:
 - `src/lib/ezygo-batch-fetcher.ts`
 - `src/app/(protected)/dashboard/page.tsx`
 - `mobile/lib/logic/ezygo_batch_fetcher.dart` (Mobile implementation)
-- `mobile/lib/services/api_service.dart` (Mobile JWE proxying)
+- `mobile/lib/services/api_service.dart` (Mobile API proxying)

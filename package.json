@@ -82,7 +82,6 @@
     "firebase-admin": "^14.2.0",
     "framer-motion": "^12.43.0",
     "googleapis": "^173.0.0",
-    "jose": "^6.2.5",
     "ldrs": "^1.1.9",
     "lodash-es": "^4.18.1",
     "lru-cache": "^11.5.2",

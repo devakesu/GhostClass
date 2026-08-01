@@ -83,7 +83,7 @@ export const dynamic = "force-dynamic";
 /**
  * Universal Authentication Sync Route
  *
- * Handles session healing for both web (cookies) and mobile (JWE/Bearer).
+ * Handles session healing for both web (cookies) and mobile (Bearer).
  * - Web: Refreshes Supabase session and heals ezygo_access_token cookie.
  * - Mobile: Returns an encrypted bundle containing the healed EzyGo token and terms status.
  */

@@ -8,7 +8,7 @@
 
 ## Overview
 
-GhostClass Mobile is a secure, zero-trust Flutter application that communicates with the GhostClass backend API. Every network request is encrypted with JWE (JSON Web Encryption), device integrity is attested by Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS), and all credentials are stored in hardware-backed secure storage — never in plain SharedPreferences.
+GhostClass Mobile is a secure, zero-trust Flutter application that communicates with the GhostClass backend API. Device integrity is attested by Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS), and all credentials are stored in hardware-backed secure storage — never in plain SharedPreferences.
 
 ## 📲 Download
 
@@ -31,7 +31,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 - **Notifications** 🔔 — In-app notification center
 - **Help & Contact** 📚 — Built-in help docs (rendered Markdown) and contact form
 - **Dark / Light Theme** 🌓 — System-aware theme with manual override
-- **Zero-Trust Security** 🔐 — App Check, Play Integrity, JWE encryption, SecureStorage, anti-tapjacking
+- **Zero-Trust Security** 🔐 — App Check, Play Integrity, SecureStorage, anti-tapjacking
 
 ## 🛠️ Tech Stack
 
@@ -69,7 +69,7 @@ GhostClass Mobile is a secure, zero-trust Flutter application that communicates 
 | `firebase_core` | ^4.7.0 | Firebase SDK |
 | `firebase_app_check` | ^0.4.3 | Device integrity & API protection |
 | `flutter_secure_storage` | ^10.0.0 | Hardware-backed credential storage |
-| `jose` + `pointycastle` | ^0.3.5+1 / ^3.9.1 | JWE key parsing + RSA operations |
+| `pointycastle` | ^3.9.1 | Certificate & ASN1 parsing |
 | `encrypt` | ^5.0.3 | AES-256 symmetric encryption |
 
 ### UI & Charts
@@ -168,9 +168,7 @@ mobile/
 │   │   ├── ghostclass_screen.dart      # GhostClass info screen
 │   │   └── static_screen.dart          # Legal/static content
 │   ├── services/
-│   │   ├── api_service.dart           # Dio HTTP client + JWE interceptor
-│   │   ├── jwe_service.dart           # JWE key fetch + encrypt/decrypt
-│   │   ├── jwe_interceptor.dart       # Dio interceptor for JWE wrapping
+│   │   ├── api_service.dart           # Dio HTTP client & API egress
 │   │   ├── secure_storage.dart        # flutter_secure_storage wrapper
 │   │   ├── security_guard.dart        # App Check + Play Integrity check
 │   │   ├── stealth_headers_service.dart # Anti-fingerprinting header injection
@@ -313,7 +311,6 @@ GhostClass Mobile implements a zero-trust security model:
 | Layer | Mechanism |
 | :--- | :--- |
 | **Device Attestation** | Firebase App Check → Play Integrity (Android) / DeviceCheck (iOS) |
-| **Network Encryption** | Every API request/response wrapped in JWE (RSA-OAEP + AES-256-GCM) |
 | **Credential Storage** | `flutter_secure_storage` (Android Keystore / iOS Keychain) |
 | **Anti-Tapjacking** | `FLAG_SECURE` on Android `MainActivity` |
 | **Stealth Headers** | Custom header injection to reduce fingerprinting during upstream data fetches |

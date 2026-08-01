@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { version?: unknown } }) => {
   const supabaseAdmin = getAdminClient();
 
-  // withSecurity handles auth and JWE. We expect a Bearer token or cookie.
+  // withSecurity handles auth. We expect a Bearer token or cookie.
   const authHeader = req.headers.get("Authorization");
   let authUser;
 
