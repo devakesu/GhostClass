@@ -1,5 +1,10 @@
 "use client";
 
+import { ATTENDANCE_STATUS } from "@/lib/logic/attendance-reconciliation";
+import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
+import { useAttendanceSettings } from "@/providers/attendance-settings";
+import { AttendanceReport, Course, TrackAttendance } from "@/types";
+import { BarChart3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
@@ -10,11 +15,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AttendanceReport, Course, TrackAttendance } from "@/types";
-import { useAttendanceSettings } from "@/providers/attendance-settings";
-import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
-import { BarChart3 } from "lucide-react";
-import { ATTENDANCE_STATUS } from "@/lib/logic/attendance-reconciliation";
 
 // --- HELPERS ---
 const formatCourseCode = (code: string | undefined, fallback?: string) => {
@@ -54,15 +54,20 @@ interface AttendanceChartProps {
  * Props for custom bar shape in chart.
  */
 interface BarShapeProps {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
   fill?: string;
   stroke?: string;
-  payload?: {
-    displayedExtra: number;
+  payload?: CourseData;
+  background?: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
   };
+  [key: string]: unknown;
 }
 
 /**
@@ -89,7 +94,14 @@ interface LabelProps {
  * @returns SVG path element for hatched bar
  */
 const HatchedBarShape = (props: BarShapeProps) => {
-  const { x, y, width, height, fill = "#000", stroke = "#000" } = props;
+  const {
+    x = 0,
+    y = 0,
+    width = 0,
+    height = 0,
+    fill = "#000",
+    stroke = "#000",
+  } = props;
   const radius = 4;
   if (!height || height <= 0 || isNaN(height)) return null;
   const r = Math.min(radius, height);
@@ -106,9 +118,58 @@ const HatchedBarShape = (props: BarShapeProps) => {
   );
 };
 
-const BottomBarShape = (props: BarShapeProps) => {
-  const { fill = "#000", x, y, width, height, payload } = props;
-  if (!height || height <= 0 || isNaN(height)) return null;
+const renderTargetLine = (
+  props: BarShapeProps & { yAxisMin?: number },
+  yAxisMin: number,
+) => {
+  const { x = 0, width = 0, payload, background } = props;
+  if (!payload || payload.customTarget == null) return null;
+  if (
+    !background ||
+    background.height == null ||
+    background.height <= 0 ||
+    background.y == null
+  ) {
+    return null;
+  }
+
+  const targetVal = payload.customTarget;
+  const domainRange = 100 - yAxisMin;
+  if (domainRange <= 0) return null;
+
+  const targetY = background.y +
+    (background.height * (100 - targetVal)) / domainRange;
+
+  return (
+    <line
+      x1={x}
+      x2={x + width}
+      y1={targetY}
+      y2={targetY}
+      stroke="#f59e0b"
+      strokeWidth={2}
+      strokeDasharray="4 2"
+      strokeOpacity={0.95}
+      style={{ pointerEvents: "none" }}
+    />
+  );
+};
+
+const BottomBarShape = (props: BarShapeProps & { yAxisMin?: number }) => {
+  const {
+    fill = "#000",
+    x = 0,
+    y = 0,
+    width = 0,
+    height = 0,
+    payload,
+    yAxisMin = 75,
+  } = props;
+  const targetLine = renderTargetLine(props, yAxisMin);
+
+  if (!height || height <= 0 || isNaN(height)) {
+    return targetLine ? <g>{targetLine}</g> : null;
+  }
   const hasTopStack = payload && payload.displayedExtra > 0;
   const radius = hasTopStack ? 0 : 4;
   const r = Math.min(radius, height);
@@ -117,14 +178,24 @@ const BottomBarShape = (props: BarShapeProps) => {
   },${y} L ${x + width - r},${y} Q ${x + width},${y} ${x + width},${y + r} L ${
     x + width
   },${y + height} Z`;
-  return <path d={pathD} fill={fill} stroke={fill} strokeWidth={1} />;
+  return (
+    <g>
+      <path d={pathD} fill={fill} stroke={fill} strokeWidth={1} />
+      {targetLine}
+    </g>
+  );
 };
 
 const CustomTargetLabel = (props: LabelProps) => {
   const { viewBox, value = 0 } = props;
   if (
-    !viewBox || viewBox.width == null || viewBox.x == null || viewBox.y == null
-  ) return null;
+    !viewBox ||
+    viewBox.width == null ||
+    viewBox.x == null ||
+    viewBox.y == null
+  ) {
+    return null;
+  }
   const x = viewBox.width - 15;
   const y = viewBox.y; // align label center on the target line
   return (
@@ -177,6 +248,8 @@ interface CourseData extends CourseStats {
   isLoss: boolean;
   mergedPresent: number;
   mergedTotal: number;
+  /** Per-course custom target when it differs from the global safeTarget; undefined otherwise. */
+  customTarget?: number;
 }
 
 function processOfficialData(
@@ -283,6 +356,7 @@ function computeAttendanceChartData(
   coursesData: { courses: Record<string, Course> } | undefined,
   safeTarget: number,
   disabledCodes: Set<string> | undefined,
+  courseTargets: Record<string, number> = {},
 ): CourseData[] {
   if (!coursesData?.courses || !attendanceData?.studentAttendanceData) {
     return [];
@@ -333,7 +407,7 @@ function computeAttendanceChartData(
   return Array.from(courseAttendance.values())
     .filter((course) => {
       // Exclude courses with no data
-      if ((course.total + course.selfTotal) <= 0) return false;
+      if (course.total + course.selfTotal <= 0) return false;
       // Exclude disabled courses
       if (disabledCodes?.has((course.code ?? "").toUpperCase())) return false;
       return true;
@@ -358,15 +432,30 @@ function computeAttendanceChartData(
       const displayedExtra = parseFloat(
         Math.abs(mergedPct - officialPct).toFixed(2),
       );
-      const isSafe = mergedPct >= safeTarget;
+
+      const courseCodeKey = normalizeCourseCode(course.code || course.id || "");
+      const rawCodeKey = course.code || "";
+      const courseIdKey = course.id ? String(course.id) : "";
+
+      /* eslint-disable security/detect-object-injection */
+      const courseTargetVal =
+        (courseCodeKey ? courseTargets[courseCodeKey] : undefined) ??
+          (rawCodeKey ? courseTargets[rawCodeKey] : undefined) ??
+          (courseIdKey ? courseTargets[courseIdKey] : undefined);
+      /* eslint-enable security/detect-object-injection */
+
+      const effectiveCourseTarget = typeof courseTargetVal === "number"
+        ? courseTargetVal
+        : safeTarget;
+      const isSafe = mergedPct >= effectiveCourseTarget;
 
       const baseSuccess = isSafe ? displayedBase : 0;
       const baseDanger = !isSafe ? displayedBase : 0;
 
-      const extraSuccess = (displayedExtra > 0 && !isLoss && isSafe)
+      const extraSuccess = displayedExtra > 0 && !isLoss && isSafe
         ? displayedExtra
         : 0;
-      const extraDanger = (displayedExtra > 0 && (isLoss || !isSafe))
+      const extraDanger = displayedExtra > 0 && (isLoss || !isSafe)
         ? displayedExtra
         : 0;
 
@@ -387,6 +476,11 @@ function computeAttendanceChartData(
         total: course.total,
         selfPresent: course.selfPresent,
         selfTotal: course.selfTotal,
+        // Only set when this course has a custom target that differs from the global target
+        customTarget:
+          typeof courseTargetVal === "number" && courseTargetVal !== safeTarget
+            ? courseTargetVal
+            : undefined,
       };
     })
     .sort((a, b) => a.totalPercentage - b.totalPercentage);
@@ -425,10 +519,12 @@ const getPercentageColor = (
   return "text-green-600 dark:text-green-400";
 };
 
-export function AttendanceChart(
-  { attendanceData, trackingData, coursesData, disabledCodes }:
-    AttendanceChartProps,
-) {
+export function AttendanceChart({
+  attendanceData,
+  trackingData,
+  coursesData,
+  disabledCodes,
+}: AttendanceChartProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltipHidden, setTooltipHidden] = useState(false);
@@ -436,7 +532,7 @@ export function AttendanceChart(
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 640px)").matches;
   });
-  const { targetPercentage } = useAttendanceSettings();
+  const { targetPercentage, courseTargets } = useAttendanceSettings();
   const safeTarget = Number(targetPercentage) > 0
     ? Number(targetPercentage)
     : 75;
@@ -527,12 +623,21 @@ export function AttendanceChart(
       coursesData,
       safeTarget,
       disabledCodes,
+      courseTargets,
     );
-  }, [attendanceData, trackingData, coursesData, safeTarget, disabledCodes]);
+  }, [
+    attendanceData,
+    trackingData,
+    coursesData,
+    safeTarget,
+    disabledCodes,
+    courseTargets,
+  ]);
 
-  const allPercentages = data.flatMap(
-    (d) => [d.totalPercentage, d.officialPercentage],
-  );
+  const allPercentages = data.flatMap((d) => [
+    d.totalPercentage,
+    d.officialPercentage,
+  ]);
   const nonZeroHeights = allPercentages.filter((h) => h > 0);
 
   let minRef = safeTarget;
@@ -540,24 +645,27 @@ export function AttendanceChart(
     const absoluteMin = Math.min(...nonZeroHeights);
     minRef = Math.min(absoluteMin, safeTarget);
   }
+  // Also ensure all custom-course target lines are visible in the Y domain
+  const courseTargetValues = Object.values(courseTargets || {}).filter(
+    (v): v is number => typeof v === "number",
+  );
+  if (courseTargetValues.length > 0) {
+    minRef = Math.min(minRef, ...courseTargetValues);
+  }
   const calculatedMin = Math.floor(minRef / 5) * 5 - 5;
   const yAxisMin = Math.max(0, calculatedMin);
 
   // Render functions for Recharts components
-  // Note: Using TypeScript interfaces for type safety. ESLint prop-types is disabled
-  // because TypeScript provides superior type checking for these component props.
-  /* eslint-disable react/prop-types */
-  const renderBottomBar = (props: BarShapeProps) => (
-    <BottomBarShape {...props} />
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const renderBottomBar = (props: any) => (
+    <BottomBarShape {...props} yAxisMin={yAxisMin} />
   );
-  const renderHatchedBar = (props: BarShapeProps) => (
-    <HatchedBarShape {...props} />
-  );
+  const renderHatchedBar = (props: any) => <HatchedBarShape {...props} />;
   const renderTargetLabel = (props: LabelProps) => {
     if (!props?.viewBox) return null;
     return <CustomTargetLabel viewBox={props.viewBox} value={safeTarget} />;
   };
-  /* eslint-enable react/prop-types */
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   const renderChartContent = () => {
     if (!dimensions.width || !dimensions.height) {
@@ -669,7 +777,10 @@ export function AttendanceChart(
           }}
           cursor={{ fill: "rgba(128, 128, 128, 0.08)" }}
           formatter={() => null}
-          content={({ active, payload }) => {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          content={(props: any) => {
+            const { active, payload } = props;
+            /* eslint-enable @typescript-eslint/no-explicit-any */
             if (active && payload && payload.length) {
               const d = payload[0].payload as CourseData;
               return (
@@ -681,7 +792,7 @@ export function AttendanceChart(
                     <span className="text-muted-foreground/60">Official:</span>
                     <span
                       className={`font-mono font-bold ${
-                        d.officialPercentage < safeTarget
+                        d.officialPercentage < (d.customTarget ?? safeTarget)
                           ? "text-red-600 dark:text-red-400"
                           : "text-green-600 dark:text-green-400"
                       }`}
@@ -696,7 +807,8 @@ export function AttendanceChart(
                     d.mergedPresent !== d.present) && (
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground/60">
-                        Adjusted (<span
+                        Adjusted (
+                        <span
                           className={getGainLossColor(
                             d.totalPercentage,
                             d.officialPercentage,
@@ -706,14 +818,15 @@ export function AttendanceChart(
                             d.totalPercentage,
                             d.officialPercentage,
                           )}
-                        </span>):
+                        </span>
+                        ):
                       </span>
                       <span
                         className={`font-mono font-bold ${
                           getPercentageColor(
                             d.totalPercentage,
                             d.officialPercentage,
-                            safeTarget,
+                            d.customTarget ?? safeTarget,
                           )
                         }`}
                       >
@@ -761,6 +874,7 @@ export function AttendanceChart(
           shape={renderHatchedBar}
         />
 
+        {/* Global target line (amber) */}
         <ReferenceLine
           y={safeTarget}
           stroke="#f59e0b"
@@ -776,7 +890,7 @@ export function AttendanceChart(
   return (
     <div
       ref={containerRef}
-      className="w-full h-full min-h-[400px]"
+      className="w-full h-full min-h-100"
       role="img"
       aria-label="Attendance overview bar chart"
     >

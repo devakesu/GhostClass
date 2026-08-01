@@ -182,6 +182,7 @@ class UserSettings {
     required this.bunkCalculatorEnabled,
     required this.targetPercentage,
     required this.disabledCourses,
+    this.courseTargets = const <String, int>{},
     this.semester,
     this.academicYear,
   });
@@ -208,12 +209,24 @@ class UserSettings {
       }
     });
 
+    final rawTargetsSource = json['course_targets'];
+    final rawTargets = rawTargetsSource is Map
+        ? Map<String, dynamic>.from(rawTargetsSource)
+        : <String, dynamic>{};
+    final targets = <String, int>{};
+    rawTargets.forEach((key, val) {
+      if (val is num) {
+        targets[key] = val.toInt();
+      }
+    });
+
     return UserSettings(
       bunkCalculatorEnabled: json['bunk_calculator_enabled'] as bool? ?? true,
       targetPercentage: (json['target_percentage'] as num?)?.toInt() ?? 75,
       semester: json['semester'] as String?,
       academicYear: json['academic_year'] as String?,
       disabledCourses: disabled,
+      courseTargets: targets,
     );
   }
   final bool bunkCalculatorEnabled;
@@ -221,6 +234,7 @@ class UserSettings {
   final String? semester;
   final String? academicYear;
   final Map<String, Map<String, String>> disabledCourses;
+  final Map<String, int> courseTargets;
 
   UserSettings copyWith({
     bool? bunkCalculatorEnabled,
@@ -228,6 +242,7 @@ class UserSettings {
     String? semester,
     String? academicYear,
     Map<String, Map<String, String>>? disabledCourses,
+    Map<String, int>? courseTargets,
   }) {
     return UserSettings(
       bunkCalculatorEnabled:
@@ -236,6 +251,7 @@ class UserSettings {
       semester: semester ?? this.semester,
       academicYear: academicYear ?? this.academicYear,
       disabledCourses: disabledCourses ?? this.disabledCourses,
+      courseTargets: courseTargets ?? this.courseTargets,
     );
   }
 
@@ -260,6 +276,7 @@ class UserSettings {
     'semester': semester,
     'academic_year': academicYear,
     'disabled_courses': disabledCourses,
+    'course_targets': courseTargets,
   };
 
   @override
@@ -271,7 +288,8 @@ class UserSettings {
           targetPercentage == other.targetPercentage &&
           semester == other.semester &&
           academicYear == other.academicYear &&
-          _mapsEqual(disabledCourses, other.disabledCourses);
+          _mapsEqual(disabledCourses, other.disabledCourses) &&
+          _mapsEqual(courseTargets, other.courseTargets);
 
   @override
   int get hashCode => Object.hash(
@@ -280,6 +298,7 @@ class UserSettings {
     semester,
     academicYear,
     disabledCourses,
+    courseTargets,
   );
 
   bool _mapsEqual(Map<dynamic, dynamic> m1, Map<dynamic, dynamic> m2) {

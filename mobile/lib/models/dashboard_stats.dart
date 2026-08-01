@@ -132,6 +132,10 @@ class DashboardStats {
               course.finalPresent++;
             }
 
+            if (status == AttendanceStatus.dutyLeave.code) {
+              course.officialDL++;
+            }
+
             if (catalogCodesSet.contains(stdCourseCode) && !courseDisabled) {
               officialTotal++;
               final statusObj = AttendanceStatus.fromCode(status);
@@ -185,11 +189,15 @@ class DashboardStats {
         if (isTrulyExtra) {
           course.finalTotal++;
           if (trackerPositive) course.finalPresent++;
+          if (trackerDL) course.extraDL++;
         } else {
           if (!officialPositive && trackerPositive) {
             course.finalPresent++;
           } else if (officialPositive && !trackerPositive) {
             course.finalPresent--;
+          }
+          if (!officialDLStatus && trackerDL) {
+            course.corrDL++;
           }
         }
 
@@ -355,9 +363,14 @@ class CourseStat {
   int extraPresent = 0;
   int extraAbsent = 0;
 
+  int officialDL = 0;
+  int corrDL = 0;
+  int extraDL = 0;
+
   int get officialAbsent => officialTotal - officialPresent;
   int get finalAbsent => finalTotal - finalPresent;
   int get manualTotalGain => extraPresent + extraAbsent;
+  int get dlCount => officialDL + corrDL + extraDL;
 
   double get percentage =>
       finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0.0;

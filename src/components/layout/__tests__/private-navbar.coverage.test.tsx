@@ -76,6 +76,10 @@ vi.mock("@/components/attendance/AddRecordTrigger", () => ({
   AddRecordTrigger: () => <button data-testid="add-trigger">Add</button>,
 }));
 
+vi.mock("@/components/attendance/course-target-dialog", () => ({
+  CourseTargetDialog: () => null,
+}));
+
 vi.mock("lucide-react", () => {
   const Icon = () => <span data-testid="icon" />;
   return {
@@ -91,6 +95,7 @@ vi.mock("lucide-react", () => {
     Percent: Icon,
     SquareAsterisk: Icon,
     Sun: Icon,
+    Target: Icon,
     UserRound: Icon,
     Bell: Icon,
   };

@@ -399,20 +399,23 @@ flutter pub get
 infisical run --env=dev --projectId=xxxx --path=/build-time -- sh -c '
   export DART_VM_OPTIONS="--bind-address=0.0.0.0"
   flutter run \
-    --dart-define=APP_DOMAIN="$APP_DOMAIN" \
-    --dart-define=APP_VERSION="$APP_VERSION" \
-    --dart-define=APP_COMMIT_SHA="$APP_COMMIT_SHA" \
-    --dart-define=BUILD_TIMESTAMP="$BUILD_TIMESTAMP" \
-    --dart-define=GITHUB_RUN_ID="$GITHUB_RUN_ID" \
-    --dart-define=GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
-    --dart-define=AUTHOR_NAME="$AUTHOR_NAME" \
-    --dart-define=AUTHOR_URL="$AUTHOR_URL" \
-    --dart-define=GITHUB_URL="$GITHUB_URL" \
-    --dart-define=DONATE_URL="$DONATE_URL" \
+    --dart-define=APP_DOMAIN="$NEXT_PUBLIC_APP_DOMAIN" \
+    --dart-define=APP_VERSION="$NEXT_PUBLIC_APP_VERSION" \
+    --dart-define=AUTHOR_NAME="$NEXT_PUBLIC_AUTHOR_NAME" \
+    --dart-define=AUTHOR_URL="$NEXT_PUBLIC_AUTHOR_URL" \
+    --dart-define=GITHUB_URL="$NEXT_PUBLIC_GITHUB_URL" \
+    --dart-define=DONATE_URL="$NEXT_PUBLIC_DONATE_URL" \
     --dart-define=APP_NAME="$APP_NAME" \
     --dart-define=ANDROID_PACKAGE_NAME="$ANDROID_PACKAGE_NAME" \
     --dart-define=IOS_APP_ID="$IOS_APP_ID" \
-    --dart-define=GHOSTCLASS_DEV_URL="$GHOSTCLASS_DEV_URL"
+    --dart-define=FIREBASE_API_KEY_ANDROID="$FIREBASE_API_KEY_ANDROID" \
+    --dart-define=FIREBASE_ANDROID_APP_ID="$FIREBASE_ANDROID_APP_ID" \
+    --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
+    --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+    --dart-define=FIREBASE_STORAGE_BUCKET="$FIREBASE_STORAGE_BUCKET" \
+    --dart-define=FIREBASE_API_KEY_IOS="$FIREBASE_API_KEY_IOS" \
+    --dart-define=FIREBASE_IOS_APP_ID="$FIREBASE_IOS_APP_ID" \
+    --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID"
 '
 ```
 

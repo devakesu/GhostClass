@@ -1,39 +1,11 @@
 "use client";
 
-import {
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  AnimatePresence,
-  domAnimation,
-  LazyMotion,
-  m as motion,
-} from "framer-motion";
-import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { logger } from "@/lib/logger";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useProfile } from "@/hooks/users/profile";
-import {
-  useAllCourseDetails,
-  useAttendanceReport,
-} from "@/hooks/courses/attendance";
-import { useFetchCourses } from "@/hooks/courses/courses";
-import {
-  useFetchUserSettings,
-  useSetAcademicYear,
-  useSetSemester,
-} from "@/hooks/users/settings";
-import { useDashboardStats } from "@/hooks/use-dashboard-stats";
-import { calculateAttendance } from "@/lib/logic/bunk";
+import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
+import { AddCourseDialog } from "@/components/attendance/AddCourseDialog";
+import { EditInstructorDialog } from "@/components/attendance/EditInstructorDialog";
+import { SelectClassDialog } from "@/components/attendance/SelectClassDialog";
 import { Loading as CompLoading } from "@/components/loading";
+import { PWAInstallBanner } from "@/components/pwa-install-banner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,35 +16,63 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAttendanceSettings } from "@/providers/attendance-settings";
-import { useTrackingData } from "@/hooks/tracker/useTrackingData";
-import { useQueryClient } from "@tanstack/react-query";
-import dynamic from "next/dynamic";
-import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
-import { AddCourseDialog } from "@/components/attendance/AddCourseDialog";
-import { AddAttendanceDialog } from "@/components/attendance/AddAttendanceDialog";
-import { EditInstructorDialog } from "@/components/attendance/EditInstructorDialog";
-import { SelectClassDialog } from "@/components/attendance/SelectClassDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useAllCourseDetails,
+  useAttendanceReport,
+} from "@/hooks/courses/attendance";
+import { useFetchCourses } from "@/hooks/courses/courses";
 import { useFetchCourseInstructors } from "@/hooks/courses/instructors";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import {
   ClassCourse,
   useFetchClassCourses,
 } from "@/hooks/courses/useFetchClassCourses";
+import { useTrackingData } from "@/hooks/tracker/useTrackingData";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { useSyncOnMount } from "@/hooks/use-sync-on-mount";
-import { PWAInstallBanner } from "@/components/pwa-install-banner";
-import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
-import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useProfile } from "@/hooks/users/profile";
+import {
+  useFetchUserSettings,
+  useSetAcademicYear,
+  useSetSemester,
+} from "@/hooks/users/settings";
+import { logger } from "@/lib/logger";
+import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
+import { calculateAttendance } from "@/lib/logic/bunk";
 import { normalizeCourseCode } from "@/lib/utils";
+import { useAttendanceSettings } from "@/providers/attendance-settings";
 import {
   AttendanceReport,
   Course,
   TrackAttendance,
   UserProfile,
 } from "@/types";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AnimatePresence,
+  domAnimation,
+  LazyMotion,
+  m as motion,
+} from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import dynamic from "next/dynamic";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 
-import { StatsPanel } from "./components/StatsPanel";
-import { DashboardCharts } from "./components/DashboardCharts";
 import { CourseGrid, DashboardCourse } from "./components/CourseGrid";
+import { DashboardCharts } from "./components/DashboardCharts";
+import { StatsPanel } from "./components/StatsPanel";
 
 const ChartSkeleton = () => (
   <div className="flex items-center justify-center h-full">
@@ -82,8 +82,8 @@ const ChartSkeleton = () => (
 
 const AttendanceCalendar = dynamic(
   () =>
-    import("@/components/attendance/attendance-calendar").then((mod) =>
-      mod.AttendanceCalendar
+    import("@/components/attendance/attendance-calendar").then(
+      (mod) => mod.AttendanceCalendar,
     ),
   {
     loading: () => <ChartSkeleton />,
@@ -195,7 +195,8 @@ function planAcademicShift(
     const nextIndex = getPeriodIndex(nextPeriod.semester, nextPeriod.year);
 
     if (
-      currentIndex !== null && nextIndex !== null &&
+      currentIndex !== null &&
+      nextIndex !== null &&
       nextIndex > currentIndex + 1
     ) {
       const maxAllowedIndex = currentIndex + 1;
@@ -277,14 +278,14 @@ async function executeAcademicChange(params: {
   effectiveYear: string | null;
   effectiveSemester: AcademicSemester | null;
   setAcademicYearMutation: {
-    mutateAsync: (
-      payload: { default_academic_year: string },
-    ) => Promise<unknown>;
+    mutateAsync: (payload: {
+      default_academic_year: string;
+    }) => Promise<unknown>;
   };
   setSemesterMutation: {
-    mutateAsync: (
-      payload: { default_semester: AcademicSemester },
-    ) => Promise<unknown>;
+    mutateAsync: (payload: {
+      default_semester: AcademicSemester;
+    }) => Promise<unknown>;
   };
   refetchProfile: () => Promise<unknown>;
   setSelectedSemester: Dispatch<SetStateAction<AcademicSemester | null>>;
@@ -387,12 +388,17 @@ interface DashboardClientProps {
 
 const ACTIVE_ATTENDANCE_CODES = new Set([110, 111, 225, 112]);
 
-const isActiveAttendanceSession = (
-  session: { attendance?: unknown; class_type?: unknown; course?: unknown },
-) => {
+const isActiveAttendanceSession = (session: {
+  attendance?: unknown;
+  class_type?: unknown;
+  course?: unknown;
+}) => {
   const attCode = Number(session.attendance);
-  return ACTIVE_ATTENDANCE_CODES.has(attCode) &&
-    session.class_type !== "Revision" && !!session.course;
+  return (
+    ACTIVE_ATTENDANCE_CODES.has(attCode) &&
+    session.class_type !== "Revision" &&
+    !!session.course
+  );
 };
 
 const isActiveTrackingRecord = (
@@ -403,8 +409,9 @@ const isActiveTrackingRecord = (
   const isSameSemester = !selectedSemester ||
     record.semester === selectedSemester;
   const isSameYear = !selectedYear || record.year === selectedYear;
-  return !!record.course && isSameSemester && isSameYear &&
-    record.attendance != null;
+  return (
+    !!record.course && isSameSemester && isSameYear && record.attendance != null
+  );
 };
 
 const buildCatalogCodes = (
@@ -434,7 +441,8 @@ const countNoDataCodes = (
 ) =>
   Array.from(catalogCodes).reduce((count, code) => {
     const hasNoData = !activeCodes.has(code) &&
-      !disabledWithDataCodes.has(code) && !disabledCodes.has(code);
+      !disabledWithDataCodes.has(code) &&
+      !disabledCodes.has(code);
     return hasNoData ? count + 1 : count;
   }, 0);
 
@@ -504,9 +512,10 @@ const getSortPriority = (item: { isDisabled?: boolean; isNew?: boolean }) => {
 };
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- This component orchestrates multiple guarded async data flows and UI states in one page-level boundary.
-export default function DashboardClient(
-  { initialData, serverError }: DashboardClientProps,
-) {
+export default function DashboardClient({
+  initialData,
+  serverError,
+}: DashboardClientProps) {
   const {
     data: rawProfile,
     isLoading: isLoadingProfile,
@@ -541,7 +550,7 @@ export default function DashboardClient(
   const setAcademicYearMutation = useSetAcademicYear({
     skipInvalidations: true,
   });
-  const { targetPercentage } = useAttendanceSettings();
+  const { targetPercentage, courseTargets } = useAttendanceSettings();
 
   const { data: userSettings, isLoading: isSettingsLoading } =
     useFetchUserSettings();
@@ -564,8 +573,8 @@ export default function DashboardClient(
   const isProfileReady = !!profile?.username && !isLoadingProfile;
 
   const isRateLimitError = serverError
-    ? (serverError.toLowerCase().includes("rate limit") ||
-      serverError.includes("429"))
+    ? serverError.toLowerCase().includes("rate limit") ||
+      serverError.includes("429")
     : false;
   useDashboardServerErrorToast(serverError, isRateLimitError);
 
@@ -577,7 +586,11 @@ export default function DashboardClient(
   );
   const [isEditInstructorOpen, setIsEditInstructorOpen] = useState(false);
   const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<
-    { code: string; name: string; initialName: string } | null
+    {
+      code: string;
+      name: string;
+      initialName: string;
+    } | null
   >(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isShifting, setIsShifting] = useState(false);
@@ -619,11 +632,11 @@ export default function DashboardClient(
         initialData,
         selectedSemester,
         selectedYear,
-        (ezygoSemester === "even" || ezygoSemester === "odd")
+        ezygoSemester === "even" || ezygoSemester === "odd"
           ? ezygoSemester
           : undefined,
         ezygoYear ?? undefined,
-        (effectiveSemester === "even" || effectiveSemester === "odd")
+        effectiveSemester === "even" || effectiveSemester === "odd"
           ? effectiveSemester
           : undefined,
         effectiveYear,
@@ -646,8 +659,8 @@ export default function DashboardClient(
     refetch: refetchAttendance,
   } = useAttendanceReport(currentSem, currentYear, {
     enabled: isProfileReady && !!currentSem && !!currentYear,
-    initialData: (isInitialDataValid && !isAttendanceStale)
-      ? (initialData?.attendance as AttendanceReport ?? undefined)
+    initialData: isInitialDataValid && !isAttendanceStale
+      ? ((initialData?.attendance as AttendanceReport) ?? undefined)
       : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
@@ -902,9 +915,13 @@ export default function DashboardClient(
 
   const requestAcademicShift = (direction: "previous" | "next") => {
     if (
-      !effectiveSemester || !effectiveYear || isUpdating ||
+      !effectiveSemester ||
+      !effectiveYear ||
+      isUpdating ||
       academicShiftLockRef.current
-    ) return;
+    ) {
+      return;
+    }
     const plan = planAcademicShift(
       direction,
       effectiveSemester,
@@ -976,8 +993,8 @@ export default function DashboardClient(
       const filteredEntries = Object.entries(newData.studentAttendanceData).map(
         ([date, sessions]) => {
           const filteredSessions = Object.fromEntries(
-            Object.entries(sessions).filter(([, s]) =>
-              s.class_type !== "Revision"
+            Object.entries(sessions).filter(
+              ([, s]) => s.class_type !== "Revision",
             ),
           );
           return [date, filteredSessions];
@@ -1012,55 +1029,79 @@ export default function DashboardClient(
       allCourseSummaries ? Object.entries(allCourseSummaries) : [],
     );
 
-    return unique.map((course) => {
-      const codeKey = normalizeCourseCode(String(course.code || course.key));
-      const courseCode = String(course.code || "");
-      const activeDetails = summariesMap.get(courseCode);
-      const stat = statsMap.get(codeKey) || statsMap.get(course.key) ||
-        { present: 0, total: 0, officialPresent: 0, officialTotal: 0 };
+    return unique
+      .map((course) => {
+        const codeKey = normalizeCourseCode(String(course.code || course.key));
+        const courseCode = String(course.code || "");
+        const activeDetails = summariesMap.get(courseCode);
+        const stat = statsMap.get(codeKey) ||
+          statsMap.get(course.key) || {
+          present: 0,
+          total: 0,
+          officialPresent: 0,
+          officialTotal: 0,
+        };
 
-      const isNew = stat.total === 0;
-      const res = isNew
-        ? { canBunk: 0, requiredToAttend: 0 }
-        : calculateAttendance(stat.present, stat.total, targetPercentage);
-      const safeRes = isNew ? { canBunk: 0 } : calculateAttendance(
-        stat.officialPresent,
-        stat.officialTotal,
-        targetPercentage,
-      );
+        /* eslint-disable security/detect-object-injection */
+        const courseTargetVal =
+          (codeKey ? courseTargets?.[codeKey] : undefined) ??
+            (courseCode
+              ? courseTargets?.[normalizeCourseCode(courseCode)]
+              : undefined) ??
+            (course.key ? courseTargets?.[String(course.key)] : undefined);
+        /* eslint-enable security/detect-object-injection */
+        const effectiveCourseTarget = typeof courseTargetVal === "number"
+          ? courseTargetVal
+          : targetPercentage;
 
-      return {
-        ...course,
-        currentPercentage: stat.total > 0
-          ? Math.round((stat.present / stat.total) * 100)
-          : 0,
-        bunkable: res.canBunk,
-        safeBunkable: safeRes.canBunk,
-        required: res.requiredToAttend,
-        isNew,
-        isDisabled: disabledCodes.has(codeKey),
-        ...stat,
-        activeCourseDetails: activeDetails,
-        name: String(course.name || ""),
-      } as DashboardCourse;
-    }).sort((a, b) => {
-      const tA = getSortPriority(a);
-      const tB = getSortPriority(b);
-      if (tA !== tB) return tA - tB;
-      if (tA === 0) {
-        if ((b.bunkable ?? 0) !== (a.bunkable ?? 0)) {
-          return (b.bunkable ?? 0) - (a.bunkable ?? 0);
+        const isNew = stat.total === 0;
+        const res = isNew
+          ? { canBunk: 0, requiredToAttend: 0 }
+          : calculateAttendance(
+            stat.present,
+            stat.total,
+            effectiveCourseTarget,
+          );
+        const safeRes = isNew ? { canBunk: 0 } : calculateAttendance(
+          stat.officialPresent,
+          stat.officialTotal,
+          effectiveCourseTarget,
+        );
+
+        return {
+          ...course,
+          currentPercentage: stat.total > 0
+            ? Math.round((stat.present / stat.total) * 100)
+            : 0,
+          bunkable: res.canBunk,
+          safeBunkable: safeRes.canBunk,
+          required: res.requiredToAttend,
+          isNew,
+          isDisabled: disabledCodes.has(codeKey),
+          ...stat,
+          activeCourseDetails: activeDetails,
+          name: String(course.name || ""),
+        } as DashboardCourse;
+      })
+      .sort((a, b) => {
+        const tA = getSortPriority(a);
+        const tB = getSortPriority(b);
+        if (tA !== tB) return tA - tB;
+        if (tA === 0) {
+          if ((b.bunkable ?? 0) !== (a.bunkable ?? 0)) {
+            return (b.bunkable ?? 0) - (a.bunkable ?? 0);
+          }
+          if ((a.required ?? 0) !== (b.required ?? 0)) {
+            return (a.required ?? 0) - (b.required ?? 0);
+          }
         }
-        if ((a.required ?? 0) !== (b.required ?? 0)) {
-          return (a.required ?? 0) - (b.required ?? 0);
-        }
-      }
-      return a.name.localeCompare(b.name);
-    });
+        return a.name.localeCompare(b.name);
+      });
   }, [
     courseRegistry,
     stats,
     targetPercentage,
+    courseTargets,
     disabledCodes,
     allCourseSummaries,
   ]);
@@ -1089,12 +1130,17 @@ export default function DashboardClient(
     return <CompLoading />;
   }
 
-  const isDataLoading = !syncSettled || !hasSyncedAndLoaded ||
-    isSettingsLoading || isLoadingAttendance ||
+  const isDataLoading = !syncSettled ||
+    !hasSyncedAndLoaded ||
+    isSettingsLoading ||
+    isLoadingAttendance ||
     (isAllCourseDetailsEnabled && isLoadingAllCourseSummaries);
 
-  const isGlobalLoading = isLoadingProfile || isUpdating || isSettingsLoading ||
-    setSemesterMutation.isPending || setAcademicYearMutation.isPending ||
+  const isGlobalLoading = isLoadingProfile ||
+    isUpdating ||
+    isSettingsLoading ||
+    setSemesterMutation.isPending ||
+    setAcademicYearMutation.isPending ||
     isShifting;
 
   return (
@@ -1228,7 +1274,7 @@ export default function DashboardClient(
 
           {isDataLoading
             ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-20 min-h-[400px]">
+              <div className="flex-1 flex flex-col items-center justify-center py-20 min-h-100">
                 <CompLoading
                   minimal
                   message="Loading dashboard statistics and course details..."

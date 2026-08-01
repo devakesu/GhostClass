@@ -277,13 +277,34 @@ class _DisableAwareCourseCardState
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(authProvider);
+    final user = ref.watch(authProvider).value;
+    final userSettings = user?.settings;
+    final courseTargets = userSettings?.courseTargets ?? {};
+    final stdCode = DashboardStats.standardize(
+      widget.course.code ?? widget.course.safeId,
+    );
+    final courseTargetVal =
+        courseTargets[stdCode] ??
+        courseTargets[widget.course.code] ??
+        courseTargets[widget.course.id.toString()];
+    final effectiveTarget =
+        (courseTargetVal ??
+                userSettings?.targetPercentage ??
+                widget.bunkResult.targetPercentage)
+            .toDouble();
+
+    final courseBunkResult = utils.calculateAttendance(
+      widget.stat.finalPresent,
+      widget.stat.finalTotal,
+      targetPercentage: effectiveTarget,
+    );
+
     return Opacity(
       opacity: _isDisabled ? 0.62 : 1,
       child: CourseCard(
         course: widget.course,
         stat: widget.stat,
-        bunkResult: widget.bunkResult,
+        bunkResult: courseBunkResult,
         bunkEnabled: widget.bunkEnabled,
         isEnabled: !_isDisabled,
         onToggleTap: _courseCode == null

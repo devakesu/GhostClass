@@ -12,6 +12,7 @@ class SettingsService {
     bool? bunkEnabled,
     int? targetPercentage,
     Map<String, Map<String, dynamic>>? disabledCourses,
+    Map<String, int>? courseTargets,
   }) async {
     final updates = <String, dynamic>{};
     if (bunkEnabled != null) {
@@ -22,6 +23,9 @@ class SettingsService {
     }
     if (disabledCourses != null) {
       updates['disabled_courses'] = disabledCourses;
+    }
+    if (courseTargets != null) {
+      updates['course_targets'] = courseTargets;
     }
 
     if (updates.isEmpty) {

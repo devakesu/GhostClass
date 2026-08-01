@@ -1,4 +1,20 @@
 {
+  "exclude": [
+    "mobile/**",
+    "**/mobile/**",
+    "node_modules/**",
+    ".next/**",
+    "Temp/**",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.test.js",
+    "**/*.test.jsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.spec.js",
+    "**/*.spec.jsx"
+  ],
   "lint": {
     "include": [
       "src/lib",

@@ -965,6 +965,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     bool? bunkEnabled,
     int? targetPercentage,
     Map<String, Map<String, String>>? disabledCourses,
+    Map<String, int>? courseTargets,
   }) async {
     final user = state.value;
     if (user == null) return;
@@ -976,6 +977,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       bunkCalculatorEnabled: bunkEnabled ?? user.settings.bunkCalculatorEnabled,
       targetPercentage: targetPercentage ?? user.settings.targetPercentage,
       disabledCourses: disabledCourses ?? user.settings.disabledCourses,
+      courseTargets: courseTargets ?? user.settings.courseTargets,
     );
 
     state = AsyncValue.data(
@@ -994,6 +996,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         bunkEnabled: bunkEnabled,
         targetPercentage: targetPercentage,
         disabledCourses: disabledCourses,
+        courseTargets: courseTargets,
       );
       // Analytics: settings updated
       try {
@@ -1006,6 +1009,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         }
         if (disabledCourses != null) {
           changes['disabledCoursesCount'] = disabledCourses.length;
+        }
+        if (courseTargets != null) {
+          changes['courseTargetsCount'] = courseTargets.length;
         }
         if (changes.isNotEmpty) {
           await AnalyticsService.instance.logSettingsUpdated(changes);

@@ -412,7 +412,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
     // --- SORTING LOGIC (WEBSITE PARITY) ---
     // Pre-calculate sorting criteria to avoid redundant math during sort
-    final target = (auth?.settings.targetPercentage ?? 75).toDouble();
+    final defaultTarget = (auth?.settings.targetPercentage ?? 75).toDouble();
+    final courseTargets = auth?.settings.courseTargets ?? const <String, int>{};
 
     final metaMap =
         <
@@ -424,7 +425,14 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               course: c,
               stats: stats,
               disabledCodes: disabledCodes,
-              targetPercentage: target,
+              targetPercentage: () {
+                final stdCode = utils.standardizeCourseCode(c.code ?? c.safeId);
+                final val =
+                    courseTargets[stdCode] ??
+                    courseTargets[c.code] ??
+                    courseTargets[c.safeId];
+                return (val ?? defaultTarget).toDouble();
+              }(),
             ),
         };
 

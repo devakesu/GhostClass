@@ -85,6 +85,10 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/components/attendance/course-target-dialog", () => ({
+  CourseTargetDialog: () => null,
+}));
+
 vi.mock("@/providers/theme", () => ({
   useTheme: vi.fn(),
 }));
@@ -273,21 +277,11 @@ describe("Navbar", () => {
     expect(handleLogout).toHaveBeenCalled();
   });
 
-  it("calls updateTarget when attendance target is changed (desktop and mobile)", () => {
+  it("opens target dialog when attendance target button is clicked", () => {
     render(<Navbar />);
-    const targetSelects = screen.getAllByTestId("select-root");
-
-    // Desktop
-    fireEvent.click(targetSelects[0]);
-    expect(mockUpdateTarget).toHaveBeenCalledWith(80);
-    expect(toast.success).toHaveBeenCalledWith(
-      "Attendance Target Updated",
-      expect.anything(),
-    );
-
-    // Mobile
-    fireEvent.click(targetSelects[1]);
-    expect(mockUpdateTarget).toHaveBeenCalledWith(80);
+    const targetBtn = screen.getByLabelText("Set attendance target percentage");
+    fireEvent.click(targetBtn);
+    expect(targetBtn).toBeInTheDocument();
   });
 
   it("calls toggleTheme when theme switch is clicked", () => {
@@ -327,7 +321,7 @@ describe("Navbar", () => {
 
     render(<Navbar />);
     const selects = screen.getAllByTestId("select-root");
-    fireEvent.click(selects[1]);
+    fireEvent.click(selects[0]);
     expect(mutate).toHaveBeenCalled();
     expect(mockInvalidateQueries).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith(

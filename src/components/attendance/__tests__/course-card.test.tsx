@@ -16,6 +16,10 @@ vi.mock("@/hooks/courses/attendance", () => ({
     data: { present: 15, total: 20, absent: 5 },
     isLoading: false,
   })),
+  useAttendanceReport: vi.fn(() => ({
+    data: null,
+    isLoading: false,
+  })),
 }));
 
 vi.mock("@/hooks/users/user", () => ({
@@ -574,6 +578,45 @@ describe("CourseCard", () => {
           "showBunkCalc_auth-user-abc",
         );
       });
+    });
+  });
+
+  describe("Duty Leaves rendering", () => {
+    it("renders non-zero Duty Leaves when attendance report includes status 225", async () => {
+      const { useAttendanceReport } = await import("@/hooks/courses/attendance");
+      vi.mocked(useAttendanceReport).mockReturnValue({
+        data: {
+          courses: { "42": { code: "CS101", name: "Computer Science" } },
+          studentAttendanceData: {
+            "2026-02-01": {
+              "1": { course: "42", attendance: 225, session: "I" },
+              "2": { course: "42", attendance: 225, session: "II" },
+            },
+          },
+        },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useAttendanceReport>);
+
+      render(<CourseCard course={sampleCourse} />);
+      expect(await screen.findByText("2 Duty Leaves")).toBeInTheDocument();
+    });
+
+    it("renders singular 'Duty Leave' when count is 1", async () => {
+      const { useAttendanceReport } = await import("@/hooks/courses/attendance");
+      vi.mocked(useAttendanceReport).mockReturnValue({
+        data: {
+          courses: { "42": { code: "CS101", name: "Computer Science" } },
+          studentAttendanceData: {
+            "2026-02-01": {
+              "1": { course: "42", attendance: 225, session: "I" },
+            },
+          },
+        },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useAttendanceReport>);
+
+      render(<CourseCard course={sampleCourse} />);
+      expect(await screen.findByText("1 Duty Leave")).toBeInTheDocument();
     });
   });
 });

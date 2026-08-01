@@ -76,6 +76,8 @@ export const SECURITY_ERRORS = {
   },
 } as const;
 
+export type AuthType = "csrf" | "app-check" | "none";
+
 export interface AuthResult {
   isValid: boolean;
   error?: string;
@@ -84,7 +86,7 @@ export interface AuthResult {
   criticalRisk?: boolean;
   alreadyLogged?: boolean;
   integrity?: unknown;
-  authType: "csrf" | "app-check" | "none";
+  authType: AuthType;
   isWebRequest?: boolean;
   isMobileRequest?: boolean;
 }
@@ -306,6 +308,27 @@ async function handleRateLimit(req: NextRequest, clientIp: string | null) {
   }
 }
 
+export function withSecurity<
+  T = unknown,
+  P extends Record<string, string | string[]> = Record<
+    string,
+    string | string[]
+  >,
+>(
+  handler: (
+    req: NextRequest,
+    context: {
+      params: P;
+      decryptedBody?: T;
+      authType?: "csrf" | "app-check" | "none";
+    },
+  ) => Promise<Response>,
+  options?: AppCheckOptions,
+): {
+  (req: NextRequest, context?: { params?: Promise<P> | P }): Promise<Response>;
+  (req: NextRequest, context: { params: Promise<P> }): Promise<Response>;
+};
+
 export function withSecurity<T = unknown>(
   handler: (
     req: NextRequest,
@@ -319,7 +342,11 @@ export function withSecurity<T = unknown>(
 ) {
   return async (
     req: NextRequest,
-    context: { params?: unknown } | undefined,
+    context?: {
+      params?:
+        | Record<string, string | string[]>
+        | Promise<Record<string, string | string[]>>;
+    },
   ) => {
     const rawParams = context?.params;
     const resolvedParams = rawParams instanceof Promise

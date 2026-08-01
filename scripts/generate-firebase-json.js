@@ -30,7 +30,12 @@ function generateFirebaseOptionsDart(secrets, targetFile) {
   if (typeof secrets === "string" && !targetFile) {
     targetPath = secrets;
   } else if (!targetPath) {
-    targetPath = path.join(process.cwd(), "mobile", "lib", "firebase_options.dart");
+    targetPath = path.join(
+      process.cwd(),
+      "mobile",
+      "lib",
+      "firebase_options.dart",
+    );
   }
   const dartContent = `// File generated dynamically during build workflow.
 // ignore_for_file: type=lint

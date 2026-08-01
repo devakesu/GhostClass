@@ -2,8 +2,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Course, TrackAttendance } from "@/types";
-import { useCourseDetails } from "@/hooks/courses/attendance";
+import { AttendanceReport, Course, TrackAttendance } from "@/types";
+import {
+  useAttendanceReport,
+  useCourseDetails,
+} from "@/hooks/courses/attendance";
 import { AlertCircle, Edit2, Loader2, User2, UserCog } from "lucide-react";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
@@ -35,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { normalizeCourseCode } from "@/lib/utils";
+import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
 
 /**
  * Extended Course interface with additional attendance statistics.
@@ -70,6 +73,8 @@ export interface CourseCardStats {
   officialPercentage: number;
   safeMetrics: ReturnType<typeof calculateAttendance>;
   extraMetrics: ReturnType<typeof calculateAttendance>;
+  effectiveTarget: number;
+  dutyLeaves: number;
 }
 
 /** Pre-defined reasons for disabling a course */
@@ -399,6 +404,17 @@ function calculateCourseStats(
   if (course.present !== undefined && course.total !== undefined) {
     const officialPresent = course.officialPresent ?? 0;
     const officialTotal = course.officialTotal ?? 0;
+    const reconciledStats = getReconciledStats(
+      String(course.id),
+      {
+        present: officialPresent,
+        absent: Math.max(officialTotal - officialPresent, 0),
+        total: officialTotal,
+      },
+      undefined,
+      courseTracks,
+    );
+
     const reconciled = {
       realPresent: officialPresent,
       realTotal: officialTotal,
@@ -426,6 +442,13 @@ function calculateCourseStats(
       targetPercentage ?? 75,
     );
 
+    const totalDL = Math.max(
+      0,
+      (reconciledStats.realDL || 0) +
+        (reconciledStats.correctionDL || 0) +
+        (reconciledStats.extraDL || 0),
+    );
+
     return {
       ...reconciled,
       displayTotal: reconciled.finalTotal,
@@ -435,6 +458,8 @@ function calculateCourseStats(
       extraMetrics,
       realAbsent: reconciled.realTotal - reconciled.realPresent,
       extras: reconciled.extrasCount,
+      effectiveTarget: targetPercentage ?? 75,
+      dutyLeaves: totalDL,
     };
   }
 
@@ -466,6 +491,13 @@ function calculateCourseStats(
     targetPercentage ?? 75,
   );
 
+  const totalDL = Math.max(
+    0,
+    (reconciled.realDL || 0) +
+      (reconciled.correctionDL || 0) +
+      (reconciled.extraDL || 0),
+  );
+
   return {
     realPresent: reconciled.realPresent,
     realAbsent: reconciled.realAbsent,
@@ -479,6 +511,8 @@ function calculateCourseStats(
     officialPercentage: reconciled.officialPercentage,
     safeMetrics,
     extraMetrics,
+    effectiveTarget: targetPercentage ?? 75,
+    dutyLeaves: totalDL,
   };
 }
 
@@ -501,15 +535,391 @@ function calculateCourseStats(
  * <CourseCard course={courseData} />
  * ```
  */
-export function CourseCard({
-  course,
-  initialCourseDetails,
-  isBatchLoading,
-  instructorName,
-  hasCustomInstructor,
-  onEditInstructor,
-  supabaseUserId,
-}: CourseCardProps) {
+async function loadBunkCalcSetting(
+  supabaseUserId?: string,
+): Promise<boolean | null> {
+  try {
+    let userId = supabaseUserId;
+
+    if (!userId) {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      userId = session?.user?.id;
+    }
+
+    if (userId) {
+      const scopedKey = `showBunkCalc_${userId}`;
+      const scopedValue = localStorage.getItem(scopedKey);
+      if (scopedValue !== null) {
+        return scopedValue === "true";
+      }
+    } else {
+      const legacyValue = localStorage.getItem("showBunkCalc");
+      if (legacyValue !== null) {
+        return legacyValue === "true";
+      }
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+  return null;
+}
+
+function useBunkCalcSetting(supabaseUserId?: string) {
+  const [showBunkCalc, setShowBunkCalc] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadBunkCalcSetting(supabaseUserId).then((setting) => {
+      if (setting !== null && isMounted) {
+        setShowBunkCalc(setting);
+      }
+    });
+
+    const handleBunkCalcToggle = (event: CustomEvent) => {
+      if (isMounted) {
+        setShowBunkCalc(event.detail);
+      }
+    };
+
+    window.addEventListener(
+      "bunkCalcToggle",
+      handleBunkCalcToggle as EventListener,
+    );
+    return () => {
+      isMounted = false;
+      window.removeEventListener(
+        "bunkCalcToggle",
+        handleBunkCalcToggle as EventListener,
+      );
+    };
+  }, [supabaseUserId]);
+
+  return showBunkCalc;
+}
+
+function DualProgressBar({
+  isGain,
+  displayPercentage,
+  officialPercentage,
+}: {
+  isGain: boolean;
+  displayPercentage: number;
+  officialPercentage: number;
+}) {
+  if (isGain) {
+    return (
+      <>
+        <div
+          className="absolute top-0 left-0 h-full bg-green-500 rounded-r-full transition-all duration-500 ease-in-out"
+          style={{ width: `${Math.min(displayPercentage, 100)}%` }}
+        />
+        <div
+          className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
+          style={{ width: `${Math.min(officialPercentage, 100)}%` }}
+        >
+          <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div
+        className="absolute top-0 left-0 h-full bg-red-600 rounded-r-full transition-all duration-500 ease-in-out"
+        style={{ width: `${Math.min(officialPercentage, 100)}%` }}
+      />
+      <div
+        className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
+        style={{ width: `${Math.min(displayPercentage, 100)}%` }}
+      >
+        <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
+      </div>
+    </>
+  );
+}
+
+function CardBodyContent({
+  isSummaryLoading,
+  hasAttendanceData,
+  stats,
+  isGain,
+  percentageTextClass,
+  showBunkCalc,
+}: {
+  isSummaryLoading: boolean;
+  hasAttendanceData: boolean;
+  stats: ReturnType<typeof calculateCourseStats>;
+  isGain: boolean;
+  percentageTextClass: string;
+  showBunkCalc: boolean;
+}) {
+  if (isSummaryLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-4">
+        <div className="animate-pulse h-4 w-24 bg-secondary rounded mb-2">
+        </div>
+        <div className="animate-pulse h-2 w-16 bg-secondary rounded"></div>
+      </div>
+    );
+  }
+  if (!hasAttendanceData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-4 px-2 h-full gap-1">
+        <div className="flex items-center gap-2 mb-1 text-amber-600 dark:text-amber-500">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          <span className="font-medium text-sm">No attendance data</span>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          No attendance records yet
+        </p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="text-center p-1 bg-green-500/10 border border-green-500/25 dark:bg-green-500/10 dark:border-green-500/20 rounded-md py-2.5 flex gap-1 flex-col">
+          <span className="text-xs text-muted-foreground block">Present</span>
+          <div className="flex items-center justify-center gap-1.5 flex-wrap px-1">
+            <span className="text-sm font-medium text-green-500">
+              {stats.realPresent}
+            </span>
+            {stats.correctionPresent > 0 && (
+              <span
+                className="text-xs font-medium text-orange-500"
+                title="Corrections"
+              >
+                +{stats.correctionPresent}
+              </span>
+            )}
+            {stats.extraPresent > 0 && (
+              <span
+                className="text-xs font-medium text-blue-500"
+                title="Extras"
+              >
+                +{stats.extraPresent}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="text-center p-1 bg-red-500/10 border border-red-500/25 dark:bg-red-500/10 dark:border-red-500/20 rounded-md py-2.5 flex gap-1 flex-col">
+          <span className="text-xs text-muted-foreground block">Absent</span>
+          <div className="flex items-center justify-center gap-0.5">
+            <span className="text-sm font-medium text-red-500">
+              {stats.realAbsent}
+            </span>
+            {stats.correctionPresent > 0 && (
+              <span className="text-xs font-medium text-orange-500">
+                -{stats.correctionPresent}
+              </span>
+            )}
+            {stats.extraAbsent > 0 && (
+              <span className="text-xs font-medium text-blue-400">
+                +{stats.extraAbsent}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="text-center p-1 bg-primary/10 border border-primary/25 dark:bg-primary/10 dark:border-primary/20 rounded-md py-2.5 flex gap-1 flex-col">
+          <span className="text-xs text-muted-foreground block">Total</span>
+          <div className="flex items-center justify-center gap-0.5">
+            <span className="text-sm font-medium">
+              {stats.realTotal}
+            </span>
+            {stats.extras > 0 && (
+              <span className="text-xs font-medium text-blue-400">
+                +{stats.extras}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+          <DualProgressBar
+            isGain={isGain}
+            displayPercentage={stats.displayPercentage}
+            officialPercentage={stats.officialPercentage}
+          />
+        </div>
+
+        <div className="flex justify-between items-center mb-1 text-sm mt-2 text-muted-foreground font-medium">
+          <span>Attendance</span>
+          <div className="flex items-center gap-2">
+            {(stats.correctionPresent > 0 || stats.extras > 0) &&
+              stats.officialPercentage !== stats.displayPercentage && (
+              <span className="text-xs">
+                {stats.officialPercentage}% <span className="mx-0.5">→</span>
+              </span>
+            )}
+            <span className={percentageTextClass}>
+              {stats.displayPercentage}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {showBunkCalc && (
+        <div className="mt-4">
+          <BunkCalculatorPanel
+            stats={stats}
+            trackingIsStrictlyBetter={stats.extraMetrics.canBunk >
+                stats.safeMetrics.canBunk ||
+              (stats.extraMetrics.canBunk === 0 &&
+                stats.safeMetrics.canBunk === 0 &&
+                stats.extraMetrics.requiredToAttend <
+                  stats.safeMetrics.requiredToAttend)}
+            noOfficialData={stats.realTotal === 0}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+type CourseRef = string | number | undefined;
+
+function isDLSessionMatch(
+  s: { course?: string | number; attendance?: string | number },
+  targetIdStr: string,
+  targetCodeNorm: string,
+  resolveCodeNorm: (ref: CourseRef) => string,
+): boolean {
+  if (!s || s.course == null || Number(s.attendance) !== 225) return false;
+  const cStr = String(s.course);
+  const cNorm = resolveCodeNorm(s.course);
+  return (
+    (targetIdStr !== "" && cStr === targetIdStr) ||
+    (targetCodeNorm !== "" && cNorm === targetCodeNorm)
+  );
+}
+
+function countOfficialDL(
+  attendanceData: AttendanceReport | undefined,
+  targetIdStr: string,
+  targetCodeNorm: string,
+  resolveCodeNorm: (ref: CourseRef) => string,
+  officialDLKeys: Set<string>,
+): number {
+  if (!attendanceData?.studentAttendanceData) return 0;
+  let count = 0;
+
+  for (
+    const [dateStr, dateData] of Object.entries(
+      attendanceData.studentAttendanceData,
+    )
+  ) {
+    if (!dateData) continue;
+    for (const [sessionKey, session] of Object.entries(dateData)) {
+      const s = session as {
+        course?: string | number;
+        attendance?: string | number;
+        session?: string | number | null;
+      };
+      if (isDLSessionMatch(s, targetIdStr, targetCodeNorm, resolveCodeNorm)) {
+        count++;
+        const cNorm = resolveCodeNorm(s.course);
+        const sessionName = s.session ?? sessionKey;
+        officialDLKeys.add(
+          generateSlotKey(
+            cNorm || String(s.course),
+            dateStr,
+            String(sessionName),
+          ),
+        );
+      }
+    }
+  }
+  return count;
+}
+
+function countTrackedDL(
+  trackingData: TrackAttendance[] | undefined,
+  targetIdStr: string,
+  targetCodeNorm: string,
+  targetNameNorm: string,
+  resolveCodeNorm: (ref: string | number | undefined) => string,
+  officialDLKeys: Set<string>,
+  normalize: (s: string | undefined) => string,
+): number {
+  if (!trackingData || trackingData.length === 0) return 0;
+  let count = 0;
+
+  for (const t of trackingData) {
+    if (!t || !t.course) continue;
+    if (Number(t.attendance) !== 225) continue;
+
+    const tStr = String(t.course);
+    const tNorm = resolveCodeNorm(t.course);
+    const tNameNorm = normalize(tStr);
+
+    const isMatch = (targetIdStr && tStr === targetIdStr) ||
+      (targetCodeNorm && tNorm === targetCodeNorm) ||
+      (targetNameNorm && tNameNorm === targetNameNorm);
+
+    if (isMatch) {
+      const key = generateSlotKey(tNorm || tStr, t.date, String(t.session));
+      if (t.status === "extra" || !officialDLKeys.has(key)) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+function computeCourseDutyLeaves(
+  attendanceData: AttendanceReport | undefined,
+  course: ExtendedCourse,
+  trackingData: TrackAttendance[] | undefined,
+  normalize: (s: string | undefined) => string,
+): number {
+  const officialDLKeys = new Set<string>();
+  const targetIdStr = String(course.id || "");
+  const targetCodeNorm = course.code ? normalizeCourseCode(course.code) : "";
+  const targetNameNorm = course.name ? normalize(course.name) : "";
+
+  const resolveCodeNorm = (courseRef: string | number | undefined) => {
+    if (courseRef == null) return "";
+    const refStr = String(courseRef);
+    /* eslint-disable security/detect-object-injection */
+    const catalogCode = attendanceData?.courses?.[refStr]?.code || refStr;
+    /* eslint-enable security/detect-object-injection */
+    return normalizeCourseCode(catalogCode);
+  };
+
+  const officialDL = countOfficialDL(
+    attendanceData,
+    targetIdStr,
+    targetCodeNorm,
+    resolveCodeNorm,
+    officialDLKeys,
+  );
+  const trackedDL = countTrackedDL(
+    trackingData,
+    targetIdStr,
+    targetCodeNorm,
+    targetNameNorm,
+    resolveCodeNorm,
+    officialDLKeys,
+    normalize,
+  );
+
+  return officialDL + trackedDL;
+}
+
+function useCourseCardStats(
+  course: CourseCardProps["course"],
+  initialCourseDetails: CourseCardProps["initialCourseDetails"],
+  isBatchLoading: boolean = false,
+  supabaseUserId?: string,
+) {
   const courseCodeNormalized = normalizeCourseCode(
     course.code || String(course.id),
   );
@@ -530,8 +940,150 @@ export function CourseCard({
   const { data: profile } = useProfile();
   const { data: trackingData } = useTrackingData(profile);
 
-  const { targetPercentage } = useAttendanceSettings();
-  const [showBunkCalc, setShowBunkCalc] = useState(true);
+  const { targetPercentage, courseTargets } = useAttendanceSettings();
+  const showBunkCalc = useBunkCalcSetting(supabaseUserId);
+
+  /* eslint-disable security/detect-object-injection */
+  const courseTargetOverride =
+    (courseCodeNormalized
+      ? courseTargets?.[courseCodeNormalized]
+      : undefined) ??
+      (course.code ? courseTargets?.[course.code] : undefined) ??
+      (course.id ? courseTargets?.[String(course.id)] : undefined);
+  /* eslint-enable security/detect-object-injection */
+  const effectiveCourseTarget = typeof courseTargetOverride === "number"
+    ? courseTargetOverride
+    : targetPercentage;
+
+  const normalize = useCallback(
+    (s: string | undefined) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "",
+    [],
+  );
+
+  const courseIdentifiers = useMemo(() => ({
+    targetId: String(course.id),
+    targetName: normalize(course.name),
+    targetCode: normalize(course.code),
+  }), [course.id, course.name, course.code, normalize]);
+
+  const { data: userSettings } = useFetchUserSettings();
+  const semesterData = userSettings?.semester;
+  const academicYearData = userSettings?.academicYear;
+
+  const { data: attendanceData } = useAttendanceReport(
+    semesterData ?? undefined,
+    academicYearData ?? undefined,
+  );
+
+  const totalDutyLeaves = useMemo(() => {
+    return computeCourseDutyLeaves(
+      attendanceData,
+      course,
+      trackingData,
+      normalize,
+    );
+  }, [
+    attendanceData,
+    course,
+    trackingData,
+    normalize,
+  ]);
+
+  const stats = useMemo(() => {
+    const computed = calculateCourseStats(
+      course,
+      courseIdentifiers,
+      trackingData,
+      activeCourseDetails,
+      effectiveCourseTarget,
+      normalize,
+    );
+    return {
+      ...computed,
+      dutyLeaves: totalDutyLeaves,
+    };
+  }, [
+    activeCourseDetails,
+    course,
+    courseIdentifiers,
+    trackingData,
+    effectiveCourseTarget,
+    normalize,
+    totalDutyLeaves,
+  ]);
+
+  const hasAttendanceData = !isSummaryLoading && stats.displayTotal > 0;
+  const isTrackingOnly = !isSummaryLoading && stats.realTotal === 0 &&
+    stats.displayTotal > 0;
+  const isGain = stats.displayPercentage >= stats.officialPercentage;
+
+  const statusColorClasses = useMemo(() => {
+    const metrics = stats.extraMetrics;
+    const isAtRisk = metrics.requiredToAttend > 0;
+
+    if (!isAtRisk) {
+      return {
+        card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
+        headerBg: "bg-green-500/10 dark:bg-green-500/20",
+        headerBorder: "border-green-500/20 dark:border-green-500/40",
+        badge:
+          "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
+      };
+    }
+
+    return {
+      card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
+      headerBg: "bg-red-500/10 dark:bg-red-500/20",
+      headerBorder: "border-red-500/20 dark:border-red-500/40",
+      badge: "bg-red-500/15 text-red-500 border-red-500/30",
+    };
+  }, [stats.extraMetrics]);
+
+  const percentageTextClass = useMemo(() => {
+    if (stats.correctionPresent > 0 || stats.extras > 0) {
+      return isGain
+        ? "text-green-600 dark:text-green-400 font-bold"
+        : "text-red-500 dark:text-red-400 font-bold";
+    }
+    return "";
+  }, [stats.correctionPresent, stats.extras, isGain]);
+
+  return {
+    stats,
+    isSummaryLoading,
+    hasAttendanceData,
+    isTrackingOnly,
+    isGain,
+    statusColorClasses,
+    percentageTextClass,
+    showBunkCalc,
+  };
+}
+
+export function CourseCard({
+  course,
+  initialCourseDetails,
+  isBatchLoading,
+  instructorName,
+  hasCustomInstructor,
+  onEditInstructor,
+  supabaseUserId,
+}: CourseCardProps) {
+  const {
+    stats,
+    isSummaryLoading,
+    hasAttendanceData,
+    isTrackingOnly,
+    isGain,
+    statusColorClasses,
+    percentageTextClass,
+    showBunkCalc,
+  } = useCourseCardStats(
+    course,
+    initialCourseDetails,
+    isBatchLoading,
+    supabaseUserId,
+  );
 
   // Disabled courses management
   const { data: userSettings } = useFetchUserSettings();
@@ -564,123 +1116,6 @@ export function CourseCard({
   const disableInFlightRef = useRef(false);
   const enableInFlightRef = useRef(false);
 
-  const normalize = useCallback(
-    (s: string | undefined) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "",
-    [],
-  );
-
-  const courseIdentifiers = useMemo(() => ({
-    targetId: String(course.id),
-    targetName: normalize(course.name),
-    targetCode: normalize(course.code),
-  }), [course.id, course.name, course.code, normalize]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSetting = async () => {
-      try {
-        let userId = supabaseUserId;
-
-        if (!userId) {
-          const supabase = createClient();
-          const { data: { session } } = await supabase.auth.getSession();
-          userId = session?.user?.id;
-        }
-
-        if (userId) {
-          const scopedKey = `showBunkCalc_${userId}`;
-          const scopedValue = localStorage.getItem(scopedKey);
-          if (scopedValue !== null && isMounted) {
-            setShowBunkCalc(scopedValue === "true");
-          }
-        } else {
-          const legacyValue = localStorage.getItem("showBunkCalc");
-          if (legacyValue !== null && isMounted) {
-            setShowBunkCalc(legacyValue === "true");
-          }
-        }
-      } catch {
-        // Ignore storage access errors
-      }
-    };
-
-    loadSetting();
-
-    const handleBunkCalcToggle = (event: CustomEvent) => {
-      if (isMounted) {
-        setShowBunkCalc(event.detail);
-      }
-    };
-
-    window.addEventListener(
-      "bunkCalcToggle",
-      handleBunkCalcToggle as EventListener,
-    );
-    return () => {
-      isMounted = false;
-      window.removeEventListener(
-        "bunkCalcToggle",
-        handleBunkCalcToggle as EventListener,
-      );
-    };
-  }, [supabaseUserId]);
-
-  const stats = useMemo(() => {
-    return calculateCourseStats(
-      course,
-      courseIdentifiers,
-      trackingData,
-      activeCourseDetails,
-      targetPercentage,
-      normalize,
-    );
-  }, [
-    activeCourseDetails,
-    course,
-    courseIdentifiers,
-    trackingData,
-    targetPercentage,
-    normalize,
-  ]);
-
-  const hasAttendanceData = useMemo(
-    () => !isSummaryLoading && stats.displayTotal > 0,
-    [isSummaryLoading, stats.displayTotal],
-  );
-
-  const isTrackingOnly = useMemo(
-    () => !isSummaryLoading && stats.realTotal === 0 && stats.displayTotal > 0,
-    [isSummaryLoading, stats.realTotal, stats.displayTotal],
-  );
-
-  const isGain = useMemo(
-    () => stats.displayPercentage >= stats.officialPercentage,
-    [stats.displayPercentage, stats.officialPercentage],
-  );
-
-  const statusColorClasses = useMemo(() => {
-    const metrics = stats.extraMetrics;
-    const isAtRisk = metrics.requiredToAttend > 0;
-
-    if (!isAtRisk) {
-      return {
-        card: "border-t-[3px] border-t-green-500/70 dark:border-t-transparent",
-        headerBg: "bg-green-500/10 dark:bg-green-500/20",
-        headerBorder: "border-green-500/20 dark:border-green-500/40",
-        badge:
-          "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
-      };
-    }
-
-    return {
-      card: "border-t-[3px] border-t-red-500/70 dark:border-t-transparent",
-      headerBg: "bg-red-500/10 dark:bg-red-500/20",
-      headerBorder: "border-red-500/20 dark:border-red-500/40",
-      badge: "bg-red-500/15 text-red-500 border-red-500/30",
-    };
-  }, [stats.extraMetrics]);
-
   const capitalize = useCallback((str: string) => {
     if (!str) return "";
     return str
@@ -696,172 +1131,6 @@ export function CourseCard({
 
   const isInactive = disabled ||
     (!isSummaryLoading && stats.displayTotal === 0);
-
-  const getDualBarRender = () => {
-    if (isGain) {
-      return (
-        <>
-          <div
-            className="absolute top-0 left-0 h-full bg-green-500 rounded-r-full transition-all duration-500 ease-in-out"
-            style={{ width: `${Math.min(stats.displayPercentage, 100)}%` }}
-          />
-          <div
-            className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
-            style={{ width: `${Math.min(stats.officialPercentage, 100)}%` }}
-          >
-            <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
-          </div>
-        </>
-      );
-    }
-    return (
-      <>
-        <div
-          className="absolute top-0 left-0 h-full bg-red-600 rounded-r-full transition-all duration-500 ease-in-out"
-          style={{ width: `${Math.min(stats.officialPercentage, 100)}%` }}
-        />
-        <div
-          className="absolute top-0 left-0 h-full bg-sky-500 transition-all duration-500 ease-in-out overflow-hidden"
-          style={{ width: `${Math.min(stats.displayPercentage, 100)}%` }}
-        >
-          <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
-        </div>
-      </>
-    );
-  };
-
-  const percentageTextClass = useMemo(() => {
-    if (stats.correctionPresent > 0 || stats.extras > 0) {
-      return isGain
-        ? "text-green-600 dark:text-green-400 font-bold"
-        : "text-red-500 dark:text-red-400 font-bold";
-    }
-    return "";
-  }, [stats.correctionPresent, stats.extras, isGain]);
-
-  const renderCardBodyContent = () => {
-    if (isSummaryLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center p-4">
-          <div className="animate-pulse h-4 w-24 bg-secondary rounded mb-2">
-          </div>
-          <div className="animate-pulse h-2 w-16 bg-secondary rounded"></div>
-        </div>
-      );
-    }
-    if (!hasAttendanceData) {
-      return (
-        <div className="flex flex-col items-center justify-center py-4 px-2 h-full gap-1">
-          <div className="flex items-center gap-2 mb-1 text-amber-600 dark:text-amber-500">
-            <AlertCircle className="h-4 w-4" aria-hidden="true" />
-            <span className="font-medium text-sm">No attendance data</span>
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            No attendance records yet
-          </p>
-        </div>
-      );
-    }
-    return (
-      <>
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className="text-center p-1 bg-green-500/10 border border-green-500/25 dark:bg-green-500/10 dark:border-green-500/20 rounded-md py-2.5 flex gap-1 flex-col">
-            <span className="text-xs text-muted-foreground block">Present</span>
-            <div className="flex items-center justify-center gap-1.5 flex-wrap px-1">
-              <span className="text-sm font-medium text-green-500">
-                {stats.realPresent}
-              </span>
-              {stats.correctionPresent > 0 && (
-                <span
-                  className="text-xs font-medium text-orange-500"
-                  title="Corrections"
-                >
-                  +{stats.correctionPresent}
-                </span>
-              )}
-              {stats.extraPresent > 0 && (
-                <span
-                  className="text-xs font-medium text-blue-500"
-                  title="Extras"
-                >
-                  +{stats.extraPresent}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="text-center p-1 bg-red-500/10 border border-red-500/25 dark:bg-red-500/10 dark:border-red-500/20 rounded-md py-2.5 flex gap-1 flex-col">
-            <span className="text-xs text-muted-foreground block">Absent</span>
-            <div className="flex items-center justify-center gap-0.5">
-              <span className="text-sm font-medium text-red-500">
-                {stats.realAbsent}
-              </span>
-              {stats.correctionPresent > 0 && (
-                <span className="text-xs font-medium text-orange-500">
-                  -{stats.correctionPresent}
-                </span>
-              )}
-              {stats.extraAbsent > 0 && (
-                <span className="text-xs font-medium text-blue-400">
-                  +{stats.extraAbsent}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="text-center p-1 bg-primary/10 border border-primary/25 dark:bg-primary/10 dark:border-primary/20 rounded-md py-2.5 flex gap-1 flex-col">
-            <span className="text-xs text-muted-foreground block">Total</span>
-            <div className="flex items-center justify-center gap-0.5">
-              <span className="text-sm font-medium">
-                {stats.realTotal}
-              </span>
-              {stats.extras > 0 && (
-                <span className="text-xs font-medium text-blue-400">
-                  +{stats.extras}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-secondary">
-            {getDualBarRender()}
-          </div>
-
-          <div className="flex justify-between items-center mb-1 text-sm mt-2 text-muted-foreground font-medium">
-            <span>Attendance</span>
-            <div className="flex items-center gap-2">
-              {(stats.correctionPresent > 0 || stats.extras > 0) &&
-                stats.officialPercentage !== stats.displayPercentage && (
-                <span className="text-xs">
-                  {stats.officialPercentage}% <span className="mx-0.5">→</span>
-                </span>
-              )}
-              <span className={percentageTextClass}>
-                {stats.displayPercentage}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {showBunkCalc && (
-          <div className="mt-4">
-            <BunkCalculatorPanel
-              stats={stats}
-              trackingIsStrictlyBetter={stats.extraMetrics.canBunk >
-                  stats.safeMetrics.canBunk ||
-                (stats.extraMetrics.canBunk === 0 &&
-                  stats.safeMetrics.canBunk === 0 &&
-                  stats.extraMetrics.requiredToAttend <
-                    stats.safeMetrics.requiredToAttend)}
-              noOfficialData={stats.realTotal === 0}
-            />
-          </div>
-        )}
-      </>
-    );
-  };
 
   return (
     <Card
@@ -912,6 +1181,24 @@ export function CourseCard({
               </button>
             )}
           </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0.5 border-primary/30 text-primary font-semibold"
+            >
+              Target: {stats.effectiveTarget}%
+            </Badge>
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-semibold"
+            >
+              {Math.max(0, stats.dutyLeaves || 0)}{" "}
+              {Math.max(0, stats.dutyLeaves || 0) === 1
+                ? "Duty Leave"
+                : "Duty Leaves"}
+            </Badge>
+          </div>
         </div>
         <div className="flex flex-col items-end gap-3 shrink-0">
           <Badge
@@ -947,7 +1234,14 @@ export function CourseCard({
       </CardHeader>
 
       <CardContent className="h-full pb-6">
-        {renderCardBodyContent()}
+        <CardBodyContent
+          isSummaryLoading={isSummaryLoading}
+          hasAttendanceData={hasAttendanceData}
+          stats={stats}
+          isGain={isGain}
+          percentageTextClass={percentageTextClass}
+          showBunkCalc={showBunkCalc}
+        />
       </CardContent>
 
       <DisableCourseDialog

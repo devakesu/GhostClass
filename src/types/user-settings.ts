@@ -16,6 +16,11 @@ export interface UserSettings {
    * Mirrors the DB column: `disabled_courses jsonb NOT NULL DEFAULT '{}'`.
    */
   disabled_courses: DisabledCoursesMap;
+  /**
+   * Map of course code to target percentage.
+   * Example: `{ "CS101": 85, "GXEST204": 80 }`
+   */
+  course_targets?: Record<string, number>;
 }
 
 /**

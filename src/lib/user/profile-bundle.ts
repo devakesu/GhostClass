@@ -107,11 +107,13 @@ export async function getProfileBundle(
         bunk_calculator_enabled: settings.bunk_calculator_enabled,
         target_percentage: settings.target_percentage,
         disabled_courses: settings.disabled_courses || {},
+        course_targets: settings.course_targets || {},
       }
       : {
         bunk_calculator_enabled: true,
         target_percentage: 75,
         disabled_courses: {},
+        course_targets: {},
       },
   };
 }

@@ -39,6 +39,7 @@ export interface UserSettings {
   bunk_calculator_enabled: boolean;
   target_percentage: number;
   disabled_courses: Record<string, Record<string, string>>; // semesterId -> courseId -> reason
+  course_targets?: Record<string, number>; // courseCode -> target percentage
 }
 
 interface UserSettingsContextType {
@@ -47,6 +48,8 @@ interface UserSettingsContextType {
   updateBunkCalc: (enabled: boolean) => void;
   updateTarget: (percentage: number) => void;
   updateDisabledCourses: (map: Record<string, Record<string, string>>) => void;
+  updateCourseTarget: (courseCode: string, target: number) => void;
+  updateCourseTargets: (map: Record<string, number>) => void;
 }
 
 const UserSettingsContext = createContext<UserSettingsContextType | undefined>(
@@ -222,7 +225,9 @@ function useUserSettingsState() {
 
       const { data, error } = await supabase
         .from("user_settings")
-        .select("bunk_calculator_enabled, target_percentage, disabled_courses")
+        .select(
+          "bunk_calculator_enabled, target_percentage, disabled_courses, course_targets",
+        )
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -357,6 +362,10 @@ function useUserSettingsState() {
         `disabledCourses_${userId}`,
         JSON.stringify(dbSettings.disabled_courses),
       );
+      sync(
+        `courseTargets_${userId}`,
+        JSON.stringify(dbSettings.course_targets || {}),
+      );
     } catch (err) {
       // Non-fatal error; just log to dev console
       logger.dev("Error during storage sync:", err);
@@ -373,6 +382,22 @@ function useUserSettingsState() {
     mutation.mutate({ target_percentage: normalizeTarget(percentage) });
   const updateDisabledCourses = (map: Record<string, Record<string, string>>) =>
     mutation.mutate({ disabled_courses: map });
+  const updateCourseTarget = (courseCode: string, target: number) => {
+    const currentTargets = dbSettings?.course_targets || {};
+    const updated = {
+      ...currentTargets,
+      [courseCode]: normalizeTarget(target),
+    };
+    mutation.mutate({ course_targets: updated });
+  };
+  const updateCourseTargets = (map: Record<string, number>) => {
+    const normalizedMap: Record<string, number> = {};
+    Object.entries(map).forEach(([code, val]) => {
+      /* eslint-disable-next-line security/detect-object-injection */
+      normalizedMap[code] = normalizeTarget(val);
+    });
+    mutation.mutate({ course_targets: normalizedMap });
+  };
 
   return {
     settings: dbSettings ?? null,
@@ -380,6 +405,8 @@ function useUserSettingsState() {
     updateBunkCalc,
     updateTarget,
     updateDisabledCourses,
+    updateCourseTarget,
+    updateCourseTargets,
   };
 }
 

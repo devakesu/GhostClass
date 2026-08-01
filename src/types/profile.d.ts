@@ -44,6 +44,7 @@ export interface UserProfile {
     bunk_calculator_enabled: boolean;
     target_percentage: number;
     disabled_courses: Record<string, Record<string, string>>;
+    course_targets?: Record<string, number>;
   } | null;
   /** Optional class relation included by some profile responses */
   class?: {
