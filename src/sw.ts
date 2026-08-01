@@ -53,7 +53,9 @@ self.addEventListener("fetch", (event) => {
   //      network so the browser manages cookies and caching based on server policy.
   try {
     const url = new URL(event.request.url);
-    if (url.pathname.startsWith("/monitoring") || url.pathname.startsWith("/api/")) {
+    if (
+      url.pathname.startsWith("/monitoring") || url.pathname.startsWith("/api/")
+    ) {
       event.stopImmediatePropagation();
       return;
     }
@@ -159,7 +161,7 @@ self.addEventListener("activate", (event) => {
       // broke Next.js streaming SSR. Any previously cached page HTML is now
       // stale and should be cleared so users don't get stuck.
       caches.delete("pages"),
-    ])
+    ]),
   );
 });
 
@@ -178,7 +180,9 @@ self.addEventListener("message", (event) => {
     }
 
     try {
-      const client = await self.clients.get((source as Client | WindowClient).id);
+      const client = await self.clients.get(
+        (source as Client | WindowClient).id,
+      );
       if (!client) {
         return;
       }

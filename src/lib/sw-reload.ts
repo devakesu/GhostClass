@@ -44,7 +44,7 @@ const ACTIVATION_TIMEOUT_MS = 3000;
 
 function activateAndRun(
   waitingWorker: ServiceWorker,
-  onReady: () => void
+  onReady: () => void,
 ): void {
   let done = false;
   let controllerChangeHandler: (() => void) | undefined;
@@ -59,7 +59,7 @@ function activateAndRun(
       if (controllerChangeHandler) {
         navigator.serviceWorker.removeEventListener(
           "controllerchange",
-          controllerChangeHandler
+          controllerChangeHandler,
         );
         controllerChangeHandler = undefined;
       }
@@ -74,9 +74,13 @@ function activateAndRun(
   // statechange/timeout paths even if `once:true` hasn't fired yet.
   const onControllerChange = () => finish();
   controllerChangeHandler = onControllerChange;
-  navigator.serviceWorker.addEventListener("controllerchange", onControllerChange, {
-    once: true,
-  });
+  navigator.serviceWorker.addEventListener(
+    "controllerchange",
+    onControllerChange,
+    {
+      once: true,
+    },
+  );
 
   // Secondary signal: waiting worker reached 'activated' state.
   // Fires even when clientsClaim: false (where controllerchange may never

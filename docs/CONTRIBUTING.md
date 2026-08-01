@@ -1,6 +1,7 @@
 # Contributing to GhostClass
 
-Thank you for your interest in contributing to GhostClass! This guide will help you understand our development workflow and contribution process.
+Thank you for your interest in contributing to GhostClass! This guide will help
+you understand our development workflow and contribution process.
 
 ## Table of Contents
 
@@ -21,7 +22,8 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 - **WSL2** (Linux distribution such as Ubuntu/Debian)
 - **VS Code or Antigravity IDE / any IDE with WSL/Docker Support**
 
-Complete step-by-step dev container environment setup: **[Getting Started / Dev Container Setup](../README.md#-getting-started)**.
+Complete step-by-step dev container environment setup:
+**[Getting Started / Dev Container Setup](../README.md#-getting-started)**.
 
 ## Development Workflow
 
@@ -64,11 +66,16 @@ flutter build apk        # Build Android APK
 5. Commit with clear messages (see [Commit Messages](#commit-messages))
 6. Push and create a Pull Request
 
-**Important**: Centralized version values apply automatically! See [Versioning System](#versioning-system) below.
+**Important**: Centralized version values apply automatically! See
+[Versioning System](#versioning-system) below.
 
 ## Versioning System
 
-GhostClass derives its build versions dynamically via centralized Infisical runtime and CI configurations (`NEXT_PUBLIC_APP_VERSION`). Contributors do not need to manually compute or inject git semantic rollover tags when proposing features. Maintainers synchronize version thresholds directly in the project dashboard prior to production releases.
+GhostClass derives its build versions dynamically via centralized Infisical
+runtime and CI configurations (`NEXT_PUBLIC_APP_VERSION`). Contributors do not
+need to manually compute or inject git semantic rollover tags when proposing
+features. Maintainers synchronize version thresholds directly in the project
+dashboard prior to production releases.
 
 ## Pull Request Process
 
@@ -214,35 +221,42 @@ Closes #123
 
 - **Bug Reports**: Use [bug report template](.github/ISSUE_TEMPLATE)
 - **Feature Requests**: Use [feature request template](.github/ISSUE_TEMPLATE)
-- **Questions**: Open a [Discussion](https://github.com/devakesu/GhostClass/discussions)
+- **Questions**: Open a
+  [Discussion](https://github.com/devakesu/GhostClass/discussions)
 - **Setup Issues**: Check [SECURITY.md](../SECURITY.md) and `.example.env`
 
 ---
 
 ## For Maintainers Only
 
-> **⚠️ This section is for repository maintainers with write access only.**  
+> **⚠️ This section is for repository maintainers with write access only.**\
 > External contributors can skip this section entirely.
 
 ### Maintainer Tools
 
 #### Infisical Secret Orchestration
 
-- Centralized management via Infisical Dashboard acts as the single source of truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
-- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations, Coolify production runtime environments inject `/runtime` secrets dynamically into memory at boot time using the Infisical CLI wrapper.
+- Centralized management via Infisical Dashboard acts as the single source of
+  truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
+- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations,
+  Coolify production runtime environments inject `/runtime` secrets dynamically
+  into memory at boot time using the Infisical CLI wrapper.
 - Eliminates manual script execution and plaintext storage on disk.
 - External contributors don't need access to Infisical to submit code.
 
 ### Version Management
 
-- App Versioning: Controlled directly via `NEXT_PUBLIC_APP_VERSION` injected dynamically at runtime/compile-time.
-- Release Automation: Dynamic multi-arch bundles and attestation manual updates are published synchronously upon successful merges to the primary main trunk.
+- App Versioning: Controlled directly via `NEXT_PUBLIC_APP_VERSION` injected
+  dynamically at runtime/compile-time.
+- Release Automation: Dynamic multi-arch bundles and attestation manual updates
+  are published synchronously upon successful merges to the primary main trunk.
 
 ---
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's GPLv3 license.
+By contributing, you agree that your contributions will be licensed under the
+project's GPLv3 license.
 
 ---
 

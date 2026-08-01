@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
-vi.unmock('@/hooks/courses/useFetchClassCourses')
-import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.unmock("@/hooks/courses/useFetchClassCourses");
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFetchClassCourses } from "../useFetchClassCourses";
 import { createClient } from "@/lib/supabase/client";
 import { useProfile } from "@/hooks/users/profile";
@@ -50,13 +50,18 @@ describe("useFetchClassCourses", () => {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      then: vi.fn().mockImplementation((cb) => cb({ data: mockData, error: null })),
+      then: vi.fn().mockImplementation((cb) =>
+        cb({ data: mockData, error: null })
+      ),
     };
     (createClient as any).mockReturnValue(mockSupabase);
 
-    const { result } = renderHook(() => useFetchClassCourses({ semester: "1", year: "2023" }), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useFetchClassCourses({ semester: "1", year: "2023" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
@@ -72,28 +77,36 @@ describe("useFetchClassCourses", () => {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      then: vi.fn().mockImplementation((cb) => cb({ data: null, error: mockError })),
+      then: vi.fn().mockImplementation((cb) =>
+        cb({ data: null, error: mockError })
+      ),
     };
     (createClient as any).mockReturnValue(mockSupabase);
 
-    const { result } = renderHook(() => useFetchClassCourses({ semester: "1", year: "2023" }), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useFetchClassCourses({ semester: "1", year: "2023" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([]);
   });
 
   it("should handle generic exception in queryFn", async () => {
-     const mockProfile = { class: { id: 100 } };
+    const mockProfile = { class: { id: 100 } };
     (useProfile as any).mockReturnValue({ data: mockProfile });
     (createClient as any).mockImplementation(() => {
-        throw new Error("Supabase crashed");
+      throw new Error("Supabase crashed");
     });
 
-    const { result } = renderHook(() => useFetchClassCourses({ semester: "1", year: "2023" }), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useFetchClassCourses({ semester: "1", year: "2023" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([]);
@@ -102,18 +115,24 @@ describe("useFetchClassCourses", () => {
   it("should not run if semester/year/classId is missing", async () => {
     (useProfile as any).mockReturnValue({ data: null });
 
-    const { result } = renderHook(() => useFetchClassCourses({ semester: "1", year: "2023" }), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useFetchClassCourses({ semester: "1", year: "2023" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     expect(result.current.isEnabled).toBe(false);
   });
 
   it("should handle profile with no class", async () => {
     (useProfile as any).mockReturnValue({ data: { class: null } });
-    const { result } = renderHook(() => useFetchClassCourses({ semester: "1", year: "2023" }), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useFetchClassCourses({ semester: "1", year: "2023" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
     expect(result.current.isEnabled).toBe(false);
   });
 });

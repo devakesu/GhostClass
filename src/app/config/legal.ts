@@ -1,6 +1,7 @@
 export const TERMS_VERSION = "2.8";
 export const LEGAL_EFFECTIVE_DATE = "May 14, 2026";
-const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL || "legal@ghostclass.devakesu.com";
+const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL ||
+  "legal@ghostclass.devakesu.com";
 
 // ------------------------------------------------------------------
 // 1.  DISCLAIMER

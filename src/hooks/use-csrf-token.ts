@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import axios from "@/lib/axios";
-import { setCsrfToken, getCsrfToken } from "@/lib/axios";
+import { getCsrfToken, setCsrfToken } from "@/lib/axios";
 import { logger } from "@/lib/logger";
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
@@ -90,7 +90,10 @@ function cleanupStaleKeys() {
 }
 
 function handleInitResponse(data: unknown) {
-  if (data && typeof data === "object" && "token" in data && typeof data.token === "string") {
+  if (
+    data && typeof data === "object" && "token" in data &&
+    typeof data.token === "string"
+  ) {
     setCsrfToken(data.token);
   }
   cleanupStaleKeys();

@@ -1,25 +1,25 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import '@testing-library/jest-dom';
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
-} from '../dropdown-menu';
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "../dropdown-menu";
 
-describe('DropdownMenu UI Components', () => {
-  it('renders dropdown menu components', () => {
+describe("DropdownMenu UI Components", () => {
+  it("renders dropdown menu components", () => {
     render(
       <DropdownMenu open={true}>
         <DropdownMenuTrigger>Open</DropdownMenuTrigger>
@@ -29,7 +29,9 @@ describe('DropdownMenu UI Components', () => {
           <DropdownMenuItem inset>
             Item 1 <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
           </DropdownMenuItem>
-          <DropdownMenuCheckboxItem checked>Checkbox Item</DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem checked>
+            Checkbox Item
+          </DropdownMenuCheckboxItem>
           <DropdownMenuRadioGroup value="1">
             <DropdownMenuRadioItem value="1">Radio 1</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
@@ -40,25 +42,25 @@ describe('DropdownMenu UI Components', () => {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     );
 
-    expect(screen.getByText('Label')).toBeInTheDocument();
-    expect(screen.getByText('Item 1')).toBeInTheDocument();
-    expect(screen.getByText('⌘K')).toBeInTheDocument();
-    expect(screen.getByText('Checkbox Item')).toBeInTheDocument();
-    expect(screen.getByText('Radio 1')).toBeInTheDocument();
-    expect(screen.getByText('Sub Menu')).toBeInTheDocument();
+    expect(screen.getByText("Label")).toBeInTheDocument();
+    expect(screen.getByText("Item 1")).toBeInTheDocument();
+    expect(screen.getByText("⌘K")).toBeInTheDocument();
+    expect(screen.getByText("Checkbox Item")).toBeInTheDocument();
+    expect(screen.getByText("Radio 1")).toBeInTheDocument();
+    expect(screen.getByText("Sub Menu")).toBeInTheDocument();
   });
 
-  it('renders destructive variant item', () => {
+  it("renders destructive variant item", () => {
     render(
-        <DropdownMenu open={true}>
-            <DropdownMenuContent>
-                <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+      <DropdownMenu open={true}>
+        <DropdownMenuContent>
+          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>,
     );
-    expect(screen.getByText('Delete')).toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
   });
 });

@@ -49,122 +49,137 @@ const ALLOWED_AVATAR_MIME_TO_EXT: Record<string, string> = {
  */
 export async function uploadUserAvatar(file: File) {
   const supabase = createClient();
-  
+
   // 1. Get Current User
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-      const err = new Error("User not authenticated during avatar upload");
-      Sentry.captureException(err, { tags: { type: "avatar_auth_error", location: "uploadUserAvatar" } });
-      throw err;
+    const err = new Error("User not authenticated during avatar upload");
+    Sentry.captureException(err, {
+      tags: { type: "avatar_auth_error", location: "uploadUserAvatar" },
+    });
+    throw err;
   }
 
   try {
-      // 2. Validate MIME type against whitelist — derive extension and content-type
-      // from the map, never from user-controlled file.name or file.type.
-      const validatedContentType = file.type;
-      const hasMime = Object.prototype.hasOwnProperty.call(ALLOWED_AVATAR_MIME_TO_EXT, validatedContentType);
-      
-      if (!hasMime) {
-        throw new Error(
-          `Unsupported file type: "${validatedContentType}". Only JPEG, PNG, and WebP images are allowed.`
-        );
-      }
-      const fileExt = Reflect.get(ALLOWED_AVATAR_MIME_TO_EXT, validatedContentType);
+    // 2. Validate MIME type against whitelist — derive extension and content-type
+    // from the map, never from user-controlled file.name or file.type.
+    const validatedContentType = file.type;
+    const hasMime = Object.prototype.hasOwnProperty.call(
+      ALLOWED_AVATAR_MIME_TO_EXT,
+      validatedContentType,
+    );
 
-      // 3. Prepare File Path using the whitelisted extension
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+    if (!hasMime) {
+      throw new Error(
+        `Unsupported file type: "${validatedContentType}". Only JPEG, PNG, and WebP images are allowed.`,
+      );
+    }
+    const fileExt = Reflect.get(
+      ALLOWED_AVATAR_MIME_TO_EXT,
+      validatedContentType,
+    );
 
-      // 4. Upload File directly to Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, {
-            upsert: true,
-            // Use the map key as the stored content-type, not the raw file.type value,
-            // so Supabase always serves the object with a known-safe MIME type.
-            contentType: validatedContentType,
-        });
+    // 3. Prepare File Path using the whitelisted extension
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      // 4. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // Guard: getPublicUrl() is synchronous and cannot fail — it constructs the URL
-      // client-side from NEXT_PUBLIC_SUPABASE_URL. A misconfigured env var would silently
-      // write a wrong-project URL to the DB without this check.
-      const supabaseProjectUrl = getSupabaseConfig("client").url;
-        
-      if (supabaseProjectUrl && !publicUrl.startsWith(supabaseProjectUrl)) {
-        throw new Error(
-          `Avatar URL origin mismatch: expected URL starting with ${supabaseProjectUrl} but got ${publicUrl}. Check NEXT_PUBLIC_SUPABASE_URL.`
-        );
-      }
-
-      // 5. Update User Profile in DB
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ avatar_url: publicUrl })
-        .eq('auth_id', user.id);
-
-      if (updateError) {
-        const profileUpdateError = new Error(`Profile update failed: ${updateError.message}`);
-        try {
-          await supabase.storage.from('avatars').remove([filePath]);
-        } catch (cleanupErr) {
-          logger.warn("Avatar cleanup after profile update failure failed (non-critical):", cleanupErr);
-          Sentry.captureException(cleanupErr, {
-            level: "warning",
-            tags: { type: "avatar_cleanup_fail", location: "uploadUserAvatar_cleanupOnUpdateFail" },
-          });
-        }
-        throw profileUpdateError;
-      }
-
-      // 6. Cleanup: Delete old avatars in the background
-      (async () => {
-          try {
-            // Bound the list call: limit prevents unbounded pagination; AbortSignal.timeout
-            // ensures the unawaited cleanup doesn't hold a connection open indefinitely.
-            const cleanupSignal = AbortSignal.timeout(15_000);
-            const { data: files } = await supabase.storage
-              .from('avatars')
-              .list(user.id, { limit: 100 }, { signal: cleanupSignal });
-
-            if (files && files.length > 0) {
-              const filesToDelete = files
-                .filter((f) => f.name !== fileName) // Keep the new one
-                .map((f) => `${user.id}/${f.name}`);
-
-              if (filesToDelete.length > 0) {
-                await supabase.storage.from('avatars').remove(filesToDelete);
-              }
-            }
-          } catch (cleanupErr) {
-            logger.warn("Background cleanup failed (non-critical):", cleanupErr);
-            Sentry.captureException(cleanupErr, { 
-                level: "warning",
-                tags: { type: "avatar_cleanup_fail", location: "uploadUserAvatar" } 
-            });
-          }
-      })();
-
-      return publicUrl;
-
-  } catch (error: unknown) {
-      logger.error("Avatar Upload Flow Failed:", error);
-      Sentry.captureException(error, {
-          tags: { type: "avatar_upload_critical", location: "uploadUserAvatar" },
-          extra: { 
-              userId: redact("id", String(user.id)),
-              fileSize: file.size,
-              fileType: file.type
-          }
+    // 4. Upload File directly to Storage
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        upsert: true,
+        // Use the map key as the stored content-type, not the raw file.type value,
+        // so Supabase always serves the object with a known-safe MIME type.
+        contentType: validatedContentType,
       });
-      throw error;
+
+    if (uploadError) {
+      throw new Error(`Upload failed: ${uploadError.message}`);
+    }
+
+    // 4. Get Public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    // Guard: getPublicUrl() is synchronous and cannot fail — it constructs the URL
+    // client-side from NEXT_PUBLIC_SUPABASE_URL. A misconfigured env var would silently
+    // write a wrong-project URL to the DB without this check.
+    const supabaseProjectUrl = getSupabaseConfig("client").url;
+
+    if (supabaseProjectUrl && !publicUrl.startsWith(supabaseProjectUrl)) {
+      throw new Error(
+        `Avatar URL origin mismatch: expected URL starting with ${supabaseProjectUrl} but got ${publicUrl}. Check NEXT_PUBLIC_SUPABASE_URL.`,
+      );
+    }
+
+    // 5. Update User Profile in DB
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ avatar_url: publicUrl })
+      .eq("auth_id", user.id);
+
+    if (updateError) {
+      const profileUpdateError = new Error(
+        `Profile update failed: ${updateError.message}`,
+      );
+      try {
+        await supabase.storage.from("avatars").remove([filePath]);
+      } catch (cleanupErr) {
+        logger.warn(
+          "Avatar cleanup after profile update failure failed (non-critical):",
+          cleanupErr,
+        );
+        Sentry.captureException(cleanupErr, {
+          level: "warning",
+          tags: {
+            type: "avatar_cleanup_fail",
+            location: "uploadUserAvatar_cleanupOnUpdateFail",
+          },
+        });
+      }
+      throw profileUpdateError;
+    }
+
+    // 6. Cleanup: Delete old avatars in the background
+    (async () => {
+      try {
+        // Bound the list call: limit prevents unbounded pagination; AbortSignal.timeout
+        // ensures the unawaited cleanup doesn't hold a connection open indefinitely.
+        const cleanupSignal = AbortSignal.timeout(15_000);
+        const { data: files } = await supabase.storage
+          .from("avatars")
+          .list(user.id, { limit: 100 }, { signal: cleanupSignal });
+
+        if (files && files.length > 0) {
+          const filesToDelete = files
+            .filter((f) => f.name !== fileName) // Keep the new one
+            .map((f) => `${user.id}/${f.name}`);
+
+          if (filesToDelete.length > 0) {
+            await supabase.storage.from("avatars").remove(filesToDelete);
+          }
+        }
+      } catch (cleanupErr) {
+        logger.warn("Background cleanup failed (non-critical):", cleanupErr);
+        Sentry.captureException(cleanupErr, {
+          level: "warning",
+          tags: { type: "avatar_cleanup_fail", location: "uploadUserAvatar" },
+        });
+      }
+    })();
+
+    return publicUrl;
+  } catch (error: unknown) {
+    logger.error("Avatar Upload Flow Failed:", error);
+    Sentry.captureException(error, {
+      tags: { type: "avatar_upload_critical", location: "uploadUserAvatar" },
+      extra: {
+        userId: redact("id", String(user.id)),
+        fileSize: file.size,
+        fileType: file.type,
+      },
+    });
+    throw error;
   }
 }

@@ -1,7 +1,12 @@
 import { renderHook, waitFor } from "@testing-library/react";
-vi.unmock('@/hooks/courses/attendance')
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useAttendanceReport, useCourseDetails, useAllCourseDetails, _resetModuleState } from "../attendance";
+vi.unmock("@/hooks/courses/attendance");
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  _resetModuleState,
+  useAllCourseDetails,
+  useAttendanceReport,
+  useCourseDetails,
+} from "../attendance";
 import axios from "@/lib/axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -55,10 +60,13 @@ describe("attendance hooks", () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data).toEqual(mockData);
-      expect(axios.post).toHaveBeenCalledWith("/attendancereports/student/detailed", {
-        semester: "1",
-        year: "2023",
-      });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/attendancereports/student/detailed",
+        {
+          semester: "1",
+          year: "2023",
+        },
+      );
     });
 
     it("should handle fetch error", async () => {
@@ -136,12 +144,12 @@ describe("attendance hooks", () => {
     });
 
     it("should handle missing totel/total/percentage entirely", async () => {
-       (axios.get as any).mockResolvedValueOnce({ data: {} });
-       const { result } = renderHook(() => useCourseDetails("CS101", 123), {
-         wrapper: createWrapper(),
-       });
-       await waitFor(() => expect(result.current.isSuccess).toBe(true));
-       expect(result.current.data?.total).toBeUndefined();
+      (axios.get as any).mockResolvedValueOnce({ data: {} });
+      const { result } = renderHook(() => useCourseDetails("CS101", 123), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.total).toBeUndefined();
     });
 
     it("should throw if course detail fetch returns null", async () => {
@@ -153,9 +161,12 @@ describe("attendance hooks", () => {
     });
 
     it("should handle custom courses (ezygoId 0)", async () => {
-      const { result } = renderHook(() => useCourseDetails("CUSTOM", 0, "Custom Course"), {
-        wrapper: createWrapper(),
-      });
+      const { result } = renderHook(
+        () => useCourseDetails("CUSTOM", 0, "Custom Course"),
+        {
+          wrapper: createWrapper(),
+        },
+      );
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(result.current.data?.course.name).toBe("Custom Course");
@@ -182,8 +193,12 @@ describe("attendance hooks", () => {
       });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(axios.get).toHaveBeenCalledWith("/attendancereports/institutionuser/courses/456/summery");
-      expect(axios.get).toHaveBeenCalledWith("/attendancereports/institutionuser/courses/456/summary");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/456/summery",
+      );
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/456/summary",
+      );
     });
   });
 
@@ -203,7 +218,9 @@ describe("attendance hooks", () => {
       const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
       );
 
       const { result } = renderHook(() => useAllCourseDetails(courses), {
@@ -215,8 +232,16 @@ describe("attendance hooks", () => {
       expect(result.current.data?.CS102.total).toBe(20);
 
       // Check if individual cache was updated
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS101", 123], expect.any(Object));
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS102", 456], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith([
+        "attendance-report",
+        "CS101",
+        123,
+      ], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith([
+        "attendance-report",
+        "CS102",
+        456,
+      ], expect.any(Object));
     });
 
     it("should normalize cache keys for courses with spaces and hyphens", async () => {
@@ -232,7 +257,9 @@ describe("attendance hooks", () => {
       const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
       );
 
       const { result } = renderHook(() => useAllCourseDetails(courses), {
@@ -240,28 +267,38 @@ describe("attendance hooks", () => {
       });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      
+
       // The cached key should be normalized (uppercase, spaces and hyphens removed)
-      expect(setQueryDataSpy).toHaveBeenCalledWith(["attendance-report", "CS1012", 123], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith([
+        "attendance-report",
+        "CS1012",
+        123,
+      ], expect.any(Object));
     });
 
     it("should handle missing course in batch courses list", async () => {
-       const mockBatchData = {
-         UNKNOWN: { total: 10, percentage: 90 },
-       };
-       (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
-       const { result } = renderHook(() => useAllCourseDetails([{ code: "CS101", id: 1, name: "N" }]), {
-         wrapper: createWrapper(),
-       });
-       await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      const mockBatchData = {
+        UNKNOWN: { total: 10, percentage: 90 },
+      };
+      (axios.post as any).mockResolvedValueOnce({ data: mockBatchData });
+      const { result } = renderHook(
+        () => useAllCourseDetails([{ code: "CS101", id: 1, name: "N" }]),
+        {
+          wrapper: createWrapper(),
+        },
+      );
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
     });
 
     it("should throw if batch response is empty", async () => {
-       (axios.post as any).mockResolvedValueOnce({ data: null });
-       const { result } = renderHook(() => useAllCourseDetails([{ code: "X", id: 1, name: "X" }]), {
-         wrapper: createWrapper(),
-       });
-       await waitFor(() => expect(result.current.isError).toBe(true));
+      (axios.post as any).mockResolvedValueOnce({ data: null });
+      const { result } = renderHook(
+        () => useAllCourseDetails([{ code: "X", id: 1, name: "X" }]),
+        {
+          wrapper: createWrapper(),
+        },
+      );
+      await waitFor(() => expect(result.current.isError).toBe(true));
     });
   });
 });

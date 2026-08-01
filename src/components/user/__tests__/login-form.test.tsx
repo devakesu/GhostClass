@@ -1,10 +1,22 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import React from "react";
 
 // vi.mock factories are hoisted to the top of the file, so variables used inside
 // them must also be hoisted via vi.hoisted().
-const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter, mockGetSession } = vi.hoisted(() => {
+const {
+  mockNProgressStart,
+  mockNProgressDone,
+  mockAxiosPost,
+  mockRouter,
+  mockGetSession,
+} = vi.hoisted(() => {
   const push = vi.fn();
   return {
     mockNProgressStart: vi.fn(),
@@ -12,9 +24,19 @@ const { mockNProgressStart, mockNProgressDone, mockAxiosPost, mockRouter, mockGe
     mockAxiosPost: vi.fn(),
     // A single stable router object prevents useEffect([router, supabase]) from
     // re-running on every render (which would cause an infinite loop in tests).
-    mockRouter: { push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() },
+    mockRouter: {
+      push,
+      replace: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+    },
     // Hoisted so it can be used inside the vi.mock factory for @/lib/supabase/client.
-    mockGetSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+    mockGetSession: vi.fn().mockResolvedValue({
+      data: { session: null },
+      error: null,
+    }),
   };
 });
 
@@ -71,11 +93,14 @@ vi.mock("axios", () => ({
 // --- Framer-motion mock ---
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, ...rest }: React.PropsWithChildren<Record<string, unknown>>) =>
-      React.createElement("div", rest, children),
+    div: (
+      { children, ...rest }: React.PropsWithChildren<Record<string, unknown>>,
+    ) => React.createElement("div", rest, children),
   },
-  AnimatePresence: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
-  LazyMotion: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
+  AnimatePresence: ({ children }: React.PropsWithChildren) =>
+    React.createElement(React.Fragment, null, children),
+  LazyMotion: ({ children }: React.PropsWithChildren) =>
+    React.createElement(React.Fragment, null, children),
   domAnimation: {},
 }));
 
@@ -120,7 +145,8 @@ vi.mock("@/lib/security/auth", () => ({
 
 // --- Password-reset form ---
 vi.mock("../password-reset-form", () => ({
-  PasswordResetForm: () => React.createElement("div", { "data-testid": "password-reset-form" }),
+  PasswordResetForm: () =>
+    React.createElement("div", { "data-testid": "password-reset-form" }),
 }));
 
 // --- User settings provider ---
@@ -134,7 +160,10 @@ vi.mock("@/lib/security/csrf-constants", () => ({
 }));
 
 import { LoginForm } from "../login-form";
-import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
+import {
+  isAuthSessionMissingError,
+  isSupabaseLockTimeoutError,
+} from "@/lib/security/auth";
 import { getCsrfToken, setCsrfToken } from "@/lib/axios";
 
 // ---------------------------------------------------------------------------
@@ -215,7 +244,10 @@ describe("LoginForm – login method auto-detection", () => {
     fireEvent.change(loginInput, { target: { value: "student@example.com" } });
 
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("student@example.com")).toHaveAttribute("type", "email");
+    expect(screen.getByDisplayValue("student@example.com")).toHaveAttribute(
+      "type",
+      "email",
+    );
   });
 
   it("switches login method to phone while typing a phone number", async () => {
@@ -225,7 +257,10 @@ describe("LoginForm – login method auto-detection", () => {
     fireEvent.change(loginInput, { target: { value: "919234567890" } });
 
     expect(screen.getByLabelText("Phone")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("919234567890")).toHaveAttribute("type", "tel");
+    expect(screen.getByDisplayValue("919234567890")).toHaveAttribute(
+      "type",
+      "tel",
+    );
   });
 
   it("reverts to username mode when an auto-inferred email no longer looks like email", async () => {
@@ -235,7 +270,9 @@ describe("LoginForm – login method auto-detection", () => {
     fireEvent.change(loginInput, { target: { value: "student@" } });
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "student" },
+    });
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "text");
@@ -250,7 +287,10 @@ describe("LoginForm – login method auto-detection", () => {
     fireEvent.change(loginInput, { target: { value: "student" } });
 
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("student")).toHaveAttribute("type", "email");
+    expect(screen.getByDisplayValue("student")).toHaveAttribute(
+      "type",
+      "email",
+    );
   });
 
   it("keeps manual phone selection while typing short digits", async () => {
@@ -269,8 +309,22 @@ describe("LoginForm – login method auto-detection", () => {
 describe("LoginForm – mount-time storage cleanup", () => {
   // Replace the global Storage objects with mocks so we can reliably track calls.
   // vi.spyOn on the Storage prototype can fail silently in jsdom.
-  let mockLocalStorage: { clear: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn>; getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; key: ReturnType<typeof vi.fn>; length: number };
-  let mockSessionStorage: { clear: ReturnType<typeof vi.fn>; removeItem: ReturnType<typeof vi.fn>; getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn>; key: ReturnType<typeof vi.fn>; length: number };
+  let mockLocalStorage: {
+    clear: ReturnType<typeof vi.fn>;
+    removeItem: ReturnType<typeof vi.fn>;
+    getItem: ReturnType<typeof vi.fn>;
+    setItem: ReturnType<typeof vi.fn>;
+    key: ReturnType<typeof vi.fn>;
+    length: number;
+  };
+  let mockSessionStorage: {
+    clear: ReturnType<typeof vi.fn>;
+    removeItem: ReturnType<typeof vi.fn>;
+    getItem: ReturnType<typeof vi.fn>;
+    setItem: ReturnType<typeof vi.fn>;
+    key: ReturnType<typeof vi.fn>;
+    length: number;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -279,10 +333,32 @@ describe("LoginForm – mount-time storage cleanup", () => {
     vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(false);
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
 
-    mockLocalStorage = { clear: vi.fn(), removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), key: vi.fn(), length: 0 };
-    mockSessionStorage = { clear: vi.fn(), removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), key: vi.fn(), length: 0 };
-    Object.defineProperty(global, "localStorage", { writable: true, configurable: true, value: mockLocalStorage });
-    Object.defineProperty(global, "sessionStorage", { writable: true, configurable: true, value: mockSessionStorage });
+    mockLocalStorage = {
+      clear: vi.fn(),
+      removeItem: vi.fn(),
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      key: vi.fn(),
+      length: 0,
+    };
+    mockSessionStorage = {
+      clear: vi.fn(),
+      removeItem: vi.fn(),
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      key: vi.fn(),
+      length: 0,
+    };
+    Object.defineProperty(global, "localStorage", {
+      writable: true,
+      configurable: true,
+      value: mockLocalStorage,
+    });
+    Object.defineProperty(global, "sessionStorage", {
+      writable: true,
+      configurable: true,
+      value: mockSessionStorage,
+    });
   });
 
   it("clears localStorage and sessionStorage when there is no session and no error", async () => {
@@ -292,24 +368,34 @@ describe("LoginForm – mount-time storage cleanup", () => {
     // Use waitFor because checkUser() is async: render() resolves immediately on the
     // initial (pre-loading) frame, before the useEffect async session check completes.
     await waitFor(() => expect(mockLocalStorage.clear).toHaveBeenCalled());
-    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("prefetchedSettings");
+    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+      "prefetchedSettings",
+    );
   });
 
   it("clears localStorage and sessionStorage when there is no session and the error is a session-missing error", async () => {
     const sessionError = new Error("Auth session missing");
-    mockGetSession.mockResolvedValue({ data: { session: null }, error: sessionError });
+    mockGetSession.mockResolvedValue({
+      data: { session: null },
+      error: sessionError,
+    });
     vi.mocked(isAuthSessionMissingError).mockReturnValue(true);
 
     render(<LoginForm />);
     await waitFor(() => expect(mockLocalStorage.clear).toHaveBeenCalled());
-    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("prefetchedSettings");
+    expect(mockSessionStorage.removeItem).toHaveBeenCalledWith(
+      "prefetchedSettings",
+    );
   });
 
   it("does not clear storage when getSession returns a lock-timeout error", async () => {
     const lockError = new Error(
       "Exclusive Navigator LockManager lock timed out on auth-token",
     );
-    mockGetSession.mockResolvedValue({ data: { session: null }, error: lockError });
+    mockGetSession.mockResolvedValue({
+      data: { session: null },
+      error: lockError,
+    });
     vi.mocked(isSupabaseLockTimeoutError).mockReturnValue(true);
 
     render(<LoginForm />);
@@ -318,7 +404,9 @@ describe("LoginForm – mount-time storage cleanup", () => {
     await waitFor(() => expect(mockGetSession).toHaveBeenCalled());
     await act(async () => {});
     expect(mockLocalStorage.clear).not.toHaveBeenCalled();
-    expect(mockSessionStorage.removeItem).not.toHaveBeenCalledWith("prefetchedSettings");
+    expect(mockSessionStorage.removeItem).not.toHaveBeenCalledWith(
+      "prefetchedSettings",
+    );
   });
 });
 
@@ -331,8 +419,13 @@ describe("LoginForm – EzyGo credential error message override", () => {
   });
 
   it("overrides the EzyGo 'our records' message with 'EzyGo records'", async () => {
-    const err = new (vi.mocked(await import("axios")).AxiosError)("Wrong password");
-    err.config = { url: "/api/backend/login", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    const err = new (vi.mocked(await import("axios")).AxiosError)(
+      "Wrong password",
+    );
+    err.config = {
+      url: "/api/backend/login",
+      headers: {},
+    } as unknown as import("axios").InternalAxiosRequestConfig;
     err.response = {
       status: 422,
       statusText: "Unprocessable Entity",
@@ -350,13 +443,21 @@ describe("LoginForm – EzyGo credential error message override", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getAllByText("These credentials do not match EzyGo records.").length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("These credentials do not match EzyGo records.")
+          .length,
+      ).toBeGreaterThan(0)
     );
   });
 
   it("passes through unrelated EzyGo error messages unchanged", async () => {
-    const err = new (vi.mocked(await import("axios")).AxiosError)("Other error");
-    err.config = { url: "/api/backend/login", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    const err = new (vi.mocked(await import("axios")).AxiosError)(
+      "Other error",
+    );
+    err.config = {
+      url: "/api/backend/login",
+      headers: {},
+    } as unknown as import("axios").InternalAxiosRequestConfig;
     err.response = {
       status: 422,
       statusText: "Unprocessable Entity",
@@ -374,7 +475,8 @@ describe("LoginForm – EzyGo credential error message override", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getAllByText("Some other error from EzyGo.").length).toBeGreaterThan(0)
+      expect(screen.getAllByText("Some other error from EzyGo.").length)
+        .toBeGreaterThan(0)
     );
   });
 });
@@ -423,17 +525,25 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
     });
 
     await waitFor(() => expect(window.location.href).toBe("/dashboard"));
-    expect(vi.mocked(setCsrfToken)).toHaveBeenCalledWith("refetched-csrf-token");
+    expect(vi.mocked(setCsrfToken)).toHaveBeenCalledWith(
+      "refetched-csrf-token",
+    );
   });
 
   it("surfaces the save-token error when the CSRF re-fetch throws", async () => {
     vi.mocked(getCsrfToken).mockReturnValueOnce(null);
 
     // Simulates the CSRF endpoint being unreachable; login proceeds without a header.
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network error")),
+    );
 
     const err = new (vi.mocked(await import("axios")).AxiosError)("403");
-    err.config = { url: "/api/auth/save-token", headers: {} } as unknown as import("axios").InternalAxiosRequestConfig;
+    err.config = {
+      url: "/api/auth/save-token",
+      headers: {},
+    } as unknown as import("axios").InternalAxiosRequestConfig;
     mockAxiosPost
       .mockResolvedValueOnce({ data: { access_token: "ezygo-tok" } })
       .mockRejectedValueOnce(err);
@@ -447,8 +557,9 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
 
     await waitFor(() =>
       expect(
-        screen.getAllByText((t) => t.includes("Secure session setup failed")).length,
-      ).toBeGreaterThan(0),
+        screen.getAllByText((t) => t.includes("Secure session setup failed"))
+          .length,
+      ).toBeGreaterThan(0)
     );
   });
 });
@@ -489,7 +600,9 @@ describe("LoginForm – screen reader announcement cleanup", () => {
     await act(async () => {});
 
     // One new announcement should have been appended.
-    expect(document.body.querySelectorAll(selector).length).toBe(countBefore + 1);
+    expect(document.body.querySelectorAll(selector).length).toBe(
+      countBefore + 1,
+    );
 
     // Advance past the 5-second removal timeout; advanceTimersByTimeAsync also
     // drains any resulting async callbacks.

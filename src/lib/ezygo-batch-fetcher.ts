@@ -1,44 +1,48 @@
 /**
  * EzyGo API Batch Fetcher with Request Deduplication and Rate Limiting
- * 
+ *
  * Solves the concurrent user problem by:
  * 1. Deduplicating identical in-flight requests (60-second cache window)
  * 2. Rate limiting concurrent requests to max 3 at a time
  * 3. Queueing additional requests to prevent overwhelming the API
- * 
+ *
  * Example: 20 concurrent users = max 3 concurrent API calls instead of 120
  */
 
-import 'server-only';
+import "server-only";
 
-import { LRUCache } from 'lru-cache';
-import { logger } from './logger';
-import { ezygoCircuitBreaker, NonBreakerError } from './circuit-breaker';
-import { createHash } from 'crypto';
-import { egressFetch } from './utils.server';
+import { LRUCache } from "lru-cache";
+import { logger } from "./logger";
+import { ezygoCircuitBreaker, NonBreakerError } from "./circuit-breaker";
+import { createHash } from "crypto";
+import { egressFetch } from "./utils.server";
 
 /**
  * Create an AbortSignal with a timeout.
  * Falls back to AbortController + setTimeout for environments where AbortSignal.timeout() is unavailable.
  * Returns an object with the signal and a cleanup function.
  */
-function createTimeoutSignal(timeoutMs: number): { signal: AbortSignal; cleanup: () => void } {
+function createTimeoutSignal(
+  timeoutMs: number,
+): { signal: AbortSignal; cleanup: () => void } {
   // Use native AbortSignal.timeout() if available
-  if (typeof AbortSignal !== 'undefined' && 
-      'timeout' in AbortSignal && 
-      typeof AbortSignal.timeout === 'function') {
-    return { 
+  if (
+    typeof AbortSignal !== "undefined" &&
+    "timeout" in AbortSignal &&
+    typeof AbortSignal.timeout === "function"
+  ) {
+    return {
       signal: AbortSignal.timeout(timeoutMs),
-      cleanup: () => {} // Native timeout doesn't need cleanup
+      cleanup: () => {}, // Native timeout doesn't need cleanup
     };
   }
-  
+
   // Fallback for environments without AbortSignal.timeout() (e.g., jsdom)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  return { 
+  return {
     signal: controller.signal,
-    cleanup: () => clearTimeout(timeoutId)
+    cleanup: () => clearTimeout(timeoutId),
   };
 }
 
@@ -49,14 +53,16 @@ function createTimeoutSignal(timeoutMs: number): { signal: AbortSignal; cleanup:
 export class QueueFullError extends NonBreakerError {
   constructor(size: number) {
     super(`Request queue is full (${size} items). Please try again later.`);
-    this.name = 'QueueFullError';
+    this.name = "QueueFullError";
   }
 }
 
 export class QueueTimeoutError extends NonBreakerError {
   constructor(timeoutMs: number) {
-    super(`Request queue timeout: waited ${timeoutMs}ms without getting a slot`);
-    this.name = 'QueueTimeoutError';
+    super(
+      `Request queue timeout: waited ${timeoutMs}ms without getting a slot`,
+    );
+    this.name = "QueueTimeoutError";
   }
 }
 
@@ -102,28 +108,28 @@ const requestQueue: QueuedRequest[] = [];
  * Wait for an available request slot
  * If max concurrent requests reached, queues the request
  * Throws QueueFullError if queue is full or QueueTimeoutError if wait exceeds timeout
- * 
+ *
  * Ensures FIFO fairness: if there are queued requests, new requests must also queue
  * to prevent jumping the line.
- * 
+ *
  * @returns The current generation ID to be passed to releaseSlot()
  */
 function waitForSlot(): Promise<number> {
   // Capture generation at slot acquisition time
   const slotGeneration = generation;
-  
+
   // Only take an immediate slot if queue is empty AND slots are available
   // This ensures FIFO: queued requests are always processed before new arrivals
   if (requestQueue.length === 0 && activeRequests < MAX_CONCURRENT) {
     activeRequests++;
     return Promise.resolve(slotGeneration);
   }
-  
+
   // Check queue size limit
   if (requestQueue.length >= MAX_QUEUE_SIZE) {
     throw new QueueFullError(MAX_QUEUE_SIZE);
   }
-  
+
   return new Promise((resolve, reject) => {
     const itemId = ++queueItemId;
     const timeoutId = setTimeout(() => {
@@ -131,13 +137,13 @@ function waitForSlot(): Promise<number> {
       // CRITICAL: Guard splice to prevent removing wrong item when index is -1
       // If item is not found (index === -1), splice(-1, 1) would remove the last queue item,
       // corrupting fairness for another user and causing their request to never execute.
-      const index = requestQueue.findIndex(item => item.id === itemId);
+      const index = requestQueue.findIndex((item) => item.id === itemId);
       if (index >= 0) {
         requestQueue.splice(index, 1);
       }
       reject(new QueueTimeoutError(QUEUE_TIMEOUT_MS));
     }, QUEUE_TIMEOUT_MS);
-    
+
     requestQueue.push({
       id: itemId,
       timeoutId,
@@ -149,7 +155,7 @@ function waitForSlot(): Promise<number> {
       reject: (error: Error) => {
         clearTimeout(timeoutId);
         reject(error);
-      }
+      },
     });
   });
 }
@@ -165,7 +171,7 @@ function releaseSlot(slotGeneration: number) {
   if (slotGeneration !== generation) {
     return;
   }
-  
+
   activeRequests--;
   const next = requestQueue.shift();
   if (next) {
@@ -175,7 +181,7 @@ function releaseSlot(slotGeneration: number) {
 
 /**
  * Smart fetch with deduplication and rate limiting
- * 
+ *
  * @param endpoint - API endpoint path (e.g., '/myprofile')
  * @param token - EzyGo access token
  * @param method - HTTP method (default: 'GET')
@@ -185,32 +191,32 @@ function releaseSlot(slotGeneration: number) {
 export function fetchEzygoData<T>(
   endpoint: string,
   token: string,
-  method: 'GET' | 'POST' = 'GET',
+  method: "GET" | "POST" = "GET",
   body?: Record<string, unknown> | unknown[] | null,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   // Normalize endpoint for consistent cache key (remove leading slashes)
-  const normalizedEndpoint = endpoint.replace(/^\/+/, '');
-  
+  const normalizedEndpoint = endpoint.replace(/^\/+/, "");
+
   // Create a secure cache key by hashing the token and serialized body separately
   // and concatenating those hashes with the HTTP method and normalized endpoint.
   // This uses full SHA-256 hashes (64 hex chars) to reduce cross-user collision risk
   // and keeps raw tokens/bodies out of long-lived cache key / LRU structures, while
   // still using serializedBody transiently for the request. Explicitly encode body
   // presence to distinguish undefined from {} or other falsy values.
-  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const tokenHash = createHash("sha256").update(token).digest("hex");
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
-  const bodyHash = serializedBody 
-    ? createHash('sha256').update(serializedBody).digest('hex')
-    : '__SENTINEL_NO_BODY_VALUE__';
+  const bodyHash = serializedBody
+    ? createHash("sha256").update(serializedBody).digest("hex")
+    : "__SENTINEL_NO_BODY_VALUE__";
   const cacheKey = `${method}:${tokenHash}:${normalizedEndpoint}:${bodyHash}`;
-  
+
   // Check if request is already in-flight
   const existingRequest = requestCache.get(cacheKey);
   if (existingRequest) {
     return existingRequest as Promise<T>;
   }
-  
+
   // Create a deferred promise that we control
   // This ensures we can set it in cache before any synchronous errors occur
   let resolveDeferred!: (value: T) => void;
@@ -219,11 +225,11 @@ export function fetchEzygoData<T>(
     resolveDeferred = resolve;
     rejectDeferred = reject;
   });
-  
+
   // Set the deferred promise in cache immediately
   // This ensures eviction works even if waitForSlot() throws synchronously
   requestCache.set(cacheKey, deferredPromise);
-  
+
   // Execute the actual request asynchronously
   (async () => {
     // QueueFullError and QueueTimeoutError are thrown by waitForSlot()
@@ -235,13 +241,15 @@ export function fetchEzygoData<T>(
     } catch (error) {
       // Queue errors (full/timeout) are transient - evict from cache to allow immediate retry
       // when queue has capacity again
-      if (error instanceof QueueFullError || error instanceof QueueTimeoutError) {
+      if (
+        error instanceof QueueFullError || error instanceof QueueTimeoutError
+      ) {
         requestCache.delete(cacheKey);
       }
       rejectDeferred(error as Error);
       return;
     }
-    
+
     try {
       // Validate that at least one egress target is configured before entering the
       // circuit breaker (avoids counting config errors as breaker failures).
@@ -251,20 +259,20 @@ export function fetchEzygoData<T>(
         !!process.env.AWS_SECONDARY_URL?.trim();
       if (!hasAnyEgressTarget) {
         throw new NonBreakerError(
-          'No egress target configured: set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL'
+          "No egress target configured: set NEXT_PUBLIC_BACKEND_URL, CF_PROXY_URL, or AWS_SECONDARY_URL",
         );
       }
 
       const result = await ezygoCircuitBreaker.execute(async () => {
         const fetchHeaders: Record<string, string> = {
-          'Authorization': `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`,
           ...(extraHeaders ?? {}),
         };
 
         // Only include Content-Type and body for POST requests with a body
         // to avoid runtime errors in Node/undici and make headers semantically correct
-        if (method === 'POST' && serializedBody !== undefined) {
-          fetchHeaders['Content-Type'] = 'application/json';
+        if (method === "POST" && serializedBody !== undefined) {
+          fetchHeaders["Content-Type"] = "application/json";
         }
 
         const { signal, cleanup } = createTimeoutSignal(15000); // 15 second timeout
@@ -274,7 +282,7 @@ export function fetchEzygoData<T>(
           signal,
         };
 
-        if (method === 'POST' && serializedBody !== undefined) {
+        if (method === "POST" && serializedBody !== undefined) {
           fetchOptions.body = serializedBody;
         }
 
@@ -284,11 +292,15 @@ export function fetchEzygoData<T>(
           const response = await egressFetch(endpoint, fetchOptions);
 
           if (!response.ok) {
-            const errorMsg = `EzyGo API error: ${response.status} ${response.statusText}`;
+            const errorMsg =
+              `EzyGo API error: ${response.status} ${response.statusText}`;
             // All 4xx errors (client errors) except 429 shouldn't trip the circuit breaker
             // They indicate invalid request/token/permissions/resource, not API failure
             // Note: 429 (rate limit) is intentionally excluded as it indicates service degradation
-            if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            if (
+              response.status >= 400 && response.status < 500 &&
+              response.status !== 429
+            ) {
               throw new NonBreakerError(errorMsg);
             }
             // 5xx errors (server errors) and 429 should trip the circuit breaker
@@ -297,9 +309,9 @@ export function fetchEzygoData<T>(
 
           const text = await response.text();
           try {
-            // EzyGo endpoints usually return JSON, but some settings endpoints 
+            // EzyGo endpoints usually return JSON, but some settings endpoints
             // return plain strings (e.g. "even", "odd") which are not valid JSON.
-            // We try to parse as JSON first, but fallback to raw text if it's a 
+            // We try to parse as JSON first, but fallback to raw text if it's a
             // SyntaxError and the response was OK.
             return JSON.parse(text);
           } catch (err) {
@@ -312,7 +324,7 @@ export function fetchEzygoData<T>(
           cleanup();
         }
       });
-      
+
       resolveDeferred(result);
     } catch (error) {
       // Only evict transient failures from cache to allow immediate retries
@@ -326,16 +338,16 @@ export function fetchEzygoData<T>(
       // Successful promises stay cached for remaining TTL to enable deduplication
     }
   })();
-  
+
   return deferredPromise;
 }
 
 /**
  * Batch fetch dashboard data in parallel (courses and attendance)
  * Respects global rate limit but fetches concurrently when slots available
- * 
+ *
  * Note: Profile is fetched client-side via useProfile hook to avoid redundant SSR fetching
- * 
+ *
  * @param token - EzyGo access token
  * @returns Promise with courses and attendance data
  */
@@ -343,22 +355,25 @@ export async function fetchDashboardData(token: string) {
   // These run concurrently but respect the global rate limit
   // Note: Profile is not fetched here as DashboardClient fetches it directly via useProfile
   const [courses, attendance] = await Promise.all([
-    fetchEzygoData('/institutionuser/courses/withusers', token).catch((error) => {
-      logger.error('[EzyGo] Failed to fetch courses', {
-        context: 'ezygo-batch-fetcher',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }),
-    fetchEzygoData('/attendancereports/student/detailed', token, 'POST', {}).catch((error) => {
-      logger.error('[EzyGo] Failed to fetch attendance', {
-        context: 'ezygo-batch-fetcher',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    })
+    fetchEzygoData("/institutionuser/courses/withusers", token).catch(
+      (error) => {
+        logger.error("[EzyGo] Failed to fetch courses", {
+          context: "ezygo-batch-fetcher",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      },
+    ),
+    fetchEzygoData("/attendancereports/student/detailed", token, "POST", {})
+      .catch((error) => {
+        logger.error("[EzyGo] Failed to fetch attendance", {
+          context: "ezygo-batch-fetcher",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }),
   ]);
-  
+
   return { courses, attendance };
 }
 
@@ -378,7 +393,7 @@ export function getRateLimiterStats() {
  * Invalidates all cached EzyGo requests for a specific user token.
  */
 export function invalidateEzygoCacheForUser(token: string) {
-  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const tokenHash = createHash("sha256").update(token).digest("hex");
   const entries = Array.from(requestCache.entries());
 
   for (const [key] of entries) {
@@ -399,19 +414,19 @@ export function resetRateLimiterState() {
   // Increment generation to invalidate in-flight requests
   // This prevents stale requests from corrupting activeRequests when they complete
   generation++;
-  
+
   // Reset active request counter
   activeRequests = 0;
-  
+
   // Reject queued promises to prevent dangling handlers
-  // Note: We don't need to explicitly clearTimeout here because the reject 
+  // Note: We don't need to explicitly clearTimeout here because the reject
   // handler (defined in waitForSlot at line 120-123) already clears the timeout
   while (requestQueue.length > 0) {
     const item = requestQueue.shift()!;
     clearTimeout(item.timeoutId);
-    item.reject(new Error('Rate limiter state reset'));
+    item.reject(new Error("Rate limiter state reset"));
   }
-  
+
   // Clear LRU cache
   requestCache.clear();
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addCourseAction } from "../courses";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -57,7 +57,9 @@ describe("course actions", () => {
       } as never);
 
       const result = await addCourseAction(formData);
-      expect(result.error).toBe("Security verification failed. Please try again.");
+      expect(result.error).toBe(
+        "Security verification failed. Please try again.",
+      );
     });
 
     it("successfully adds a course", async () => {
@@ -72,7 +74,9 @@ describe("course actions", () => {
 
       const mockSupabase = {
         auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-id" } } }),
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-id" } },
+          }),
         },
         from: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
@@ -87,7 +91,7 @@ describe("course actions", () => {
       expect(result).toEqual({});
       expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
         course_code: "CS101",
-        course_name: "intro to computer science"
+        course_name: "intro to computer science",
       }));
       expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
     });
@@ -98,10 +102,14 @@ describe("course actions", () => {
       formData.append("courseName", "Intro CS");
       formData.append("cf-turnstile-response", "valid");
 
-      vi.mocked(fetch).mockResolvedValue({ json: async () => ({ success: true }) } as never);
+      vi.mocked(fetch).mockResolvedValue(
+        { json: async () => ({ success: true }) } as never,
+      );
 
       const mockSupabase = {
-        auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }) },
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }),
+        },
         from: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),

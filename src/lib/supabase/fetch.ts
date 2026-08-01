@@ -44,32 +44,34 @@ function combineSignals(
  * Resolves Supabase credentials based on environment.
  * Handles development overrides and validation guards.
  */
-export function getSupabaseConfig(type: 'client' | 'admin' = 'client') {
+export function getSupabaseConfig(type: "client" | "admin" = "client") {
   let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  let key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  let key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (type === 'admin') {
-      key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (type === "admin") {
+    key = process.env.SUPABASE_SECRET_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
   }
 
   // Use development overrides if present to ensure dev/prod isolation
   if (process.env.NODE_ENV === "development") {
     const devUrl = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
-    const devKey = type === 'admin' 
-        ? process.env.SUPABASE_DEV_SECRET_KEY 
-        : process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
+    const devKey = type === "admin"
+      ? process.env.SUPABASE_DEV_SECRET_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
 
     if (devUrl && devKey) {
       url = devUrl;
       key = devKey;
-    } else if (url && url.includes('supabase.co')) {
+    } else if (url && url.includes("supabase.co")) {
       // Environment Guard: Alert developer if production URL is leaking into development
       // Use a delayed logger to avoid circular dependency issues if logger imports config
       setTimeout(() => {
         if (typeof logger.warn === "function") {
           logger.warn(
             `[Supabase Security] Production URL detected in development! ⚠️`,
-            `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`
+            `\nTarget: ${url}\nEnsure NEXT_PUBLIC_SUPABASE_DEV_URL and corresponding keys are configured.`,
           );
         }
       }, 0);
@@ -108,7 +110,9 @@ function configureTierHeaders(
   isDev: boolean,
   tierName: string,
 ): Headers {
-  const headers = new Headers(input instanceof Request ? input.headers : undefined);
+  const headers = new Headers(
+    input instanceof Request ? input.headers : undefined,
+  );
   if (initHeaders) {
     new Headers(initHeaders).forEach((v, k) => headers.set(k, v));
   }
@@ -154,11 +158,23 @@ async function attemptTierFetch(
   isSafeMethod: boolean,
   isLast: boolean,
   isDev: boolean,
-): Promise<{ success: true; response: Response } | { success: false; retryable: boolean; error?: unknown }> {
+): Promise<
+  { success: true; response: Response } | {
+    success: false;
+    retryable: boolean;
+    error?: unknown;
+  }
+> {
   const url = `${tier.base}${path}`;
   const tierController = new AbortController();
-  const tierTimeout = setTimeout(() => tierController.abort(), SUPABASE_TIER_TIMEOUT_MS);
-  const tierSignal: AbortSignal = combineSignals(callerSignal, tierController.signal);
+  const tierTimeout = setTimeout(
+    () => tierController.abort(),
+    SUPABASE_TIER_TIMEOUT_MS,
+  );
+  const tierSignal: AbortSignal = combineSignals(
+    callerSignal,
+    tierController.signal,
+  );
 
   const headers = configureTierHeaders(input, init?.headers, isDev, tier.name);
   const effectiveInit: RequestInit = {
@@ -174,7 +190,9 @@ async function attemptTierFetch(
     const res = await fetch(tierInput, tierInit);
     clearTimeout(tierTimeout);
 
-    if (SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod) {
+    if (
+      SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod
+    ) {
       await res.body?.cancel();
       return { success: false, retryable: true };
     }
@@ -192,7 +210,8 @@ async function extractBodyOverride(
   init: RequestInit | undefined,
   input: RequestInfo | URL,
 ): Promise<ArrayBuffer | null> {
-  const rawBody = (init?.body as BodyInit | null | undefined) ?? (input instanceof Request && !input.bodyUsed ? input.body : null);
+  const rawBody = (init?.body as BodyInit | null | undefined) ??
+    (input instanceof Request && !input.bodyUsed ? input.body : null);
   if (rawBody instanceof ReadableStream) {
     try {
       return await new Response(rawBody).arrayBuffer();
@@ -219,7 +238,9 @@ export function buildSupabaseTieredFetch(
     if (!u) return null;
     try {
       const url = new URL(u);
-      const basePath = url.pathname === "/" ? "" : stripTrailingSlashes(url.pathname);
+      const basePath = url.pathname === "/"
+        ? ""
+        : stripTrailingSlashes(url.pathname);
       return `${url.origin}${basePath}`;
     } catch {
       return null;
@@ -227,13 +248,17 @@ export function buildSupabaseTieredFetch(
   };
 
   const isDev = process.env.NODE_ENV === "development";
-  const devBase = isDev ? parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL) : null;
-  const cfBase  = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
-  const awsBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL);
+  const devBase = isDev
+    ? parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_DEV_PROXY_URL)
+    : null;
+  const cfBase = parseProxyBase(process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL);
+  const awsBase = parseProxyBase(
+    process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL,
+  );
 
   const tiers: Array<TierConfig> = [];
-  const isServer = typeof window === 'undefined';
-  
+  const isServer = typeof window === "undefined";
+
   if (isServer) {
     // Server NEVER uses proxy (as per security policy)
     tiers.push({ base: supabaseOrigin, name: "direct" });
@@ -243,7 +268,7 @@ export function buildSupabaseTieredFetch(
     tiers.push({ base: supabaseOrigin, name: "direct" });
   } else {
     // Production: Use tiered failover (CF -> AWS -> direct)
-    if (cfBase)  tiers.push({ base: cfBase, name: "CF" });
+    if (cfBase) tiers.push({ base: cfBase, name: "CF" });
     if (awsBase) tiers.push({ base: awsBase, name: "AWS" });
     tiers.push({ base: supabaseOrigin, name: "direct" });
   }
@@ -267,9 +292,14 @@ export function buildSupabaseTieredFetch(
     }
 
     const path = `${parsedInputUrl.pathname}${parsedInputUrl.search}`;
-    const callerSignal: AbortSignal | null = (init?.signal as AbortSignal | undefined) ?? (input instanceof Request ? input.signal : null);
-    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-    const isSafeMethod = method === "GET" || method === "HEAD" || method === "OPTIONS";
+    const callerSignal: AbortSignal | null =
+      (init?.signal as AbortSignal | undefined) ??
+        (input instanceof Request ? input.signal : null);
+    const method =
+      (init?.method ?? (input instanceof Request ? input.method : "GET"))
+        .toUpperCase();
+    const isSafeMethod = method === "GET" || method === "HEAD" ||
+      method === "OPTIONS";
 
     let bodyOverride: ArrayBuffer | null = null;
     if (tiers.length > 1) {
@@ -305,10 +335,10 @@ export function buildSupabaseTieredFetch(
 // Module-level singleton
 export const _supabaseOrigin = (() => {
   const { url } = getSupabaseConfig();
-  try { 
-    return new URL(url).origin; 
-  } catch { 
-    return url ?? ""; 
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url ?? "";
   }
 })();
 

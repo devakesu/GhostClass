@@ -19,11 +19,14 @@ const ChartSkeleton = () => (
 );
 
 const AttendanceChart = dynamic(
-  () => import("@/components/attendance/attendance-chart").then((mod) => mod.AttendanceChart),
+  () =>
+    import("@/components/attendance/attendance-chart").then((mod) =>
+      mod.AttendanceChart
+    ),
   {
     loading: () => <ChartSkeleton />,
     ssr: false,
-  }
+  },
 );
 
 interface DashboardChartsProps {
@@ -151,25 +154,23 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance
-                  ? <Skeleton className="h-8 w-16" />
-                  : (
-                    <>
-                      <span className="text-2xl font-bold text-green-500">
-                        {stats.realPresent}
+                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                  <>
+                    <span className="text-2xl font-bold text-green-500">
+                      {stats.realPresent}
+                    </span>
+                    {stats.correctionPresent > 0 && (
+                      <span className="text-lg font-bold text-orange-500 ml-1">
+                        +{stats.correctionPresent}
                       </span>
-                      {stats.correctionPresent > 0 && (
-                        <span className="text-lg font-bold text-orange-500 ml-1">
-                          +{stats.correctionPresent}
-                        </span>
-                      )}
-                      {stats.extraPresent > 0 && (
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
-                          +{stats.extraPresent}
-                        </span>
-                      )}
-                    </>
-                  )}
+                    )}
+                    {stats.extraPresent > 0 && (
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
+                        +{stats.extraPresent}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -189,25 +190,23 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance
-                  ? <Skeleton className="h-8 w-16" />
-                  : (
-                    <>
-                      <span className="text-2xl font-bold text-red-500">
-                        {stats.realAbsent}
+                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                  <>
+                    <span className="text-2xl font-bold text-red-500">
+                      {stats.realAbsent}
+                    </span>
+                    {stats.savedAbsent > 0 && (
+                      <span className="text-lg font-bold text-orange-500 ml-1">
+                        -{stats.savedAbsent}
                       </span>
-                      {stats.savedAbsent > 0 && (
-                        <span className="text-lg font-bold text-orange-500 ml-1">
-                          -{stats.savedAbsent}
-                        </span>
-                      )}
-                      {stats.extraAbsent > 0 && (
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
-                          +{stats.extraAbsent}
-                        </span>
-                      )}
-                    </>
-                  )}
+                    )}
+                    {stats.extraAbsent > 0 && (
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
+                        +{stats.extraAbsent}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -227,25 +226,23 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance
-                  ? <Skeleton className="h-8 w-16" />
-                  : (
-                    <>
-                      <span className="text-2xl font-bold text-yellow-500">
-                        {stats.realDL}
+                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                  <>
+                    <span className="text-2xl font-bold text-yellow-500">
+                      {stats.realDL}
+                    </span>
+                    {stats.correctionDL > 0 && (
+                      <span className="text-lg font-bold text-orange-500 ml-1">
+                        +{stats.correctionDL}
                       </span>
-                      {stats.correctionDL > 0 && (
-                        <span className="text-lg font-bold text-orange-500 ml-1">
-                          +{stats.correctionDL}
-                        </span>
-                      )}
-                      {stats.extraDL > 0 && (
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
-                          +{stats.extraDL}
-                        </span>
-                      )}
-                    </>
-                  )}
+                    )}
+                    {stats.extraDL > 0 && (
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400 ml-1">
+                        +{stats.extraDL}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -303,4 +300,3 @@ export function DashboardCharts({
     </div>
   );
 }
-

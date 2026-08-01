@@ -28,8 +28,7 @@ const withSerwist = withSerwistInit({
   // AND
   // 2. The dev SW flag is NOT set to true
   // This ensures production builds ALWAYS generate the service worker
-  disable:
-    process.env.NODE_ENV !== "production" &&
+  disable: process.env.NODE_ENV !== "production" &&
     process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV !== "true",
   // Must be false: caching navigation (document) responses breaks Next.js streaming SSR.
   // All protected pages use `export const dynamic = 'force-dynamic'`. When this is true,
@@ -217,12 +216,11 @@ const nextConfig = {
 
   // Performance: Minimize JavaScript bundle
   compiler: {
-    removeConsole:
-      process.env.NODE_ENV === "production"
-        ? {
-            exclude: ["error", "warn"], // Preserve console.error and console.warn; strip log/info from production
-          }
-        : false,
+    removeConsole: process.env.NODE_ENV === "production"
+      ? {
+        exclude: ["error", "warn"], // Preserve console.error and console.warn; strip log/info from production
+      }
+      : false,
   },
 
   generateBuildId: () => {

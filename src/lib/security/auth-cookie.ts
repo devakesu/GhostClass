@@ -19,7 +19,7 @@ export async function setAuthCookie(token: string, days = 31) {
     path: "/",
     expires,
   });
-}  
+}
 
 export async function clearAuthCookie() {
   (await cookies()).delete("ezygo_access_token");
@@ -49,12 +49,17 @@ export async function getAuthTokenWithFallback(userId?: string) {
     try {
       const cachedToken = await redis.get<string>(cacheKey);
       if (cachedToken) {
-        logger.info("[auth-cookie] EzyGo token healed from Redis cache", { userId: redact("id", finalUserId) });
+        logger.info("[auth-cookie] EzyGo token healed from Redis cache", {
+          userId: redact("id", finalUserId),
+        });
         // Attempt to restore the cookie for future requests
         try {
           await setAuthCookie(cachedToken);
         } catch (cookieErr) {
-          logger.dev("[auth-cookie] Could not set auth cookie in cache fallback", cookieErr);
+          logger.dev(
+            "[auth-cookie] Could not set auth cookie in cache fallback",
+            cookieErr,
+          );
         }
         return cachedToken;
       }
@@ -62,7 +67,10 @@ export async function getAuthTokenWithFallback(userId?: string) {
       logger.dev("[auth-cookie] Redis cache check failed", redisErr);
     }
 
-    logger.warn("[auth-cookie] Cold start: EzyGo cookie missing. Falling back to DB healing.", { userId: redact("id", finalUserId) });
+    logger.warn(
+      "[auth-cookie] Cold start: EzyGo cookie missing. Falling back to DB healing.",
+      { userId: redact("id", finalUserId) },
+    );
 
     const supabaseAdmin = getAdminClient();
     const { data: dbUser } = await supabaseAdmin
@@ -72,8 +80,11 @@ export async function getAuthTokenWithFallback(userId?: string) {
       .maybeSingle();
 
     if (dbUser?.ezygo_token && dbUser?.ezygo_iv) {
-      const token = decrypt({ iv: dbUser.ezygo_iv, content: dbUser.ezygo_token });
-      
+      const token = decrypt({
+        iv: dbUser.ezygo_iv,
+        content: dbUser.ezygo_token,
+      });
+
       // Cache in Redis for 5 minutes (300 seconds)
       try {
         await redis.set(cacheKey, token, { ex: 300 });
@@ -85,9 +96,14 @@ export async function getAuthTokenWithFallback(userId?: string) {
       try {
         await setAuthCookie(token);
       } catch (cookieErr) {
-        logger.dev("[auth-cookie] Could not set auth cookie in fallback", cookieErr);
+        logger.dev(
+          "[auth-cookie] Could not set auth cookie in fallback",
+          cookieErr,
+        );
       }
-      logger.info("[auth-cookie] EzyGo token healed from database fallback", { userId: redact("id", finalUserId) });
+      logger.info("[auth-cookie] EzyGo token healed from database fallback", {
+        userId: redact("id", finalUserId),
+      });
       return token;
     }
   } catch (err) {

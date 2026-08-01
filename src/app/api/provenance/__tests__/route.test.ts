@@ -2,7 +2,7 @@
  * Tests for Provenance API Route
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET } from "../route";
 import { NextRequest } from "next/server";
 
@@ -102,7 +102,7 @@ describe("Provenance API Route", () => {
     expect(data.container).toBe(true);
 
     delete process.env.APP_COMMIT_SHA;
-    
+
     const response2 = GET(makeRequest());
     const data2 = await response2.json();
 
@@ -120,7 +120,9 @@ describe("Provenance API Route", () => {
     const response = GET(makeRequest());
     const data = await response.json();
 
-    expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(data.timestamp).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
   });
 
   it("should have no-cache headers", () => {
@@ -333,7 +335,9 @@ describe("Provenance API Route", () => {
       const data = await response.json();
       const afterCall = new Date().toISOString();
 
-      expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(data.timestamp).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+      );
       expect(data.timestamp >= beforeCall).toBe(true);
       expect(data.timestamp <= afterCall).toBe(true);
     });

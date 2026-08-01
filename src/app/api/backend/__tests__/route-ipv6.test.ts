@@ -12,38 +12,42 @@
  * string), causing same-origin reads from an IPv6 host to be incorrectly
  * rejected even when the host was in the allowlist.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NextRequest } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 // Must be hoisted before any module imports that transitively import server-only
-vi.mock('server-only', () => ({}));
+vi.mock("server-only", () => ({}));
 
-import { __resetAllowedHostsCache } from '@/lib/security/origin-validation';
+import { __resetAllowedHostsCache } from "@/lib/security/origin-validation";
 
 // Pre-configure the app domain to an IPv6 address BEFORE importing the route
 // module so that the module-level allowedHosts cache is populated correctly.
 vi.hoisted(() => {
-  vi.stubEnv('NODE_ENV', 'production');
-  vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
-  vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '::1');
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://api.example.com");
+  vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "::1");
 });
 
-vi.mock('@/lib/security/auth-cookie', () => ({
-  getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
-  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
+vi.mock("@/lib/security/auth-cookie", () => ({
+  getAuthTokenServer: vi.fn(() => Promise.resolve("mock-token")),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve("mock-token")),
 }));
 
-vi.mock('@/lib/security/csrf', () => ({
+vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock('@/lib/ratelimit', () => ({
+vi.mock("@/lib/ratelimit", () => ({
   proxyRateLimiter: {
-    limit: vi.fn().mockResolvedValue({ success: true, remaining: 10, reset: Date.now() + 1000 }),
+    limit: vi.fn().mockResolvedValue({
+      success: true,
+      remaining: 10,
+      reset: Date.now() + 1000,
+    }),
   },
 }));
 
-vi.mock('next/headers', () => ({
+vi.mock("next/headers", () => ({
   headers: vi.fn(),
   cookies: vi.fn(() => ({
     get: vi.fn(),
@@ -52,18 +56,37 @@ vi.mock('next/headers', () => ({
 
 // Same lightweight pass-through circuit breaker as in route-failover.test.ts.
 // Avoids Sentry initialization side effects and cross-file CB state pollution.
-vi.mock('@/lib/circuit-breaker', () => {
+vi.mock("@/lib/circuit-breaker", () => {
   class CircuitBreakerOpenError extends Error {
-    constructor(message: string) { super(message); this.name = 'CircuitBreakerOpenError'; }
+    constructor(message: string) {
+      super(message);
+      this.name = "CircuitBreakerOpenError";
+    }
   }
   class NonBreakerError extends Error {
-    constructor(message: string) { super(message); this.name = 'NonBreakerError'; }
+    constructor(message: string) {
+      super(message);
+      this.name = "NonBreakerError";
+    }
   }
   class UpstreamServerError extends Error {
-    status: number; statusText: string; body: string; headers?: Headers;
-    constructor(message: string, status: number, statusText: string, body: string, headers?: Headers) {
-      super(message); this.name = 'UpstreamServerError';
-      this.status = status; this.statusText = statusText; this.body = body; this.headers = headers;
+    status: number;
+    statusText: string;
+    body: string;
+    headers?: Headers;
+    constructor(
+      message: string,
+      status: number,
+      statusText: string,
+      body: string,
+      headers?: Headers,
+    ) {
+      super(message);
+      this.name = "UpstreamServerError";
+      this.status = status;
+      this.statusText = statusText;
+      this.body = body;
+      this.headers = headers;
     }
   }
   return {
@@ -80,21 +103,21 @@ vi.mock('@/lib/circuit-breaker', () => {
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
-describe('Backend Proxy Route – IPv6 hostname normalization', () => {
-  type RouteModule = typeof import('../[...path]/route');
-  let GET: RouteModule['GET'];
+describe("Backend Proxy Route – IPv6 hostname normalization", () => {
+  type RouteModule = typeof import("../[...path]/route");
+  let GET: RouteModule["GET"];
 
   beforeEach(async () => {
     // Defensive: restore real timers first (see route-failover.test.ts comment).
     vi.useRealTimers();
     vi.clearAllMocks();
     __resetAllowedHostsCache();
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
-    vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', '::1');
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://api.example.com");
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "::1");
 
     if (!GET) {
-      const routeModule = await import('../[...path]/route');
+      const routeModule = await import("../[...path]/route");
       GET = routeModule.GET;
     }
   });
@@ -103,31 +126,31 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
     vi.restoreAllMocks();
   });
 
-  it('should allow same-origin GET from bracketed IPv6 host ([::1]:3000) when ::1 is the app domain', async () => {
+  it("should allow same-origin GET from bracketed IPv6 host ([::1]:3000) when ::1 is the app domain", async () => {
     // normalizeHost("[::1]:3000") must return "::1" (strip brackets + port)
     // so that allowedHosts.has("::1") succeeds.
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ data: [] }), {
         status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+        headers: { "content-type": "application/json" },
+      }),
     );
 
-    const request = new NextRequest('http://[::1]:3000/api/backend/users', {
-      method: 'GET',
+    const request = new NextRequest("http://[::1]:3000/api/backend/users", {
+      method: "GET",
       headers: {
-        'sec-fetch-site': 'same-origin',
-        host: '[::1]:3000',
-        'x-csrf-token': 'mock-csrf-token',
+        "sec-fetch-site": "same-origin",
+        host: "[::1]:3000",
+        "x-csrf-token": "mock-csrf-token",
       },
     });
 
-    const ctx = { params: Promise.resolve({ path: ['users'] }) };
+    const ctx = { params: Promise.resolve({ path: ["users"] }) };
     const response = await GET(request, ctx);
     expect(response.status).toBe(200);
   });
 
-  it('should allow same-origin GET when x-forwarded-host contains an unbracketed IPv6 address (::1)', async () => {
+  it("should allow same-origin GET when x-forwarded-host contains an unbracketed IPv6 address (::1)", async () => {
     // Regression test for the bug where normalizeHost("::1") returned "" (empty
     // string) because the old code treated the first ":" as a port separator.
     // x-forwarded-host can carry a bare IPv6 address (e.g. from a proxy that
@@ -136,20 +159,20 @@ describe('Backend Proxy Route – IPv6 hostname normalization', () => {
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ data: [] }), {
         status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+        headers: { "content-type": "application/json" },
+      }),
     );
 
-    const request = new NextRequest('http://[::1]:3000/api/backend/users', {
-      method: 'GET',
+    const request = new NextRequest("http://[::1]:3000/api/backend/users", {
+      method: "GET",
       headers: {
-        'sec-fetch-site': 'same-origin',
-        'x-forwarded-host': '::1',
-        'x-csrf-token': 'mock-csrf-token',
+        "sec-fetch-site": "same-origin",
+        "x-forwarded-host": "::1",
+        "x-csrf-token": "mock-csrf-token",
       },
     });
 
-    const ctx = { params: Promise.resolve({ path: ['users'] }) };
+    const ctx = { params: Promise.resolve({ path: ["users"] }) };
     const response = await GET(request, ctx);
     expect(response.status).toBe(200);
   });

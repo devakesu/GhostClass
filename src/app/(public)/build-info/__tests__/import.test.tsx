@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import BuildInfoPage from '../page';
+import { describe, expect, it } from "vitest";
+import BuildInfoPage from "../page";
 
-describe('Import Test', () => {
-  it('should import BuildInfoPage', () => {
+describe("Import Test", () => {
+  it("should import BuildInfoPage", () => {
     expect(BuildInfoPage).toBeDefined();
   });
 });

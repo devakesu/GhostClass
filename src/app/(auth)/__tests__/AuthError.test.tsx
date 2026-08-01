@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import AuthError from '../error';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import AuthError from "../error";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
@@ -30,25 +30,29 @@ vi.mock("@/components/error-fallback", () => ({
   ),
 }));
 
-describe('AuthError', () => {
+describe("AuthError", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('logs error and captures exception on mount', () => {
-    const error = new Error('Auth error') as Error & { digest?: string };
-    error.digest = 'auth-digest';
+  it("logs error and captures exception on mount", () => {
+    const error = new Error("Auth error") as Error & { digest?: string };
+    error.digest = "auth-digest";
     const reset = vi.fn();
 
     render(<AuthError error={error} reset={reset} />);
 
-    expect(logger.error).toHaveBeenCalledWith("[auth] Render error:", "Auth error", "auth-digest");
+    expect(logger.error).toHaveBeenCalledWith(
+      "[auth] Render error:",
+      "Auth error",
+      "auth-digest",
+    );
     expect(Sentry.captureException).toHaveBeenCalledWith(error, {
       tags: {
         location: "auth",
         digest: "auth-digest",
       },
     });
-    expect(screen.getByTestId('error-fallback')).toBeInTheDocument();
+    expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
   });
 });

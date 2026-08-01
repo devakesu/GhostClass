@@ -32,13 +32,13 @@ interface ErrorBoundaryState {
 /**
  * ErrorBoundary component that catches JavaScript errors anywhere in the child component tree.
  * Logs errors to Sentry and displays a fallback UI instead of crashing.
- * 
+ *
  * Features:
  * - Catches runtime errors in child components
  * - Reports errors to Sentry with context
  * - Provides fallback UI with reload and reset options
  * - Environment-aware error logging
- * 
+ *
  * @example
  * ```tsx
  * <ErrorBoundary fallback={<ErrorFallback />}>
@@ -46,7 +46,8 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary
+  extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -70,7 +71,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       logger.error("ErrorBoundary caught an error:", error, errorInfo);
     } else {
       // In production, avoid logging potentially sensitive details to the console
-      logger.error("ErrorBoundary caught an error. Full details have been reported to monitoring.");
+      logger.error(
+        "ErrorBoundary caught an error. Full details have been reported to monitoring.",
+      );
     }
 
     // 2. Report error to Sentry
@@ -82,8 +85,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       },
       tags: {
         boundary: "react_component_tree",
-        location: "ErrorBoundary/componentDidCatch"
-      }
+        location: "ErrorBoundary/componentDidCatch",
+      },
     });
 
     // 3. Call custom error handler if provided
@@ -109,16 +112,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     const appDomain = getAppDomain();
     // Validate domain: proper hostname format (no consecutive dots, no leading/trailing hyphens in labels)
-    if (!/^[a-zA-Z0-9.-]+$/.test(appDomain) || appDomain.length > 253 || !appDomain.includes(".")) return;
-    const subject = encodeURIComponent('Error Report - GhostClass');
+    if (
+      !/^[a-zA-Z0-9.-]+$/.test(appDomain) || appDomain.length > 253 ||
+      !appDomain.includes(".")
+    ) return;
+    const subject = encodeURIComponent("Error Report - GhostClass");
     const body = encodeURIComponent(
       `Hi Admin,\n\nI encountered an error while using GhostClass.\n\n` +
-      `Timestamp: ${new Date().toISOString()}\n\n` +
-      `Note: Detailed error information has been automatically logged to our monitoring system.\n\n` +
-      `Please help resolve this issue.\n\nThank you!`
+        `Timestamp: ${new Date().toISOString()}\n\n` +
+        `Note: Detailed error information has been automatically logged to our monitoring system.\n\n` +
+        `Please help resolve this issue.\n\nThank you!`,
     );
 
-    window.location.href = `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
+    window.location.href =
+      `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
   };
 
   render(): ReactNode {
@@ -135,15 +142,23 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex min-h-100 w-full flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
           <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20 mb-4">
-            <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <AlertTriangle
+              className="h-8 w-8 text-red-600 dark:text-red-400"
+              aria-hidden="true"
+            />
           </div>
-          
+
           <h2 className="text-xl font-bold tracking-tight text-foreground mb-2">
             Something went wrong
           </h2>
-          
-          <p className="text-sm text-muted-foreground max-w-100 mb-6" role="alert" aria-live="polite">
-            We encountered an unexpected error. You can try to recover the component or reload the page.
+
+          <p
+            className="text-sm text-muted-foreground max-w-100 mb-6"
+            role="alert"
+            aria-live="polite"
+          >
+            We encountered an unexpected error. You can try to recover the
+            component or reload the page.
           </p>
 
           <div className="flex flex-wrap gap-3 justify-center">
@@ -154,7 +169,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
               Try Again
             </button>
-            
+
             <button
               onClick={this.handleReload}
               className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -171,13 +186,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Report Error
             </button>
           </div>
-          
-          {/* Optional: Show Error Message in Dev only if you want, 
-              but usually hiding it is better for UX */}
-          {process.env.NODE_ENV === 'development' && (
-             <p className="mt-8 text-xs font-mono text-red-500 bg-red-50 dark:bg-red-950/50 p-2 rounded max-w-lg break-all">
-                {this.state.error.toString()}
-             </p>
+
+          {
+            /* Optional: Show Error Message in Dev only if you want,
+              but usually hiding it is better for UX */
+          }
+          {process.env.NODE_ENV === "development" && (
+            <p className="mt-8 text-xs font-mono text-red-500 bg-red-50 dark:bg-red-950/50 p-2 rounded max-w-lg break-all">
+              {this.state.error.toString()}
+            </p>
           )}
         </div>
       );

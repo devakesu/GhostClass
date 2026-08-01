@@ -9,21 +9,21 @@ import { logger } from "@/lib/logger";
 /**
  * React Query hook for fetching user's attendance tracking data.
  * Automatically filters by current semester and academic year.
- * 
+ *
  * @param user - User object or user identifier
  * @param options - Optional configuration object
  * @param options.enabled - Whether the query should run (default: true)
  * @param options.semester - Optional term override from the dashboard selection
  * @param options.year - Optional academic year override from the dashboard selection
  * @returns Query result containing tracking attendance records
- * 
+ *
  * Query Configuration:
  * - Auto-refetch: Every 60 seconds
  * - Window focus refetch: Enabled
  * - Stale time: 30 seconds
  * - Cache time: 2 minutes
  * - Error handling: Logs to Sentry with redacted user info
- * 
+ *
  * @example
  * ```tsx
  * const { data: trackingData } = useTrackingData(user);
@@ -35,7 +35,7 @@ export function useTrackingData(
   options?: { enabled?: boolean; semester?: string; year?: string },
 ) {
   const supabase = createClient();
-  
+
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
   const resolvedSemester = options?.semester ?? semesterData;
@@ -48,7 +48,7 @@ export function useTrackingData(
       resolvedSemester ?? null,
       resolvedAcademicYear ?? null,
     ],
-    
+
     queryFn: async () => {
       // getSession() reads the JWT from local storage — no network call.
       // The actual Supabase query below is RLS-protected, so an expired/invalid
@@ -66,27 +66,28 @@ export function useTrackingData(
         .select("*")
         .eq("semester", resolvedSemester)
         .eq("year", resolvedAcademicYear)
-        .order("date", { ascending: false }) 
+        .order("date", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) {
         logger.error("Error fetching tracking data:", error);
-        
+
         Sentry.captureException(error, {
-            tags: { type: "tracking_fetch_error" },
-            extra: { 
-                userId: redact("id", String(user?.id ?? "unknown")),
-                semester: resolvedSemester,
-                year: resolvedAcademicYear,
-            }
+          tags: { type: "tracking_fetch_error" },
+          extra: {
+            userId: redact("id", String(user?.id ?? "unknown")),
+            semester: resolvedSemester,
+            year: resolvedAcademicYear,
+          },
         });
-        
+
         return [];
       }
 
       return (data as TrackAttendance[]) || [];
     },
-    enabled: !!user && (options?.enabled !== false) && !!resolvedSemester && !!resolvedAcademicYear,
+    enabled: !!user && (options?.enabled !== false) && !!resolvedSemester &&
+      !!resolvedAcademicYear,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,

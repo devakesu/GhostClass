@@ -55,31 +55,31 @@ function stripTrailingSlashes(str) {
   return s;
 }
 
-const EZYGO_API_URL  = stripTrailingSlashes(process.env.EZYGO_API_URL  ?? "");
+const EZYGO_API_URL = stripTrailingSlashes(process.env.EZYGO_API_URL ?? "");
 // Trim to guard against accidental whitespace in environment configuration.
-const PROXY_SECRET   = (process.env.PROXY_SECRET   ?? "").trim();
+const PROXY_SECRET = (process.env.PROXY_SECRET ?? "").trim();
 
 // Pre-compute the HMAC key and expected digest once at module load.
 // Both depend only on PROXY_SECRET, so there is no benefit in recomputing
 // them per request.  The digest is used with timingSafeEqual inside the
 // handler so the comparison always operates on fixed-length 32-byte buffers,
 // avoiding timing side-channels based on value or length differences.
-const AUTH_KEY             = PROXY_SECRET ? Buffer.from(PROXY_SECRET) : null;
+const AUTH_KEY = PROXY_SECRET ? Buffer.from(PROXY_SECRET) : null;
 const EXPECTED_AUTH_DIGEST = AUTH_KEY
   ? createHmac("sha256", AUTH_KEY).update(PROXY_SECRET).digest()
   : null;
 
 // Headers injected by AWS / API Gateway that must not be forwarded to EzyGo.
 const STRIP_REQUEST_HEADERS = new Set([
-  "x-proxy-secret",       // Our auth header — must never reach EzyGo
-  "x-forwarded-proto",    // AWS-injected
-  "x-forwarded-port",     // AWS-injected
-  "x-amzn-trace-id",      // AWS X-Ray trace ID
-  "x-amzn-requestid",     // API GW request ID
-  "x-amz-cf-id",          // CloudFront ID (if any)
+  "x-proxy-secret", // Our auth header — must never reach EzyGo
+  "x-forwarded-proto", // AWS-injected
+  "x-forwarded-port", // AWS-injected
+  "x-amzn-trace-id", // AWS X-Ray trace ID
+  "x-amzn-requestid", // API GW request ID
+  "x-amz-cf-id", // CloudFront ID (if any)
   "x-amz-security-token", // Should never be present; strip defensively
-  "via",                   // Hop-by-hop proxy trail
-  "connection",            // HTTP/1.1 connection management
+  "via", // Hop-by-hop proxy trail
+  "connection", // HTTP/1.1 connection management
   // Request framing/encoding can become stale when API Gateway delivers
   // base64-decoded payloads to Lambda. Let undici compute these correctly.
   "content-length",
@@ -106,8 +106,13 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
 
 function authenticateRequest(eventHeaders) {
   const incomingSecret = (eventHeaders?.["x-proxy-secret"] ?? "").trim();
-  const actualDigest   = AUTH_KEY ? createHmac("sha256", AUTH_KEY).update(incomingSecret).digest() : null;
-  if (!PROXY_SECRET || !EXPECTED_AUTH_DIGEST || !actualDigest || !timingSafeEqual(EXPECTED_AUTH_DIGEST, actualDigest)) {
+  const actualDigest = AUTH_KEY
+    ? createHmac("sha256", AUTH_KEY).update(incomingSecret).digest()
+    : null;
+  if (
+    !PROXY_SECRET || !EXPECTED_AUTH_DIGEST || !actualDigest ||
+    !timingSafeEqual(EXPECTED_AUTH_DIGEST, actualDigest)
+  ) {
     return { statusCode: 403, body: "Forbidden" };
   }
   return null;
@@ -115,16 +120,26 @@ function authenticateRequest(eventHeaders) {
 
 function buildTargetUrl(rawPath, rawQueryString) {
   if (!EZYGO_API_URL) {
-    return { error: { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is empty or only whitespace" } };
+    return {
+      error: {
+        statusCode: 500,
+        body: "Misconfigured: EZYGO_API_URL is empty or only whitespace",
+      },
+    };
   }
   let upstreamBase;
   try {
     upstreamBase = new URL(EZYGO_API_URL);
   } catch {
-    return { error: { statusCode: 500, body: "Misconfigured: EZYGO_API_URL is not a valid URL" } };
+    return {
+      error: {
+        statusCode: 500,
+        body: "Misconfigured: EZYGO_API_URL is not a valid URL",
+      },
+    };
   }
-  const basePath       = stripTrailingSlashes(upstreamBase.pathname);
-  const incomingPath   = rawPath;
+  const basePath = stripTrailingSlashes(upstreamBase.pathname);
+  const incomingPath = rawPath;
 
   // Path-join strategy (supports both caller styles):
   // 1) Caller sends /login/lookup                 + base /api/v1/X -> /api/v1/X/login/lookup
@@ -132,9 +147,12 @@ function buildTargetUrl(rawPath, rawQueryString) {
   // This prevents dropping the required base path or double-prefixing it.
   let resolvedPathname = incomingPath;
   if (basePath) {
-    const hasBasePrefix = incomingPath === basePath || incomingPath.startsWith(`${basePath}/`);
+    const hasBasePrefix = incomingPath === basePath ||
+      incomingPath.startsWith(`${basePath}/`);
     if (!hasBasePrefix) {
-      resolvedPathname = `${basePath}${incomingPath.startsWith("/") ? "" : "/"}${incomingPath}`;
+      resolvedPathname = `${basePath}${
+        incomingPath.startsWith("/") ? "" : "/"
+      }${incomingPath}`;
     }
   }
 
@@ -149,9 +167,9 @@ async function prepareLambdaResponse(response) {
   // Use text() for text/JSON responses (all EzyGo API calls).
   // Use arrayBuffer() + base64 for binary content as a safety fallback
   // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
-  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
-  const isTextResponse =
-    responseContentType === "" ||
+  const responseContentType = (response.headers.get("content-type") ?? "")
+    .toLowerCase();
+  const isTextResponse = responseContentType === "" ||
     responseContentType.startsWith("text/") ||
     responseContentType.startsWith("application/json") ||
     responseContentType.startsWith("application/xml");
@@ -177,8 +195,8 @@ async function prepareLambdaResponse(response) {
 
   return {
     statusCode: response.status,
-    headers:    responseHeaders,
-    body:       responseBody,
+    headers: responseHeaders,
+    body: responseBody,
     isBase64Encoded,
   };
 }
@@ -194,8 +212,8 @@ export const handler = async (event) => {
   }
 
   // ── 2. Build target URL ───────────────────────────────────────────────────
-  const rawPath        = event.rawPath        ?? "/";
-  const rawQueryString = event.rawQueryString ?  `?${event.rawQueryString}` : "";
+  const rawPath = event.rawPath ?? "/";
+  const rawQueryString = event.rawQueryString ? `?${event.rawQueryString}` : "";
   const urlResult = buildTargetUrl(rawPath, rawQueryString);
   if (urlResult.error) {
     return urlResult.error;

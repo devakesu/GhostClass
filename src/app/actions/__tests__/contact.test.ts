@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -25,11 +25,13 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 
 vi.mock("@/lib/contact/service", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/contact/service")>("@/lib/contact/service");
-    return {
-        ...actual,
-        processContactSubmission: vi.fn(),
-    };
+  const actual = await vi.importActual<typeof import("@/lib/contact/service")>(
+    "@/lib/contact/service",
+  );
+  return {
+    ...actual,
+    processContactSubmission: vi.fn(),
+  };
 });
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -51,11 +53,13 @@ describe("contact actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
-    vi.mocked(headers).mockResolvedValue(new Headers({
-      "host": "localhost:3000",
-      "origin": "http://localhost:3000",
-      "x-forwarded-for": "127.0.0.1"
-    }) as never);
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({
+        "host": "localhost:3000",
+        "origin": "http://localhost:3000",
+        "x-forwarded-for": "127.0.0.1",
+      }) as never,
+    );
   });
 
   describe("submitContactForm", () => {
@@ -76,7 +80,9 @@ describe("contact actions", () => {
     it("returns error if rate limited", async () => {
       const formData = new FormData();
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
-      vi.mocked(contactRateLimiter.limit).mockResolvedValue({ success: false } as never);
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
+        { success: false } as never,
+      );
 
       const result = await submitContactForm(formData);
       expect(result.error).toContain("Too many requests");
@@ -87,18 +93,25 @@ describe("contact actions", () => {
       formData.append("name", "John Doe");
       formData.append("email", "john@example.com");
       formData.append("subject", "Hello");
-      formData.append("message", "Test message that is long enough for Zod validation");
+      formData.append(
+        "message",
+        "Test message that is long enough for Zod validation",
+      );
       formData.append("cf-turnstile-response", "valid-token");
       formData.append("csrf_token", "valid-csrf");
 
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
-      vi.mocked(contactRateLimiter.limit).mockResolvedValue({ success: true } as never);
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
+        { success: true } as never,
+      );
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: true }),
       } as never);
 
       vi.mocked(createClient).mockResolvedValue({
-        auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }) }
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u" } } }),
+        },
       } as never);
 
       vi.mocked(processContactSubmission).mockResolvedValue({ success: true });
@@ -110,22 +123,27 @@ describe("contact actions", () => {
     });
 
     it("handles Turnstile failure", async () => {
-        const formData = new FormData();
-        formData.append("name", "John Doe");
-        formData.append("email", "john@example.com");
-        formData.append("subject", "Hello");
-        formData.append("message", "Test message that is long enough for Zod validation");
-        formData.append("cf-turnstile-response", "invalid");
-        formData.append("csrf_token", "valid-csrf");
-  
-        vi.mocked(validateCsrfToken).mockResolvedValue(true);
-        vi.mocked(contactRateLimiter.limit).mockResolvedValue({ success: true } as never);
-        vi.mocked(fetch).mockResolvedValue({
-          json: async () => ({ success: false }),
-        } as never);
-  
-        const result = await submitContactForm(formData);
-        expect(result.error).toContain("CAPTCHA validation failed");
-      });
+      const formData = new FormData();
+      formData.append("name", "John Doe");
+      formData.append("email", "john@example.com");
+      formData.append("subject", "Hello");
+      formData.append(
+        "message",
+        "Test message that is long enough for Zod validation",
+      );
+      formData.append("cf-turnstile-response", "invalid");
+      formData.append("csrf_token", "valid-csrf");
+
+      vi.mocked(validateCsrfToken).mockResolvedValue(true);
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
+        { success: true } as never,
+      );
+      vi.mocked(fetch).mockResolvedValue({
+        json: async () => ({ success: false }),
+      } as never);
+
+      const result = await submitContactForm(formData);
+      expect(result.error).toContain("CAPTCHA validation failed");
+    });
   });
 });

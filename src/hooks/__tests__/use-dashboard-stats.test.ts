@@ -1,7 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useDashboardStats } from "../use-dashboard-stats";
-
 
 describe("useDashboardStats", () => {
   const mockCoursesData = {

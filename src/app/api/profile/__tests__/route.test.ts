@@ -8,7 +8,7 @@
  * - Auth and CSRF checks reject unauthenticated / forged requests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { __resetCachedKey } from "@/lib/crypto";
 import { __resetAllowedHostsCache } from "@/lib/security/origin-validation";
@@ -67,7 +67,9 @@ vi.mock("@/lib/security/csrf", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/security/app-check")>("@/lib/security/app-check");
+  const actual = await vi.importActual<
+    typeof import("@/lib/security/app-check")
+  >("@/lib/security/app-check");
   return {
     ...actual,
     withSecurity: vi.fn((handler) => handler),
@@ -98,52 +100,57 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 
 // --- Mock sync logic ---
-const mockPerformProfileSync = vi.fn().mockImplementation(async (token, _ezygoId, authId) => {
-  const supabaseAdmin = getAdminClient();
-  
-  // Fetch from the mocked egressFetch
-  const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) {
-    throw new Error(`EzyGo Profile failed: ${res.status}`);
-  }
-  const json = await res.json();
-  const d = json.data || json;
-  
-  const { encrypt } = await import("@/lib/crypto");
-  
-  const mobileVal = d.mobile || d.user?.mobile;
-  const encPhone = mobileVal ? encrypt(mobileVal) : null;
-  const encGender = d.gender ? encrypt(d.gender) : null;
-  const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+const mockPerformProfileSync = vi.fn().mockImplementation(
+  async (token, _ezygoId, authId) => {
+    const supabaseAdmin = getAdminClient();
 
-  const upsertData = { 
-    id: d.user_id || 42, 
-    auth_id: authId, 
-    username: d.username || d.user?.username || null,
-    email: d.email || d.user?.email || null,
-    first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
-    last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
-    phone: encPhone?.content || null, 
-    phone_iv: encPhone?.iv || null,
-    gender: encGender?.content || null,
-    gender_iv: encGender?.iv || null,
-    birth_date: encBirthDate?.content || null,
-    birth_date_iv: encBirthDate?.iv || null,
-    ezygo_created_at: d.created_at || null,
-    current_semester: d.current_semester || d.current_term || null,
-    current_year: d.current_year || d.academic_year || null,
-  };
-  await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
-
-  return {
-    academic: {
-      year: d.current_year || d.academic_year || null,
-      semester: d.current_semester || d.current_term || null,
-      current_year: d.current_year || d.academic_year || null,
-      current_semester: d.current_semester || d.current_term || null,
+    // Fetch from the mocked egressFetch
+    const res = await mockEgressFetch("myprofile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error(`EzyGo Profile failed: ${res.status}`);
     }
-  };
-});
+    const json = await res.json();
+    const d = json.data || json;
+
+    const { encrypt } = await import("@/lib/crypto");
+
+    const mobileVal = d.mobile || d.user?.mobile;
+    const encPhone = mobileVal ? encrypt(mobileVal) : null;
+    const encGender = d.gender ? encrypt(d.gender) : null;
+    const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+    const upsertData = {
+      id: d.user_id || 42,
+      auth_id: authId,
+      username: d.username || d.user?.username || null,
+      email: d.email || d.user?.email || null,
+      first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
+      last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") ||
+        "User",
+      phone: encPhone?.content || null,
+      phone_iv: encPhone?.iv || null,
+      gender: encGender?.content || null,
+      gender_iv: encGender?.iv || null,
+      birth_date: encBirthDate?.content || null,
+      birth_date_iv: encBirthDate?.iv || null,
+      ezygo_created_at: d.created_at || null,
+      current_semester: d.current_semester || d.current_term || null,
+      current_year: d.current_year || d.academic_year || null,
+    };
+    await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
+
+    return {
+      academic: {
+        year: d.current_year || d.academic_year || null,
+        semester: d.current_semester || d.current_term || null,
+        current_year: d.current_year || d.academic_year || null,
+        current_semester: d.current_semester || d.current_term || null,
+      },
+    };
+  },
+);
 vi.mock("@/lib/user/sync", () => ({
   performProfileSync: mockPerformProfileSync,
 }));
@@ -152,7 +159,8 @@ vi.mock("@/lib/user/sync", () => ({
 // Helper builders
 // ---------------------------------------------------------------------------
 
-const VALID_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const VALID_ENCRYPTION_KEY =
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 const MOCK_USER = { id: "auth-user-id-123" };
 
@@ -172,7 +180,7 @@ function makeEzygoFetchOk(profile = MOCK_EZYGO_PROFILE) {
     new Response(JSON.stringify({ data: profile }), {
       status: 200,
       headers: { "content-type": "application/json" },
-    })
+    }),
   );
 }
 
@@ -191,7 +199,10 @@ const makeGetReq = (overrideHeaders?: Record<string, string>) =>
     headers: { origin: "http://localhost", ...overrideHeaders },
   });
 
-function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csrf") {
+function makePatchRequest(
+  body: Record<string, unknown>,
+  csrfHeader = "valid-csrf",
+) {
   return new NextRequest("http://localhost:3000/api/profile", {
     method: "PATCH",
     headers: {
@@ -203,11 +214,10 @@ function makePatchRequest(body: Record<string, unknown>, csrfHeader = "valid-csr
 }
 
 describe("GET /api/profile", () => {
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    
+
     // Reset all database and sync mocks to clear any mockImplementations from previous tests
     mockAdminSelect.mockReset();
     mockAdminUpsert.mockReset();
@@ -228,54 +238,61 @@ describe("GET /api/profile", () => {
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
     mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
-    
+
     // Re-assign mockPerformProfileSync implementation
-    mockPerformProfileSync.mockImplementation(async (token, _ezygoId, authId) => {
-      const supabaseAdmin = getAdminClient();
-      
-      // Fetch from the mocked egressFetch
-      const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) {
-        throw new Error(`EzyGo Profile failed: ${res.status}`);
-      }
-      const json = await res.json();
-      const d = json.data || json;
-      
-      const { encrypt } = await import("@/lib/crypto");
-      
-      const mobileVal = d.mobile || d.user?.mobile;
-      const encPhone = mobileVal ? encrypt(mobileVal) : null;
-      const encGender = d.gender ? encrypt(d.gender) : null;
-      const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+    mockPerformProfileSync.mockImplementation(
+      async (token, _ezygoId, authId) => {
+        const supabaseAdmin = getAdminClient();
 
-      const upsertData = { 
-        id: d.user_id || 42, 
-        auth_id: authId, 
-        username: d.username || d.user?.username || null,
-        email: d.email || d.user?.email || null,
-        first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
-        last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
-        phone: encPhone?.content || null, 
-        phone_iv: encPhone?.iv || null,
-        gender: encGender?.content || null,
-        gender_iv: encGender?.iv || null,
-        birth_date: encBirthDate?.content || null,
-        birth_date_iv: encBirthDate?.iv || null,
-        ezygo_created_at: d.created_at || null,
-        current_semester: d.current_semester || d.current_term || null,
-        current_year: d.current_year || d.academic_year || null,
-      };
-      await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
-
-      return {
-        academic: {
-          year: d.current_year || d.academic_year || null,
-          semester: d.current_semester || d.current_term || null,
-          current_year: d.current_year || d.academic_year || null,
-          current_semester: d.current_semester || d.current_term || null,
+        // Fetch from the mocked egressFetch
+        const res = await mockEgressFetch("myprofile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          throw new Error(`EzyGo Profile failed: ${res.status}`);
         }
-      };
-    });
+        const json = await res.json();
+        const d = json.data || json;
+
+        const { encrypt } = await import("@/lib/crypto");
+
+        const mobileVal = d.mobile || d.user?.mobile;
+        const encPhone = mobileVal ? encrypt(mobileVal) : null;
+        const encGender = d.gender ? encrypt(d.gender) : null;
+        const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+        const upsertData = {
+          id: d.user_id || 42,
+          auth_id: authId,
+          username: d.username || d.user?.username || null,
+          email: d.email || d.user?.email || null,
+          first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
+          last_name: d.last_name ||
+            d.full_name?.split(" ").slice(1).join(" ") || "User",
+          phone: encPhone?.content || null,
+          phone_iv: encPhone?.iv || null,
+          gender: encGender?.content || null,
+          gender_iv: encGender?.iv || null,
+          birth_date: encBirthDate?.content || null,
+          birth_date_iv: encBirthDate?.iv || null,
+          ezygo_created_at: d.created_at || null,
+          current_semester: d.current_semester || d.current_term || null,
+          current_year: d.current_year || d.academic_year || null,
+        };
+        await supabaseAdmin.from("users").upsert(upsertData, {
+          onConflict: "id",
+        });
+
+        return {
+          academic: {
+            year: d.current_year || d.academic_year || null,
+            semester: d.current_semester || d.current_term || null,
+            current_year: d.current_year || d.academic_year || null,
+            current_semester: d.current_semester || d.current_term || null,
+          },
+        };
+      },
+    );
 
     // Dynamic Mock Database State
     let storedUser: any = null;
@@ -296,7 +313,12 @@ describe("GET /api/profile", () => {
       }),
     });
     // Default: rate limiter allows the request
-    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
+    mockRateLimiterLimit.mockResolvedValue({
+      success: true,
+      reset: Date.now() + 60000,
+      limit: 5,
+      remaining: 4,
+    });
   });
 
   afterEach(() => {
@@ -371,12 +393,12 @@ describe("GET /api/profile", () => {
   it("resolves the EzyGo fallback token using the authenticated user id for bearer tokens", async () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
-    
+
     // Simulate bearer token authorization header
     const req = makeGetReq({ authorization: "Bearer some-supabase-token" });
     const res = await GET(req, { params: {} });
     expect(res.status).toBe(200);
-    
+
     // Verify getAuthTokenWithFallback was called with the authenticated user ID
     expect(mockGetAuthTokenWithFallback).toHaveBeenCalledWith(MOCK_USER.id);
   });
@@ -398,7 +420,9 @@ describe("GET /api/profile", () => {
     await GET(makeGetReq(), { params: {} });
 
     expect(mockAdminUpsert).toHaveBeenCalledOnce();
-    const [upsertPayload] = mockAdminUpsert.mock.calls[0] as [Record<string, unknown>];
+    const [upsertPayload] = mockAdminUpsert.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
 
     // Ciphertext must differ from plaintext
     expect(upsertPayload.phone).not.toBe(MOCK_EZYGO_PROFILE.mobile);
@@ -513,7 +537,12 @@ describe("PATCH /api/profile", () => {
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
     // Default: rate limiter allows the request
-    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
+    mockRateLimiterLimit.mockResolvedValue({
+      success: true,
+      reset: Date.now() + 60000,
+      limit: 5,
+      remaining: 4,
+    });
   });
 
   afterEach(() => {
@@ -617,7 +646,11 @@ describe("PATCH /api/profile", () => {
 
     const { PATCH } = await import("../route");
     // gender and birth_date explicitly set to null – should be stored as NULL
-    const req = makePatchRequest({ first_name: "Alice", gender: null, birth_date: null });
+    const req = makePatchRequest({
+      first_name: "Alice",
+      gender: null,
+      birth_date: null,
+    });
     await PATCH(req, { params: {} });
 
     expect(capturedUpdate.gender).toBeNull();
@@ -696,54 +729,61 @@ describe("Edge Case & Branch Coverage", () => {
     });
     mockGetAuthToken.mockResolvedValue("ezygo-session-token");
     mockGetAuthTokenWithFallback.mockResolvedValue("ezygo-session-token");
-    
+
     // Re-assign mockPerformProfileSync implementation
-    mockPerformProfileSync.mockImplementation(async (token, _ezygoId, authId) => {
-      const supabaseAdmin = getAdminClient();
-      
-      // Fetch from the mocked egressFetch
-      const res = await mockEgressFetch("myprofile", { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) {
-        throw new Error(`EzyGo Profile failed: ${res.status}`);
-      }
-      const json = await res.json();
-      const d = json.data || json;
-      
-      const { encrypt } = await import("@/lib/crypto");
-      
-      const mobileVal = d.mobile || d.user?.mobile;
-      const encPhone = mobileVal ? encrypt(mobileVal) : null;
-      const encGender = d.gender ? encrypt(d.gender) : null;
-      const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+    mockPerformProfileSync.mockImplementation(
+      async (token, _ezygoId, authId) => {
+        const supabaseAdmin = getAdminClient();
 
-      const upsertData = { 
-        id: d.user_id || 42, 
-        auth_id: authId, 
-        username: d.username || d.user?.username || null,
-        email: d.email || d.user?.email || null,
-        first_name: d.first_name || d.full_name?.split(" ")[0] || "Test", 
-        last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User", 
-        phone: encPhone?.content || null, 
-        phone_iv: encPhone?.iv || null,
-        gender: encGender?.content || null,
-        gender_iv: encGender?.iv || null,
-        birth_date: encBirthDate?.content || null,
-        birth_date_iv: encBirthDate?.iv || null,
-        ezygo_created_at: d.created_at || null,
-        current_semester: d.current_semester || d.current_term || null,
-        current_year: d.current_year || d.academic_year || null,
-      };
-      await supabaseAdmin.from("users").upsert(upsertData, { onConflict: "id" });
-
-      return {
-        academic: {
-          year: d.current_year || d.academic_year || null,
-          semester: d.current_semester || d.current_term || null,
-          current_year: d.current_year || d.academic_year || null,
-          current_semester: d.current_semester || d.current_term || null,
+        // Fetch from the mocked egressFetch
+        const res = await mockEgressFetch("myprofile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          throw new Error(`EzyGo Profile failed: ${res.status}`);
         }
-      };
-    });
+        const json = await res.json();
+        const d = json.data || json;
+
+        const { encrypt } = await import("@/lib/crypto");
+
+        const mobileVal = d.mobile || d.user?.mobile;
+        const encPhone = mobileVal ? encrypt(mobileVal) : null;
+        const encGender = d.gender ? encrypt(d.gender) : null;
+        const encBirthDate = d.birth_date ? encrypt(d.birth_date) : null;
+
+        const upsertData = {
+          id: d.user_id || 42,
+          auth_id: authId,
+          username: d.username || d.user?.username || null,
+          email: d.email || d.user?.email || null,
+          first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
+          last_name: d.last_name ||
+            d.full_name?.split(" ").slice(1).join(" ") || "User",
+          phone: encPhone?.content || null,
+          phone_iv: encPhone?.iv || null,
+          gender: encGender?.content || null,
+          gender_iv: encGender?.iv || null,
+          birth_date: encBirthDate?.content || null,
+          birth_date_iv: encBirthDate?.iv || null,
+          ezygo_created_at: d.created_at || null,
+          current_semester: d.current_semester || d.current_term || null,
+          current_year: d.current_year || d.academic_year || null,
+        };
+        await supabaseAdmin.from("users").upsert(upsertData, {
+          onConflict: "id",
+        });
+
+        return {
+          academic: {
+            year: d.current_year || d.academic_year || null,
+            semester: d.current_semester || d.current_term || null,
+            current_year: d.current_year || d.academic_year || null,
+            current_semester: d.current_semester || d.current_term || null,
+          },
+        };
+      },
+    );
 
     // Dynamic Mock Database State
     let storedUser: any = null;
@@ -764,9 +804,14 @@ describe("Edge Case & Branch Coverage", () => {
       }),
     });
     mockAdminUpdate.mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
+      eq: vi.fn().mockResolvedValue({ error: null }),
     });
-    mockRateLimiterLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000, limit: 5, remaining: 4 });
+    mockRateLimiterLimit.mockResolvedValue({
+      success: true,
+      reset: Date.now() + 60000,
+      limit: 5,
+      remaining: 4,
+    });
   });
 
   it("handles shouldSync=true when getAuthTokenServer returns null", async () => {
@@ -780,11 +825,11 @@ describe("Edge Case & Branch Coverage", () => {
     }));
     mockGetAuthToken.mockResolvedValue(null);
     mockGetAuthTokenWithFallback.mockResolvedValue(null);
-    
+
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile?sync=true");
     const res = await GET(req, { params: {} });
-    
+
     expect(res.status).toBe(200);
     expect(mockPerformProfileSync).not.toHaveBeenCalled();
   });
@@ -799,11 +844,11 @@ describe("Edge Case & Branch Coverage", () => {
       }),
     }));
     mockPerformProfileSync.mockRejectedValue(new Error("Sync failed"));
-    
+
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile?sync=true");
     const res = await GET(req, { params: {} });
-    
+
     expect(res.status).toBe(200);
     // Even if sync fails, we return the existing DB data
     const body = await res.json();
@@ -811,22 +856,28 @@ describe("Edge Case & Branch Coverage", () => {
   });
 
   it("returns 502 when EzyGo returns error status", async () => {
-    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ error: "EzyGo error" }), { status: 500 }));
-    
+    mockEgressFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: "EzyGo error" }), { status: 500 }),
+    );
+
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
-    
+
     const body = await res.json();
     expect(res.status).toBe(502);
     expect(body.error).toContain("Failed to reach EzyGo profile service");
   });
 
   it("handles EzyGo response without .data wrapper", async () => {
-    mockEgressFetch.mockResolvedValue(new Response(JSON.stringify({ user_id: 123, username: "direct" }), { status: 200 }));
-    
+    mockEgressFetch.mockResolvedValue(
+      new Response(JSON.stringify({ user_id: 123, username: "direct" }), {
+        status: 200,
+      }),
+    );
+
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
-    
+
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.username).toBe("direct");
@@ -837,7 +888,7 @@ describe("Edge Case & Branch Coverage", () => {
     const req = new NextRequest("http://localhost/api/profile", {
       method: "PATCH",
       body: "not-json",
-      headers: { "content-type": "application/json" }
+      headers: { "content-type": "application/json" },
     });
     const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(400);
@@ -848,105 +899,113 @@ describe("Edge Case & Branch Coverage", () => {
     mockAdminUpdate.mockImplementation(() => ({
       eq: vi.fn().mockResolvedValue({ error: { message: "DB Error" } }),
     }));
-    
+
     const { PATCH } = await import("../route");
     const req = makePatchRequest({ first_name: "Alice" });
     const res = await PATCH(req, { params: {} });
-    
+
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Failed to update profile" });
   });
 
   it("backgrounds the profile sync when class sem/year match expected academic settings (no conflict)", async () => {
-    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const { calculateCurrentAcademicInfo } = await import(
+      "@/lib/logic/academic"
+    );
     const expected = calculateCurrentAcademicInfo();
-    
+
     mockAdminSelect.mockImplementation(() => ({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
-          data: { 
-            id: 1, 
-            first_name: "Alice", 
+          data: {
+            id: 1,
+            first_name: "Alice",
             auth_id: MOCK_USER.id,
-            class: { 
-              id: "class-id", 
-              name: "Test Class", 
-              sem: expected.current_semester, 
-              year: expected.current_year 
-            }
+            class: {
+              id: "class-id",
+              name: "Test Class",
+              sem: expected.current_semester,
+              year: expected.current_year,
+            },
           },
           error: null,
         }),
       }),
     }));
-    
+
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile?sync=true");
     const res = await GET(req, { params: {} });
-    
+
     expect(res.status).toBe(200);
     expect(mockPerformProfileSync).not.toHaveBeenCalled();
   });
 
   it("performs blocking profile sync synchronously when class sem/year do not match expected settings (conflict)", async () => {
-    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const { calculateCurrentAcademicInfo } = await import(
+      "@/lib/logic/academic"
+    );
     const expected = calculateCurrentAcademicInfo();
     const wrongSem = expected.current_semester === "even" ? "odd" : "even";
-    
+
     mockAdminSelect.mockImplementation(() => ({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
-          data: { 
-            id: 1, 
-            first_name: "Alice", 
+          data: {
+            id: 1,
+            first_name: "Alice",
             auth_id: MOCK_USER.id,
-            class: { 
-              id: "class-id", 
-              name: "Test Class", 
-              sem: wrongSem, 
-              year: expected.current_year 
-            }
+            class: {
+              id: "class-id",
+              name: "Test Class",
+              sem: wrongSem,
+              year: expected.current_year,
+            },
           },
           error: null,
         }),
       }),
     }));
-    
+
     const { GET } = await import("../route");
     const req = new NextRequest("http://localhost/api/profile?sync=true");
     const res = await GET(req, { params: {} });
-    
+
     expect(res.status).toBe(200);
     expect(mockPerformProfileSync).toHaveBeenCalledOnce();
   });
 
   it("performs blocking profile sync synchronously when force=true even when class sem/year match expected settings (no conflict)", async () => {
-    const { calculateCurrentAcademicInfo } = await import("@/lib/logic/academic");
+    const { calculateCurrentAcademicInfo } = await import(
+      "@/lib/logic/academic"
+    );
     const expected = calculateCurrentAcademicInfo();
-    
+
     mockAdminSelect.mockImplementation(() => ({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
-          data: { 
-            id: 1, 
-            first_name: "Alice", 
+          data: {
+            id: 1,
+            first_name: "Alice",
             auth_id: MOCK_USER.id,
-            class: { 
-              id: "class-id", 
-              name: "Test Class", 
-              sem: expected.current_semester, 
-              year: expected.current_year 
-            }
+            class: {
+              id: "class-id",
+              name: "Test Class",
+              sem: expected.current_semester,
+              year: expected.current_year,
+            },
           },
           error: null,
         }),
       }),
     }));
-    
+
     const { GET } = await import("../route");
-    const req = new NextRequest("http://localhost/api/profile?sync=true&force=true");
+    const req = new NextRequest(
+      "http://localhost/api/profile?sync=true&force=true",
+    );
     const res = await GET(req, { params: {} });
-    
+
     expect(res.status).toBe(200);
     expect(mockPerformProfileSync).toHaveBeenCalledOnce();
   });

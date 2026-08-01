@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
-import ScoresError from '../error';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+import ScoresError from "../error";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 
@@ -19,19 +19,23 @@ vi.mock("@/components/error-fallback", () => ({
   ErrorFallback: () => <div data-testid="error-fallback">ErrorFallback</div>,
 }));
 
-describe('ScoresError', () => {
+describe("ScoresError", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('logs error and captures exception', () => {
-    const error = new Error('Test error') as any;
-    error.digest = 'test-digest';
+  it("logs error and captures exception", () => {
+    const error = new Error("Test error") as any;
+    error.digest = "test-digest";
     const reset = vi.fn();
 
     render(<ScoresError error={error} reset={reset} />);
 
-    expect(logger.error).toHaveBeenCalledWith("[scores] Render error:", "Test error", "test-digest");
+    expect(logger.error).toHaveBeenCalledWith(
+      "[scores] Render error:",
+      "Test error",
+      "test-digest",
+    );
     expect(Sentry.captureException).toHaveBeenCalledWith(error, {
       tags: {
         location: "scores",

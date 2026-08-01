@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
 import {
-  isPositive,
-  getOfficialSessionRaw,
   ATTENDANCE_STATUS,
+  getOfficialSessionRaw,
+  isPositive,
 } from "@/lib/logic/attendance-reconciliation";
 import { AttendanceReport, TrackAttendance } from "@/types";
 
@@ -64,7 +64,9 @@ interface OfficialSessionPayload {
   session?: string | number | null;
 }
 
-function createCodeResolver(coursesData: UseDashboardStatsOptions["coursesData"]) {
+function createCodeResolver(
+  coursesData: UseDashboardStatsOptions["coursesData"],
+) {
   return (id: string): string => {
     const courses = coursesData?.courses;
     if (courses && Object.prototype.hasOwnProperty.call(courses, id)) {
@@ -85,7 +87,7 @@ function addCourseStatIfMissing(map: Map<string, CourseStat>, key: string) {
 
 function populateClassCourseStats(
   map: Map<string, CourseStat>,
-  classCourses: UseDashboardStatsOptions["classCourses"]
+  classCourses: UseDashboardStatsOptions["classCourses"],
 ) {
   if (!classCourses) return;
 
@@ -98,7 +100,7 @@ function populateClassCourseStats(
 function initCourseStatsMap(
   coursesData: UseDashboardStatsOptions["coursesData"],
   classCourses: UseDashboardStatsOptions["classCourses"],
-  resolveCode: (id: string) => string
+  resolveCode: (id: string) => string,
 ): Map<string, CourseStat> {
   const map = new Map<string, CourseStat>();
 
@@ -124,7 +126,7 @@ function processSingleSession(
   officialMap: Map<string, number>,
   normalizedDisabledCodes: Set<string>,
   officialStats: OfficialAccumulator,
-  resolveCode: (id: string) => string
+  resolveCode: (id: string) => string,
 ) {
   if (!session || !session.course || session.class_type === "Revision") return;
 
@@ -166,11 +168,15 @@ function processOfficialAttendance(
   officialMap: Map<string, number>,
   normalizedDisabledCodes: Set<string>,
   officialStats: OfficialAccumulator,
-  resolveCode: (id: string) => string
+  resolveCode: (id: string) => string,
 ) {
   if (!attendanceData?.studentAttendanceData) return;
 
-  for (const [dateStr, dateData] of Object.entries(attendanceData.studentAttendanceData)) {
+  for (
+    const [dateStr, dateData] of Object.entries(
+      attendanceData.studentAttendanceData,
+    )
+  ) {
     if (!dateData) continue;
     for (const [sessionKey, session] of Object.entries(dateData)) {
       processSingleSession(
@@ -181,7 +187,7 @@ function processOfficialAttendance(
         officialMap,
         normalizedDisabledCodes,
         officialStats,
-        resolveCode
+        resolveCode,
       );
     }
   }
@@ -191,7 +197,7 @@ function updateCourseStatForTrack(
   cStat: CourseStat,
   isTrulyExtra: boolean,
   trackPos: boolean,
-  offPos: boolean
+  offPos: boolean,
 ) {
   if (isTrulyExtra) {
     cStat.total++;
@@ -219,7 +225,7 @@ function updateModifierStatsForTrack(
   trackPos: boolean,
   trackDL: boolean,
   offPos: boolean,
-  offDL: boolean
+  offDL: boolean,
 ) {
   if (isTrulyExtra) {
     if (trackPos) {
@@ -249,9 +255,12 @@ function processSingleTrackItem(
   officialMap: Map<string, number>,
   normalizedDisabledCodes: Set<string>,
   modifierStats: ModifierAccumulator,
-  resolveCode: (id: string) => string
+  resolveCode: (id: string) => string,
 ) {
-  if (!item || item.semester !== selectedSemester || item.year !== selectedYear || !item.course) {
+  if (
+    !item || item.semester !== selectedSemester || item.year !== selectedYear ||
+    !item.course
+  ) {
     return;
   }
 
@@ -263,7 +272,9 @@ function processSingleTrackItem(
   const trackAttendanceNum = Number(item.attendance);
   const trackPos = isPositive(trackAttendanceNum);
   const trackDL = trackAttendanceNum === ATTENDANCE_STATUS.DUTY_LEAVE;
-  const offPos = officialStatus !== undefined ? isPositive(officialStatus) : false;
+  const offPos = officialStatus !== undefined
+    ? isPositive(officialStatus)
+    : false;
   const offDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
 
   const cStat = courseStatsMap.get(statsKey);
@@ -272,7 +283,14 @@ function processSingleTrackItem(
   }
 
   if (!normalizedDisabledCodes.has(statsKey)) {
-    updateModifierStatsForTrack(modifierStats, isTrulyExtra, trackPos, trackDL, offPos, offDL);
+    updateModifierStatsForTrack(
+      modifierStats,
+      isTrulyExtra,
+      trackPos,
+      trackDL,
+      offPos,
+      offDL,
+    );
   }
 }
 
@@ -284,7 +302,7 @@ function processTrackingData(
   officialMap: Map<string, number>,
   normalizedDisabledCodes: Set<string>,
   modifierStats: ModifierAccumulator,
-  resolveCode: (id: string) => string
+  resolveCode: (id: string) => string,
 ) {
   if (!trackingData) return;
   for (const item of trackingData) {
@@ -296,7 +314,7 @@ function processTrackingData(
       officialMap,
       normalizedDisabledCodes,
       modifierStats,
-      resolveCode
+      resolveCode,
     );
   }
 }
@@ -314,10 +332,15 @@ export function useDashboardStats({
     const resolveCode = createCodeResolver(coursesData);
 
     const normalizedDisabledCodes = new Set(
-      Array.from(disabledCodes).map((c) => normalizeCourseCode(c))
+      Array.from(disabledCodes).map((c) => normalizeCourseCode(c)),
     );
 
-    const officialStats: OfficialAccumulator = { present: 0, absent: 0, dl: 0, total: 0 };
+    const officialStats: OfficialAccumulator = {
+      present: 0,
+      absent: 0,
+      dl: 0,
+      total: 0,
+    };
     const modifierStats: ModifierAccumulator = {
       correctionPresent: 0,
       savedAbsent: 0,
@@ -327,7 +350,11 @@ export function useDashboardStats({
       extraDL: 0,
     };
 
-    const courseStatsMap = initCourseStatsMap(coursesData, classCourses, resolveCode);
+    const courseStatsMap = initCourseStatsMap(
+      coursesData,
+      classCourses,
+      resolveCode,
+    );
     const officialMap = new Map<string, number>();
 
     processOfficialAttendance(
@@ -336,7 +363,7 @@ export function useDashboardStats({
       officialMap,
       normalizedDisabledCodes,
       officialStats,
-      resolveCode
+      resolveCode,
     );
 
     processTrackingData(
@@ -347,23 +374,20 @@ export function useDashboardStats({
       officialMap,
       normalizedDisabledCodes,
       modifierStats,
-      resolveCode
+      resolveCode,
     );
 
-    const finalTotal =
-      officialStats.total +
+    const finalTotal = officialStats.total +
       modifierStats.extraPresent +
       modifierStats.extraAbsent;
-    const finalPresent =
-      officialStats.present +
+    const finalPresent = officialStats.present +
       modifierStats.correctionPresent +
       modifierStats.extraPresent;
 
     const percentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
-    const officialPercentage =
-      officialStats.total > 0
-        ? (officialStats.present / officialStats.total) * 100
-        : 0;
+    const officialPercentage = officialStats.total > 0
+      ? (officialStats.present / officialStats.total) * 100
+      : 0;
 
     const formatPct = (val: number) =>
       val % 1 === 0 ? Math.round(val) : parseFloat(val.toFixed(2));

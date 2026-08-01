@@ -1,19 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST } from '../route';
-import { getAdminClient } from '@/lib/supabase/admin';
-import { logger } from '@/lib/logger';
-import type { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { POST } from "../route";
+import { getAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
+import type { NextRequest } from "next/server";
 
 // Mock withSecurity to just call the handler directly
-vi.mock('@/lib/security/app-check', () => ({
+vi.mock("@/lib/security/app-check", () => ({
   withSecurity: (handler: unknown) => handler,
 }));
 
-vi.mock('@/lib/supabase/admin', () => ({
+vi.mock("@/lib/supabase/admin", () => ({
   getAdminClient: vi.fn(),
 }));
 
-vi.mock('@/lib/logger', () => ({
+vi.mock("@/lib/logger", () => ({
   logger: {
     warn: vi.fn(),
     error: vi.fn(),
@@ -21,11 +21,11 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-vi.mock('@sentry/nextjs', () => ({
+vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
-vi.mock('next/server', () => ({
+vi.mock("next/server", () => ({
   NextResponse: {
     json: vi.fn((data, init) => ({
       data,
@@ -36,7 +36,7 @@ vi.mock('next/server', () => ({
 
 type MockRes = { status: number; data: Record<string, unknown> };
 
-describe('POST /api/user/accept-terms', () => {
+describe("POST /api/user/accept-terms", () => {
   const mockSupabaseAdmin = {
     auth: {
       getUser: vi.fn(),
@@ -45,16 +45,18 @@ describe('POST /api/user/accept-terms', () => {
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     then: vi.fn().mockImplementation((onFulfilled: () => unknown) => {
-        return Promise.resolve({ error: null }).then(onFulfilled);
+      return Promise.resolve({ error: null }).then(onFulfilled);
     }),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as unknown as ReturnType<typeof getAdminClient>);
+    vi.mocked(getAdminClient).mockReturnValue(
+      mockSupabaseAdmin as unknown as ReturnType<typeof getAdminClient>,
+    );
   });
 
-  it('returns 401 if Authorization header is missing', async () => {
+  it("returns 401 if Authorization header is missing", async () => {
     const req = {
       headers: {
         get: vi.fn().mockReturnValue(null),
@@ -64,114 +66,140 @@ describe('POST /api/user/accept-terms', () => {
     const response = await POST(req, {}) as unknown as MockRes;
 
     expect(response.status).toBe(401);
-    expect(response.data.error).toBe('Unauthorized');
+    expect(response.data.error).toBe("Unauthorized");
   });
 
-  it('returns 401 if session is invalid', async () => {
+  it("returns 401 if session is invalid", async () => {
     const req = {
       headers: {
-        get: vi.fn().mockReturnValue('Bearer invalid-token'),
+        get: vi.fn().mockReturnValue("Bearer invalid-token"),
       },
     } as unknown as NextRequest;
 
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('Invalid') });
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: new Error("Invalid"),
+    });
 
     const response = await POST(req, {}) as unknown as MockRes;
 
     expect(response.status).toBe(401);
-    expect(response.data.error).toBe('Invalid session');
+    expect(response.data.error).toBe("Invalid session");
   });
 
-  it('successfully updates terms for an authorized user', async () => {
+  it("successfully updates terms for an authorized user", async () => {
     const req = {
       headers: {
-        get: vi.fn().mockReturnValue('Bearer valid-token'),
+        get: vi.fn().mockReturnValue("Bearer valid-token"),
       },
-      json: vi.fn().mockResolvedValue({ version: '1.0' }),
+      json: vi.fn().mockResolvedValue({ version: "1.0" }),
     } as unknown as NextRequest;
 
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    
-    // Reset then for success
-    mockSupabaseAdmin.then.mockImplementationOnce((onFulfilled: () => unknown) => {
-        return Promise.resolve({ error: null }).then(onFulfilled);
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+      error: null,
     });
+
+    // Reset then for success
+    mockSupabaseAdmin.then.mockImplementationOnce(
+      (onFulfilled: () => unknown) => {
+        return Promise.resolve({ error: null }).then(onFulfilled);
+      },
+    );
 
     const response = await POST(req, {}) as unknown as MockRes;
 
     expect(response.status).toBe(200);
     expect(response.data.success).toBe(true);
-    expect(mockSupabaseAdmin.update).toHaveBeenCalledWith(expect.objectContaining({ terms_version: '1.0' }));
-    expect(mockSupabaseAdmin.eq).toHaveBeenCalledWith('auth_id', 'user-123');
+    expect(mockSupabaseAdmin.update).toHaveBeenCalledWith(
+      expect.objectContaining({ terms_version: "1.0" }),
+    );
+    expect(mockSupabaseAdmin.eq).toHaveBeenCalledWith("auth_id", "user-123");
   });
 
-  it('returns 400 if version is missing', async () => {
+  it("returns 400 if version is missing", async () => {
     const req = {
       headers: {
-        get: vi.fn().mockReturnValue('Bearer valid-token'),
+        get: vi.fn().mockReturnValue("Bearer valid-token"),
       },
       json: vi.fn().mockResolvedValue({}),
     } as unknown as NextRequest;
 
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-
-    const response = await POST(req, {}) as unknown as MockRes;
-
-    expect(response.status).toBe(400);
-    expect(response.data.error).toBe('Version is required');
-  });
-
-  it('returns 400 if version format is invalid', async () => {
-    const req = {
-      headers: {
-        get: vi.fn().mockReturnValue('Bearer valid-token'),
-      },
-      json: vi.fn().mockResolvedValue({ version: '!!!' }),
-    } as unknown as NextRequest;
-
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-
-    const response = await POST(req, {}) as unknown as MockRes;
-
-    expect(response.status).toBe(400);
-    expect(response.data.error).toBe('Invalid version format');
-  });
-
-  it('returns 500 if database update fails', async () => {
-    const req = {
-      headers: {
-        get: vi.fn().mockReturnValue('Bearer valid-token'),
-      },
-      json: vi.fn().mockResolvedValue({ version: '1.0' }),
-    } as unknown as NextRequest;
-
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
-    
-    mockSupabaseAdmin.then.mockImplementationOnce((onFulfilled: () => unknown) => {
-        return Promise.resolve({ error: new Error('DB Error') }).then(onFulfilled);
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+      error: null,
     });
 
     const response = await POST(req, {}) as unknown as MockRes;
 
-    expect(response.status).toBe(500);
-    expect(response.data.error).toBe('Failed to update terms acceptance');
-    expect(logger.error).toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    expect(response.data.error).toBe("Version is required");
   });
 
-  it('handles malformed JSON body', async () => {
+  it("returns 400 if version format is invalid", async () => {
     const req = {
       headers: {
-        get: vi.fn().mockReturnValue('Bearer valid-token'),
+        get: vi.fn().mockReturnValue("Bearer valid-token"),
       },
-      json: vi.fn().mockRejectedValue(new Error('Parse Error')),
+      json: vi.fn().mockResolvedValue({ version: "!!!" }),
     } as unknown as NextRequest;
 
-    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
 
     const response = await POST(req, {}) as unknown as MockRes;
 
     expect(response.status).toBe(400);
-    expect(response.data.error).toBe('Invalid request body');
+    expect(response.data.error).toBe("Invalid version format");
+  });
+
+  it("returns 500 if database update fails", async () => {
+    const req = {
+      headers: {
+        get: vi.fn().mockReturnValue("Bearer valid-token"),
+      },
+      json: vi.fn().mockResolvedValue({ version: "1.0" }),
+    } as unknown as NextRequest;
+
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+
+    mockSupabaseAdmin.then.mockImplementationOnce(
+      (onFulfilled: () => unknown) => {
+        return Promise.resolve({ error: new Error("DB Error") }).then(
+          onFulfilled,
+        );
+      },
+    );
+
+    const response = await POST(req, {}) as unknown as MockRes;
+
+    expect(response.status).toBe(500);
+    expect(response.data.error).toBe("Failed to update terms acceptance");
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("handles malformed JSON body", async () => {
+    const req = {
+      headers: {
+        get: vi.fn().mockReturnValue("Bearer valid-token"),
+      },
+      json: vi.fn().mockRejectedValue(new Error("Parse Error")),
+    } as unknown as NextRequest;
+
+    mockSupabaseAdmin.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+
+    const response = await POST(req, {}) as unknown as MockRes;
+
+    expect(response.status).toBe(400);
+    expect(response.data.error).toBe("Invalid request body");
     expect(logger.warn).toHaveBeenCalled();
   });
 });

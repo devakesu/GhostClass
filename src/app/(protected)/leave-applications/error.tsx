@@ -13,7 +13,11 @@ export default function LeaveApplicationsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error("[leave-applications] Render error:", error.message, error.digest);
+    logger.error(
+      "[leave-applications] Render error:",
+      error.message,
+      error.digest,
+    );
     Sentry.captureException(error, {
       tags: {
         location: "leave-applications",

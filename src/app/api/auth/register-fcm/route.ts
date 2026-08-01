@@ -14,7 +14,10 @@ const FcmTokenSchema = z.object({
   fcm_token: z.string().trim().min(1),
 });
 
-const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: unknown }) => {
+const postHandler = async (
+  req: Request,
+  { decryptedBody }: { decryptedBody?: unknown },
+) => {
   const ip = getClientIp(req.headers);
   if (!ip) {
     return NextResponse.json(
@@ -45,18 +48,31 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: un
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth
+      .getUser(token);
     if (error || !authUser) {
-      logger.error("[register-fcm] Supabase auth.getUser error:", error || "No user returned");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      logger.error(
+        "[register-fcm] Supabase auth.getUser error:",
+        error || "No user returned",
+      );
+      return NextResponse.json({ error: "Unauthorized" }, {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     user = authUser;
   } else {
     const supabase = await createClient();
     const { data: { user: authUser }, error } = await supabase.auth.getUser();
     if (error || !authUser) {
-      logger.error("[register-fcm] Supabase client auth.getUser error:", error || "No user returned");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      logger.error(
+        "[register-fcm] Supabase client auth.getUser error:",
+        error || "No user returned",
+      );
+      return NextResponse.json({ error: "Unauthorized" }, {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     user = authUser;
   }
@@ -66,20 +82,30 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: un
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ error: "Invalid JSON body" }, {
+        status: 400,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
   }
 
   const parsed = FcmTokenSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed" }, { status: 422, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ error: "Validation failed" }, {
+      status: 422,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const { fcm_token } = parsed.data;
 
   const { error: updateError } = await supabaseAdmin
     .from("users")
-    .update({ fcm_token, has_mobile_app: true, updated_at: new Date().toISOString() })
+    .update({
+      fcm_token,
+      has_mobile_app: true,
+      updated_at: new Date().toISOString(),
+    })
     .eq("auth_id", user.id);
 
   if (updateError) {
@@ -87,7 +113,10 @@ const postHandler = async (req: Request, { decryptedBody }: { decryptedBody?: un
     Sentry.captureException(updateError, {
       tags: { type: "db_update_error", location: "api/auth/register-fcm" },
     });
-    return NextResponse.json({ error: "Failed to register FCM token" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ error: "Failed to register FCM token" }, {
+      status: 500,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   return NextResponse.json({ success: true });

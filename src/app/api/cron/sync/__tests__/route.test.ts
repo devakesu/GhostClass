@@ -15,7 +15,7 @@
  *  10. Mixed batch — multiple tracker items with varied outcomes
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { sendEmail } from "@/lib/email";
 
@@ -38,12 +38,15 @@ beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
 
-  // Re-stub environment variables because vi.resetModules() might clear them 
+  // Re-stub environment variables because vi.resetModules() might clear them
   // or the previous test might have modified them.
   vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://ezygo.example.com");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.com");
   vi.stubEnv("CRON_SECRET", "test-cron-secret-value");
-  vi.stubEnv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+  vi.stubEnv(
+    "ENCRYPTION_KEY",
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  );
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 
   const route = await import("../route");
@@ -60,18 +63,20 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", () => ({
-  withSecurity: vi.fn((handler) => (req: any, context: any = { authType: "cron" }) => handler(req, context)),
+  withSecurity: vi.fn(
+    (handler) => (req: any, context: any = { authType: "cron" }) =>
+      handler(req, context),
+  ),
 }));
 
 const mockCreateClient = vi.fn().mockResolvedValue({
   auth: {
-    getUser: vi.fn().mockResolvedValue({ data: { user: null } })
-  }
+    getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+  },
 });
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mockCreateClient,
 }));
-
 
 // ---------------------------------------------------------------------------
 // Crypto mock — always return a predictable decrypted token
@@ -84,15 +89,22 @@ vi.mock("@/lib/crypto", () => ({
 // Rate limiter mock
 // ---------------------------------------------------------------------------
 vi.mock("@/lib/ratelimit", () => ({
-  syncRateLimiter: { limit: vi.fn().mockResolvedValue({ success: true, reset: 0 }) },
+  syncRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true, reset: 0 }),
+  },
 }));
 
 // ---------------------------------------------------------------------------
 // Email / template mocks
 // ---------------------------------------------------------------------------
-vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }));
+vi.mock(
+  "@/lib/email",
+  () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }),
+);
 vi.mock("@/lib/email-templates", () => ({
-  renderAttendanceConflictEmail: vi.fn().mockResolvedValue("<html>conflict</html>"),
+  renderAttendanceConflictEmail: vi.fn().mockResolvedValue(
+    "<html>conflict</html>",
+  ),
   renderCourseMismatchEmail: vi.fn().mockResolvedValue("<html>mismatch</html>"),
   renderRevisionClassEmail: vi.fn().mockResolvedValue("<html>revision</html>"),
 }));
@@ -139,7 +151,9 @@ function makeCronRequest(username?: string): NextRequest {
 // EzyGo mock response builders
 // ---------------------------------------------------------------------------
 
-function mockCoursesResponse(courses: { id: number; name: string; code?: string }[] = COURSES) {
+function mockCoursesResponse(
+  courses: { id: number; name: string; code?: string }[] = COURSES,
+) {
   // We'll handle this in the global mockFetch implementation
   (mockFetch as any)._courses = courses;
 }
@@ -148,19 +162,32 @@ function mockRolesResponse(roles: any[] = [{ id: 1, name: "Student" }]) {
   (mockFetch as any)._roles = roles;
 }
 
-function mockAttendanceResponse(officialData: Record<string, Record<string, unknown>>) {
+function mockAttendanceResponse(
+  officialData: Record<string, Record<string, unknown>>,
+) {
   (mockFetch as any)._attendance = officialData;
 }
 
 mockFetch.mockImplementation(async (url: string) => {
   if (url.includes("institutionuser/courses/withusers")) {
-    return new Response(JSON.stringify((mockFetch as any)._courses || COURSES), { status: 200 });
+    return new Response(
+      JSON.stringify((mockFetch as any)._courses || COURSES),
+      { status: 200 },
+    );
   }
   if (url.includes("institutionuser/myroles")) {
-    return new Response(JSON.stringify((mockFetch as any)._roles || [{ id: 1, name: "Student" }]), { status: 200 });
+    return new Response(
+      JSON.stringify((mockFetch as any)._roles || [{ id: 1, name: "Student" }]),
+      { status: 200 },
+    );
   }
   if (url.includes("attendancereports/student/detailed")) {
-    return new Response(JSON.stringify({ studentAttendanceData: (mockFetch as any)._attendance || {} }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        studentAttendanceData: (mockFetch as any)._attendance || {},
+      }),
+      { status: 200 },
+    );
   }
   return new Response(JSON.stringify({}), { status: 200 });
 });
@@ -200,7 +227,7 @@ function ezygoSession(
   sessionNum: number,
   attendance: number | null,
   course: number | null,
-  class_type = "Regular"
+  class_type = "Regular",
 ) {
   return { session: sessionNum, attendance, course, class_type };
 }
@@ -225,13 +252,20 @@ function buildAdminMock(opts: {
   const trackerData = opts.trackerData || [];
   const users = opts.usersData || [MOCK_USER_ROW];
   const deleteInSpy = vi.fn().mockReturnValue(Promise.resolve({ error: null }));
-  const updateTrackerSpy = vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) });
+  const updateTrackerSpy = vi.fn().mockReturnValue({
+    in: vi.fn().mockResolvedValue({ error: null }),
+  });
   const notificationInsertSpy = vi.fn().mockResolvedValue({ error: null });
-  const usersUpdateSpy = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  const usersUpdateSpy = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue({ error: null }),
+  });
 
   const usersEqSpy = vi.fn().mockImplementation(() => {
     const res = Promise.resolve({ data: users, error: null });
-    (res as any).single = vi.fn().mockResolvedValue({ data: users[0], error: null });
+    (res as any).single = vi.fn().mockResolvedValue({
+      data: users[0],
+      error: null,
+    });
     (res as any).order = vi.fn().mockReturnValue({
       limit: vi.fn().mockResolvedValue({ data: users, error: null }),
     });
@@ -272,7 +306,7 @@ function buildAdminMock(opts: {
 
     if (table === "course_mappings") {
       return {
-        select: vi.fn().mockResolvedValue({ data: [], error: null })
+        select: vi.fn().mockResolvedValue({ data: [], error: null }),
       };
     }
 
@@ -281,7 +315,14 @@ function buildAdminMock(opts: {
 
   mockAdminFrom.mockImplementation(usersQuerySpy);
 
-  return { deleteInSpy, updateTrackerSpy, notificationInsertSpy, usersUpdateSpy, usersEqSpy, usersQuerySpy };
+  return {
+    deleteInSpy,
+    updateTrackerSpy,
+    notificationInsertSpy,
+    usersUpdateSpy,
+    usersEqSpy,
+    usersQuerySpy,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +342,10 @@ beforeEach(async () => {
   vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://ezygo.example.com");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.com");
   vi.stubEnv("CRON_SECRET", "test-cron-secret-value");
-  vi.stubEnv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+  vi.stubEnv(
+    "ENCRYPTION_KEY",
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  );
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 
   // Re-import to pick up fresh mocks
@@ -322,7 +366,14 @@ describe("Cron sync — official present + tracker positive → delete + alert",
     const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
       trackerData: [
         // id=332: correction, attendance=110 (present), course=1005, 2025-10-24 session III
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
+        {
+          id: 101,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "110",
+          status: "correction",
+        },
       ],
     });
 
@@ -351,7 +402,14 @@ describe("Cron sync — official present, tracker was absent → delete + 'Atten
     const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
       trackerData: [
         // Tracker says absent (111) but official flipped to present (110) — surprise update
-        { id: 106, course: "1005", date: "2025-10-24", session: "III", attendance: "111", status: "correction" },
+        {
+          id: 106,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "111",
+          status: "correction",
+        },
       ],
     });
 
@@ -381,17 +439,25 @@ describe("Cron sync — official present, tracker was absent → delete + 'Atten
 
 describe("Cron sync — official absent, tracker correction → entry stays (no change)", () => {
   it("does not delete or update the correction when official says absent", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [
-        // User disputes an absence; official still says absent — keep the correction
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
-      ],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [
+          // User disputes an absence; official still says absent — keep the correction
+          {
+            id: 101,
+            course: "1005",
+            date: "2025-10-24",
+            session: "III",
+            attendance: "110",
+            status: "correction",
+          },
+        ],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
     mockAttendanceResponse({
-      "2025-10-24": { "3": ezygoSession(3, 111 /* absent */, 1005) },
+      "2025-10-24": { "3": ezygoSession(3, 111, /* absent */ 1005) },
     });
 
     const res = await GET(makeCronRequest("testuser"));
@@ -409,17 +475,25 @@ describe("Cron sync — official absent, tracker correction → entry stays (no 
 
 describe("Cron sync — official absent, tracker extra (self-mark present) → conflict", () => {
   it("updates status to correction and inserts a conflict notification", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [
-        // id=334: user self-marked present on 2025-12-31 but official says absent
-        { id: 103, course: "1001", date: "2025-12-31", session: "I", attendance: "110", status: "extra" },
-      ],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [
+          // id=334: user self-marked present on 2025-12-31 but official says absent
+          {
+            id: 103,
+            course: "1001",
+            date: "2025-12-31",
+            session: "I",
+            attendance: "110",
+            status: "extra",
+          },
+        ],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
     mockAttendanceResponse({
-      "2025-12-31": { "1": ezygoSession(1, 111 /* absent */, 1001) },
+      "2025-12-31": { "1": ezygoSession(1, 111, /* absent */ 1001) },
     });
 
     const res = await GET(makeCronRequest("testuser"));
@@ -452,11 +526,19 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
 
 describe("Cron sync — no official record for date → extra entry stays untouched", () => {
   it("leaves the extra entry alone when EzyGo has no record for that date", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [
-        { id: 103, course: "1001", date: "2025-12-31", session: "I", attendance: "110", status: "extra" },
-      ],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [
+          {
+            id: 103,
+            course: "1001",
+            date: "2025-12-31",
+            session: "I",
+            attendance: "110",
+            status: "extra",
+          },
+        ],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
@@ -481,7 +563,14 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
       trackerData: [
         // Tracker says course 1001 for this slot, but official has a different course
-        { id: 103, course: "1001", date: "2025-12-31", session: "I", attendance: "110", status: "extra" },
+        {
+          id: 103,
+          course: "1001",
+          date: "2025-12-31",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+        },
       ],
     });
 
@@ -496,7 +585,12 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     const body = await res.json();
 
     if (res.status !== 200) {
-      console.error("TEST DEBUG: Status", res.status, "Body", JSON.stringify(body, null, 2));
+      console.error(
+        "TEST DEBUG: Status",
+        res.status,
+        "Body",
+        JSON.stringify(body, null, 2),
+      );
     }
     expect(res.status).toBe(200);
     expect(body.deletions).toBe(1);
@@ -523,14 +617,27 @@ describe("Cron sync — course mismatch on a correction entry → delete + alert
     // Official is 110 (positive) → isOfficialPositive → delete + 'Attendance Updated' alert.
     const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
       trackerData: [
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
+        {
+          id: 101,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "110",
+          status: "correction",
+        },
       ],
     });
 
     mockCoursesResponse();
     mockRolesResponse();
     mockAttendanceResponse({
-      "2025-10-24": { "3": ezygoSession(3, 110, 99999 /* different course, ignored for corrections */) },
+      "2025-10-24": {
+        "3": ezygoSession(
+          3,
+          110,
+          99999, /* different course, ignored for corrections */
+        ),
+      },
     });
 
     const res = await GET(makeCronRequest("testuser"));
@@ -551,7 +658,14 @@ describe("Cron sync — EzyGo returns null attendance/course (holiday slot) → 
   it("does not build an officialMap key for the null slot, leaving the tracker item alone", async () => {
     const { deleteInSpy, updateTrackerSpy } = buildAdminMock({
       trackerData: [
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
+        {
+          id: 101,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "110",
+          status: "correction",
+        },
       ],
     });
 
@@ -559,7 +673,9 @@ describe("Cron sync — EzyGo returns null attendance/course (holiday slot) → 
     mockRolesResponse();
     mockAttendanceResponse({
       // Null attendance and course — holiday / empty slot from EzyGo
-      "2025-10-24": { "3": { session: 3, attendance: null, course: null, class_type: null } },
+      "2025-10-24": {
+        "3": { session: 3, attendance: null, course: null, class_type: null },
+      },
     });
 
     const res = await GET(makeCronRequest("testuser"));
@@ -576,11 +692,19 @@ describe("Cron sync — EzyGo returns null attendance/course (holiday slot) → 
 
 describe("Cron sync — EzyGo Revision class, correction entry → deleted silently", () => {
   it("deletes the correction without sending a notification", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
-      ],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [
+          {
+            id: 101,
+            course: "1005",
+            date: "2025-10-24",
+            session: "III",
+            attendance: "110",
+            status: "correction",
+          },
+        ],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
@@ -608,7 +732,14 @@ describe("Cron sync — EzyGo Revision class, correction entry → deleted silen
   it("sends an email when an extra entry is a Revision class", async () => {
     buildAdminMock({
       trackerData: [
-        { id: 105, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "extra" },
+        {
+          id: 105,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "110",
+          status: "extra",
+        },
       ],
     });
 
@@ -628,7 +759,14 @@ describe("Cron sync — EzyGo Revision class, correction entry → deleted silen
   it("handles email failure gracefully", async () => {
     buildAdminMock({
       trackerData: [
-        { id: 101, course: "1001", date: "2025-10-24", session: "I", attendance: "110", status: "extra" },
+        {
+          id: 101,
+          course: "1001",
+          date: "2025-10-24",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+        },
       ],
     });
 
@@ -685,7 +823,10 @@ describe("GET /api/cron/sync — Batch & Auth modes", () => {
   it("syncs the authenticated user when called without cron secret", async () => {
     mockCreateClient.mockResolvedValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u-auth" } }, error: null }),
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "u-auth" } },
+          error: null,
+        }),
       },
     } as any);
 
@@ -697,7 +838,7 @@ describe("GET /api/cron/sync — Batch & Auth modes", () => {
     mockRolesResponse();
     mockAttendanceResponse({});
 
-    // Use a different path or header that doesn't trigger the cron check, 
+    // Use a different path or header that doesn't trigger the cron check,
     // or just mock handleAuthentication if we could.
     // Here we'll just mock the GET params to simulate a non-cron request.
     const req = new NextRequest("http://localhost/api/cron/sync", {
@@ -722,7 +863,14 @@ describe("Cron sync — Duty Leave (225) tracker entry; official confirms presen
     // correction(225) + official(225): officialCode === trackerCode → delete + 'Attendance Updated' alert.
     const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
       trackerData: [
-        { id: 102, course: "1005", date: "2025-10-24", session: "IV", attendance: "225", status: "correction" },
+        {
+          id: 102,
+          course: "1005",
+          date: "2025-10-24",
+          session: "IV",
+          attendance: "225",
+          status: "correction",
+        },
       ],
     });
 
@@ -748,20 +896,56 @@ describe("Cron sync — Duty Leave (225) tracker entry; official confirms presen
 
 describe("Cron sync — mixed batch with multiple outcomes", () => {
   it("correctly processes corrections + extras with varied official responses", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [
-        // A: correction (110) → official present (110) → DELETE + alert
-        { id: 101, course: "1005", date: "2025-10-24", session: "III", attendance: "110", status: "correction" },
-        // B: correction (225) → official present (225) → DELETE + alert
-        { id: 102, course: "1005", date: "2025-10-24", session: "IV", attendance: "225", status: "correction" },
-        // C: extra (110) → official absent (111) → CONFLICT, update + notif
-        { id: 103, course: "1001", date: "2025-12-31", session: "I", attendance: "110", status: "extra" },
-        // D: extra (225) → no EzyGo record → STAYS (no key in officialMap)
-        { id: 105, course: "1007", date: "2025-12-31", session: "II", attendance: "225", status: "extra" },
-        // E: correction (225) → official absent (111) → correction status, not extra → STAYS
-        { id: 104, course: "1001", date: "2025-10-06", session: "III", attendance: "225", status: "correction" },
-      ],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [
+          // A: correction (110) → official present (110) → DELETE + alert
+          {
+            id: 101,
+            course: "1005",
+            date: "2025-10-24",
+            session: "III",
+            attendance: "110",
+            status: "correction",
+          },
+          // B: correction (225) → official present (225) → DELETE + alert
+          {
+            id: 102,
+            course: "1005",
+            date: "2025-10-24",
+            session: "IV",
+            attendance: "225",
+            status: "correction",
+          },
+          // C: extra (110) → official absent (111) → CONFLICT, update + notif
+          {
+            id: 103,
+            course: "1001",
+            date: "2025-12-31",
+            session: "I",
+            attendance: "110",
+            status: "extra",
+          },
+          // D: extra (225) → no EzyGo record → STAYS (no key in officialMap)
+          {
+            id: 105,
+            course: "1007",
+            date: "2025-12-31",
+            session: "II",
+            attendance: "225",
+            status: "extra",
+          },
+          // E: correction (225) → official absent (111) → correction status, not extra → STAYS
+          {
+            id: 104,
+            course: "1001",
+            date: "2025-10-06",
+            session: "III",
+            attendance: "225",
+            status: "correction",
+          },
+        ],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
@@ -771,11 +955,11 @@ describe("Cron sync — mixed batch with multiple outcomes", () => {
         "4": ezygoSession(4, 225, 1005), // B: official duty leave (positive)
       },
       "2025-12-31": {
-        "1": ezygoSession(1, 111 /* absent */, 1001), // C: conflict
+        "1": ezygoSession(1, 111, /* absent */ 1001), // C: conflict
         // session 2 absent from EzyGo → D stays
       },
       "2025-10-06": {
-        "3": ezygoSession(3, 111 /* absent */, 1001), // E: official absent → correction stays
+        "3": ezygoSession(3, 111, /* absent */ 1001), // E: official absent → correction stays
       },
     });
 
@@ -814,9 +998,10 @@ describe("Cron sync — mixed batch with multiple outcomes", () => {
 
 describe("Cron sync — no tracker data → processed successfully, nothing to do", () => {
   it("returns processed=1 with zero mutations when the tracker is empty", async () => {
-    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
-      trackerData: [],
-    });
+    const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
+      buildAdminMock({
+        trackerData: [],
+      });
 
     mockCoursesResponse();
     mockRolesResponse();
@@ -843,7 +1028,9 @@ describe("Cron sync — EzyGo courses API fails → user counted as error", () =
     buildAdminMock({ trackerData: [] });
 
     // Courses API returns 500 for the first call
-    mockFetch.mockImplementationOnce(async () => new Response("Server Error", { status: 500 }));
+    mockFetch.mockImplementationOnce(async () =>
+      new Response("Server Error", { status: 500 })
+    );
 
     const res = await GET(makeCronRequest("testuser"));
     const body = await res.json();
@@ -863,7 +1050,9 @@ describe("Cron sync — EzyGo attendance API fails → user counted as error", (
     // Courses succeed, attendance fails
     mockCoursesResponse();
     mockRolesResponse();
-    mockFetch.mockResolvedValueOnce(new Response("Bad Gateway", { status: 502 }));
+    mockFetch.mockResolvedValueOnce(
+      new Response("Bad Gateway", { status: 502 }),
+    );
 
     const res = await GET(makeCronRequest("testuser"));
     const body = await res.json();
@@ -915,6 +1104,6 @@ describe("Cron sync — malformed authorization header (no Bearer prefix)", () =
     const res = await GET(req);
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toBe('Unauthorized');
+    expect(body.error).toBe("Unauthorized");
   });
 });

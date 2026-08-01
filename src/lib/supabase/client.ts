@@ -1,5 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { getSupabaseConfig, _customFetch } from "./fetch";
+import { _customFetch, getSupabaseConfig } from "./fetch";
 
 /**
  * Creates a Supabase browser client for client-side operations.
@@ -35,7 +35,7 @@ import { getSupabaseConfig, _customFetch } from "./fetch";
  * ```
  */
 export function createClient() {
-  const { url, key } = getSupabaseConfig('client');
+  const { url, key } = getSupabaseConfig("client");
 
   return createBrowserClient(
     url,

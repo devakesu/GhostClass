@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require("node:fs");
+const path = require("node:path");
 
 /**
 /**
@@ -11,13 +11,13 @@ const path = require('node:path');
  * @returns {string}
  */
 function getVar(key, envMap) {
-  if (envMap && typeof envMap === 'object') {
+  if (envMap && typeof envMap === "object") {
     const val = Object.getOwnPropertyDescriptor(envMap, key);
     if (val && val.value) return val.value;
   }
   const envVal = Object.getOwnPropertyDescriptor(process.env, key);
   if (envVal && envVal.value) return envVal.value;
-  return '';
+  return "";
 }
 
 /**
@@ -25,8 +25,13 @@ function getVar(key, envMap) {
  * @param {string} [targetFile]
  * @returns {boolean}
  */
-function generateFirebaseOptionsDart(targetFile) {
-
+function generateFirebaseOptionsDart(secrets, targetFile) {
+  let targetPath = targetFile;
+  if (typeof secrets === "string" && !targetFile) {
+    targetPath = secrets;
+  } else if (!targetPath) {
+    targetPath = path.join(process.cwd(), "mobile", "lib", "firebase_options.dart");
+  }
   const dartContent = `// File generated dynamically during build workflow.
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
@@ -85,7 +90,6 @@ class DefaultFirebaseOptions {
 }
 `;
 
-  const targetPath = targetFile || path.join(process.cwd(), 'mobile', 'lib', 'firebase_options.dart');
   try {
     const dir = path.dirname(targetPath);
     if (!fs.existsSync(dir)) {
@@ -104,39 +108,46 @@ class DefaultFirebaseOptions {
  * Helper to build Dart configurations object for flutter firebase.json.
  */
 function buildDartConfigurations(projectId, appIds) {
-  const { androidAppIdDefault, iosAppIdDefault, androidAppIdNexus, iosAppIdNexus, androidAppIdNexusMec, iosAppIdNexusMec } = appIds;
+  const {
+    androidAppIdDefault,
+    iosAppIdDefault,
+    androidAppIdNexus,
+    iosAppIdNexus,
+    androidAppIdNexusMec,
+    iosAppIdNexusMec,
+  } = appIds;
   const dartConfigurations = {};
 
   // Standard lib/firebase_options.dart target
   if (androidAppIdDefault || (!androidAppIdNexus && !androidAppIdNexusMec)) {
-    dartConfigurations['lib/firebase_options.dart'] = {
+    dartConfigurations["lib/firebase_options.dart"] = {
       projectId: projectId,
       configurations: {
         android: androidAppIdDefault,
-        ios: iosAppIdDefault
-      }
+        ios: iosAppIdDefault,
+      },
     };
   }
 
   // Flavor target: Nexus
   if (androidAppIdNexus) {
-    dartConfigurations['lib/firebase_options_nexus.dart'] = {
+    dartConfigurations["lib/firebase_options_nexus.dart"] = {
       projectId: projectId,
       configurations: {
         android: androidAppIdNexus,
-        ios: iosAppIdNexus || androidAppIdNexus
-      }
+        ios: iosAppIdNexus || androidAppIdNexus,
+      },
     };
   }
 
   // Flavor target: Nexus MEC
   if (androidAppIdNexusMec || (androidAppIdNexus && iosAppIdNexusMec)) {
-    dartConfigurations['lib/firebase_options_nexus_mec.dart'] = {
+    dartConfigurations["lib/firebase_options_nexus_mec.dart"] = {
       projectId: projectId,
       configurations: {
         android: androidAppIdNexusMec || androidAppIdNexus,
-        ios: iosAppIdNexusMec || iosAppIdNexus || androidAppIdNexus
-      }
+        ios: iosAppIdNexusMec || iosAppIdNexus || androidAppIdNexus,
+      },
     };
   }
 
@@ -159,29 +170,31 @@ function generateFirebaseJson(secrets = [], targetFile) {
     }
   }
 
-  const projectId =
-    getVar('FIREBASE_PROJECT_ID', envMap) ||
-    getVar('FIREBASE_PROJECT_ID_NEXUS', envMap) ||
-    getVar('NEXT_PUBLIC_FIREBASE_PROJECT_ID', envMap);
+  const projectId = getVar("FIREBASE_PROJECT_ID", envMap) ||
+    getVar("FIREBASE_PROJECT_ID_NEXUS", envMap) ||
+    getVar("NEXT_PUBLIC_FIREBASE_PROJECT_ID", envMap);
 
-  const androidAppIdNexus = getVar('FIREBASE_ANDROID_APP_ID_NEXUS', envMap);
-  const iosAppIdNexus = getVar('FIREBASE_IOS_APP_ID_NEXUS', envMap);
-  const androidAppIdNexusMec = getVar('FIREBASE_ANDROID_APP_ID_NEXUS_MEC', envMap);
-  const iosAppIdNexusMec = getVar('FIREBASE_IOS_APP_ID_NEXUS_MEC', envMap);
+  const androidAppIdNexus = getVar("FIREBASE_ANDROID_APP_ID_NEXUS", envMap);
+  const iosAppIdNexus = getVar("FIREBASE_IOS_APP_ID_NEXUS", envMap);
+  const androidAppIdNexusMec = getVar(
+    "FIREBASE_ANDROID_APP_ID_NEXUS_MEC",
+    envMap,
+  );
+  const iosAppIdNexusMec = getVar("FIREBASE_IOS_APP_ID_NEXUS_MEC", envMap);
 
-  const androidAppIdDefault =
-    getVar('FIREBASE_ANDROID_APP_ID', envMap) ||
-    getVar('FIREBASE_APP_ID_ANDROID', envMap) ||
+  const androidAppIdDefault = getVar("FIREBASE_ANDROID_APP_ID", envMap) ||
+    getVar("FIREBASE_APP_ID_ANDROID", envMap) ||
     androidAppIdNexus;
-  const iosAppIdDefault =
-    getVar('FIREBASE_IOS_APP_ID', envMap) ||
-    getVar('FIREBASE_APP_ID_IOS', envMap) ||
+  const iosAppIdDefault = getVar("FIREBASE_IOS_APP_ID", envMap) ||
+    getVar("FIREBASE_APP_ID_IOS", envMap) ||
     iosAppIdNexus ||
     androidAppIdDefault;
 
   // Check if minimum requirements exist
   if (!projectId || (!androidAppIdDefault && !androidAppIdNexus)) {
-    console.log('ℹ️ Skipping mobile/firebase.json generation (missing Firebase project/app IDs).');
+    console.log(
+      "ℹ️ Skipping mobile/firebase.json generation (missing Firebase project/app IDs).",
+    );
     return false;
   }
 
@@ -192,7 +205,7 @@ function generateFirebaseJson(secrets = [], targetFile) {
     androidAppIdNexus,
     iosAppIdNexus,
     androidAppIdNexusMec,
-    iosAppIdNexusMec
+    iosAppIdNexusMec,
   });
 
   const firebaseJson = {
@@ -202,21 +215,22 @@ function generateFirebaseJson(secrets = [], targetFile) {
           default: {
             projectId: projectId,
             appId: defaultAndroidAppId,
-            fileOutput: 'android/app/google-services.json'
-          }
+            fileOutput: "android/app/google-services.json",
+          },
         },
-        dart: dartConfigurations
-      }
-    }
+        dart: dartConfigurations,
+      },
+    },
   };
 
-  const targetPath = targetFile || path.join(process.cwd(), 'mobile', 'firebase.json');
+  const targetPath = targetFile ||
+    path.join(process.cwd(), "mobile", "firebase.json");
   try {
     const dir = path.dirname(targetPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(targetPath, JSON.stringify(firebaseJson, null, 2) + '\n');
+    fs.writeFileSync(targetPath, JSON.stringify(firebaseJson, null, 2) + "\n");
     console.log(`✓ Dynamically generated ${targetPath}`);
 
     // Also generate firebase_options.dart with dynamic secret values

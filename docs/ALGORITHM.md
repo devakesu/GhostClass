@@ -1,10 +1,13 @@
 # Attendance Calculation Algorithm
 
-Detailed documentation of the core attendance calculation and bunk logic used in GhostClass (Web and Mobile).
+Detailed documentation of the core attendance calculation and bunk logic used in
+GhostClass (Web and Mobile).
 
 ## Core Algorithm
 
-The algorithm is implemented with parity in both [bunk.ts](src/lib/logic/bunk.ts) (Web) and [bunk.dart](mobile/lib/logic/bunk.dart) (Mobile).
+The algorithm is implemented with parity in both
+[bunk.ts](src/lib/logic/bunk.ts) (Web) and
+[bunk.dart](mobile/lib/logic/bunk.dart) (Mobile).
 
 ### Calculation Flow
 
@@ -55,10 +58,13 @@ x = (target*total - 100*present) / (100 - target)
 
 The calculation combines official data with user-added modifiers:
 
-1. **Official Data**: Fetched from EzyGo API (`realPresent`, `realTotal`, `realAbsent`).
+1. **Official Data**: Fetched from EzyGo API (`realPresent`, `realTotal`,
+   `realAbsent`).
 2. **Manual Modifiers**:
-   - `extraPresent/extraAbsent`: Additional classes marked by user (adds to total).
-   - `correctionPresent`: Wrongly marked absences corrected to present (status swap only).
+   - `extraPresent/extraAbsent`: Additional classes marked by user (adds to
+     total).
+   - `correctionPresent`: Wrongly marked absences corrected to present (status
+     swap only).
 
 ### Final Calculation Formula
 
@@ -70,16 +76,18 @@ displayPercentage = (finalPresent / finalTotal) * 100
 
 ## Duty Leave Rules
 
-**Attendance Code 225 Limit**: Maximum 5 duty leave entries per course per semester.
+**Attendance Code 225 Limit**: Maximum 5 duty leave entries per course per
+semester.
 
-- Enforced via database trigger `check_225_attendance_limit()` in the `tracker` table.
+- Enforced via database trigger `check_225_attendance_limit()` in the `tracker`
+  table.
 
 - Raises an exception if exceeded to maintain data integrity.
 
 ## Example Scenarios
 
-| Scenario | Present | Total | Target | Result |
-| :--- | :--- | :--- | :--- | :--- |
-| **At Target** | 45 | 60 | 75% | `isExact = true` |
-| **Can Bunk** | 50 | 60 | 75% | `canBunk = 6` |
-| **Need to Attend** | 40 | 60 | 75% | `requiredToAttend = 6` |
+| Scenario           | Present | Total | Target | Result                 |
+| :----------------- | :------ | :---- | :----- | :--------------------- |
+| **At Target**      | 45      | 60    | 75%    | `isExact = true`       |
+| **Can Bunk**       | 50      | 60    | 75%    | `canBunk = 6`          |
+| **Need to Attend** | 40      | 60    | 75%    | `requiredToAttend = 6` |

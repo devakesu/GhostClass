@@ -43,8 +43,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useFetchCourses } from "@/hooks/courses/courses";
 import {
-  isLegacyRemark,
   getOfficialSessionRaw,
+  isLegacyRemark,
 } from "@/lib/logic/attendance-reconciliation";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
@@ -65,8 +65,12 @@ import { AttendanceReport, Course, TrackAttendance } from "@/types";
 type AttendanceCode = string | number | undefined;
 
 type AttendanceDataPayload = AttendanceReport | null | undefined;
-type AttendanceSessionItem = AttendanceReport["studentAttendanceData"][string][string];
-type CoursesDataPayload = { courses: Record<string, Course> } | null | undefined;
+type AttendanceSessionItem =
+  AttendanceReport["studentAttendanceData"][string][string];
+type CoursesDataPayload =
+  | { courses: Record<string, Course> }
+  | null
+  | undefined;
 
 const STATUS_ORDER = ["Present", "Duty Leave", "Absent"] as const;
 type StatusKey = (typeof STATUS_ORDER)[number];
@@ -161,8 +165,10 @@ function getCorrectionStatusText(
 ): string {
   let sessionToUse = trackingItem.session;
   const sessions = attendanceData?.sessions;
-  
-  if (sessions && Object.prototype.hasOwnProperty.call(sessions, sessionToUse)) {
+
+  if (
+    sessions && Object.prototype.hasOwnProperty.call(sessions, sessionToUse)
+  ) {
     const resolvedSession = Reflect.get(sessions, sessionToUse);
     const normalized = normalizeSession(resolvedSession?.name || "");
     if (!isNaN(parseInt(normalized, 10))) {
@@ -203,7 +209,8 @@ function TrackingRecordCard({
   setDeleteConfirmOpen: (id: string | null) => void;
   getResolvedSessionName: (sessionValue: string, dateStr?: string) => string;
 }) {
-  const trackingId = `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
+  const trackingId =
+    `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
 
   // Status Logic
   const isCorrection = trackingItem.status === "correction";
@@ -234,11 +241,13 @@ function TrackingRecordCard({
     : "bg-brand-accent/10 text-brand-accent border-brand-accent/40 dark:border-brand-accent/20";
 
   let statusBadgeClass = "bg-green-500/20 text-green-600 dark:text-green-400";
-  let cardBgClass = "bg-green-500/5 border-green-500/35 dark:border-green-500/20";
+  let cardBgClass =
+    "bg-green-500/5 border-green-500/35 dark:border-green-500/20";
 
   if (userColor === "orange") {
     statusBadgeClass = "bg-orange-500/20 text-orange-600 dark:text-orange-400";
-    cardBgClass = "bg-orange-500/5 border-orange-500/35 dark:border-orange-500/20";
+    cardBgClass =
+      "bg-orange-500/5 border-orange-500/35 dark:border-orange-500/20";
   } else if (userColor === "red") {
     statusBadgeClass = "bg-red-500/20 text-red-600 dark:text-red-400";
     cardBgClass = "bg-red-500/5 border-red-500/35 dark:border-red-500/20";
@@ -281,23 +290,29 @@ function TrackingRecordCard({
           whileTap={{ scale: 0.95 }}
           disabled={deleteId === trackingId}
           onClick={() => setDeleteConfirmOpen(trackingId)}
-          aria-label={`Remove tracking entry for ${getResolvedSessionName(
-            trackingItem.session,
-          )} session on ${formatDisplayDate(trackingItem.date)}`}
+          aria-label={`Remove tracking entry for ${
+            getResolvedSessionName(
+              trackingItem.session,
+            )
+          } session on ${formatDisplayDate(trackingItem.date)}`}
           className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 border border-yellow-500/40 dark:border-yellow-500/20 rounded-lg font-medium text-yellow-600 dark:text-yellow-500 disabled:opacity-50"
         >
-          {deleteId === trackingId ? (
-            "Deleting..."
-          ) : (
-            <>
-              <span className="max-md:hidden">Remove</span>
-              <Trash2 size={15} aria-hidden="true" />
-            </>
-          )}
+          {deleteId === trackingId
+            ? (
+              "Deleting..."
+            )
+            : (
+              <>
+                <span className="max-md:hidden">Remove</span>
+                <Trash2 size={15} aria-hidden="true" />
+              </>
+            )}
         </m.button>
       </div>
       {trackingItem.remarks && !isLegacyRemark(trackingItem.remarks) && (
-        <p className={cn("text-[11px] mt-1.5 italic truncate", remarkColorClass)}>
+        <p
+          className={cn("text-[11px] mt-1.5 italic truncate", remarkColorClass)}
+        >
           {trackingItem.remarks.trim()}
         </p>
       )}
@@ -402,8 +417,7 @@ function CourseSectionCard({
       <div className="flex flex-col gap-5">
         {activeStatusLabels.map((statusLabel) => {
           const groupItems = statusGroups.get(statusLabel)!;
-          const { dot, text, border } =
-            STATUS_STYLES.get(statusLabel)!;
+          const { dot, text, border } = STATUS_STYLES.get(statusLabel)!;
           return (
             <div
               key={statusLabel}
@@ -463,7 +477,10 @@ function CourseSectionCard({
   );
 }
 
-function getCourseFilterKeys(selectedCourseFilter: string, coursesData: CoursesDataPayload): string[] {
+function getCourseFilterKeys(
+  selectedCourseFilter: string,
+  coursesData: CoursesDataPayload,
+): string[] {
   const keys = new Set([selectedCourseFilter]);
   const courseList = coursesData?.courses
     ? Object.values(coursesData.courses)
@@ -546,51 +563,69 @@ function groupAndSortTrackingData(
   return map;
 }
 
-function buildSessionIndexMap(attendanceData: AttendanceDataPayload): Map<string, number> {
+function buildSessionIndexMap(
+  attendanceData: AttendanceDataPayload,
+): Map<string, number> {
   const map = new Map<string, number>();
   if (!attendanceData?.studentAttendanceData) return map;
 
-  Object.entries(attendanceData.studentAttendanceData).forEach(([dateKey, dateData]) => {
-    const isoDate = normalizeToISODate(dateKey);
-    Object.entries(dateData).forEach(([sessionKey, sessionData], index) => {
-      const ordinal = index + 1;
-      map.set(`${isoDate}|${String(sessionKey).trim().toLowerCase()}`, ordinal);
+  Object.entries(attendanceData.studentAttendanceData).forEach(
+    ([dateKey, dateData]) => {
+      const isoDate = normalizeToISODate(dateKey);
+      Object.entries(dateData).forEach(([sessionKey, sessionData], index) => {
+        const ordinal = index + 1;
+        map.set(
+          `${isoDate}|${String(sessionKey).trim().toLowerCase()}`,
+          ordinal,
+        );
 
-      if (sessionData?.session) {
-        map.set(`${isoDate}|${String(sessionData.session).trim().toLowerCase()}`, ordinal);
-      }
-    });
-  });
+        if (sessionData?.session) {
+          map.set(
+            `${isoDate}|${String(sessionData.session).trim().toLowerCase()}`,
+            ordinal,
+          );
+        }
+      });
+    },
+  );
   return map;
 }
 
-function buildOfficialSessionsMap(attendanceData: AttendanceDataPayload): Map<string, AttendanceSessionItem> {
+function buildOfficialSessionsMap(
+  attendanceData: AttendanceDataPayload,
+): Map<string, AttendanceSessionItem> {
   const map = new Map<string, AttendanceSessionItem>();
   if (!attendanceData?.studentAttendanceData) return map;
 
   const sessionsObj = attendanceData?.sessions;
 
-  Object.entries(attendanceData.studentAttendanceData).forEach(([dateStr, dateData]) => {
-    Object.entries(dateData).forEach(([sessionKey, session], index) => {
-      if (!session.course) return;
+  Object.entries(attendanceData.studentAttendanceData).forEach(
+    ([dateStr, dateData]) => {
+      Object.entries(dateData).forEach(([sessionKey, session], index) => {
+        if (!session.course) return;
 
-      let rawSession = getOfficialSessionRaw(session, sessionKey);
-      const isLargeNumeric = !isNaN(parseInt(String(rawSession))) && parseInt(String(rawSession)) > 20;
+        let rawSession = getOfficialSessionRaw(session, sessionKey);
+        const isLargeNumeric = !isNaN(parseInt(String(rawSession))) &&
+          parseInt(String(rawSession)) > 20;
 
-      if (sessionsObj && Object.prototype.hasOwnProperty.call(sessionsObj, rawSession)) {
-        const resolved = Reflect.get(sessionsObj, rawSession);
-        const normalized = normalizeSession(resolved?.name || "");
-        if (!isNaN(parseInt(normalized, 10))) {
-          rawSession = normalized;
+        if (
+          sessionsObj &&
+          Object.prototype.hasOwnProperty.call(sessionsObj, rawSession)
+        ) {
+          const resolved = Reflect.get(sessionsObj, rawSession);
+          const normalized = normalizeSession(resolved?.name || "");
+          if (!isNaN(parseInt(normalized, 10))) {
+            rawSession = normalized;
+          }
+        } else if (isLargeNumeric) {
+          rawSession = String(index + 1);
         }
-      } else if (isLargeNumeric) {
-        rawSession = String(index + 1);
-      }
 
-      const key = generateSlotKey(session.course, dateStr, rawSession);
-      map.set(key, session);
-    });
-  });
+        const key = generateSlotKey(session.course, dateStr, rawSession);
+        map.set(key, session);
+      });
+    },
+  );
   return map;
 }
 
@@ -601,15 +636,21 @@ function resolveSessionName(
   sessionIndexMap: Map<string, number> = new Map(),
 ): string {
   const sessions = attendanceData?.sessions;
-  if (sessions && Object.prototype.hasOwnProperty.call(sessions, sessionValue)) {
+  if (
+    sessions && Object.prototype.hasOwnProperty.call(sessions, sessionValue)
+  ) {
     const resolved = Reflect.get(sessions, sessionValue);
-    return typeof resolved?.name === "string" 
-      ? resolved.name 
+    return typeof resolved?.name === "string"
+      ? resolved.name
       : String(sessionValue);
   }
 
   if (dateStr && sessionIndexMap.size > 0) {
-    const index = sessionIndexMap.get(`${normalizeToISODate(dateStr)}|${String(sessionValue).trim().toLowerCase()}`);
+    const index = sessionIndexMap.get(
+      `${normalizeToISODate(dateStr)}|${
+        String(sessionValue).trim().toLowerCase()
+      }`,
+    );
     if (index) return formatSessionName(String(index));
   }
 
@@ -656,7 +697,10 @@ function findLastCrossedHeader(
   return lastCrossedHeader;
 }
 
-function getNextExpandedCourses(prev: Set<string>, courseName: string): Set<string> {
+function getNextExpandedCourses(
+  prev: Set<string>,
+  courseName: string,
+): Set<string> {
   const newSet = new Set(prev);
   if (newSet.has(courseName)) {
     newSet.delete(courseName);
@@ -789,8 +833,7 @@ function CourseFilterControls({
             </SelectItem>
             {allCourseKeys.map((courseKey) => {
               const displayCourseName = getCourseNameById(courseKey);
-              const courseCount =
-                groupedAllData.get(courseKey)?.length || 0;
+              const courseCount = groupedAllData.get(courseKey)?.length || 0;
               const courseCode = getCourseCodeById(courseKey).toUpperCase();
               const isDisabled = isCourseDisabled(courseCode);
 
@@ -799,7 +842,9 @@ function CourseFilterControls({
                   key={courseKey}
                   value={courseKey}
                   className="whitespace-normal py-2"
-                  textValue={`${displayCourseName}${isDisabled ? " (Disabled)" : ""}`}
+                  textValue={`${displayCourseName}${
+                    isDisabled ? " (Disabled)" : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-4 w-full py-0.5">
                     <span
@@ -848,9 +893,7 @@ function CourseFilterControls({
           aria-label={buttonLabel}
           className="text-sm cursor-pointer justify-between items-center gap-2 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/15 duration-300 border border-brand-accent/40 dark:border-brand-accent/20 py-1 px-3 rounded-md flex"
         >
-          {selectedCourseFilter === "all"
-            ? "DELETE ALL"
-            : "CLEAR SUBJECT"}{" "}
+          {selectedCourseFilter === "all" ? "DELETE ALL" : "CLEAR SUBJECT"}{" "}
           <Trash2 size={14} aria-hidden="true" />
         </button>
       </div>
@@ -906,8 +949,8 @@ function TrackingModals({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Record</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this tracking record? This
-              cannot be undone.
+              Are you sure you want to delete this tracking record? This cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -973,9 +1016,7 @@ function TrackingModals({
               }}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {selectedCourseFilter === "all"
-                ? "DELETE ALL"
-                : "CLEAR SUBJECT"}
+              {selectedCourseFilter === "all" ? "DELETE ALL" : "CLEAR SUBJECT"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1134,10 +1175,10 @@ async function executeDeleteSingleRecord({
     if (error) throw error;
 
     toast.success("Delete successful");
-    
+
     queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
     queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
-    
+
     await Promise.all([refetchTrackingData(), refetchCount()]);
 
     const remainingInCourse = groupedAllData.get(course)?.length || 0;
@@ -1214,7 +1255,7 @@ async function executeDeleteAllRecords({
         ? "All records cleared."
         : "Subject records cleared.",
     );
-    
+
     queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
     queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
     queryClient.invalidateQueries({ queryKey: ["track_data"] });
@@ -1249,7 +1290,9 @@ export default function TrackingClient() {
   const [isProcessing, setIsProcessing] = useState(false);
   const enabled = !!profile;
 
-  const courseHeaderRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const courseHeaderRefs = useRef<Map<string, HTMLDivElement | null>>(
+    new Map(),
+  );
 
   // Per-course record limits (for performance with 100+ records)
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(
@@ -1261,7 +1304,6 @@ export default function TrackingClient() {
   );
 
   // Reset to first page when filter changes is handled by the Select onValueChange.
-
 
   // Use a unique ID per mount to detect Strict Mode remounts (now managed inside useSyncOnMount)
 
@@ -1325,16 +1367,21 @@ export default function TrackingClient() {
   });
 
   /** Pre-calculate session indices for all official records to ensure consistent display */
-  const sessionIndexMap = useMemo(() => buildSessionIndexMap(attendanceData), [attendanceData]);
+  const sessionIndexMap = useMemo(() => buildSessionIndexMap(attendanceData), [
+    attendanceData,
+  ]);
 
   /** Resolve session name using available registries and pre-calculated indices */
   const getResolvedSessionName = useCallback(
     (sessionValue: string, dateStr?: string): string =>
-      resolveSessionName(sessionValue, dateStr, attendanceData, sessionIndexMap),
+      resolveSessionName(
+        sessionValue,
+        dateStr,
+        attendanceData,
+        sessionIndexMap,
+      ),
     [attendanceData, sessionIndexMap],
   );
-
-
 
   // --- AUTO SYNC ---
   const { isSyncing, syncSettled, syncFailed } = useSyncOnMount({
@@ -1374,22 +1421,39 @@ export default function TrackingClient() {
 
   // --- 1. GROUP AND SORT DATA ---
   const groupedAllData = useMemo(
-    () => groupAndSortTrackingData(trackingData, semesterData ?? undefined, academicYearData ?? undefined),
+    () =>
+      groupAndSortTrackingData(
+        trackingData,
+        semesterData ?? undefined,
+        academicYearData ?? undefined,
+      ),
     [trackingData, semesterData, academicYearData],
   );
 
   const allCourseKeys = useMemo(
-    () => sortAllCourseKeys(groupedAllData.keys(), getCourseCodeById, getCourseNameById, isCourseDisabled),
+    () =>
+      sortAllCourseKeys(
+        groupedAllData.keys(),
+        getCourseCodeById,
+        getCourseNameById,
+        isCourseDisabled,
+      ),
     [groupedAllData, isCourseDisabled, getCourseCodeById, getCourseNameById],
   );
 
-  const effectiveCourseFilter =
-    selectedCourseFilter !== "all" && (!groupedAllData.get(selectedCourseFilter)?.length)
-      ? "all"
-      : selectedCourseFilter;
+  const effectiveCourseFilter = selectedCourseFilter !== "all" &&
+      (!groupedAllData.get(selectedCourseFilter)?.length)
+    ? "all"
+    : selectedCourseFilter;
 
   const filteredCourseKeys = useMemo(
-    () => filterCourseKeys(allCourseKeys, effectiveCourseFilter, getCourseCodeById, isCourseDisabled),
+    () =>
+      filterCourseKeys(
+        allCourseKeys,
+        effectiveCourseFilter,
+        getCourseCodeById,
+        isCourseDisabled,
+      ),
     [allCourseKeys, effectiveCourseFilter, isCourseDisabled, getCourseCodeById],
   );
 
@@ -1405,14 +1469,27 @@ export default function TrackingClient() {
     courseHeaderRefs,
   );
 
-
   const activeCourseMeta = useMemo(
-    () => buildActiveCourseMeta(activeCourseKey, groupedAllData, getCourseNameById, getCourseCodeById, isCourseDisabled),
-    [activeCourseKey, groupedAllData, getCourseNameById, getCourseCodeById, isCourseDisabled],
+    () =>
+      buildActiveCourseMeta(
+        activeCourseKey,
+        groupedAllData,
+        getCourseNameById,
+        getCourseCodeById,
+        isCourseDisabled,
+      ),
+    [
+      activeCourseKey,
+      groupedAllData,
+      getCourseNameById,
+      getCourseCodeById,
+      isCourseDisabled,
+    ],
   );
 
   const goToPrevPage = () => setCurrentPage((p) => Math.max(0, p - 1));
-  const goToNextPage = () => setCurrentPage((p) => Math.min(totalPages - 1, p + 1));
+  const goToNextPage = () =>
+    setCurrentPage((p) => Math.min(totalPages - 1, p + 1));
 
   const toggleCourseExpansion = (courseName: string) => {
     setExpandedCourses((prev) => getNextExpandedCourses(prev, courseName));
@@ -1461,7 +1538,10 @@ export default function TrackingClient() {
   };
 
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
-  const officialSessionsMap = useMemo(() => buildOfficialSessionsMap(attendanceData), [attendanceData]);
+  const officialSessionsMap = useMemo(
+    () => buildOfficialSessionsMap(attendanceData),
+    [attendanceData],
+  );
 
   // Block rendering only on base data readiness; sync runs in the background.
   const isInitialLoading = !enabled || isDataLoading;
@@ -1543,7 +1623,8 @@ export default function TrackingClient() {
               Attendance Tracker
             </h1>
             <p className="text-muted-foreground">
-              These are custom-marked attendance records or the absences you have marked for re-checking or duty leave.
+              These are custom-marked attendance records or the absences you
+              have marked for re-checking or duty leave.
             </p>
           </div>
           {isSyncing && (
@@ -1624,7 +1705,10 @@ export default function TrackingClient() {
             recordsPerCourseInitial={recordsPerCourseInitial}
             getStatusKey={getStatusKey}
             attendanceData={attendanceData as AttendanceDataPayload}
-            officialSessionsMap={officialSessionsMap as Map<string, AttendanceSessionItem>}
+            officialSessionsMap={officialSessionsMap as Map<
+              string,
+              AttendanceSessionItem
+            >}
             deleteId={deleteId}
             setDeleteConfirmOpen={setDeleteConfirmOpen}
             getResolvedSessionName={getResolvedSessionName}

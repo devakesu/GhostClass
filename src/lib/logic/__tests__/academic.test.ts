@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calculateCurrentAcademicInfo } from "../academic";
 
 describe("calculateCurrentAcademicInfo", () => {
@@ -41,14 +41,16 @@ describe("calculateCurrentAcademicInfo", () => {
   });
 
   it("should handle numeric semester strings", () => {
-    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "1" })).toEqual({
-      current_year: "2023-24",
-      current_semester: "odd",
-    });
-    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "2" })).toEqual({
-      current_year: "2023-24",
-      current_semester: "even",
-    });
+    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "1" }))
+      .toEqual({
+        current_year: "2023-24",
+        current_semester: "odd",
+      });
+    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "2" }))
+      .toEqual({
+        current_year: "2023-24",
+        current_semester: "even",
+      });
   });
 
   it("should detect semester based on date when metadata is partial or invalid", () => {
@@ -69,15 +71,26 @@ describe("calculateCurrentAcademicInfo", () => {
 
   it("should fallback to date when metadata semester is invalid", () => {
     vi.setSystemTime(new Date(2023, 6, 1));
-    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "invalid" })).toEqual({
-        current_year: "2023-24",
-        current_semester: "odd",
+    expect(
+      calculateCurrentAcademicInfo({ year: "2023-24", semester: "invalid" }),
+    ).toEqual({
+      current_year: "2023-24",
+      current_semester: "odd",
     });
   });
 
   it("handles normalized semester cases", () => {
-    expect(calculateCurrentAcademicInfo({ year: "2024-25", semester: "1" }).current_semester).toBe("odd");
-    expect(calculateCurrentAcademicInfo({ year: "2024-25", semester: "2" }).current_semester).toBe("even");
-    expect(calculateCurrentAcademicInfo({ year: "2024-25", semester: "random" }).current_semester).toBeDefined(); // Fallback
+    expect(
+      calculateCurrentAcademicInfo({ year: "2024-25", semester: "1" })
+        .current_semester,
+    ).toBe("odd");
+    expect(
+      calculateCurrentAcademicInfo({ year: "2024-25", semester: "2" })
+        .current_semester,
+    ).toBe("even");
+    expect(
+      calculateCurrentAcademicInfo({ year: "2024-25", semester: "random" })
+        .current_semester,
+    ).toBeDefined(); // Fallback
   });
 });

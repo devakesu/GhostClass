@@ -392,11 +392,14 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
           children: [
             Icon(LucideIcons.calendar, size: 18, color: primary),
             const SizedBox(width: 12),
-            Text(
-              DateFormat('MMMM d, yyyy').format(_selectedDate),
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                DateFormat('MMMM d, yyyy').format(_selectedDate),
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

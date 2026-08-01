@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import axiosInstance, { getCookie, getCsrfToken, setCsrfToken } from '../axios';
-import { logger } from '@/lib/logger';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import axiosInstance, { getCookie, getCsrfToken, setCsrfToken } from "../axios";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/logger', () => ({
+vi.mock("@/lib/logger", () => ({
   logger: {
     dev: vi.fn(),
     warn: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-vi.mock('@/lib/security/auth', () => ({
+vi.mock("@/lib/security/auth", () => ({
   handleLogout: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -27,27 +27,31 @@ global.fetch = mockFetch;
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('axios lib', () => {
+describe("axios lib", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock sessionStorage
     const store: Record<string, string> = {};
-    vi.stubGlobal('sessionStorage', {
+    vi.stubGlobal("sessionStorage", {
       getItem: vi.fn((key) => store[key] || null),
-      setItem: vi.fn((key, value) => { store[key] = value; }),
-      removeItem: vi.fn((key) => { delete store[key]; }),
+      setItem: vi.fn((key, value) => {
+        store[key] = value;
+      }),
+      removeItem: vi.fn((key) => {
+        delete store[key];
+      }),
     });
 
     // Mock document.cookie
-    vi.stubGlobal('document', {
-      cookie: '',
+    vi.stubGlobal("document", {
+      cookie: "",
       querySelector: vi.fn().mockReturnValue(null),
     });
 
     // Mock window
-    vi.stubGlobal('window', {
-      location: { origin: 'http://localhost:3000' },
+    vi.stubGlobal("window", {
+      location: { origin: "http://localhost:3000" },
       dispatchEvent: vi.fn(),
     });
   });
@@ -56,166 +60,180 @@ describe('axios lib', () => {
     vi.unstubAllGlobals();
   });
 
-  describe('getCookie', () => {
-    it('returns null when document is undefined', () => {
-      vi.stubGlobal('document', undefined);
-      expect(getCookie('test')).toBe(null);
+  describe("getCookie", () => {
+    it("returns null when document is undefined", () => {
+      vi.stubGlobal("document", undefined);
+      expect(getCookie("test")).toBe(null);
     });
 
-    it('retrieves a cookie value', () => {
-      document.cookie = 'foo=bar; baz=qux';
-      expect(getCookie('foo')).toBe('bar');
-      expect(getCookie('baz')).toBe('qux');
-      expect(getCookie('none')).toBe(null);
+    it("retrieves a cookie value", () => {
+      document.cookie = "foo=bar; baz=qux";
+      expect(getCookie("foo")).toBe("bar");
+      expect(getCookie("baz")).toBe("qux");
+      expect(getCookie("none")).toBe(null);
     });
   });
 
-  describe('CSRF Token Management', () => {
-    const VALID_TOKEN = 'a'.repeat(64); // 64 hex chars
+  describe("CSRF Token Management", () => {
+    const VALID_TOKEN = "a".repeat(64); // 64 hex chars
 
-    it('sets and gets CSRF token', () => {
+    it("sets and gets CSRF token", () => {
       setCsrfToken(VALID_TOKEN);
       expect(getCsrfToken()).toBe(VALID_TOKEN);
-      expect(sessionStorage.setItem).toHaveBeenCalledWith('csrf_token_memory', VALID_TOKEN);
+      expect(sessionStorage.setItem).toHaveBeenCalledWith(
+        "csrf_token_memory",
+        VALID_TOKEN,
+      );
     });
 
-    it('rejects invalid CSRF tokens', () => {
-      setCsrfToken('short');
+    it("rejects invalid CSRF tokens", () => {
+      setCsrfToken("short");
       expect(getCsrfToken()).toBe(null);
-      expect(logger.error).toHaveBeenCalledWith('[CSRF] Invalid token format');
+      expect(logger.error).toHaveBeenCalledWith("[CSRF] Invalid token format");
 
-      setCsrfToken('not-hex' + 'a'.repeat(57));
+      setCsrfToken("not-hex" + "a".repeat(57));
       expect(getCsrfToken()).toBe(null);
     });
 
-    it('removes CSRF token when null is passed', () => {
+    it("removes CSRF token when null is passed", () => {
       setCsrfToken(VALID_TOKEN);
       setCsrfToken(null);
       expect(getCsrfToken()).toBe(null);
-      expect(sessionStorage.removeItem).toHaveBeenCalledWith('csrf_token_memory');
+      expect(sessionStorage.removeItem).toHaveBeenCalledWith(
+        "csrf_token_memory",
+      );
     });
 
-    it('logs CSP warning in production if meta tag is missing', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      
+    it("logs CSP warning in production if meta tag is missing", () => {
+      vi.stubEnv("NODE_ENV", "production");
+
       try {
         getCsrfToken();
-        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('No CSP meta tag detected'));
+        expect(logger.info).toHaveBeenCalledWith(
+          expect.stringContaining("No CSP meta tag detected"),
+        );
       } finally {
         vi.unstubAllEnvs();
       }
     });
   });
 
-  describe('Request Interceptor', () => {
-    it('attaches CSRF header if token exists', async () => {
-      setCsrfToken('a'.repeat(64));
-      
-      const config = { 
-        url: '/api/test', 
-        method: 'get', 
-        headers: new Map() 
+  describe("Request Interceptor", () => {
+    it("attaches CSRF header if token exists", async () => {
+      setCsrfToken("a".repeat(64));
+
+      const config = {
+        url: "/api/test",
+        method: "get",
+        headers: new Map(),
       } as any;
-      
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+
+      const interceptor = (axiosInstance.interceptors.request as any)
+        .handlers[0]?.fulfilled;
       const resultConfig = await interceptor(config);
-      
-      expect(resultConfig.headers.get('x-csrf-token')).toBe('a'.repeat(64));
+
+      expect(resultConfig.headers.get("x-csrf-token")).toBe("a".repeat(64));
     });
 
-    it('initializes CSRF before internal requests when token is missing', async () => {
+    it("initializes CSRF before internal requests when token is missing", async () => {
       const config = {
-        url: '/api/profile',
-        method: 'get',
+        url: "/api/profile",
+        method: "get",
         headers: new Map(),
       } as any;
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: 'c'.repeat(64) }),
+        json: async () => ({ token: "c".repeat(64) }),
       });
 
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const interceptor = (axiosInstance.interceptors.request as any)
+        .handlers[0]?.fulfilled;
       const resultConfig = await interceptor(config);
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
-      expect(resultConfig.headers.get('x-csrf-token')).toBe('c'.repeat(64));
+      expect(mockFetch).toHaveBeenCalledWith("/api/csrf", expect.any(Object));
+      expect(resultConfig.headers.get("x-csrf-token")).toBe("c".repeat(64));
     });
   });
 
-  describe('Response Interceptor', () => {
-    it('handles 403 CSRF error by refreshing token and retrying', async () => {
+  describe("Response Interceptor", () => {
+    it("handles 403 CSRF error by refreshing token and retrying", async () => {
       const error = {
-        config: { url: '/api/test', _csrfRetried: false, headers: new Map() },
-        response: { 
-          status: 403, 
-          data: { message: 'Invalid CSRF Token' } 
-        }
+        config: { url: "/api/test", _csrfRetried: false, headers: new Map() },
+        response: {
+          status: 403,
+          data: { message: "Invalid CSRF Token" },
+        },
       } as any;
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: 'b'.repeat(64) })
+        json: async () => ({ token: "b".repeat(64) }),
       });
 
-      const requestSpy = vi.spyOn(axiosInstance, 'request').mockResolvedValue({ data: 'success' } as any);
-      
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
+      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
+        { data: "success" } as any,
+      );
+
+      const interceptor = (axiosInstance.interceptors.response as any)
+        .handlers[0]?.rejected;
       if (interceptor) await interceptor(error);
-      
-      expect(mockFetch).toHaveBeenCalledWith('/api/csrf', expect.any(Object));
-      expect(getCsrfToken()).toBe('b'.repeat(64));
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/csrf", expect.any(Object));
+      expect(getCsrfToken()).toBe("b".repeat(64));
       expect(requestSpy).toHaveBeenCalled();
     });
 
-    it('handles 401 error by attempting session sync', async () => {
+    it("handles 401 error by attempting session sync", async () => {
       const error = {
-        config: { url: '/api/test', _authRetried: false },
-        response: { status: 401 }
+        config: { url: "/api/test", _authRetried: false },
+        response: { status: 401 },
       } as any;
 
-      setCsrfToken('d'.repeat(64));
-      
+      setCsrfToken("d".repeat(64));
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ success: true })
+        json: async () => ({ success: true }),
       });
-      const requestSpy = vi.spyOn(axiosInstance, 'request').mockResolvedValue({ data: 'success' } as any);
+      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
+        { data: "success" } as any,
+      );
 
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
+      const interceptor = (axiosInstance.interceptors.response as any)
+        .handlers[0]?.rejected;
       if (interceptor) await interceptor(error);
-      
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/sync', expect.any(Object));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/auth/sync",
+        expect.any(Object),
+      );
       expect(requestSpy).toHaveBeenCalled();
     });
 
-    it('handles 401 error and logs out if session sync fails', async () => {
+    it("handles 401 error and logs out if session sync fails", async () => {
       const error = {
-        config: { url: '/api/test', _authRetried: false },
-        response: { status: 401 }
+        config: { url: "/api/test", _authRetried: false },
+        response: { status: 401 },
       } as any;
 
-      setCsrfToken('d'.repeat(64));
-      
+      setCsrfToken("d".repeat(64));
+
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        status: 500
+        status: 500,
       });
-      
-      const { handleLogout } = await import('@/lib/security/auth');
 
-      // @ts-expect-error -- accessing private interceptor handler for testing
-      const interceptor = axiosInstance.interceptors.response.handlers[0].rejected;
+      const { handleLogout } = await import("@/lib/security/auth");
+
+      const interceptor = (axiosInstance.interceptors.response as any)
+        .handlers[0]?.rejected;
       try {
         if (interceptor) await interceptor(error);
       } catch (e) {
         logger.dev("Expected rejection in test", e);
       }
-      
+
       expect(handleLogout).toHaveBeenCalled();
     });
   });

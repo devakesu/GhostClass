@@ -2,7 +2,7 @@
  * Tests for Health API Route
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { GET } from "../route";
 
 describe("Health API Route", () => {
@@ -17,7 +17,9 @@ describe("Health API Route", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(data.timestamp).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
   });
 
   it("should return valid JSON", async () => {

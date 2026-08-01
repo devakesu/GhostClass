@@ -471,7 +471,7 @@ paths:
         - Sends email notifications for conflicts
         - Updates sync timestamps
 
-        **Authentication:** 
+        **Authentication:**
         - **Option 1 (Cron)**: Bearer token with CRON_SECRET in Authorization header
         - **Option 2 (Users)**: Valid session cookie (authenticated users)
 
@@ -755,7 +755,7 @@ paths:
           description: Too many requests
           content:
             application/json:
-                $ref: "#/components/schemas/RateLimitError"
+              $ref: "#/components/schemas/RateLimitError"
 
   /api/courses/add:
     post:
@@ -828,7 +828,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
- 
+
   /api/instructors/upsert:
     post:
       tags:
@@ -1364,7 +1364,6 @@ paths:
             application/yaml:
               schema:
                 type: string
-
 
   /api/auth/sync:
     post:

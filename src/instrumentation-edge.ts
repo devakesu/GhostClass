@@ -10,8 +10,7 @@ function scrubGaApiSecret(url: string): string {
     const hostname = parsed.hostname;
 
     // Only scrub GA Measurement Protocol URLs on google-analytics.com and its subdomains
-    const isGoogleAnalyticsHost =
-      hostname === "google-analytics.com" ||
+    const isGoogleAnalyticsHost = hostname === "google-analytics.com" ||
       hostname === "www.google-analytics.com" ||
       hostname.endsWith(".google-analytics.com");
 
@@ -44,20 +43,22 @@ Sentry.init({
   beforeSend(event, hint) {
     // Filter out common network errors that don't indicate real issues
     const error = hint?.originalException;
-    
-    if (error && typeof error === 'object' && 'message' in error) {
+
+    if (error && typeof error === "object" && "message" in error) {
       const errorMessage = String(error.message).toLowerCase();
-      
+
       // Ignore aborted requests (common during hot reload, navigation, etc.)
-      if (errorMessage.includes('aborted') || 
-          errorMessage.includes('econnreset') ||
-          errorMessage.includes('epipe') ||
-          errorMessage.includes('client closed') ||
-          errorMessage.includes('socket hang up')) {
+      if (
+        errorMessage.includes("aborted") ||
+        errorMessage.includes("econnreset") ||
+        errorMessage.includes("epipe") ||
+        errorMessage.includes("client closed") ||
+        errorMessage.includes("socket hang up")
+      ) {
         return null; // Don't send to Sentry
       }
     }
-    
+
     // Scrub Authorization headers from all captured requests
     if (event.request && event.request.headers) {
       const headers = { ...event.request.headers };
@@ -71,7 +72,10 @@ Sentry.init({
   // Scrub api_secret from GA4 URLs in breadcrumbs (defense-in-depth, C-2)
   beforeBreadcrumb(breadcrumb) {
     if (breadcrumb.data?.url && typeof breadcrumb.data.url === "string") {
-      breadcrumb.data = { ...breadcrumb.data, url: scrubGaApiSecret(breadcrumb.data.url) };
+      breadcrumb.data = {
+        ...breadcrumb.data,
+        url: scrubGaApiSecret(breadcrumb.data.url),
+      };
     }
     return breadcrumb;
   },
@@ -80,7 +84,9 @@ Sentry.init({
   beforeSendTransaction(event) {
     if (Array.isArray(event.spans)) {
       for (const span of event.spans) {
-        if (span.data?.["http.url"] && typeof span.data["http.url"] === "string") {
+        if (
+          span.data?.["http.url"] && typeof span.data["http.url"] === "string"
+        ) {
           span.data["http.url"] = scrubGaApiSecret(span.data["http.url"]);
         }
         if (span.data?.["url"] && typeof span.data["url"] === "string") {

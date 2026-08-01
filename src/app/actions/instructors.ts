@@ -31,7 +31,9 @@ export async function upsertInstructorAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid instructor details" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Invalid instructor details",
+    };
   }
 
   const { courseCode, instructorName } = parsed.data;
@@ -48,8 +50,9 @@ export async function upsertInstructorAction(
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${turnstileToken}`,
-      }
+        body:
+          `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${turnstileToken}`,
+      },
     );
     const verifyData = await verifyResponse.json();
     if (!verifyData.success) {
@@ -58,14 +61,19 @@ export async function upsertInstructorAction(
     }
   } catch (err) {
     logger.error("Turnstile verification exception", err);
-    Sentry.captureException(err, { tags: { type: "turnstile_verification_error", location: "actions/instructors" } });
+    Sentry.captureException(err, {
+      tags: {
+        type: "turnstile_verification_error",
+        location: "actions/instructors",
+      },
+    });
     return { error: "Security check failed. Please check your connection." };
   }
 
   // 2. Perform Database Update
   try {
     const supabase = await createClient();
-    
+
     // Get current authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -80,7 +88,10 @@ export async function upsertInstructorAction(
       .single();
 
     if (profileError || !profile?.class_id) {
-      logger.error("Failed to fetch user class for instructor update", profileError);
+      logger.error(
+        "Failed to fetch user class for instructor update",
+        profileError,
+      );
       return { error: "No class associated with your profile" };
     }
 
@@ -91,14 +102,22 @@ export async function upsertInstructorAction(
         class_id: profile.class_id,
         course_code: normalizeCourseCode(courseCode),
         instructor_name: instructorName,
-        updated_by: user.id
+        updated_by: user.id,
       }, {
-        onConflict: "class_id, course_code"
+        onConflict: "class_id, course_code",
       });
 
     if (upsertError) {
-      logger.error("Database upsert failed for course_instructors", upsertError);
-      Sentry.captureException(upsertError, { tags: { type: "instructor_upsert_error", location: "actions/instructors" } });
+      logger.error(
+        "Database upsert failed for course_instructors",
+        upsertError,
+      );
+      Sentry.captureException(upsertError, {
+        tags: {
+          type: "instructor_upsert_error",
+          location: "actions/instructors",
+        },
+      });
       return { error: "Failed to save instructor to database" };
     }
 
@@ -106,7 +125,12 @@ export async function upsertInstructorAction(
     return {};
   } catch (error) {
     logger.error("upsertInstructorAction failed with exception", error);
-    Sentry.captureException(error, { tags: { type: "instructor_action_error", location: "actions/instructors" } });
+    Sentry.captureException(error, {
+      tags: {
+        type: "instructor_action_error",
+        location: "actions/instructors",
+      },
+    });
     return { error: "An unexpected error occurred while saving" };
   }
 }

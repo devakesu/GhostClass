@@ -13,17 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const ChartBar = ({ 
-  course, 
-  target, 
-  chartHeight 
-}: { 
-  course: { 
-    readonly code: string; 
-    readonly official: number; 
-    readonly adjusted: number | null 
-  }; 
-  target: number; 
+const ChartBar = ({
+  course,
+  target,
+  chartHeight,
+}: {
+  course: {
+    readonly code: string;
+    readonly official: number;
+    readonly adjusted: number | null;
+  };
+  target: number;
   chartHeight: number;
 }) => {
   const aboveTarget = course.official >= target;
@@ -32,7 +32,9 @@ const ChartBar = ({
   const isGain = hasTracking && (course.adjusted!) >= course.official;
 
   const baseHeight = (course.official / 100) * chartHeight;
-  const adjustedHeight = hasTracking ? (course.adjusted! / 100) * chartHeight : 0;
+  const adjustedHeight = hasTracking
+    ? (course.adjusted! / 100) * chartHeight
+    : 0;
   const overlayHeight = Math.abs(adjustedHeight - baseHeight);
   const containerHeight = Math.max(baseHeight, adjustedHeight);
 
@@ -41,7 +43,7 @@ const ChartBar = ({
     solidBarHeight = adjustedHeight;
   }
 
-  const roundedClass = (!hasTracking || !isGain) ? 'rounded-t' : '';
+  const roundedClass = (!hasTracking || !isGain) ? "rounded-t" : "";
 
   return (
     <div className="flex flex-col items-center gap-1 w-14">
@@ -55,13 +57,21 @@ const ChartBar = ({
         />
         {hasTracking && (
           <div
-            className={`absolute left-0 right-0 ${isGain ? 'rounded-t' : ''} border-x border-t`}
+            className={`absolute left-0 right-0 ${
+              isGain ? "rounded-t" : ""
+            } border-x border-t`}
             style={{
               bottom: isGain ? baseHeight : adjustedHeight,
               height: overlayHeight,
-              backgroundColor: isGain ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-              backgroundImage: `repeating-linear-gradient(45deg, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 0, ${isGain ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.7)'} 2.5px, transparent 2.5px, transparent 5px)`,
-              borderColor: isGain ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)',
+              backgroundColor: isGain
+                ? "rgba(34, 197, 94, 0.05)"
+                : "rgba(239, 68, 68, 0.05)",
+              backgroundImage: `repeating-linear-gradient(45deg, ${
+                isGain ? "rgba(34, 197, 94, 0.6)" : "rgba(239, 68, 68, 0.7)"
+              } 0, ${
+                isGain ? "rgba(34, 197, 94, 0.6)" : "rgba(239, 68, 68, 0.7)"
+              } 2.5px, transparent 2.5px, transparent 5px)`,
+              borderColor: isGain ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
             }}
           />
         )}
@@ -72,7 +82,11 @@ const ChartBar = ({
       <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
         {course.official}%
         {hasTracking && (
-          <span className={isGain ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+          <span
+            className={isGain
+              ? "text-green-600 dark:text-green-400"
+              : "text-red-600 dark:text-red-400"}
+          >
             {" "} → {course.adjusted}%
           </span>
         )}
@@ -112,7 +126,9 @@ function makePanelId(question: string): string {
   return `faq-panel-${slug || "item"}`;
 }
 
-function FaqItem({ question, answer }: { question: string; answer: React.ReactNode }) {
+function FaqItem(
+  { question, answer }: { question: string; answer: React.ReactNode },
+) {
   const [open, setOpen] = useState(false);
   const panelId = makePanelId(question);
   const btnId = `${panelId}-btn`;
@@ -126,11 +142,19 @@ function FaqItem({ question, answer }: { question: string; answer: React.ReactNo
         aria-controls={panelId}
       >
         <span>{question}</span>
-        {open ? (
-          <ChevronUp className="shrink-0 size-4 text-primary" aria-hidden="true" />
-        ) : (
-          <ChevronDown className="shrink-0 size-4 text-muted-foreground" aria-hidden="true" />
-        )}
+        {open
+          ? (
+            <ChevronUp
+              className="shrink-0 size-4 text-primary"
+              aria-hidden="true"
+            />
+          )
+          : (
+            <ChevronDown
+              className="shrink-0 size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+          )}
       </button>
       <div
         id={panelId}
@@ -146,11 +170,19 @@ function FaqItem({ question, answer }: { question: string; answer: React.ReactNo
 }
 
 // ─── Mock course card ──────────────────────────────────────────────────────────
-function MockCourseCard({ officialPct = 80, adjustedPct = 82.5 }: { officialPct?: number; adjustedPct?: number } = {}) {
+function MockCourseCard(
+  { officialPct = 80, adjustedPct = 82.5 }: {
+    officialPct?: number;
+    adjustedPct?: number;
+  } = {},
+) {
   const isGain = adjustedPct >= officialPct;
 
   return (
-    <Card className="bg-card/80 border-border w-full max-w-md mx-auto" data-testid="mock-course-card">
+    <Card
+      className="bg-card/80 border-border w-full max-w-md mx-auto"
+      data-testid="mock-course-card"
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -159,7 +191,10 @@ function MockCourseCard({ officialPct = 80, adjustedPct = 82.5 }: { officialPct?
             </CardTitle>
             <p className="text-muted-foreground text-xs mt-0.5">CSE301</p>
           </div>
-          <Badge variant="outline" className="text-xs border-border text-muted-foreground shrink-0">
+          <Badge
+            variant="outline"
+            className="text-xs border-border text-muted-foreground shrink-0"
+          >
             {officialPct}%
           </Badge>
         </div>
@@ -215,12 +250,22 @@ function MockCourseCard({ officialPct = 80, adjustedPct = 82.5 }: { officialPct?
         <div>
           <div className="flex justify-between text-xs text-muted-foreground mb-1">
             <span>Official {officialPct}%</span>
-            <span className={`${isGain ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} font-medium`}>Tracking {adjustedPct}%</span>
+            <span
+              className={`${
+                isGain
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              } font-medium`}
+            >
+              Tracking {adjustedPct}%
+            </span>
           </div>
           <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
             {/* Official bar */}
             <div
-              className={`absolute left-0 top-0 h-full bg-sky-500 overflow-hidden ${!isGain ? 'rounded-r-full' : ''}`}
+              className={`absolute left-0 top-0 h-full bg-sky-500 overflow-hidden ${
+                !isGain ? "rounded-r-full" : ""
+              }`}
               style={{ width: `${officialPct}%` }}
             >
               <div className="absolute right-0 top-0 w-[1.5px] h-full bg-white/20" />
@@ -242,9 +287,13 @@ function MockCourseCard({ officialPct = 80, adjustedPct = 82.5 }: { officialPct?
         <div className="grid grid-cols-2 gap-2 text-xs">
           {/* Official panel */}
           <div className="bg-blue-500/10 dark:bg-blue-950/40 border border-blue-500/30 dark:border-blue-800/40 rounded-lg p-3 space-y-1">
-            <p className="text-blue-600 dark:text-blue-300 font-semibold">Safe (Official)</p>
+            <p className="text-blue-600 dark:text-blue-300 font-semibold">
+              Safe (Official)
+            </p>
             <p className="text-muted-foreground">Can bunk</p>
-            <p className="text-green-600 dark:text-green-400 font-bold text-lg">3</p>
+            <p className="text-green-600 dark:text-green-400 font-bold text-lg">
+              3
+            </p>
           </div>
           {/* Tracking panel */}
           <div className="bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/40 rounded-lg p-3 space-y-1">
@@ -311,7 +360,12 @@ function MockAttendanceChart() {
         {/* Bars */}
         <div className="absolute inset-0 flex items-end gap-2 justify-around px-2 pb-0">
           {courses.map((c) => (
-            <ChartBar key={c.code} course={c} target={TARGET} chartHeight={CHART_HEIGHT} />
+            <ChartBar
+              key={c.code}
+              course={c}
+              target={TARGET}
+              chartHeight={CHART_HEIGHT}
+            />
           ))}
         </div>
       </div>
@@ -327,27 +381,29 @@ function MockAttendanceChart() {
           Official Red = Below target
         </span>
         <span className="flex items-center gap-1.5">
-          <span 
-            className="inline-block size-3 rounded-sm border" 
-            style={{ 
-              borderColor: 'rgb(34, 197, 94)',
-              backgroundImage: 'repeating-linear-gradient(45deg, rgba(34, 197, 94, 0.6) 0, rgba(34, 197, 94, 0.6) 1.5px, transparent 1.5px, transparent 3px)' 
-            }} 
+          <span
+            className="inline-block size-3 rounded-sm border"
+            style={{
+              borderColor: "rgb(34, 197, 94)",
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(34, 197, 94, 0.6) 0, rgba(34, 197, 94, 0.6) 1.5px, transparent 1.5px, transparent 3px)",
+            }}
           />
           Striped Green = Tracking gain
         </span>
         <span className="flex items-center gap-1.5">
-          <span 
-            className="inline-block size-3 rounded-sm border" 
-            style={{ 
-              borderColor: 'rgb(239, 68, 68)',
-              backgroundImage: 'repeating-linear-gradient(45deg, rgba(239, 68, 68, 0.7) 0, rgba(239, 68, 68, 0.7) 1.5px, transparent 1.5px, transparent 3px)' 
-            }} 
+          <span
+            className="inline-block size-3 rounded-sm border"
+            style={{
+              borderColor: "rgb(239, 68, 68)",
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(239, 68, 68, 0.7) 0, rgba(239, 68, 68, 0.7) 1.5px, transparent 1.5px, transparent 3px)",
+            }}
           />
           Striped Red = Tracking loss
         </span>
         <span className="flex items-center gap-1.5">
-            <span className="inline-block w-5 border-t-2 border-dashed border-amber-500 dark:border-amber-400" />
+          <span className="inline-block w-5 border-t-2 border-dashed border-amber-500 dark:border-amber-400" />
           Dashed amber = Target %
         </span>
       </div>
@@ -371,7 +427,9 @@ export default function HelpClient() {
           >
             Google Play Store
           </a>
-          . Alternatively, the web version is a Progressive Web App (PWA) — on most mobile browsers, you can select &apos;Add to Home Screen&apos; to install it as a standalone experience.
+          . Alternatively, the web version is a Progressive Web App (PWA) — on
+          most mobile browsers, you can select &apos;Add to Home Screen&apos; to
+          install it as a standalone experience.
         </>
       ),
     },
@@ -411,12 +469,14 @@ export default function HelpClient() {
         "Visit the 'Build Transparency' page from the footer. It provides live provenance data, including the SLSA attestation level, build timestamp, and the exact GitHub commit used to build this instance.",
     },
     {
-      question: "Why doesn't GhostClass call the EzyGo API directly from the browser?",
+      question:
+        "Why doesn't GhostClass call the EzyGo API directly from the browser?",
       answer:
         "The original approach exposed the EzyGo bearer token in the browser's Network tab and JavaScript memory — trivially stealable via DevTools or XSS. GhostClass stores the token in an httpOnly cookie (AES-256-GCM encrypted) and proxies all EzyGo requests through the server, so the raw token is never visible in the browser. The trade-off is a small extra network hop (~10–50 ms) per request.",
     },
     {
-      question: "Why is the dashboard sometimes slow when many people log in at once?",
+      question:
+        "Why is the dashboard sometimes slow when many people log in at once?",
       answer:
         "All EzyGo API calls are queued through a server-side rate limiter (default: 3 concurrent requests) to avoid hitting EzyGo's rate limits. Early users in a burst get sub-2 s loads; later users in the same burst may wait a few extra seconds in the queue.",
     },
@@ -442,7 +502,10 @@ export default function HelpClient() {
       <div className="max-w-3xl mx-auto space-y-12">
         {/* ── Header ── */}
         <div className="flex items-center gap-4 border-b border-border pb-6">
-            <HelpCircle className="size-8 text-primary shrink-0" aria-hidden="true" />
+          <HelpCircle
+            className="size-8 text-primary shrink-0"
+            aria-hidden="true"
+          />
           <div>
             <h1 className="text-3xl font-bold text-foreground tracking-tight">
               Help & FAQ
@@ -461,16 +524,22 @@ export default function HelpClient() {
           </SectionHeading>
 
           <p className="text-muted-foreground text-sm">
-            Below is a sample course card with all features shown. Hover over the
-            small{" "}
-            <span className="text-orange-500 font-semibold">orange</span> and{" "}
-            <span className="text-blue-500 dark:text-blue-400 font-semibold">blue</span> modifiers to
-            see tooltips.
+            Below is a sample course card with all features shown. Hover over
+            the small{" "}
+            <span className="text-orange-500 font-semibold">orange</span> and
+            {" "}
+            <span className="text-blue-500 dark:text-blue-400 font-semibold">
+              blue
+            </span>{" "}
+            modifiers to see tooltips.
           </p>
 
           <MockCourseCard />
           <p className="text-muted-foreground text-sm mt-4">
-            If your tracking data shows a <span className="text-red-600 font-semibold">loss</span> (e.g. you corrected a present class to absent), the card reflects it:
+            If your tracking data shows a{" "}
+            <span className="text-red-600 font-semibold">loss</span>{" "}
+            (e.g. you corrected a present class to absent), the card reflects
+            it:
           </p>
           <MockCourseCard officialPct={80} adjustedPct={75} />
 
@@ -481,7 +550,9 @@ export default function HelpClient() {
               <li className="flex items-center gap-2">
                 <span className="inline-block size-3 rounded-sm bg-green-500 shrink-0" />
                 <span>
-                  <span className="text-green-500 font-semibold">Green number</span>{" "}
+                  <span className="text-green-500 font-semibold">
+                    Green number
+                  </span>{" "}
                   (e.g. 32) = Official present count from EzyGo
                 </span>
               </li>
@@ -491,8 +562,10 @@ export default function HelpClient() {
                   <span className="text-orange-500 font-semibold">
                     Orange <code>+N</code>
                   </span>{" "}
-                  next to Present = Correction entries that convert absences to present/DL
-                  (does <strong className="text-foreground/80">NOT</strong> add to total)
+                  next to Present = Correction entries that convert absences to
+                  present/DL (does{" "}
+                  <strong className="text-foreground/80">NOT</strong>{" "}
+                  add to total)
                 </span>
               </li>
               <li className="flex items-center gap-2">
@@ -501,14 +574,15 @@ export default function HelpClient() {
                   <span className="text-blue-500 dark:text-blue-400 font-semibold">
                     Blue <code>+N</code>
                   </span>{" "}
-                  next to Present = Extra present classes you manually added (adds to
-                  total)
+                  next to Present = Extra present classes you manually added
+                  (adds to total)
                 </span>
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block size-3 rounded-sm bg-red-500 shrink-0" />
                 <span>
-                  <span className="text-red-500 font-semibold">Red number</span>{" "}
+                  <span className="text-red-500 font-semibold">Red number</span>
+                  {" "}
                   (e.g. 8) = Official absent count from EzyGo
                 </span>
               </li>
@@ -531,7 +605,9 @@ export default function HelpClient() {
                 </span>
               </li>
               <li>
-                <span className="text-foreground/80 font-semibold">Total</span> +{" "}
+                <span className="text-foreground/80 font-semibold">Total</span>
+                {" "}
+                +{" "}
                 <span className="text-blue-500 dark:text-blue-400 font-semibold">
                   Blue <code>+N</code>
                 </span>{" "}
@@ -550,14 +626,14 @@ export default function HelpClient() {
               <li>
                 <span className="inline-block size-3 rounded-sm bg-green-500 mr-1.5 align-middle" />
                 Green overlay (going further right) = Tracking data{" "}
-                <strong className="text-foreground/80">GAIN</strong> (adjusted % is
-                higher than official)
+                <strong className="text-foreground/80">GAIN</strong>{" "}
+                (adjusted % is higher than official)
               </li>
               <li>
                 <span className="inline-block size-3 rounded-sm bg-red-600 mr-1.5 align-middle" />
                 Deep red overlay (going further left/right) = Tracking data{" "}
-                <strong className="text-foreground/80">LOSS</strong> (adjusted % is
-                lower than official)
+                <strong className="text-foreground/80">LOSS</strong>{" "}
+                (adjusted % is lower than official)
               </li>
             </ul>
 
@@ -585,9 +661,12 @@ export default function HelpClient() {
               </li>
               <li>
                 Shows how many classes you can safely bunk (
-                <span className="text-green-600 dark:text-green-400">green</span>) or must attend (
-                <span className="text-amber-600 dark:text-amber-400">amber</span>) to stay at your
-                target %
+                <span className="text-green-600 dark:text-green-400">
+                  green
+                </span>) or must attend (
+                <span className="text-amber-600 dark:text-amber-400">
+                  amber
+                </span>) to stay at your target %
               </li>
             </ul>
           </div>
@@ -605,16 +684,20 @@ export default function HelpClient() {
               </h3>
               <ul className="text-muted-foreground text-sm space-y-2 list-disc list-inside">
                 <li>
-                  Used when EzyGo marked you absent but you were actually present
+                  Used when EzyGo marked you absent but you were actually
+                  present
                 </li>
                 <li>
-                  Does <strong className="text-foreground/80">NOT</strong> add to the
-                  total class count — it only adjusts present/absent counts
+                  Does <strong className="text-foreground/80">NOT</strong>{" "}
+                  add to the total class count — it only adjusts present/absent
+                  counts
                 </li>
                 <li>
                   Shown in{" "}
-                  <span className="text-orange-600 dark:text-orange-500 font-semibold">orange</span> on
-                  the course card
+                  <span className="text-orange-600 dark:text-orange-500 font-semibold">
+                    orange
+                  </span>{" "}
+                  on the course card
                 </li>
               </ul>
               <p className="text-muted-foreground/80 text-xs italic">
@@ -626,25 +709,30 @@ export default function HelpClient() {
 
             {/* Extra card */}
             <div className="bg-muted/30 border border-blue-500/50 dark:border-blue-700/50 rounded-lg p-5 space-y-3">
-              <h3 className="text-blue-600 dark:text-blue-400 font-semibold text-base">Extra</h3>
+              <h3 className="text-blue-600 dark:text-blue-400 font-semibold text-base">
+                Extra
+              </h3>
               <ul className="text-muted-foreground text-sm space-y-2 list-disc list-inside">
                 <li>
                   Used for classes that EzyGo doesn&apos;t know about yet (newly
                   held class not synced)
                 </li>
                 <li>
-                  <strong className="text-foreground/80">ADDS</strong> to the total
-                  class count AND to present/absent
+                  <strong className="text-foreground/80">ADDS</strong>{" "}
+                  to the total class count AND to present/absent
                 </li>
                 <li>
                   Shown in{" "}
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold">blue</span> on the
-                  course card
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                    blue
+                  </span>{" "}
+                  on the course card
                 </li>
               </ul>
               <p className="text-muted-foreground/80 text-xs italic">
-                Example: &quot;Professor held an extra class that hasn&apos;t appeared in
-                EzyGo yet. Add an Extra → Present so GhostClass factors it in.&quot;
+                Example: &quot;Professor held an extra class that hasn&apos;t
+                appeared in EzyGo yet. Add an Extra → Present so GhostClass
+                factors it in.&quot;
               </p>
             </div>
           </div>
@@ -656,7 +744,8 @@ export default function HelpClient() {
 
           <p className="text-muted-foreground text-sm">
             The attendance chart gives you a quick visual overview of all your
-            courses. Below is a sample chart showing all four possible combinations.
+            courses. Below is a sample chart showing all four possible
+            combinations.
           </p>
 
           <MockAttendanceChart />
@@ -666,42 +755,54 @@ export default function HelpClient() {
             <ul className="space-y-2">
               <li className="flex items-center gap-2">
                 <span className="inline-block size-3 rounded-sm bg-green-600 shrink-0" />
-                <span className="text-foreground/80 font-semibold">Official Green</span> = Above
-                target (safe)
+                <span className="text-foreground/80 font-semibold">
+                  Official Green
+                </span>{" "}
+                = Above target (safe)
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block size-3 rounded-sm bg-red-600 shrink-0" />
-                <span className="text-foreground/80 font-semibold">Official Red</span> = Below target
-                (danger)
+                <span className="text-foreground/80 font-semibold">
+                  Official Red
+                </span>{" "}
+                = Below target (danger)
               </li>
               <li className="flex items-center gap-2">
-                <span 
-                  className="inline-block size-3 rounded-sm border shrink-0" 
-                  style={{ 
-                    borderColor: 'rgb(34, 197, 94)',
-                    backgroundImage: 'repeating-linear-gradient(45deg, rgb(34, 197, 94) 0, rgb(34, 197, 94) 2px, transparent 2px, transparent 5px)',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)'
-                  }} 
+                <span
+                  className="inline-block size-3 rounded-sm border shrink-0"
+                  style={{
+                    borderColor: "rgb(34, 197, 94)",
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, rgb(34, 197, 94) 0, rgb(34, 197, 94) 2px, transparent 2px, transparent 5px)",
+                    backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  }}
                 />
-                <span className="text-foreground/80 font-semibold">Striped Green</span> on top =
-                Tracking GAIN (adjusted % higher than official)
+                <span className="text-foreground/80 font-semibold">
+                  Striped Green
+                </span>{" "}
+                on top = Tracking GAIN (adjusted % higher than official)
               </li>
               <li className="flex items-center gap-2">
-                <span 
-                  className="inline-block size-3 rounded-sm border shrink-0" 
-                  style={{ 
-                    borderColor: 'rgb(239, 68, 68)',
-                    backgroundImage: 'repeating-linear-gradient(45deg, rgb(239, 68, 68) 0, rgb(239, 68, 68) 2px, transparent 2px, transparent 5px)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                  }} 
+                <span
+                  className="inline-block size-3 rounded-sm border shrink-0"
+                  style={{
+                    borderColor: "rgb(239, 68, 68)",
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, rgb(239, 68, 68) 0, rgb(239, 68, 68) 2px, transparent 2px, transparent 5px)",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  }}
                 />
-                <span className="text-foreground/80 font-semibold">Striped Red</span> on top =
-                Tracking LOSS (adjusted % lower than official)
+                <span className="text-foreground/80 font-semibold">
+                  Striped Red
+                </span>{" "}
+                on top = Tracking LOSS (adjusted % lower than official)
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block w-5 border-t-2 border-dashed border-amber-500 shrink-0" />
-                <span className="text-foreground/80 font-semibold">Dashed amber line</span> = Your
-                attendance target (default 75%)
+                <span className="text-foreground/80 font-semibold">
+                  Dashed amber line
+                </span>{" "}
+                = Your attendance target (default 75%)
               </li>
             </ul>
           </div>
@@ -710,7 +811,10 @@ export default function HelpClient() {
         {/* ── Section 4 – FAQ ── */}
         <section className="space-y-4">
           <SectionHeading>
-            <MessageSquare className="inline-block mr-2 size-4" aria-hidden="true" />
+            <MessageSquare
+              className="inline-block mr-2 size-4"
+              aria-hidden="true"
+            />
             Frequently Asked Questions
           </SectionHeading>
 
@@ -738,7 +842,10 @@ export default function HelpClient() {
               Our team is happy to help. Reach out via the contact page and
               we&apos;ll get back to you as soon as possible.
             </p>
-            <Button asChild className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+            <Button
+              asChild
+              className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+            >
               <Link href="/contact">Contact Us →</Link>
             </Button>
           </div>

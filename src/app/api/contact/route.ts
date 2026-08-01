@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers as nextHeaders } from "next/headers";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { withSecurity } from "@/lib/security/app-check";
-import {
-  processContactSubmission,
-  contactSchema,
-} from "@/lib/contact/service";
+import { contactSchema, processContactSubmission } from "@/lib/contact/service";
 import { getClientIp } from "@/lib/utils.server";
 import { contactRateLimiter } from "@/lib/ratelimit";
 import { logger } from "@/lib/logger";
@@ -16,7 +13,7 @@ export const dynamic = "force-dynamic";
 /**
  * Unified API for contact form submissions.
  * Optimized for Mobile App usage (Flutter) with Zero-Trust security (App Check).
- * 
+ *
  * Flow:
  * - App Check for mobile callers (via withSecurity)
  * - Rate limited via withSecurity
@@ -107,10 +104,13 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
 
   if (!flowResult.success) {
     logger.error("[contact] Submission flow failed:", flowResult.error);
-    Sentry.captureException(new Error(flowResult.error || "Contact flow failed"), {
-      tags: { type: "contact_flow_error", location: "api/contact" },
-      extra: { userId, ip },
-    });
+    Sentry.captureException(
+      new Error(flowResult.error || "Contact flow failed"),
+      {
+        tags: { type: "contact_flow_error", location: "api/contact" },
+        extra: { userId, ip },
+      },
+    );
     return NextResponse.json(
       { error: flowResult.error || "Failed to process message" },
       { status: 500 },

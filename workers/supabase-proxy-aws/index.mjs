@@ -59,14 +59,14 @@
 
 // Headers injected by AWS / API Gateway that must not reach Supabase.
 const STRIP_REQUEST_HEADERS = new Set([
-  "x-forwarded-proto",    // AWS-injected
-  "x-forwarded-port",     // AWS-injected
-  "x-amzn-trace-id",      // AWS X-Ray trace ID
-  "x-amzn-requestid",     // API GW request ID
-  "x-amz-cf-id",          // CloudFront ID (if any)
+  "x-forwarded-proto", // AWS-injected
+  "x-forwarded-port", // AWS-injected
+  "x-amzn-trace-id", // AWS X-Ray trace ID
+  "x-amzn-requestid", // API GW request ID
+  "x-amz-cf-id", // CloudFront ID (if any)
   "x-amz-security-token", // Defensive strip
-  "via",                   // Hop-by-hop proxy trail
-  "connection",            // HTTP/1.1 connection management
+  "via", // Hop-by-hop proxy trail
+  "connection", // HTTP/1.1 connection management
   // Request framing/encoding can become stale when API Gateway delivers
   // base64-decoded payloads to Lambda. Let undici compute these correctly.
   "content-length",
@@ -103,7 +103,7 @@ function stripTrailingSlashes(str) {
   return s;
 }
 
-const SUPABASE_URL   = stripTrailingSlashes(process.env.SUPABASE_URL   ?? "");
+const SUPABASE_URL = stripTrailingSlashes(process.env.SUPABASE_URL ?? "");
 const ALLOWED_ORIGIN = stripTrailingSlashes(process.env.ALLOWED_ORIGIN ?? "");
 
 function validateOrigin(eventHeaders, method, path) {
@@ -118,7 +118,10 @@ function validateOrigin(eventHeaders, method, path) {
     return null;
   }
   if (!ALLOWED_ORIGIN) {
-    return { statusCode: 500, body: "Misconfigured: ALLOWED_ORIGIN is not set" };
+    return {
+      statusCode: 500,
+      body: "Misconfigured: ALLOWED_ORIGIN is not set",
+    };
   }
   if (requestOrigin !== ALLOWED_ORIGIN) {
     return { statusCode: 403, body: "Forbidden: origin not allowed" };
@@ -131,12 +134,12 @@ async function prepareLambdaResponse(response) {
   // Use text() for text/JSON responses (all Supabase Auth and PostgREST calls).
   // Use arrayBuffer() + base64 for binary content (e.g. Supabase Storage downloads)
   // so the Lambda passthrough does not corrupt non-UTF-8 payloads.
-  const responseContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  const responseContentType = (response.headers.get("content-type") ?? "")
+    .toLowerCase();
   // Default to text when content-type is absent — Supabase Auth and PostgREST
   // always send a content-type header; a missing header means an unexpected
   // response where text() is the safest fallback for logging/debugging.
-  const isTextResponse =
-    responseContentType === "" ||
+  const isTextResponse = responseContentType === "" ||
     responseContentType.startsWith("text/") ||
     responseContentType.startsWith("application/json") ||
     responseContentType.startsWith("application/vnd.pgrst.") ||
@@ -164,8 +167,8 @@ async function prepareLambdaResponse(response) {
 
   return {
     statusCode: response.status,
-    headers:    responseHeaders,
-    body:       responseBody,
+    headers: responseHeaders,
+    body: responseBody,
     isBase64Encoded,
   };
 }
@@ -179,7 +182,10 @@ export const handler = async (event) => {
   try {
     supabaseOrigin = new URL(SUPABASE_URL).origin;
   } catch {
-    return { statusCode: 500, body: "Misconfigured: SUPABASE_URL is not a valid URL" };
+    return {
+      statusCode: 500,
+      body: "Misconfigured: SUPABASE_URL is not a valid URL",
+    };
   }
 
   const rawPath = event.rawPath ?? "/";
@@ -197,7 +203,7 @@ export const handler = async (event) => {
   // ── 3. Build target URL ───────────────────────────────────────────────────
   // Preserve the incoming path + query; only swap the origin.
   const rawQueryString = event.rawQueryString ? `?${event.rawQueryString}` : "";
-  const targetUrl      = `${supabaseOrigin}${rawPath}${rawQueryString}`;
+  const targetUrl = `${supabaseOrigin}${rawPath}${rawQueryString}`;
 
   // ── 4. Build outbound headers ─────────────────────────────────────────────
   const outHeaders = {};
@@ -230,7 +236,9 @@ export const handler = async (event) => {
   } catch (err) {
     return {
       statusCode: 502,
-      body: `Proxy fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+      body: `Proxy fetch failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
     };
   }
 

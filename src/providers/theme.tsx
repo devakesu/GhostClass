@@ -91,22 +91,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     saveTheme(t);
   }, [saveTheme]);
   const toggleTheme = useCallback(
-    () => setThemeState((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      saveTheme(next);
-      return next;
-    }),
-    [saveTheme]
+    () =>
+      setThemeState((prev) => {
+        const next = prev === "dark" ? "light" : "dark";
+        saveTheme(next);
+        return next;
+      }),
+    [saveTheme],
   );
 
   const value = useMemo(
     () => ({ theme, toggleTheme, setTheme }),
-    [theme, toggleTheme, setTheme]
+    [theme, toggleTheme, setTheme],
   );
 
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}
+  </ThemeContext.Provider>;
 }
 
 export function useTheme() {

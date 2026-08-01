@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 const { mockToast, mockDismiss } = vi.hoisted(() => ({
-  mockToast: vi.fn().mockReturnValue('toast-id-1'),
+  mockToast: vi.fn().mockReturnValue("toast-id-1"),
   mockDismiss: vi.fn(),
 }));
 
-vi.mock('sonner', () => ({
+vi.mock("sonner", () => ({
   toast: Object.assign(mockToast, { dismiss: mockDismiss }),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('sonner', () => ({
 function setStandaloneMode(isStandalone: boolean) {
   const original = window.matchMedia;
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: isStandalone && query === '(display-mode: standalone)',
+    matches: isStandalone && query === "(display-mode: standalone)",
     media: query,
     onchange: null,
     addEventListener: vi.fn(),
@@ -34,20 +34,24 @@ function setStandaloneMode(isStandalone: boolean) {
 
 /** Fire popstate with sentinel state (simulates user hitting the root/sentinel). */
 function fireSentinelPopState() {
-  window.dispatchEvent(new PopStateEvent('popstate', { state: { __gce: true } }));
+  window.dispatchEvent(
+    new PopStateEvent("popstate", { state: { __gce: true } }),
+  );
 }
 
 /** Fire popstate with no sentinel state (simulates mid-app back navigation). */
 function fireMidAppPopState() {
-  window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'dashboard' } }));
+  window.dispatchEvent(
+    new PopStateEvent("popstate", { state: { page: "dashboard" } }),
+  );
 }
 
 function setPath(path: string) {
-  history.replaceState(history.state, '', path);
+  history.replaceState(history.state, "", path);
 }
 
-describe('useBackToExit', () => {
-  let useBackToExit: typeof import('@/hooks/useBackToExit').useBackToExit;
+describe("useBackToExit", () => {
+  let useBackToExit: typeof import("@/hooks/useBackToExit").useBackToExit;
   let restoreMatchMedia: () => void;
   let pushStateSpy: ReturnType<typeof vi.spyOn>;
   let replaceStateSpy: ReturnType<typeof vi.spyOn>;
@@ -58,11 +62,11 @@ describe('useBackToExit', () => {
     vi.resetModules();
 
     restoreMatchMedia = setStandaloneMode(true);
-    pushStateSpy = vi.spyOn(history, 'pushState');
-    replaceStateSpy = vi.spyOn(history, 'replaceState');
-    closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
+    pushStateSpy = vi.spyOn(history, "pushState");
+    replaceStateSpy = vi.spyOn(history, "replaceState");
+    closeSpy = vi.spyOn(window, "close").mockImplementation(() => {});
 
-    const mod = await import('@/hooks/useBackToExit');
+    const mod = await import("@/hooks/useBackToExit");
     useBackToExit = mod.useBackToExit;
   });
 
@@ -79,7 +83,7 @@ describe('useBackToExit', () => {
   // Standalone guard
   // -------------------------------------------------------------------------
 
-  it('does nothing when not in standalone mode', () => {
+  it("does nothing when not in standalone mode", () => {
     restoreMatchMedia();
     restoreMatchMedia = setStandaloneMode(false);
 
@@ -94,18 +98,18 @@ describe('useBackToExit', () => {
   // Sentinel push on mount
   // -------------------------------------------------------------------------
 
-  it('marks root entry with sentinel (replaceState) and pushes clean top on mount', () => {
+  it("marks root entry with sentinel (replaceState) and pushes clean top on mount", () => {
     renderHook(() => useBackToExit());
     // Root entry is marked with __gce via replaceState (preserves existing state)
     expect(replaceStateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ __gce: true }),
-      '',
+      "",
       expect.any(String),
     );
     // Clean top entry is pushed WITHOUT __gce so mid-app backs are not caught
     expect(pushStateSpy).toHaveBeenCalledWith(
       expect.not.objectContaining({ __gce: true }),
-      '',
+      "",
       expect.any(String),
     );
   });
@@ -115,105 +119,110 @@ describe('useBackToExit', () => {
   // toward deep-mode exit toast
   // -------------------------------------------------------------------------
 
-  it('does not show toast on a mid-app back press (non-sentinel state)', () => {
+  it("does not show toast on a mid-app back press (non-sentinel state)", () => {
     renderHook(() => useBackToExit());
     pushStateSpy.mockClear();
 
-    act(() => { fireMidAppPopState(); });
+    act(() => {
+      fireMidAppPopState();
+    });
 
     expect(mockToast).not.toHaveBeenCalled();
     // Sentinel must not be re-pushed for mid-app navigation
     expect(pushStateSpy).not.toHaveBeenCalled();
   });
 
-  it('resets exit state when navigating back to a dashboard route', () => {
-    mockToast.mockReturnValueOnce('toast-dash');
+  it("resets exit state when navigating back to a dashboard route", () => {
+    mockToast.mockReturnValueOnce("toast-dash");
     renderHook(() => useBackToExit());
 
     // 1. Trigger exit toast on a non-dashboard route
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
-    expect(mockToast).toHaveBeenCalledWith('Press back again to exit', expect.any(Object));
+    expect(mockToast).toHaveBeenCalledWith(
+      "Press back again to exit",
+      expect.any(Object),
+    );
 
     // 2. Navigate back to dashboard — should reset state and dismiss toast
     act(() => {
-      setPath('/dashboard/main');
+      setPath("/dashboard/main");
       fireMidAppPopState();
     });
-    
-    expect(mockDismiss).toHaveBeenCalledWith('toast-dash');
-    
+
+    expect(mockDismiss).toHaveBeenCalledWith("toast-dash");
+
     // 3. Further back press should NOT close the app (state was reset)
     act(() => {
-      setPath('/dashboard/main');
+      setPath("/dashboard/main");
       fireMidAppPopState();
     });
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
-  it('does not show toast on a popstate with null state', () => {
+  it("does not show toast on a popstate with null state", () => {
     renderHook(() => useBackToExit());
 
     act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
     });
 
     expect(mockToast).not.toHaveBeenCalled();
   });
 
-  it('shows toast after the second qualifying non-dashboard back press', () => {
+  it("shows toast after the second qualifying non-dashboard back press", () => {
     renderHook(() => useBackToExit());
 
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     expect(mockToast).not.toHaveBeenCalled();
 
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     expect(mockToast).toHaveBeenCalledWith(
-      'Press back again to exit',
+      "Press back again to exit",
       expect.objectContaining({ duration: 2000 }),
     );
   });
 
-  it('closes on further qualifying non-dashboard back after toast is shown', () => {
+  it("closes on further qualifying non-dashboard back after toast is shown", () => {
     renderHook(() => useBackToExit());
 
     act(() => {
-      setPath('/scores');
+      setPath("/scores");
       fireMidAppPopState();
     });
     act(() => {
-      setPath('/scores');
+      setPath("/scores");
       fireMidAppPopState();
     });
 
     act(() => {
       vi.advanceTimersByTime(500);
-      setPath('/scores');
+      setPath("/scores");
       fireMidAppPopState();
     });
 
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('requires two qualifying non-dashboard backs again after deep-mode threshold expires', () => {
+  it("requires two qualifying non-dashboard backs again after deep-mode threshold expires", () => {
     renderHook(() => useBackToExit());
 
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     expect(mockToast).toHaveBeenCalledTimes(1);
@@ -221,14 +230,14 @@ describe('useBackToExit', () => {
     // Let deep-mode window expire, then press back once: should NOT re-show toast.
     act(() => {
       vi.advanceTimersByTime(2500);
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     expect(mockToast).toHaveBeenCalledTimes(1);
 
     // Second qualifying back after expiry should show a fresh toast.
     act(() => {
-      setPath('/tracking');
+      setPath("/tracking");
       fireMidAppPopState();
     });
     expect(mockToast).toHaveBeenCalledTimes(2);
@@ -238,28 +247,32 @@ describe('useBackToExit', () => {
   // First sentinel hit — shows toast, re-pushes sentinel
   // -------------------------------------------------------------------------
 
-  it('shows toast when user hits the sentinel (back at root)', () => {
+  it("shows toast when user hits the sentinel (back at root)", () => {
     renderHook(() => useBackToExit());
     pushStateSpy.mockClear();
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
 
     expect(mockToast).toHaveBeenCalledWith(
-      'Press back again to exit',
+      "Press back again to exit",
       expect.objectContaining({ duration: 2000 }),
     );
   });
 
-  it('re-pushes a clean top entry (no sentinel) after first hit so the next press is catchable', () => {
+  it("re-pushes a clean top entry (no sentinel) after first hit so the next press is catchable", () => {
     renderHook(() => useBackToExit());
     pushStateSpy.mockClear();
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
 
     // A new clean top is pushed WITHOUT __gce (derived from event.state minus sentinel)
     expect(pushStateSpy).toHaveBeenCalledWith(
       expect.not.objectContaining({ __gce: true }),
-      '',
+      "",
       expect.any(String),
     );
   });
@@ -268,11 +281,13 @@ describe('useBackToExit', () => {
   // Second sentinel hit within threshold → window.close()
   // -------------------------------------------------------------------------
 
-  it('calls window.close() on second sentinel hit within 2 s', () => {
+  it("calls window.close() on second sentinel hit within 2 s", () => {
     renderHook(() => useBackToExit());
-    mockToast.mockReturnValueOnce('toast-42');
+    mockToast.mockReturnValueOnce("toast-42");
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     act(() => {
       vi.advanceTimersByTime(500);
       fireSentinelPopState();
@@ -281,27 +296,31 @@ describe('useBackToExit', () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses toast before closing on second sentinel hit', () => {
+  it("dismisses toast before closing on second sentinel hit", () => {
     renderHook(() => useBackToExit());
-    mockToast.mockReturnValueOnce('toast-42');
+    mockToast.mockReturnValueOnce("toast-42");
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     act(() => {
       vi.advanceTimersByTime(500);
       fireSentinelPopState();
     });
 
-    expect(mockDismiss).toHaveBeenCalledWith('toast-42');
+    expect(mockDismiss).toHaveBeenCalledWith("toast-42");
   });
 
   // -------------------------------------------------------------------------
   // Second sentinel hit AFTER threshold → fresh first press
   // -------------------------------------------------------------------------
 
-  it('treats a sentinel hit after the threshold as a new first press', () => {
+  it("treats a sentinel hit after the threshold as a new first press", () => {
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     expect(mockToast).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -317,27 +336,31 @@ describe('useBackToExit', () => {
   // Mid-app press does NOT trigger close even after sentinel toast shown
   // -------------------------------------------------------------------------
 
-  it('cancels the exit toast and resets state when a mid-app back fires while toast is showing', () => {
-    mockToast.mockReturnValueOnce('toast-mid');
+  it("cancels the exit toast and resets state when a mid-app back fires while toast is showing", () => {
+    mockToast.mockReturnValueOnce("toast-mid");
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); }); // root hit — toast shown
+    act(() => {
+      fireSentinelPopState();
+    }); // root hit — toast shown
     act(() => {
       vi.advanceTimersByTime(500);
       fireMidAppPopState(); // mid-app back — must cancel the countdown
     });
 
-    expect(mockDismiss).toHaveBeenCalledWith('toast-mid');
+    expect(mockDismiss).toHaveBeenCalledWith("toast-mid");
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
-  it('does not close when sentinel → mid-app back → sentinel within threshold (mid-app resets countdown)', () => {
+  it("does not close when sentinel → mid-app back → sentinel within threshold (mid-app resets countdown)", () => {
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); }); // first root hit
+    act(() => {
+      fireSentinelPopState();
+    }); // first root hit
     act(() => {
       vi.advanceTimersByTime(500);
-      fireMidAppPopState();  // navigated away — resets countdown
+      fireMidAppPopState(); // navigated away — resets countdown
     });
     act(() => {
       vi.advanceTimersByTime(100);
@@ -352,39 +375,59 @@ describe('useBackToExit', () => {
   // Toast callbacks reset state
   // -------------------------------------------------------------------------
 
-  it('resets state when toast auto-closes', () => {
+  it("resets state when toast auto-closes", () => {
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); });
-    const { onAutoClose } = mockToast.mock.calls[0][1] as { onAutoClose: () => void };
-    act(() => { onAutoClose(); });
+    act(() => {
+      fireSentinelPopState();
+    });
+    const { onAutoClose } = mockToast.mock.calls[0][1] as {
+      onAutoClose: () => void;
+    };
+    act(() => {
+      onAutoClose();
+    });
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     expect(mockToast).toHaveBeenCalledTimes(2);
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
-  it('resets state when toast is manually dismissed', () => {
+  it("resets state when toast is manually dismissed", () => {
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); });
-    const { onDismiss } = mockToast.mock.calls[0][1] as { onDismiss: () => void };
-    act(() => { onDismiss(); });
+    act(() => {
+      fireSentinelPopState();
+    });
+    const { onDismiss } = mockToast.mock.calls[0][1] as {
+      onDismiss: () => void;
+    };
+    act(() => {
+      onDismiss();
+    });
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     expect(mockToast).toHaveBeenCalledTimes(2);
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
-  it('ignores stale callback from replaced toast during dismiss + recreate flow', () => {
+  it("ignores stale callback from replaced toast during dismiss + recreate flow", () => {
     mockToast
-      .mockReturnValueOnce('toast-old')
-      .mockReturnValueOnce('toast-new');
+      .mockReturnValueOnce("toast-old")
+      .mockReturnValueOnce("toast-new");
 
     renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); });
-    const oldToastOptions = mockToast.mock.calls[0][1] as { onDismiss: () => void };
+    act(() => {
+      fireSentinelPopState();
+    });
+    const oldToastOptions = mockToast.mock.calls[0][1] as {
+      onDismiss: () => void;
+    };
 
     // Force a new root-mode toast while old one still exists.
     act(() => {
@@ -393,7 +436,9 @@ describe('useBackToExit', () => {
     });
 
     // Simulate late callback from the replaced toast.
-    act(() => { oldToastOptions.onDismiss(); });
+    act(() => {
+      oldToastOptions.onDismiss();
+    });
 
     // Exit should still be armed for the newer toast.
     act(() => {
@@ -408,36 +453,43 @@ describe('useBackToExit', () => {
   // Cleanup
   // -------------------------------------------------------------------------
 
-  it('removes the popstate listener on unmount', () => {
-    const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
+  it("removes the popstate listener on unmount", () => {
+    const removeListenerSpy = vi.spyOn(window, "removeEventListener");
     const { unmount } = renderHook(() => useBackToExit());
 
     unmount();
 
-    expect(removeListenerSpy).toHaveBeenCalledWith('popstate', expect.any(Function));
+    expect(removeListenerSpy).toHaveBeenCalledWith(
+      "popstate",
+      expect.any(Function),
+    );
     removeListenerSpy.mockRestore();
   });
 
-  it('does not show toast after unmount', () => {
+  it("does not show toast after unmount", () => {
     const { unmount } = renderHook(() => useBackToExit());
     unmount();
 
-    act(() => { fireSentinelPopState(); });
+    act(() => {
+      fireSentinelPopState();
+    });
     expect(mockToast).not.toHaveBeenCalled();
   });
 
-  it('dismisses active toast on unmount', () => {
-    mockToast.mockReturnValueOnce('toast-unmount');
+  it("dismisses active toast on unmount", () => {
+    mockToast.mockReturnValueOnce("toast-unmount");
     const { unmount } = renderHook(() => useBackToExit());
 
-    act(() => { fireSentinelPopState(); }); // show toast
+    act(() => {
+      fireSentinelPopState();
+    }); // show toast
     expect(mockToast).toHaveBeenCalledTimes(1);
 
     unmount();
-    expect(mockDismiss).toHaveBeenCalledWith('toast-unmount');
+    expect(mockDismiss).toHaveBeenCalledWith("toast-unmount");
   });
 
-  it('does not re-initialize sentinel on StrictMode re-mount (module-level flag guard)', () => {
+  it("does not re-initialize sentinel on StrictMode re-mount (module-level flag guard)", () => {
     // First mount — initializes the sentinel (replaceState + pushState)
     const { unmount } = renderHook(() => useBackToExit());
     replaceStateSpy.mockClear();

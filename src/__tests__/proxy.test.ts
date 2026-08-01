@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 // --- Mocks (must be hoisted before imports) ---
@@ -155,7 +155,7 @@ describe("proxy – cross-device terms sync", () => {
     // Should set the terms_version cookie
     const setCookies = response.headers.getSetCookie();
     const termsCookie = setCookies.find((h) =>
-      h.toLowerCase().startsWith("terms_version="),
+      h.toLowerCase().startsWith("terms_version=")
     );
     expect(termsCookie).toBeDefined();
     expect(termsCookie).toContain("2.3");
@@ -181,7 +181,7 @@ describe("proxy – cross-device terms sync", () => {
     // Should set the updated terms_version cookie
     const setCookies = response.headers.getSetCookie();
     const termsCookie = setCookies.find((h) =>
-      h.toLowerCase().startsWith("terms_version="),
+      h.toLowerCase().startsWith("terms_version=")
     );
     expect(termsCookie).toBeDefined();
     expect(termsCookie).toContain("2.3");

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import ReactQueryProvider from "@/providers/react-query";
 import { ThemeProvider } from "@/providers/theme";
 import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
-import { Manrope, DM_Mono } from "next/font/google";
+import { DM_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
@@ -49,11 +49,11 @@ export const metadata: Metadata = {
     images: ["/opengraph-image"],
   },
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/apple-icon',
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/apple-icon",
   },
-  manifest: '/manifest.webmanifest',
+  manifest: "/manifest.webmanifest",
 };
 
 const klick = localFont({
@@ -76,8 +76,6 @@ const dmMono = DM_Mono({
   style: ["normal", "italic"],
 });
 
-
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -91,41 +89,56 @@ export default async function RootLayout({
   // The x-nonce header is read here and forwarded to the inline script for strict-CSP
   // compliance. If this layout is ever refactored, verify nonce delivery end-to-end
   // before merging.
-   
+
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
-  const hasGoogleAnalytics = !!gaId && gaId !== 'undefined' && gaId.startsWith('G-');
-  
+  const hasGoogleAnalytics = !!gaId && gaId !== "undefined" &&
+    gaId.startsWith("G-");
+
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className="light">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+      className="light"
+    >
       <head>
         <meta name="application-name" content="GhostClass" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-TileColor" content="#141414" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#141414" />
-        {/* Blocking script: executes synchronously before any CSS or content is
+        {
+          /* Blocking script: executes synchronously before any CSS or content is
             painted. Measures the real scrollbar track width by creating a hidden
             div with forced scrollbar (offsetWidth - clientWidth), then sets
             --scrollbar-width on :root. This is independent of CSS load order
             and of scrollbar-gutter, unlike calc(100vw - 100%) tricks.
             A ResizeObserver keeps the value current on zoom / display changes.
-            CSP nonce is required for strict-CSP compliance. */}
+            CSP nonce is required for strict-CSP compliance. */
+        }
         <script
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.remove('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
+            __html:
+              `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.remove('dark')}function u(){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);var w=d.offsetWidth-d.clientWidth;d.remove();document.documentElement.style.setProperty('--scrollbar-width',w+'px')}u();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(function(){u()}).observe(document.documentElement)}else if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',u)}})();`,
           }}
         />
       </head>
       <body
         className={`overflow-x-hidden w-full max-w-screen antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
       >
-        {/* Pre-hydration loader — injected via script so React never owns this
+        {
+          /* Pre-hydration loader — injected via script so React never owns this
             DOM node. Safe to imperatively .remove() from GlobalInit without
-            corrupting React's fiber tree. */}
-        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
+            corrupting React's fiber tree. */
+        }
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
 (function(){
   var wrap = document.createElement('div');
   wrap.id = 'prehyd-loader';
@@ -156,44 +169,50 @@ export default async function RootLayout({
   wrap.appendChild(txt);
   document.currentScript.parentNode.insertBefore(wrap, document.currentScript.nextSibling);
 })();
-        `}} />
+        `,
+          }}
+        />
         {/* Skip Navigation Link for Accessibility */}
-        <a 
-          href="#main-content" 
+        <a
+          href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100000] focus:bg-background focus:text-foreground focus:px-4 focus:py-2 focus:rounded focus:ring-2 focus:ring-ring"
         >
           Skip to main content
         </a>
         <ThemeProvider>
-        <ReactQueryProvider>
-          {/* --- GOOGLE ANALYTICS (Server-side via Measurement Protocol) --- */}
-          {/* AnalyticsTracker is placed inside ReactQueryProvider so it can safely */}
-          {/* use TanStack Query hooks in the future without ordering issues.       */}
-          {hasGoogleAnalytics && (
-            <Suspense fallback={null}>
-              {/* Client-side tracker component - sends events to /api/analytics/track */}
-              {/* No gtag.js script needed - bypasses CSP inline script restrictions */}
-              <AnalyticsTracker />
-            </Suspense>
-          )}
-          <NextTopLoader 
-            color="#a855f7"
-            initialPosition={0.08}
-            crawlSpeed={200}
-            height={5}
-            crawl={true}
-            showSpinner={false}
-            easing="ease"
-            speed={200}
-            shadow={false}
-            zIndex={2147483647}
-          />
-          <GlobalInit />
-          <ServiceWorkerRegister />
-          <div id="main-content" tabIndex={-1} className="flex min-h-screen flex-col bg-background">
-            {children}
-          </div>
-        </ReactQueryProvider>
+          <ReactQueryProvider>
+            {/* --- GOOGLE ANALYTICS (Server-side via Measurement Protocol) --- */}
+            {/* AnalyticsTracker is placed inside ReactQueryProvider so it can safely */}
+            {/* use TanStack Query hooks in the future without ordering issues.       */}
+            {hasGoogleAnalytics && (
+              <Suspense fallback={null}>
+                {/* Client-side tracker component - sends events to /api/analytics/track */}
+                {/* No gtag.js script needed - bypasses CSP inline script restrictions */}
+                <AnalyticsTracker />
+              </Suspense>
+            )}
+            <NextTopLoader
+              color="#a855f7"
+              initialPosition={0.08}
+              crawlSpeed={200}
+              height={5}
+              crawl={true}
+              showSpinner={false}
+              easing="ease"
+              speed={200}
+              shadow={false}
+              zIndex={2147483647}
+            />
+            <GlobalInit />
+            <ServiceWorkerRegister />
+            <div
+              id="main-content"
+              tabIndex={-1}
+              className="flex min-h-screen flex-col bg-background"
+            >
+              {children}
+            </div>
+          </ReactQueryProvider>
         </ThemeProvider>
       </body>
     </html>

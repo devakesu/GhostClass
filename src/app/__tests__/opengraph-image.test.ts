@@ -2,14 +2,14 @@
  * Tests for opengraph-image.tsx
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Stable constructor mock — must be a `function`, not an arrow, to be constructable.
 // Using a module-scope constant keeps the same reference across vi.resetModules() calls.
 const MockImageResponse = vi.fn(function (
   this: { type: string; element: unknown; options: unknown },
   element: unknown,
-  options: unknown
+  options: unknown,
 ) {
   this.type = "ImageResponse";
   this.element = element;
@@ -32,7 +32,9 @@ describe("opengraph-image", () => {
     vi.clearAllMocks();
     vi.resetModules();
     // Restore default icon return value after clearAllMocks resets call history.
-    mockReadPublicPngAsDataUri.mockReturnValue("data:image/png;base64,ZmFrZQ==");
+    mockReadPublicPngAsDataUri.mockReturnValue(
+      "data:image/png;base64,ZmFrZQ==",
+    );
   });
 
   it("should export correct size dimensions", async () => {
@@ -67,7 +69,7 @@ describe("opengraph-image", () => {
     mod.default();
     expect(MockImageResponse).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ width: 1200, height: 630 })
+      expect.objectContaining({ width: 1200, height: 630 }),
     );
   });
 
@@ -80,4 +82,3 @@ describe("opengraph-image", () => {
     expect(MockImageResponse).toHaveBeenCalled();
   });
 });
-

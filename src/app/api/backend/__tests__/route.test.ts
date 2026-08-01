@@ -1,48 +1,55 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NextRequest } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 // Must be hoisted before any module imports that transitively import server-only
-vi.mock('server-only', () => ({}));
+vi.mock("server-only", () => ({}));
 
 // Set environment variables BEFORE any imports using vi.hoisted
 // This ensures they're available when the route module's top-level constants are initialized
 vi.hoisted(() => {
-    vi.stubEnv('NODE_ENV', 'production');
-  vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://api.example.com");
 });
 
 // Mock the security modules before importing route
-vi.mock('@/lib/security/auth-cookie', () => ({
-  getAuthTokenServer: vi.fn(() => Promise.resolve('mock-token')),
-  getAuthTokenWithFallback: vi.fn(() => Promise.resolve('mock-token')),
+vi.mock("@/lib/security/auth-cookie", () => ({
+  getAuthTokenServer: vi.fn(() => Promise.resolve("mock-token")),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve("mock-token")),
   setAuthCookie: vi.fn(),
   clearAuthCookie: vi.fn(),
 }));
 
-vi.mock('@/lib/security/csrf', () => ({
+vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
 }));
- 
-vi.mock('@/lib/ratelimit', () => ({
+
+vi.mock("@/lib/ratelimit", () => ({
   proxyRateLimiter: {
-    limit: vi.fn(() => Promise.resolve({ success: true, limit: 100, remaining: 99, reset: Date.now() })),
+    limit: vi.fn(() =>
+      Promise.resolve({
+        success: true,
+        limit: 100,
+        remaining: 99,
+        reset: Date.now(),
+      })
+    ),
   },
 }));
 
-vi.mock('@/lib/ezygo-batch-fetcher', () => ({
+vi.mock("@/lib/ezygo-batch-fetcher", () => ({
   fetchEzygoData: vi.fn(),
   invalidateEzygoCacheForUser: vi.fn(),
 }));
 
-vi.mock('@/lib/security/app-check', async () => {
-  const actual = await vi.importActual('@/lib/security/app-check') as any;
+vi.mock("@/lib/security/app-check", async () => {
+  const actual = await vi.importActual("@/lib/security/app-check") as any;
   return {
     ...actual,
     verifyAppCheckToken: vi.fn(() => Promise.resolve({ isValid: true })),
   };
 });
 
-vi.mock('next/headers', () => ({
+vi.mock("next/headers", () => ({
   headers: vi.fn(),
   cookies: vi.fn(() => ({
     get: vi.fn(),
@@ -53,34 +60,48 @@ vi.mock('next/headers', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
 
-describe('Backend Proxy Route', () => {
-  type RouteModule = typeof import('../[...path]/route');
-  let GET: RouteModule['GET'];
-  let POST: RouteModule['POST'];
-  let PUT: RouteModule['PUT'];
-  let PATCH: RouteModule['PATCH'];
-  let DELETE: RouteModule['DELETE'];
-  let HEAD: RouteModule['HEAD'];
+describe("Backend Proxy Route", () => {
+  type RouteModule = typeof import("../[...path]/route");
+  let GET: RouteModule["GET"];
+  let POST: RouteModule["POST"];
+  let PUT: RouteModule["PUT"];
+  let PATCH: RouteModule["PATCH"];
+  let DELETE: RouteModule["DELETE"];
+  let HEAD: RouteModule["HEAD"];
 
   // Local helper that mirrors the old `forward(request, method, path)` call signature,
   // routing each call to the corresponding exported HTTP handler.
-  async function forward(request: NextRequest, method: string, path: string[]): Promise<Response> {
+  async function forward(
+    request: NextRequest,
+    method: string,
+    path: string[],
+  ): Promise<Response> {
     const ctx = { params: Promise.resolve({ path }) };
-    
+
     // Ensure we have authentication to get past withSecurity
     // We use x-csrf-token to make it look like a web request by default
-    if (!request.headers.has('x-csrf-token') && !request.headers.has('X-Firebase-AppCheck')) {
-      request.headers.set('x-csrf-token', 'mock-csrf-token');
+    if (
+      !request.headers.has("x-csrf-token") &&
+      !request.headers.has("X-Firebase-AppCheck")
+    ) {
+      request.headers.set("x-csrf-token", "mock-csrf-token");
     }
 
     switch (method.toUpperCase()) {
-      case 'GET':    return GET(request, ctx);
-      case 'POST':   return POST(request, ctx);
-      case 'PUT':    return PUT(request, ctx);
-      case 'PATCH':  return PATCH(request, ctx);
-      case 'DELETE': return DELETE(request, ctx);
-      case 'HEAD':   return HEAD(request, ctx);
-      default: throw new Error(`Unsupported method in test: ${method}`);
+      case "GET":
+        return GET(request, ctx);
+      case "POST":
+        return POST(request, ctx);
+      case "PUT":
+        return PUT(request, ctx);
+      case "PATCH":
+        return PATCH(request, ctx);
+      case "DELETE":
+        return DELETE(request, ctx);
+      case "HEAD":
+        return HEAD(request, ctx);
+      default:
+        throw new Error(`Unsupported method in test: ${method}`);
     }
   }
 
@@ -88,19 +109,21 @@ describe('Backend Proxy Route', () => {
     vi.useRealTimers();
     vi.resetModules();
     vi.clearAllMocks();
-    
+
     // Default mock implementations
-    const { validateCsrfToken } = await import('@/lib/security/csrf');
+    const { validateCsrfToken } = await import("@/lib/security/csrf");
     vi.mocked(validateCsrfToken).mockResolvedValue(true);
-    
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_BACKEND_URL', 'https://api.example.com');
-    vi.stubEnv('NEXT_PUBLIC_APP_DOMAIN', 'localhost');
-    
-    const { __resetAllowedHostsCache } = await import('@/lib/security/origin-validation');
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://api.example.com");
+    vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost");
+
+    const { __resetAllowedHostsCache } = await import(
+      "@/lib/security/origin-validation"
+    );
     __resetAllowedHostsCache();
-    
-    const routeModule = await import('../[...path]/route');
+
+    const routeModule = await import("../[...path]/route");
     GET = routeModule.GET;
     POST = routeModule.POST;
     PUT = routeModule.PUT;
@@ -108,7 +131,7 @@ describe('Backend Proxy Route', () => {
     DELETE = routeModule.DELETE;
     HEAD = routeModule.HEAD;
 
-    const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
+    const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
     await ezygoCircuitBreaker.reset();
   });
 
@@ -116,838 +139,1010 @@ describe('Backend Proxy Route', () => {
     vi.restoreAllMocks();
   });
 
-  describe('CSRF Protection', () => {
+  describe("CSRF Protection", () => {
     beforeEach(() => {
-      vi.stubEnv('VITEST', 'false');
+      vi.stubEnv("VITEST", "false");
     });
 
-    it('should enforce CSRF validation for POST requests', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should enforce CSRF validation for POST requests", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-        headers: {
-          origin: 'http://localhost',
-          'x-csrf-token': 'any-token',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "x-csrf-token": "any-token",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Invalid CSRF token');
+      expect(body.message).toBe("Invalid CSRF token");
     });
 
-    it('should allow POST requests with valid CSRF token', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should allow POST requests with valid CSRF token", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
 
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ success: true }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-        headers: {
-          origin: 'http://localhost',
-          'content-type': 'application/json',
-          'x-csrf-token': 'any-token',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "content-type": "application/json",
+            "x-csrf-token": "any-token",
+          },
+          body: JSON.stringify({ name: "Test" }),
         },
-        body: JSON.stringify({ name: 'Test' }),
-      });
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(200);
     });
 
-    it('should skip CSRF validation for GET requests', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
-      
+    it("should skip CSRF validation for GET requests", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
+
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'X-Firebase-AppCheck': 'mock-token', // Use App Check to bypass CSRF check
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "X-Firebase-AppCheck": "mock-token", // Use App Check to bypass CSRF check
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
-      
+      await forward(request, "GET", ["users"]);
+
       // validateCsrfToken should not be called for GET
       expect(validateCsrfToken).not.toHaveBeenCalled();
     });
 
-    it('should enforce CSRF validation for PUT requests', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should enforce CSRF validation for PUT requests", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'PUT',
-        headers: {
-          origin: 'http://localhost',
-          'x-csrf-token': 'any-token',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "PUT",
+          headers: {
+            origin: "http://localhost",
+            "x-csrf-token": "any-token",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'PUT', ['users', '1']);
+      const response = await forward(request, "PUT", ["users", "1"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Invalid CSRF token');
+      expect(body.message).toBe("Invalid CSRF token");
     });
 
-    it('should enforce CSRF validation for PATCH requests', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should enforce CSRF validation for PATCH requests", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'PATCH',
-        headers: {
-          origin: 'http://localhost',
-          'x-csrf-token': 'any-token',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "PATCH",
+          headers: {
+            origin: "http://localhost",
+            "x-csrf-token": "any-token",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'PATCH', ['users', '1']);
+      const response = await forward(request, "PATCH", ["users", "1"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Invalid CSRF token');
+      expect(body.message).toBe("Invalid CSRF token");
     });
 
-    it('should enforce CSRF validation for DELETE requests', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should enforce CSRF validation for DELETE requests", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(false);
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'DELETE',
-        headers: {
-          origin: 'http://localhost',
-          'x-csrf-token': 'any-token',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "DELETE",
+          headers: {
+            origin: "http://localhost",
+            "x-csrf-token": "any-token",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'DELETE', ['users', '1']);
+      const response = await forward(request, "DELETE", ["users", "1"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Invalid CSRF token');
+      expect(body.message).toBe("Invalid CSRF token");
     });
   });
 
-  describe('Origin Validation', () => {
-    it('should reject POST requests without origin header', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-      });
+  describe("Origin Validation", () => {
+    it("should reject POST requests without origin header", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+        },
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+      expect(body.message).toBe(
+        "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.",
+      );
     });
 
-    it('should reject POST requests from unauthorized origins', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-        headers: {
-          origin: 'http://evil.com',
+    it("should reject POST requests from unauthorized origins", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://evil.com",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Origin not allowed. This endpoint only accepts requests from authorized domains.');
+      expect(body.message).toBe(
+        "Origin not allowed. This endpoint only accepts requests from authorized domains.",
+      );
     });
 
-    it('should accept POST requests from allowed origins', async () => {
-      const { validateCsrfToken } = await import('@/lib/security/csrf');
+    it("should accept POST requests from allowed origins", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
 
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ success: true }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-        headers: {
-          origin: 'http://localhost',
-          'content-type': 'application/json',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ name: "Test" }),
         },
-        body: JSON.stringify({ name: 'Test' }),
-      });
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(200);
     });
 
-    it('should enforce origin validation for authenticated GET requests (SEC-04)', async () => {
+    it("should enforce origin validation for authenticated GET requests (SEC-04)", async () => {
       // GET requests to non-public paths must include a valid Origin header.
       // This prevents cross-origin data exfiltration (e.g. attendance records).
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        // No origin header
-      });
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          // No origin header
+        },
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+      expect(body.message).toBe(
+        "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.",
+      );
     });
 
-    it('should reject GET requests from unauthorized origins', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://evil.com',
+    it("should reject GET requests from unauthorized origins", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://evil.com",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Origin not allowed. This endpoint only accepts requests from authorized domains.');
+      expect(body.message).toBe(
+        "Origin not allowed. This endpoint only accepts requests from authorized domains.",
+      );
     });
 
-    it('should accept GET requests from allowed origins', async () => {
+    it("should accept GET requests from allowed origins", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(200);
     });
 
-    it('should allow same-origin GET without origin header when sec-fetch-site is same-origin', async () => {
+    it("should allow same-origin GET without origin header when sec-fetch-site is same-origin", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          'sec-fetch-site': 'same-origin',
-          host: 'localhost:3000',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            "sec-fetch-site": "same-origin",
+            host: "localhost:3000",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(200);
     });
 
-    it('should reject GET without origin header when sec-fetch-site is cross-site', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          'sec-fetch-site': 'cross-site',
-          host: 'localhost:3000',
+    it("should reject GET without origin header when sec-fetch-site is cross-site", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            "sec-fetch-site": "cross-site",
+            host: "localhost:3000",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+      expect(body.message).toBe(
+        "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.",
+      );
     });
 
-    it('should handle invalid origin URLs', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'POST',
-        headers: {
-          origin: 'not-a-valid-url',
+    it("should handle invalid origin URLs", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "POST",
+          headers: {
+            origin: "not-a-valid-url",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'POST', ['users']);
+      const response = await forward(request, "POST", ["users"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Invalid origin header format');
+      expect(body.message).toBe("Invalid origin header format");
     });
 
-    it('should reject PUT requests without origin header', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'PUT',
-      });
+    it("should reject PUT requests without origin header", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "PUT",
+        },
+      );
 
-      const response = await forward(request, 'PUT', ['users', '1']);
+      const response = await forward(request, "PUT", ["users", "1"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.');
+      expect(body.message).toBe(
+        "Origin header required. This endpoint is browser-only. For API access, use programmatic endpoints or implement API key authentication.",
+      );
     });
 
-    it('should reject PATCH requests from unauthorized origins', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'PATCH',
-        headers: {
-          origin: 'http://evil.com',
+    it("should reject PATCH requests from unauthorized origins", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "PATCH",
+          headers: {
+            origin: "http://evil.com",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'PATCH', ['users', '1']);
+      const response = await forward(request, "PATCH", ["users", "1"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Origin not allowed. This endpoint only accepts requests from authorized domains.');
+      expect(body.message).toBe(
+        "Origin not allowed. This endpoint only accepts requests from authorized domains.",
+      );
     });
 
-    it('should reject DELETE requests from unauthorized origins', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users/1', {
-        method: 'DELETE',
-        headers: {
-          origin: 'http://evil.com',
+    it("should reject DELETE requests from unauthorized origins", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/1",
+        {
+          method: "DELETE",
+          headers: {
+            origin: "http://evil.com",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'DELETE', ['users', '1']);
+      const response = await forward(request, "DELETE", ["users", "1"]);
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.message).toBe('Origin not allowed. This endpoint only accepts requests from authorized domains.');
+      expect(body.message).toBe(
+        "Origin not allowed. This endpoint only accepts requests from authorized domains.",
+      );
     });
   });
 
-  describe('Path Validation', () => {
-    it('should reject requests with missing path', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend', {
-        method: 'GET',
+  describe("Path Validation", () => {
+    it("should reject requests with missing path", async () => {
+      const request = new NextRequest("http://localhost:3000/api/backend", {
+        method: "GET",
       });
 
-      const response = await forward(request, 'GET', []);
+      const response = await forward(request, "GET", []);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Missing path');
+      expect(body.message).toBe("Missing path");
     });
 
-    it('should reject requests with query parameters in path segments', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-      });
+    it("should reject requests with query parameters in path segments", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+        },
+      );
 
       // Simulate path segment containing query parameter (defense in depth)
-      const response = await forward(request, 'GET', ['users?admin=true']);
+      const response = await forward(request, "GET", ["users?admin=true"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Invalid path format');
+      expect(body.message).toBe("Invalid path format");
     });
 
-    it('should reject requests with fragment identifiers in path segments', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-      });
+    it("should reject requests with fragment identifiers in path segments", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+        },
+      );
 
       // Simulate path segment containing fragment (defense in depth)
-      const response = await forward(request, 'GET', ['users#section']);
+      const response = await forward(request, "GET", ["users#section"]);
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Invalid path format');
+      expect(body.message).toBe("Invalid path format");
     });
 
-    it('should accept valid path segments', async () => {
+    it("should accept valid path segments", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users/123', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users/123",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users', '123']);
+      const response = await forward(request, "GET", ["users", "123"]);
       expect(response.status).toBe(200);
     });
   });
 
-  describe('Timeout and Abort Handling', () => {
+  describe("Timeout and Abort Handling", () => {
     it('should return 502 with "Upstream timed out" message when request times out', async () => {
       // Mock a fetch that takes longer than the timeout (15 seconds)
       // We'll use fake timers to control time
       vi.useFakeTimers();
-      
+
       try {
         // Mock fetch to reject with AbortError when signal is aborted
         // This simulates the behavior when a timeout occurs
         vi.mocked(mockFetch).mockImplementation(async (_url, init) => {
           const signal = init?.signal;
-          
+
           // Fail fast if no AbortSignal is provided so the test doesn't hang silently
           if (!signal) {
             return Promise.reject(
-              new Error('Missing AbortSignal in timeout test fetch mock')
+              new Error("Missing AbortSignal in timeout test fetch mock"),
             );
           }
 
           // If the signal is already aborted when fetch is called, reject immediately
           if (signal.aborted) {
-            const abortError = new Error('The operation was aborted');
-            abortError.name = 'AbortError';
+            const abortError = new Error("The operation was aborted");
+            abortError.name = "AbortError";
             return Promise.reject(abortError);
           }
-          
+
           return new Promise((_resolve, reject) => {
             // Reject with AbortError when signal fires abort event
             signal.addEventListener(
-              'abort',
+              "abort",
               () => {
-                const abortError = new Error('The operation was aborted');
-                abortError.name = 'AbortError';
+                const abortError = new Error("The operation was aborted");
+                abortError.name = "AbortError";
                 reject(abortError);
               },
-              { once: true }
+              { once: true },
             );
             // Never resolve - simulates a hanging request until aborted
           });
         });
 
-        const request = new NextRequest('http://localhost:3000/api/backend/users', {
-          method: 'GET',
-          headers: {
-            origin: 'http://localhost',
+        const request = new NextRequest(
+          "http://localhost:3000/api/backend/users",
+          {
+            method: "GET",
+            headers: {
+              origin: "http://localhost",
+            },
           },
-        });
+        );
 
-        const responsePromise = forward(request, 'GET', ['users']);
-        
+        const responsePromise = forward(request, "GET", ["users"]);
+
         // Fast-forward past the 15-second timeout
         await vi.advanceTimersByTimeAsync(16000);
-        
+
         const response = await responsePromise;
-        
+
         // Should return 502 status
         expect(response.status).toBe(502);
-        
+
         // Should return "Upstream timed out" message for AbortError
         const body = await response.json();
-        expect(body.message).toBe('Upstream timed out');
+        expect(body.message).toBe("Upstream timed out");
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('should distinguish AbortError from other fetch failures', async () => {
+    it("should distinguish AbortError from other fetch failures", async () => {
       // Mock fetch to throw a non-abort error
-      vi.mocked(mockFetch).mockRejectedValue(new Error('Network connection failed'));
+      vi.mocked(mockFetch).mockRejectedValue(
+        new Error("Network connection failed"),
+      );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
-      
+      const response = await forward(request, "GET", ["users"]);
+
       // Should return 502 status
       expect(response.status).toBe(502);
-      
+
       // Should return generic "Upstream fetch failed" message (not timeout-specific)
       const body = await response.json();
-      expect(body.message).toContain('EzyGo servers are having technical issues');
+      expect(body.message).toContain(
+        "EzyGo servers are having technical issues",
+      );
     });
   });
 
-  describe('Rate Limiting (429) Handling', () => {
+  describe("Rate Limiting (429) Handling", () => {
     beforeEach(async () => {
       // Reset circuit breaker before each test to ensure clean state
-      const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
+      const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
       await ezygoCircuitBreaker.reset();
     });
 
-    it('should treat 429 as breaker-worthy and preserve error message in production', async () => {
-      const rateLimitMessage = 'Rate limit exceeded. Please try again in 60 seconds.';
+    it("should treat 429 as breaker-worthy and preserve error message in production", async () => {
+      const rateLimitMessage =
+        "Rate limit exceeded. Please try again in 60 seconds.";
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ message: rateLimitMessage }), {
           status: 429,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
-      
+      const response = await forward(request, "GET", ["users"]);
+
       // Should preserve 429 status
       expect(response.status).toBe(429);
-      
+
       // Should preserve rate-limit message even in production (not sanitized like 5xx)
       const body = await response.json();
       expect(body.message).toBe(rateLimitMessage);
     });
 
-    it('should forward rate-limit headers from upstream 429 responses', async () => {
-      const rateLimitMessage = 'Rate limit exceeded';
+    it("should forward rate-limit headers from upstream 429 responses", async () => {
+      const rateLimitMessage = "Rate limit exceeded";
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ message: rateLimitMessage }), {
           status: 429,
-          headers: { 
-            'content-type': 'application/json',
-            'retry-after': '60',
-            'x-ratelimit-limit': '100',
-            'x-ratelimit-remaining': '0',
-            'x-ratelimit-reset': '1707552000'
+          headers: {
+            "content-type": "application/json",
+            "retry-after": "60",
+            "x-ratelimit-limit": "100",
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": "1707552000",
           },
-        })
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
-      
+      const response = await forward(request, "GET", ["users"]);
+
       // Should preserve 429 status
       expect(response.status).toBe(429);
-      
+
       // Should forward rate-limit headers to help clients back off
-      expect(response.headers.get('retry-after')).toBe('60');
-      expect(response.headers.get('x-ratelimit-limit')).toBe('100');
-      expect(response.headers.get('x-ratelimit-remaining')).toBe('0');
-      expect(response.headers.get('x-ratelimit-reset')).toBe('1707552000');
+      expect(response.headers.get("retry-after")).toBe("60");
+      expect(response.headers.get("x-ratelimit-limit")).toBe("100");
+      expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+      expect(response.headers.get("x-ratelimit-reset")).toBe("1707552000");
     });
 
-    it('should treat 429 as breaker-worthy error (exercises circuit breaker path)', async () => {
+    it("should treat 429 as breaker-worthy error (exercises circuit breaker path)", async () => {
       // Mock the circuit breaker module to track if execute was called
-      const { ezygoCircuitBreaker } = await import('@/lib/circuit-breaker');
-      const executeSpy = vi.spyOn(ezygoCircuitBreaker, 'execute');
-      
+      const { ezygoCircuitBreaker } = await import("@/lib/circuit-breaker");
+      const executeSpy = vi.spyOn(ezygoCircuitBreaker, "execute");
+
       vi.mocked(mockFetch).mockResolvedValue(
-        new Response('Too Many Requests', {
+        new Response("Too Many Requests", {
           status: 429,
-          headers: { 'content-type': 'text/plain' },
-        })
+          headers: { "content-type": "text/plain" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      const response = await forward(request, 'GET', ['users']);
-      
+      const response = await forward(request, "GET", ["users"]);
+
       // Circuit breaker execute should have been called
       expect(executeSpy).toHaveBeenCalled();
-      
+
       // Should return 429 status
       expect(response.status).toBe(429);
-      
+
       // Clean up
       executeSpy.mockRestore();
     });
 
-    it('should log 429 as warning (not error)', async () => {
-      const { logger } = await import('@/lib/logger');
-      const warnSpy = vi.spyOn(logger, 'warn');
-      
+    it("should log 429 as warning (not error)", async () => {
+      const { logger } = await import("@/lib/logger");
+      const warnSpy = vi.spyOn(logger, "warn");
+
       vi.mocked(mockFetch).mockResolvedValue(
-        new Response('Rate limited', {
+        new Response("Rate limited", {
           status: 429,
-          headers: { 'content-type': 'text/plain' },
-        })
+          headers: { "content-type": "text/plain" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
-      
+      await forward(request, "GET", ["users"]);
+
       // Should log as warning with 429 context
       expect(warnSpy).toHaveBeenCalledWith(
-        'Proxy upstream rate limit (429)',
+        "Proxy upstream rate limit (429)",
         expect.objectContaining({
-          status: 429
-        })
+          status: 429,
+        }),
       );
-      
+
       // Clean up
       warnSpy.mockRestore();
     });
   });
 
-  describe('Proxy Header Forwarding', () => {
-    it('should forward x-forwarded-for and x-real-ip from incoming x-forwarded-for header', async () => {
+  describe("Proxy Header Forwarding", () => {
+    it("should forward x-forwarded-for and x-real-ip from incoming x-forwarded-for header", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'x-forwarded-for': '1.2.3.4, 10.0.0.1',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "x-forwarded-for": "1.2.3.4, 10.0.0.1",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['x-forwarded-for']).toBe('1.2.3.4');
-      expect(fetchHeaders['x-real-ip']).toBe('1.2.3.4');
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["x-forwarded-for"]).toBe("1.2.3.4");
+      expect(fetchHeaders["x-real-ip"]).toBe("1.2.3.4");
     });
 
-    it('should forward x-forwarded-for and x-real-ip from incoming x-real-ip header when x-forwarded-for is absent', async () => {
+    it("should forward x-forwarded-for and x-real-ip from incoming x-real-ip header when x-forwarded-for is absent", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'x-real-ip': '5.6.7.8',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "x-real-ip": "5.6.7.8",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['x-forwarded-for']).toBe('5.6.7.8');
-      expect(fetchHeaders['x-real-ip']).toBe('5.6.7.8');
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["x-forwarded-for"]).toBe("5.6.7.8");
+      expect(fetchHeaders["x-real-ip"]).toBe("5.6.7.8");
     });
 
-    it('should prefer x-real-ip over x-forwarded-for when both are present (getClientIp priority)', async () => {
+    it("should prefer x-real-ip over x-forwarded-for when both are present (getClientIp priority)", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'x-real-ip': '5.6.7.8',
-          'x-forwarded-for': '1.2.3.4, 10.0.0.1',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "x-real-ip": "5.6.7.8",
+            "x-forwarded-for": "1.2.3.4, 10.0.0.1",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
       // x-real-ip wins over x-forwarded-for (getClientIp priority: cf-connecting-ip → x-real-ip → x-forwarded-for)
-      expect(fetchHeaders['x-forwarded-for']).toBe('5.6.7.8');
-      expect(fetchHeaders['x-real-ip']).toBe('5.6.7.8');
+      expect(fetchHeaders["x-forwarded-for"]).toBe("5.6.7.8");
+      expect(fetchHeaders["x-real-ip"]).toBe("5.6.7.8");
     });
 
-    it('should forward user-agent header to EzyGo', async () => {
+    it("should forward user-agent header to EzyGo", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'user-agent': 'Mozilla/5.0 (Test Browser)',
-          'x-forwarded-for': '1.2.3.4',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "user-agent": "Mozilla/5.0 (Test Browser)",
+            "x-forwarded-for": "1.2.3.4",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['user-agent']).toBe('Mozilla/5.0 (Test Browser)');
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["user-agent"]).toBe("Mozilla/5.0 (Test Browser)");
     });
 
-    it('should omit x-forwarded-for and x-real-ip when no IP headers are present', async () => {
+    it("should omit x-forwarded-for and x-real-ip when no IP headers are present", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['x-forwarded-for']).toBeUndefined();
-      expect(fetchHeaders['x-real-ip']).toBeUndefined();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["x-forwarded-for"]).toBeUndefined();
+      expect(fetchHeaders["x-real-ip"]).toBeUndefined();
     });
 
-    it('should omit user-agent when not present in incoming request', async () => {
+    it("should omit user-agent when not present in incoming request", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
         new Response(JSON.stringify({ data: [] }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: {
-          origin: 'http://localhost',
-          'x-forwarded-for': '1.2.3.4',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: {
+            origin: "http://localhost",
+            "x-forwarded-for": "1.2.3.4",
+          },
         },
-      });
+      );
 
-      await forward(request, 'GET', ['users']);
+      await forward(request, "GET", ["users"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['user-agent']).toBeUndefined();
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["user-agent"]).toBeUndefined();
     });
 
-    it('should forward proxy headers for public paths (login)', async () => {
+    it("should forward proxy headers for public paths (login)", async () => {
       vi.mocked(mockFetch).mockResolvedValue(
-        new Response(JSON.stringify({ token: 'abc' }), {
+        new Response(JSON.stringify({ token: "abc" }), {
           status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
+          headers: { "content-type": "application/json" },
+        }),
       );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/auth/login', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-forwarded-for': '9.10.11.12',
-          'user-agent': 'TestAgent/1.0',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "9.10.11.12",
+            "user-agent": "TestAgent/1.0",
+          },
+          body: JSON.stringify({ username: "user", password: "pass" }),
         },
-        body: JSON.stringify({ username: 'user', password: 'pass' }),
-      });
+      );
 
-      await forward(request, 'POST', ['auth', 'login']);
+      await forward(request, "POST", ["auth", "login"]);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(fetchHeaders['x-forwarded-for']).toBe('9.10.11.12');
-      expect(fetchHeaders['x-real-ip']).toBe('9.10.11.12');
-      expect(fetchHeaders['user-agent']).toBe('TestAgent/1.0');
+      const fetchHeaders = mockFetch.mock.calls[0][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(fetchHeaders["x-forwarded-for"]).toBe("9.10.11.12");
+      expect(fetchHeaders["x-real-ip"]).toBe("9.10.11.12");
+      expect(fetchHeaders["user-agent"]).toBe("TestAgent/1.0");
     });
   });
 
-  describe('Cache Invalidation and Edge Cases', () => {
-    it('should invalidate cache for default_semester setting', async () => {
-      const { invalidateEzygoCacheForUser } = await import('@/lib/ezygo-batch-fetcher');
+  describe("Cache Invalidation and Edge Cases", () => {
+    it("should invalidate cache for default_semester setting", async () => {
+      const { invalidateEzygoCacheForUser } = await import(
+        "@/lib/ezygo-batch-fetcher"
+      );
       const mockInvalidate = vi.mocked(invalidateEzygoCacheForUser);
 
-      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response("ok", { status: 200 }),
+      );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/user/setting/default_semester', {
-        method: 'POST',
-        headers: {
-          origin: 'http://localhost',
-          'x-csrf-token': 'any',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/user/setting/default_semester",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "x-csrf-token": "any",
+          },
+          body: JSON.stringify({ semester: "odd" }),
         },
-        body: JSON.stringify({ semester: 'odd' }),
-      });
+      );
 
-      const response = await forward(request, 'POST', ['user', 'setting', 'default_semester']);
+      const response = await forward(request, "POST", [
+        "user",
+        "setting",
+        "default_semester",
+      ]);
       expect(response.status).toBe(200);
       expect(mockInvalidate).toHaveBeenCalled();
     });
 
-    it('should handle fetch errors gracefully (exercises line 199)', async () => {
-      vi.mocked(mockFetch).mockRejectedValue(new Error('Network failure'));
+    it("should handle fetch errors gracefully (exercises line 199)", async () => {
+      vi.mocked(mockFetch).mockRejectedValue(new Error("Network failure"));
 
-      const request = new NextRequest('http://localhost:3000/api/backend/users', {
-        method: 'GET',
-        headers: { origin: 'http://localhost' },
-      });
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users",
+        {
+          method: "GET",
+          headers: { origin: "http://localhost" },
+        },
+      );
 
-      const response = await forward(request, 'GET', ['users']);
+      const response = await forward(request, "GET", ["users"]);
       expect(response.status).toBe(502);
       const body = await response.json();
-      expect(body.message).toContain('Exception: EzyGo servers');
+      expect(body.message).toContain("Exception: EzyGo servers");
     });
 
-    it('should handle binary bodies (exercises line 93)', async () => {
-      vi.mocked(mockFetch).mockResolvedValue(new Response('ok', { status: 200 }));
+    it("should handle binary bodies (exercises line 93)", async () => {
+      vi.mocked(mockFetch).mockResolvedValue(
+        new Response("ok", { status: 200 }),
+      );
 
-      const request = new NextRequest('http://localhost:3000/api/backend/upload', {
-        method: 'POST',
-        headers: {
-          origin: 'http://localhost',
-          'content-type': 'application/octet-stream',
-          'x-csrf-token': 'any',
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/upload",
+        {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "content-type": "application/octet-stream",
+            "x-csrf-token": "any",
+          },
+          body: new Uint8Array([1, 2, 3]),
         },
-        body: new Uint8Array([1, 2, 3]),
-      });
+      );
 
-      const response = await forward(request, 'POST', ['upload']);
+      const response = await forward(request, "POST", ["upload"]);
       expect(response.status).toBe(200);
     });
 
-    it('should handle missing path segments (exercises line 33)', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/', {
-        method: 'GET',
-        headers: { 'x-csrf-token': 'mock-token' }
+    it("should handle missing path segments (exercises line 33)", async () => {
+      const request = new NextRequest("http://localhost:3000/api/backend/", {
+        method: "GET",
+        headers: { "x-csrf-token": "mock-token" },
       });
-      const response = await GET(request, { params: Promise.resolve({ path: [] }) } as any);
+      const response = await GET(
+        request,
+        { params: Promise.resolve({ path: [] }) } as any,
+      );
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Missing path');
+      expect(body.message).toBe("Missing path");
     });
 
-    it('should reject paths with fragments (exercises line 35)', async () => {
-      const request = new NextRequest('http://localhost:3000/api/backend/users#fragment', {
-        method: 'GET',
-        headers: { 'x-csrf-token': 'mock-token' }
-      });
-      const response = await GET(request, { params: Promise.resolve({ path: ['users#fragment'] }) } as any);
+    it("should reject paths with fragments (exercises line 35)", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/users#fragment",
+        {
+          method: "GET",
+          headers: { "x-csrf-token": "mock-token" },
+        },
+      );
+      const response = await GET(
+        request,
+        { params: Promise.resolve({ path: ["users#fragment"] }) } as any,
+      );
       expect(response.status).toBe(400);
-      expect((await response.json()).message).toBe('Invalid path format');
+      expect((await response.json()).message).toBe("Invalid path format");
     });
   });
 });

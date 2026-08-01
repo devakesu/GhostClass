@@ -2,7 +2,7 @@
  * Tests for CSP (Content Security Policy) module
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getCspHeader } from "../csp";
 
 describe("Content Security Policy", () => {
@@ -69,14 +69,14 @@ describe("Content Security Policy", () => {
 
   it("should include Supabase URL in img-src when set", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    
+
     const header = getCspHeader();
     expect(header).toContain("https://example.supabase.co");
   });
 
   it("should include Supabase URL in connect-src when set", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    
+
     const header = getCspHeader();
     const connectSrcSection = header.split("connect-src")[1];
     expect(connectSrcSection).toContain("https://example.supabase.co");
@@ -84,7 +84,7 @@ describe("Content Security Policy", () => {
 
   it("should handle missing Supabase URL gracefully", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    
+
     const header = getCspHeader();
     expect(header).toBeTruthy();
     expect(header).toContain("connect-src 'self'");
@@ -93,7 +93,7 @@ describe("Content Security Policy", () => {
   it("should include localhost in development", () => {
     // Test current environment (which should be test, not production)
     const header = getCspHeader();
-    
+
     // In non-production, should include localhost
     if (process.env.NODE_ENV !== "production") {
       expect(header).toContain("localhost:3000");
@@ -104,7 +104,7 @@ describe("Content Security Policy", () => {
     // This tests the production path, but we can only verify the code logic
     // In actual production NODE_ENV, this would be included
     const header = getCspHeader();
-    
+
     if (process.env.NODE_ENV === "production") {
       expect(header).toContain("upgrade-insecure-requests");
     } else {
@@ -116,7 +116,7 @@ describe("Content Security Policy", () => {
   it("should not include upgrade-insecure-requests in development", () => {
     // In test environment, should not include upgrade-insecure-requests
     const header = getCspHeader();
-    
+
     if (process.env.NODE_ENV !== "production") {
       expect(header).not.toContain("upgrade-insecure-requests");
     }
@@ -198,15 +198,15 @@ describe("Content Security Policy", () => {
     it("should enforce production CSP when FORCE_STRICT_CSP is set to 'true'", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "true");
-      
+
       const header = getCspHeader("test-nonce-123");
-      
+
       // Should include production nonce
       expect(header).toContain("'nonce-test-nonce-123'");
-      
+
       // Should include strict-dynamic for production
       expect(header).toContain("'strict-dynamic'");
-      
+
       // NOTE: 'unsafe-eval' is still included when NODE_ENV=development because HMR (React
       // Fast Refresh) requires eval(). It is only omitted in real production builds.
     });
@@ -214,12 +214,12 @@ describe("Content Security Policy", () => {
     it("should enforce production CSP when FORCE_STRICT_CSP is set to '1'", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "1");
-      
+
       const header = getCspHeader("test-nonce-456");
-      
+
       // Should include production nonce
       expect(header).toContain("'nonce-test-nonce-456'");
-      
+
       // Should include strict-dynamic for production
       expect(header).toContain("'strict-dynamic'");
     });
@@ -227,21 +227,21 @@ describe("Content Security Policy", () => {
     it("should enforce production CSP when FORCE_STRICT_CSP is set to 'yes' (case insensitive)", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "YES");
-      
+
       const header = getCspHeader("test-nonce-789");
-      
+
       // Should include production nonce
       expect(header).toContain("'nonce-test-nonce-789'");
-      
+
       // Should include strict-dynamic for production
       expect(header).toContain("'strict-dynamic'");
     });
 
     it("should use development CSP when FORCE_STRICT_CSP is not set", () => {
       vi.stubEnv("NODE_ENV", "development");
-      
+
       const header = getCspHeader();
-      
+
       // Should include development-only directives
       expect(header).toContain("'unsafe-eval'");
       expect(header).toContain("'unsafe-inline'");
@@ -250,9 +250,9 @@ describe("Content Security Policy", () => {
     it("should use development CSP when FORCE_STRICT_CSP is set to invalid value", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "false");
-      
+
       const header = getCspHeader();
-      
+
       // Should include development-only directives since 'false' is not a valid truthy value
       expect(header).toContain("'unsafe-eval'");
       expect(header).toContain("'unsafe-inline'");
@@ -261,12 +261,12 @@ describe("Content Security Policy", () => {
     it("should enforce production CSP when NEXT_PUBLIC_FORCE_STRICT_CSP is set to 'true'", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("NEXT_PUBLIC_FORCE_STRICT_CSP", "true");
-      
+
       const header = getCspHeader("client-nonce-123");
-      
+
       // Should include production nonce
       expect(header).toContain("'nonce-client-nonce-123'");
-      
+
       // Should include strict-dynamic for production
       expect(header).toContain("'strict-dynamic'");
     });
@@ -275,9 +275,9 @@ describe("Content Security Policy", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "false");
       vi.stubEnv("NEXT_PUBLIC_FORCE_STRICT_CSP", "true");
-      
+
       const header = getCspHeader();
-      
+
       // FORCE_STRICT_CSP is checked first, so 'false' should result in dev mode
       // (since 'false' doesn't match the regex pattern)
       expect(header).toContain("'unsafe-eval'");
@@ -286,9 +286,9 @@ describe("Content Security Policy", () => {
     it("should include localhost URLs in connect-src when forced strict CSP in development", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "true");
-      
+
       const header = getCspHeader("test-nonce");
-      
+
       // Even in strict mode, development localhost URLs should still be included
       // because the actual condition checks NODE_ENV, not isDev flag
       expect(header).toContain("localhost:3000");
@@ -297,9 +297,9 @@ describe("Content Security Policy", () => {
     it("should not include upgrade-insecure-requests when forced strict CSP in development", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("FORCE_STRICT_CSP", "true");
-      
+
       const header = getCspHeader("test-nonce");
-      
+
       // upgrade-insecure-requests checks NODE_ENV === 'production' directly
       // so it won't be included even with forced strict CSP
       expect(header).not.toContain("upgrade-insecure-requests");
@@ -358,7 +358,10 @@ describe("Content Security Policy", () => {
 
   describe("Supabase browser proxy origins in connect-src", () => {
     it("includes CF proxy origin in connect-src when NEXT_PUBLIC_SUPABASE_CF_PROXY_URL is set", () => {
-      vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "https://cf-proxy.workers.dev");
+      vi.stubEnv(
+        "NEXT_PUBLIC_SUPABASE_CF_PROXY_URL",
+        "https://cf-proxy.workers.dev",
+      );
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
       const header = getCspHeader();
       expect(header).toContain("https://cf-proxy.workers.dev");
@@ -366,7 +369,10 @@ describe("Content Security Policy", () => {
 
     it("includes AWS proxy origin in connect-src when NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL is set", () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
-      vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "https://abc.execute-api.amazonaws.com");
+      vi.stubEnv(
+        "NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL",
+        "https://abc.execute-api.amazonaws.com",
+      );
       const header = getCspHeader();
       expect(header).toContain("https://abc.execute-api.amazonaws.com");
     });
@@ -401,8 +407,8 @@ describe("Content Security Policy", () => {
     it("should warn if NEXT_PUBLIC_APP_DOMAIN is not set in production mode", () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
-      
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      vi.spyOn(console, "warn").mockImplementation(() => {});
       const header = getCspHeader("nonce");
       expect(header).toBeTruthy();
     });

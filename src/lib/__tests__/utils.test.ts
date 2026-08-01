@@ -1,26 +1,28 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { 
-  cn, 
-  toTitleCase, 
-  toRoman, 
-  normalizeSession, 
-  normalizeToISODate, 
-  normalizeDate, 
-  generateSlotKey, 
-  formatSessionName, 
-  getSessionNumber, 
-  formatCourseCode,
-  getAppDomain,
-  isValidAvatarUrl,
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cn,
   compressImage,
-  redact
+  formatCourseCode,
+  formatSessionName,
+  generateSlotKey,
+  getAppDomain,
+  getSessionNumber,
+  isValidAvatarUrl,
+  normalizeDate,
+  normalizeSession,
+  normalizeToISODate,
+  redact,
+  toRoman,
+  toTitleCase,
 } from "../utils";
 
 describe("utils.ts", () => {
   describe("cn", () => {
     it("merges tailwind classes", () => {
       expect(cn("px-2", "px-4")).toBe("px-4");
-      expect(cn("px-2 py-1", { "bg-red-500": true })).toBe("px-2 py-1 bg-red-500");
+      expect(cn("px-2 py-1", { "bg-red-500": true })).toBe(
+        "px-2 py-1 bg-red-500",
+      );
     });
   });
 
@@ -92,8 +94,8 @@ describe("utils.ts", () => {
       expect(normalizeDate("15/01/2024")).toBe("20240115");
       expect(normalizeDate("")).toBe("");
       expect(normalizeDate("2024-01-15T10:00:00Z")).toBe("20240115");
-      
-      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
       expect(normalizeDate("not-a-date")).toBe("");
       expect(spy).toHaveBeenCalled();
     });
@@ -142,11 +144,16 @@ describe("utils.ts", () => {
     });
 
     it("returns true if it matches the Supabase hostname", () => {
-      expect(isValidAvatarUrl("https://project.supabase.co/storage/v1/object/public/avatars/test.png")).toBe(true);
+      expect(
+        isValidAvatarUrl(
+          "https://project.supabase.co/storage/v1/object/public/avatars/test.png",
+        ),
+      ).toBe(true);
     });
 
     it("returns true even if it points to a different hostname (validation moved to next.config.ts)", () => {
-      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png")).toBe(true);
+      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png"))
+        .toBe(true);
       expect(isValidAvatarUrl("https://evil.com/test.png")).toBe(true);
     });
 
@@ -186,23 +193,23 @@ describe("utils.ts", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
       vi.stubEnv("NEXT_PUBLIC_DEFAULT_DOMAIN", "");
-      
+
       const originalWindow = global.window;
       global.window = { location: { hostname: "my-app.com" } } as any;
-      
+
       expect(getAppDomain()).toBe("my-app.com");
-      
+
       global.window = originalWindow;
     });
 
     it("ignores localhost/IPs in dev fallback", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
-      
+
       const originalWindow = global.window;
       global.window = { location: { hostname: "localhost" } } as any;
       expect(getAppDomain("fallback.com")).toBe("fallback.com");
-      
+
       global.window = { location: { hostname: "127.0.0.1" } } as any;
       expect(getAppDomain("fallback.com")).toBe("fallback.com");
 
@@ -213,8 +220,8 @@ describe("utils.ts", () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "");
       vi.stubEnv("NEXT_PUBLIC_DEFAULT_DOMAIN", "");
-      
-      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
       getAppDomain();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining("SECURITY"));
     });
@@ -223,7 +230,11 @@ describe("utils.ts", () => {
   describe("isValidAvatarUrl", () => {
     it("validates Supabase avatar URLs", () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
-      expect(isValidAvatarUrl("https://abc.supabase.co/storage/v1/object/public/avatars/u.png")).toBe(true);
+      expect(
+        isValidAvatarUrl(
+          "https://abc.supabase.co/storage/v1/object/public/avatars/u.png",
+        ),
+      ).toBe(true);
       expect(isValidAvatarUrl("http://abc.supabase.co/u.png")).toBe(false);
       expect(isValidAvatarUrl("https://other.com/u.png")).toBe(true);
       expect(isValidAvatarUrl(null)).toBe(false);
@@ -239,7 +250,9 @@ describe("utils.ts", () => {
   describe("generateSlotKey", () => {
     it("generates a canonical slot key", () => {
       expect(generateSlotKey(101, "2024-01-15", 1)).toBe("101_20240115_I");
-      expect(generateSlotKey("CS101", "2024-01-15", "iii")).toBe("CS101_20240115_III");
+      expect(generateSlotKey("CS101", "2024-01-15", "iii")).toBe(
+        "CS101_20240115_III",
+      );
     });
   });
 
@@ -262,11 +275,11 @@ describe("utils.ts", () => {
       const mockCanvas = {
         getContext: vi.fn().mockReturnValue(null),
       };
-      vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
-      
+      vi.spyOn(document, "createElement").mockReturnValue(mockCanvas as any);
+
       // Mock FileReader
       const mockReader = {
-        readAsDataURL: vi.fn().mockImplementation(function(this: any) {
+        readAsDataURL: vi.fn().mockImplementation(function (this: any) {
           setTimeout(() => {
             if (this.onload) {
               this.onload({ target: { result: "data:image/png;base64," } });
@@ -274,18 +287,30 @@ describe("utils.ts", () => {
           }, 0);
         }),
       };
-      vi.stubGlobal('FileReader', vi.fn().mockImplementation(function() { return mockReader; }));
+      vi.stubGlobal(
+        "FileReader",
+        vi.fn().mockImplementation(function () {
+          return mockReader;
+        }),
+      );
 
       // Mock Image
       const mockImage = {
         set src(_: string) {
           setTimeout(() => (this as any).onload(), 0);
-        }
+        },
       };
-      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+      vi.stubGlobal(
+        "Image",
+        vi.fn().mockImplementation(function () {
+          return mockImage;
+        }),
+      );
 
       const file = new File(["test"], "test.png", { type: "image/png" });
-      await expect(compressImage(file, 0.5)).rejects.toThrow("Failed to get canvas context");
+      await expect(compressImage(file, 0.5)).rejects.toThrow(
+        "Failed to get canvas context",
+      );
     });
 
     it("should reject if blob is null", async () => {
@@ -299,14 +324,19 @@ describe("utils.ts", () => {
         }),
         toBlob: vi.fn().mockImplementation((cb) => cb(null)),
       };
-      vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
-      
+      vi.spyOn(document, "createElement").mockReturnValue(mockCanvas as any);
+
       const mockImage = {
         set src(_: string) {
           setTimeout(() => (this as any).onload(), 0);
-        }
+        },
       };
-      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+      vi.stubGlobal(
+        "Image",
+        vi.fn().mockImplementation(function () {
+          return mockImage;
+        }),
+      );
 
       const file = new File(["test"], "test.png", { type: "image/png" });
       await expect(compressImage(file, 0.5)).rejects.toThrow("Canvas is empty");
@@ -325,12 +355,14 @@ describe("utils.ts", () => {
         }),
         toBlob: vi.fn().mockImplementation((cb) => cb(mockBlob)),
       };
-      
-      const spyCreate = vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas as any);
-      
+
+      const spyCreate = vi.spyOn(document, "createElement").mockReturnValue(
+        mockCanvas as any,
+      );
+
       // Mock FileReader
       const mockReader = {
-        readAsDataURL: vi.fn().mockImplementation(function(this: any) {
+        readAsDataURL: vi.fn().mockImplementation(function (this: any) {
           setTimeout(() => {
             if (this.onload) {
               this.onload({ target: { result: "data:image/png;base64," } });
@@ -338,25 +370,35 @@ describe("utils.ts", () => {
           }, 0);
         }),
       };
-      vi.stubGlobal('FileReader', vi.fn().mockImplementation(function() { return mockReader; }));
-      
+      vi.stubGlobal(
+        "FileReader",
+        vi.fn().mockImplementation(function () {
+          return mockReader;
+        }),
+      );
+
       // Mock Image
       const mockImage = {
         width: 2000,
         height: 1000,
         set src(_: string) {
           setTimeout(() => (this as any).onload(), 0);
-        }
+        },
       };
-      vi.stubGlobal('Image', vi.fn().mockImplementation(function() { return mockImage; }));
+      vi.stubGlobal(
+        "Image",
+        vi.fn().mockImplementation(function () {
+          return mockImage;
+        }),
+      );
 
       const file = new File(["original"], "test.png", { type: "image/png" });
       const result = await compressImage(file, 0.5);
-      
+
       expect(result).toBeInstanceOf(File);
       expect(result.name).toBe("test.jpg");
       expect(mockCanvas.width).toBe(1920); // Scaled down
-      
+
       spyCreate.mockRestore();
     });
   });

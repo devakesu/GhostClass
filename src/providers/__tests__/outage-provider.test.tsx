@@ -1,10 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import { OutageProvider, useOutage } from "../outage-provider";
 
 // Mock ServiceErrorView to avoid Radix/Framer issues in tests
 vi.mock("@/components/service-error-view", () => ({
-  ServiceErrorView: ({ messages, error }: { messages: string[]; error?: string }) => (
+  ServiceErrorView: (
+    { messages, error }: { messages: string[]; error?: string },
+  ) => (
     <div data-testid="error-view">
       <div data-testid="messages">{messages.join(", ")}</div>
       {error && <div data-testid="details">{error}</div>}
@@ -17,7 +19,12 @@ function TestComponent() {
   return (
     <div>
       <span data-testid="has-outage">{String(hasOutage)}</span>
-      <button data-testid="set-true" onClick={() => setOutage(["Server down"], "503")}>Set True</button>
+      <button
+        data-testid="set-true"
+        onClick={() => setOutage(["Server down"], "503")}
+      >
+        Set True
+      </button>
       <button data-testid="reset" onClick={() => resetOutage()}>Reset</button>
     </div>
   );
@@ -33,7 +40,7 @@ describe("OutageProvider", () => {
     render(
       <OutageProvider>
         <TestComponent />
-      </OutageProvider>
+      </OutageProvider>,
     );
 
     expect(screen.getByTestId("has-outage").textContent).toBe("false");
@@ -42,7 +49,7 @@ describe("OutageProvider", () => {
     act(() => {
       screen.getByTestId("set-true").click();
     });
-    
+
     // TestComponent is unmounted when hasOutage is true
     expect(screen.queryByTestId("has-outage")).not.toBeInTheDocument();
     expect(screen.getByTestId("error-view")).toBeInTheDocument();
@@ -54,14 +61,14 @@ describe("OutageProvider", () => {
     render(
       <OutageProvider>
         <TestComponent />
-      </OutageProvider>
+      </OutageProvider>,
     );
 
     expect(screen.queryByTestId("error-view")).not.toBeInTheDocument();
 
     act(() => {
       const event = new CustomEvent("gc:outage", {
-        detail: { messages: ["External outage"], details: "Error 503" }
+        detail: { messages: ["External outage"], details: "Error 503" },
       });
       window.dispatchEvent(event);
     });

@@ -1,4 +1,4 @@
-declare module 'lru-cache' {
+declare module "lru-cache" {
   export class LRUCache<K = unknown, V = unknown> {
     constructor(options: {
       max: number;

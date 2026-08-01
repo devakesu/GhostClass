@@ -2,7 +2,8 @@
 
 ## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in GhostClass, please report it responsibly:
+If you discover a security vulnerability in GhostClass, please report it
+responsibly:
 
 **Email**: [admin@ghostclass.devakesu.com](mailto:admin@ghostclass.devakesu.com)
 
@@ -22,13 +23,22 @@ GhostClass implements multiple layers of security:
 ### Authentication & Authorization
 
 - **Supabase Auth** - Industry-standard authentication with JWT tokens
-- **Row Level Security (RLS)** - Database-level access control ensuring users only access their data
+- **Row Level Security (RLS)** - Database-level access control ensuring users
+  only access their data
 - **Session Management** - Secure session handling with automatic expiration
 
 ### Data Protection
 
-- **HttpOnly Cookies** - Multiple `httpOnly` cookies with distinct `SameSite` policies. The session token (`ezygo_access_token`) uses `SameSite=Lax` — intentional to allow the cookie on PWA standalone launches (top-level navigations); `Strict` would block it on bookmarks and installed-app launch, causing an infinite redirect loop. The CSRF token cookie uses `SameSite=Strict` since it only needs to be present on same-site requests where the header can be validated. All mutations require a valid CSRF token regardless.
-- **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- **HttpOnly Cookies** - Multiple `httpOnly` cookies with distinct `SameSite`
+  policies. The session token (`ezygo_access_token`) uses `SameSite=Lax` —
+  intentional to allow the cookie on PWA standalone launches (top-level
+  navigations); `Strict` would block it on bookmarks and installed-app launch,
+  causing an infinite redirect loop. The CSRF token cookie uses
+  `SameSite=Strict` since it only needs to be present on same-site requests
+  where the header can be validated. All mutations require a valid CSRF token
+  regardless.
+- **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options,
+  Referrer-Policy
 - **Input Validation** - Zod schemas validate all user input
 - **Origin Validation** - Strict origin checking in production
 - **AES-256-GCM Encryption** - Secure token encryption at rest
@@ -39,13 +49,19 @@ GhostClass implements multiple layers of security:
 - **Circuit Breaker Pattern** - Graceful handling of upstream API failures
 - **Request Deduplication** - Prevents duplicate concurrent requests
 - **Bot Protection** - Cloudflare Turnstile on public endpoints
-- **CSRF Protection** - Custom token-based CSRF protection for web; App Check attestation for mobile requests. `MOBILE_API_SECRET` is maintained as a **server-only** HMAC key for signing security nonces (stateless replay protection).
-- **Device Attestation (Mobile)** - Firebase App Check with Play Integrity (Android) and DeviceCheck (iOS)
-- **Anti-Tapjacking (Mobile)** - Android `FLAG_SECURE` implementation to prevent screenshot/overlay attacks on sensitive screens
+- **CSRF Protection** - Custom token-based CSRF protection for web; App Check
+  attestation for mobile requests. `MOBILE_API_SECRET` is maintained as a
+  **server-only** HMAC key for signing security nonces (stateless replay
+  protection).
+- **Device Attestation (Mobile)** - Firebase App Check with Play Integrity
+  (Android) and DeviceCheck (iOS)
+- **Anti-Tapjacking (Mobile)** - Android `FLAG_SECURE` implementation to prevent
+  screenshot/overlay attacks on sensitive screens
 
 ### Supply Chain Security
 
-- **Signed Docker Images** - All images signed with Sigstore cosign (keyless OIDC)
+- **Signed Docker Images** - All images signed with Sigstore cosign (keyless
+  OIDC)
 - **SLSA Level 3 Provenance** - Build provenance attestations
 - **GitHub Attestations** - Native GitHub artifact attestations
 - **SBOM (CycloneDX)** - Software Bill of Materials for all releases
@@ -54,11 +70,16 @@ GhostClass implements multiple layers of security:
 
 ### CI/CD Security
 
-- **Script Injection Prevention** - Environment variables used for all untrusted GitHub Actions inputs
-- **Least Privilege Permissions** - Workflows use minimum required permissions with explicit grants
-- **GPG Signing** - Commits and tags cryptographically signed (except Dependabot PRs)
-- **Secret Management** - GitHub secrets isolated per workflow with no cross-contamination
-- **Dependabot Isolation** - Special handling for Dependabot PRs without secret access
+- **Script Injection Prevention** - Environment variables used for all untrusted
+  GitHub Actions inputs
+- **Least Privilege Permissions** - Workflows use minimum required permissions
+  with explicit grants
+- **GPG Signing** - Commits and tags cryptographically signed (except Dependabot
+  PRs)
+- **Secret Management** - GitHub secrets isolated per workflow with no
+  cross-contamination
+- **Dependabot Isolation** - Special handling for Dependabot PRs without secret
+  access
 
 ### Environment Security
 
@@ -68,13 +89,26 @@ GhostClass implements multiple layers of security:
 
 ### Egress Proxy Chain
 
-- **EzyGo Server-Side Egress** - All server-to-EzyGo API requests route through a two-tier egress proxy chain: a Cloudflare Worker (`CF_PROXY_URL`, Tier 1) falling back to an AWS Lambda (`AWS_SECONDARY_URL`, Tier 2), then direct. This masks the origin server IP and bypasses ISP-level blocks. Implemented via `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`.
-- **Supabase Browser Proxy (ISP Bypass)** - Browser-to-Supabase requests auto-fail-over through the same pattern: CF Worker (`NEXT_PUBLIC_SUPABASE_CF_PROXY_URL`) → Lambda (`NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL`) → direct. Implemented in `src/lib/supabase/client.ts`.
-- **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret` header on every incoming request; requests without a valid secret are rejected with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET`, `AWS_SECONDARY_SECRET`, and `MOBILE_API_SECRET` are server-only runtime variables).
+- **EzyGo Server-Side Egress** - All server-to-EzyGo API requests route through
+  a two-tier egress proxy chain: a Cloudflare Worker (`CF_PROXY_URL`, Tier 1)
+  falling back to an AWS Lambda (`AWS_SECONDARY_URL`, Tier 2), then direct. This
+  masks the origin server IP and bypasses ISP-level blocks. Implemented via
+  `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`.
+- **Supabase Browser Proxy (ISP Bypass)** - Browser-to-Supabase requests
+  auto-fail-over through the same pattern: CF Worker
+  (`NEXT_PUBLIC_SUPABASE_CF_PROXY_URL`) → Lambda
+  (`NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL`) → direct. Implemented in
+  `src/lib/supabase/client.ts`.
+- **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret`
+  header on every incoming request; requests without a valid secret are rejected
+  with `403`. Secrets are never embedded in the client bundle
+  (`CF_PROXY_SECRET`, `AWS_SECONDARY_SECRET`, and `MOBILE_API_SECRET` are
+  server-only runtime variables).
 
 ## Dependency Security Overrides
 
-GhostClass uses npm overrides to enforce minimum secure versions of transitive dependencies. All overrides are documented below with their security rationale:
+GhostClass uses npm overrides to enforce minimum secure versions of transitive
+dependencies. All overrides are documented below with their security rationale:
 
 ### Current Overrides (package.json)
 
@@ -88,7 +122,8 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 #### tar: ^7.5.15
 
 - **Reason**: Path traversal vulnerabilities in versions ≤7.5.14
-- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712, CVE-2021-37713 / GHSA-qffp-2rhf-9h96
+- **CVEs**: CVE-2021-32803, CVE-2021-32804, CVE-2021-37701, CVE-2021-37712,
+  CVE-2021-37713 / GHSA-qffp-2rhf-9h96
 - **Scope**: Dev-only (used by supabase CLI for unpacking)
 - **Status**: ✅ Patched
 
@@ -132,7 +167,8 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 #### @tootallnate/once: ^3.0.1
 
-- **Reason**: Memory leak prevention and event listener security hardening in legacy HTTP agent wrappers
+- **Reason**: Memory leak prevention and event listener security hardening in
+  legacy HTTP agent wrappers
 - **Scope**: Dev-only / transitive dependency
 - **Status**: ✅ Up-to-date
 
@@ -158,7 +194,8 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 #### undici: ^8.4.2
 
-- **Reason**: HTTP request smuggling and header injection protection in Worker fetch engine
+- **Reason**: HTTP request smuggling and header injection protection in Worker
+  fetch engine
 - **Scope**: Proxy worker dependency
 - **Status**: ✅ Patched
 
@@ -177,22 +214,25 @@ GhostClass uses npm overrides to enforce minimum secure versions of transitive d
 
 ## Known Issues
 
-No active known issues. `npm audit` reports **0 vulnerabilities** across all dependencies.
+No active known issues. `npm audit` reports **0 vulnerabilities** across all
+dependencies.
 
 All previously tracked issues have been resolved:
 
-| Issue | Resolution |
-| --- | --- |
-| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint | Advisory resolved — no longer flagged by `npm audit`. |
+| Issue                                                       | Resolution                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint         | Advisory resolved — no longer flagged by `npm audit`.      |
 | `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.5` override in `package.json`. |
 
-See [Dependency Security Overrides](#dependency-security-overrides) for the current override list.
+See [Dependency Security Overrides](#dependency-security-overrides) for the
+current override list.
 
 ## GitHub Actions Security
 
 ### Script Injection Prevention
 
-GhostClass workflows are hardened against script injection attacks using environment variables for all untrusted inputs.
+GhostClass workflows are hardened against script injection attacks using
+environment variables for all untrusted inputs.
 
 #### Vulnerable Pattern (❌ DO NOT USE)
 
@@ -202,7 +242,9 @@ run: |
   git checkout "refs/tags/${VERSION_TAG}"
 ```
 
-**Risk**: Attacker-controlled inputs like branch names, tag names, or workflow inputs can contain shell metacharacters (`;`, `|`, `$()`, etc.) that execute arbitrary commands.
+**Risk**: Attacker-controlled inputs like branch names, tag names, or workflow
+inputs can contain shell metacharacters (`;`, `|`, `$()`, etc.) that execute
+arbitrary commands.
 
 #### Secure Pattern (✅ ALWAYS USE)
 
@@ -214,14 +256,19 @@ run: |
   git checkout "refs/tags/${VERSION_TAG}"
 ```
 
-**Protection**: Environment variables treat the entire input as literal data, preventing command injection.
+**Protection**: Environment variables treat the entire input as literal data,
+preventing command injection.
 
 #### Protected Workflows
 
 ##### release.yml
 
-- Dynamic versions injected from Infisical are processed via intermediate environment mapping (`env.VERSION_TAG`, `env.VERSION`) during markdown verification and release generation loops.
-- `github.repository` and `github.repository_owner` are passed via localized `env:` blocks to prevent repository name manipulation during container image publishing and artifact attestation steps.
+- Dynamic versions injected from Infisical are processed via intermediate
+  environment mapping (`env.VERSION_TAG`, `env.VERSION`) during markdown
+  verification and release generation loops.
+- `github.repository` and `github.repository_owner` are passed via localized
+  `env:` blocks to prevent repository name manipulation during container image
+  publishing and artifact attestation steps.
 
 #### References
 
@@ -333,9 +380,12 @@ View build provenance and security information directly in your browser:
 - SLSA attestation status and links
 - Direct links to source code, build logs, and attestations
 
-**Footer Link**: Click the "verified" badge in the footer to access build transparency information.
+**Footer Link**: Click the "verified" badge in the footer to access build
+transparency information.
 
-The web interface provides a user-friendly way to verify build provenance without requiring command-line tools, making security information accessible to all users.
+The web interface provides a user-friendly way to verify build provenance
+without requiring command-line tools, making security information accessible to
+all users.
 
 ## Deployment Security Checklist
 
@@ -398,15 +448,18 @@ GhostClass participates in:
 - **Trivy** - Container image vulnerability scanning
 - **Sentry** - Real-time error tracking and monitoring
 
-View our security score: [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/devakesu/GhostClass/badge)](https://scorecard.dev/viewer/?uri=github.com/devakesu/GhostClass)
+View our security score:
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/devakesu/GhostClass/badge)](https://scorecard.dev/viewer/?uri=github.com/devakesu/GhostClass)
 
 ## Additional Resources
 
 - **SLSA Framework**: [https://slsa.dev](https://slsa.dev)
 - **Sigstore Project**: [https://sigstore.dev](https://sigstore.dev)
 - **OpenSSF Scorecard**: [https://scorecard.dev](https://scorecard.dev)
-- **GitHub Security**: [https://docs.github.com/en/code-security](https://docs.github.com/en/code-security)
+- **GitHub Security**:
+  [https://docs.github.com/en/code-security](https://docs.github.com/en/code-security)
 
 ---
 
-For development setup and contribution guidelines, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+For development setup and contribution guidelines, see
+[CONTRIBUTING.md](docs/CONTRIBUTING.md).

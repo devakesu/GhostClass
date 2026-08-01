@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { handleLogout } from "@/lib/security/auth";
 import { logger } from "@/lib/logger";
 
-async function cleanupUserAvatars(supabase: ReturnType<typeof createClient>, userId: string): Promise<void> {
+async function cleanupUserAvatars(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<void> {
   try {
     const limit = 100;
     const maxIterations = 20; // Safety cap to avoid infinite loops in case of unexpected behavior.
@@ -31,12 +34,15 @@ async function cleanupUserAvatars(supabase: ReturnType<typeof createClient>, use
 
     for (let i = 0; i < maxIterations; i++) {
       const { data: files, error: listError } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .list(userId, { limit, offset }, { signal: AbortSignal.timeout(5000) });
 
       if (listError) {
         // Log but don't block account deletion if storage listing fails.
-        logger.error("Failed to list avatar files during account deletion:", listError);
+        logger.error(
+          "Failed to list avatar files during account deletion:",
+          listError,
+        );
         break;
       }
 
@@ -56,20 +62,32 @@ async function cleanupUserAvatars(supabase: ReturnType<typeof createClient>, use
 
     if (allPaths.length > 0) {
       const { error: removeError } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .remove(allPaths);
       if (removeError) {
         // Log but still proceed with account deletion even if removal fails.
-        logger.error("Failed to remove avatar files during account deletion:", removeError);
+        logger.error(
+          "Failed to remove avatar files during account deletion:",
+          removeError,
+        );
       }
     }
   } catch (storageError: unknown) {
     // Best-effort cleanup: log and continue with account deletion even if storage throws.
     const errObj = storageError as { name?: string };
-    if (storageError && typeof storageError === "object" && errObj.name === "AbortError") {
-      logger.warn("Avatar storage cleanup aborted during account deletion:", storageError);
+    if (
+      storageError && typeof storageError === "object" &&
+      errObj.name === "AbortError"
+    ) {
+      logger.warn(
+        "Avatar storage cleanup aborted during account deletion:",
+        storageError,
+      );
     } else {
-      logger.error("Unexpected error during avatar storage cleanup:", storageError);
+      logger.error(
+        "Unexpected error during avatar storage cleanup:",
+        storageError,
+      );
     }
   }
 }
@@ -80,10 +98,10 @@ export function DeleteAccount() {
   const [confirmation, setConfirmation] = useState("");
   const supabase = createClient();
   const queryClient = useQueryClient();
-  
+
   const handleDelete = async () => {
     if (confirmation !== "DELETE") return;
-    
+
     setIsDeleting(true);
     try {
       // 1. Delete storage objects (avatars) using the Storage API helper.
@@ -95,19 +113,18 @@ export function DeleteAccount() {
       }
 
       // 2. Delete account data from database (public tables + auth user)
-      const { error } = await supabase.rpc('delete_user_account');
+      const { error } = await supabase.rpc("delete_user_account");
 
       if (error) throw error;
-      
+
       toast.success("Account deleted successfully");
 
       // Clear React Query cache
       queryClient.clear();
-      
+
       // Use centralized logout logic (handles auth, storage, cookies, redirect)
       // handleLogout will lazy-load CSRF token handling when needed
       await handleLogout();
-      
     } catch (error: unknown) {
       const err = error as { message?: string };
       toast.error(err.message || "Failed to delete account");
@@ -124,10 +141,11 @@ export function DeleteAccount() {
             Delete Account
           </h3>
           <p className="text-sm text-red-800/80 dark:text-red-300/70 leading-relaxed max-w-xl">
-            Permanently remove your account and all associated attendance data. This action is irreversible and cannot be undone.
+            Permanently remove your account and all associated attendance data.
+            This action is irreversible and cannot be undone.
           </p>
         </div>
-        
+
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
           <AlertDialogTrigger asChild>
             <Button
@@ -144,17 +162,31 @@ export function DeleteAccount() {
               <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4 animate-pulse">
                 <AlertTriangle className="h-8 w-8 text-destructive" />
               </div>
-              <AlertDialogTitle className="text-xl font-bold tracking-tight">Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogTitle className="text-xl font-bold tracking-tight">
+                Are you absolutely sure?
+              </AlertDialogTitle>
               <AlertDialogDescription className="text-muted-foreground text-sm px-2 mt-2">
-                This will permanently erase your <span className="text-foreground font-semibold">GhostClass</span> account, including all attendance logs and personal settings.
-                <br /><br />
-                <span className="text-[11px] opacity-70">Note: Your official EzyGo account remains unaffected.</span>
+                This will permanently erase your{" "}
+                <span className="text-foreground font-semibold">
+                  GhostClass
+                </span>{" "}
+                account, including all attendance logs and personal settings.
+                <br />
+                <br />
+                <span className="text-[11px] opacity-70">
+                  Note: Your official EzyGo account remains unaffected.
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
-            
+
             <div className="py-4 space-y-2">
-              <Label htmlFor="confirm" className="text-sm text-muted-foreground">
-                Type <span className="font-bold text-foreground">DELETE</span> to confirm
+              <Label
+                htmlFor="confirm"
+                className="text-sm text-muted-foreground"
+              >
+                Type <span className="font-bold text-foreground">DELETE</span>
+                {" "}
+                to confirm
               </Label>
               <Input
                 id="confirm"
@@ -166,7 +198,7 @@ export function DeleteAccount() {
             </div>
 
             <AlertDialogFooter className="sm:justify-center gap-2 pt-2">
-              <AlertDialogCancel 
+              <AlertDialogCancel
                 disabled={isDeleting}
                 className="rounded-xl border-border/40 hover:bg-muted"
               >
@@ -180,14 +212,19 @@ export function DeleteAccount() {
                 disabled={confirmation !== "DELETE" || isDeleting}
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl px-6"
               >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-label="Deleting account" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Permanently Delete"
-                )}
+                {isDeleting
+                  ? (
+                    <>
+                      <Loader2
+                        className="mr-2 h-4 w-4 animate-spin"
+                        aria-label="Deleting account"
+                      />
+                      Deleting...
+                    </>
+                  )
+                  : (
+                    "Permanently Delete"
+                  )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

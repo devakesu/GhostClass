@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { useProfile } from "@/hooks/users/profile";
 import { useUserSettings } from "@/providers/user-settings";
-import { useInstitutions, useUpdateDefaultInstitutionUser, useDefaultInstitutionUser } from "@/hooks/users/institutions";
+import {
+  useDefaultInstitutionUser,
+  useInstitutions,
+  useUpdateDefaultInstitutionUser,
+} from "@/hooks/users/institutions";
 import { useTheme } from "@/providers/theme";
 import { handleLogout } from "@/lib/security/auth";
 import { isValidAvatarUrl } from "@/lib/utils";
@@ -87,12 +91,24 @@ vi.mock("@/providers/theme", () => ({
 
 // Mock UI components to simplify testing
 vi.mock("@/components/ui/switch", () => ({
-  Switch: ({ checked, onCheckedChange, "aria-label": ariaLabel, id, "aria-labelledby": ariaLabelledBy }: { checked?: boolean; onCheckedChange: (v: boolean) => void; "aria-label"?: string; id?: string; "aria-labelledby"?: string }) => (
-    <input 
-      type="checkbox" 
+  Switch: ({
+    checked,
+    onCheckedChange,
+    "aria-label": ariaLabel,
+    id,
+    "aria-labelledby": ariaLabelledBy,
+  }: {
+    checked?: boolean;
+    onCheckedChange: (v: boolean) => void;
+    "aria-label"?: string;
+    id?: string;
+    "aria-labelledby"?: string;
+  }) => (
+    <input
+      type="checkbox"
       id={id}
-      checked={checked} 
-      onChange={(e) => onCheckedChange(e.target.checked)} 
+      checked={checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
     />
@@ -100,10 +116,16 @@ vi.mock("@/components/ui/switch", () => ({
 }));
 
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ children, value, onValueChange }: { children: React.ReactNode; value?: string; onValueChange?: (v: string) => void }) => (
-    <div 
-      data-testid="select-root" 
-      data-value={value} 
+  Select: (
+    { children, value, onValueChange }: {
+      children: React.ReactNode;
+      value?: string;
+      onValueChange?: (v: string) => void;
+    },
+  ) => (
+    <div
+      data-testid="select-root"
+      data-value={value}
       onClick={(e) => {
         e.stopPropagation();
         if (onValueChange) onValueChange("80");
@@ -112,21 +134,41 @@ vi.mock("@/components/ui/select", () => ({
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, "aria-label": ariaLabel, id }: { children: React.ReactNode; "aria-label"?: string; id?: string }) => <button id={id} aria-label={ariaLabel}>{children}</button>,
-  SelectValue: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <div data-value={value}>{children}</div>,
+  SelectTrigger: (
+    { children, "aria-label": ariaLabel, id }: {
+      children: React.ReactNode;
+      "aria-label"?: string;
+      id?: string;
+    },
+  ) => <button id={id} aria-label={ariaLabel}>{children}</button>,
+  SelectValue: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SelectContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SelectItem: (
+    { children, value }: { children: React.ReactNode; value: string },
+  ) => <div data-value={value}>{children}</div>,
 }));
 
 // Mock DropdownMenu to render children directly
 vi.mock("@/components/ui/dropdown-menu", () => ({
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <div onClick={onClick} role="menuitem">{children}</div>
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
   ),
-  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuItem: (
+    { children, onClick }: { children: React.ReactNode; onClick?: () => void },
+  ) => <div onClick={onClick} role="menuitem">{children}</div>,
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   DropdownMenuSeparator: () => <hr />,
 }));
 
@@ -139,25 +181,39 @@ describe("Navbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPathname.mockReturnValue("/dashboard");
-    
-    vi.mocked(useProfile).mockReturnValue({ 
-      data: { username: "testuser", email: "test@example.com", avatar_url: null }, 
-      isLoading: false 
+
+    vi.mocked(useProfile).mockReturnValue({
+      data: {
+        username: "testuser",
+        email: "test@example.com",
+        avatar_url: null,
+      },
+      isLoading: false,
     } as never);
-    
+
     vi.mocked(useUserSettings).mockReturnValue({
       settings: { bunk_calculator_enabled: true, target_percentage: 75 },
       updateBunkCalc: mockUpdateBunkCalc,
       updateTarget: mockUpdateTarget,
       isLoading: false,
     } as never);
-    
-    vi.mocked(useInstitutions).mockReturnValue({ data: [], isLoading: false } as never);
-    vi.mocked(useDefaultInstitutionUser).mockReturnValue({ data: null } as never);
-    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate: vi.fn() } as never);
-    vi.mocked(useTheme).mockReturnValue({ theme: "dark", toggleTheme: mockToggleTheme } as never);
+
+    vi.mocked(useInstitutions).mockReturnValue(
+      { data: [], isLoading: false } as never,
+    );
+    vi.mocked(useDefaultInstitutionUser).mockReturnValue(
+      { data: null } as never,
+    );
+    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue(
+      { mutate: vi.fn() } as never,
+    );
+    vi.mocked(useTheme).mockReturnValue(
+      { theme: "dark", toggleTheme: mockToggleTheme } as never,
+    );
     vi.mocked(isValidAvatarUrl).mockReturnValue(false);
-    vi.mocked(useQueryClient).mockReturnValue({ invalidateQueries: mockInvalidateQueries } as never);
+    vi.mocked(useQueryClient).mockReturnValue(
+      { invalidateQueries: mockInvalidateQueries } as never,
+    );
   });
 
   it("renders without crashing", () => {
@@ -181,7 +237,7 @@ describe("Navbar", () => {
       mockPathname.mockReturnValue("/other");
       render(<Navbar />);
       const items = screen.getAllByRole("menuitem");
-      const targetItem = items.find(item => item.textContent?.includes(text));
+      const targetItem = items.find((item) => item.textContent?.includes(text));
       if (targetItem) {
         fireEvent.click(targetItem);
         expect(mockRouterPush).toHaveBeenCalledWith(path);
@@ -192,19 +248,20 @@ describe("Navbar", () => {
   it("calls updateBunkCalc when bunk calculator toggle is changed", () => {
     render(<Navbar />);
     const bunkToggle = screen.getByLabelText("Toggle bunk calculator feature");
-    
+
     // Toggle to false
     fireEvent.click(bunkToggle);
     expect(mockUpdateBunkCalc).toHaveBeenCalledWith(false);
     expect(toast.warning).toHaveBeenCalledWith("Bunk Calculator Disabled");
-    
+
     // Toggle to true
     vi.mocked(useUserSettings).mockReturnValue({
       settings: { bunk_calculator_enabled: false },
       updateBunkCalc: mockUpdateBunkCalc,
     } as never);
     render(<Navbar />);
-    const newToggle = screen.getAllByLabelText("Toggle bunk calculator feature")[1];
+    const newToggle =
+      screen.getAllByLabelText("Toggle bunk calculator feature")[1];
     fireEvent.click(newToggle);
     expect(toast.success).toHaveBeenCalledWith("Bunk Calculator Enabled");
   });
@@ -219,12 +276,15 @@ describe("Navbar", () => {
   it("calls updateTarget when attendance target is changed (desktop and mobile)", () => {
     render(<Navbar />);
     const targetSelects = screen.getAllByTestId("select-root");
-    
+
     // Desktop
     fireEvent.click(targetSelects[0]);
     expect(mockUpdateTarget).toHaveBeenCalledWith(80);
-    expect(toast.success).toHaveBeenCalledWith("Attendance Target Updated", expect.anything());
-    
+    expect(toast.success).toHaveBeenCalledWith(
+      "Attendance Target Updated",
+      expect.anything(),
+    );
+
     // Mobile
     fireEvent.click(targetSelects[1]);
     expect(mockUpdateTarget).toHaveBeenCalledWith(80);
@@ -240,9 +300,13 @@ describe("Navbar", () => {
   it("renders avatar image if URL is valid", () => {
     vi.mocked(isValidAvatarUrl).mockReturnValue(true);
     vi.mocked(useProfile).mockReturnValue({
-      data: { avatar_url: "http://example.com/avatar.png", username: "testuser", email: "test@example.com" },
+      data: {
+        avatar_url: "http://example.com/avatar.png",
+        username: "testuser",
+        email: "test@example.com",
+      },
     } as never);
-    
+
     render(<Navbar />);
     const avatarImg = screen.getByAltText(/testuser profile picture/i);
     expect(avatarImg).toBeInTheDocument();
@@ -253,18 +317,23 @@ describe("Navbar", () => {
       if (options.onSuccess) options.onSuccess();
       if (options.onError) options.onError();
     });
-    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue({ mutate } as never);
-    vi.mocked(useInstitutions).mockReturnValue({ 
-      data: [{ id: 1, institution: { name: "Inst 1" } }], 
-      isLoading: false 
+    vi.mocked(useUpdateDefaultInstitutionUser).mockReturnValue(
+      { mutate } as never,
+    );
+    vi.mocked(useInstitutions).mockReturnValue({
+      data: [{ id: 1, institution: { name: "Inst 1" } }],
+      isLoading: false,
     } as never);
-    
+
     render(<Navbar />);
     const selects = screen.getAllByTestId("select-root");
-    fireEvent.click(selects[1]); 
+    fireEvent.click(selects[1]);
     expect(mutate).toHaveBeenCalled();
     expect(mockInvalidateQueries).toHaveBeenCalled();
-    expect(toast.success).toHaveBeenCalledWith("Institution updated", expect.anything());
+    expect(toast.success).toHaveBeenCalledWith(
+      "Institution updated",
+      expect.anything(),
+    );
     expect(toast.error).toHaveBeenCalled();
   });
 
@@ -282,7 +351,7 @@ describe("Navbar", () => {
     const trackingBtn = screen.getByRole("button", { name: /Tracking/i });
     fireEvent.click(trackingBtn);
     expect(mockRouterPush).toHaveBeenCalledWith("/tracking");
-    
+
     const scoresBtn = screen.getByRole("button", { name: /Scores/i });
     fireEvent.click(scoresBtn);
     expect(mockRouterPush).toHaveBeenCalledWith("/scores");

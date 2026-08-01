@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../route";
 
 // Mocking dependencies
@@ -18,13 +18,18 @@ vi.mock("next/server", () => ({
 }));
 
 vi.mock("@/lib/crypto", () => ({
-  encrypt: vi.fn(() => ({ content: "encrypted-token", iv: "0123456789abcdef01234567" })),
+  encrypt: vi.fn(() => ({
+    content: "encrypted-token",
+    iv: "0123456789abcdef01234567",
+  })),
   decrypt: vi.fn(() => "decrypted-password"),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: {
-    limit: vi.fn(() => Promise.resolve({ success: true, limit: 10, reset: 0, remaining: 9 })),
+    limit: vi.fn(() =>
+      Promise.resolve({ success: true, limit: 10, reset: 0, remaining: 9 })
+    ),
   },
 }));
 
@@ -50,8 +55,7 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-vi.mock("@/lib/security/csrf", () => ({
-}));
+vi.mock("@/lib/security/csrf", () => ({}));
 
 vi.mock("@/lib/security/auth-cookie", () => ({
   setAuthCookie: vi.fn(),
@@ -62,7 +66,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("@/lib/user/sync", () => ({
-  performProfileSync: vi.fn(() => Promise.resolve({ updates: 0, deletions: 0 })),
+  performProfileSync: vi.fn(() =>
+    Promise.resolve({ updates: 0, deletions: 0 })
+  ),
 }));
 
 vi.mock("@/lib/security/app-check", () => ({
@@ -73,7 +79,9 @@ vi.mock("@/lib/security/app-check", () => ({
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      signInWithPassword: vi.fn(() => Promise.resolve({ data: { user: { id: "auth-id" } }, error: null })),
+      signInWithPassword: vi.fn(() =>
+        Promise.resolve({ data: { user: { id: "auth-id" } }, error: null })
+      ),
     },
   })),
 }));
@@ -83,7 +91,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
 }));
 
-import { headers, cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { egressFetch } from "@/lib/utils.server";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -102,7 +110,9 @@ describe("POST /api/auth/save-token", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetAllowedHostsCache();
-    vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: true, limit: 10, reset: 0, remaining: 9 } as any);
+    vi.mocked(authRateLimiter.limit).mockResolvedValue(
+      { success: true, limit: 10, reset: 0, remaining: 9 } as any,
+    );
     mockHeaders.get.mockImplementation((name) => {
       if (name === "x-csrf-token") return "valid-csrf";
       if (name === "origin") return "https://localhost:3000";
@@ -142,26 +152,39 @@ describe("POST /api/auth/save-token", () => {
 
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "proxyuser", id: "99999", email: "proxy@example.com" }),
+      json: async () => ({
+        username: "proxyuser",
+        id: "99999",
+        email: "proxy@example.com",
+      }),
     } as any);
 
     const mockSupabaseAdmin = {
       auth: {
         admin: {
-          createUser: vi.fn(() => Promise.resolve({ data: { user: { id: "proxy-auth-id" } }, error: null })),
+          createUser: vi.fn(() =>
+            Promise.resolve({
+              data: { user: { id: "proxy-auth-id" } },
+              error: null,
+            })
+          ),
         },
       },
       from: vi.fn(() => ({
         upsert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
-        single: vi.fn(() => Promise.resolve({ data: { id: "99999" }, error: null })),
+        single: vi.fn(() =>
+          Promise.resolve({ data: { id: "99999" }, error: null })
+        ),
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
       })),
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
@@ -170,7 +193,14 @@ describe("POST /api/auth/save-token", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    vi.mocked(authRateLimiter.limit).mockResolvedValue({ success: false, limit: 1, reset: Date.now() + 1000, remaining: 0 } as any);
+    vi.mocked(authRateLimiter.limit).mockResolvedValue(
+      {
+        success: false,
+        limit: 1,
+        reset: Date.now() + 1000,
+        remaining: 0,
+      } as any,
+    );
 
     const req = { json: async () => ({ token: "test-token" }) } as any;
     const response = await POST(req, {} as any);
@@ -190,26 +220,39 @@ describe("POST /api/auth/save-token", () => {
   it("handles EzyGo authentication success and user creation", async () => {
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+      json: async () => ({
+        username: "testuser",
+        id: "12345",
+        email: "test@example.com",
+      }),
     } as any);
 
     const mockSupabaseAdmin = {
       auth: {
         admin: {
-          createUser: vi.fn(() => Promise.resolve({ data: { user: { id: "new-auth-id" } }, error: null })),
+          createUser: vi.fn(() =>
+            Promise.resolve({
+              data: { user: { id: "new-auth-id" } },
+              error: null,
+            })
+          ),
         },
       },
       from: vi.fn(() => ({
         upsert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
-        single: vi.fn(() => Promise.resolve({ data: { id: "12345" }, error: null })),
+        single: vi.fn(() =>
+          Promise.resolve({ data: { id: "12345" }, error: null })
+        ),
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
       })),
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
@@ -222,13 +265,22 @@ describe("POST /api/auth/save-token", () => {
   it("handles existing user login", async () => {
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "existinguser", id: "54321", email: "existing@example.com" }),
+      json: async () => ({
+        username: "existinguser",
+        id: "54321",
+        email: "existing@example.com",
+      }),
     } as any);
 
     const mockSupabaseAdmin = {
       auth: {
         admin: {
-          createUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: { message: "User already registered", status: 422 } })),
+          createUser: vi.fn(() =>
+            Promise.resolve({
+              data: { user: null },
+              error: { message: "User already registered", status: 422 },
+            })
+          ),
         },
       },
       from: vi.fn((table) => {
@@ -236,14 +288,16 @@ describe("POST /api/auth/save-token", () => {
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
-            single: vi.fn(() => Promise.resolve({ 
-              data: { 
-                auth_id: "existing-uuid", 
-                auth_password: "encrypted", 
-                auth_password_iv: "0123456789abcdef01234567" 
-              }, 
-              error: null 
-            })),
+            single: vi.fn(() =>
+              Promise.resolve({
+                data: {
+                  auth_id: "existing-uuid",
+                  auth_password: "encrypted",
+                  auth_password_iv: "0123456789abcdef01234567",
+                },
+                error: null,
+              })
+            ),
             upsert: vi.fn().mockResolvedValue({ error: null }),
           };
         }
@@ -251,7 +305,9 @@ describe("POST /api/auth/save-token", () => {
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
-            maybeSingle: vi.fn(() => Promise.resolve({ data: { target_percentage: 75 } })),
+            maybeSingle: vi.fn(() =>
+              Promise.resolve({ data: { target_percentage: 75 } })
+            ),
           };
         }
         return {};
@@ -259,7 +315,9 @@ describe("POST /api/auth/save-token", () => {
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
@@ -271,7 +329,11 @@ describe("POST /api/auth/save-token", () => {
   it("handles orphan user cleanup", async () => {
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "orphanuser", id: "99999", email: "orphan@example.com" }),
+      json: async () => ({
+        username: "orphanuser",
+        id: "99999",
+        email: "orphan@example.com",
+      }),
     } as any);
 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
@@ -280,7 +342,9 @@ describe("POST /api/auth/save-token", () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ users: [{ id: "orphan-uuid", email: "ezygo_99999@localhost:3000" }] }),
+      json: async () => ({
+        users: [{ id: "orphan-uuid", email: "ezygo_99999@localhost:3000" }],
+      }),
     });
     vi.stubGlobal("fetch", mockFetch as unknown as typeof fetch);
 
@@ -288,31 +352,50 @@ describe("POST /api/auth/save-token", () => {
       auth: {
         admin: {
           createUser: vi.fn()
-            .mockResolvedValueOnce({ data: { user: null }, error: { message: "User already registered", status: 422 } })
-            .mockResolvedValueOnce({ data: { user: { id: "new-auth-id-after-cleanup" } }, error: null }),
-          listUsers: vi.fn(() => Promise.resolve({ 
-            data: { users: [{ id: "orphan-uuid", email: "ezygo_99999@localhost:3000" }] }, 
-            error: null 
-          })),
+            .mockResolvedValueOnce({
+              data: { user: null },
+              error: { message: "User already registered", status: 422 },
+            })
+            .mockResolvedValueOnce({
+              data: { user: { id: "new-auth-id-after-cleanup" } },
+              error: null,
+            }),
+          listUsers: vi.fn(() =>
+            Promise.resolve({
+              data: {
+                users: [{
+                  id: "orphan-uuid",
+                  email: "ezygo_99999@localhost:3000",
+                }],
+              },
+              error: null,
+            })
+          ),
           deleteUser: vi.fn(() => Promise.resolve({ error: null })),
         },
       },
       from: vi.fn(() => ({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        single: vi.fn(() => Promise.resolve({ data: { auth_id: null }, error: null })), // Orphan detected
+        single: vi.fn(() =>
+          Promise.resolve({ data: { auth_id: null }, error: null })
+        ), // Orphan detected
         upsert: vi.fn().mockResolvedValue({ error: null }),
       })),
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
 
     expect(response.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const requestUrl = new URL(String(mockFetch.mock.calls[0]?.[0]));
-    expect(requestUrl.searchParams.get("email")).toBe("ezygo_99999@localhost:3000");
+    expect(requestUrl.searchParams.get("email")).toBe(
+      "ezygo_99999@localhost:3000",
+    );
     const body = await response.json();
     expect(body.userId).toBe("new-auth-id-after-cleanup");
   });
@@ -350,20 +433,28 @@ describe("POST /api/auth/save-token", () => {
     const req = { json: async () => ({ token: "test-token" }) } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ message: "Unable to determine client IP" });
+    expect(await response.json()).toEqual({
+      message: "Unable to determine client IP",
+    });
   });
 
   it("returns 401 when EzyGo returns 401", async () => {
     vi.mocked(egressFetch).mockResolvedValueOnce({ status: 401 } as any);
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ message: "Invalid or expired token" });
+    expect(await response.json()).toEqual({
+      message: "Invalid or expired token",
+    });
   });
 
   it("returns 502 when EzyGo returns unexpected status", async () => {
     vi.mocked(egressFetch).mockResolvedValueOnce({ status: 404 } as any);
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(502);
   });
@@ -372,7 +463,9 @@ describe("POST /api/auth/save-token", () => {
     const timeoutError = new Error("AbortError");
     timeoutError.name = "AbortError";
     vi.mocked(egressFetch).mockRejectedValueOnce(timeoutError);
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(504);
   });
@@ -382,10 +475,16 @@ describe("POST /api/auth/save-token", () => {
     vi.mocked(redis.set).mockRejectedValueOnce(new Error("Redis down"));
     vi.mocked(egressFetch).mockResolvedValueOnce({
       status: 200,
-      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+      json: async () => ({
+        username: "testuser",
+        id: "12345",
+        email: "test@example.com",
+      }),
     } as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(503);
   });
@@ -395,10 +494,16 @@ describe("POST /api/auth/save-token", () => {
     vi.mocked(redis.set).mockResolvedValueOnce(null); // Lock not acquired
     vi.mocked(egressFetch).mockResolvedValueOnce({
       status: 200,
-      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+      json: async () => ({
+        username: "testuser",
+        id: "12345",
+        email: "test@example.com",
+      }),
     } as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(409);
   });
@@ -406,24 +511,39 @@ describe("POST /api/auth/save-token", () => {
   it("returns 400 for invalid user identifier sanitization", async () => {
     vi.mocked(egressFetch).mockResolvedValueOnce({
       status: 200,
-      json: async () => ({ username: "testuser", id: "invalid#id", email: "test@example.com" }),
+      json: async () => ({
+        username: "testuser",
+        id: "invalid#id",
+        email: "test@example.com",
+      }),
     } as any);
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ message: "Invalid user identifier" });
+    expect(await response.json()).toEqual({
+      message: "Invalid user identifier",
+    });
   });
 
   it("bootstraps canonical password for legacy user", async () => {
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "legacyuser", id: "77777", email: "legacy@example.com" }),
+      json: async () => ({
+        username: "legacyuser",
+        id: "77777",
+        email: "legacy@example.com",
+      }),
     } as any);
 
     const mockSupabaseAdmin = {
       auth: {
         admin: {
-          createUser: vi.fn().mockResolvedValue({ data: { user: null }, error: { message: "User already registered", status: 422 } }),
+          createUser: vi.fn().mockResolvedValue({
+            data: { user: null },
+            error: { message: "User already registered", status: 422 },
+          }),
           updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }),
         },
       },
@@ -434,18 +554,22 @@ describe("POST /api/auth/save-token", () => {
               // The handler calls .select() in two ways:
               // 1. Initial lookup: .from("users").select(...).eq(...).single()
               // 2. Update bootstrap: .from("users").update(...).eq(...).is(...).select(...)
-              
+
               // Case 1: Initial lookup or Case 2: Terminal select
-              const terminalResult = Promise.resolve({ 
-                data: [{ auth_password: "enc", auth_password_iv: "iv" }], 
-                error: null 
+              const terminalResult = Promise.resolve({
+                data: [{ auth_password: "enc", auth_password_iv: "iv" }],
+                error: null,
               });
-              
+
               return Object.assign(terminalResult, {
                 eq: vi.fn().mockReturnThis(),
-                single: vi.fn().mockResolvedValue({ 
-                  data: { auth_id: "legacy-uuid", auth_password: null, auth_password_iv: null }, 
-                  error: null 
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    auth_id: "legacy-uuid",
+                    auth_password: null,
+                    auth_password_iv: null,
+                  },
+                  error: null,
                 }),
                 is: vi.fn().mockReturnThis(),
                 select: vi.fn().mockReturnThis(),
@@ -467,7 +591,9 @@ describe("POST /api/auth/save-token", () => {
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(200);
   });
@@ -475,18 +601,33 @@ describe("POST /api/auth/save-token", () => {
   it("returns 500 when DB upsert fails", async () => {
     vi.mocked(egressFetch).mockResolvedValue({
       status: 200,
-      json: async () => ({ username: "testuser", id: "12345", email: "test@example.com" }),
+      json: async () => ({
+        username: "testuser",
+        id: "12345",
+        email: "test@example.com",
+      }),
     } as any);
 
     const mockSupabaseAdmin = {
-      auth: { admin: { createUser: vi.fn().mockResolvedValue({ data: { user: { id: "new-auth-id" } }, error: null }) } },
+      auth: {
+        admin: {
+          createUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "new-auth-id" } },
+            error: null,
+          }),
+        },
+      },
       from: vi.fn(() => ({
-        upsert: vi.fn().mockResolvedValue({ error: { message: "Upsert failed" } }),
+        upsert: vi.fn().mockResolvedValue({
+          error: { message: "Upsert failed" },
+        }),
       })),
     };
     vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
 
-    const req = { json: async () => ({ token: "a-very-long-token-that-is-valid-length" }) } as any;
+    const req = {
+      json: async () => ({ token: "a-very-long-token-that-is-valid-length" }),
+    } as any;
     const response = await POST(req, {} as any);
     expect(response.status).toBe(500);
   });

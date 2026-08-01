@@ -1,60 +1,72 @@
-import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import { useNotificationVirtualizer } from '../use-notification-virtualizer';
-import { useVirtualizerBridge } from '../virtualizer-bridge';
+import { describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { useNotificationVirtualizer } from "../use-notification-virtualizer";
+import { useVirtualizerBridge } from "../virtualizer-bridge";
 
 // Mock the bridge
-vi.mock('../virtualizer-bridge', () => ({
-  useVirtualizerBridge: vi.fn(props => ({
+vi.mock("../virtualizer-bridge", () => ({
+  useVirtualizerBridge: vi.fn((props) => ({
     getVirtualItems: () => [],
     ...props,
   })),
 }));
 
-describe('useNotificationVirtualizer', () => {
+describe("useNotificationVirtualizer", () => {
   const mockItems = [
-    { type: 'header', id: 'h1', label: 'Today' },
-    { type: 'notification', id: 1, data: { id: 1, description: 'Short desc' } },
-    { type: 'notification', id: 2, data: { id: 2, description: 'Long desc'.repeat(20) } },
+    { type: "header", id: "h1", label: "Today" },
+    { type: "notification", id: 1, data: { id: 1, description: "Short desc" } },
+    {
+      type: "notification",
+      id: 2,
+      data: { id: 2, description: "Long desc".repeat(20) },
+    },
   ] as any;
 
-  it('calculates estimateSize correctly for header', () => {
+  it("calculates estimateSize correctly for header", () => {
     const parentRef = { current: null };
-    renderHook(() => useNotificationVirtualizer({ virtualItems: mockItems, parentRef }));
-    
+    renderHook(() =>
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+    );
+
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
-    
+
     expect(estimateSize(0)).toBe(57); // header
   });
 
-  it('calculates estimateSize correctly for notification', () => {
+  it("calculates estimateSize correctly for notification", () => {
     const parentRef = { current: null };
-    renderHook(() => useNotificationVirtualizer({ virtualItems: mockItems, parentRef }));
-    
+    renderHook(() =>
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+    );
+
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
-    
+
     expect(estimateSize(1)).toBeGreaterThan(80); // short notification + margin
   });
 
-  it('calculates larger size for long notification', () => {
+  it("calculates larger size for long notification", () => {
     const parentRef = { current: null };
-    renderHook(() => useNotificationVirtualizer({ virtualItems: mockItems, parentRef }));
-    
+    renderHook(() =>
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+    );
+
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
-    
+
     expect(estimateSize(2)).toBeGreaterThan(estimateSize(1));
   });
 
-  it('provides a measureElement function that returns height', () => {
+  it("provides a measureElement function that returns height", () => {
     const parentRef = { current: null };
-    renderHook(() => useNotificationVirtualizer({ virtualItems: mockItems, parentRef }));
-    
+    renderHook(() =>
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+    );
+
     const { measureElement } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
-    
+
     const mockElement = {
       getBoundingClientRect: () => ({ height: 100 }),
     };
-    
+
     expect(measureElement(mockElement)).toBe(100);
   });
 });

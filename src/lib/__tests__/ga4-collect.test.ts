@@ -2,7 +2,7 @@
  * Tests for GA4 Collect Library
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ga4Collect } from "../ga4-collect";
 
 const loggerSpy = vi.hoisted(() => ({
@@ -19,10 +19,13 @@ describe("ga4-collect", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      statusText: "OK",
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        statusText: "OK",
+      }),
+    );
   });
 
   afterEach(() => {
@@ -47,22 +50,25 @@ describe("ga4-collect", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify(payload),
-      })
+      }),
     );
   });
 
   it("should log error if fetch fails", async () => {
     vi.stubEnv("GA_API_SECRET", "secret-123");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: false,
-      statusText: "Internal Server Error",
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Internal Server Error",
+      }),
+    );
 
     await ga4Collect(measurementId, payload);
 
     expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to send event"),
-        "Internal Server Error"
+      expect.stringContaining("Failed to send event"),
+      "Internal Server Error",
     );
   });
 });

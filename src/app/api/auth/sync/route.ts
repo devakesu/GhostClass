@@ -14,7 +14,7 @@ import * as Sentry from "@sentry/nextjs";
  * Attempts to get the user with a single retry on network failure.
  */
 async function getUserWithRetry(
-  supabaseFn: () => Promise<UserResponse>
+  supabaseFn: () => Promise<UserResponse>,
 ): Promise<UserResponse> {
   try {
     return await supabaseFn();
@@ -29,12 +29,15 @@ async function getUserWithRetry(
 
 async function enforceAuthRateLimit(ip: string) {
   const { success, reset, limit, remaining } = await authRateLimiter.limit(
-    `auth_sync_${ip}`
+    `auth_sync_${ip}`,
   );
   if (!success) {
     const waitTime = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
     return NextResponse.json(
-      { message: "Too many requests. Please try again later.", retryAfter: reset },
+      {
+        message: "Too many requests. Please try again later.",
+        retryAfter: reset,
+      },
       {
         status: 429,
         headers: {
@@ -43,7 +46,7 @@ async function enforceAuthRateLimit(ip: string) {
           "X-RateLimit-Remaining": remaining.toString(),
           "X-RateLimit-Reset": reset.toString(),
         },
-      }
+      },
     );
   }
   return null;
@@ -92,7 +95,7 @@ const handler = async (
   context: {
     authType?: "csrf" | "app-check" | "none";
     params: Record<string, string | string[]>;
-  }
+  },
 ) => {
   try {
     const isMobile = context.authType === "app-check";
@@ -100,18 +103,21 @@ const handler = async (
     if (!ip) {
       return NextResponse.json(
         { message: "Unable to determine client IP" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const rlResp = await enforceAuthRateLimit(ip);
     if (rlResp) return rlResp;
 
-    const userResolution = await resolveUser(context.authType || "none", req.headers);
+    const userResolution = await resolveUser(
+      context.authType || "none",
+      req.headers,
+    );
     if ("error" in userResolution) {
       return NextResponse.json(
         { message: userResolution.error },
-        { status: userResolution.status }
+        { status: userResolution.status },
       );
     }
 
@@ -123,7 +129,7 @@ const handler = async (
       });
       return NextResponse.json(
         { success: false, message: "Profile sync failed" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -152,7 +158,7 @@ const handler = async (
     });
     return NextResponse.json(
       { message: "Failed to synchronize authentication. Please try again." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };

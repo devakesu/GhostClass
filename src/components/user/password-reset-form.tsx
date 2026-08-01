@@ -42,10 +42,12 @@ const PASSWORD_VALIDATION = {
 
 const validatePassword = (password: string): string | null => {
   if (!password || password.trim().length === 0) return "Password is required";
-  if (password.length < PASSWORD_VALIDATION.MIN_LENGTH)
+  if (password.length < PASSWORD_VALIDATION.MIN_LENGTH) {
     return `Password must be at least ${PASSWORD_VALIDATION.MIN_LENGTH} characters`;
-  if (password.length > PASSWORD_VALIDATION.MAX_LENGTH)
+  }
+  if (password.length > PASSWORD_VALIDATION.MAX_LENGTH) {
     return `Password must be at most ${PASSWORD_VALIDATION.MAX_LENGTH} characters long`;
+  }
   return null;
 };
 
@@ -73,7 +75,10 @@ function getLoginMethodProps(method: LoginMethod) {
   }
 }
 
-function getStepSubtitle(step: "username" | "option" | "otp", loginMethod: LoginMethod): string {
+function getStepSubtitle(
+  step: "username" | "option" | "otp",
+  loginMethod: LoginMethod,
+): string {
   switch (step) {
     case "option":
       return "Choose how to receive your reset code";
@@ -81,7 +86,9 @@ function getStepSubtitle(step: "username" | "option" | "otp", loginMethod: Login
       return "Enter the code and your new password";
     case "username":
     default:
-      return `Enter your ${getLoginMethodProps(loginMethod).label.toLowerCase()} to begin`;
+      return `Enter your ${
+        getLoginMethodProps(loginMethod).label.toLowerCase()
+      } to begin`;
   }
 }
 
@@ -101,7 +108,9 @@ async function refreshCsrfTokenPostReset(): Promise<void> {
       cache: "no-store",
     });
     if (csrfRefreshRes.ok) {
-      const csrfData = await csrfRefreshRes.json().catch(() => null) as { token?: string } | null;
+      const csrfData = await csrfRefreshRes.json().catch(() => null) as {
+        token?: string;
+      } | null;
       if (typeof csrfData?.token === "string") {
         setCsrfToken(csrfData.token); // keep sessionStorage in sync
       }
@@ -124,9 +133,11 @@ async function refreshCsrfTokenPostReset(): Promise<void> {
 
 function writeCustomPostResetSettings(
   userId: string,
-  settings: NonNullable<Parameters<typeof persistPostResetSettings>[1]>
+  settings: NonNullable<Parameters<typeof persistPostResetSettings>[1]>,
 ): void {
-  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean" ? settings.bunk_calculator_enabled : true;
+  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean"
+    ? settings.bunk_calculator_enabled
+    : true;
   const rawTarget = settings.target_percentage;
 
   let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
@@ -146,12 +157,17 @@ function writeCustomPostResetSettings(
           bunk_calculator_enabled: bunkEnabled,
           target_percentage: targetPercentage,
         },
-      })
+      }),
     );
     localStorage.setItem(`showBunkCalc_${userId}`, bunkEnabled.toString());
-    localStorage.setItem(`targetPercentage_${userId}`, targetPercentage.toString());
+    localStorage.setItem(
+      `targetPercentage_${userId}`,
+      targetPercentage.toString(),
+    );
   } catch (storageError) {
-    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    const msg = storageError instanceof Error
+      ? storageError.message
+      : String(storageError);
     logger.dev("Failed to write settings to storage after password reset", {
       context: "PasswordResetForm/handleResetSubmit",
       error: msg,
@@ -162,29 +178,45 @@ function writeCustomPostResetSettings(
 function writeDefaultPostResetSettings(userId: string): void {
   try {
     localStorage.setItem(`showBunkCalc_${userId}`, "true");
-    localStorage.setItem(`targetPercentage_${userId}`, DEFAULT_TARGET_PERCENTAGE.toString());
+    localStorage.setItem(
+      `targetPercentage_${userId}`,
+      DEFAULT_TARGET_PERCENTAGE.toString(),
+    );
   } catch (storageError) {
-    const msg = storageError instanceof Error ? storageError.message : String(storageError);
-    logger.dev("Failed to write default settings to storage after password reset", {
-      context: "PasswordResetForm/handleResetSubmit",
-      error: msg,
-    });
+    const msg = storageError instanceof Error
+      ? storageError.message
+      : String(storageError);
+    logger.dev(
+      "Failed to write default settings to storage after password reset",
+      {
+        context: "PasswordResetForm/handleResetSubmit",
+        error: msg,
+      },
+    );
   }
-  logger.dev("No settings returned from /api/auth/save-token; applied default settings for new user.", {
-    context: "PasswordResetForm/handleResetSubmit",
-  });
+  logger.dev(
+    "No settings returned from /api/auth/save-token; applied default settings for new user.",
+    {
+      context: "PasswordResetForm/handleResetSubmit",
+    },
+  );
 }
 
 async function persistPostResetSettings(
   supabase: ReturnType<typeof createClient>,
-  settings: { bunk_calculator_enabled?: boolean; target_percentage?: number } | undefined
+  settings:
+    | { bunk_calculator_enabled?: boolean; target_percentage?: number }
+    | undefined,
 ): Promise<void> {
   const { data: { user }, error: getUserError } = await supabase.auth.getUser();
   if (getUserError || !user) {
-    logger.error("User session not available after password reset; skipping settings prefetch", {
-      context: "PasswordResetForm/handleResetSubmit",
-      error: getUserError,
-    });
+    logger.error(
+      "User session not available after password reset; skipping settings prefetch",
+      {
+        context: "PasswordResetForm/handleResetSubmit",
+        error: getUserError,
+      },
+    );
     return;
   }
 
@@ -219,7 +251,9 @@ export function PasswordResetForm({
   // Initialize CSRF token
   useCSRFToken();
 
-  const handleUsernameSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleUsernameSubmit = async (
+    e: React.SyntheticEvent<HTMLFormElement>,
+  ) => {
     e.preventDefault();
     NProgress.start();
     setIsLoading(true);
@@ -248,13 +282,19 @@ export function PasswordResetForm({
     } catch (error: unknown) {
       NProgress.done();
       const err = error as AxiosError<ErrorResponse>;
-      setError(`Ezygo: ${err.response?.data?.message ?? "Failed to fetch reset options."}`);
+      setError(
+        `Ezygo: ${
+          err.response?.data?.message ?? "Failed to fetch reset options."
+        }`,
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOptionSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleOptionSubmit = async (
+    e: React.SyntheticEvent<HTMLFormElement>,
+  ) => {
     e.preventDefault();
     NProgress.start();
     setIsLoading(true);
@@ -273,13 +313,19 @@ export function PasswordResetForm({
     } catch (error: unknown) {
       NProgress.done();
       const err = error as AxiosError<ErrorResponse>;
-      setError(`Ezygo: ${err.response?.data?.message ?? "Failed to request password reset."}`);
+      setError(
+        `Ezygo: ${
+          err.response?.data?.message ?? "Failed to request password reset."
+        }`,
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResetSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleResetSubmit = async (
+    e: React.SyntheticEvent<HTMLFormElement>,
+  ) => {
     e.preventDefault();
     setError(null);
 
@@ -309,19 +355,24 @@ export function PasswordResetForm({
       const csrfToken = getCsrfToken();
       // CSRF token is required for save-token; abort if missing
       if (!csrfToken) {
-        throw new Error("CSRF token unavailable – please reload the page and try again.");
+        throw new Error(
+          "CSRF token unavailable – please reload the page and try again.",
+        );
       }
 
       // Use plain axios for internal auth endpoint
       const saveTokenResponse = await axios.post(
         "/api/auth/save-token",
         { token },
-        { headers: { [CSRF_HEADER]: csrfToken } }
+        { headers: { [CSRF_HEADER]: csrfToken } },
       );
 
       await refreshCsrfTokenPostReset();
 
-      await persistPostResetSettings(supabase, saveTokenResponse.data?.settings);
+      await persistPostResetSettings(
+        supabase,
+        saveTokenResponse.data?.settings,
+      );
 
       // Navigate to dashboard
       router.push("/dashboard");
@@ -393,7 +444,8 @@ export function PasswordResetForm({
                   size="icon"
                   variant={loginMethod === "username" ? "secondary" : "ghost"}
                   className="h-6 w-6 p-3"
-                  onClick={() => setLoginMethod("username")}
+                  onClick={() =>
+                    setLoginMethod("username")}
                 >
                   <User className="h-4 w-4" aria-label="Username" />
                 </Button>
@@ -402,7 +454,8 @@ export function PasswordResetForm({
                   size="icon"
                   variant={loginMethod === "email" ? "secondary" : "ghost"}
                   className="h-6 w-6 p-3"
-                  onClick={() => setLoginMethod("email")}
+                  onClick={() =>
+                    setLoginMethod("email")}
                 >
                   <Mail className="h-4 w-4" aria-label="Email" />
                 </Button>
@@ -433,7 +486,7 @@ export function PasswordResetForm({
               className="flex-1 font-semibold min-h-11.5 mt-4 rounded-[12px] font-sm"
               onClick={onCancel}
             >
-               Cancel
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -462,28 +515,39 @@ export function PasswordResetForm({
                   "flex items-center gap-3 rounded-[12px] border px-4 py-3 cursor-pointer transition-all duration-150",
                   selectedOption === `mail:${email}`
                     ? "border-purple-500/60 bg-purple-500/10"
-                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20"
+                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20",
                 )}
               >
-                <div className={cn(
-                  "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
-                  selectedOption === `mail:${email}`
-                    ? "bg-purple-500/20 text-purple-400"
-                    : "bg-secondary/30 text-muted-foreground"
-                )}>
+                <div
+                  className={cn(
+                    "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
+                    selectedOption === `mail:${email}`
+                      ? "bg-purple-500/20 text-purple-400"
+                      : "bg-secondary/30 text-muted-foreground",
+                  )}
+                >
                   <Mail className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Email</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Email
+                  </span>
                   <span className="text-sm font-medium truncate">{email}</span>
                 </div>
-                <RadioGroupItem value={`mail:${email}`} id={`mail:${email}`} className="sr-only" aria-label={`Send reset code to email ${email}`} />
-                <div className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
-                  selectedOption === `mail:${email}`
-                    ? "border-purple-500 bg-purple-500"
-                    : "border-white/30"
-                )}>
+                <RadioGroupItem
+                  value={`mail:${email}`}
+                  id={`mail:${email}`}
+                  className="sr-only"
+                  aria-label={`Send reset code to email ${email}`}
+                />
+                <div
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
+                    selectedOption === `mail:${email}`
+                      ? "border-purple-500 bg-purple-500"
+                      : "border-white/30",
+                  )}
+                >
                   {selectedOption === `mail:${email}` && (
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   )}
@@ -498,28 +562,39 @@ export function PasswordResetForm({
                   "flex items-center gap-3 rounded-[12px] border px-4 py-3 cursor-pointer transition-all duration-150",
                   selectedOption === `sms:${mobile}`
                     ? "border-purple-500/60 bg-purple-500/10"
-                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20"
+                    : "border-white/10 bg-secondary/10 hover:border-white/20 hover:bg-secondary/20",
                 )}
               >
-                <div className={cn(
-                  "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
-                  selectedOption === `sms:${mobile}`
-                    ? "bg-purple-500/20 text-purple-400"
-                    : "bg-secondary/30 text-muted-foreground"
-                )}>
+                <div
+                  className={cn(
+                    "flex shrink-0 items-center justify-center rounded-full p-2 transition-colors duration-150",
+                    selectedOption === `sms:${mobile}`
+                      ? "bg-purple-500/20 text-purple-400"
+                      : "bg-secondary/30 text-muted-foreground",
+                  )}
+                >
                   <Phone className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">SMS</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    SMS
+                  </span>
                   <span className="text-sm font-medium truncate">{mobile}</span>
                 </div>
-                <RadioGroupItem value={`sms:${mobile}`} id={`sms:${mobile}`} className="sr-only" aria-label={`Send reset code to phone ${mobile}`} />
-                <div className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
-                  selectedOption === `sms:${mobile}`
-                    ? "border-purple-500 bg-purple-500"
-                    : "border-white/30"
-                )}>
+                <RadioGroupItem
+                  value={`sms:${mobile}`}
+                  id={`sms:${mobile}`}
+                  className="sr-only"
+                  aria-label={`Send reset code to phone ${mobile}`}
+                />
+                <div
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
+                    selectedOption === `sms:${mobile}`
+                      ? "border-purple-500 bg-purple-500"
+                      : "border-white/30",
+                  )}
+                >
                   {selectedOption === `sms:${mobile}` && (
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   )}
@@ -554,7 +629,8 @@ export function PasswordResetForm({
             <Input
               id="otp"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
+              onChange={(e) =>
+                setOtp(e.target.value)}
               placeholder="Enter the reset code"
               className="custom-input"
               required
@@ -567,7 +643,8 @@ export function PasswordResetForm({
                 id="new-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) =>
+                  setPassword(e.target.value)}
                 placeholder="Enter your new password"
                 className="custom-input"
                 required
@@ -579,11 +656,9 @@ export function PasswordResetForm({
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent mr-1.5"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                )}
+                {showPassword
+                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  : <Eye className="h-4 w-4" aria-hidden="true" />}
               </Button>
             </div>
           </div>
@@ -606,11 +681,9 @@ export function PasswordResetForm({
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent mr-1.5"
                 onClick={() => setShowNewPassword(!showNewPassword)}
               >
-                {showNewPassword ? (
-                  <EyeOff className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                )}
+                {showNewPassword
+                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  : <Eye className="h-4 w-4" aria-hidden="true" />}
               </Button>
             </div>
           </div>

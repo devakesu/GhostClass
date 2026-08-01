@@ -1,75 +1,75 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { ErrorBoundary } from '../error-boundary';
-import * as Sentry from '@sentry/nextjs';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { ErrorBoundary } from "../error-boundary";
+import * as Sentry from "@sentry/nextjs";
 
 // Mock dependencies
-vi.mock('@sentry/nextjs', () => ({
+vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
-vi.mock('@/lib/logger', () => ({
+vi.mock("@/lib/logger", () => ({
   logger: {
     error: vi.fn(),
   },
 }));
 
-vi.mock('@/lib/sw-reload', () => ({
+vi.mock("@/lib/sw-reload", () => ({
   reloadWithUpdate: vi.fn(),
 }));
 
 const ProblemChild = () => {
-  throw new Error('Crashing child');
+  throw new Error("Crashing child");
 };
 
-describe('ErrorBoundary Component', () => {
+describe("ErrorBoundary Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Silence console.error for expected errors during tests
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it('renders children when no error occurs', () => {
+  it("renders children when no error occurs", () => {
     render(
       <ErrorBoundary>
         <div>Safe Child</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
-    expect(screen.getByText('Safe Child')).toBeDefined();
+    expect(screen.getByText("Safe Child")).toBeDefined();
   });
 
-  it('renders fallback UI when error occurs', () => {
+  it("renders fallback UI when error occurs", () => {
     render(
       <ErrorBoundary>
         <ProblemChild />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
-    expect(screen.getByText('Something went wrong')).toBeDefined();
+    expect(screen.getByText("Something went wrong")).toBeDefined();
     expect(Sentry.captureException).toHaveBeenCalled();
   });
 
-  it('renders custom fallback when provided', () => {
+  it("renders custom fallback when provided", () => {
     render(
       <ErrorBoundary fallback={<div>Custom Fallback</div>}>
         <ProblemChild />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
-    expect(screen.getByText('Custom Fallback')).toBeDefined();
+    expect(screen.getByText("Custom Fallback")).toBeDefined();
   });
 
-  it('resets error when Try Again is clicked', () => {
+  it("resets error when Try Again is clicked", () => {
     render(
       <ErrorBoundary>
         <ProblemChild />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
-    
-    expect(screen.getByText('Something went wrong')).toBeDefined();
-    
-    fireEvent.click(screen.getByText('Try Again'));
-    
-    // After reset, it tries to render children again. 
-    // Since ProblemChild still throws, it will catch it again, 
+
+    expect(screen.getByText("Something went wrong")).toBeDefined();
+
+    fireEvent.click(screen.getByText("Try Again"));
+
+    // After reset, it tries to render children again.
+    // Since ProblemChild still throws, it will catch it again,
     // but we've tested the reset logic triggers.
     // To properly test reset, we'd need a conditional thrower.
   });

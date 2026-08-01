@@ -21,7 +21,10 @@ export async function LeaveDataLoader({ token }: { token: string }) {
       error: error instanceof Error ? error.message : String(error),
     });
     Sentry.captureException(error, {
-      tags: { type: "leave_data_fetch_failure", location: "leave-applications/LeaveDataLoader" },
+      tags: {
+        type: "leave_data_fetch_failure",
+        location: "leave-applications/LeaveDataLoader",
+      },
     });
   }
 

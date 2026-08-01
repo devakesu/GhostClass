@@ -8,26 +8,28 @@ import { logger } from "@/lib/logger";
  * once fetchDashboardData resolves. This converts a blocking ~770 ms TTFB into
  * perceived-instant page load with a streaming fallback spinner.
  */
-export async function DashboardDataLoader({ token, userId }: { token: string; userId: string }) {
+export async function DashboardDataLoader(
+  { token, userId }: { token: string; userId: string },
+) {
   let initialData = null;
   try {
-    logger.dev('[Dashboard] Fetching initial data server-side', {
-      context: 'dashboard-page',
+    logger.dev("[Dashboard] Fetching initial data server-side", {
+      context: "dashboard-page",
       userId,
     });
 
     initialData = await fetchDashboardData(token);
 
-    logger.dev('[Dashboard] Initial data fetched successfully', {
-      context: 'dashboard-page',
+    logger.dev("[Dashboard] Initial data fetched successfully", {
+      context: "dashboard-page",
       hasCourses: !!initialData.courses,
       hasAttendance: !!initialData.attendance,
     });
   } catch (error: unknown) {
     // Graceful degradation – client will refetch on mount
     const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error('[Dashboard] Failed to fetch initial data', {
-      context: 'dashboard-page',
+    logger.error("[Dashboard] Failed to fetch initial data", {
+      context: "dashboard-page",
       error: errorMsg,
       userId,
     });

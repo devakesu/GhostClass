@@ -15,10 +15,10 @@ vi.mock("@supabase/ssr", () => ({
   createBrowserClient: vi.fn(() => ({ isMock: true })),
 }));
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Must be mocked for tests to run in jsdom/node
-vi.mock('server-only', () => ({}));
+vi.mock("server-only", () => ({}));
 
 import { buildSupabaseTieredFetch } from "@/lib/supabase/fetch";
 
@@ -36,8 +36,8 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 const SUPABASE_ORIGIN = "https://test.supabase.co";
-const CF_PROXY        = "https://cf-proxy.workers.dev";
-const AWS_PROXY       = "https://aws-proxy.execute-api.amazonaws.com";
+const CF_PROXY = "https://cf-proxy.workers.dev";
+const AWS_PROXY = "https://aws-proxy.execute-api.amazonaws.com";
 
 /** Creates a mock fetch that throws a network error on the first call. */
 function mockFetchNetworkError(thenStatus = 200): ReturnType<typeof vi.fn> {
@@ -102,7 +102,9 @@ describe("buildSupabaseTieredFetch — non-Supabase URL pass-through", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("passes through requests not aimed at the Supabase origin", async () => {
-    const mockFetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("ok", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
@@ -131,13 +133,15 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {});
 
-    const calledUrl = (mockFetch.mock.calls[0][0] as string);
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toMatch(new RegExp(`^${CF_PROXY}`));
     expect(calledUrl).toContain("/auth/v1/user");
   });
@@ -146,13 +150,15 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/table?select=*`, {});
 
-    const calledUrl = (mockFetch.mock.calls[0][0] as string);
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toContain("?select=*");
   });
 
@@ -160,12 +166,17 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const requestInput = new Request(`${SUPABASE_ORIGIN}/auth/v1/user`, {
       method: "POST",
-      headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+      },
       body: '{"key":"value"}',
     });
 
@@ -173,7 +184,10 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     await tieredFetch(requestInput);
 
     // The proxied call should use the CF proxy origin, not the Supabase origin.
-    const [calledInput, calledInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const [calledInput, calledInit] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
     expect(calledInput).toMatch(new RegExp(`^${CF_PROXY}`));
     expect(calledInput).toContain("/auth/v1/user");
 
@@ -204,7 +218,9 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, { method: "GET" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+      method: "GET",
+    });
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -224,7 +240,9 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/data`, { method: "GET" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/data`, {
+      method: "GET",
+    });
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -241,7 +259,9 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, { method: "GET" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+      method: "GET",
+    });
 
     // Last tier (direct) returns its response regardless of status.
     expect(res.status).toBe(502);
@@ -263,13 +283,18 @@ describe("buildSupabaseTieredFetch — POST mutation safety", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", AWS_PROXY);
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("", { status: 502 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("", { status: 502 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/token`, {
       method: "POST",
-      body: JSON.stringify({ grant_type: "refresh_token", refresh_token: "tok" }),
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token: "tok",
+      }),
     });
 
     expect(res.status).toBe(502);
@@ -281,11 +306,15 @@ describe("buildSupabaseTieredFetch — POST mutation safety", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("", { status: 503 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("", { status: 503 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/row`, { method: "PUT" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/row`, {
+      method: "PUT",
+    });
 
     expect(res.status).toBe(503);
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -323,7 +352,9 @@ describe("buildSupabaseTieredFetch — network error failover", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", CF_PROXY);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const mockFetch = vi.fn().mockRejectedValue(
+      new TypeError("Failed to fetch"),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
@@ -359,7 +390,7 @@ describe("buildSupabaseTieredFetch — ReadableStream body buffering", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const payload = JSON.stringify({ refresh_token: "abc" });
-    const stream  = new ReadableStream({
+    const stream = new ReadableStream({
       start(ctrl) {
         ctrl.enqueue(new TextEncoder().encode(payload));
         ctrl.close();
@@ -409,7 +440,9 @@ describe("buildSupabaseTieredFetch — caller AbortSignal", () => {
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
     await expect(
-      tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, { signal: controller.signal }),
+      tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+        signal: controller.signal,
+      }),
     ).rejects.toMatchObject({ name: "AbortError" });
 
     // Must not retry on subsequent tiers when caller aborted.
@@ -432,7 +465,9 @@ describe("buildSupabaseTieredFetch — caller AbortSignal", () => {
     });
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    await expect(tieredFetch(request)).rejects.toMatchObject({ name: "AbortError" });
+    await expect(tieredFetch(request)).rejects.toMatchObject({
+      name: "AbortError",
+    });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -458,7 +493,9 @@ describe("buildSupabaseTieredFetch — 4xx are not retried", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, { method: "GET" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {
+      method: "GET",
+    });
 
     expect(res.status).toBe(401);
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -474,7 +511,9 @@ describe("buildSupabaseTieredFetch — 4xx are not retried", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
-    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/data`, { method: "GET" });
+    const res = await tieredFetch(`${SUPABASE_ORIGIN}/rest/v1/data`, {
+      method: "GET",
+    });
 
     expect(res.status).toBe(403);
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -496,7 +535,9 @@ describe("buildSupabaseTieredFetch — API Gateway stage path preservation", () 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", awsWithStage);
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;
@@ -511,7 +552,9 @@ describe("buildSupabaseTieredFetch — API Gateway stage path preservation", () 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_CF_PROXY_URL", `${CF_PROXY}/`);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL", "");
 
-    const mockFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", mockFetch);
 
     const tieredFetch = buildSupabaseTieredFetch(SUPABASE_ORIGIN)!;

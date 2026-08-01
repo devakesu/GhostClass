@@ -53,7 +53,7 @@ function getSanitizedUserProperties(userProperties: unknown) {
 
 const handler = async (
   req: Request,
-  { decryptedBody }: { decryptedBody?: unknown }
+  { decryptedBody }: { decryptedBody?: unknown },
 ) => {
   try {
     const ip = getClientIp(req.headers);
@@ -67,7 +67,7 @@ const handler = async (
         {
           status: 429,
           headers: { "Retry-After": waitTime.toString() },
-        }
+        },
       );
     }
 
@@ -84,7 +84,10 @@ const handler = async (
       return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
 
-    const { clientId, events, userProperties } = body as Record<string, unknown>;
+    const { clientId, events, userProperties } = body as Record<
+      string,
+      unknown
+    >;
     if (!clientId || !Array.isArray(events)) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
@@ -92,8 +95,9 @@ const handler = async (
     const sanitizedEvents: GA4Event[] = events.map(
       (event: Record<string, unknown>) => ({
         name: sanitizeGA4Name(String(event.name || "event")),
-        params: (event.params as Record<string, string | number | boolean>) || {},
-      })
+        params: (event.params as Record<string, string | number | boolean>) ||
+          {},
+      }),
     );
 
     const sanitizedUP = getSanitizedUserProperties(userProperties);
@@ -101,7 +105,7 @@ const handler = async (
     await trackGA4Event(
       clientId as string,
       sanitizedEvents,
-      sanitizedUP
+      sanitizedUP,
     );
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -111,7 +115,7 @@ const handler = async (
     });
     return NextResponse.json(
       { error: "Failed to process tracking data." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };

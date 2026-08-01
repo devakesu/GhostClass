@@ -2,7 +2,7 @@
 // src/hooks/courses/exams.ts
 
 import axios from "@/lib/axios";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Exam, ExamAnswer, ExamQuestion } from "@/types";
 import { retryOnce } from "@/lib/query-utils";
 import { useFetchAcademicYear, useFetchSemester } from "../users/settings";
@@ -102,7 +102,7 @@ export const useExamAnswers = (examId: number | null) => {
     queryKey: ["exam-answers", examId, semester, year],
     queryFn: async () => {
       const res = await axios.get(
-        `/exams/${examId}/institutionuser/examanswers`
+        `/exams/${examId}/institutionuser/examanswers`,
       );
       if (!res) throw new Error("Failed to fetch exam answers");
       return res.data;
@@ -135,7 +135,7 @@ export const useAllExamAnswers = (examIds: number[]) => {
       queryKey: ["exam-answers", id, semester, year],
       queryFn: async () => {
         const res = await axios.get(
-          `/exams/${id}/institutionuser/examanswers`
+          `/exams/${id}/institutionuser/examanswers`,
         );
         if (!res) throw new Error("Failed to fetch exam answers");
         return res.data as ExamAnswer[];
@@ -178,18 +178,26 @@ export const useAllExamQuestions = (examIds: number[]) => {
  * Batch fetches details (questions + answers) for multiple exams via the custom batch API.
  * This is the preferred way to pre-fetch data for the Scores page.
  */
-export const useBatchExamDetails = (examIds: number[], options?: { enabled?: boolean }) => {
+export const useBatchExamDetails = (
+  examIds: number[],
+  options?: { enabled?: boolean },
+) => {
   const { data: semester } = useFetchSemester();
   const { data: year } = useFetchAcademicYear();
 
-  return useQuery<Record<number, { questions: ExamQuestion[]; answers: ExamAnswer[] }>>({
+  return useQuery<
+    Record<number, { questions: ExamQuestion[]; answers: ExamAnswer[] }>
+  >({
     queryKey: ["exam-details-batch", examIds, semester ?? null, year ?? null],
     queryFn: async () => {
       if (!examIds.length) return {};
-      const res = await axios.post("/api/scores/batch", { examIds }, { baseURL: "" });
+      const res = await axios.post("/api/scores/batch", { examIds }, {
+        baseURL: "",
+      });
       return res.data;
     },
-    enabled: (options?.enabled !== false) && examIds.length > 0 && !!semester && !!year,
+    enabled: (options?.enabled !== false) && examIds.length > 0 && !!semester &&
+      !!year,
     staleTime: 15 * 60 * 1000, // Cache batch heavily (15 mins)
     gcTime: 20 * 60 * 1000,
     retry: retryOnce,

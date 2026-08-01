@@ -1,4 +1,7 @@
-import { CourseCard, ExtendedCourse } from "@/components/attendance/course-card";
+import {
+  CourseCard,
+  ExtendedCourse,
+} from "@/components/attendance/course-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { m as motion } from "framer-motion";
 import { Plus } from "lucide-react";
@@ -12,14 +15,18 @@ export type DashboardCourse = ExtendedCourse & {
   bunkable?: number;
   safeBunkable?: number;
   required?: number;
-  activeCourseDetails?: { present: number; absent: number; total: number } | null;
+  activeCourseDetails?:
+    | { present: number; absent: number; total: number }
+    | null;
 };
 
 interface CourseGridProps {
   isLoadingCourses: boolean;
   isLoadingAllCourseSummaries: boolean;
   sortedCourses: DashboardCourse[];
-  customInstructors: Array<{ course_code: string; instructor_name?: string | null }>;
+  customInstructors: Array<
+    { course_code: string; instructor_name?: string | null }
+  >;
   allCourseSummaries: Record<string, unknown> | null;
   profile: { auth_id?: string | null } | null;
   onEditInstructor: (
@@ -54,43 +61,57 @@ export function CourseGrid({
       return (
         <>
           {sortedCourses.map((course) => {
-            const courseCodeNormalized = normalizeCourseCode(String(course.code || course.id));
+            const courseCodeNormalized = normalizeCourseCode(
+              String(course.code || course.id),
+            );
             const customInstructor = customInstructors
               ?.find(
                 (ci) => ci.course_code === courseCodeNormalized,
               );
 
-            const institutionUsers = course.institution_users as Array<{
-              pivot: { courserole_id: number };
-              first_name: string;
-              last_name: string;
-            }> | undefined;
+            const institutionUsers = course.institution_users as
+              | Array<{
+                pivot: { courserole_id: number };
+                first_name: string;
+                last_name: string;
+              }>
+              | undefined;
 
-            const ezygoInstructors =
-              institutionUsers?.filter(
-                (user) => user.pivot.courserole_id === 1,
-              ) || [];
+            const ezygoInstructors = institutionUsers?.filter(
+              (user) => user.pivot.courserole_id === 1,
+            ) || [];
 
             const hasCustomName = !!customInstructor?.instructor_name;
             let instructorName: string | undefined = undefined;
             if (hasCustomName) {
               instructorName = customInstructor.instructor_name ?? undefined;
             } else if (ezygoInstructors.length > 0) {
-              instructorName = `${ezygoInstructors[0].first_name} ${ezygoInstructors[0].last_name}`;
+              instructorName = `${ezygoInstructors[0].first_name} ${
+                ezygoInstructors[0].last_name
+              }`;
             }
 
-              const initialCourseDetails = allCourseSummaries?.[String(course.code || "")] as DashboardCourse["activeCourseDetails"];
+            const initialCourseDetails = allCourseSummaries
+              ?.[String(course.code || "")] as DashboardCourse[
+                "activeCourseDetails"
+              ];
 
             return (
               <div key={String(course.key)}>
-                  <CourseCard
+                <CourseCard
                   course={course}
-                    initialCourseDetails={initialCourseDetails}
+                  initialCourseDetails={initialCourseDetails}
                   isBatchLoading={isLoadingAllCourseSummaries}
                   instructorName={instructorName}
                   hasCustomInstructor={hasCustomName}
                   supabaseUserId={profile?.auth_id ?? undefined}
-                  onEditInstructor={() => onEditInstructor(course, instructorName || "", hasCustomName, customInstructor)}
+                  onEditInstructor={() =>
+                    onEditInstructor(
+                      course,
+                      instructorName || "",
+                      hasCustomName,
+                      customInstructor,
+                    )}
                 />
               </div>
             );
@@ -112,8 +133,7 @@ export function CourseGrid({
               Can&apos;t find a course?
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-50">
-              Add it manually to start tracking your attendance
-              immediately.
+              Add it manually to start tracking your attendance immediately.
             </p>
             <div className="absolute inset-0 rounded-xl bg-linear-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </motion.div>
@@ -156,4 +176,3 @@ export function CourseGrid({
     </div>
   );
 }
-

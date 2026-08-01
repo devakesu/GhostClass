@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import * as ExamHooks from './hooks/courses/exams.ts';
+import { describe, expect, it } from "vitest";
+import * as ExamHooks from "./hooks/courses/exams.ts";
 
-describe('Exam Hooks Import Sanity', () => {
-  it('should import exam hooks', () => {
+describe("Exam Hooks Import Sanity", () => {
+  it("should import exam hooks", () => {
     expect(ExamHooks).toBeDefined();
   });
 });

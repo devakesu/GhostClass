@@ -2,7 +2,7 @@
  * Tests for POST /api/analytics/track
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { trackGA4Event } from "@/lib/analytics";
 import { syncRateLimiter } from "@/lib/ratelimit";
@@ -47,24 +47,34 @@ describe("POST /api/analytics/track", () => {
   it("returns 400 when IP cannot be determined", async () => {
     vi.mocked(_getClientIp).mockReturnValueOnce(null);
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/analytics/track", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
   });
 
   it("returns 429 when rate limited", async () => {
-    vi.mocked(syncRateLimiter.limit).mockResolvedValueOnce({ success: false, reset: Date.now() + 1000, limit: 1, remaining: 0, pending: Promise.resolve() });
+    vi.mocked(syncRateLimiter.limit).mockResolvedValueOnce({
+      success: false,
+      reset: Date.now() + 1000,
+      limit: 1,
+      remaining: 0,
+      pending: Promise.resolve(),
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/analytics/track", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(429);
   });
 
   it("returns 400 for invalid body", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/analytics/track", { 
+    const req = new NextRequest("http://localhost/api/analytics/track", {
       method: "POST",
-      body: "not-json"
+      body: "not-json",
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
@@ -72,9 +82,9 @@ describe("POST /api/analytics/track", () => {
 
   it("returns 400 when missing fields", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/analytics/track", { 
+    const req = new NextRequest("http://localhost/api/analytics/track", {
       method: "POST",
-      body: JSON.stringify({ clientId: "123" }) // missing events
+      body: JSON.stringify({ clientId: "123" }), // missing events
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
@@ -85,18 +95,18 @@ describe("POST /api/analytics/track", () => {
     const body = {
       clientId: "client-123",
       events: [{ name: "page_view", params: { page: "/" } }],
-      userProperties: { role: "admin", status: { value: "active" } }
+      userProperties: { role: "admin", status: { value: "active" } },
     };
-    const req = new NextRequest("http://localhost/api/analytics/track", { 
+    const req = new NextRequest("http://localhost/api/analytics/track", {
       method: "POST",
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200);
     expect(trackGA4Event).toHaveBeenCalledWith(
       "client-123",
       [{ name: "page_view", params: { page: "/" } }],
-      { role: { value: "admin" }, status: { value: "active" } }
+      { role: { value: "admin" }, status: { value: "active" } },
     );
   });
 
@@ -104,24 +114,28 @@ describe("POST /api/analytics/track", () => {
     const { POST } = await import("../route");
     const body = {
       clientId: "client-123",
-      events: [{ name: "mobile_event" }]
+      events: [{ name: "mobile_event" }],
     };
-    const req = new NextRequest("http://localhost/api/analytics/track", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/analytics/track", {
+      method: "POST",
+    });
     const res = await POST(req, { decryptedBody: body, params: {} } as any);
     expect(res.status).toBe(200);
     expect(trackGA4Event).toHaveBeenCalled();
   });
 
   it("returns 500 on tracking error", async () => {
-    vi.mocked(trackGA4Event).mockRejectedValueOnce(new Error("Tracking failed"));
+    vi.mocked(trackGA4Event).mockRejectedValueOnce(
+      new Error("Tracking failed"),
+    );
     const { POST } = await import("../route");
     const body = {
       clientId: "client-123",
-      events: [{ name: "test" }]
+      events: [{ name: "test" }],
     };
-    const req = new NextRequest("http://localhost/api/analytics/track", { 
+    const req = new NextRequest("http://localhost/api/analytics/track", {
       method: "POST",
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(500);

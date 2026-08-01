@@ -7,7 +7,9 @@ import { Course } from "@/types";
 interface UseCourseLookupProps {
   coursesData?: { courses: Record<string, Course> } | null;
   classCourses?: Array<{ course_code?: string; course_name?: string }> | null;
-  attendanceData?: { courses?: Record<string, { code?: string; name?: string }> } | null;
+  attendanceData?: {
+    courses?: Record<string, { code?: string; name?: string }>;
+  } | null;
 }
 
 export function useCourseLookup({
@@ -30,7 +32,8 @@ export function useCourseLookup({
       // 2. Find in coursesData by ID or Code
       const course = Object.values(courses || {}).find(
         (c) =>
-          String(c.id) === id || (c.code && normalize(c.code) === normalizedInput)
+          String(c.id) === id ||
+          (c.code && normalize(c.code) === normalizedInput),
       );
       if (course?.code) return normalize(course.code);
 
@@ -38,21 +41,20 @@ export function useCourseLookup({
       const custom = classCourses?.find(
         (cc) =>
           typeof cc.course_code === "string" &&
-          normalize(cc.course_code) === normalizedInput
+          normalize(cc.course_code) === normalizedInput,
       );
       if (custom?.course_code) return normalize(custom.course_code);
 
       // 4. Fallback to attendanceData courses
       const altCourses = attendanceData?.courses;
-      const hasAlt =
-        altCourses &&
+      const hasAlt = altCourses &&
         typeof altCourses === "object" &&
         Object.prototype.hasOwnProperty.call(altCourses, id);
 
       const altCourse = hasAlt ? Reflect.get(altCourses, id) : undefined;
       return normalize(altCourse?.code ?? id);
     },
-    [attendanceData, coursesData, classCourses]
+    [attendanceData, coursesData, classCourses],
   );
 
   const getCourseNameById = useCallback(
@@ -68,7 +70,8 @@ export function useCourseLookup({
       // 2. Find in coursesData by ID or Code
       const course = Object.values(courses || {}).find(
         (c) =>
-          String(c.id) === id || (c.code && normalize(c.code) === normalizedInput)
+          String(c.id) === id ||
+          (c.code && normalize(c.code) === normalizedInput),
       );
       if (course?.name) return course.name;
 
@@ -76,21 +79,20 @@ export function useCourseLookup({
       const custom = classCourses?.find(
         (cc) =>
           typeof cc.course_code === "string" &&
-          normalize(cc.course_code) === normalizedInput
+          normalize(cc.course_code) === normalizedInput,
       );
       if (custom) return custom.course_name || custom.course_code || id;
 
       // 4. Fallback to attendanceData courses
       const altCourses = attendanceData?.courses;
-      const hasAlt =
-        altCourses &&
+      const hasAlt = altCourses &&
         typeof altCourses === "object" &&
         Object.prototype.hasOwnProperty.call(altCourses, id);
 
       const altCourse = hasAlt ? Reflect.get(altCourses, id) : undefined;
       return altCourse?.name ?? id;
     },
-    [attendanceData, coursesData, classCourses]
+    [attendanceData, coursesData, classCourses],
   );
 
   return {

@@ -51,20 +51,20 @@
 
 :root {
   --radius: 0.75rem;
-  
+
   /* ── Light theme (Matches AppTheme._buildLightTheme) ── */
   --background: oklch(0.98 0.005 240); /* #F9FAFB */
-  --foreground: oklch(0.12 0.01 240);  /* #18181B */
+  --foreground: oklch(0.12 0.01 240); /* #18181B */
 
-  --card: oklch(1 0 0);                /* #FFFFFF */
+  --card: oklch(1 0 0); /* #FFFFFF */
   --card-foreground: oklch(0.12 0.01 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.12 0.01 240);
 
-  --primary: oklch(0.65 0.23 345);     /* Vibrant Rose Pink */
+  --primary: oklch(0.65 0.23 345); /* Vibrant Rose Pink */
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.96 0.005 240);  /* #F3F4F6 */
+  --secondary: oklch(0.96 0.005 240); /* #F3F4F6 */
   --secondary-foreground: oklch(0.45 0.02 240);
 
   --muted: oklch(0.96 0.005 240);
@@ -73,10 +73,10 @@
   --accent: oklch(0.96 0.005 240);
   --accent-foreground: oklch(0.12 0.01 240);
 
-  --destructive: oklch(0.60 0.22 25);   /* AppColors.dangerRed (light variant) */
+  --destructive: oklch(0.60 0.22 25); /* AppColors.dangerRed (light variant) */
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(0.92 0.01 240);      /* #E5E7EB */
+  --border: oklch(0.92 0.01 240); /* #E5E7EB */
   --input: oklch(1 0 0);
   --ring: oklch(0.65 0.23 345);
 
@@ -104,38 +104,38 @@
 .dark {
   /* ── Dark theme (Enhanced for maximum distinguishability & premium feel) ── */
   --background: oklch(0.08 0.02 265); /* Deeper midnight black-blue #050508 */
-  --foreground: oklch(0.98 0.01 265);   /* Crisp high-contrast off-white */
-  
-  --card: oklch(0.16 0.03 265);       /* Distinct surface lift #141424 */
+  --foreground: oklch(0.98 0.01 265); /* Crisp high-contrast off-white */
+
+  --card: oklch(0.16 0.03 265); /* Distinct surface lift #141424 */
   --card-foreground: oklch(0.98 0.01 265);
   --popover: oklch(0.18 0.03 265);
   --popover-foreground: oklch(0.98 0.01 265);
-  
-  --primary: oklch(0.70 0.25 345);     /* Neon Rose Pink */
+
+  --primary: oklch(0.70 0.25 345); /* Neon Rose Pink */
   --primary-foreground: oklch(1 0 0);
-  
-  --secondary: oklch(0.24 0.04 265);  /* More visible secondary #2a2a3c */
+
+  --secondary: oklch(0.24 0.04 265); /* More visible secondary #2a2a3c */
   --secondary-foreground: oklch(0.90 0.02 265);
-  
+
   --muted: oklch(0.20 0.03 265);
   --muted-foreground: oklch(0.70 0.03 265);
-  
+
   --accent: oklch(0.24 0.04 265);
   --accent-foreground: oklch(0.98 0.01 265);
-  
+
   --destructive: oklch(0.65 0.25 25);
   --destructive-foreground: oklch(1 0 0);
-  
-  --border: oklch(0.32 0.06 265);      /* Much more defined borders for accessibility #3b3b55 */
+
+  --border: oklch(0.32 0.06 265); /* Much more defined borders for accessibility #3b3b55 */
   --input: oklch(0.14 0.03 265);
   --ring: oklch(0.70 0.25 345);
-  
+
   --chart-1: oklch(0.70 0.25 345);
   --chart-2: oklch(0.60 0.25 150);
   --chart-3: oklch(0.55 0.20 200);
   --chart-4: oklch(0.60 0.25 340);
   --chart-5: oklch(0.80 0.15 90);
-  
+
   --sidebar: oklch(0.10 0.02 265);
   --sidebar-foreground: oklch(0.98 0.01 265);
   --sidebar-primary: oklch(0.70 0.25 345);
@@ -144,7 +144,7 @@
   --sidebar-accent-foreground: oklch(0.98 0.01 265);
   --sidebar-border: oklch(0.30 0.05 265);
   --sidebar-ring: oklch(0.70 0.25 345);
-  
+
   --surface-elevated: oklch(0.22 0.04 265);
   --surface-overlay: oklch(1 0 0 / 0.15);
   --separator: oklch(0.30 0.05 265);
@@ -254,20 +254,26 @@ select:focus-visible {
     width: 100%;
     height: 100%;
     z-index: -2;
-    background: 
-      radial-gradient(circle at 70% 0%, oklch(0.92 0.1 345 / 0.1), transparent 50%),
-      radial-gradient(circle at 30% 100%, oklch(0.9 0.1 200 / 0.08), transparent 50%),
-      radial-gradient(circle at 100% 100%, oklch(0.95 0.05 100 / 0.05), transparent 50%);
+    background:
+      radial-gradient(circle at 70% 0%, oklch(0.92 0.1 345 / 0.1), transparent
+      50%),
+      radial-gradient(circle at 30% 100%, oklch(0.9 0.1 200 / 0.08), transparent
+      50%),
+      radial-gradient(circle at 100% 100%, oklch(0.95 0.05 100 / 0.05),
+      transparent 50%);
     filter: blur(100px);
     pointer-events: none;
     transition: background 0.8s ease;
   }
 
   .dark body::before {
-    background: 
-      radial-gradient(circle at 80% 10%, oklch(0.5 0.2 345 / 0.1), transparent 45%),
-      radial-gradient(circle at 20% 90%, oklch(0.4 0.15 265 / 0.08), transparent 45%),
-      radial-gradient(circle at 50% 50%, oklch(0.4 0.2 200 / 0.04), transparent 60%);
+    background:
+      radial-gradient(circle at 80% 10%, oklch(0.5 0.2 345 / 0.1), transparent
+      45%),
+      radial-gradient(circle at 20% 90%, oklch(0.4 0.15 265 / 0.08), transparent
+      45%),
+      radial-gradient(circle at 50% 50%, oklch(0.4 0.2 200 / 0.04), transparent
+      60%);
   }
 
   /* Acrylic/Glass effect overlay */
@@ -305,19 +311,25 @@ select:focus-visible {
 
 @layer utilities {
   .custom-input {
-    @apply bg-input border-border h-11 border-2 rounded-[12px] text-sm font-medium hover:outline-none focus:outline-none focus:ring-2 focus:ring-border focus:border-border transition-all duration-200 ease-in-out;
+    @apply bg-input border-border h-11 border-2 rounded-[12px] text-sm
+      font-medium hover:outline-none focus:outline-none focus:ring-2
+      focus:ring-border focus:border-border transition-all duration-200
+      ease-in-out;
   }
 
   .custom-dropdown {
-    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
+    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2
+      rounded-[12px] text-sm font-medium backdrop-blur-2xl;
   }
 
   .custom-button {
-    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2 rounded-[12px] text-sm font-medium backdrop-blur-2xl;
+    @apply bg-popover/90 border-border/60 dark:border-border/80 border-2
+      rounded-[12px] text-sm font-medium backdrop-blur-2xl;
   }
 
   .custom-container {
-    @apply bg-card/80 border-border/60 dark:border-border/80 border-2 text-sm font-medium rounded-[16px] backdrop-blur-xl;
+    @apply bg-card/80 border-border/60 dark:border-border/80 border-2 text-sm
+      font-medium rounded-[16px] backdrop-blur-xl;
     box-shadow: 0 8px 32px -4px rgb(0 0 0 / 0.1);
   }
 

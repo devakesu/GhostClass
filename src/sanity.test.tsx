@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-import { render, screen } from '@testing-library/react';
+import { render, screen } from "@testing-library/react";
 
-describe('Sanity Check', () => {
-  it('should render a simple div', () => {
+describe("Sanity Check", () => {
+  it("should render a simple div", () => {
     render(<div>Hello</div>);
-    expect(screen.getByText('Hello')).toBeInTheDocument();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
   });
 });

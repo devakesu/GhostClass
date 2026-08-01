@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
 import { redact } from "@/lib/utils";
 import {
@@ -63,11 +63,17 @@ const _global = globalThis.__ghostclass_useSyncOnMount_state_v1 ??= {
 
 // Local aliases for clarity; always read/write to `_global` to persist across HMR
 const getLastSyncSuccessTime = () => _global.lastSyncSuccessTime;
-const setLastSyncSuccessTime = (v: number) => { _global.lastSyncSuccessTime = v; };
+const setLastSyncSuccessTime = (v: number) => {
+  _global.lastSyncSuccessTime = v;
+};
 const getLastSyncUsername = () => _global.lastSyncUsername;
-const setLastSyncUsername = (v: string | null) => { _global.lastSyncUsername = v; };
+const setLastSyncUsername = (v: string | null) => {
+  _global.lastSyncUsername = v;
+};
 const getActiveSyncPromise = () => _global.activeSyncPromise;
-const setActiveSyncPromise = (v: ActiveSyncHandle) => { _global.activeSyncPromise = v; };
+const setActiveSyncPromise = (v: ActiveSyncHandle) => {
+  _global.activeSyncPromise = v;
+};
 
 async function executeGlobalSync() {
   const res = await axios.get<SyncResponse>(`/api/cron/sync`, {
@@ -82,9 +88,11 @@ function handleSyncError(
   sentryLocation: string,
   sentryTag: string,
   userId: string | number | undefined,
-  setIsSyncing: (val: boolean) => void
+  setIsSyncing: (val: boolean) => void,
 ) {
-  const errName = error instanceof Error ? error.name : (error as { name?: string })?.name;
+  const errName = error instanceof Error
+    ? error.name
+    : (error as { name?: string })?.name;
   if (errName === "CanceledError" || errName === "AbortError") {
     logger.dev(`[${sentryLocation}] Sync request aborted`);
     return;
@@ -130,8 +138,8 @@ export function useSyncOnMount({
 
     // Check if successfully synced within cooldown period
     const now = Date.now();
-    const isAlreadySynced =
-      getLastSyncUsername() === username && (now - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS;
+    const isAlreadySynced = getLastSyncUsername() === username &&
+      (now - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS;
 
     if (isAlreadySynced || syncFinishedRef.current) {
       setSyncSettled(true);
@@ -171,7 +179,10 @@ export function useSyncOnMount({
     const runSync = async () => {
       // Re-check inside async run to handle concurrent mounts firing in the same tick
       const innerNow = Date.now();
-      if (getLastSyncUsername() === username && (innerNow - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS) {
+      if (
+        getLastSyncUsername() === username &&
+        (innerNow - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS
+      ) {
         setSyncSettled(true);
         return;
       }
@@ -179,13 +190,20 @@ export function useSyncOnMount({
       setIsSyncing(true);
 
       try {
-        if (!getActiveSyncPromise() || getActiveSyncPromise()!.username !== username) {
-          logger.dev(`[${sentryLocation}] Initiating global EzyGo sync request`);
+        if (
+          !getActiveSyncPromise() ||
+          getActiveSyncPromise()!.username !== username
+        ) {
+          logger.dev(
+            `[${sentryLocation}] Initiating global EzyGo sync request`,
+          );
           // H-6: Use a shared object reference so the promise identity is captured
           // before any async continuation (catch/finally) fires. The previous pattern
           // assigned currentPromise after the IIFE started, so a synchronous throw
           // inside executeGlobalSync would compare against null and leave activeSyncPromise stale.
-          const syncHandle: { promise: Promise<{ data: SyncResponse; status: number }> | null } = { promise: null };
+          const syncHandle: {
+            promise: Promise<{ data: SyncResponse; status: number }> | null;
+          } = { promise: null };
           const promise = (async () => {
             try {
               return await executeGlobalSync();
@@ -203,7 +221,9 @@ export function useSyncOnMount({
           syncHandle.promise = promise;
           setActiveSyncPromise({ username, promise });
         } else {
-          logger.dev(`[${sentryLocation}] Awaiting existing active EzyGo sync request`);
+          logger.dev(
+            `[${sentryLocation}] Awaiting existing active EzyGo sync request`,
+          );
         }
 
         const result = await getActiveSyncPromise()!.promise;
@@ -229,7 +249,10 @@ export function useSyncOnMount({
     const scheduleSync = () => {
       if (typeof window !== "undefined") {
         const win = window as unknown as Window & {
-          requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+          requestIdleCallback?: (
+            callback: () => void,
+            options?: { timeout: number },
+          ) => number;
           cancelIdleCallback?: (id: number) => void;
         };
         if (win.requestIdleCallback) {
@@ -295,4 +318,3 @@ export function _resetModuleState() {
   setLastSyncUsername(null);
   setActiveSyncPromise(null);
 }
-

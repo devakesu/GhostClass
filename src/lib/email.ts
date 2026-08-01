@@ -23,48 +23,57 @@ interface ProviderResult {
 
 const hasBrevo = !!process.env.BREVO_API_KEY;
 const hasSendPulse = !!(
-  process.env.SENDPULSE_CLIENT_ID && 
+  process.env.SENDPULSE_CLIENT_ID &&
   process.env.SENDPULSE_CLIENT_SECRET
 );
 
 const getSenderEmail = () => {
   const appEmail = process.env.NEXT_PUBLIC_APP_EMAIL;
   if (!appEmail) {
-    const err = new Error('NEXT_PUBLIC_APP_EMAIL is not configured');
-    Sentry.captureException(err, { tags: { type: "config_error", location: "getSenderEmail" } });
+    const err = new Error("NEXT_PUBLIC_APP_EMAIL is not configured");
+    Sentry.captureException(err, {
+      tags: { type: "config_error", location: "getSenderEmail" },
+    });
     throw err;
   }
-  return 'admin@' + appEmail.replace(/^@/, '');
+  return "admin@" + appEmail.replace(/^@/, "");
 };
 
-const getSenderName = (fromName?: string) => fromName?.trim() || process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass';
+const getSenderName = (fromName?: string) =>
+  fromName?.trim() || process.env.NEXT_PUBLIC_APP_NAME || "GhostClass";
 
 const CONFIG = {
   get sender() {
     return {
-      name: process.env.NEXT_PUBLIC_APP_NAME || 'GhostClass',
+      name: process.env.NEXT_PUBLIC_APP_NAME || "GhostClass",
       email: getSenderEmail(),
     };
   },
   brevo: {
     url: "https://api.brevo.com/v3/smtp/email",
-    get key() { return process.env.BREVO_API_KEY; },
+    get key() {
+      return process.env.BREVO_API_KEY;
+    },
   },
   sendpulse: {
     authUrl: "https://api.sendpulse.com/oauth/access_token",
     emailUrl: "https://api.sendpulse.com/smtp/emails",
-    get clientId() { return process.env.SENDPULSE_CLIENT_ID; },
-    get clientSecret() { return process.env.SENDPULSE_CLIENT_SECRET; },
+    get clientId() {
+      return process.env.SENDPULSE_CLIENT_ID;
+    },
+    get clientSecret() {
+      return process.env.SENDPULSE_CLIENT_SECRET;
+    },
   },
 };
 
 async function getSendPulseToken() {
   if (!hasSendPulse) throw new Error("SendPulse credentials not configured");
-  
+
   try {
     const res = await fetch(CONFIG.sendpulse.authUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         grant_type: "client_credentials",
         client_id: CONFIG.sendpulse.clientId,
@@ -84,15 +93,18 @@ async function getSendPulseToken() {
   }
 }
 
-async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaSendPulse(
+  { to, subject, html, text, replyTo, fromName, toName }: SendEmailProps,
+): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
     const token = await getSendPulseToken();
     const payload = {
       email: {
-        html: Buffer.from(html).toString("base64"), 
-        text: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
+        html: Buffer.from(html).toString("base64"),
+        text: text ||
+          sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
         subject,
         from: {
           email: CONFIG.sender.email,
@@ -104,9 +116,9 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, to
     };
 
     const res = await fetch(CONFIG.sendpulse.emailUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
@@ -125,7 +137,9 @@ async function sendViaSendPulse({ to, subject, html, text, replyTo, fromName, to
   }
 }
 
-async function sendViaBrevo({ to, subject, html, text, replyTo, fromName, toName }: SendEmailProps): Promise<ProviderResult> {
+async function sendViaBrevo(
+  { to, subject, html, text, replyTo, fromName, toName }: SendEmailProps,
+): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
@@ -137,12 +151,13 @@ async function sendViaBrevo({ to, subject, html, text, replyTo, fromName, toName
       to: [{ email: to, ...(toName ? { name: toName } : {}) }],
       subject,
       htmlContent: html,
-      textContent: text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
+      textContent: text ||
+        sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
       ...(replyTo ? { replyTo: { email: replyTo } } : {}),
     };
 
     const res = await fetch(CONFIG.brevo.url, {
-      method: 'POST',
+      method: "POST",
       headers: {
         "api-key": CONFIG.brevo.key!,
         "content-type": "application/json",
@@ -179,7 +194,7 @@ async function executeFailover(
   secondary: ProviderFn,
   props: SendEmailProps,
   sName: "Brevo" | "SendPulse",
-  err: unknown
+  err: unknown,
 ): Promise<ProviderResult> {
   const errMsg = err instanceof Error ? err.message : String(err);
   try {
@@ -194,7 +209,7 @@ async function executeFailover(
         to: redact("email", props.to),
         primary_error: errMsg,
         secondary_error: err2Msg,
-      }
+      },
     });
     return { success: false, provider: sName, error: msg };
   }
@@ -224,7 +239,9 @@ function getProviders(useSP: boolean): ProvidersConfig {
   };
 }
 
-export async function sendEmail(props: SendEmailProps): Promise<ProviderResult> {
+export async function sendEmail(
+  props: SendEmailProps,
+): Promise<ProviderResult> {
   if (!hasBrevo && !hasSendPulse) {
     const err = new Error("No provider");
     Sentry.captureException(err, { tags: { location: "sendEmail" } });

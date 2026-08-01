@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import * as logic from '../index';
+import { describe, expect, it } from "vitest";
+import * as logic from "../index";
 
-describe('Logic Barrel Index', () => {
-  it('exports expected functions and constants', () => {
+describe("Logic Barrel Index", () => {
+  it("exports expected functions and constants", () => {
     expect(logic.ATTENDANCE_STATUS).toBeDefined();
     expect(logic.calculateAttendance).toBeDefined();
     expect(logic.calculateCurrentAcademicInfo).toBeDefined();

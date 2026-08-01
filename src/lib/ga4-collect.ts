@@ -23,7 +23,7 @@ import { logger } from "@/lib/logger";
 export async function ga4Collect(
   measurementId: string,
   payload: object,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<void> {
   const apiSecret = process.env.GA_API_SECRET;
 

@@ -1,64 +1,67 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import GlobalError from '../global-error';
-import * as Sentry from '@sentry/nextjs';
-import { reloadWithUpdate, tryAutoUpdate } from '@/lib/sw-reload';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import GlobalError from "../global-error";
+import * as Sentry from "@sentry/nextjs";
+import { reloadWithUpdate, tryAutoUpdate } from "@/lib/sw-reload";
 
-vi.mock('@sentry/nextjs', () => ({
+vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
-vi.mock('@/lib/sw-reload', () => ({
+vi.mock("@/lib/sw-reload", () => ({
   reloadWithUpdate: vi.fn(),
   tryAutoUpdate: vi.fn(),
 }));
 
-describe('GlobalError', () => {
+describe("GlobalError", () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
     vi.clearAllMocks();
     // @ts-expect-error - test-only: simulate global error object
     delete window.location;
-     (window as any).location = { ...originalLocation, href: '' };
+    (window as any).location = { ...originalLocation, href: "" };
   });
 
   afterEach(() => {
-     (window as any).location = originalLocation;
+    (window as any).location = originalLocation;
   });
 
-  it('reports error to Sentry and tries auto update on mount', () => {
-    const error = new Error('Global Crash') as any;
-    error.digest = 'global-digest';
+  it("reports error to Sentry and tries auto update on mount", () => {
+    const error = new Error("Global Crash") as any;
+    error.digest = "global-digest";
     const reset = vi.fn();
 
     render(<GlobalError error={error} reset={reset} />);
 
     expect(screen.getByText(/Error ID:/)).toBeDefined();
-    expect(screen.getByText('global-digest')).toBeDefined();
-    expect(Sentry.captureException).toHaveBeenCalledWith(error, expect.objectContaining({
-      tags: expect.objectContaining({ digest: 'global-digest' }),
-    }));
+    expect(screen.getByText("global-digest")).toBeDefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        tags: expect.objectContaining({ digest: "global-digest" }),
+      }),
+    );
     expect(tryAutoUpdate).toHaveBeenCalled();
   });
 
-  it('calls reloadWithUpdate when Try Again is clicked', () => {
-    const error = new Error('Global Crash');
+  it("calls reloadWithUpdate when Try Again is clicked", () => {
+    const error = new Error("Global Crash");
     const reset = vi.fn();
 
     render(<GlobalError error={error} reset={reset} />);
 
-    fireEvent.click(screen.getByText('Try Again'));
+    fireEvent.click(screen.getByText("Try Again"));
     expect(reloadWithUpdate).toHaveBeenCalled();
   });
 
-  it('navigates to home when Go Home is clicked', () => {
-    const error = new Error('Global Crash');
+  it("navigates to home when Go Home is clicked", () => {
+    const error = new Error("Global Crash");
     const reset = vi.fn();
 
     render(<GlobalError error={error} reset={reset} />);
 
-    fireEvent.click(screen.getByText('Go Home'));
-    expect(window.location.href).toBe('/');
+    fireEvent.click(screen.getByText("Go Home"));
+    expect(window.location.href).toBe("/");
   });
 });

@@ -1,5 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { acceptTermsAction, setTermsVersionCookie, clearTermsVersionCookie, clearTermsRedirectCountCookie } from "../user";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  acceptTermsAction,
+  clearTermsRedirectCountCookie,
+  clearTermsVersionCookie,
+  setTermsVersionCookie,
+} from "../user";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -30,7 +35,9 @@ describe("user actions", () => {
     it("successfully accepts terms", async () => {
       const mockSupabase = {
         auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-id" } } }),
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-id" } },
+          }),
         },
         from: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
@@ -41,11 +48,11 @@ describe("user actions", () => {
       await acceptTermsAction("v1");
 
       expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
-        terms_version: "v1"
+        terms_version: "v1",
       }));
       expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
         name: "terms_version",
-        value: "v1"
+        value: "v1",
       }));
       expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
     });
@@ -64,7 +71,9 @@ describe("user actions", () => {
     it("throws error if database update fails", async () => {
       const mockSupabase = {
         auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-id" } } }),
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-id" } },
+          }),
         },
         from: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
@@ -82,7 +91,7 @@ describe("user actions", () => {
       expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
         name: "terms_version",
         value: "v2",
-        maxAge: 31536000
+        maxAge: 31536000,
       }));
     });
   });
@@ -93,7 +102,7 @@ describe("user actions", () => {
       expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
         name: "terms_version",
         value: "",
-        maxAge: 0
+        maxAge: 0,
       }));
     });
   });
@@ -104,7 +113,7 @@ describe("user actions", () => {
       expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
         name: "terms_redirect_count",
         value: "",
-        maxAge: 0
+        maxAge: 0,
       }));
     });
   });

@@ -2,12 +2,12 @@
 
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
-  useEffect,
-  type ReactNode,
 } from "react";
 import { ServiceErrorView } from "@/components/service-error-view";
 
@@ -40,13 +40,18 @@ export function OutageProvider({ children }: { children: ReactNode }) {
 
   // Handle global custom event for non-React code (like axios)
   useEffect(() => {
-    const handleOutageEvent = (event: CustomEvent<{ messages: string[]; details?: string }>) => {
+    const handleOutageEvent = (
+      event: CustomEvent<{ messages: string[]; details?: string }>,
+    ) => {
       setOutage(event.detail.messages, event.detail.details);
     };
 
     window.addEventListener("gc:outage", handleOutageEvent as EventListener);
     return () => {
-      window.removeEventListener("gc:outage", handleOutageEvent as EventListener);
+      window.removeEventListener(
+        "gc:outage",
+        handleOutageEvent as EventListener,
+      );
     };
   }, [setOutage]);
 
@@ -57,18 +62,18 @@ export function OutageProvider({ children }: { children: ReactNode }) {
 
   return (
     <OutageContext.Provider value={value}>
-      {hasOutage ? (
-        <ServiceErrorView
-          messages={errorMessages}
-          error={errorDetails}
-          onRetry={() => {
-            resetOutage();
-            window.location.reload();
-          }}
-        />
-      ) : (
-        children
-      )}
+      {hasOutage
+        ? (
+          <ServiceErrorView
+            messages={errorMessages}
+            error={errorDetails}
+            onRetry={() => {
+              resetOutage();
+              window.location.reload();
+            }}
+          />
+        )
+        : children}
     </OutageContext.Provider>
   );
 }

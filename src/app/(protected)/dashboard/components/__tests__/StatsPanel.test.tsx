@@ -1,22 +1,26 @@
 /** @vitest-environment jsdom */
-import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { StatsPanel } from '../StatsPanel';
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { StatsPanel } from "../StatsPanel";
 
-vi.mock('@/components/ui/card', () => ({
+vi.mock("@/components/ui/card", () => ({
   Card: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardContent: ({ children }: { children?: ReactNode }) => (
+    <div>{children}</div>
+  ),
   CardHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   CardTitle: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/ui/skeleton', () => ({
+vi.mock("@/components/ui/skeleton", () => ({
   Skeleton: () => <div data-testid="skeleton" />,
 }));
 
-vi.mock('framer-motion', () => {
-  const mockComponent = ({ children, ...rest }: { children?: ReactNode; [key: string]: unknown }) => {
+vi.mock("framer-motion", () => {
+  const mockComponent = (
+    { children, ...rest }: { children?: ReactNode; [key: string]: unknown },
+  ) => {
     return <div {...rest}>{children}</div>;
   };
 
@@ -30,8 +34,8 @@ vi.mock('framer-motion', () => {
   };
 });
 
-describe('StatsPanel', () => {
-  it('renders the loading footer without paragraph nesting', () => {
+describe("StatsPanel", () => {
+  it("renders the loading footer without paragraph nesting", () => {
     const { container } = render(
       <StatsPanel
         stats={{
@@ -49,7 +53,7 @@ describe('StatsPanel', () => {
       />,
     );
 
-    expect(screen.getAllByTestId('skeleton')).toHaveLength(3);
-    expect(container.querySelector('p')).toBeNull();
+    expect(screen.getAllByTestId("skeleton")).toHaveLength(3);
+    expect(container.querySelector("p")).toBeNull();
   });
 });

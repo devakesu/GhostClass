@@ -107,7 +107,10 @@ export function resolveSafeUpstreamErrorMessage(
   if (!body) return fallback;
 
   const trimmed = body.trim();
-  if (trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") || trimmed.toLowerCase().includes("<html")) {
+  if (
+    trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") ||
+    trimmed.toLowerCase().includes("<html")
+  ) {
     return fallback;
   }
 

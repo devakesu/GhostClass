@@ -73,13 +73,21 @@ async function safeEzygoJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-async function processCoursesData(coursesRes: Response): Promise<{ coursesMap: Record<string, CourseItem>; coursesList: CourseItem[] }> {
+async function processCoursesData(
+  coursesRes: Response,
+): Promise<
+  { coursesMap: Record<string, CourseItem>; coursesList: CourseItem[] }
+> {
   let coursesList: CourseItem[] = [];
   const entries: [string, CourseItem][] = [];
   try {
-    const parsed = await safeResponseJson<{ data?: CourseItem[] } | CourseItem[]>(coursesRes);
+    const parsed = await safeResponseJson<
+      { data?: CourseItem[] } | CourseItem[]
+    >(coursesRes);
     if (!parsed) return { coursesMap: {}, coursesList: [] };
-    coursesList = Array.isArray(parsed) ? parsed : ((safeGet(parsed, "data") as CourseItem[] | undefined) ?? []);
+    coursesList = Array.isArray(parsed)
+      ? parsed
+      : ((safeGet(parsed, "data") as CourseItem[] | undefined) ?? []);
 
     if (Array.isArray(coursesList)) {
       for (const c of coursesList) {
@@ -93,12 +101,19 @@ async function processCoursesData(coursesRes: Response): Promise<{ coursesMap: R
       }
     }
   } catch (err) {
-    logger.error("Sync: Failed to parse courses JSON", err instanceof Error ? err : new Error(String(err)));
+    logger.error(
+      "Sync: Failed to parse courses JSON",
+      err instanceof Error ? err : new Error(String(err)),
+    );
   }
   return { coursesMap: Object.fromEntries(entries), coursesList };
 }
 
-function extractAcademicSettingValue(raw: unknown, primaryKey: string, fallbackKeys: string[] = []): string | null {
+function extractAcademicSettingValue(
+  raw: unknown,
+  primaryKey: string,
+  fallbackKeys: string[] = [],
+): string | null {
   if (!raw) return null;
   if (typeof raw !== "object") return String(raw);
 
@@ -133,8 +148,16 @@ function resolveAcademicContext(
   semRaw: unknown,
   yearRaw: unknown,
 ) {
-  const semVal = extractAcademicSettingValue(semRaw, "default_semester", ["current_semester", "current_term", "semester"]);
-  const yearVal = extractAcademicSettingValue(yearRaw, "default_academic_year", ["current_year", "academic_year", "year"]);
+  const semVal = extractAcademicSettingValue(semRaw, "default_semester", [
+    "current_semester",
+    "current_term",
+    "semester",
+  ]);
+  const yearVal = extractAcademicSettingValue(
+    yearRaw,
+    "default_academic_year",
+    ["current_year", "academic_year", "year"],
+  );
 
   const ezygoAcademicSemester = normalizeSemester(semVal);
 
@@ -157,53 +180,59 @@ function triggerAcademicSelfHeal(
   ezygoAcademicYear: string | null,
   currentAcademic: { current_semester: string; current_year: string },
 ): Promise<unknown> | void {
-  const needsSemesterUpdate = !ezygoAcademicSemester || ezygoAcademicSemester !== currentAcademic.current_semester;
-  const needsYearUpdate = !ezygoAcademicYear || ezygoAcademicYear !== currentAcademic.current_year;
+  const needsSemesterUpdate = !ezygoAcademicSemester ||
+    ezygoAcademicSemester !== currentAcademic.current_semester;
+  const needsYearUpdate = !ezygoAcademicYear ||
+    ezygoAcademicYear !== currentAcademic.current_year;
 
   if (!needsSemesterUpdate && !needsYearUpdate) return;
 
-  logger.info(`[sync] Self-healing academic context for ${authId}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`);
+  logger.info(
+    `[sync] Self-healing academic context for ${authId}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
+  );
 
   const pushPromises: Promise<unknown>[] = [];
   if (needsSemesterUpdate) {
     pushPromises.push(egressFetch("user/setting/default_semester", {
       method: "POST",
-      headers: { 
+      headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ default_semester: currentAcademic.current_semester }),
+      body: JSON.stringify({
+        default_semester: currentAcademic.current_semester,
+      }),
     }));
   }
   if (needsYearUpdate) {
     pushPromises.push(egressFetch("user/setting/default_academic_year", {
       method: "POST",
-      headers: { 
+      headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ default_academic_year: currentAcademic.current_year }),
+      body: JSON.stringify({
+        default_academic_year: currentAcademic.current_year,
+      }),
     }));
   }
 
-  return Promise.all(pushPromises).catch(err => logger.warn("[sync] Academic self-heal push failed", err));
+  return Promise.all(pushPromises).catch((err) =>
+    logger.warn("[sync] Academic self-heal push failed", err)
+  );
 }
-
 
 function cleanClassName(input: string): string {
   return input
     // Remove odd/even
     .replace(/\b(odd|even)\b/gi, "")
-
     // Remove S1-S8 / s1-s8
     .replace(/\bs[1-8]\b/gi, "")
-
     // Remove academic year formats:
     // 2025-26
     // 2025-2026
     // 25-26
     .replace(/\b(?:\d{4}-\d{2}|\d{4}-\d{4}|\d{2}-\d{2})\b/g, "")
-
     // Remove extra spaces
     .replace(/\s+/g, " ")
     .trim();
@@ -213,7 +242,7 @@ async function upsertManualClass(
   pcg: number | null,
   sem: SemesterType,
   year: string,
-  formattedName: string
+  formattedName: string,
 ): Promise<{ id: string; name: string } | null> {
   const supabaseAdmin = getAdminClient();
   try {
@@ -226,25 +255,35 @@ async function upsertManualClass(
 
     const { data: newClass, error: upsertErr } = await supabaseAdmin
       .from("classes")
-      .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
+      .upsert(upsertPayload, {
+        onConflict: "programme_config_group_id, sem, year, name",
+      })
       .select("id, name")
       .single();
 
     if (upsertErr || !newClass) {
-      logger.error("[sync] detectAndSyncClass: Failed to clone/manual-upsert class", upsertErr);
+      logger.error(
+        "[sync] detectAndSyncClass: Failed to clone/manual-upsert class",
+        upsertErr,
+      );
       return null;
     }
     return newClass;
   } catch (err) {
-    logger.error("[sync] detectAndSyncClass: Exception cloning manual class", err instanceof Error ? err : new Error(String(err)));
+    logger.error(
+      "[sync] detectAndSyncClass: Exception cloning manual class",
+      err instanceof Error ? err : new Error(String(err)),
+    );
     return null;
   }
 }
 
 async function detectClassWithoutCourses(
   existingUserClassId: string | null | undefined,
-  currentAcademic: { current_semester: string; current_year: string }
-): Promise<{ classId: string | null; classInfo: { id: string; name: string } | null }> {
+  currentAcademic: { current_semester: string; current_year: string },
+): Promise<
+  { classId: string | null; classInfo: { id: string; name: string } | null }
+> {
   if (!existingUserClassId) {
     return { classId: null, classInfo: null };
   }
@@ -257,36 +296,53 @@ async function detectClassWithoutCourses(
     .maybeSingle();
 
   if (error) {
-    logger.error("[sync] detectAndSyncClass: Failed to fetch existing user class", error);
+    logger.error(
+      "[sync] detectAndSyncClass: Failed to fetch existing user class",
+      error,
+    );
   }
 
   if (!currentClass) {
     return { classId: null, classInfo: null };
   }
 
-  const currentClassId = currentClass.id ?? currentClass.class_id ?? existingUserClassId ?? null;
-  const currentClassName = typeof currentClass.name === "string" && currentClass.name.trim() !== ""
-    ? currentClass.name
-    : "Class";
+  const currentClassId = currentClass.id ?? currentClass.class_id ??
+    existingUserClassId ?? null;
+  const currentClassName =
+    typeof currentClass.name === "string" && currentClass.name.trim() !== ""
+      ? currentClass.name
+      : "Class";
 
-  const isCurrentAcademic = currentClass.sem === currentAcademic.current_semester && currentClass.year === currentAcademic.current_year;
+  const isCurrentAcademic =
+    currentClass.sem === currentAcademic.current_semester &&
+    currentClass.year === currentAcademic.current_year;
   if (isCurrentAcademic) {
-    return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
+    return {
+      classId: currentClassId,
+      classInfo: { id: currentClassId, name: currentClassName },
+    };
   }
 
-  const hasNoName = typeof currentClass.name !== "string" || currentClass.name.trim() === "";
+  const hasNoName = typeof currentClass.name !== "string" ||
+    currentClass.name.trim() === "";
   if (hasNoName) {
-    logger.warn("[sync] detectAndSyncClass: Existing class has no name; keeping current class without cloning", {
+    logger.warn(
+      "[sync] detectAndSyncClass: Existing class has no name; keeping current class without cloning",
+      {
+        classId: currentClassId,
+      },
+    );
+    return {
       classId: currentClassId,
-    });
-    return { classId: currentClassId, classInfo: { id: currentClassId, name: currentClassName } };
+      classInfo: { id: currentClassId, name: currentClassName },
+    };
   }
 
   const pcg = currentClass.programme_config_group_id;
   const sem = normalizeSemester(currentAcademic.current_semester) || "even";
   const year = currentAcademic.current_year;
   const name = cleanClassName(currentClass.name);
-  const formattedName = `${name} ${sem} ${year}`.trim().replace(/\s+/g, ' ');
+  const formattedName = `${name} ${sem} ${year}`.trim().replace(/\s+/g, " ");
 
   let query = supabaseAdmin
     .from("classes")
@@ -316,16 +372,21 @@ async function detectClassWithoutCourses(
   return { classId: null, classInfo: null };
 }
 
-function findCourseWithGroup(coursesList: CourseItem[]): CourseItem | undefined {
+function findCourseWithGroup(
+  coursesList: CourseItem[],
+): CourseItem | undefined {
   const primary = coursesList.find(
-    c => (c.usersubgroup?.programme_config_group_id != null || c.usersubgroup?.usergroup?.id != null)
-      && c.usersubgroup?.usergroup?.name != null
+    (c) =>
+      (c.usersubgroup?.programme_config_group_id != null ||
+        c.usersubgroup?.usergroup?.id != null) &&
+      c.usersubgroup?.usergroup?.name != null,
   );
   if (primary) return primary;
 
   return coursesList.find(
-    c => c.usersubgroup?.programme_config_group_id != null
-      || c.usersubgroup?.usergroup?.id != null
+    (c) =>
+      c.usersubgroup?.programme_config_group_id != null ||
+      c.usersubgroup?.usergroup?.id != null,
   );
 }
 
@@ -335,7 +396,7 @@ async function tryUpdateExistingUserClass(
   sem: SemesterType,
   year: string,
   externalId: number | null,
-  name: string
+  name: string,
 ): Promise<{ id: string; name: string } | null> {
   if (!existingUserClassId) {
     return null;
@@ -368,7 +429,10 @@ async function tryUpdateExistingUserClass(
       .eq("id", userClass.id);
 
     if (updateErr) {
-      logger.error("[sync] detectAndSyncClass: Failed to update user's existing class with official EzyGo metadata", updateErr);
+      logger.error(
+        "[sync] detectAndSyncClass: Failed to update user's existing class with official EzyGo metadata",
+        updateErr,
+      );
     }
     return { id: userClass.id, name };
   }
@@ -381,7 +445,7 @@ async function findOrCreateCohortClass(
   sem: SemesterType,
   year: string,
   externalId: number | null,
-  name: string
+  name: string,
 ): Promise<{ id: string; name: string } | null> {
   const supabaseAdmin = getAdminClient();
 
@@ -394,7 +458,10 @@ async function findOrCreateCohortClass(
     .eq("name", name);
 
   if (fetchErr) {
-    logger.error("[sync] detectAndSyncClass: Failed to fetch class by cohort", fetchErr);
+    logger.error(
+      "[sync] detectAndSyncClass: Failed to fetch class by cohort",
+      fetchErr,
+    );
   }
 
   const matchedClass = existingClasses?.[0];
@@ -406,7 +473,10 @@ async function findOrCreateCohortClass(
         .update({ external_group_id: externalId })
         .eq("id", matchedClass.id);
       if (updateErr) {
-        logger.error("[sync] detectAndSyncClass: Failed to update class metadata", updateErr);
+        logger.error(
+          "[sync] detectAndSyncClass: Failed to update class metadata",
+          updateErr,
+        );
       }
     }
     return { id: matchedClass.id, name };
@@ -425,17 +495,25 @@ async function findOrCreateCohortClass(
 
     const { data: newClass, error: upsertErr } = await supabaseAdmin
       .from("classes")
-      .upsert(upsertPayload, { onConflict: "programme_config_group_id, sem, year, name" })
+      .upsert(upsertPayload, {
+        onConflict: "programme_config_group_id, sem, year, name",
+      })
       .select("id, name")
       .single();
 
     if (upsertErr || !newClass) {
-      logger.error("[sync] detectAndSyncClass: Failed to upsert new class", upsertErr);
+      logger.error(
+        "[sync] detectAndSyncClass: Failed to upsert new class",
+        upsertErr,
+      );
       return null;
     }
     return newClass;
   } catch (err) {
-    logger.error("[sync] detectAndSyncClass: Exception upserting new class", err instanceof Error ? err : new Error(String(err)));
+    logger.error(
+      "[sync] detectAndSyncClass: Exception upserting new class",
+      err instanceof Error ? err : new Error(String(err)),
+    );
     return null;
   }
 }
@@ -446,7 +524,7 @@ async function syncCohortClass(
   year: string,
   externalId: number | null,
   name: string,
-  existingUserClassId: string | null | undefined
+  existingUserClassId: string | null | undefined,
 ): Promise<{
   classId: string | null;
   classInfo: { id: string; name: string } | null;
@@ -459,7 +537,7 @@ async function syncCohortClass(
     sem,
     year,
     externalId,
-    name
+    name,
   );
 
   if (existingMatched) {
@@ -471,7 +549,13 @@ async function syncCohortClass(
     };
   }
 
-  const cohortClass = await findOrCreateCohortClass(pcg, sem, year, externalId, name);
+  const cohortClass = await findOrCreateCohortClass(
+    pcg,
+    sem,
+    year,
+    externalId,
+    name,
+  );
   if (cohortClass) {
     return {
       classId: cohortClass.id,
@@ -488,7 +572,7 @@ async function detectAndSyncClass(
   coursesList: CourseItem[],
   _rolesData: unknown,
   currentAcademic: { current_semester: string; current_year: string },
-  existingUserClassId: string | null | undefined
+  existingUserClassId: string | null | undefined,
 ): Promise<{
   classId: string | null;
   classInfo: { id: string; name: string } | null;
@@ -496,7 +580,10 @@ async function detectAndSyncClass(
   detectedYear?: string | null;
 }> {
   if (coursesList.length === 0) {
-    return await detectClassWithoutCourses(existingUserClassId, currentAcademic);
+    return await detectClassWithoutCourses(
+      existingUserClassId,
+      currentAcademic,
+    );
   }
 
   const courseWithGroup = findCourseWithGroup(coursesList);
@@ -504,13 +591,17 @@ async function detectAndSyncClass(
     const sub = courseWithGroup.usersubgroup;
     const pcg = sub.programme_config_group_id ?? sub.usergroup?.id ?? null;
     if (pcg != null) {
-      const sem = normalizeSemester(sub.academic_semester || currentAcademic.current_semester) || "even";
+      const sem = normalizeSemester(
+        sub.academic_semester || currentAcademic.current_semester,
+      ) || "even";
       const year = sub.academic_year || currentAcademic.current_year;
       const externalId = sub.id != null ? Number(sub.id) : null;
       const nameRaw = (sub.name && sub.name.trim() !== "") ? sub.name : "Class";
       const name = shortTextSchema.parse(nameRaw);
 
-      logger.info(`[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${nameRaw}`);
+      logger.info(
+        `[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${nameRaw}`,
+      );
 
       return await syncCohortClass(
         Number(pcg),
@@ -518,7 +609,7 @@ async function detectAndSyncClass(
         year,
         externalId,
         name,
-        existingUserClassId
+        existingUserClassId,
       );
     }
   }
@@ -532,8 +623,8 @@ async function populateCourseCatalogAndMigrateTrackers(
 ): Promise<void> {
   const supabaseAdmin = getAdminClient();
   const mappings = coursesList
-    .filter(c => c.id !== undefined && c.id !== null && c.code)
-    .map(c => ({
+    .filter((c) => c.id !== undefined && c.id !== null && c.code)
+    .map((c) => ({
       ezygo_id: String(c.id),
       university_code: normalizeCourseCode(String(c.code)),
       course_name: c.name,
@@ -550,7 +641,9 @@ async function populateCourseCatalogAndMigrateTrackers(
       .select("course")
       .eq("auth_user_id", authId);
 
-    const coursesWithTrackers = new Set(currentTrackers?.map(t => String(t.course)) || []);
+    const coursesWithTrackers = new Set(
+      currentTrackers?.map((t) => String(t.course)) || [],
+    );
 
     for (const m of mappings) {
       const ezygoIdStr = m.ezygo_id;
@@ -570,9 +663,15 @@ async function detectClassAndPopulateCatalog(
   rolesData: unknown,
   authId: string,
   currentAcademic: { current_semester: string; current_year: string },
-  existingUserClassId: string | null | undefined
+  existingUserClassId: string | null | undefined,
 ) {
-  const { classId, classInfo, detectedSem, detectedYear } = await detectAndSyncClass(coursesList, rolesData, currentAcademic, existingUserClassId);
+  const { classId, classInfo, detectedSem, detectedYear } =
+    await detectAndSyncClass(
+      coursesList,
+      rolesData,
+      currentAcademic,
+      existingUserClassId,
+    );
   await populateCourseCatalogAndMigrateTrackers(coursesList, authId);
   return { classId, classInfo, detectedSem, detectedYear };
 }
@@ -591,7 +690,10 @@ interface ExistingUserData {
   last_synced_at?: string | null;
 }
 
-function safeDecryptField(iv: string | null | undefined, content: string | null | undefined): string | null {
+function safeDecryptField(
+  iv: string | null | undefined,
+  content: string | null | undefined,
+): string | null {
   if (!iv || !content) return null;
   try {
     return decrypt({ iv, content });
@@ -600,13 +702,18 @@ function safeDecryptField(iv: string | null | undefined, content: string | null 
   }
 }
 
-function readExistingProfileDecrypted(existingUser: ExistingUserData | null | undefined) {
+function readExistingProfileDecrypted(
+  existingUser: ExistingUserData | null | undefined,
+) {
   if (!existingUser) {
     return { localGender: null, localBirthDate: null, localPhone: null };
   }
   return {
     localGender: safeDecryptField(existingUser.gender_iv, existingUser.gender),
-    localBirthDate: safeDecryptField(existingUser.birth_date_iv, existingUser.birth_date),
+    localBirthDate: safeDecryptField(
+      existingUser.birth_date_iv,
+      existingUser.birth_date,
+    ),
     localPhone: safeDecryptField(existingUser.phone_iv, existingUser.phone),
   };
 }
@@ -623,7 +730,8 @@ function resolveMergedProfile(
     return remote ? String(remote) : null;
   };
 
-  const { localGender, localBirthDate, localPhone } = readExistingProfileDecrypted(existingUser);
+  const { localGender, localBirthDate, localPhone } =
+    readExistingProfileDecrypted(existingUser);
 
   const remoteFirst = ezygoData.first_name ||
     (ezygoData.full_name ? ezygoData.full_name.trim().split(" ")[0] : null);
@@ -685,7 +793,7 @@ export type SyncResult = FullSyncResult | LightSyncResult;
 
 async function fetchAcademicAndProfileData(
   token: string,
-  fullSync: boolean
+  fullSync: boolean,
 ): Promise<[Response | undefined, unknown, unknown]> {
   if (fullSync) {
     return Promise.all([
@@ -719,17 +827,23 @@ async function fetchAcademicAndProfileData(
 
 async function parseProfileResponse(
   ezygoRes: Response | undefined,
-  ezygoId: string
+  ezygoId: string,
 ): Promise<{ ezygoData: EzygoProfileResponse; resolvedEzygoId: string }> {
   if (!ezygoRes || !ezygoRes.ok) {
     throw new Error(`EzyGo Profile failed: ${ezygoRes?.status}`);
   }
 
-  const json = await safeResponseJson<{ data?: EzygoProfileResponse } | EzygoProfileResponse>(ezygoRes);
+  const json = await safeResponseJson<
+    { data?: EzygoProfileResponse } | EzygoProfileResponse
+  >(ezygoRes);
   if (!json) {
-    throw new Error(`EzyGo Profile returned empty or invalid JSON: ${ezygoRes?.status}`);
+    throw new Error(
+      `EzyGo Profile returned empty or invalid JSON: ${ezygoRes?.status}`,
+    );
   }
-  const parsedProfile = ezygoProfileSchema.safeParse(safeGet(json, "data") ?? json);
+  const parsedProfile = ezygoProfileSchema.safeParse(
+    safeGet(json, "data") ?? json,
+  );
   if (!parsedProfile.success) {
     throw new Error(`EzyGo Profile returned invalid data: ${ezygoRes?.status}`);
   }
@@ -785,15 +899,25 @@ export async function performProfileSync(
 
   try {
     // Step 1: Fetch Profile and Academic Context in parallel
-    const [ezygoRes, semRaw, yearRaw] = await fetchAcademicAndProfileData(token, fullSync);
-
-    const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } = resolveAcademicContext(
-      semRaw,
-      yearRaw,
+    const [ezygoRes, semRaw, yearRaw] = await fetchAcademicAndProfileData(
+      token,
+      fullSync,
     );
 
+    const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } =
+      resolveAcademicContext(
+        semRaw,
+        yearRaw,
+      );
+
     // Step 2: Self-heal academic context if missing, and WAIT for it to finish
-    await triggerAcademicSelfHeal(token, authId, ezygoAcademicSemester, ezygoAcademicYear, currentAcademic);
+    await triggerAcademicSelfHeal(
+      token,
+      authId,
+      ezygoAcademicSemester,
+      ezygoAcademicYear,
+      currentAcademic,
+    );
 
     if (!fullSync) {
       // Fast path: if only a light sync is requested, we just return the academic context.
@@ -804,11 +928,14 @@ export async function performProfileSync(
           semester: ezygoAcademicSemester,
           current_year: currentAcademic.current_year,
           current_semester: currentAcademic.current_semester,
-        }
+        },
       };
     }
 
-    const { ezygoData, resolvedEzygoId } = await parseProfileResponse(ezygoRes, ezygoId);
+    const { ezygoData, resolvedEzygoId } = await parseProfileResponse(
+      ezygoRes,
+      ezygoId,
+    );
 
     const existingUser = preFetchedExistingUser ?? (await supabaseAdmin
       .from("users")
@@ -842,19 +969,26 @@ export async function performProfileSync(
         rolesData,
         authId,
         currentAcademic,
-        existingUser?.class_id
+        existingUser?.class_id,
       );
       classId = detection.classId;
       classInfo = detection.classInfo;
     }
 
-    const { mergedFirst, mergedLast, mergedPhone, mergedGender, mergedBirthDate } = resolveMergedProfile(existingUser, ezygoData);
+    const {
+      mergedFirst,
+      mergedLast,
+      mergedPhone,
+      mergedGender,
+      mergedBirthDate,
+    } = resolveMergedProfile(existingUser, ezygoData);
 
     const encPhone = mergedPhone ? encrypt(mergedPhone) : null;
     const encGender = mergedGender ? encrypt(mergedGender) : null;
     const encBirthDate = mergedBirthDate ? encrypt(mergedBirthDate) : null;
 
-    const upsertUsername = ezygoData.username ?? ezygoData.user?.username ?? null;
+    const upsertUsername = ezygoData.username ?? ezygoData.user?.username ??
+      null;
     const upsertEmail = ezygoData.email ?? ezygoData.user?.email ?? null;
 
     const upsertData: Record<string, unknown> = {
@@ -870,7 +1004,9 @@ export async function performProfileSync(
       gender_iv: encGender?.iv ?? null,
       birth_date: encBirthDate?.content ?? null,
       birth_date_iv: encBirthDate?.iv ?? null,
-      ezygo_created_at: safeGet(ezygoData, "created_at") ? String(safeGet(ezygoData, "created_at")) : null,
+      ezygo_created_at: safeGet(ezygoData, "created_at")
+        ? String(safeGet(ezygoData, "created_at"))
+        : null,
       class_id: classId || existingUser?.class_id || null,
     };
 
@@ -900,7 +1036,8 @@ export async function performProfileSync(
         phone: mergedPhone,
         gender: mergedGender,
         birthDate: mergedBirthDate,
-        lastSyncedAt: (upsertData.last_synced_at as string) || existingUser?.last_synced_at || null,
+        lastSyncedAt: (upsertData.last_synced_at as string) ||
+          existingUser?.last_synced_at || null,
       },
       academic: {
         year: ezygoAcademicYear,

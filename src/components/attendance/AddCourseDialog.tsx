@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "@/hooks/users/profile";
 import Turnstile, { useTurnstile } from "react-turnstile";
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookPlus, Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, BookPlus, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AddCourseDialogProps {
@@ -67,7 +67,6 @@ export function AddCourseDialog({
     return undefined;
   }, [open]);
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseCode.trim() || !courseName.trim()) {
@@ -81,13 +80,13 @@ export function AddCourseDialog({
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const formData = new FormData();
       formData.append("courseCode", courseCode);
       formData.append("courseName", courseName);
       formData.append("cf-turnstile-response", token);
-      
+
       const csrfToken = getCsrfToken();
       if (csrfToken) formData.append("csrf_token", csrfToken);
 
@@ -116,7 +115,9 @@ export function AddCourseDialog({
       onOpenChange(false);
     } catch (error: unknown) {
       logger.error("Error adding course:", error);
-      Sentry.captureException(error, { tags: { type: "course_mutation_error", location: "AddCourseDialog" } });
+      Sentry.captureException(error, {
+        tags: { type: "course_mutation_error", location: "AddCourseDialog" },
+      });
       toast.error("Failed to add course. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -151,17 +152,22 @@ export function AddCourseDialog({
           <DialogDescription className="text-center">
             Adding this course will make it available to everyone in{" "}
             <strong>{profile?.class?.name || "your class"}</strong> for the{" "}
-            <strong>{(semester || profile?.current_semester)?.toUpperCase()} {(academicYear || profile?.current_year)}</strong>
-            {" "}
+            <strong>
+              {(semester || profile?.current_semester)?.toUpperCase()}{" "}
+              {academicYear || profile?.current_year}
+            </strong>{" "}
             semester.
           </DialogDescription>
         </DialogHeader>
 
         <Alert className="bg-amber-500/10 border-amber-500/50 text-amber-600 dark:text-amber-400">
           <AlertTriangle className="h-4 w-4 text-amber-500!" />
-          <AlertTitle className="text-sm font-bold text-amber-600 dark:text-amber-400">Accuracy Matters</AlertTitle>
+          <AlertTitle className="text-sm font-bold text-amber-600 dark:text-amber-400">
+            Accuracy Matters
+          </AlertTitle>
           <AlertDescription className="text-xs opacity-90">
-            Please enter valid data. Spamming or entering fake info is strictly prohibited and can be traced to your account.
+            Please enter valid data. Spamming or entering fake info is strictly
+            prohibited and can be traced to your account.
           </AlertDescription>
         </Alert>
 

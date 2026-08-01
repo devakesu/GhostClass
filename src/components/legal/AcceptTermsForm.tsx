@@ -28,15 +28,18 @@ export function AcceptTermsForm() {
       await acceptTermsAction(TERMS_VERSION);
       // Small delay to ensure cookie propagation and cache revalidation complete
       // This helps prevent race conditions with middleware cookie checks
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       // Replace history entry so back does not return to accept-terms.
       router.replace("/dashboard");
     } catch (error) {
       NProgress.done();
       logger.error("Failed to accept terms", error);
       Sentry.captureException(error, {
-        tags: { type: "terms_acceptance_failure", location: "AcceptTermsForm/handleAgree" },
-        extra: { version: TERMS_VERSION }
+        tags: {
+          type: "terms_acceptance_failure",
+          location: "AcceptTermsForm/handleAgree",
+        },
+        extra: { version: TERMS_VERSION },
       });
       toast.error("Failed to accept terms. Please try again.");
       setLoading(false);
@@ -69,11 +72,33 @@ export function AcceptTermsForm() {
             <ReactMarkdown
               components={{
                 /* eslint-disable @typescript-eslint/no-unused-vars */
-                h1: ({node: _node, ...props}) => <h1 className="text-sm font-bold text-foreground uppercase tracking-wider mb-2 mt-4" {...props} />,
-                p: ({node: _node, ...props}) => <p className="text-xs leading-relaxed text-muted-foreground mb-1.5" {...props} />,
-                ul: ({node: _node, ...props}) => <ul className="list-disc pl-4 mb-3 space-y-1" {...props} />,
-                li: ({node: _node, ...props}) => <li className="text-xs text-muted-foreground pl-1" {...props} />,
-                strong: ({node: _node, ...props}) => <strong className="text-purple-600 dark:text-purple-300 font-semibold" {...props} />
+                h1: ({ node: _node, ...props }) => (
+                  <h1
+                    className="text-sm font-bold text-foreground uppercase tracking-wider mb-2 mt-4"
+                    {...props}
+                  />
+                ),
+                p: ({ node: _node, ...props }) => (
+                  <p
+                    className="text-xs leading-relaxed text-muted-foreground mb-1.5"
+                    {...props}
+                  />
+                ),
+                ul: ({ node: _node, ...props }) => (
+                  <ul className="list-disc pl-4 mb-3 space-y-1" {...props} />
+                ),
+                li: ({ node: _node, ...props }) => (
+                  <li
+                    className="text-xs text-muted-foreground pl-1"
+                    {...props}
+                  />
+                ),
+                strong: ({ node: _node, ...props }) => (
+                  <strong
+                    className="text-purple-600 dark:text-purple-300 font-semibold"
+                    {...props}
+                  />
+                ),
                 /* eslint-enable @typescript-eslint/no-unused-vars */
               }}
             >
@@ -94,7 +119,10 @@ export function AcceptTermsForm() {
             className="border-muted-foreground/40 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
           />
 
-          <span id="terms-label" className="text-xs text-muted-foreground font-normal select-none">
+          <span
+            id="terms-label"
+            className="text-xs text-muted-foreground font-normal select-none"
+          >
             I have read and accept the{" "}
             <Link
               href="/legal"
@@ -105,7 +133,7 @@ export function AcceptTermsForm() {
                 // to this page instead of closing the app.
                 e.preventDefault();
                 e.stopPropagation();
-                router.push('/legal');
+                router.push("/legal");
               }}
             >
               above Disclaimer and all Policies listed here
@@ -120,7 +148,7 @@ export function AcceptTermsForm() {
             "w-full h-11 font-semibold transition-all duration-300",
             checked
               ? "bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 shadow-[0_0_30px_-5px_rgba(168,85,247,0.5)]"
-              : "bg-muted text-muted-foreground hover:bg-muted"
+              : "bg-muted text-muted-foreground hover:bg-muted",
           )}
           aria-live="polite"
         >

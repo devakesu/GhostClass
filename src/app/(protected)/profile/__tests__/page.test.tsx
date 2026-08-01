@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import ProfilePage from '../page';
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import ProfilePage from "../page";
 
-vi.mock('../ProfileClient', () => ({
+vi.mock("../ProfileClient", () => ({
   default: () => <div data-testid="profile-client">ProfileClient</div>,
 }));
 
-describe('ProfilePage', () => {
-  it('renders ProfileClient', () => {
+describe("ProfilePage", () => {
+  it("renders ProfileClient", () => {
     render(<ProfilePage />);
-    expect(screen.getByTestId('profile-client')).toBeDefined();
+    expect(screen.getByTestId("profile-client")).toBeDefined();
   });
 });

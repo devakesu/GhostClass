@@ -1,7 +1,7 @@
-import { renderHook, act } from "@testing-library/react";
-vi.unmock('@/hooks/courses/useDisabledCourses')
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useDisabledCourses, makeSemesterKey } from "../useDisabledCourses";
+import { act, renderHook } from "@testing-library/react";
+vi.unmock("@/hooks/courses/useDisabledCourses");
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeSemesterKey, useDisabledCourses } from "../useDisabledCourses";
 import { useUserSettings } from "@/providers/user-settings";
 
 vi.mock("@/providers/user-settings", () => ({
@@ -39,25 +39,33 @@ describe("useDisabledCourses", () => {
   });
 
   it("should identify disabled courses", () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
     expect(result.current.isDisabled("CS101")).toBe(true);
     expect(result.current.isDisabled("MA101")).toBe(false);
   });
 
   it("should get disable reason", () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
     expect(result.current.getDisableReason("CS101")).toBe("Already passed");
     expect(result.current.getDisableReason("MA101")).toBeNull();
   });
 
   it("should return null for reason if semKey is null", () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: null, semester: "1" }));
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: null, semester: "1" })
+    );
     expect(result.current.getDisableReason("CS101")).toBeNull();
   });
 
   it("should disable a course", async () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
+
     await act(async () => {
       await result.current.disableCourse("MA101", "Testing");
     });
@@ -71,20 +79,26 @@ describe("useDisabledCourses", () => {
   });
 
   it("should create a new semester bucket when disabling a course", async () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2024", semester: "2" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2024", semester: "2" })
+    );
+
     await act(async () => {
       await result.current.disableCourse("PH101", "New Sem");
     });
 
-    expect(mockUpdateDisabledCourses).toHaveBeenCalledWith(expect.objectContaining({
-      "2024-2": { PH101: "New Sem" }
-    }));
+    expect(mockUpdateDisabledCourses).toHaveBeenCalledWith(
+      expect.objectContaining({
+        "2024-2": { PH101: "New Sem" },
+      }),
+    );
   });
 
   it("should enable a course", async () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
+
     await act(async () => {
       await result.current.enableCourse("CS101");
     });
@@ -93,8 +107,10 @@ describe("useDisabledCourses", () => {
   });
 
   it("should handle enabling non-existent course or semester", async () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2024", semester: "2" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2024", semester: "2" })
+    );
+
     await act(async () => {
       await result.current.enableCourse("UNKNOWN");
     });
@@ -103,8 +119,10 @@ describe("useDisabledCourses", () => {
   });
 
   it("should return early if semKey is null during disable/enable", async () => {
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: null, semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: null, semester: "1" })
+    );
+
     await act(async () => {
       await result.current.disableCourse("MA101", "X");
       await result.current.enableCourse("CS101");
@@ -118,14 +136,18 @@ describe("useDisabledCourses", () => {
       settings: null,
       isLoading: false,
     });
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
     expect(result.current.disabledCoursesMap).toEqual({});
     expect(result.current.disabledCodes.size).toBe(0);
   });
 
   it("should return null reason if semester not in map", () => {
-     const { result } = renderHook(() => useDisabledCourses({ academicYear: "2024", semester: "1" }));
-     expect(result.current.getDisableReason("ANY")).toBeNull();
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2024", semester: "1" })
+    );
+    expect(result.current.getDisableReason("ANY")).toBeNull();
   });
 
   it("should enable a course and keep the semester bucket if other courses remain", async () => {
@@ -141,8 +163,10 @@ describe("useDisabledCourses", () => {
       isLoading: false,
       updateDisabledCourses: mockUpdateDisabledCourses,
     });
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
+
     await act(async () => {
       await result.current.enableCourse("CS101");
     });
@@ -166,8 +190,10 @@ describe("useDisabledCourses", () => {
       isLoading: false,
       updateDisabledCourses: mockUpdateDisabledCourses,
     });
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
+
     await act(async () => {
       await result.current.enableCourse("CS101");
     });
@@ -187,8 +213,10 @@ describe("useDisabledCourses", () => {
       isLoading: false,
       updateDisabledCourses: mockUpdateDisabledCourses,
     });
-    const { result } = renderHook(() => useDisabledCourses({ academicYear: "2023", semester: "1" }));
-    
+    const { result } = renderHook(() =>
+      useDisabledCourses({ academicYear: "2023", semester: "1" })
+    );
+
     await act(async () => {
       await result.current.enableCourse("CS101");
     });
@@ -197,7 +225,7 @@ describe("useDisabledCourses", () => {
     // await updateDisabledCourses(newMap);
     // and newMap was structuredClone of original.
     expect(mockUpdateDisabledCourses).toHaveBeenCalledWith({
-      "2023-1": { "MA101": "Other" }
+      "2023-1": { "MA101": "Other" },
     });
   });
 });

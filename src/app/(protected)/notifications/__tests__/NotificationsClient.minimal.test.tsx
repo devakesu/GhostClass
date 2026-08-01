@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import NotificationsPage from "../NotificationsClient";
@@ -25,11 +25,11 @@ vi.mock("@/hooks/users/user", () => ({
 }));
 
 vi.mock("@/hooks/use-sync-on-mount", () => ({
-    useSyncOnMount: vi.fn(() => ({
-      isSyncing: false,
-      syncSettled: true,
-      syncFailed: false,
-    })),
+  useSyncOnMount: vi.fn(() => ({
+    isSyncing: false,
+    syncSettled: true,
+    syncFailed: false,
+  })),
 }));
 
 vi.mock("@/hooks/notifications/use-notification-virtualizer", () => ({
@@ -49,6 +49,7 @@ vi.mock("@tanstack/react-query", () => ({
 describe("NotificationsClient Minimal", () => {
   it("renders without hanging", () => {
     render(<NotificationsPage />);
-    expect(screen.getByRole("heading", { name: /^Notifications$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Notifications$/i }))
+      .toBeInTheDocument();
   });
 });

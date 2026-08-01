@@ -1,10 +1,5 @@
 import { m as motion } from "framer-motion";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatsPanelProps {
@@ -23,7 +18,9 @@ interface StatsPanelProps {
   targetPercentage: number;
 }
 
-export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: StatsPanelProps) {
+export function StatsPanel(
+  { stats, isLoadingAttendance, targetPercentage }: StatsPanelProps,
+) {
   const officialWidth = stats.rawOfficialPercentage;
   const isGain = stats.rawPercentage >= stats.rawOfficialPercentage;
   let diffWidth = isGain
@@ -52,28 +49,24 @@ export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: Sta
             role="status"
             aria-live="polite"
           >
-            {isLoadingAttendance
-              ? <Skeleton className="h-5 w-16" />
-              : (
-                <>
-                  {(diffPresent !== 0 || diffTotal > 0) &&
-                    stats.officialPercentage !== stats.percentage && (
-                    <span className="text-muted-foreground">
-                      {stats.officialPercentage}%{" "}
-                      <span className="mx-0.5">→</span>
-                    </span>
-                  )}
-                </>
-              )}
+            {isLoadingAttendance ? <Skeleton className="h-5 w-16" /> : (
+              <>
+                {(diffPresent !== 0 || diffTotal > 0) &&
+                  stats.officialPercentage !== stats.percentage && (
+                  <span className="text-muted-foreground">
+                    {stats.officialPercentage}%{" "}
+                    <span className="mx-0.5">→</span>
+                  </span>
+                )}
+              </>
+            )}
             <span
               className={stats.rawPercentage >= targetPercentage
                 ? "text-sky-600 dark:text-sky-400"
                 : "text-red-600 dark:text-red-400"}
             >
               {isLoadingAttendance
-                ? (
-                  <Skeleton className="h-7 w-12 inline-block align-middle" />
-                )
+                ? <Skeleton className="h-7 w-12 inline-block align-middle" />
                 : `${stats.percentage}%`}
             </span>
             <span className="sr-only">
@@ -156,4 +149,3 @@ export function StatsPanel({ stats, isLoadingAttendance, targetPercentage }: Sta
     </motion.div>
   );
 }
-

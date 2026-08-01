@@ -1,9 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getCspHeader } from "../csp";
 import { logger } from "../logger";
 import * as Sentry from "@sentry/nextjs";
-import { getSupabaseConfig, _customFetch } from "./fetch";
+import { _customFetch, getSupabaseConfig } from "./fetch";
 
 export async function updateSession(request: NextRequest, nonce?: string) {
   // 1. Get CSP Header
@@ -15,9 +15,9 @@ export async function updateSession(request: NextRequest, nonce?: string) {
   });
 
   // 3. Apply CSP to the initial response
-  response.headers.set('Content-Security-Policy', cspHeader);
+  response.headers.set("Content-Security-Policy", cspHeader);
 
-  const { url, key } = getSupabaseConfig('client');
+  const { url, key } = getSupabaseConfig("client");
 
   const supabase = createServerClient(
     url,
@@ -28,19 +28,21 @@ export async function updateSession(request: NextRequest, nonce?: string) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+
           // Supabase needs to create a NEW response to set cookies
           response = NextResponse.next({ request });
-          
+
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
-          response.headers.set('Content-Security-Policy', cspHeader);
+          response.headers.set("Content-Security-Policy", cspHeader);
         },
       },
-      ...(_customFetch ? { global: { fetch: _customFetch } } : {})
-    }
+      ...(_customFetch ? { global: { fetch: _customFetch } } : {}),
+    },
   );
 
   try {
@@ -59,12 +61,18 @@ export async function updateSession(request: NextRequest, nonce?: string) {
       response.cookies.delete(name);
     });
 
-    logger.warn("Session refresh failed in middleware, clearing invalid session cookies", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.warn(
+      "Session refresh failed in middleware, clearing invalid session cookies",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
     Sentry.captureException(error, {
       level: "warning",
-      tags: { type: "session_refresh_failure", location: "supabase/middleware" },
+      tags: {
+        type: "session_refresh_failure",
+        location: "supabase/middleware",
+      },
     });
   }
 

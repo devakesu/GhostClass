@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 import { Loading } from "@/components/loading";
 
 // Force dynamic rendering for protected routes
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -24,8 +24,8 @@ export default async function DashboardPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    logger.dev('[Dashboard] User not authenticated, redirecting', {
-      context: 'dashboard-page',
+    logger.dev("[Dashboard] User not authenticated, redirecting", {
+      context: "dashboard-page",
     });
     redirect("/");
   }
@@ -35,8 +35,8 @@ export default async function DashboardPage() {
   const token = cookieStore.get("ezygo_access_token")?.value;
 
   if (!token) {
-    logger.warn('[Dashboard] EzyGo token missing, redirecting', {
-      context: 'dashboard-page',
+    logger.warn("[Dashboard] EzyGo token missing, redirecting", {
+      context: "dashboard-page",
       userId: user.id,
     });
     redirect("/");

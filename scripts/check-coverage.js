@@ -57,6 +57,8 @@ if (lowCoverageFiles.length > 0) {
 console.log("\nBottom 10 files by statement coverage:");
 allFiles.slice(0, 10).forEach((f) => {
   console.log(
-    `${f.file.replace(process.cwd(), "")}: S:${f.sPct.toFixed(2)}% F:${f.fPct.toFixed(2)}% B:${f.bPct.toFixed(2)}%`,
+    `${f.file.replace(process.cwd(), "")}: S:${f.sPct.toFixed(2)}% F:${
+      f.fPct.toFixed(2)
+    }% B:${f.bPct.toFixed(2)}%`,
   );
 });

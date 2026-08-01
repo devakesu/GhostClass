@@ -18,11 +18,11 @@ import Image from "next/image";
 import { motion, Variants } from "framer-motion";
 import {
   Camera,
+  Clock,
   Fingerprint,
   Loader2,
   Mail,
   Phone,
-  Clock,
   School,
   UserCheck,
 } from "lucide-react";
@@ -45,7 +45,7 @@ export default function ProfileClient() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isLoading = (profileLoading && !profile);
+  const isLoading = profileLoading && !profile;
 
   const joinedTargetDate = profile?.ezygo_created_at || profile?.created_at;
   const joinedDateString = joinedTargetDate
@@ -85,10 +85,9 @@ export default function ProfileClient() {
     toast.info("Compressing large image...", { duration: 2000 });
     try {
       const compressed = await compressImage(originalFile, 0.7);
-      const bestCompressed =
-        compressed.size > 5 * 1024 * 1024
-          ? await compressImage(originalFile, 0.5)
-          : compressed;
+      const bestCompressed = compressed.size > 5 * 1024 * 1024
+        ? await compressImage(originalFile, 0.5)
+        : compressed;
       if (bestCompressed.size > 5 * 1024 * 1024) {
         throw new Error(
           "Image is too large to upload even after compression. Please choose a smaller image (under 5 MB).",

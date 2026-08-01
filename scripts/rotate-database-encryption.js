@@ -357,7 +357,9 @@ async function executeRotation() {
 if (require.main === module) {
   executeRotation().catch((err) => {
     console.error(
-      `\n${colors.red}❌ Fatal runtime script error: ${err.stack || err.message}${colors.reset}`,
+      `\n${colors.red}❌ Fatal runtime script error: ${
+        err.stack || err.message
+      }${colors.reset}`,
     );
     process.exit(1);
   });

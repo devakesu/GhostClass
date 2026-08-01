@@ -14,7 +14,7 @@ import { retryTwice } from "@/lib/query-utils";
 /**
  * React Query provider with pre-configured defaults for the application.
  * Wraps the app with QueryClientProvider and AttendanceSettingsProvider.
- * 
+ *
  * Query Configuration:
  * - Stale time: 3 minutes
  * - Garbage collection: 10 minutes
@@ -23,10 +23,10 @@ import { retryTwice } from "@/lib/query-utils";
  * - Reconnect refetch: Enabled globally (covers PWA offline→online transitions)
  * - Refetch interval: Disabled globally; time-sensitive queries (courses, attendance,
  *   tracking) set their own 60 s interval explicitly
- * 
+ *
  * @param children - Child components to wrap
  * @returns Configured React Query provider with attendance settings
- * 
+ *
  * @example
  * ```tsx
  * <ReactQueryProvider>
@@ -56,7 +56,7 @@ export default function ReactQueryProvider({ children }: PropsWithChildren) {
             refetchInterval: false,
           },
         },
-      })
+      }),
   );
 
   return (

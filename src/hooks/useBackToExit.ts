@@ -31,7 +31,7 @@ export function useBackToExit(): void {
       history.replaceState(
         { ...rootState, [SENTINEL_KEY]: true },
         "",
-        window.location.href
+        window.location.href,
       );
       history.pushState(rootState, "", window.location.href);
     }
@@ -81,7 +81,10 @@ export function useBackToExit(): void {
 
       if (exitModeRef.current === "root") resetExitState();
 
-      if (exitArmedRef.current && exitModeRef.current === "deep" && firstBackTimeRef.current) {
+      if (
+        exitArmedRef.current && exitModeRef.current === "deep" &&
+        firstBackTimeRef.current
+      ) {
         if (now - firstBackTimeRef.current < THRESHOLD_MS) {
           resetExitState();
           window.close();
@@ -118,7 +121,7 @@ export function useBackToExit(): void {
 
       const cleanState = { ...state };
       Reflect.deleteProperty(cleanState, SENTINEL_KEY);
-      
+
       history.pushState(cleanState, "", window.location.href);
       showExitToast();
     };
@@ -126,7 +129,8 @@ export function useBackToExit(): void {
     const handlePopState = (event: PopStateEvent) => {
       const now = Date.now();
       const state = event.state as Record<string, unknown> | null;
-      const hasSentinel = state && typeof state === "object" && Reflect.get(state, SENTINEL_KEY) === true;
+      const hasSentinel = state && typeof state === "object" &&
+        Reflect.get(state, SENTINEL_KEY) === true;
 
       if (!hasSentinel) {
         handleDeepExit(now);

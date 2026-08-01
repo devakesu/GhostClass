@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  useInstitutions,
   useDefaultInstitutionUser,
+  useInstitutions,
   useUpdateDefaultInstitutionUser,
 } from "@/hooks/users/institutions";
 import { Button } from "@/components/ui/button";
@@ -18,21 +18,21 @@ import { toast } from "sonner";
 import { Building2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 /**
  * Institution selector component for managing user's default institution.
  * Displays enrolled institutions with radio selection and optimistic UI updates.
  * Handles loading states and empty states gracefully.
- * 
+ *
  * @returns Interactive institution selection card with animations
- * 
+ *
  * Features:
  * - Radio button selection for institutions
  * - Optimistic UI updates with rollback on error
  * - Loading and empty state handling
  * - Animated transitions
- * 
+ *
  * @example
  * ```tsx
  * <InstitutionSelector />
@@ -48,7 +48,8 @@ export function InstitutionSelector() {
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
 
   // Use pending selection if user has edited, otherwise use the server value
-  const selectedInstitution = pendingSelection ?? defaultInstitutionUser?.toString() ?? "";
+  const selectedInstitution = pendingSelection ??
+    defaultInstitutionUser?.toString() ?? "";
 
   const handleSaveInstitution = () => {
     if (!selectedInstitution) return;
@@ -79,7 +80,10 @@ export function InstitutionSelector() {
           <CardDescription>Select your default institution</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-6">
-          <Loader2 className="h-fit w-6 animate-spin text-muted-foreground" aria-label="Loading" />
+          <Loader2
+            className="h-fit w-6 animate-spin text-muted-foreground"
+            aria-label="Loading"
+          />
         </CardContent>
       </Card>
     );
@@ -126,7 +130,8 @@ export function InstitutionSelector() {
           >
             {/* Screen reader helper text */}
             <span className="sr-only" id="institution-help">
-              Choose your primary educational institution to customize your experience. Your selection will be saved as default.
+              Choose your primary educational institution to customize your
+              experience. Your selection will be saved as default.
             </span>
             <AnimatePresence>
               {institutions.map((institution, index) => (
@@ -147,7 +152,10 @@ export function InstitutionSelector() {
                     aria-label={`Select institution ${institution.institution.name} with role ${institution.institution_role.name}`}
                   >
                     <div className="flex items-center space-x-2 md:space-x-3">
-                      <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Building2
+                        className="h-4 w-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                       <div className="flex flex-col gap-0.5">
                         <p className="text-sm font-medium line-clamp-1">
                           {institution.institution.name}
@@ -179,25 +187,30 @@ export function InstitutionSelector() {
             <motion.div>
               <Button
                 onClick={handleSaveInstitution}
-                disabled={
-                  updateDefaultInstitutionUser.isPending ||
+                disabled={updateDefaultInstitutionUser.isPending ||
                   pendingSelection === null ||
-                  pendingSelection === defaultInstitutionUser?.toString()
-                }
+                  pendingSelection === defaultInstitutionUser?.toString()}
                 className="w-full font-semibold min-h-11.5 rounded-[12px] mt-4 font-md"
                 aria-label="Save selected institution as default"
               >
                 {updateDefaultInstitutionUser.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  <Loader2
+                    className="mr-2 h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
                 )}
-                {updateDefaultInstitutionUser.isPending ? (
-                  <>
-                    <span className="sr-only">Saving your institution preference</span>
-                    <span aria-hidden="true">Saving...</span>
-                  </>
-                ) : (
-                  "Save as Default"
-                )}
+                {updateDefaultInstitutionUser.isPending
+                  ? (
+                    <>
+                      <span className="sr-only">
+                        Saving your institution preference
+                      </span>
+                      <span aria-hidden="true">Saving...</span>
+                    </>
+                  )
+                  : (
+                    "Save as Default"
+                  )}
               </Button>
             </motion.div>
           </motion.div>

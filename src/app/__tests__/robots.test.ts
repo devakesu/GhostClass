@@ -2,7 +2,7 @@
  * Tests for robots.ts
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import robots from "../robots";
 
 describe("robots.txt", () => {
@@ -55,7 +55,7 @@ describe("robots.txt", () => {
 
   it("should include sitemap URL from environment", () => {
     process.env.NEXT_PUBLIC_SITEMAP_URL = "https://example.com/sitemap.xml";
-    
+
     const config = robots();
     expect(config.sitemap).toBe("https://example.com/sitemap.xml");
   });
@@ -79,7 +79,7 @@ describe("robots.txt", () => {
   it("should have correct structure", () => {
     const config = robots();
     const rules = Array.isArray(config.rules) ? config.rules[0] : config.rules;
-    
+
     expect(typeof rules).toBe("object");
     expect(Array.isArray(rules.disallow)).toBe(true);
   });

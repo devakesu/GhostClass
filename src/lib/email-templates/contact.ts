@@ -34,10 +34,13 @@ const HEADER_STYLE =
 /** Renders a responsive logo <img> for the email header, or an empty string if no URL is configured. */
 const renderLogoImg = (size = 180): string => {
   const src = getLogoUrl();
-  if (!src) return `<span style="color: #ffffff; font-size: 22px; font-weight: 700;">GhostClass</span>`;
+  if (!src) {
+    return `<span style="color: #ffffff; font-size: 22px; font-weight: 700;">GhostClass</span>`;
+  }
   return (
     `<img src="${src}" alt="GhostClass" width="${size}" ` +
-    `style="display: block; margin: 0 auto; width: ${size}px; max-width: 100%; height: auto; border: 0;" />`);
+    `style="display: block; margin: 0 auto; width: ${size}px; max-width: 100%; height: auto; border: 0;" />`
+  );
 };
 
 const BODY_STYLE = `padding: 40px;`;

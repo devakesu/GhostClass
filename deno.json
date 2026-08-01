@@ -26,5 +26,12 @@
         "no-window"
       ]
     }
-  }
+  },
+  "allowScripts": [
+    "npm:@firebase/util@1.15.2",
+    "npm:@sentry/cli@2.58.6",
+    "npm:esbuild@0.28.1",
+    "npm:protobufjs@7.6.5",
+    "npm:unrs-resolver@1.12.2"
+  ]
 }

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useMemo,
-  ReactNode,
-} from "react";
+import { createContext, ReactNode, useContext, useMemo } from "react";
 import { useUserSettings } from "@/providers/user-settings";
 
 interface AttendanceSettingsContextType {
@@ -35,7 +30,7 @@ export function AttendanceSettingsProvider({
       setTargetPercentage: updateTarget,
       isLoading,
     }),
-    [targetPercentage, updateTarget, isLoading]
+    [targetPercentage, updateTarget, isLoading],
   );
 
   return (
@@ -49,7 +44,7 @@ export const useAttendanceSettings = () => {
   const context = useContext(AttendanceSettingsContext);
   if (context === undefined) {
     throw new Error(
-      "useAttendanceSettings must be used within an AttendanceSettingsProvider"
+      "useAttendanceSettings must be used within an AttendanceSettingsProvider",
     );
   }
   return context;

@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
-vi.unmock('@/hooks/courses/courses')
-import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.unmock("@/hooks/courses/courses");
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFetchCourses } from "../courses";
 import axios from "@/lib/axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,10 +48,12 @@ describe("useFetchCourses", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    
+
     expect(result.current.data?.courses["1"]).toEqual(mockCourses[0]);
     expect(result.current.data?.courses["2"]).toEqual(mockCourses[1]);
-    expect(axios.get).toHaveBeenCalledWith("/institutionuser/courses/withusers");
+    expect(axios.get).toHaveBeenCalledWith(
+      "/institutionuser/courses/withusers",
+    );
   });
 
   it("should handle empty data", async () => {
