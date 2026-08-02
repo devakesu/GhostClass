@@ -24,6 +24,7 @@ import {
 } from "@/lib/proxy/constants";
 import {
   buildEgressTargets,
+  limitReadableStream,
   readWithLimit,
   resolveSafeUpstreamErrorMessage,
 } from "@/lib/proxy/proxy-utils";
@@ -148,7 +149,8 @@ async function prepareRequestBody(
 
 interface EgressResult {
   res: Response;
-  text: string;
+  text?: string;
+  bodyStream?: ReadableStream<Uint8Array> | null;
   egressName: string;
 }
 
@@ -359,13 +361,13 @@ async function attemptSingleTarget(
       `${egress.baseUrl}/${fullPath}${req.nextUrl.search}`,
       init,
     );
-    const text = await readWithLimit(
-      res.body,
-      MAX_RESPONSE_BYTES,
-      controller.signal,
-    );
 
     if (RETRYABLE_UPSTREAM_STATUSES.has(res.status)) {
+      const text = await readWithLimit(
+        res.body,
+        MAX_RESPONSE_BYTES,
+        controller.signal,
+      );
       throw new UpstreamServerError(
         `Err: ${res.status}`,
         res.status,
@@ -374,7 +376,21 @@ async function attemptSingleTarget(
         res.headers,
       );
     }
-    return { res, text, egressName: egress.name };
+
+    if (!res.ok) {
+      const text = await readWithLimit(
+        res.body,
+        MAX_RESPONSE_BYTES,
+        controller.signal,
+      );
+      return { res, text, egressName: egress.name };
+    }
+
+    const bodyStream = res.body
+      ? limitReadableStream(res.body, MAX_RESPONSE_BYTES, controller.signal)
+      : null;
+
+    return { res, bodyStream, egressName: egress.name };
   } finally {
     clearTimeout(timeout);
   }
@@ -418,6 +434,43 @@ async function executeCircuitBreakerLoop(
     }
   }
   throw lastError || new Error("Egress failure");
+}
+
+function handleProxyResultResponse(
+  result: EgressResult,
+  fullPath: string,
+): NextResponse {
+  const sanitizedHeaders = getSanitizedHeaders(result.res.headers);
+  if (!result.res.ok) {
+    const isRateLimit = result.res.status === 429;
+    if (isRateLimit) {
+      logger.warn("Proxy upstream rate limit (429)", {
+        path: fullPath,
+        status: 429,
+      });
+    } else {
+      logger.error(`Proxy error ${result.res.status}`, { path: fullPath });
+    }
+    const msg = (IS_PRODUCTION && result.res.status >= 500)
+      ? "Service experiencing issues."
+      : resolveSafeUpstreamErrorMessage(result.text ?? "", result.res.status);
+    return NextResponse.json({ message: msg, status: result.res.status }, {
+      status: result.res.status,
+      headers: getEgressHeaders(sanitizedHeaders, result.egressName),
+    });
+  }
+
+  if (result.bodyStream) {
+    return new NextResponse(result.bodyStream, {
+      status: result.res.status,
+      headers: getEgressHeaders(sanitizedHeaders, result.egressName),
+    });
+  }
+
+  return new NextResponse(result.text ?? "", {
+    status: result.res.status,
+    headers: getEgressHeaders(sanitizedHeaders, result.egressName),
+  });
 }
 
 async function forward(
@@ -488,30 +541,7 @@ async function forward(
       );
     });
 
-    const sanitizedHeaders = getSanitizedHeaders(result.res.headers);
-    if (!result.res.ok) {
-      const isRateLimit = result.res.status === 429;
-      if (isRateLimit) {
-        logger.warn("Proxy upstream rate limit (429)", {
-          path: fullPath,
-          status: 429,
-        });
-      } else {
-        logger.error(`Proxy error ${result.res.status}`, { path: fullPath });
-      }
-      const msg = (IS_PRODUCTION && result.res.status >= 500)
-        ? "Service experiencing issues."
-        : resolveSafeUpstreamErrorMessage(result.text, result.res.status);
-      return NextResponse.json({ message: msg, status: result.res.status }, {
-        status: result.res.status,
-        headers: getEgressHeaders(sanitizedHeaders, result.egressName),
-      });
-    }
-
-    return new NextResponse(result.text, {
-      status: result.res.status,
-      headers: getEgressHeaders(sanitizedHeaders, result.egressName),
-    });
+    return handleProxyResultResponse(result, fullPath);
   } catch (err: unknown) {
     return handleProxyUpstreamError(err, lastAttemptedEgressName);
   }

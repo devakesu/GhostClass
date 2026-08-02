@@ -636,7 +636,7 @@ application to ensure parity and reliability.
 
 Unlike the web app which uses `httpOnly` cookies, the mobile app:
 
-1. **Authenticates** with a `MOBILE_API_SECRET` and App Check.
+1. **Authenticates** with Firebase App Check.
 2. **Stores tokens** in the hardware-backed **SecureStorage**
    (Keystore/Keychain).
 3. **Calls EzyGo directly** for attendance data to minimize latency, while using

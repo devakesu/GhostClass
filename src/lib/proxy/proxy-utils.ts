@@ -90,6 +90,51 @@ export async function readWithLimit(
   return output;
 }
 
+export function limitReadableStream(
+  body: ReadableStream<Uint8Array>,
+  limitBytes: number,
+  signal?: AbortSignal,
+  onLimitExceeded?: () => void,
+): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  let total = 0;
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        controller.error(
+          new DOMException("The operation was aborted.", "AbortError"),
+        );
+        return;
+      }
+
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+
+        total += value.byteLength;
+        if (total > limitBytes) {
+          onLimitExceeded?.();
+          await reader.cancel();
+          controller.error(new UpstreamResponseTooLargeError(limitBytes));
+          return;
+        }
+
+        controller.enqueue(value);
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+    },
+  });
+}
+
 export function resolveSafeUpstreamErrorMessage(
   body: string,
   status: number,

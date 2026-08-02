@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   buildEgressTargets,
+  limitReadableStream,
   readWithLimit,
   resolveSafeUpstreamErrorMessage,
   UpstreamResponseTooLargeError,
@@ -116,6 +117,49 @@ describe("Proxy Utils", () => {
       streamController!.enqueue(new Uint8Array([1]));
 
       await expect(promise).rejects.toThrow();
+    });
+  });
+
+  describe("limitReadableStream", () => {
+    it("streams data normally within limit", async () => {
+      const data = new TextEncoder().encode("stream payload");
+      const source = new ReadableStream({
+        start(c) {
+          c.enqueue(data);
+          c.close();
+        },
+      });
+
+      const limitedStream = limitReadableStream(source, 100);
+      const reader = limitedStream.getReader();
+      const chunk = await reader.read();
+      expect(chunk.done).toBe(false);
+      expect(new TextDecoder().decode(chunk.value)).toBe("stream payload");
+
+      const finalChunk = await reader.read();
+      expect(finalChunk.done).toBe(true);
+    });
+
+    it("errors when stream exceeds limit and calls onLimitExceeded", async () => {
+      const chunk1 = new Uint8Array(10);
+      const chunk2 = new Uint8Array(10);
+      const source = new ReadableStream({
+        start(c) {
+          c.enqueue(chunk1);
+          c.enqueue(chunk2);
+          c.close();
+        },
+      });
+
+      const onLimit = vi.fn();
+      const limitedStream = limitReadableStream(source, 15, undefined, onLimit);
+      const reader = limitedStream.getReader();
+
+      const read1 = await reader.read();
+      expect(read1.done).toBe(false);
+
+      await expect(reader.read()).rejects.toThrow(UpstreamResponseTooLargeError);
+      expect(onLimit).toHaveBeenCalledOnce();
     });
   });
 

@@ -50,9 +50,7 @@ GhostClass implements multiple layers of security:
 - **Request Deduplication** - Prevents duplicate concurrent requests
 - **Bot Protection** - Cloudflare Turnstile on public endpoints
 - **CSRF Protection** - Custom token-based CSRF protection for web; App Check
-  attestation for mobile requests. `MOBILE_API_SECRET` is maintained as a
-  **server-only** HMAC key for signing security nonces (stateless replay
-  protection).
+  attestation for mobile requests.
 - **Device Attestation (Mobile)** - Firebase App Check with Play Integrity
   (Android) and DeviceCheck (iOS)
 - **Anti-Tapjacking (Mobile)** - Android `FLAG_SECURE` implementation to prevent
@@ -101,9 +99,8 @@ GhostClass implements multiple layers of security:
   `src/lib/supabase/client.ts`.
 - **Proxy Secret Validation** - All proxy workers validate an `x-proxy-secret`
   header on every incoming request; requests without a valid secret are rejected
-  with `403`. Secrets are never embedded in the client bundle
-  (`CF_PROXY_SECRET`, `AWS_SECONDARY_SECRET`, and `MOBILE_API_SECRET` are
-  server-only runtime variables).
+  with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET`
+  and `AWS_SECONDARY_SECRET` are server-only runtime variables).
 
 ## Dependency Security Overrides
 
