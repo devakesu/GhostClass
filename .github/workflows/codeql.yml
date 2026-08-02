@@ -71,6 +71,10 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
+      - name: Prepare app_secrets.dart
+        working-directory: mobile
+        run: cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
+
       - name: Prepare google-services.json
         working-directory: mobile
         run: |
