@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 vi.unmock("../use-sync-on-mount");
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useSyncOnMount, _resetModuleState } from "../use-sync-on-mount";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { _resetModuleState, useSyncOnMount } from "../use-sync-on-mount";
 import { logger } from "@/lib/logger";
 import axios from "@/lib/axios";
 
@@ -54,11 +54,16 @@ describe("useSyncOnMount", () => {
       expect(result.current.syncSettled).toBe(true);
     }, { timeout: 10000 });
 
-    expect(axios.get).toHaveBeenCalledWith("/api/cron/sync", expect.any(Object));
+    expect(axios.get).toHaveBeenCalledWith(
+      "/api/cron/sync",
+      expect.any(Object),
+    );
   });
 
   it("should not sync if disabled", () => {
-    const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, enabled: false }));
+    const { result } = renderHook(() =>
+      useSyncOnMount({ ...defaultOptions, enabled: false })
+    );
 
     expect(result.current.isSyncing).toBe(false);
     expect(result.current.syncSettled).toBe(false);
@@ -66,7 +71,9 @@ describe("useSyncOnMount", () => {
   });
 
   it("should not sync if username is missing but userId is present (short-circuit)", () => {
-    const { result } = renderHook(() => useSyncOnMount({ ...defaultOptions, username: undefined }));
+    const { result } = renderHook(() =>
+      useSyncOnMount({ ...defaultOptions, username: undefined })
+    );
 
     expect(result.current.isSyncing).toBe(false);
     expect(result.current.syncSettled).toBe(true);
@@ -153,7 +160,9 @@ describe("useSyncOnMount", () => {
     renderHook(() => useSyncOnMount(defaultOptions));
 
     await waitFor(() => {
-      expect(logger.dev).toHaveBeenCalledWith(expect.stringContaining("Sync request aborted"));
+      expect(logger.dev).toHaveBeenCalledWith(
+        expect.stringContaining("Sync request aborted"),
+      );
     }, { timeout: 10000 });
   });
 
@@ -174,20 +183,22 @@ describe("useSyncOnMount", () => {
     expect(axios.get).toHaveBeenCalledTimes(1);
   });
 
-  it('should skip state updates if unmounted after request', async () => {
+  it("should skip state updates if unmounted after request", async () => {
     let resolveAxios: (v: any) => void;
-    vi.mocked(axios.get).mockImplementation(() => new Promise(resolve => {
-      resolveAxios = resolve;
-    }));
+    vi.mocked(axios.get).mockImplementation(() =>
+      new Promise((resolve) => {
+        resolveAxios = resolve;
+      })
+    );
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
-    
+
     await waitFor(() => {
       expect(axios.get).toHaveBeenCalled();
     });
-    
+
     unmount();
-    
+
     // Complete axios after unmount
     // @ts-expect-error - resolveAxios is assigned
     resolveAxios({
@@ -195,30 +206,32 @@ describe("useSyncOnMount", () => {
       data: { success: true },
     });
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     // Verify no errors thrown and request resolves cleanly in background
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it('should skip state updates if unmounted after request error', async () => {
+  it("should skip state updates if unmounted after request error", async () => {
     let rejectAxios: (v: any) => void;
-    vi.mocked(axios.get).mockImplementation(() => new Promise((_, reject) => {
-      rejectAxios = reject;
-    }));
+    vi.mocked(axios.get).mockImplementation(() =>
+      new Promise((_, reject) => {
+        rejectAxios = reject;
+      })
+    );
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
-    
+
     await waitFor(() => {
       expect(axios.get).toHaveBeenCalled();
     });
-    
+
     unmount();
-    
+
     // Fail axios after unmount
     // @ts-expect-error - rejectAxios is assigned
-    rejectAxios(new Error('Post-unmount fail'));
+    rejectAxios(new Error("Post-unmount fail"));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     // Verify no log error was recorded since the component had unmounted
     expect(logger.error).not.toHaveBeenCalled();
   });

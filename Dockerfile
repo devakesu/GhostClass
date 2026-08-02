@@ -1,7 +1,7 @@
 # ===============================
 # 0. Global deterministic settings
 # ===============================
-ARG NODE_IMAGE=node:22.22.3-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920
+ARG NODE_IMAGE=node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3
 ARG SOURCE_DATE_EPOCH=1767225600
 
 # ===============================
@@ -9,13 +9,13 @@ ARG SOURCE_DATE_EPOCH=1767225600
 # ===============================
 FROM ${NODE_IMAGE} AS base
 
-# Update npm to version 11 without using `npm install -g` (avoids scorecard "npmCommand not pinned" flag).
+# Update npm to version 12 without using `npm install -g` (avoids scorecard "npmCommand not pinned" flag).
 # /usr/local/bin/npm already symlinks to /usr/local/lib/node_modules/npm/bin/npm-cli.js,
 # so overwriting that directory via tar achieves the same result with no unpinned npm invocation.
 # The tarball is verified by SHA-256 before extraction.
 RUN apk add --no-cache wget && \
-  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-11.14.1.tgz && \
-  echo "bddc8ec2a698d283674cf0a798ef444ba7332497f330dd166056281fcafaca7a  /tmp/npm.tgz" | sha256sum -c - && \
+  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.0.2.tgz && \
+  echo "5dbb86c71d07a1957f2e90734092dd6a58bdcd9ebc2d8d41ca1c6e6a21d364e1  /tmp/npm.tgz" | sha256sum -c - && \
   rm -rf /usr/local/lib/node_modules/npm && \
   mkdir -p /usr/local/lib/node_modules/npm && \
   tar -xz --strip-components=1 -C /usr/local/lib/node_modules/npm -f /tmp/npm.tgz && \

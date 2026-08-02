@@ -1,6 +1,6 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-vi.unmock('@/hooks/users/profile')
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+vi.unmock("@/hooks/users/profile");
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProfile, useUpdateProfile } from "../profile";
 import axiosInstance from "@/lib/axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -64,9 +64,12 @@ describe("profile hooks", () => {
       const mockProfile = { id: "1", first_name: "Test" };
       (axiosInstance.get as any).mockResolvedValueOnce({ data: mockProfile });
 
-      const { result } = renderHook(() => useProfile({ sync: true, force: true }), {
-        wrapper: createWrapper(queryClient),
-      });
+      const { result } = renderHook(
+        () => useProfile({ sync: true, force: true }),
+        {
+          wrapper: createWrapper(queryClient),
+        },
+      );
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
       expect(axiosInstance.get).toHaveBeenCalledWith(
@@ -100,7 +103,11 @@ describe("profile hooks", () => {
         await result.current.mutateAsync({ data: updateData });
       });
 
-      expect(axiosInstance.patch).toHaveBeenCalledWith("/api/profile", updateData, expect.any(Object));
+      expect(axiosInstance.patch).toHaveBeenCalledWith(
+        "/api/profile",
+        updateData,
+        expect.any(Object),
+      );
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["profile"] });
     });
 
@@ -126,44 +133,47 @@ describe("profile hooks", () => {
       }
 
       // Check if Sentry was called
-      expect(Sentry.captureException).toHaveBeenCalledWith(error, expect.any(Object));
-      
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        error,
+        expect.any(Object),
+      );
+
       // Check if cache was reverted
       expect(queryClient.getQueryData(["profile"])).toEqual(previousProfile);
     });
 
     it("should handle error rollback when no previous profile exists", async () => {
-        const error = new Error("Update failed");
-        (axiosInstance.patch as any).mockRejectedValueOnce(error);
+      const error = new Error("Update failed");
+      (axiosInstance.patch as any).mockRejectedValueOnce(error);
 
-        const { result } = renderHook(() => useUpdateProfile(), {
-            wrapper: createWrapper(queryClient),
+      const { result } = renderHook(() => useUpdateProfile(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      try {
+        await act(async () => {
+          await result.current.mutateAsync({ data: { first_name: "New" } });
         });
+      } catch {
+        // expected error
+      }
 
-        try {
-            await act(async () => {
-                await result.current.mutateAsync({ data: { first_name: "New" } });
-            });
-        } catch {
-            // expected error
-        }
-
-        expect(queryClient.getQueryData(["profile"])).toBeUndefined();
+      expect(queryClient.getQueryData(["profile"])).toBeUndefined();
     });
 
     it("should handle optimistic update when no previous profile exists", async () => {
-        const updateData = { first_name: "New" };
-        (axiosInstance.patch as any).mockResolvedValueOnce({ data: updateData });
+      const updateData = { first_name: "New" };
+      (axiosInstance.patch as any).mockResolvedValueOnce({ data: updateData });
 
-        const { result } = renderHook(() => useUpdateProfile(), {
-            wrapper: createWrapper(queryClient),
-        });
+      const { result } = renderHook(() => useUpdateProfile(), {
+        wrapper: createWrapper(queryClient),
+      });
 
-        await act(async () => {
-            await result.current.mutateAsync({ data: updateData });
-        });
+      await act(async () => {
+        await result.current.mutateAsync({ data: updateData });
+      });
 
-        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
     });
   });
 });

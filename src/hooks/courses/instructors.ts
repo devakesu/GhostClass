@@ -18,7 +18,6 @@ interface UseFetchCourseInstructorsOptions {
   enabled?: boolean;
 }
 
-
 export function useFetchCourseInstructors(
   { semester, year, enabled = true }: UseFetchCourseInstructorsOptions = {},
 ) {
@@ -26,7 +25,12 @@ export function useFetchCourseInstructors(
   const classId = profile?.class?.id;
 
   return useQuery<CourseInstructor[]>({
-    queryKey: ["course_instructors", semester ?? null, year ?? null, classId ?? null],
+    queryKey: [
+      "course_instructors",
+      semester ?? null,
+      year ?? null,
+      classId ?? null,
+    ],
     enabled: enabled && !!semester && !!year && !!classId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {

@@ -1,7 +1,7 @@
 // Manage user institutions and default institution settings
 // src/hooks/users/institutions.ts
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "@/lib/axios";
 import { Institution } from "@/types";
 import { retryOnce } from "@/lib/query-utils";
@@ -9,16 +9,16 @@ import { retryOnce } from "@/lib/query-utils";
 /**
  * React Query hook for fetching user's enrolled institutions.
  * Automatically filters to show only institutions where user has student role.
- * 
+ *
  * @returns Query result containing array of student institutions
- * 
+ *
  * Query Configuration:
  * - Stale time: 5 minutes
  * - Retry: Disabled
  * - Cache key: ["institutions"]
- * 
+ *
  * @throws {Error} If no student institutions found
- * 
+ *
  * @example
  * ```tsx
  * const { data: institutions } = useInstitutions();
@@ -34,7 +34,7 @@ export function useInstitutions() {
 
       const studentInstitutions = res.data.filter(
         (institution: Institution) =>
-          institution.institution_role.name === "student"
+          institution.institution_role.name === "student",
       );
 
       if (studentInstitutions.length === 0) {
@@ -50,9 +50,9 @@ export function useInstitutions() {
 
 /**
  * React Query hook for fetching user's default institution ID.
- * 
+ *
  * @returns Query result containing default institution ID
- * 
+ *
  * @example
  * ```tsx
  * const { data: defaultId } = useDefaultInstitute();
@@ -80,7 +80,7 @@ export function useDefaultInstitutionUser() {
     queryKey: ["defaultInstitutionUser"],
     queryFn: async () => {
       const res = await axiosInstance.get(
-        "/user/setting/default_institutionUser"
+        "/user/setting/default_institutionUser",
       );
       if (!res) throw new Error("Failed to fetch default institution user");
 
@@ -88,7 +88,7 @@ export function useDefaultInstitutionUser() {
 
       if (defaultInstitutionUser && institutions) {
         const currentDefault = institutions.find(
-          (inst) => inst?.id === defaultInstitutionUser
+          (inst) => inst?.id === defaultInstitutionUser,
         );
 
         if (
@@ -96,10 +96,12 @@ export function useDefaultInstitutionUser() {
             currentDefault?.institution_role?.name !== "student") &&
           institutions.length > 0
         ) {
-          const studentInstitution = institutions.find(inst => inst?.institution_role?.name === "student");
+          const studentInstitution = institutions.find((inst) =>
+            inst?.institution_role?.name === "student"
+          );
           if (studentInstitution) {
             await updateDefaultInstitutionUser.mutateAsync(
-              studentInstitution.id
+              studentInstitution.id,
             );
             return studentInstitution.id;
           }
@@ -123,7 +125,7 @@ export function useUpdateDefaultInstitutionUser() {
         "/user/setting/default_institutionUser",
         {
           default_institutionUser: institutionUserId,
-        }
+        },
       );
       if (!res) throw new Error("Failed to update default institution user");
       return res.data;

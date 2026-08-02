@@ -65,6 +65,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       await apiService.upsertInstructor(
         courseCode: widget.courseCode,
         instructorName: name,
+        courseName: widget.courseName,
         supabaseToken: supabaseToken,
       );
 

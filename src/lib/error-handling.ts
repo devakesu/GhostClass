@@ -2,8 +2,29 @@
  * Error handling utilities for database constraint violations and other errors
  */
 
-import { PostgrestError } from "@supabase/supabase-js";
 import { Course } from "@/types";
+import { PostgrestError } from "@supabase/supabase-js";
+
+/**
+ * Normalizes any caught error value into a standard Error instance.
+ */
+export function toError(err: unknown): Error {
+  if (err instanceof Error) {
+    return err;
+  }
+  if (typeof err === "string") {
+    return new Error(err);
+  }
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return new Error((err as { message: string }).message);
+  }
+  return new Error(String(err ?? "Unknown error"));
+}
 
 /**
  * Centrally managed database constraint hints.
@@ -23,7 +44,11 @@ export interface DatabaseError {
   message?: string;
 }
 
-function normalizeError(error: unknown): { code: string; message: string; status?: number } {
+function normalizeError(error: unknown): {
+  code: string;
+  message: string;
+  status?: number;
+} {
   if (!error || typeof error !== "object") {
     return { code: "", message: "" };
   }
@@ -58,7 +83,11 @@ function normalizeError(error: unknown): { code: string; message: string; status
   return { code, message, status };
 }
 
-function handleSecurityOrUniqueViolation(code: string, lower: string, context: string): string | null {
+function handleSecurityOrUniqueViolation(
+  code: string,
+  lower: string,
+  context: string,
+): string | null {
   if (code === "42501" || lower.includes("row-level security")) {
     if (context === "adding course") {
       return "You don't have permission to add courses to this class. Ensure your profile sync is complete.";
@@ -86,7 +115,10 @@ function handleSecurityOrUniqueViolation(code: string, lower: string, context: s
  * Maps Supabase/PostgreSQL errors to human-readable messages.
  * Keeps technical DB details out of user-facing UI.
  */
-export function getHumanReadableError(error: unknown, context: string = "operation"): string {
+export function getHumanReadableError(
+  error: unknown,
+  context: string = "operation",
+): string {
   if (!error) return `Failed to complete ${context}`;
 
   const { code, message, status } = normalizeError(error);
@@ -106,7 +138,11 @@ export function getHumanReadableError(error: unknown, context: string = "operati
   }
 
   // Network / timeout
-  if (message.includes("fetch") || lower.includes("network") || code === "ERR_NETWORK") {
+  if (
+    message.includes("fetch") ||
+    lower.includes("network") ||
+    code === "ERR_NETWORK"
+  ) {
     return "Connection failed. Please check your internet and try again.";
   }
 
@@ -125,58 +161,60 @@ export function getHumanReadableError(error: unknown, context: string = "operati
 
 /**
  * Checks if an error is a duty leave constraint violation (P0001 error with specific hint)
- * 
+ *
  * @param error - The error object to check
  * @returns true if the error is a duty leave constraint violation, false otherwise
  */
 export function isDutyLeaveConstraintError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  
+
   const errorObj = error as Record<string, unknown>;
-  
+
   // Check direct error properties
-  const isDirectMatch = (
-    errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE && 
-    errorObj.hint === DB_CONSTRAINTS.DUTY_LEAVE_LIMIT
-  );
-  
+  const isDirectMatch = errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
+    errorObj.hint === DB_CONSTRAINTS.DUTY_LEAVE_LIMIT;
+
   if (isDirectMatch) return true;
-  
+
   // Check if error is wrapped in a details property or other nested structure
   if (errorObj.details && typeof errorObj.details === "object") {
     const details = errorObj.details as Record<string, unknown>;
-    const isNestedMatch =
-      details.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
+    const isNestedMatch = details.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
       details.hint === DB_CONSTRAINTS.DUTY_LEAVE_LIMIT;
 
     if (isNestedMatch) {
       return true;
     }
   }
-  
+
   // Check error message as fallback
-  if (errorObj.message && typeof errorObj.message === 'string') {
-    return errorObj.message.includes('Maximum') && 
-           errorObj.message.includes('Duty Leaves exceeded') &&
-           errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE;
+  if (errorObj.message && typeof errorObj.message === "string") {
+    return (
+      errorObj.message.includes("Maximum") &&
+      errorObj.message.includes("Duty Leaves exceeded") &&
+      errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE
+    );
   }
-  
+
   return false;
 }
 
 /**
  * Generates a user-friendly error message for duty leave constraint violations
- * 
+ *
  * @param courseId - The course ID
  * @param coursesData - The courses data object containing course information
  * @returns A user-friendly error message
  */
 export function getDutyLeaveErrorMessage(
-  courseId: string, 
-  coursesData?: { courses: Record<string, Course> }
+  courseId: string,
+  coursesData?: { courses: Record<string, Course> },
 ): string {
-  const courseEntries = coursesData?.courses ? Object.entries(coursesData.courses) : [];
-  const foundCourse = courseEntries.find(([k]) => k === courseId);
-  const courseName = foundCourse?.[1]?.name || `course ${courseId}`;
+  const courses = coursesData?.courses;
+  const course =
+    courses && Object.prototype.hasOwnProperty.call(courses, courseId)
+      ? (Reflect.get(courses, courseId) as Course)
+      : undefined;
+  const courseName = course?.name || `course ${courseId}`;
   return `Cannot add Duty Leave: Maximum of 5 duty leaves per semester exceeded for ${courseName}`;
 }

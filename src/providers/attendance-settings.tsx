@@ -1,16 +1,14 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useMemo,
-  ReactNode,
-} from "react";
+import { createContext, ReactNode, useContext, useMemo } from "react";
 import { useUserSettings } from "@/providers/user-settings";
 
 interface AttendanceSettingsContextType {
   targetPercentage: number;
   setTargetPercentage: (percentage: number) => void;
+  courseTargets: Record<string, number>;
+  updateCourseTarget: (courseCode: string, percentage: number) => void;
+  updateCourseTargets: (map: Record<string, number>) => void;
   isLoading: boolean;
 }
 
@@ -25,17 +23,37 @@ interface AttendanceSettingsProviderProps {
 export function AttendanceSettingsProvider({
   children,
 }: AttendanceSettingsProviderProps) {
-  const { settings, updateTarget, isLoading } = useUserSettings();
+  const {
+    settings,
+    updateTarget,
+    updateCourseTarget,
+    updateCourseTargets,
+    isLoading,
+  } = useUserSettings();
 
   const targetPercentage = settings?.target_percentage ?? 75;
+  const courseTargets = useMemo(
+    () => settings?.course_targets ?? {},
+    [settings?.course_targets],
+  );
 
   const contextValue = useMemo(
     () => ({
       targetPercentage,
       setTargetPercentage: updateTarget,
+      courseTargets,
+      updateCourseTarget,
+      updateCourseTargets,
       isLoading,
     }),
-    [targetPercentage, updateTarget, isLoading]
+    [
+      targetPercentage,
+      updateTarget,
+      courseTargets,
+      updateCourseTarget,
+      updateCourseTargets,
+      isLoading,
+    ],
   );
 
   return (
@@ -49,7 +67,7 @@ export const useAttendanceSettings = () => {
   const context = useContext(AttendanceSettingsContext);
   if (context === undefined) {
     throw new Error(
-      "useAttendanceSettings must be used within an AttendanceSettingsProvider"
+      "useAttendanceSettings must be used within an AttendanceSettingsProvider",
     );
   }
   return context;

@@ -21,7 +21,7 @@ export interface AttendanceResult {
 export function calculateAttendance(
   present: number,
   total: number,
-  targetPercentage: number = 75
+  targetPercentage: number = 75,
 ): AttendanceResult {
   const safeTarget = Number.isFinite(targetPercentage)
     ? Math.min(100, Math.max(1, targetPercentage))
@@ -61,7 +61,7 @@ export function calculateAttendance(
       };
     }
     const required = Math.ceil(
-      (safeTarget * total - 100 * present) / (100 - safeTarget)
+      (safeTarget * total - 100 * present) / (100 - safeTarget),
     );
     return {
       canBunk: 0,
@@ -79,8 +79,7 @@ export function calculateAttendance(
     requiredToAttend: 0,
     targetPercentage: safeTarget,
     isExact: false,
-    isBorderline:
-      bunkableExact > 0 &&
+    isBorderline: bunkableExact > 0 &&
       bunkableExact < 0.9 &&
       bunkable === 0,
   };

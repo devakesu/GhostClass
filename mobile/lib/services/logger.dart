@@ -86,8 +86,8 @@ class AppLogger {
 
   /// Logs a debug message.
   static void d(String message, [Object? error, StackTrace? stackTrace]) {
-    _addToBuffer('DEBUG', message);
     if (kDebugMode) {
+      _addToBuffer('DEBUG', message);
       debugPrint('[DEBUG] $message');
       if (error != null) debugPrint('Error: $error');
       if (stackTrace != null) debugPrint('StackTrace: $stackTrace');
@@ -152,6 +152,16 @@ class AppLogger {
   /// Logs an error message (simple wrapper).
   static void e(String message, [Object? error, StackTrace? stackTrace]) {
     eWithContext(message, error: error, stackTrace: stackTrace);
+  }
+
+  /// Logs a handled/expected error to the buffer and debug console without sending to Sentry.
+  static void eLocal(String message, [Object? error, StackTrace? stackTrace]) {
+    _addToBuffer('ERROR_LOCAL', message);
+    if (kDebugMode) {
+      debugPrint('[ERROR_LOCAL] $message');
+      if (error != null) debugPrint('Error: $error');
+      if (stackTrace != null) debugPrint('StackTrace: $stackTrace');
+    }
   }
 
   /// Logs an error message with optional tags/extras and sends a sanitized

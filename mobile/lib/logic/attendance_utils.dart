@@ -3,28 +3,44 @@ import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/services/logger.dart';
 
+const romanNumerals = [
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+  'XI',
+  'XII',
+];
+
+const Map<String, int> romanToNumberMap = {
+  'i': 1,
+  'ii': 2,
+  'iii': 3,
+  'iv': 4,
+  'v': 5,
+  'vi': 6,
+  'vii': 7,
+  'viii': 8,
+  'ix': 9,
+  'x': 10,
+  'xi': 11,
+  'xii': 12,
+};
+
 /// Converts a numeric value (1, 2, 3...) to Roman numerals (I, II, III...).
 String toRoman(dynamic value) {
   final n = (value is String)
       ? int.tryParse(value) ?? 0
       : (value is num ? value.toInt() : 0);
   if (n < 1) return n.toString();
-  const romans = [
-    'I',
-    'II',
-    'III',
-    'IV',
-    'V',
-    'VI',
-    'VII',
-    'VIII',
-    'IX',
-    'X',
-    'XI',
-    'XII',
-  ];
-  if (n > 0 && n <= romans.length) {
-    return romans[n - 1];
+  if (n > 0 && n <= romanNumerals.length) {
+    return romanNumerals[n - 1];
   }
   return n.toString();
 }
@@ -104,12 +120,15 @@ String normalizeDate(dynamic date) {
   }
 
   AppLogger.e(
-    'attendance_utils.normalizeDate: Unrecognized date format. Returning empty string to avoid invalid slot keys.',
+    'attendance_utils.normalizeDate: Unrecognized date format. Preserving raw string to prevent key collision.',
     {'raw': s},
   );
-  return '';
+  return s;
 }
 
+/// Parses date strings in expected EzyGo formats:
+/// 1. YYYY-MM-DD (e.g. 2024-01-15)
+/// 2. DD-MM-YYYY or DD-MM-YY (e.g. 15-01-2024 or 15-01-24)
 String? _parseSeparatedDate(String base, String sep) {
   final parts = base.split(sep);
   if (parts.length != 3) return null;
@@ -124,12 +143,25 @@ String? _parseSeparatedDate(String base, String sep) {
     return null;
   }
 
-  var year = (a.length == 4) ? int.parse(a) : int.parse(c);
-  if (year < 100) year += 2000;
-  final month = int.parse(b);
-  final day = (a.length == 4) ? int.parse(c) : int.parse(a);
+  int year;
+  int month;
+  int day;
+  if (a.length == 4) {
+    // Format: YYYY-MM-DD
+    year = int.parse(a);
+    month = int.parse(b);
+    day = int.parse(c);
+  } else if (c.length == 4 || c.length == 2) {
+    // Format: DD-MM-YYYY or DD-MM-YY
+    day = int.parse(a);
+    month = int.parse(b);
+    year = int.parse(c);
+    if (year < 100) year += 2000;
+  } else {
+    return null;
+  }
 
-  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
   final parsed = DateTime.tryParse(
     "${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}",
@@ -138,7 +170,7 @@ String? _parseSeparatedDate(String base, String sep) {
       parsed.year != year ||
       parsed.month != month ||
       parsed.day != day) {
-    return '';
+    return null;
   }
 
   final yearStr = year.toString().padLeft(4, '0');
@@ -161,22 +193,7 @@ String normalizeSession(dynamic session) {
   if (s.contains(' ')) s = s.split(' ')[0];
 
   // 2. Roman to Number Map
-  const romans = {
-    'viii': '8',
-    'vii': '7',
-    'vi': '6',
-    'v': '5',
-    'iv': '4',
-    'iii': '3',
-    'ii': '2',
-    'i': '1',
-    'ix': '9',
-    'x': '10',
-    'xi': '11',
-    'xii': '12',
-  };
-
-  if (romans.containsKey(s)) return romans[s]!;
+  if (romanToNumberMap.containsKey(s)) return romanToNumberMap[s]!.toString();
 
   // 3. Parse Integer
   final num = int.tryParse(s);
@@ -196,22 +213,15 @@ String formatSessionName(String sessionName) {
       .trim();
 
   final lower = clean.toLowerCase();
-  const romanMap = {
-    'i': '1st Hour',
-    'ii': '2nd Hour',
-    'iii': '3rd Hour',
-    'iv': '4th Hour',
-    'v': '5th Hour',
-    'vi': '6th Hour',
-    'vii': '7th Hour',
-    'viii': '8th Hour',
-    'ix': '9th Hour',
-    'x': '10th Hour',
-    'xi': '11th Hour',
-    'xii': '12th Hour',
-  };
-
-  if (romanMap.containsKey(lower)) return romanMap[lower]!;
+  final romanVal = romanToNumberMap[lower];
+  if (romanVal != null) {
+    final j = romanVal % 10;
+    final k = romanVal % 100;
+    if (j == 1 && k != 11) return '${romanVal}st Hour';
+    if (j == 2 && k != 12) return '${romanVal}nd Hour';
+    if (j == 3 && k != 13) return '${romanVal}rd Hour';
+    return '${romanVal}th Hour';
+  }
 
   final num = int.tryParse(clean);
   if (num != null && num > 0) {
@@ -236,22 +246,7 @@ int getSessionNumber(String name) {
       .replaceAll(RegExp('session|hour'), '')
       .trim();
 
-  const romanMap = {
-    'i': 1,
-    'ii': 2,
-    'iii': 3,
-    'iv': 4,
-    'v': 5,
-    'vi': 6,
-    'vii': 7,
-    'viii': 8,
-    'ix': 9,
-    'x': 10,
-    'xi': 11,
-    'xii': 12,
-  };
-
-  if (romanMap.containsKey(clean)) return romanMap[clean]!;
+  if (romanToNumberMap.containsKey(clean)) return romanToNumberMap[clean]!;
 
   final match = RegExp(r'\d+').firstMatch(clean);
   if (match != null) {

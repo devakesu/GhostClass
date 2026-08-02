@@ -1,28 +1,34 @@
 /** @vitest-environment jsdom */
-import type { ReactNode } from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { DashboardCharts } from '../DashboardCharts';
-import dynamic from 'next/dynamic';
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { DashboardCharts } from "../DashboardCharts";
+import dynamic from "next/dynamic";
 
-vi.mock('@/components/ui/card', () => ({
+vi.mock("@/components/ui/card", () => ({
   Card: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  CardDescription: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  CardContent: ({ children }: { children?: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardDescription: ({ children }: { children?: ReactNode }) => (
+    <div>{children}</div>
+  ),
   CardHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   CardTitle: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/ui/skeleton', () => ({
+vi.mock("@/components/ui/skeleton", () => ({
   Skeleton: () => <div data-testid="skeleton" />,
 }));
 
-vi.mock('@/components/error-boundary', () => ({
+vi.mock("@/components/error-boundary", () => ({
   ErrorBoundary: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('framer-motion', () => {
-  const mockComponent = ({ children, ...rest }: { children?: ReactNode; [key: string]: unknown }) => {
+vi.mock("framer-motion", () => {
+  const mockComponent = (
+    { children, ...rest }: { children?: ReactNode; [key: string]: unknown },
+  ) => {
     return <div {...rest}>{children}</div>;
   };
   return {
@@ -34,31 +40,35 @@ vi.mock('framer-motion', () => {
       div: mockComponent,
       button: mockComponent,
     },
-    AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    AnimatePresence: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
     LazyMotion: ({ children }: { children?: ReactNode }) => <>{children}</>,
     domAnimation: {},
   };
 });
 
-vi.mock('next/image', () => ({
+vi.mock("next/image", () => ({
   // eslint-disable-next-line @next/next/no-img-element
-  default: (props: { src?: string; [key: string]: unknown }) => <img {...props} data-testid="mock-image" src={props.src || ""} />,
+  default: (props: { src?: string; [key: string]: unknown }) => (
+    <img {...props} data-testid="mock-image" src={props.src || ""} />
+  ),
 }));
 
-vi.mock('@/components/loading', () => ({
+vi.mock("@/components/loading", () => ({
   Loading: () => <div data-testid="loading" />,
 }));
 
 // Mock dynamic import correctly to capture the options
-vi.mock('next/dynamic', () => ({
+vi.mock("next/dynamic", () => ({
   default: vi.fn(() => {
     const MockChart = () => <div data-testid="attendance-chart" />;
-    MockChart.displayName = 'AttendanceChart';
+    MockChart.displayName = "AttendanceChart";
     return MockChart;
   }),
 }));
 
-describe('DashboardCharts', () => {
+describe("DashboardCharts", () => {
   const mockProps = {
     stats: {
       realPresent: 10,
@@ -82,19 +92,19 @@ describe('DashboardCharts', () => {
     isLoadingCourses: false,
   };
 
-  it('renders stats and chart', () => {
+  it("renders stats and chart", () => {
     render(<DashboardCharts {...mockProps} />);
-    expect(screen.getByText('Attendance Overview')).toBeInTheDocument();
+    expect(screen.getByText("Attendance Overview")).toBeInTheDocument();
   });
 
-  it('covers dynamic loading config and ChartSkeleton', () => {
+  it("covers dynamic loading config and ChartSkeleton", () => {
     const dynamicMock = vi.mocked(dynamic);
     // Find the call for AttendanceChart
-    const call = dynamicMock.mock.calls.find(c => c[1]?.ssr === false);
+    const call = dynamicMock.mock.calls.find((c) => c[1]?.ssr === false);
     if (call && call[1]?.loading) {
       const Loading = call[1].loading;
       render(<Loading />);
-      expect(screen.getByTestId('loading')).toBeInTheDocument();
+      expect(screen.getByTestId("loading")).toBeInTheDocument();
     }
   });
 });

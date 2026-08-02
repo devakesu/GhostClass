@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   ATTENDANCE_STATUS,
-  isPositive,
-  isAbsent,
-  getOfficialSessionRaw,
-  getReconciledStats,
   calculateAttendance,
   calculateCurrentAcademicInfo,
+  getOfficialSessionRaw,
+  getReconciledStats,
+  isAbsent,
   isLogicModuleLoaded,
+  isPositive,
 } from "../index";
 
 describe("Logic Barrel Coverage", () => {

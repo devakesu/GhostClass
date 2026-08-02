@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Ghost, Home, ArrowLeft } from "lucide-react";
+import { ArrowLeft, Ghost, Home } from "lucide-react";
 
 export function NotFoundContent() {
   const router = useRouter();
@@ -13,8 +13,8 @@ export function NotFoundContent() {
       <div className="flex justify-center">
         <div className="relative">
           <div className="absolute inset-0 blur-3xl bg-purple-500/20 rounded-full animate-pulse" />
-          <Ghost 
-            className="w-32 h-32 text-purple-500/80 relative animate-bounce" 
+          <Ghost
+            className="w-32 h-32 text-purple-500/80 relative animate-bounce"
             strokeWidth={1.5}
             aria-hidden="true"
           />
@@ -51,10 +51,10 @@ export function NotFoundContent() {
           <Home className="w-4 h-4" aria-hidden="true" />
           Go Home
         </Button>
-        
-        <Button 
-          size="lg" 
-          variant="outline" 
+
+        <Button
+          size="lg"
+          variant="outline"
           className="gap-2 min-w-50"
           onClick={() => router.back()}
         >

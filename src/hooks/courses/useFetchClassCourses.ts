@@ -31,7 +31,12 @@ export function useFetchClassCourses(
   const classId = profile?.class?.id;
 
   return useQuery<ClassCourse[]>({
-    queryKey: ["class_courses", semester ?? null, year ?? null, classId ?? null],
+    queryKey: [
+      "class_courses",
+      semester ?? null,
+      year ?? null,
+      classId ?? null,
+    ],
     enabled: enabled && !!semester && !!year && !!classId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {

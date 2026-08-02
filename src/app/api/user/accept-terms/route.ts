@@ -14,17 +14,23 @@ export const dynamic = "force-dynamic";
  *
  * Logic matches acceptTermsAction in src/app/actions/user.ts
  */
-const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { version?: unknown } }) => {
+const handler = async (
+  req: NextRequest,
+  { decryptedBody }: { decryptedBody?: { version?: unknown } },
+) => {
   const supabaseAdmin = getAdminClient();
 
-  // withSecurity handles auth and JWE. We expect a Bearer token or cookie.
+  // withSecurity handles auth. We expect a Bearer token or cookie.
   const authHeader = req.headers.get("Authorization");
   let authUser;
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    const { data: { user }, error: authError } = await supabaseAdmin.auth
+      .getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    }
     authUser = user;
   } else {
     // Fallback or unauthorized? withSecurity handles basic checks, but we need the user object.
@@ -50,10 +56,15 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { 
   }
 
   // Validate version format — must be a short alphanumeric version string (e.g. "1.0", "2024-01")
-  const versionSchema = z.string().min(1).max(50).regex(/^[0-9a-zA-Z._-]+$/, "Invalid version format");
+  const versionSchema = z.string().min(1).max(50).regex(
+    /^[0-9a-zA-Z._-]+$/,
+    "Invalid version format",
+  );
   const versionResult = versionSchema.safeParse(version);
   if (!versionResult.success) {
-    return NextResponse.json({ error: "Invalid version format" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid version format" }, {
+      status: 400,
+    });
   }
 
   // 3. Update database
@@ -76,7 +87,10 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: { 
     });
   }
 
-  logger.info("API /user/accept-terms: Success", { userId: redact("id", authUser.id), version });
+  logger.info("API /user/accept-terms: Success", {
+    userId: redact("id", authUser.id),
+    version,
+  });
 
   return NextResponse.json({ success: true, version });
 };

@@ -15,7 +15,7 @@ export function useTrackingCount(
 
   return useQuery<number>({
     queryKey: ["count", user?.username, semesterData, academicYearData],
-    
+
     queryFn: async () => {
       // getSession() reads the JWT from local storage — no network call.
       // RLS on the tracker table validates the JWT server-side.
@@ -35,16 +35,19 @@ export function useTrackingCount(
 
       if (error) {
         logger.error("Error fetching count:", error);
-        
-        Sentry.captureException(error, { 
-            tags: { type: "tracking_count_fetch_error", location: "useTrackingCount/queryFn" },
-            extra: { 
-                userId: redact("id", String(user?.id)),
-                semester: semesterData, 
-                year: academicYearData 
-            }
+
+        Sentry.captureException(error, {
+          tags: {
+            type: "tracking_count_fetch_error",
+            location: "useTrackingCount/queryFn",
+          },
+          extra: {
+            userId: redact("id", String(user?.id)),
+            semester: semesterData,
+            year: academicYearData,
+          },
         });
-        
+
         return 0;
       }
 

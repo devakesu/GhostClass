@@ -6,17 +6,20 @@ import { Button } from "@/components/ui/button";
 import { LayoutDashboard } from "lucide-react";
 
 export function PublicNavbar() {
-
   return (
-    <nav 
+    <nav
       className="sticky top-0 z-10 flex h-20 items-center justify-between gap-4 px-4 md:px-6 border-b-2 border-border/50 bg-card shadow-sm"
       aria-label="Main navigation"
     >
       <div className="flex items-center gap-2 h-full">
-        <Link href="/" className="group h-full flex items-center" aria-label="GhostClass home">
-          <div className="relative w-40 sm:w-64 md:w-80 h-20 overflow-hidden"> 
-            <Image 
-              src="/logo.png" 
+        <Link
+          href="/"
+          className="group h-full flex items-center"
+          aria-label="GhostClass home"
+        >
+          <div className="relative w-40 sm:w-64 md:w-80 h-20 overflow-hidden">
+            <Image
+              src="/logo.png"
               alt="GhostClass Logo"
               fill
               sizes="(max-width: 640px) 160px, (max-width: 768px) 256px, 320px"
@@ -28,7 +31,7 @@ export function PublicNavbar() {
           </div>
         </Link>
       </div>
-      
+
       <div className="flex gap-2 sm:gap-4 items-center">
         <Link href="/dashboard">
           <Button className="gap-2">

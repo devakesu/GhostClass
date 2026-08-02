@@ -1,2 +1,4 @@
-import { it, expect } from 'vitest';
-it('works', () => { expect(1).toBe(1); });
+import { expect, it } from "vitest";
+it("works", () => {
+  expect(typeof process).toBe("object");
+});

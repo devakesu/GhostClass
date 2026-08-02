@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import * as Sentry from "@sentry/nextjs";
-import { logger } from "@/lib/logger";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -19,18 +24,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
+import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
+import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
+import { useProfile } from "@/hooks/users/profile";
 import {
-  BookOpen,
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
-import { toast } from "sonner";
+  getDutyLeaveErrorMessage,
+  getHumanReadableError,
+  isDutyLeaveConstraintError,
+} from "@/lib/error-handling";
+import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/client";
+import {
+  cn,
+  formatSessionName,
+  normalizeCourseCode,
+  normalizeDate,
+  normalizeSession,
+  toRoman,
+} from "@/lib/utils";
+import { optionalReasonSchema } from "@/lib/validation/text";
+import { AttendanceReport, Course, TrackAttendance } from "@/types";
+import * as Sentry from "@sentry/nextjs";
 import {
   addMonths,
   eachDayOfInterval,
@@ -44,29 +59,15 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { cn, normalizeCourseCode } from "@/lib/utils";
-import { optionalReasonSchema } from "@/lib/validation/text";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  formatSessionName,
-  normalizeDate,
-  normalizeSession,
-  toRoman,
-} from "@/lib/utils";
-import {
-  getHumanReadableError,
-  getDutyLeaveErrorMessage,
-  isDutyLeaveConstraintError,
-} from "@/lib/error-handling";
-import { AttendanceReport, Course, TrackAttendance } from "@/types";
-import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
-import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
-import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
-import { useProfile } from "@/hooks/users/profile";
+  BookOpen,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 interface User {
   id: string | number;
@@ -112,20 +113,20 @@ function computeSortedCourses(
   coursesData: { courses: Record<string, Course> } | undefined,
   classCourses: { course_code: string; course_name: string }[] | undefined,
   isDisabled: (code: string) => boolean,
-  getCourseCodeById: (id: string) => string
+  getCourseCodeById: (id: string) => string,
 ) {
   const courses: { key: string; name: string }[] = [];
-  
+
   if (coursesData?.courses) {
     Object.entries(coursesData.courses).forEach(([key, c]) => {
       courses.push({ key, name: c.name });
     });
   }
-  
+
   if (classCourses) {
-    classCourses.forEach(cc => {
+    classCourses.forEach((cc) => {
       const code = normalizeCourseCode(cc.course_code);
-      if (!courses.some(c => normalizeCourseCode(c.key) === code)) {
+      if (!courses.some((c) => normalizeCourseCode(c.key) === code)) {
         courses.push({ key: cc.course_code, name: cc.course_name });
       }
     });
@@ -142,7 +143,10 @@ function computeSortedCourses(
   });
 }
 
-function computeSemesterBounds(selectedSemester?: "odd" | "even", selectedYear?: string) {
+function computeSemesterBounds(
+  selectedSemester?: "odd" | "even",
+  selectedYear?: string,
+) {
   if (!selectedYear || !selectedSemester) {
     return { min: undefined, max: undefined };
   }
@@ -170,7 +174,12 @@ function computeSemesterBounds(selectedSemester?: "odd" | "even", selectedYear?:
   }
 }
 
-function computeAutoSession(open: boolean, attendanceData: AttendanceReport | undefined, trackingData: TrackAttendance[], date: Date) {
+function computeAutoSession(
+  open: boolean,
+  attendanceData: AttendanceReport | undefined,
+  trackingData: TrackAttendance[],
+  date: Date,
+) {
   if (!open || !attendanceData) return "";
   const occupiedSessions = new Set<string>();
   const dateKey = normalizeDate(date);
@@ -181,16 +190,22 @@ function computeAutoSession(open: boolean, attendanceData: AttendanceReport | un
     Object.entries(officialDay).forEach(([key, s], index) => {
       const slot = s as AttendanceSlot;
       if (
-        slot.course == null || slot.course === "null" ||
-        slot.course === 0 || slot.course === "0"
-      ) return;
+        slot.course == null ||
+        slot.course === "null" ||
+        slot.course === 0 ||
+        slot.course === "0"
+      ) {
+        return;
+      }
 
       // eslint-disable-next-line security/detect-object-injection
       let name = attendanceData.sessions?.[key]?.name;
-      if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+      if (!name && slot.session && slot.session !== "null") {
+        name = String(slot.session);
+      }
       if (!name) {
         const keyInt = parseInt(key);
-        name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+        name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
       }
       if (name) occupiedSessions.add(normalizeSession(name));
     });
@@ -207,10 +222,10 @@ function computeAutoSession(open: boolean, attendanceData: AttendanceReport | un
 }
 
 function computeBestCourse(
-  session: string, 
-  date: Date, 
-  attendanceData: AttendanceReport | undefined, 
-  getCourseCodeById: (id: string) => string
+  session: string,
+  date: Date,
+  attendanceData: AttendanceReport | undefined,
+  getCourseCodeById: (id: string) => string,
 ) {
   if (!session || !attendanceData?.studentAttendanceData) return "";
   const dayOfWeek = date.getDay();
@@ -225,14 +240,23 @@ function computeBestCourse(
       if (new Date(y, m, d).getDay() === dayOfWeek) {
         Object.entries(sessions).forEach(([key, s], index) => {
           const slot = s as AttendanceSlot;
-          if (slot.course == null || slot.course === "null" || slot.course === 0 || slot.course === "0") return;
+          if (
+            slot.course == null ||
+            slot.course === "null" ||
+            slot.course === 0 ||
+            slot.course === "0"
+          ) {
+            return;
+          }
 
           // eslint-disable-next-line security/detect-object-injection
           let name = attendanceData.sessions?.[key]?.name;
-          if (!name && slot.session && slot.session !== "null") name = String(slot.session);
+          if (!name && slot.session && slot.session !== "null") {
+            name = String(slot.session);
+          }
           if (!name) {
             const keyInt = parseInt(key);
-            name = (!isNaN(keyInt) && keyInt < 20) ? key : String(index + 1);
+            name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
           }
           if (name && normalizeSession(name) === target) {
             const cid = getCourseCodeById(String(slot.course));
@@ -247,16 +271,19 @@ function computeBestCourse(
   let best = "";
   let max = 0;
   Object.entries(frequencyMap).forEach(([cid, count]) => {
-    if (count > max) { max = count; best = cid; }
+    if (count > max) {
+      max = count;
+      best = cid;
+    }
   });
   return best;
 }
 
 function checkIfSessionBlocked(
-  session: string, 
-  date: Date, 
-  attendanceData: AttendanceReport | undefined, 
-  trackingData: TrackAttendance[]
+  session: string,
+  date: Date,
+  attendanceData: AttendanceReport | undefined,
+  trackingData: TrackAttendance[],
 ) {
   if (!session) return false;
 
@@ -271,14 +298,17 @@ function checkIfSessionBlocked(
       const slot = s as AttendanceSlot;
 
       if (
-        slot.course == null || slot.course === "null" || slot.course === 0 ||
+        slot.course == null ||
+        slot.course === "null" ||
+        slot.course === 0 ||
         slot.course === "0"
       ) {
         return false;
       }
 
       // eslint-disable-next-line security/detect-object-injection
-      let effectiveName: string | undefined = attendanceData.sessions?.[key]?.name;
+      let effectiveName: string | undefined = attendanceData.sessions?.[key]
+        ?.name;
 
       if (!effectiveName && slot.session && slot.session !== "null") {
         effectiveName = String(slot.session);
@@ -286,9 +316,7 @@ function checkIfSessionBlocked(
 
       if (!effectiveName) {
         const keyInt = parseInt(key);
-        effectiveName = (!isNaN(keyInt) && keyInt < 20)
-          ? key
-          : String(index + 1);
+        effectiveName = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
       }
 
       if (effectiveName && normalizeSession(effectiveName) === targetSession) {
@@ -376,7 +404,12 @@ export function AddAttendanceDialog({
   });
 
   const sortedCourses = useMemo(() => {
-    return computeSortedCourses(coursesData, classCourses, isDisabled, getCourseCodeById);
+    return computeSortedCourses(
+      coursesData,
+      classCourses,
+      isDisabled,
+      getCourseCodeById,
+    );
   }, [coursesData, classCourses, isDisabled, getCourseCodeById]);
 
   // 1. CALCULATE SEMESTER BOUNDS
@@ -407,7 +440,7 @@ export function AddAttendanceDialog({
         setStatusType("Present");
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, semesterBounds.min, semesterBounds.max]);
 
   // --- 3. SMART DEFAULTS (Occupancy Check) ---
@@ -422,7 +455,7 @@ export function AddAttendanceDialog({
         setSession(autoSession);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, getDateKey(date), attendanceData, autoSession]);
 
   // --- 4. PREFILL COURSE ---
@@ -438,9 +471,8 @@ export function AddAttendanceDialog({
         else if (sortedCourses.length > 0) setCourseId(sortedCourses[0].key);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, date.getDay(), session, bestCourse, sortedCourses]);
-
 
   // --- 5. VALIDATION (Is Session Blocked?) ---
   const isSessionBlocked = useMemo(() => {
@@ -464,7 +496,9 @@ export function AddAttendanceDialog({
       if (statusType === "Duty Leave") attCode = 225;
 
       const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
 
       if (!authUser) {
         toast.error("You must be logged in");
@@ -480,19 +514,17 @@ export function AddAttendanceDialog({
 
       const finalRemarks = optionalReasonSchema.parse(remarks);
 
-      const { error } = await supabase
-        .from("tracker")
-        .insert({
-          auth_user_id: authUser.id,
-          course: courseIdToSave,
-          date: format(date, "yyyy-MM-dd"),
-          session: toRoman(session),
-          semester: selectedSemester,
-          year: selectedYear,
-          status: "extra",
-          attendance: attCode,
-          remarks: finalRemarks,
-        });
+      const { error } = await supabase.from("tracker").insert({
+        auth_user_id: authUser.id,
+        course: courseIdToSave,
+        date: format(date, "yyyy-MM-dd"),
+        session: toRoman(session),
+        semester: selectedSemester,
+        year: selectedYear,
+        status: "extra",
+        attendance: attCode,
+        remarks: finalRemarks,
+      });
 
       if (error) {
         if (isDutyLeaveConstraintError(error)) {
@@ -538,6 +570,21 @@ export function AddAttendanceDialog({
   });
   const startDay = getDay(startOfMonth(currentMonth));
 
+  const renderSubmitButtonText = () => {
+    if (isSubmitting) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          Saving
+        </>
+      );
+    }
+    if (isSessionBlocked) {
+      return "Session occupied";
+    }
+    return "Save Record";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-106.25 custom-container border-border/50 bg-card/90 backdrop-blur-xl shadow-2xl">
@@ -565,7 +612,10 @@ export function AddAttendanceDialog({
                       "w-full justify-start text-left font-normal bg-accent/20 border-border/50 hover:bg-accent/30",
                     )}
                     aria-label={`Selected date: ${
-                      format(date, "MMMM d, yyyy")
+                      format(
+                        date,
+                        "MMMM d, yyyy",
+                      )
                     }. Click to change date`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -611,16 +661,16 @@ export function AddAttendanceDialog({
 
                       {/* Days Header */}
                       <div className="grid grid-cols-7 text-center mb-1">
-                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((
-                          dayLabel,
-                        ) => (
-                          <div
-                            key={dayLabel}
-                            className="text-[0.8rem] text-muted-foreground font-medium py-1"
-                          >
-                            {dayLabel}
-                          </div>
-                        ))}
+                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(
+                          (dayLabel) => (
+                            <div
+                              key={dayLabel}
+                              className="text-[0.8rem] text-muted-foreground font-medium py-1"
+                            >
+                              {dayLabel}
+                            </div>
+                          ),
+                        )}
                       </div>
 
                       {/* Days Grid */}
@@ -661,9 +711,13 @@ export function AddAttendanceDialog({
                                     "hover:bg-accent hover:text-foreground cursor-pointer",
                                   isSelected &&
                                     "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm scale-105 font-medium",
-                                  !isSelected && isTodayDate && !isDisabled &&
+                                  !isSelected &&
+                                    isTodayDate &&
+                                    !isDisabled &&
                                     "bg-accent/50 text-accent-foreground font-medium border border-border/50",
-                                  !isSelected && !isTodayDate && !isDisabled &&
+                                  !isSelected &&
+                                    !isTodayDate &&
+                                    !isDisabled &&
                                     "text-foreground",
                                   isDisabled &&
                                     "text-muted-foreground/30 cursor-not-allowed pointer-events-none",
@@ -707,161 +761,190 @@ export function AddAttendanceDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {isSessionBlocked && (
-                <p
-                  id="session-blocked-warning"
-                  className="text-[10px] text-red-600 dark:text-red-400 mt-1.5 ml-1 flex items-center gap-1"
-                  role="alert"
-                  aria-live="polite"
-                >
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                    aria-hidden="true"
-                  />
-                  Session occupied
-                </p>
-              )}
             </div>
           </div>
 
-          {/* COURSE */}
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label
-              htmlFor="course-select"
-              className="text-right text-muted-foreground pt-3"
+          {/* BLURRED & BLOCKED FORM CONTAINER WHEN SESSION IS BLOCKED */}
+          <div className="relative rounded-lg overflow-hidden transition-all duration-200">
+            <div
+              className={cn(
+                "space-y-4 transition-all duration-200",
+                isSessionBlocked &&
+                  "blur-[2px] opacity-40 pointer-events-none select-none",
+              )}
             >
-              Subject
-            </Label>
-            <div className="col-span-3 space-y-3">
-              <Select
-                value={courseId}
-                onValueChange={setCourseId}
-                disabled={!profile?.class?.id || sortedCourses.length === 0}
-              >
-                <SelectTrigger
-                  id="course-select"
-                  className="bg-accent/20 hover:bg-accent/30 border-border/50 h-11 w-full backdrop-blur-md transition-all duration-300 text-left ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap overflow-hidden"
-                  aria-label="Select course or subject"
+              {/* COURSE */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label
+                  htmlFor="course-select"
+                  className="text-right text-muted-foreground pt-3"
                 >
-                  <div className="flex items-center gap-2.5 w-full min-w-0 overflow-hidden">
-                    <BookOpen
-                      size={15}
-                      className={cn(
-                        "shrink-0 transition-colors",
-                        courseId ? "text-primary" : "text-muted-foreground",
-                      )}
+                  Subject
+                </Label>
+                <div className="col-span-3 space-y-3">
+                  <Select
+                    value={courseId}
+                    onValueChange={setCourseId}
+                    disabled={!profile?.class?.id ||
+                      sortedCourses.length === 0 || isSessionBlocked}
+                  >
+                    <SelectTrigger
+                      id="course-select"
+                      className="bg-accent/20 hover:bg-accent/30 border-border/50 h-11 w-full backdrop-blur-md transition-all duration-300 text-left ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap overflow-hidden"
+                      aria-label="Select course or subject"
+                    >
+                      <div className="flex items-center gap-2.5 w-full min-w-0 overflow-hidden">
+                        <BookOpen
+                          size={15}
+                          className={cn(
+                            "shrink-0 transition-colors",
+                            courseId ? "text-primary" : "text-muted-foreground",
+                          )}
+                        />
+                        <SelectValue
+                          placeholder={!profile?.class?.id ||
+                              sortedCourses.length === 0
+                            ? "No courses available"
+                            : "Select Subject"}
+                        />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
+                      {sortedCourses.map((c: { key: string; name: string }) => {
+                        const code = getCourseCodeById(c.key);
+                        const isCourseDisabled = isDisabled(code);
+                        return (
+                          <SelectItem
+                            key={c.key}
+                            value={c.key}
+                            className={cn(
+                              "whitespace-normal py-2",
+                              isCourseDisabled && "opacity-60 italic",
+                            )}
+                          >
+                            <span className="leading-tight text-left capitalize truncate block">
+                              {c.name.toLowerCase()}
+                              {isCourseDisabled && " (Disabled)"}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* STATUS */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-muted-foreground">
+                  Status
+                </Label>
+                <RadioGroup
+                  value={statusType}
+                  onValueChange={(v: AttendanceStatusType) => {
+                    setStatusType(v);
+                  }}
+                  className="col-span-3 flex gap-4"
+                  aria-label="Select attendance status"
+                  disabled={isSessionBlocked}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Present"
+                      id="r1"
+                      className="text-green-500 border-green-500/50"
                     />
-                    <SelectValue placeholder={!profile?.class?.id || sortedCourses.length === 0 ? "No courses available" : "Select Subject"} />
+                    <Label
+                      htmlFor="r1"
+                      className="cursor-pointer text-green-500 font-normal"
+                    >
+                      Present
+                    </Label>
                   </div>
-                </SelectTrigger>
-                <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
-                  {sortedCourses.map((c: { key: string; name: string; }) => {
-                    const code = getCourseCodeById(c.key);
-                    const isCourseDisabled = isDisabled(code);
-                    return (
-                      <SelectItem
-                        key={c.key}
-                        value={c.key}
-                        className={cn(
-                          "whitespace-normal py-2",
-                          isCourseDisabled && "opacity-60 italic",
-                        )}
-                      >
-                        <span className="leading-tight text-left capitalize truncate block">
-                          {c.name.toLowerCase()}
-                          {isCourseDisabled && " (Disabled)"}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Absent"
+                      id="r2"
+                      className="text-red-500 border-red-500/50"
+                    />
+                    <Label
+                      htmlFor="r2"
+                      className="cursor-pointer text-red-500 font-normal"
+                    >
+                      Absent
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Duty Leave"
+                      id="r3"
+                      className="text-yellow-500 border-yellow-500/50"
+                    />
+                    <Label
+                      htmlFor="r3"
+                      className="cursor-pointer text-yellow-500 font-normal"
+                    >
+                      DL
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-          {/* STATUS */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right text-muted-foreground">Status</Label>
-            <RadioGroup
-              value={statusType}
-              onValueChange={(v: AttendanceStatusType) => {
-                setStatusType(v);
-              }}
-              className="col-span-3 flex gap-4"
-              aria-label="Select attendance status"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Present"
-                  id="r1"
-                  className="text-green-500 border-green-500/50"
-                />
+              {/* REMARKS / REASON */}
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label
-                  htmlFor="r1"
-                  className="cursor-pointer text-green-500 font-normal"
+                  htmlFor="remarks-dialog"
+                  className="text-right text-muted-foreground"
                 >
-                  Present
+                  {statusType === "Duty Leave" ? "Reason" : "Remarks"}
                 </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="remarks-dialog"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder={statusType === "Duty Leave"
+                      ? "Required for Duty Leave"
+                      : "Optional notes"}
+                    className={cn(
+                      "bg-accent/20 border-border/50",
+                      statusType === "Duty Leave" &&
+                        remarks.length === 0 &&
+                        "border-red-500/50 focus-visible:ring-red-500",
+                    )}
+                    required={statusType === "Duty Leave"}
+                    maxLength={255}
+                    disabled={isSessionBlocked}
+                  />
+                  {statusType === "Duty Leave" && remarks.length === 0 && (
+                    <p className="text-[10px] text-red-500 mt-1.5 ml-1 flex items-center gap-1">
+                      Reason is required to add Duty Leave
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Absent"
-                  id="r2"
-                  className="text-red-500 border-red-500/50"
-                />
-                <Label
-                  htmlFor="r2"
-                  className="cursor-pointer text-red-500 font-normal"
-                >
-                  Absent
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Duty Leave"
-                  id="r3"
-                  className="text-yellow-500 border-yellow-500/50"
-                />
-                <Label
-                  htmlFor="r3"
-                  className="cursor-pointer text-yellow-500 font-normal"
-                >
-                  DL
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* REMARKS / REASON */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label
-              htmlFor="remarks-dialog"
-              className="text-right text-muted-foreground"
-            >
-              {statusType === "Duty Leave" ? "Reason" : "Remarks"}
-            </Label>
-            <div className="col-span-3">
-              <Input
-                id="remarks-dialog"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder={statusType === "Duty Leave"
-                  ? "Required for Duty Leave"
-                  : "Optional notes"}
-                className={cn(
-                  "bg-accent/20 border-border/50",
-                  statusType === "Duty Leave" && remarks.length === 0 &&
-                    "border-red-500/50 focus-visible:ring-red-500",
-                )}
-                required={statusType === "Duty Leave"}
-                maxLength={255}
-              />
-              {statusType === "Duty Leave" && remarks.length === 0 && (
-                <p className="text-[10px] text-red-500 mt-1.5 ml-1 flex items-center gap-1">
-                  Reason is required to add Duty Leave
-                </p>
-              )}
             </div>
+
+            {isSessionBlocked && (
+              <div
+                id="session-blocked-warning"
+                className="absolute inset-0 z-20 flex items-center justify-center bg-background/40 backdrop-blur-xs rounded-lg border border-red-500/20 p-4 text-center"
+                role="alert"
+                aria-live="polite"
+              >
+                <div className="flex flex-col items-center justify-center text-center gap-1.5 p-4 text-red-600 dark:text-red-400">
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  </div>
+                  <div className="font-bold text-sm text-center">
+                    Session occupied
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium text-center">
+                    Please select another period/hour
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -876,30 +959,23 @@ export function AddAttendanceDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !courseId || !session || isSessionBlocked ||
+            disabled={isSubmitting ||
+              !courseId ||
+              !session ||
+              isSessionBlocked ||
               (statusType === "Duty Leave" && remarks.trim().length === 0)}
             className={cn(
-              "custom-button transition-colors min-w-[120px]",
+              "custom-button transition-colors min-w-30",
               statusType === "Present" &&
                 "bg-green-600! hover:bg-green-700! text-white! border-none!",
               statusType === "Absent" &&
                 "bg-red-600! hover:bg-red-700! text-white! border-none!",
               statusType === "Duty Leave" &&
                 "bg-yellow-600! hover:bg-yellow-700! text-white! border-none!",
-              "disabled:opacity-100 disabled:!bg-muted disabled:!text-muted-foreground disabled:border-border/70",
+              "disabled:opacity-100 disabled:bg-muted! disabled:text-muted-foreground! disabled:border-border/70",
             )}
           >
-            {isSubmitting
-              ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Saving
-                </>
-              )
-              : "Save Record"}
+            {renderSubmitButtonText()}
           </Button>
         </DialogFooter>
       </DialogContent>

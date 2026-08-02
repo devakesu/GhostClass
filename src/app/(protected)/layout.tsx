@@ -3,14 +3,18 @@
 import { Navbar } from "@/components/layout/private-navbar";
 import { Footer } from "@/components/layout/footer";
 import { useInstitutions } from "@/hooks/users/institutions";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/toaster";
-import { LazyMotion, domAnimation, m as motion, useScroll } from "framer-motion";
+import {
+  domAnimation,
+  LazyMotion,
+  m as motion,
+  useScroll,
+} from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 import { OutageProvider } from "@/providers/outage-provider";
-import { Loading as CompLoading } from "@/components/loading";
 
 function ProtectedChrome({ children }: { children: React.ReactNode }) {
   const [isHidden, setIsHidden] = useState(false);
@@ -68,10 +72,12 @@ function ProtectedChrome({ children }: { children: React.ReactNode }) {
               transition={{ duration: 0.35, ease: "easeInOut" }}
               className={cn(
                 "fixed top-0 left-0 right-0 z-50",
-                isHidden ? "pointer-events-none" : "pointer-events-auto"
+                isHidden ? "pointer-events-none" : "pointer-events-auto",
               )}
               style={{ paddingRight: "var(--scrollbar-width, 0px)" }}
-              {...((isHidden && typeof HTMLElement !== "undefined") ? { inert: true } : {}) as { inert?: boolean }}
+              {...((isHidden && typeof HTMLElement !== "undefined")
+                ? { inert: true }
+                : {}) as { inert?: boolean }}
             >
               <Navbar />
             </motion.div>
@@ -95,20 +101,9 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isCsrfReady, setIsCsrfReady] = useState(false);
-
   useEffect(() => {
-    let cancelled = false;
-    ensureCSRFToken().finally(() => {
-      if (!cancelled) setIsCsrfReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    void ensureCSRFToken();
   }, []);
-
-  if (!isCsrfReady) return <CompLoading />;
 
   return <ProtectedChrome>{children}</ProtectedChrome>;
 }

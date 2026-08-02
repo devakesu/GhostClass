@@ -139,6 +139,7 @@ class _DashboardContent extends ConsumerWidget {
             stats: data.stats,
             targetPercentage: targetValue,
             disabledCodes: data.disabledCodes,
+            courseTargets: userSettings?.courseTargets ?? const {},
           ),
           StatsGridSection(stats: data.stats, activeCount: data.courses.length),
           const CourseLineupHeader(),

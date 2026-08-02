@@ -44,14 +44,12 @@ const ACTIVATION_TIMEOUT_MS = 3000;
 
 function activateAndRun(
   waitingWorker: ServiceWorker,
-  onReady: () => void
+  onReady: () => void,
 ): void {
   let done = false;
-  // eslint-disable-next-line prefer-const -- declared before `finish()` which closes over it; cannot use const
-  let activationTimeout: ReturnType<typeof setTimeout> | undefined;
   let controllerChangeHandler: (() => void) | undefined;
 
-  const finish = () => {
+  function finish() {
     if (!done) {
       done = true;
       clearTimeout(activationTimeout);
@@ -61,22 +59,28 @@ function activateAndRun(
       if (controllerChangeHandler) {
         navigator.serviceWorker.removeEventListener(
           "controllerchange",
-          controllerChangeHandler
+          controllerChangeHandler,
         );
         controllerChangeHandler = undefined;
       }
       onReady();
     }
-  };
+  }
+
+  const activationTimeout = setTimeout(finish, ACTIVATION_TIMEOUT_MS);
 
   // Primary signal: SW finished claiming the tab.
   // Use a named wrapper so `controllerChangeHandler` can be removed by the
   // statechange/timeout paths even if `once:true` hasn't fired yet.
   const onControllerChange = () => finish();
   controllerChangeHandler = onControllerChange;
-  navigator.serviceWorker.addEventListener("controllerchange", onControllerChange, {
-    once: true,
-  });
+  navigator.serviceWorker.addEventListener(
+    "controllerchange",
+    onControllerChange,
+    {
+      once: true,
+    },
+  );
 
   // Secondary signal: waiting worker reached 'activated' state.
   // Fires even when clientsClaim: false (where controllerchange may never
@@ -90,7 +94,6 @@ function activateAndRun(
   });
 
   // Safety net: if neither signal arrives within the timeout, proceed anyway.
-  activationTimeout = setTimeout(finish, ACTIVATION_TIMEOUT_MS);
 
   waitingWorker.postMessage({ type: "SKIP_WAITING" });
 }

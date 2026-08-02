@@ -3,16 +3,16 @@ import { ContactForm } from "@/components/contact-form";
 
 export default async function ContactClient() {
   const supabase = await createClient();
-  
+
   // 1. Check if user exists
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   let userDetails: { name: string; email: string } | undefined = undefined;
 
   if (user) {
     // 2. If logged in, fetch profile details
     const { data: profile } = await supabase
-      .from("users") 
+      .from("users")
       .select("first_name, last_name, email")
       .eq("auth_id", user.id)
       .single();
@@ -20,7 +20,7 @@ export default async function ContactClient() {
     if (profile) {
       userDetails = {
         name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
-        email: profile.email || user.email
+        email: profile.email || user.email,
       };
     }
   }

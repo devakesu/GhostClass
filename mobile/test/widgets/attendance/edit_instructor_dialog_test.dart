@@ -79,6 +79,7 @@ void main() {
         () => mockApi.upsertInstructor(
           courseCode: any(named: 'courseCode'),
           instructorName: any(named: 'instructorName'),
+          courseName: any(named: 'courseName'),
           supabaseToken: any(named: 'supabaseToken'),
         ),
       ).thenAnswer(
@@ -157,6 +158,7 @@ void main() {
         () => mockApi.upsertInstructor(
           courseCode: 'CS101',
           instructorName: 'Dr. New',
+          courseName: 'Intro',
           supabaseToken: 'test-supabase-token',
         ),
       ).called(1);

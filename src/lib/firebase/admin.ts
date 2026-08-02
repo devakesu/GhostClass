@@ -1,5 +1,10 @@
 import { logger } from "@/lib/logger";
-import * as admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAppCheck as getAdminAppCheck } from "firebase-admin/app-check";
+import {
+  getMessaging as getAdminMessaging,
+  type Messaging,
+} from "firebase-admin/messaging";
 
 export interface DecodedAppCheckToken {
   appId: string;
@@ -20,24 +25,27 @@ export interface AppCheckVerifier {
 export function getAppCheck(): AppCheckVerifier | null {
   try {
     // Check if Firebase Admin is already initialized
-    const firebaseApp = admin.apps.length > 0 ? admin.app() : initializeFirebaseAdmin();
-    
+    const firebaseApp = getApps().length > 0
+      ? getApp()
+      : initializeFirebaseAdmin();
+
     if (!firebaseApp) {
-      logger.warn("Firebase Admin App Check: Failed to initialize Firebase Admin");
+      logger.warn(
+        "Firebase Admin App Check: Failed to initialize Firebase Admin",
+      );
       return null;
     }
 
     return {
       async verifyToken(token: string) {
         try {
-          const appCheckService = admin.appCheck();
+          const appCheckService = getAdminAppCheck(firebaseApp);
           const decodedToken = await appCheckService.verifyToken(token);
-          return { 
+          return {
             appId: decodedToken.appId,
-            token: decodedToken.token
+            token: decodedToken.token,
           };
         } catch (error) {
-
           logger.error("Firebase App Check token verification failed:", error);
           throw error;
         }
@@ -53,16 +61,20 @@ export function getAppCheck(): AppCheckVerifier | null {
  * Initialize and return Firebase Admin Messaging service
  * Returns null if Firebase Admin is not properly configured
  */
-export function getMessaging(): admin.messaging.Messaging | null {
+export function getMessaging(): Messaging | null {
   try {
-    const firebaseApp = admin.apps.length > 0 ? admin.app() : initializeFirebaseAdmin();
-    
+    const firebaseApp = getApps().length > 0
+      ? getApp()
+      : initializeFirebaseAdmin();
+
     if (!firebaseApp) {
-      logger.warn("Firebase Admin Messaging: Failed to initialize Firebase Admin");
+      logger.warn(
+        "Firebase Admin Messaging: Failed to initialize Firebase Admin",
+      );
       return null;
     }
 
-    return admin.messaging();
+    return getAdminMessaging(firebaseApp);
   } catch (error) {
     logger.error("Firebase Admin Messaging initialization failed:", error);
     return null;
@@ -74,7 +86,7 @@ export function getMessaging(): admin.messaging.Messaging | null {
  */
 function initializeFirebaseAdmin() {
   const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  
+
   if (!serviceAccountJson) {
     logger.warn("Firebase Admin: GOOGLE_SERVICE_ACCOUNT_JSON not configured");
     return null;
@@ -82,15 +94,17 @@ function initializeFirebaseAdmin() {
 
   try {
     let credentials: Record<string, unknown>;
-    
+
     if (serviceAccountJson.startsWith("{")) {
       credentials = JSON.parse(serviceAccountJson) as Record<string, unknown>;
     } else {
-      credentials = JSON.parse(Buffer.from(serviceAccountJson, "base64").toString("utf-8")) as Record<string, unknown>;
+      credentials = JSON.parse(
+        Buffer.from(serviceAccountJson, "base64").toString("utf-8"),
+      ) as Record<string, unknown>;
     }
 
-    const app = admin.initializeApp({
-      credential: admin.credential.cert(credentials),
+    const app = initializeApp({
+      credential: cert(credentials),
       projectId: credentials.project_id as string,
     });
 

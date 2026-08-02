@@ -1,27 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
-import { headers as nextHeaders } from "next/headers";
-import { getAdminClient } from "@/lib/supabase/admin";
-import { withSecurity } from "@/lib/security/app-check";
-import {
-  processContactSubmission,
-  contactSchema,
-} from "@/lib/contact/service";
-import { getClientIp } from "@/lib/utils.server";
-import { contactRateLimiter } from "@/lib/ratelimit";
+import { contactSchema, processContactSubmission } from "@/lib/contact/service";
 import { logger } from "@/lib/logger";
+import { contactRateLimiter } from "@/lib/ratelimit";
+import { withSecurity } from "@/lib/security/app-check";
+import { getAdminClient } from "@/lib/supabase/admin";
+import { getClientIp, redact } from "@/lib/utils.server";
 import * as Sentry from "@sentry/nextjs";
+import { headers as nextHeaders } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Unified API for contact form submissions.
- * Optimized for Mobile App usage (Flutter) with Zero-Trust security (JWE + App Check).
- * Now triggers the same email notification and confirmation flow as the web app.
+ * Optimized for Mobile App usage (Flutter) with Zero-Trust security (App Check).
  *
- * Security layers:
+ * NOTE ON DUAL RATE LIMITING:
+ * This route deliberately employs a multi-layered rate limiting strategy:
+ * 1. Outer Limiter (withSecurity): Broad API abuse prevention protecting endpoint infrastructure.
+ * 2. Inner Limiter (contactRateLimiter): Strict resource throttle (per-IP) to prevent spamming contact submissions.
+ *
+ * Flow:
+ * - App Check for mobile callers (via withSecurity)
+ * - Rate limited via withSecurity
+ * - Turnstile CAPTCHA optional check for web callers
+ * - Server-side validation using Zod
  * - Rate limiting (per-IP via contactRateLimiter)
  * - CSRF validation for non-mobile (web) callers
- * - App Check + JWE for mobile callers (via withSecurity)
  */
 export const POST = withSecurity(async (req, { decryptedBody }) => {
   const request = req as NextRequest;
@@ -55,7 +59,7 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
     );
   }
 
-  // 2. Resolve Payload (JWE or JSON)
+  // 2. Resolve Payload (JSON)
   let body = decryptedBody;
   if (!body) {
     try {
@@ -105,10 +109,16 @@ export const POST = withSecurity(async (req, { decryptedBody }) => {
 
   if (!flowResult.success) {
     logger.error("[contact] Submission flow failed:", flowResult.error);
-    Sentry.captureException(new Error(flowResult.error || "Contact flow failed"), {
-      tags: { type: "contact_flow_error", location: "api/contact" },
-      extra: { userId, ip },
-    });
+    Sentry.captureException(
+      new Error(flowResult.error || "Contact flow failed"),
+      {
+        tags: { type: "contact_flow_error", location: "api/contact" },
+        extra: {
+          userId: userId ? redact("id", userId) : undefined,
+          ip: ip ? redact("id", ip) : undefined,
+        },
+      },
+    );
     return NextResponse.json(
       { error: flowResult.error || "Failed to process message" },
       { status: 500 },

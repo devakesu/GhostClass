@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle, Mail, RefreshCcw, Home, LogOut } from "lucide-react";
+import { AlertTriangle, Home, LogOut, Mail, RefreshCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getAppDomain } from "@/lib/utils";
 import { handleLogout, isAuthSessionMissingError } from "@/lib/security/auth";
 import { reloadWithUpdate } from "@/lib/sw-reload";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logger } from "@/lib/logger";
 
@@ -21,7 +21,9 @@ interface ErrorFallbackProps {
  * ErrorFallback component that displays a user-friendly error message
  * with options to try again or go back to the dashboard.
  */
-export function ErrorFallback({ error, reset, showDetails, homeUrl = "/dashboard" }: ErrorFallbackProps) {
+export function ErrorFallback(
+  { error, reset, showDetails, homeUrl = "/dashboard" }: ErrorFallbackProps,
+) {
   const router = useRouter();
   const isDevelopment = process.env.NODE_ENV === "development";
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -90,16 +92,17 @@ export function ErrorFallback({ error, reset, showDetails, homeUrl = "/dashboard
 
   const handleEmailReport = () => {
     const appDomain = getAppDomain();
-    
-    const subject = encodeURIComponent('Error Report - GhostClass');
+
+    const subject = encodeURIComponent("Error Report - GhostClass");
     const body = encodeURIComponent(
       `Hi Admin,\n\nI encountered an error while using GhostClass.\n\n` +
-      `Timestamp: ${new Date().toISOString()}\n\n` +
-      `Note: Detailed error information has been automatically logged to our monitoring system.\n\n` +
-      `Please help resolve this issue.\n\nThank you!`
+        `Timestamp: ${new Date().toISOString()}\n\n` +
+        `Note: Detailed error information has been automatically logged to our monitoring system.\n\n` +
+        `Please help resolve this issue.\n\nThank you!`,
     );
 
-    window.location.href = `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
+    window.location.href =
+      `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -108,7 +111,10 @@ export function ErrorFallback({ error, reset, showDetails, homeUrl = "/dashboard
         {/* Error Icon */}
         <div className="flex justify-center">
           <div className="rounded-full bg-red-100 p-4 dark:bg-red-900/20">
-            <AlertTriangle className="h-12 w-12 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <AlertTriangle
+              className="h-12 w-12 text-red-600 dark:text-red-400"
+              aria-hidden="true"
+            />
           </div>
         </div>
 
@@ -147,7 +153,7 @@ export function ErrorFallback({ error, reset, showDetails, homeUrl = "/dashboard
             <RefreshCcw className="w-4 h-4" aria-hidden="true" />
             Try Again
           </Button>
-          
+
           <Button
             onClick={handleGoHome}
             size="lg"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -20,7 +20,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { GraduationCap, Loader2 } from "lucide-react";
-import { getAvailableClassesAction, selectUserClassAction } from "@/app/actions/user";
+import {
+  getAvailableClassesAction,
+  selectUserClassAction,
+} from "@/app/actions/user";
 import { handleLogout } from "@/lib/security/auth";
 
 interface SelectClassDialogProps {
@@ -80,7 +83,9 @@ export function SelectClassDialog({
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save class selection";
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Failed to save class selection";
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -111,7 +116,8 @@ export function SelectClassDialog({
           No classes are available for this term yet.
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Please wait until a class syncs from EzyGo or contact your administrator.
+          Please wait until a class syncs from EzyGo or contact your
+          administrator.
         </p>
       </div>
     );
@@ -155,7 +161,9 @@ export function SelectClassDialog({
             Select Your Class
           </DialogTitle>
           <DialogDescription className="text-center">
-            You must select a class for the current term (<strong>{semester.toUpperCase()} {academicYear}</strong>) to access course and attendance features.
+            You must select a class for the current term (<strong>
+              {semester.toUpperCase()} {academicYear}
+            </strong>) to access course and attendance features.
           </DialogDescription>
         </DialogHeader>
 
@@ -168,7 +176,8 @@ export function SelectClassDialog({
               {classSelectorContent}
             </div>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              If your class is not listed, please wait until someone else in your class syncs it or until EzyGo is initialized.
+              If your class is not listed, please wait until someone else in
+              your class syncs it or until EzyGo is initialized.
             </p>
           </div>
 
@@ -176,16 +185,19 @@ export function SelectClassDialog({
             <Button
               type="submit"
               className="w-full h-12 text-lg font-bold transition-all hover:scale-[1.02]"
-                disabled={isSubmitting || !selectedClassId || classes.length === 0}
+              disabled={isSubmitting || !selectedClassId ||
+                classes.length === 0}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Saving Selection...
-                </>
-              ) : (
-                "Confirm Class"
-              )}
+              {isSubmitting
+                ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Saving Selection...
+                  </>
+                )
+                : (
+                  "Confirm Class"
+                )}
             </Button>
             <Button
               type="button"

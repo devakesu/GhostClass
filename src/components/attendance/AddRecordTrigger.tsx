@@ -32,25 +32,25 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   // Transform user object to match AddAttendanceDialog's expected interface
   const dialogUser: DialogUser = {
     id: String(user.id),
-    auth_id: "auth_id" in user 
+    auth_id: "auth_id" in user
       ? (user as User & { auth_id?: string | null }).auth_id ?? undefined
       : undefined,
   };
 
   const { data: selectedSemester } = useFetchSemester();
   const { data: selectedYear } = useFetchAcademicYear();
-  
+
   const { data: attendanceData } = useAttendanceReport(
     selectedSemester ?? undefined,
     selectedYear ?? undefined,
     { enabled: isOpen },
   );
-  
-  const { data: trackingData } = useTrackingData(user, { 
-    enabled: isOpen 
+
+  const { data: trackingData } = useTrackingData(user, {
+    enabled: isOpen,
   });
-  
-  const { data: coursesData } = useFetchCourses({ 
+
+  const { data: coursesData } = useFetchCourses({
     enabled: isOpen,
     semester: selectedSemester ?? undefined,
     year: selectedYear ?? undefined,
@@ -80,16 +80,16 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
         <span className="sr-only sm:hidden">Add Record</span>
       </Button>
 
-      <AddAttendanceDialog 
-         open={isOpen} 
-         onOpenChange={setIsOpen}
-         attendanceData={attendanceData ?? undefined}
-         trackingData={trackingData || []}
-         coursesData={coursesData ?? undefined}
-         user={dialogUser}
-         onSuccess={handleSuccess}
-         selectedSemester={selectedSemester ?? undefined}
-         selectedYear={selectedYear ?? undefined}
+      <AddAttendanceDialog
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        attendanceData={attendanceData ?? undefined}
+        trackingData={trackingData || []}
+        coursesData={coursesData ?? undefined}
+        user={dialogUser}
+        onSuccess={handleSuccess}
+        selectedSemester={selectedSemester ?? undefined}
+        selectedYear={selectedYear ?? undefined}
       />
     </>
   );

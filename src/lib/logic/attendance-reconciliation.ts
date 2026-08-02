@@ -5,24 +5,25 @@ interface RawSessionData {
   session?: string | number | null;
 }
 
-import { 
-  ATTENDANCE_STATUS, 
-  isPositiveStatus as isPositive, 
+import {
+  ATTENDANCE_STATUS,
+  DUTY_LEAVE_PLACEHOLDER_REMARKS,
   isAbsentStatus as isAbsent,
-  DUTY_LEAVE_PLACEHOLDER_REMARKS 
+  isPositiveStatus as isPositive,
 } from "../constants/ezygo";
 
 export const isLegacyRemark = (remark: string | null | undefined): boolean => {
   if (!remark) return true;
   const trimmed = remark.trim();
-  return DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed) || trimmed.startsWith("Self-Marked:");
+  return DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed) ||
+    trimmed.startsWith("Self-Marked:");
 };
 
-export { isPositive, isAbsent, ATTENDANCE_STATUS };
+export { ATTENDANCE_STATUS, isAbsent, isPositive };
 
 export const getOfficialSessionRaw = (
-  session: RawSessionData | null | undefined, 
-  sessionKey: string | number
+  session: RawSessionData | null | undefined,
+  sessionKey: string | number,
 ): string | number => {
   if (session && session.session != null && session.session !== "") {
     return session.session;
@@ -36,19 +37,19 @@ export interface ReconciledStats {
   realAbsent: number;
   realDL: number;
   realOther: number;
-  
+
   finalPresent: number;
   finalTotal: number;
-  
-  correctionPresent: number; 
-  savedAbsent: number;       
-  correctionDL: number;      
-  
-  extraPresent: number;      
-  extraAbsent: number;       
+
+  correctionPresent: number;
+  savedAbsent: number;
+  correctionDL: number;
+
+  extraPresent: number;
+  extraAbsent: number;
   extraDL: number;
-  extrasCount: number;       
-  
+  extrasCount: number;
+
   officialPercentage: number;
   finalPercentage: number;
 }
@@ -82,7 +83,7 @@ function processOfficialSessions(
   courseId: string,
   officialSessions: OfficialSession[],
   officialMap: Map<string, number>,
-  stats: ReconciliationAccumulator
+  stats: ReconciliationAccumulator,
 ) {
   for (const session of officialSessions) {
     if (!session || session.class_type === "Revision") continue;
@@ -110,7 +111,7 @@ function processOfficialSessions(
 function handleExtraTrack(
   trackPos: boolean,
   trackDL: boolean,
-  stats: ReconciliationAccumulator
+  stats: ReconciliationAccumulator,
 ) {
   stats.extrasCount++;
   if (trackPos) {
@@ -128,7 +129,7 @@ function handleCorrectionTrack(
   trackDL: boolean,
   offPos: boolean,
   offDL: boolean,
-  stats: ReconciliationAccumulator
+  stats: ReconciliationAccumulator,
 ) {
   if (!offPos && trackPos) {
     stats.correctionPresent++;
@@ -143,7 +144,7 @@ function processCourseTracks(
   courseId: string,
   courseTracks: TrackAttendance[],
   officialMap: Map<string, number>,
-  stats: ReconciliationAccumulator
+  stats: ReconciliationAccumulator,
 ) {
   for (const item of courseTracks) {
     if (!item) continue;
@@ -170,13 +171,23 @@ export function getReconciledStats(
   courseId: string,
   officialAggregate: { present: number; absent: number; total: number },
   officialSessions: OfficialSession[] | undefined,
-  courseTracks: TrackAttendance[] | undefined
+  courseTracks: TrackAttendance[] | undefined,
 ): ReconciledStats {
   const stats: ReconciliationAccumulator = {
-    realPresent: 0, realTotal: 0, realAbsent: 0, realDL: 0, realOther: 0,
-    correctionPresent: 0, savedAbsent: 0, correctionDL: 0,
-    extraPresent: 0, extraAbsent: 0, extraDL: 0,
-    finalPresent: 0, finalTotal: 0, extrasCount: 0
+    realPresent: 0,
+    realTotal: 0,
+    realAbsent: 0,
+    realDL: 0,
+    realOther: 0,
+    correctionPresent: 0,
+    savedAbsent: 0,
+    correctionDL: 0,
+    extraPresent: 0,
+    extraAbsent: 0,
+    extraDL: 0,
+    finalPresent: 0,
+    finalTotal: 0,
+    extrasCount: 0,
   };
 
   const officialMap = new Map<string, number>();
@@ -193,15 +204,20 @@ export function getReconciledStats(
     processCourseTracks(courseId, courseTracks, officialMap, stats);
   }
 
-  stats.finalPresent = stats.realPresent + stats.correctionPresent + stats.extraPresent;
-  stats.finalTotal   = stats.realTotal   + stats.extrasCount;
+  stats.finalPresent = stats.realPresent + stats.correctionPresent +
+    stats.extraPresent;
+  stats.finalTotal = stats.realTotal + stats.extrasCount;
 
-  const officialPct = stats.realTotal > 0 ? (stats.realPresent / stats.realTotal) * 100 : 0;
-  const finalPct = stats.finalTotal > 0 ? (stats.finalPresent / stats.finalTotal) * 100 : 0;
+  const officialPct = stats.realTotal > 0
+    ? (stats.realPresent / stats.realTotal) * 100
+    : 0;
+  const finalPct = stats.finalTotal > 0
+    ? (stats.finalPresent / stats.finalTotal) * 100
+    : 0;
 
   return {
     ...stats,
     officialPercentage: parseFloat(officialPct.toFixed(2)),
-    finalPercentage: parseFloat(finalPct.toFixed(2))
+    finalPercentage: parseFloat(finalPct.toFixed(2)),
   };
 }

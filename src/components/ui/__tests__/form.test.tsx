@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import React from 'react';
-import { useForm } from 'react-hook-form';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import React from "react";
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -10,10 +10,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '../form';
-import { Input } from '../input';
+} from "../form";
+import { Input } from "../input";
 
-describe('Form Components', () => {
+describe("Form Components", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -22,7 +22,7 @@ describe('Form Components', () => {
   const TestForm = () => {
     const form = useForm({
       defaultValues: {
-        test: '',
+        test: "",
       },
     });
 
@@ -46,24 +46,24 @@ describe('Form Components', () => {
     );
   };
 
-  it('renders correctly', () => {
+  it("renders correctly", () => {
     render(<TestForm />);
-    expect(screen.getByText('Test Label')).toBeDefined();
-    expect(screen.getByPlaceholderText('test placeholder')).toBeDefined();
-    expect(screen.getByText('Test Description')).toBeDefined();
+    expect(screen.getByText("Test Label")).toBeDefined();
+    expect(screen.getByPlaceholderText("test placeholder")).toBeDefined();
+    expect(screen.getByText("Test Description")).toBeDefined();
   });
 
-  it('shows error message when validation fails', async () => {
+  it("shows error message when validation fails", async () => {
     const ErrorForm = () => {
       const form = useForm({
         defaultValues: {
-          test: '',
+          test: "",
         },
       });
 
       // Manually set error
       React.useEffect(() => {
-        form.setError('test', { message: 'Test Error' });
+        form.setError("test", { message: "Test Error" });
       }, [form]);
 
       return (
@@ -86,6 +86,6 @@ describe('Form Components', () => {
     };
 
     render(<ErrorForm />);
-    expect(await screen.findByText('Test Error')).toBeDefined();
+    expect(await screen.findByText("Test Error")).toBeDefined();
   });
 });

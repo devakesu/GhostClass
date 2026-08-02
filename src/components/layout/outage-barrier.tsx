@@ -2,11 +2,11 @@
 
 import { useOutage } from "@/providers/outage-provider";
 import { ServiceErrorView } from "@/components/service-error-view";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 /**
  * Global Outage Barrier
- * 
+ *
  * Overlays the entire application with a ServiceErrorView when an outage
  * is detected. This prevents user interaction with potentially stale or
  * broken data during service downtime.

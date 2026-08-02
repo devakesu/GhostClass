@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 4.4.9+1
+version: 4.5.0+1
 environment:
   sdk: ^3.11.4
 
@@ -29,7 +29,7 @@ environment:
 dependencies:
   crypto: ^3.0.2
   cupertino_icons: ^1.0.8
-  device_info_plus: ^12.4.0
+  device_info_plus: ^13.2.0
   dio: ^5.9.2
   encrypt: ^5.0.3
   firebase_analytics: ^12.3.0
@@ -47,12 +47,11 @@ dependencies:
   google_fonts: ^8.0.2
   image_picker: ^1.1.2
   intl: ^0.20.2
-  jose: ^0.3.5+1
   lucide_icons_flutter: ^3.1.14+1
   markdown: any
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.1
   path: ^1.9.1
-  permission_handler: ^11.3.1
+  permission_handler: ^13.0.0
   pointycastle: ^3.9.1
   riverpod_annotation: ^4.0.2
   sentry_dio: ^9.18.0
@@ -118,7 +117,7 @@ flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   image_path: "assets/images/icon.png"
-  min_sdk_android: 29 # android min sdk min:16, default:21
+  min_sdk_android: 29
 
 sentry:
   project: ghostclass-f

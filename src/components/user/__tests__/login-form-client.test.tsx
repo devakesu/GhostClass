@@ -3,25 +3,30 @@
  * the login flash by deferring Framer Motion SSR rendering.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 
 // Mock next/dynamic so the dynamic import resolves synchronously in tests.
 vi.mock("next/dynamic", () => ({
-  default: (loader: unknown, options?: { loading?: () => React.ReactElement }) => {
+  default: (
+    loader: unknown,
+    options?: { loading?: () => React.ReactElement },
+  ) => {
     // Execute the loader to cover the dynamic import logic in the host component.
     if (typeof loader === "function") {
       loader();
     }
-    const LoadingFallback = options?.loading ?? (() => React.createElement("div", null, "loading"));
+    const LoadingFallback = options?.loading ??
+      (() => React.createElement("div", null, "loading"));
     return LoadingFallback;
   },
 }));
 
 // Mock the Loading spinner so it renders a predictable DOM node.
 vi.mock("@/components/loading", () => ({
-  Loading: () => React.createElement("div", { "data-testid": "loading-spinner" }),
+  Loading: () =>
+    React.createElement("div", { "data-testid": "loading-spinner" }),
 }));
 
 // Mock the actual LoginForm so next/dynamic's import() can resolve without

@@ -1,36 +1,36 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  LazyMotion,
-  domAnimation,
-  m as motion,
   AnimatePresence,
+  domAnimation,
+  LazyMotion,
+  m as motion,
 } from "framer-motion";
 import {
-  GraduationCap,
-  FileText,
-  Clock,
-  BookOpen,
   AlertCircle,
+  BookOpen,
+  ChevronRight,
+  Clock,
+  FileText,
+  GraduationCap,
+  HelpCircle,
   RefreshCw,
   X,
-  ChevronRight,
-  HelpCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loading } from "@/components/loading";
-import { useExams, useExamAnswers, useExamQuestions, useBatchExamDetails } from "@/hooks/courses/exams";
-import { useFetchSemester, useFetchAcademicYear } from "@/hooks/users/settings";
+import {
+  useBatchExamDetails,
+  useExamAnswers,
+  useExamQuestions,
+  useExams,
+} from "@/hooks/courses/exams";
+import { useFetchAcademicYear, useFetchSemester } from "@/hooks/users/settings";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
 import type { Exam, ExamAnswer, ExamQuestion } from "@/types";
 import { cn } from "@/lib/utils";
@@ -83,23 +83,35 @@ function safeParseFloat(val: unknown): number {
 
 function getScoreColorClass(score: number, max: number) {
   const pct = max > 0 ? (score / max) * 100 : 0;
-  if (pct >= 75) return { text: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" };
-  if (pct >= 50) return { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" };
+  if (pct >= 75) {
+    return {
+      text: "text-emerald-600 dark:text-emerald-400",
+      bar: "bg-emerald-500",
+    };
+  }
+  if (pct >= 50) {
+    return { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" };
+  }
   return { text: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" };
 }
 
-function computeQuestionsMaxMark(qData: ExamQuestion[], answers: ExamAnswer[]): number {
+function computeQuestionsMaxMark(
+  qData: ExamQuestion[],
+  answers: ExamAnswer[],
+): number {
   if (!qData || qData.length === 0) return 0;
-  const uniqueQuestions = Array.from(new Map(qData.map((q) => [q.id, q])).values());
+  const uniqueQuestions = Array.from(
+    new Map(qData.map((q) => [q.id, q])).values(),
+  );
   const parentIds = new Set(
     uniqueQuestions
       .map((q) => q.subquestion_parent_id)
-      .filter((id): id is number => id !== null)
+      .filter((id): id is number => id !== null),
   );
   const leaves = uniqueQuestions.filter((q) => !parentIds.has(q.id));
 
   const gradedQuestionIds = new Set(
-    answers.filter((a) => a.score !== null).map((a) => a.examquestion_id)
+    answers.filter((a) => a.score !== null).map((a) => a.examquestion_id),
   );
   const gradedLeaves = leaves.filter((q) => gradedQuestionIds.has(q.id));
   const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
@@ -145,7 +157,7 @@ function formatGroupCounts(nAssessments: number, nAssignments: number): string {
  * Returns an ordered array of { id, label, exams } so rendering stays deterministic.
  */
 function groupByCourse(
-  exams: Exam[]
+  exams: Exam[],
 ): { id: string; label: string; exams: Exam[] }[] {
   const order: string[] = [];
   const map = new Map<string, { id: string; label: string; exams: Exam[] }>();
@@ -186,21 +198,27 @@ function ScoreCard({
   // getMaxMark reads exam-level API fields that are frequently null;
   // fall back to resolvedMaxMark (summed from examquestions).
   const apiMaxMark = getMaxMark(exam);
-  const maxNum = apiMaxMark ? safeParseFloat(apiMaxMark) : (resolvedMaxMark ?? null);
-  const maxMark = apiMaxMark ?? (resolvedMaxMark != null ? String(resolvedMaxMark) : null);
+  const maxNum = apiMaxMark
+    ? safeParseFloat(apiMaxMark)
+    : (resolvedMaxMark ?? null);
+  const maxMark = apiMaxMark ??
+    (resolvedMaxMark != null ? String(resolvedMaxMark) : null);
   const date = getExamDate(exam);
   const isAssessment = exam.activity_type === "assessment";
-  const colors =
-    score != null && maxNum != null && maxNum > 0
-      ? getScoreColorClass(score, maxNum)
-      : null;
+  const colors = score != null && maxNum != null && maxNum > 0
+    ? getScoreColorClass(score, maxNum)
+    : null;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.4), ease: "easeOut" }}
+      transition={{
+        duration: 0.25,
+        delay: Math.min(index * 0.04, 0.4),
+        ease: "easeOut",
+      }}
       className="h-full"
     >
       <Card
@@ -233,7 +251,7 @@ function ScoreCard({
                 "shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border",
                 isAssessment
                   ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/50 dark:border-blue-500/30"
-                  : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30"
+                  : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30",
               )}
               variant="outline"
             >
@@ -253,28 +271,32 @@ function ScoreCard({
 
           {/* Score row */}
           <div className="flex items-center justify-between mt-auto">
-            {score != null ? (
-              <div className="flex items-baseline gap-1">
-                <span
-                  className={cn(
-                    "text-xl sm:text-2xl font-bold tabular-nums",
-                    colors ? colors.text : "text-foreground"
-                  )}
-                >
-                  {score}
-                </span>
-                {maxMark && (
-                  <span className="text-sm text-muted-foreground font-medium">
-                    / {maxMark}
+            {score != null
+              ? (
+                <div className="flex items-baseline gap-1">
+                  <span
+                    className={cn(
+                      "text-xl sm:text-2xl font-bold tabular-nums",
+                      colors ? colors.text : "text-foreground",
+                    )}
+                  >
+                    {score}
                   </span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground italic">Pending</span>
-              </div>
-            )}
+                  {maxMark && (
+                    <span className="text-sm text-muted-foreground font-medium">
+                      / {maxMark}
+                    </span>
+                  )}
+                </div>
+              )
+              : (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground italic">
+                    Pending
+                  </span>
+                </div>
+              )}
 
             {date && (
               <span className="hidden sm:inline text-[11px] text-muted-foreground/60 tabular-nums">
@@ -296,7 +318,7 @@ function ScoreCard({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
-                  colors ? colors.bar : "bg-foreground/40"
+                  colors ? colors.bar : "bg-foreground/40",
                 )}
                 style={{ width: `${Math.min(100, (score / maxNum) * 100)}%` }}
               />
@@ -375,26 +397,28 @@ function QuestionRow({
 
       {/* Per-question bar + max */}
       <div className="flex-1 min-w-0">
-        {scoreNum != null && maxNum > 0 ? (
-          <div
-            className="w-full h-1 bg-foreground/10 rounded-full overflow-hidden"
-            role="progressbar"
-            aria-valuenow={Math.round((scoreNum / maxNum) * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`Q${question.question_no}: ${scoreNum} of ${maxNum} marks`}
-          >
+        {scoreNum != null && maxNum > 0
+          ? (
             <div
-              className={cn(
-                "h-full rounded-full transition-all duration-500",
-                barColor
-              )}
-              style={{ width: `${Math.min(100, (scoreNum / maxNum) * 100)}%` }}
-            />
-          </div>
-        ) : (
-          <div className="w-full h-1 bg-foreground/5 rounded-full" />
-        )}
+              className="w-full h-1 bg-foreground/10 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuenow={Math.round((scoreNum / maxNum) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Q${question.question_no}: ${scoreNum} of ${maxNum} marks`}
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  barColor,
+                )}
+                style={{
+                  width: `${Math.min(100, (scoreNum / maxNum) * 100)}%`,
+                }}
+              />
+            </div>
+          )
+          : <div className="w-full h-1 bg-foreground/5 rounded-full" />}
       </div>
 
       {/* Score / max */}
@@ -403,7 +427,7 @@ function QuestionRow({
           variant="outline"
           className={cn(
             "text-xs font-bold tabular-nums px-2 py-0.5 border",
-            chipClass
+            chipClass,
           )}
         >
           {displayScore}
@@ -456,7 +480,7 @@ function ExamDetailDrawer({
   const sortedQuestions = useMemo(() => {
     if (!questions) return [];
     return [...questions].sort(
-      (a, b) => Number(a.question_no) - Number(b.question_no)
+      (a, b) => Number(a.question_no) - Number(b.question_no),
     );
   }, [questions]);
 
@@ -468,13 +492,15 @@ function ExamDetailDrawer({
     if (!answers || answers.length === 0) return null;
     // Deduplicate by unique answer ID to prevent inflation from API duplicates
     const uniqueAnswers = Array.from(
-      new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a])).values()
+      new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a]))
+        .values(),
     );
     const hasAnyScore = uniqueAnswers.some((a: ExamAnswer) => a.score != null);
     if (!hasAnyScore) return null;
     return uniqueAnswers.reduce<number>(
-      (sum: number, a: ExamAnswer) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
-      0
+      (sum: number, a: ExamAnswer) =>
+        sum + (a.score != null ? safeParseFloat(a.score) : 0),
+      0,
     );
   }, [answers]);
 
@@ -485,7 +511,7 @@ function ExamDetailDrawer({
    */
   /**
    * Total possible marks derived from the question paper.
-   * Priority: 
+   * Priority:
    * 1. exam.maximum_mark (most reliable official total)
    * 2. exam.settings.questionPaperMaximumMark
    * 3. sum of unique leaf question maximum marks that HAVE AN ANSWER (for flexible/optional papers)
@@ -497,34 +523,42 @@ function ExamDetailDrawer({
     if (apiMaxMark) return safeParseFloat(apiMaxMark);
 
     if (!questions || questions.length === 0) return null;
-    
+
     // Deduplicate by unique question ID
     const uniqueQuestions = Array.from(
-      new Map<number, ExamQuestion>(questions.map((q: ExamQuestion) => [q.id, q])).values()
+      new Map<number, ExamQuestion>(
+        questions.map((q: ExamQuestion) => [q.id, q]),
+      ).values(),
     );
-    
+
     // Identify parents to find leaves
     const parentIds = new Set(
       uniqueQuestions
         .map((q: ExamQuestion) => q.subquestion_parent_id)
-        .filter((id): id is number => id !== null)
+        .filter((id): id is number => id !== null),
     );
-    const leaves = uniqueQuestions.filter((q: ExamQuestion) => !parentIds.has(q.id));
-    
+    const leaves = uniqueQuestions.filter((q: ExamQuestion) =>
+      !parentIds.has(q.id)
+    );
+
     // Priority 3: Only sum leaves that have been graded (have a non-null score).
     // This is the most reliable way to handle flexible papers in EzyGo,
     // where unattempted optional questions are returned but shouldn't count.
     const gradedQuestionIds = new Set(
-      answers?.filter((a: ExamAnswer) => a.score !== null).map((a: ExamAnswer) => a.examquestion_id) || []
+      answers?.filter((a: ExamAnswer) => a.score !== null).map((
+        a: ExamAnswer,
+      ) => a.examquestion_id) || [],
     );
-    const gradedLeaves = leaves.filter((q: ExamQuestion) => gradedQuestionIds.has(q.id));
-    
+    const gradedLeaves = leaves.filter((q: ExamQuestion) =>
+      gradedQuestionIds.has(q.id)
+    );
+
     const targetSet = gradedLeaves.length > 0 ? gradedLeaves : leaves;
-    
+
     // Handle OR-groups within the target set
     const orGroups = new Map<number, number>();
     let total = 0;
-    
+
     for (const q of targetSet) {
       const mark = safeParseFloat(q.maximum_mark);
       if (q.orquestion_group_id != null) {
@@ -534,7 +568,7 @@ function ExamDetailDrawer({
         total += mark;
       }
     }
-    
+
     for (const groupMark of orGroups.values()) {
       total += groupMark;
     }
@@ -579,8 +613,13 @@ function ExamDetailDrawer({
     const node = panelRef.current;
     if (!node) return;
 
-    const focusableSelector = 'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"]), [contenteditable]';
-    const elements = Array.from(node.querySelectorAll<HTMLElement>(focusableSelector)).filter((el) => el.offsetParent !== null || el.getAttribute('tabindex') !== '-1');
+    const focusableSelector =
+      'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"]), [contenteditable]';
+    const elements = Array.from(
+      node.querySelectorAll<HTMLElement>(focusableSelector),
+    ).filter((el) =>
+      el.offsetParent !== null || el.getAttribute("tabindex") !== "-1"
+    );
     const first = elements[0];
     const last = elements[elements.length - 1];
 
@@ -595,7 +634,7 @@ function ExamDetailDrawer({
     }
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
+      if (e.key !== "Tab") return;
       if (elements.length === 0) {
         e.preventDefault();
         return;
@@ -614,9 +653,9 @@ function ExamDetailDrawer({
       }
     };
 
-    document.addEventListener('keydown', handleKey);
+    document.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener("keydown", handleKey);
       // Restore previous focus when drawer closes
       try {
         prevActive?.focus?.();
@@ -665,7 +704,7 @@ function ExamDetailDrawer({
                   "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border",
                   isAssessment
                     ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/50 dark:border-blue-500/30"
-                    : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30"
+                    : "bg-orange-500/15 text-orange-600 dark:text-orange-300 border-orange-500/50 dark:border-orange-500/30",
                 )}
               >
                 {exam.activity_type}
@@ -700,18 +739,23 @@ function ExamDetailDrawer({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 pb-6 space-y-4">
-
           {/* Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-12">
-              <Loading minimal message="Waiting on Ezygo to stop ghosting us 👻" />
+              <Loading
+                minimal
+                message="Waiting on Ezygo to stop ghosting us 👻"
+              />
             </div>
           )}
 
           {/* Error */}
           {isError && !isLoading && (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <AlertCircle className="h-7 w-7 text-red-400" aria-hidden="true" />
+              <AlertCircle
+                className="h-7 w-7 text-red-400"
+                aria-hidden="true"
+              />
               <p className="text-sm text-muted-foreground">
                 Could not load question breakdown.
               </p>
@@ -762,7 +806,7 @@ function ExamDetailDrawer({
                 <span
                   className={cn(
                     "text-2xl font-bold tabular-nums",
-                    totalColors ? totalColors.text : "text-foreground"
+                    totalColors ? totalColors.text : "text-foreground",
                   )}
                 >
                   {Number.isInteger(computedTotal)
@@ -770,7 +814,9 @@ function ExamDetailDrawer({
                     : computedTotal.toFixed(2)}
                 </span>
                 <span className="text-sm text-muted-foreground font-medium">
-                  /{totalPossible % 1 === 0 ? totalPossible : totalPossible.toFixed(1)}
+                  /{totalPossible % 1 === 0
+                    ? totalPossible
+                    : totalPossible.toFixed(1)}
                 </span>
               </div>
             </div>
@@ -778,7 +824,9 @@ function ExamDetailDrawer({
               <div
                 className="mt-2 w-full h-1.5 bg-foreground/10 rounded-full overflow-hidden"
                 role="progressbar"
-                aria-valuenow={Math.round((computedTotal / totalPossible) * 100)}
+                aria-valuenow={Math.round(
+                  (computedTotal / totalPossible) * 100,
+                )}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-label={`Total score ${computedTotal} of ${totalPossible}`}
@@ -786,10 +834,12 @@ function ExamDetailDrawer({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-700",
-                    totalColors ? totalColors.bar : "bg-foreground/40"
+                    totalColors ? totalColors.bar : "bg-foreground/40",
                   )}
                   style={{
-                    width: `${Math.min(100, (computedTotal / totalPossible) * 100)}%`,
+                    width: `${
+                      Math.min(100, (computedTotal / totalPossible) * 100)
+                    }%`,
                   }}
                 />
               </div>
@@ -902,7 +952,8 @@ export default function ScoresClient() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } = useExams();
+  const { data: exams, isLoading: examsLoading, isError, refetch, isFetching } =
+    useExams();
 
   // URL-driven panel state
   const panel = searchParams.get("panel");
@@ -926,7 +977,7 @@ export default function ScoresClient() {
       exams
         ?.filter((e: Exam) => e.participants && e.participants.length > 0)
         .map((e: Exam) => e.id) ?? [],
-    [exams]
+    [exams],
   );
   // Pre-fetch all exam answers in parallel on load via a single batch request.
   const batchQuery = useBatchExamDetails(examIds);
@@ -935,7 +986,10 @@ export default function ScoresClient() {
     if (!batchQuery.data) return;
 
     for (const [idStr, detailsVal] of Object.entries(batchQuery.data)) {
-      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
+      const details = detailsVal as {
+        questions: ExamQuestion[];
+        answers: ExamAnswer[];
+      };
       const examId = Number.parseInt(idStr, 10);
       if (!Number.isFinite(examId)) continue;
 
@@ -962,19 +1016,26 @@ export default function ScoresClient() {
     if (!batchQuery.data) return resMap;
 
     Object.entries(batchQuery.data).forEach(([idStr, detailsVal]) => {
-      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
+      const details = detailsVal as {
+        questions: ExamQuestion[];
+        answers: ExamAnswer[];
+      };
       const id = parseInt(idStr, 10);
       const answers = details.answers;
       if (answers && answers.length > 0) {
         const uniqueAnswers = Array.from(
-          new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a])).values(),
+          new Map<number, ExamAnswer>(answers.map((a: ExamAnswer) => [a.id, a]))
+            .values(),
         );
-        const hasAnyScore = uniqueAnswers.some((a: ExamAnswer) => a.score != null);
+        const hasAnyScore = uniqueAnswers.some((a: ExamAnswer) =>
+          a.score != null
+        );
         if (hasAnyScore) {
           resMap.set(
             id,
             uniqueAnswers.reduce<number>(
-              (sum: number, a: ExamAnswer) => sum + (a.score != null ? safeParseFloat(a.score) : 0),
+              (sum: number, a: ExamAnswer) =>
+                sum + (a.score != null ? safeParseFloat(a.score) : 0),
               0,
             ),
           );
@@ -994,7 +1055,10 @@ export default function ScoresClient() {
     if (!batchQuery.data) return resMap;
 
     Object.entries(batchQuery.data).forEach(([idStr, detailsVal]) => {
-      const details = detailsVal as { questions: ExamQuestion[]; answers: ExamAnswer[] };
+      const details = detailsVal as {
+        questions: ExamQuestion[];
+        answers: ExamAnswer[];
+      };
       const id = parseInt(idStr, 10);
       const exam = exams?.find((e: Exam) => e.id === id);
       const qData = details.questions;
@@ -1017,7 +1081,7 @@ export default function ScoresClient() {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.set("panel", exam.id.toString());
       const nextUrl = `${pathname}?${nextParams.toString()}`;
-      
+
       // If no panel is present, push; otherwise replace to avoid history bloat
       if (!searchParams.has("panel")) {
         router.push(nextUrl, { scroll: false });
@@ -1025,7 +1089,7 @@ export default function ScoresClient() {
         router.replace(nextUrl, { scroll: false });
       }
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   );
 
   // Programmatic close: replace the URL with panel param removed.
@@ -1034,7 +1098,9 @@ export default function ScoresClient() {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.delete("panel");
       const params = nextParams.toString();
-      router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
+      router.replace(params ? `${pathname}?${params}` : pathname, {
+        scroll: false,
+      });
     }
   }, [router, pathname, searchParams]);
 
@@ -1051,7 +1117,8 @@ export default function ScoresClient() {
       if (!e.participants || e.participants.length === 0) return false;
       if (e.activity_type === "assignment") {
         const details = batchQuery.data?.[e.id];
-        const hasAnswers = details?.answers !== undefined && details.answers.length > 0;
+        const hasAnswers = details?.answers !== undefined &&
+          details.answers.length > 0;
         const hasScore = resolvedScores.has(e.id) || getScore(e) !== null;
         return hasAnswers || hasScore;
       }
@@ -1060,10 +1127,9 @@ export default function ScoresClient() {
   }, [exams, batchQuery.data, resolvedScores]);
 
   const filtered = useMemo(() => {
-    const base =
-      filter === "all"
-        ? participatedExams
-        : participatedExams.filter((e: Exam) => e.activity_type === filter);
+    const base = filter === "all"
+      ? participatedExams
+      : participatedExams.filter((e: Exam) => e.activity_type === filter);
     // Marked (has resolved score) first, then pending
     return [...base].sort((a, b) => {
       const aScored = resolvedScores.has(a.id) || getScore(a) !== null ? 1 : 0;
@@ -1075,15 +1141,19 @@ export default function ScoresClient() {
   const counts: Record<ActivityFilter, number> = useMemo(() => {
     return {
       all: participatedExams.length,
-      assessment: participatedExams.filter((e: Exam) => e.activity_type === "assessment").length,
-      assignment: participatedExams.filter((e: Exam) => e.activity_type === "assignment").length,
+      assessment: participatedExams.filter((e: Exam) =>
+        e.activity_type === "assessment"
+      ).length,
+      assignment: participatedExams.filter((e: Exam) =>
+        e.activity_type === "assignment"
+      ).length,
     };
   }, [participatedExams]);
 
   const stats = useMemo(() => {
     if (filtered.length === 0) return null;
     const scored = filtered.filter(
-      (e) => (resolvedScores.get(e.id) ?? getScore(e)) != null
+      (e) => (resolvedScores.get(e.id) ?? getScore(e)) != null,
     ).length;
     const pending = filtered.length - scored;
     const percentages = filtered
@@ -1094,24 +1164,19 @@ export default function ScoresClient() {
         return (safeParseFloat(s) / m) * 100;
       })
       .filter((v): v is number => v !== null);
-    const avg =
-      percentages.length > 0
-        ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
-        : null;
+    const avg = percentages.length > 0
+      ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
+      : null;
     return { total: filtered.length, scored, pending, avg };
   }, [filtered, resolvedScores, resolvedMaxMarks]);
 
-
   if (isLoading || (!exams && !isError)) {
-    return (
-      <Loading />
-    );
+    return <Loading />;
   }
 
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex-1 container mx-auto max-w-7xl px-4 md:px-6 pt-4 md:pt-6">
-
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
@@ -1120,7 +1185,10 @@ export default function ScoresClient() {
           className="flex items-center gap-4 mb-8"
         >
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 border border-primary/50 dark:border-primary/30 shrink-0">
-            <GraduationCap className="h-6 w-6 text-primary" aria-hidden="true" />
+            <GraduationCap
+              className="h-6 w-6 text-primary"
+              aria-hidden="true"
+            />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight mb-1">
@@ -1144,7 +1212,10 @@ export default function ScoresClient() {
               { label: "Total", value: String(stats.total) },
               { label: "Scored", value: String(stats.scored) },
               { label: "Pending", value: String(stats.pending) },
-              { label: "Avg Score", value: stats.avg != null ? `${stats.avg}%` : "—" },
+              {
+                label: "Avg Score",
+                value: stats.avg != null ? `${stats.avg}%` : "—",
+              },
             ].map((s) => (
               <div
                 key={s.label}
@@ -1178,7 +1249,7 @@ export default function ScoresClient() {
                 "custom-button rounded-lg text-xs font-medium transition-all",
                 filter === tab.key
                   ? "border-primary/60 bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setFilter(tab.key)}
             >
@@ -1186,7 +1257,7 @@ export default function ScoresClient() {
               <span
                 className={cn(
                   "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                  filter === tab.key ? "bg-primary/30" : "bg-foreground/10"
+                  filter === tab.key ? "bg-primary/30" : "bg-foreground/10",
                 )}
               >
                 {counts[tab.key]}
@@ -1245,8 +1316,7 @@ export default function ScoresClient() {
               aria-hidden="true"
             />
             <p className="text-sm font-medium text-muted-foreground">
-              No{" "}
-              {filter !== "all" ? filter + "s" : "exams"} found
+              No {filter !== "all" ? filter + "s" : "exams"} found
             </p>
           </motion.div>
         )}

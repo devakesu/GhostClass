@@ -247,12 +247,15 @@ class ApiService {
     required String courseCode,
     required String instructorName,
     required String supabaseToken,
+    String? courseName,
   }) async {
     return client.post(
       '${AppConfig.ghostclassApiUrl}/instructors/upsert',
       data: {
         'courseCode': courseCode,
         'instructorName': instructorName,
+        if (courseName != null && courseName.isNotEmpty)
+          'courseName': courseName,
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );
@@ -269,19 +272,8 @@ class ApiService {
   }
 
   // --- Error Handling ---
-  bool _isTransientAppCheckFailure(String? text) {
-    final msg = (text ?? '').toLowerCase();
-    if (msg.isEmpty) return false;
-    return msg.contains('too_many_attempts') ||
-        msg.contains('timeout') ||
-        msg.contains('network') ||
-        msg.contains('connection') ||
-        msg.contains('unavailable') ||
-        msg.contains('rate limit') ||
-        msg.contains('internal google server error') ||
-        msg.contains('google_server_unavailable') ||
-        msg.contains('-12');
-  }
+  bool _isTransientAppCheckFailure(String? text) =>
+      isTransientAppCheckFailure(text);
 
   AppException mapDioError(DioException e) {
     final status = e.response?.statusCode;

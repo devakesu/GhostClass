@@ -12,10 +12,10 @@
  */
 export {
   ATTENDANCE_STATUS,
-  isPositive,
-  isAbsent,
   getOfficialSessionRaw,
   getReconciledStats,
+  isAbsent,
+  isPositive,
 } from "./attendance-reconciliation";
 
 export type { ReconciledStats } from "./attendance-reconciliation";

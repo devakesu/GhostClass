@@ -20,40 +20,101 @@ import { logger } from "@/lib/logger";
  */
 
 // Generic fallback (used when endpoint-specific vars are absent)
-const RATE_LIMIT_REQUESTS = parseInt(process.env.RATE_LIMIT_REQUESTS || "10", 10);
-const RATE_LIMIT_WINDOW   = parseInt(process.env.RATE_LIMIT_WINDOW   || "10", 10);
+const RATE_LIMIT_REQUESTS = parseInt(
+  process.env.RATE_LIMIT_REQUESTS || "10",
+  10,
+);
+const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW || "10", 10);
 
 // Validate shared fallback values
 // Error messages use "[value redacted]" instead of the raw env var value to
 // avoid exposing attacker-influenced config values in deployment logs.
-if (!Number.isFinite(RATE_LIMIT_REQUESTS) || RATE_LIMIT_REQUESTS < 1 || RATE_LIMIT_REQUESTS > 1000) {
-  throw new Error(`RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
+if (
+  !Number.isFinite(RATE_LIMIT_REQUESTS) || RATE_LIMIT_REQUESTS < 1 ||
+  RATE_LIMIT_REQUESTS > 1000
+) {
+  throw new Error(
+    `RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
 }
-if (!Number.isFinite(RATE_LIMIT_WINDOW) || RATE_LIMIT_WINDOW < 1 || RATE_LIMIT_WINDOW > 3600) {
-  throw new Error(`RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+if (
+  !Number.isFinite(RATE_LIMIT_WINDOW) || RATE_LIMIT_WINDOW < 1 ||
+  RATE_LIMIT_WINDOW > 3600
+) {
+  throw new Error(
+    `RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
 }
 
 // Sync-specific limits (fall back to shared defaults)
-const SYNC_LIMIT  = parseInt(process.env.SYNC_RATE_LIMIT_REQUESTS || String(RATE_LIMIT_REQUESTS), 10);
-const SYNC_WINDOW = parseInt(process.env.SYNC_RATE_LIMIT_WINDOW   || String(RATE_LIMIT_WINDOW),   10);
-if (!Number.isFinite(SYNC_LIMIT)  || SYNC_LIMIT  < 1 || SYNC_LIMIT  > 1000) throw new Error(`SYNC_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
-if (!Number.isFinite(SYNC_WINDOW) || SYNC_WINDOW < 1 || SYNC_WINDOW > 3600) throw new Error(`SYNC_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+const SYNC_LIMIT = parseInt(
+  process.env.SYNC_RATE_LIMIT_REQUESTS || String(RATE_LIMIT_REQUESTS),
+  10,
+);
+const SYNC_WINDOW = parseInt(
+  process.env.SYNC_RATE_LIMIT_WINDOW || String(RATE_LIMIT_WINDOW),
+  10,
+);
+if (!Number.isFinite(SYNC_LIMIT) || SYNC_LIMIT < 1 || SYNC_LIMIT > 1000) {
+  throw new Error(
+    `SYNC_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
+}
+if (!Number.isFinite(SYNC_WINDOW) || SYNC_WINDOW < 1 || SYNC_WINDOW > 3600) {
+  throw new Error(
+    `SYNC_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
+}
 
 // Contact-form-specific limits (fall back to shared defaults)
-const CONTACT_LIMIT  = parseInt(process.env.CONTACT_RATE_LIMIT_REQUESTS || String(RATE_LIMIT_REQUESTS), 10);
-const CONTACT_WINDOW = parseInt(process.env.CONTACT_RATE_LIMIT_WINDOW   || String(RATE_LIMIT_WINDOW),   10);
-if (!Number.isFinite(CONTACT_LIMIT)  || CONTACT_LIMIT  < 1 || CONTACT_LIMIT  > 1000) throw new Error(`CONTACT_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
-if (!Number.isFinite(CONTACT_WINDOW) || CONTACT_WINDOW < 1 || CONTACT_WINDOW > 3600) throw new Error(`CONTACT_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+const CONTACT_LIMIT = parseInt(
+  process.env.CONTACT_RATE_LIMIT_REQUESTS || String(RATE_LIMIT_REQUESTS),
+  10,
+);
+const CONTACT_WINDOW = parseInt(
+  process.env.CONTACT_RATE_LIMIT_WINDOW || String(RATE_LIMIT_WINDOW),
+  10,
+);
+if (
+  !Number.isFinite(CONTACT_LIMIT) || CONTACT_LIMIT < 1 || CONTACT_LIMIT > 1000
+) {
+  throw new Error(
+    `CONTACT_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
+}
+if (
+  !Number.isFinite(CONTACT_WINDOW) || CONTACT_WINDOW < 1 ||
+  CONTACT_WINDOW > 3600
+) {
+  throw new Error(
+    `CONTACT_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
+}
 
 // Profile-specific limits (slightly higher to accommodate cache misses and
 // startup sync bursts without affecting auth/logout/csrf budgets).
-const PROFILE_LIMIT = parseInt(process.env.PROFILE_RATE_LIMIT_REQUESTS || "15", 10);
-const PROFILE_WINDOW = parseInt(process.env.PROFILE_RATE_LIMIT_WINDOW || "60", 10);
-if (!Number.isFinite(PROFILE_LIMIT) || PROFILE_LIMIT < 1 || PROFILE_LIMIT > 1000) {
-  throw new Error(`PROFILE_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
+const PROFILE_LIMIT = parseInt(
+  process.env.PROFILE_RATE_LIMIT_REQUESTS || "15",
+  10,
+);
+const PROFILE_WINDOW = parseInt(
+  process.env.PROFILE_RATE_LIMIT_WINDOW || "60",
+  10,
+);
+if (
+  !Number.isFinite(PROFILE_LIMIT) || PROFILE_LIMIT < 1 || PROFILE_LIMIT > 1000
+) {
+  throw new Error(
+    `PROFILE_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
 }
-if (!Number.isFinite(PROFILE_WINDOW) || PROFILE_WINDOW < 1 || PROFILE_WINDOW > 3600) {
-  throw new Error(`PROFILE_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+if (
+  !Number.isFinite(PROFILE_WINDOW) || PROFILE_WINDOW < 1 ||
+  PROFILE_WINDOW > 3600
+) {
+  throw new Error(
+    `PROFILE_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
 }
 
 // Parse and validate auth rate limit settings
@@ -61,25 +122,38 @@ const AUTH_LIMIT = parseInt(process.env.AUTH_RATE_LIMIT_REQUESTS || "5", 10);
 const AUTH_WINDOW = parseInt(process.env.AUTH_RATE_LIMIT_WINDOW || "60", 10);
 
 if (!Number.isFinite(AUTH_LIMIT) || AUTH_LIMIT < 1 || AUTH_LIMIT > 1000) {
-  throw new Error(`AUTH_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`);
+  throw new Error(
+    `AUTH_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
 }
 if (!Number.isFinite(AUTH_WINDOW) || AUTH_WINDOW < 1 || AUTH_WINDOW > 3600) {
-  throw new Error(`AUTH_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+  throw new Error(
+    `AUTH_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
 }
 
 // High-throughput limits (used by proxy-style routes such as batch fetchers)
-const PROXY_LIMIT = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10);
+const PROXY_LIMIT = parseInt(
+  process.env.PROXY_RATE_LIMIT_REQUESTS || "300",
+  10,
+);
 const PROXY_WINDOW = parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10);
 
 if (!Number.isFinite(PROXY_LIMIT) || PROXY_LIMIT < 1 || PROXY_LIMIT > 5000) {
-  throw new Error(`PROXY_RATE_LIMIT_REQUESTS must be between 1-5000, got: [value redacted]`);
+  throw new Error(
+    `PROXY_RATE_LIMIT_REQUESTS must be between 1-5000, got: [value redacted]`,
+  );
 }
 if (!Number.isFinite(PROXY_WINDOW) || PROXY_WINDOW < 1 || PROXY_WINDOW > 3600) {
-  throw new Error(`PROXY_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`);
+  throw new Error(
+    `PROXY_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
 }
 
 // Log configuration (logger.dev handles environment-specific suppression)
-logger.dev(`[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`);
+logger.dev(
+  `[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`,
+);
 logger.dev(`[Profile Rate Limit] ${PROFILE_LIMIT}/${PROFILE_WINDOW}s`);
 logger.dev(`[Auth Rate Limit] ${AUTH_LIMIT} requests per ${AUTH_WINDOW}s`);
 logger.dev(`[Proxy Rate Limit] ${PROXY_LIMIT} requests per ${PROXY_WINDOW}s`);

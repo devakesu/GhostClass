@@ -2,7 +2,7 @@
  * Tests for sitemap.ts
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import sitemap from "../sitemap";
 
 describe("sitemap.xml", () => {
@@ -24,39 +24,41 @@ describe("sitemap.xml", () => {
 
   it("should include homepage", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
-    
+
     const urls = sitemap();
-    const homepage = urls.find(u => u.url === "https://example.com");
-    
+    const homepage = urls.find((u) => u.url === "https://example.com");
+
     expect(homepage).toBeDefined();
     expect(homepage?.priority).toBe(1);
   });
 
   it("should not include login page", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
-    
+
     const urls = sitemap();
-    const loginPage = urls.find(u => u.url === "https://example.com/login");
-    
+    const loginPage = urls.find((u) => u.url === "https://example.com/login");
+
     expect(loginPage).toBeUndefined();
   });
 
   it("should include contact page", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
-    
+
     const urls = sitemap();
-    const contactPage = urls.find(u => u.url === "https://example.com/contact");
-    
+    const contactPage = urls.find((u) =>
+      u.url === "https://example.com/contact"
+    );
+
     expect(contactPage).toBeDefined();
     expect(contactPage?.priority).toBe(0.8);
   });
 
   it("should include legal page", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
-    
+
     const urls = sitemap();
-    const legalPage = urls.find(u => u.url === "https://example.com/legal");
-    
+    const legalPage = urls.find((u) => u.url === "https://example.com/legal");
+
     expect(legalPage).toBeDefined();
     expect(legalPage?.priority).toBe(0.8);
   });
@@ -65,7 +67,7 @@ describe("sitemap.xml", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
 
     const urls = sitemap();
-    const helpPage = urls.find(u => u.url === "https://example.com/help");
+    const helpPage = urls.find((u) => u.url === "https://example.com/help");
 
     expect(helpPage).toBeDefined();
     expect(helpPage?.priority).toBe(0.7);
@@ -77,10 +79,10 @@ describe("sitemap.xml", () => {
   });
 
   it("should set lastModified to Date when BUILD_TIMESTAMP is set", () => {
-    process.env.BUILD_TIMESTAMP = '2026-02-18T10:00:00Z';
+    process.env.BUILD_TIMESTAMP = "2026-02-18T10:00:00Z";
     const urls = sitemap();
-    
-    urls.forEach(url => {
+
+    urls.forEach((url) => {
       expect(url.lastModified).toBeInstanceOf(Date);
     });
     delete process.env.BUILD_TIMESTAMP;
@@ -89,33 +91,33 @@ describe("sitemap.xml", () => {
   it("should omit lastModified when BUILD_TIMESTAMP is not set", () => {
     delete process.env.BUILD_TIMESTAMP;
     const urls = sitemap();
-    
-    urls.forEach(url => {
+
+    urls.forEach((url) => {
       expect(url.lastModified).toBeUndefined();
     });
   });
 
   it("should set changeFrequency to monthly", () => {
     const urls = sitemap();
-    
-    urls.forEach(url => {
+
+    urls.forEach((url) => {
       expect(url.changeFrequency).toBe("monthly");
     });
   });
 
   it("should handle missing APP_URL", () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
-    
+
     const urls = sitemap();
     expect(urls).toHaveLength(0);
   });
 
   it("should have correct URL structure", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://test.com";
-    
+
     const urls = sitemap();
-    
-    urls.forEach(url => {
+
+    urls.forEach((url) => {
       expect(url).toHaveProperty("url");
       expect(url).toHaveProperty("lastModified");
       expect(url).toHaveProperty("changeFrequency");
@@ -127,7 +129,7 @@ describe("sitemap.xml", () => {
     const urls = sitemap();
     const homepage = urls[0];
     const others = urls.slice(1);
-    
+
     expect(homepage.priority).toBeGreaterThan(others[0].priority || 0);
   });
 
@@ -135,7 +137,8 @@ describe("sitemap.xml", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://test.com";
 
     const urls = sitemap();
-    const find = (suffix: string) => urls.find(u => u.url === `https://test.com${suffix}`);
+    const find = (suffix: string) =>
+      urls.find((u) => u.url === `https://test.com${suffix}`);
 
     // Homepage has highest priority
     expect(find("")?.priority).toBe(1);
@@ -154,8 +157,14 @@ describe("sitemap.xml", () => {
     expect(find("/login")).toBeUndefined();
 
     // Ordering: homepage > core (0.8) > help (0.7) > build-info (0.4)
-    expect((find("")?.priority ?? 0)).toBeGreaterThan(find("/contact")?.priority ?? 0);
-    expect((find("/contact")?.priority ?? 0)).toBeGreaterThan(find("/help")?.priority ?? 0);
-    expect((find("/help")?.priority ?? 0)).toBeGreaterThan(find("/build-info")?.priority ?? 0);
+    expect(find("")?.priority ?? 0).toBeGreaterThan(
+      find("/contact")?.priority ?? 0,
+    );
+    expect(find("/contact")?.priority ?? 0).toBeGreaterThan(
+      find("/help")?.priority ?? 0,
+    );
+    expect(find("/help")?.priority ?? 0).toBeGreaterThan(
+      find("/build-info")?.priority ?? 0,
+    );
   });
 });

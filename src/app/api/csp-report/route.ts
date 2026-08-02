@@ -50,8 +50,7 @@ function extractLogFields(text: string): Record<string, unknown> {
     if (typeof parsed !== "object" || parsed === null) return {};
 
     // Legacy report-uri format: { "csp-report": { ... } }
-    const report =
-      (parsed as Record<string, unknown>)["csp-report"] ??
+    const report = (parsed as Record<string, unknown>)["csp-report"] ??
       // Reporting API v1 wraps reports in an array: [{ body: { ... } }]
       (Array.isArray(parsed)
         ? (parsed[0] as Record<string, unknown>)?.["body"]
@@ -80,20 +79,23 @@ function extractLogFields(text: string): Record<string, unknown> {
  * Handle GET requests gracefully.
  * Browsers only POST to this endpoint; GETs are usually manual visits or crawlers.
  */
-export async function GET() {
+export function GET() {
   return NextResponse.json(
     {
       status: "operational",
       message: "This endpoint is for CSP violation reports via POST only.",
-      docs: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri",
+      docs:
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri",
     },
-    { status: 200 }
+    { status: 200 },
   );
 }
 
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") ?? "";
-  const isAccepted = ACCEPTED_CONTENT_TYPES.some((t) => contentType.includes(t));
+  const isAccepted = ACCEPTED_CONTENT_TYPES.some((t) =>
+    contentType.includes(t)
+  );
 
   if (!isAccepted) {
     return new NextResponse(null, { status: 415 });

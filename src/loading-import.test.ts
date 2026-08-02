@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { Loading } from './components/loading';
+import { describe, expect, it } from "vitest";
+import { Loading } from "./components/loading.tsx";
 
-describe('Loading Import Sanity', () => {
-  it('should import Loading', () => {
+describe("Loading Import Sanity", () => {
+  it("should import Loading", () => {
     expect(Loading).toBeDefined();
   });
 });

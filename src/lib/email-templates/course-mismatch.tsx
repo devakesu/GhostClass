@@ -1,5 +1,6 @@
 import {
   Body,
+  Button,
   Container,
   Head,
   Heading,
@@ -7,9 +8,13 @@ import {
   Img,
   Section,
   Text,
-  Button,
 } from "react-email";
-import { emailStyles, tableStyles, getLogoUrl, headerLogoStyle } from "./styles";
+import {
+  emailStyles,
+  getLogoUrl,
+  headerLogoStyle,
+  tableStyles,
+} from "./styles";
 
 interface CourseMismatchEmailProps {
   username: string;
@@ -33,7 +38,12 @@ export const CourseMismatchEmail = ({
     <Body style={emailStyles.main}>
       <Container style={emailStyles.container}>
         <Section style={emailStyles.header}>
-          <Img src={getLogoUrl()} alt="GhostClass" width={180} style={headerLogoStyle} />
+          <Img
+            src={getLogoUrl()}
+            alt="GhostClass"
+            width={180}
+            style={headerLogoStyle}
+          />
         </Section>
 
         <Section style={emailStyles.content}>

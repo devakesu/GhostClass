@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import ProfileClient from "./ProfileClient";
 
 // Force dynamic rendering for protected routes
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Profile",

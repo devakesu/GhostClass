@@ -1,4 +1,4 @@
-// proxy-utils.ts
+import { stripTrailingSlashes } from "@/lib/utils";
 
 export interface EgressTarget {
   readonly baseUrl: string;
@@ -18,9 +18,7 @@ export class UpstreamResponseTooLargeError extends Error {
 export function buildEgressTargets(): EgressTarget[] {
   const targets: EgressTarget[] = [];
 
-  const cfUrlRaw = process.env.CF_PROXY_URL?.trim();
-  let cfUrl = cfUrlRaw ?? "";
-  while (cfUrl.endsWith("/")) cfUrl = cfUrl.slice(0, -1);
+  const cfUrl = stripTrailingSlashes(process.env.CF_PROXY_URL);
   if (cfUrl) {
     const secret = process.env.CF_PROXY_SECRET?.trim();
     targets.push({
@@ -32,9 +30,7 @@ export function buildEgressTargets(): EgressTarget[] {
     });
   }
 
-  const awsUrlRaw = process.env.AWS_SECONDARY_URL?.trim();
-  let awsUrl = awsUrlRaw ?? "";
-  while (awsUrl.endsWith("/")) awsUrl = awsUrl.slice(0, -1);
+  const awsUrl = stripTrailingSlashes(process.env.AWS_SECONDARY_URL);
   if (awsUrl) {
     const secret = process.env.AWS_SECONDARY_SECRET?.trim();
     targets.push({
@@ -46,9 +42,7 @@ export function buildEgressTargets(): EgressTarget[] {
     });
   }
 
-  const directUrlRaw = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
-  let directUrl = directUrlRaw ?? "";
-  while (directUrl.endsWith("/")) directUrl = directUrl.slice(0, -1);
+  const directUrl = stripTrailingSlashes(process.env.NEXT_PUBLIC_BACKEND_URL);
   if (directUrl) {
     targets.push({
       baseUrl: directUrl,
@@ -96,6 +90,51 @@ export async function readWithLimit(
   return output;
 }
 
+export function limitReadableStream(
+  body: ReadableStream<Uint8Array>,
+  limitBytes: number,
+  signal?: AbortSignal,
+  onLimitExceeded?: () => void,
+): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  let total = 0;
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        controller.error(
+          new DOMException("The operation was aborted.", "AbortError"),
+        );
+        return;
+      }
+
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+
+        total += value.byteLength;
+        if (total > limitBytes) {
+          onLimitExceeded?.();
+          await reader.cancel();
+          controller.error(new UpstreamResponseTooLargeError(limitBytes));
+          return;
+        }
+
+        controller.enqueue(value);
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+    },
+  });
+}
+
 export function resolveSafeUpstreamErrorMessage(
   body: string,
   status: number,
@@ -107,7 +146,10 @@ export function resolveSafeUpstreamErrorMessage(
   if (!body) return fallback;
 
   const trimmed = body.trim();
-  if (trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") || trimmed.toLowerCase().includes("<html")) {
+  if (
+    trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") ||
+    trimmed.toLowerCase().includes("<html")
+  ) {
     return fallback;
   }
 
@@ -116,14 +158,32 @@ export function resolveSafeUpstreamErrorMessage(
       message?: string;
       error?: string;
     };
-    if (parsed.message?.trim()) return parsed.message.trim();
-    if (parsed.error?.trim()) return parsed.error.trim();
+    const rawMsg = (parsed.message?.trim() || parsed.error?.trim() || "")
+      .trim();
+    if (rawMsg) {
+      const lower = rawMsg.toLowerCase();
+      if (
+        lower.includes("/home/") || lower.includes("postgres") ||
+        lower.includes("pgsql") || lower.includes("at ") ||
+        lower.includes("node_modules")
+      ) {
+        return fallback;
+      }
+      return rawMsg.length > 280 ? `${rawMsg.slice(0, 280)}...` : rawMsg;
+    }
   } catch {
     // Fall through and sanitize plain text body.
   }
 
   const sanitized = body.replace(/[\r\n\t]+/g, " ").trim();
-  if (!sanitized) return fallback;
+  const lowerSanitized = sanitized.toLowerCase();
+  if (
+    !sanitized || lowerSanitized.includes("/home/") ||
+    lowerSanitized.includes("postgres") || lowerSanitized.includes("pgsql") ||
+    lowerSanitized.includes("at ") || lowerSanitized.includes("node_modules")
+  ) {
+    return fallback;
+  }
 
   return sanitized.length > 280 ? `${sanitized.slice(0, 280)}...` : sanitized;
 }

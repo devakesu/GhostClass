@@ -1,21 +1,21 @@
 /** @vitest-environment jsdom */
-import { describe, it, vi, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import DashboardError from '../error';
-import { logger } from '@/lib/logger';
-import * as Sentry from '@sentry/nextjs';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import DashboardError from "../error";
+import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
-vi.mock('@/lib/logger', () => ({
+vi.mock("@/lib/logger", () => ({
   logger: {
     error: vi.fn(),
   },
 }));
 
-vi.mock('@sentry/nextjs', () => ({
+vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
-vi.mock('@/components/error-fallback', () => ({
+vi.mock("@/components/error-fallback", () => ({
   ErrorFallback: ({ error, reset }: any) => (
     <div data-testid="error-fallback">
       <span>{error.message}</span>
@@ -24,35 +24,37 @@ vi.mock('@/components/error-fallback', () => ({
   ),
 }));
 
-describe('DashboardError', () => {
-  const mockError = new Error('Test dashboard error') as Error & { digest?: string };
-  mockError.digest = 'dash-digest';
+describe("DashboardError", () => {
+  const mockError = new Error("Test dashboard error") as Error & {
+    digest?: string;
+  };
+  mockError.digest = "dash-digest";
   const mockReset = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders correctly and logs errors', () => {
+  it("renders correctly and logs errors", () => {
     render(<DashboardError error={mockError} reset={mockReset} />);
 
-    expect(screen.getByTestId('error-fallback')).toBeInTheDocument();
-    expect(screen.getByText('Test dashboard error')).toBeInTheDocument();
+    expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
+    expect(screen.getByText("Test dashboard error")).toBeInTheDocument();
 
     expect(logger.error).toHaveBeenCalledWith(
-      '[dashboard] Render error:',
-      'Test dashboard error',
-      'dash-digest'
+      "[dashboard] Render error:",
+      "Test dashboard error",
+      "dash-digest",
     );
     expect(Sentry.captureException).toHaveBeenCalledWith(mockError, {
-      tags: { location: 'dashboard', digest: 'dash-digest' },
+      tags: { location: "dashboard", digest: "dash-digest" },
     });
   });
 
-  it('handles reset call', () => {
+  it("handles reset call", () => {
     render(<DashboardError error={mockError} reset={mockReset} />);
-    
-    fireEvent.click(screen.getByText('Reset'));
+
+    fireEvent.click(screen.getByText("Reset"));
     expect(mockReset).toHaveBeenCalled();
   });
 });

@@ -2,9 +2,9 @@ import { useCallback } from "react";
 import { useVirtualizerBridge } from "./virtualizer-bridge";
 import { Notification } from "@/hooks/notifications/useNotifications";
 
-export type VirtualItem = 
-  | { type: 'header', id: string, label: string }
-  | { type: 'notification', id: number, data: Notification };
+export type VirtualItem =
+  | { type: "header"; id: string; label: string }
+  | { type: "notification"; id: number; data: Notification };
 
 /**
  * Custom hook to isolate TanStack Virtual logic from the React Compiler.
@@ -23,22 +23,29 @@ export function useNotificationVirtualizer({
     if (!item) return 80;
 
     if (item.type === "header") {
-      return 57; 
+      return 57;
     }
 
     const notification = item.data;
-    const description = typeof notification?.description === "string" ? notification.description : "";
+    const description = typeof notification?.description === "string"
+      ? notification.description
+      : "";
 
     const baseHeightShort = 80;
     const baseHeightMedium = 95;
-    
+
     const extraPer100Chars = 12;
     const maxExtra = 60;
     const extraHeight = description.length > 80
-      ? Math.min(maxExtra, Math.ceil((description.length - 80) / 100) * extraPer100Chars)
+      ? Math.min(
+        maxExtra,
+        Math.ceil((description.length - 80) / 100) * extraPer100Chars,
+      )
       : 0;
 
-    const baseHeight = description.length > 80 ? baseHeightMedium : baseHeightShort;
+    const baseHeight = description.length > 80
+      ? baseHeightMedium
+      : baseHeightShort;
     const marginBottom = 8;
 
     return baseHeight + extraHeight + marginBottom;
@@ -50,7 +57,8 @@ export function useNotificationVirtualizer({
     count: virtualItems.length,
     getScrollElement,
     estimateSize,
-    measureElement: (el: Element) => (el as HTMLElement).getBoundingClientRect().height,
+    measureElement: (el: Element) =>
+      (el as HTMLElement).getBoundingClientRect().height,
     overscan: 10,
   });
 }

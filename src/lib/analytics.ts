@@ -32,13 +32,13 @@ interface GA4PageView {
 /**
  * Send event to GA4 via Measurement Protocol
  * Server-side only - bypasses CSP restrictions
- * 
+ *
  * @see https://developers.google.com/analytics/devguides/collection/protocol/ga4
  */
 export async function trackGA4Event(
   clientId: string,
   events: GA4Event[],
-  userProperties?: Record<string, { value: string }>
+  userProperties?: Record<string, { value: string }>,
 ) {
   if (!GA_MEASUREMENT_ID) {
     logger.warn("[GA4] Measurement ID not configured");
@@ -79,7 +79,7 @@ export async function trackGA4Event(
 export async function trackPageView(
   clientId: string,
   pageData: GA4PageView,
-  userId?: string
+  userId?: string,
 ) {
   await trackGA4Event(
     clientId,
@@ -89,11 +89,12 @@ export async function trackPageView(
         params: {
           page_location: pageData.page_location,
           ...(pageData.page_title && { page_title: pageData.page_title }),
-          ...(pageData.page_referrer && { page_referrer: pageData.page_referrer }),
+          ...(pageData.page_referrer &&
+            { page_referrer: pageData.page_referrer }),
         },
       },
     ],
-    userId ? { user_id: { value: userId } } : undefined
+    userId ? { user_id: { value: userId } } : undefined,
   );
 }
 
@@ -122,7 +123,7 @@ export function getOrCreateClientId(): string {
   // Math.random(), reducing the risk of client ID collisions in analytics.
   const randomPart = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
   const clientId = `${Date.now()}.${randomPart}`;
-  
+
   // SameSite=Lax is intentional: the analytics client ID cookie must be sent on top-level
   // navigations from external sites (e.g. clicking a link to this app) so that returning
   // visitors are recognised across sessions. SameSite=Strict would drop the cookie on those
@@ -134,7 +135,8 @@ export function getOrCreateClientId(): string {
   // it does not contain authentication or other sensitive data.
   const isProd = process.env.NODE_ENV === "production";
   const secureAttr = isProd ? "; Secure" : "";
-  document.cookie = `${cookieName}=${clientId}; path=/; max-age=63072000; SameSite=Lax${secureAttr}`; // 2 years
-  
+  document.cookie =
+    `${cookieName}=${clientId}; path=/; max-age=63072000; SameSite=Lax${secureAttr}`; // 2 years
+
   return clientId;
 }

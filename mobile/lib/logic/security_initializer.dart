@@ -22,8 +22,7 @@ typedef ActivateFn =
 class SecurityInitializer {
   SecurityInitializer._();
 
-  // Exposed for tests to exercise the private constructor and improve
-  // coverage. Kept minimal and intended only for test use.
+  @visibleForTesting
   static void invokePrivateConstructorForTest() => SecurityInitializer._();
 
   /// Initializes and activates App Check based on the current build mode.

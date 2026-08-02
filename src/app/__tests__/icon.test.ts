@@ -2,14 +2,14 @@
  * Tests for icon.tsx
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Stable constructor mock — must be a `function`, not an arrow, to be constructable.
 // Using a module-scope constant keeps the same reference across vi.resetModules() calls.
 const MockImageResponse = vi.fn(function (
   this: { type: string; element: unknown; options: unknown },
   element: unknown,
-  options: unknown
+  options: unknown,
 ) {
   this.type = "ImageResponse";
   this.element = element;
@@ -32,7 +32,9 @@ describe("icon", () => {
     vi.clearAllMocks();
     vi.resetModules();
     // Restore default icon return value after clearAllMocks resets call history.
-    mockReadPublicPngAsDataUri.mockReturnValue("data:image/png;base64,ZmFrZQ==");
+    mockReadPublicPngAsDataUri.mockReturnValue(
+      "data:image/png;base64,ZmFrZQ==",
+    );
   });
 
   it("should export correct size dimensions", async () => {
@@ -62,7 +64,7 @@ describe("icon", () => {
     mod.default();
     expect(MockImageResponse).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ width: 32, height: 32 })
+      expect.objectContaining({ width: 32, height: 32 }),
     );
   });
 
@@ -75,4 +77,3 @@ describe("icon", () => {
     expect(MockImageResponse).toHaveBeenCalled();
   });
 });
-

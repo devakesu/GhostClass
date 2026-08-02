@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, act, cleanup } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks — use vi.hoisted() so factory closures can reference these fns,
@@ -12,14 +12,14 @@ const { mockToast, mockLoggerDev, mockLoggerError } = vi.hoisted(() => ({
   mockLoggerError: vi.fn(),
 }));
 
-vi.mock('sonner', () => ({ toast: mockToast }));
+vi.mock("sonner", () => ({ toast: mockToast }));
 
-vi.mock('@/lib/logger', () => ({
+vi.mock("@/lib/logger", () => ({
   logger: { dev: mockLoggerDev, error: mockLoggerError },
 }));
 
 // Mock the side-effect import so it doesn't execute module-level browser code
-vi.mock('@/hooks/usePWAInstall', () => ({}));
+vi.mock("@/hooks/usePWAInstall", () => ({}));
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -36,7 +36,10 @@ function makeEventSource() {
       listeners.set(event, [...(listeners.get(event) ?? []), cb]);
     },
     removeEventListener(event: string, cb: (...args: unknown[]) => void) {
-      listeners.set(event, (listeners.get(event) ?? []).filter((f) => f !== cb));
+      listeners.set(
+        event,
+        (listeners.get(event) ?? []).filter((f) => f !== cb),
+      );
     },
     _emit(event: string, ...args: unknown[]) {
       // Spread to avoid mutation issues if a listener removes itself
@@ -47,15 +50,15 @@ function makeEventSource() {
 
 function makeSWEnv() {
   const installingWorker = Object.assign(makeEventSource(), {
-    state: 'installing' as string,
+    state: "installing" as string,
     postMessage: vi.fn(),
   });
   const waitingWorker = Object.assign(makeEventSource(), {
-    state: 'waiting' as string,
+    state: "waiting" as string,
     postMessage: vi.fn(),
   });
   const registration = Object.assign(makeEventSource(), {
-    scope: 'http://localhost/',
+    scope: "http://localhost/",
     installing: null as typeof installingWorker | null,
     waiting: null as typeof waitingWorker | null,
     update: vi.fn().mockResolvedValue(undefined),
@@ -71,25 +74,31 @@ function makeSWEnv() {
 // Component under test (static import — mocks above must be declared first)
 // ---------------------------------------------------------------------------
 
-import { ServiceWorkerRegister, __resetRefreshingForTests } from '@/components/sw-register';
+import {
+  __resetRefreshingForTests,
+  ServiceWorkerRegister,
+} from "@/components/sw-register";
 
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
 
-describe('ServiceWorkerRegister', () => {
+describe("ServiceWorkerRegister", () => {
   let reloadSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     __resetRefreshingForTests();
     vi.clearAllMocks();
     // Enable SW registration in development so the dev-guard is bypassed
-    vi.stubEnv('NEXT_PUBLIC_ENABLE_SW_IN_DEV', 'true');
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_SW_IN_DEV", "true");
     // Make the document appear fully loaded so handleLoad() fires immediately
-    Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
+    Object.defineProperty(document, "readyState", {
+      configurable: true,
+      value: "complete",
+    });
     // Stub window.location.reload
     reloadSpy = vi.fn();
-    Object.defineProperty(window, 'location', {
+    Object.defineProperty(window, "location", {
       configurable: true,
       writable: true,
       value: { ...window.location, reload: reloadSpy },
@@ -106,10 +115,10 @@ describe('ServiceWorkerRegister', () => {
   // -------------------------------------------------------------------------
 
   it('skips SW registration in development when NEXT_PUBLIC_ENABLE_SW_IN_DEV is not "true"', async () => {
-    vi.stubEnv('NEXT_PUBLIC_ENABLE_SW_IN_DEV', 'false');
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_SW_IN_DEV", "false");
 
     const { swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -120,7 +129,7 @@ describe('ServiceWorkerRegister', () => {
 
     expect(swContainer.register).not.toHaveBeenCalled();
     expect(mockLoggerDev).toHaveBeenCalledWith(
-      expect.stringContaining('disabled in development'),
+      expect.stringContaining("disabled in development"),
       expect.anything(),
     );
   });
@@ -129,9 +138,9 @@ describe('ServiceWorkerRegister', () => {
   // Registration timing
   // -------------------------------------------------------------------------
 
-  it('registers immediately when document is already loaded', async () => {
+  it("registers immediately when document is already loaded", async () => {
     const { swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -140,14 +149,17 @@ describe('ServiceWorkerRegister', () => {
 
     await act(async () => {});
 
-    expect(swContainer.register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+    expect(swContainer.register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
   });
 
-  it('registers after the window load event fires when document is not yet loaded', async () => {
-    Object.defineProperty(document, 'readyState', { configurable: true, value: 'loading' });
+  it("registers after the window load event fires when document is not yet loaded", async () => {
+    Object.defineProperty(document, "readyState", {
+      configurable: true,
+      value: "loading",
+    });
 
     const { swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -160,16 +172,16 @@ describe('ServiceWorkerRegister', () => {
 
     // Fire load → registers immediately (no artificial delay)
     await act(async () => {
-      window.dispatchEvent(new Event('load'));
+      window.dispatchEvent(new Event("load"));
     });
 
-    expect(swContainer.register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+    expect(swContainer.register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
   });
 
-  it('does not set up the hourly interval if unmounted before registration resolves', async () => {
+  it("does not set up the hourly interval if unmounted before registration resolves", async () => {
     vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -195,9 +207,9 @@ describe('ServiceWorkerRegister', () => {
   // Registration outcomes
   // -------------------------------------------------------------------------
 
-  it('logs success with logger.dev after successful registration', async () => {
+  it("logs success with logger.dev after successful registration", async () => {
     const { swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -207,16 +219,16 @@ describe('ServiceWorkerRegister', () => {
     await act(async () => {});
 
     expect(mockLoggerDev).toHaveBeenCalledWith(
-      'Service worker registered successfully',
+      "Service worker registered successfully",
       expect.anything(),
     );
   });
 
-  it('logs error with logger.error when SW registration throws', async () => {
-    const error = new Error('registration failed');
+  it("logs error with logger.error when SW registration throws", async () => {
+    const error = new Error("registration failed");
     const { swContainer } = makeSWEnv();
     swContainer.register.mockRejectedValue(error);
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -226,7 +238,7 @@ describe('ServiceWorkerRegister', () => {
     await act(async () => {});
 
     expect(mockLoggerError).toHaveBeenCalledWith(
-      'Service worker registration failed',
+      "Service worker registration failed",
       expect.objectContaining({ error }),
     );
   });
@@ -238,7 +250,7 @@ describe('ServiceWorkerRegister', () => {
   it('shows the update toast when a new SW reaches "installed" with an existing controller', async () => {
     const { installingWorker, registration, swContainer } = makeSWEnv();
     swContainer.controller = {}; // existing controller → this is an update, not a first install
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -248,23 +260,23 @@ describe('ServiceWorkerRegister', () => {
 
     await act(async () => {
       registration.installing = installingWorker;
-      registration._emit('updatefound');
-      installingWorker.state = 'installed';
-      installingWorker._emit('statechange');
+      registration._emit("updatefound");
+      installingWorker.state = "installed";
+      installingWorker._emit("statechange");
     });
 
     expect(mockToast).toHaveBeenCalledWith(
-      'App updated — tap to refresh',
+      "App updated — tap to refresh",
       expect.objectContaining({
-        action: expect.objectContaining({ label: 'Refresh' }),
+        action: expect.objectContaining({ label: "Refresh" }),
       }),
     );
   });
 
-  it('does not show the update toast on first install (no existing controller)', async () => {
+  it("does not show the update toast on first install (no existing controller)", async () => {
     const { installingWorker, registration, swContainer } = makeSWEnv();
     swContainer.controller = null; // no controller → first install
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -274,9 +286,9 @@ describe('ServiceWorkerRegister', () => {
 
     await act(async () => {
       registration.installing = installingWorker;
-      registration._emit('updatefound');
-      installingWorker.state = 'installed';
-      installingWorker._emit('statechange');
+      registration._emit("updatefound");
+      installingWorker.state = "installed";
+      installingWorker._emit("statechange");
     });
 
     expect(mockToast).not.toHaveBeenCalled();
@@ -290,12 +302,12 @@ describe('ServiceWorkerRegister', () => {
   // -------------------------------------------------------------------------
 
   async function triggerUpdateReady(
-    registration: ReturnType<typeof makeSWEnv>['registration'],
-    swContainer: ReturnType<typeof makeSWEnv>['swContainer'],
-    installingWorker: ReturnType<typeof makeSWEnv>['installingWorker'],
+    registration: ReturnType<typeof makeSWEnv>["registration"],
+    swContainer: ReturnType<typeof makeSWEnv>["swContainer"],
+    installingWorker: ReturnType<typeof makeSWEnv>["installingWorker"],
   ): Promise<() => void> {
     swContainer.controller = {};
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -303,29 +315,41 @@ describe('ServiceWorkerRegister', () => {
     await act(async () => {});
     await act(async () => {
       registration.installing = installingWorker;
-      registration._emit('updatefound');
-      installingWorker.state = 'installed';
-      installingWorker._emit('statechange');
+      registration._emit("updatefound");
+      installingWorker.state = "installed";
+      installingWorker._emit("statechange");
     });
     // Return the Refresh button onClick from the toast call
     return mockToast.mock.calls[0][1].action.onClick as () => void;
   }
 
-  it('sends SKIP_WAITING to the waiting worker when Refresh is clicked', async () => {
-    const { installingWorker, waitingWorker, registration, swContainer } = makeSWEnv();
-    const onClick = await triggerUpdateReady(registration, swContainer, installingWorker);
+  it("sends SKIP_WAITING to the waiting worker when Refresh is clicked", async () => {
+    const { installingWorker, waitingWorker, registration, swContainer } =
+      makeSWEnv();
+    const onClick = await triggerUpdateReady(
+      registration,
+      swContainer,
+      installingWorker,
+    );
 
     registration.waiting = waitingWorker;
     act(() => {
       onClick();
     });
 
-    expect(waitingWorker.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    expect(waitingWorker.postMessage).toHaveBeenCalledWith({
+      type: "SKIP_WAITING",
+    });
   });
 
-  it('reloads via statechange→activated fallback when controllerchange does not fire (clientsClaim: false)', async () => {
-    const { installingWorker, waitingWorker, registration, swContainer } = makeSWEnv();
-    const onClick = await triggerUpdateReady(registration, swContainer, installingWorker);
+  it("reloads via statechange→activated fallback when controllerchange does not fire (clientsClaim: false)", async () => {
+    const { installingWorker, waitingWorker, registration, swContainer } =
+      makeSWEnv();
+    const onClick = await triggerUpdateReady(
+      registration,
+      swContainer,
+      installingWorker,
+    );
 
     registration.waiting = waitingWorker;
     act(() => {
@@ -335,16 +359,21 @@ describe('ServiceWorkerRegister', () => {
     // controllerchange does NOT fire — new SW activated without claiming clients
     // The statechange→activated listener should trigger the reload instead
     await act(async () => {
-      waitingWorker.state = 'activated';
-      waitingWorker._emit('statechange');
+      waitingWorker.state = "activated";
+      waitingWorker._emit("statechange");
     });
 
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('reloads via controllerchange when that event fires after SKIP_WAITING', async () => {
-    const { installingWorker, waitingWorker, registration, swContainer } = makeSWEnv();
-    const onClick = await triggerUpdateReady(registration, swContainer, installingWorker);
+  it("reloads via controllerchange when that event fires after SKIP_WAITING", async () => {
+    const { installingWorker, waitingWorker, registration, swContainer } =
+      makeSWEnv();
+    const onClick = await triggerUpdateReady(
+      registration,
+      swContainer,
+      installingWorker,
+    );
 
     registration.waiting = waitingWorker;
     act(() => {
@@ -352,15 +381,20 @@ describe('ServiceWorkerRegister', () => {
     });
 
     await act(async () => {
-      swContainer._emit('controllerchange');
+      swContainer._emit("controllerchange");
     });
 
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('prevents double-reload when both controllerchange and statechange→activated fire', async () => {
-    const { installingWorker, waitingWorker, registration, swContainer } = makeSWEnv();
-    const onClick = await triggerUpdateReady(registration, swContainer, installingWorker);
+  it("prevents double-reload when both controllerchange and statechange→activated fire", async () => {
+    const { installingWorker, waitingWorker, registration, swContainer } =
+      makeSWEnv();
+    const onClick = await triggerUpdateReady(
+      registration,
+      swContainer,
+      installingWorker,
+    );
 
     registration.waiting = waitingWorker;
     act(() => {
@@ -369,17 +403,21 @@ describe('ServiceWorkerRegister', () => {
 
     // Both events fire — the refreshing guard must prevent two reloads
     await act(async () => {
-      swContainer._emit('controllerchange');
-      waitingWorker.state = 'activated';
-      waitingWorker._emit('statechange');
+      swContainer._emit("controllerchange");
+      waitingWorker.state = "activated";
+      waitingWorker._emit("statechange");
     });
 
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('reloads immediately when Refresh is clicked and registration.waiting is null (already activated)', async () => {
+  it("reloads immediately when Refresh is clicked and registration.waiting is null (already activated)", async () => {
     const { installingWorker, registration, swContainer } = makeSWEnv();
-    const onClick = await triggerUpdateReady(registration, swContainer, installingWorker);
+    const onClick = await triggerUpdateReady(
+      registration,
+      swContainer,
+      installingWorker,
+    );
 
     // Waiting worker has already finished activating by the time user clicks
     registration.waiting = null;
@@ -394,10 +432,10 @@ describe('ServiceWorkerRegister', () => {
   // Periodic update check
   // -------------------------------------------------------------------------
 
-  it('sets up an hourly interval that calls registration.update()', async () => {
+  it("sets up an hourly interval that calls registration.update()", async () => {
     vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -415,11 +453,11 @@ describe('ServiceWorkerRegister', () => {
     vi.useRealTimers();
   });
 
-  it('logs a dev message when the periodic update check fails', async () => {
+  it("logs a dev message when the periodic update check fails", async () => {
     vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
-    registration.update.mockRejectedValue(new Error('network'));
-    Object.defineProperty(navigator, 'serviceWorker', {
+    registration.update.mockRejectedValue(new Error("network"));
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });
@@ -431,7 +469,7 @@ describe('ServiceWorkerRegister', () => {
     });
 
     expect(mockLoggerDev).toHaveBeenCalledWith(
-      'Service worker update check failed',
+      "Service worker update check failed",
       expect.anything(),
     );
     vi.useRealTimers();
@@ -441,10 +479,10 @@ describe('ServiceWorkerRegister', () => {
   // Cleanup
   // -------------------------------------------------------------------------
 
-  it('clears the hourly update interval on unmount', async () => {
+  it("clears the hourly update interval on unmount", async () => {
     vi.useFakeTimers();
     const { registration, swContainer } = makeSWEnv();
-    Object.defineProperty(navigator, 'serviceWorker', {
+    Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
       value: swContainer,
     });

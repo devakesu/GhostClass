@@ -10,7 +10,7 @@ import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 /**
  * Client component for automatic event tracking via server-side API
  * Replaces gtag.js enhanced measurement to avoid CSP violations
- * 
+ *
  * Automatically tracks (matching gtag.js enhanced measurement):
  * - Page views (route changes)
  * - Scroll depth (25%, 50%, 75%, 90%)
@@ -23,7 +23,9 @@ export function AnalyticsTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const scrollTracked = useRef<Set<number>>(new Set());
-  const formInteractions = useRef<Map<HTMLFormElement, { focused: boolean; submitted: boolean }>>(new Map());
+  const formInteractions = useRef<
+    Map<HTMLFormElement, { focused: boolean; submitted: boolean }>
+  >(new Map());
 
   useEffect(() => {
     // Track page view on mount and route changes
@@ -31,7 +33,9 @@ export function AnalyticsTracker() {
       try {
         const clientId = getOrCreateClientId();
         const queryString = searchParams?.toString();
-        const url = `${window.location.origin}${pathname}${queryString ? "?" + queryString : ""}`;
+        const url = `${window.location.origin}${pathname}${
+          queryString ? "?" + queryString : ""
+        }`;
 
         await postAnalyticsBody(
           JSON.stringify({
@@ -65,7 +69,7 @@ export function AnalyticsTracker() {
         // Silently fail - don't break app if analytics fails
         // Ignore AbortError as it's expected during fast navigation/timeouts
         if (error instanceof Error && error.name === "AbortError") return;
-        
+
         logger.warn("[Analytics] Failed to track page view:", error);
       }
     };
@@ -87,18 +91,23 @@ export function AnalyticsTracker() {
       window.requestAnimationFrame(() => {
         scrollTicking = false;
 
-        const maxScrollable = document.documentElement.scrollHeight - window.innerHeight;
-        
+        const maxScrollable = document.documentElement.scrollHeight -
+          window.innerHeight;
+
         // If there is no scrollable content, skip scroll depth tracking
         if (maxScrollable <= 0) {
           return;
         }
 
-        const scrollPercent = Math.round((window.scrollY / maxScrollable) * 100);
+        const scrollPercent = Math.round(
+          (window.scrollY / maxScrollable) * 100,
+        );
 
         const thresholds = [25, 50, 75, 90];
         for (const threshold of thresholds) {
-          if (scrollPercent >= threshold && !scrollTracked.current.has(threshold)) {
+          if (
+            scrollPercent >= threshold && !scrollTracked.current.has(threshold)
+          ) {
             scrollTracked.current.add(threshold);
             trackEvent("scroll", { percent_scrolled: threshold });
             break; // Only track one threshold per scroll event
@@ -111,20 +120,24 @@ export function AnalyticsTracker() {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const link = target.closest("a");
-      
+
       if (link && link.href) {
         let url: URL;
         try {
           url = new URL(link.href, window.location.href);
         } catch (error) {
           // Malformed URL - skip tracking for this click to avoid breaking analytics
-          logger.warn("[Analytics] Ignoring click with invalid URL:", link.href, error);
+          logger.warn(
+            "[Analytics] Ignoring click with invalid URL:",
+            link.href,
+            error,
+          );
           return;
         }
-        
+
         const isOutbound = url.hostname !== window.location.hostname;
-        const isDownload = link.hasAttribute("download") || 
-                          /\.(pdf|zip|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i.test(url.pathname);
+        const isDownload = link.hasAttribute("download") ||
+          /\.(pdf|zip|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i.test(url.pathname);
 
         if (isOutbound) {
           trackEvent("click", {
@@ -147,8 +160,9 @@ export function AnalyticsTracker() {
       const form = (e.target as HTMLElement).closest("form");
       if (!form) return;
 
-      const formData = formInteractions.current.get(form) || { focused: false, submitted: false };
-      
+      const formData = formInteractions.current.get(form) ||
+        { focused: false, submitted: false };
+
       // Use getAttribute to avoid HTMLFormElement named-element getter returning a
       // child <input name="name"> / <input name="action"> instead of the string attribute.
       const formId = form.getAttribute("id") || "unknown";
@@ -182,14 +196,16 @@ export function AnalyticsTracker() {
       if (!video || video.tagName !== "VIDEO") return;
 
       // Validate video duration to prevent NaN or Infinity
-      const hasValidDuration = Number.isFinite(video.duration) && video.duration > 0;
+      const hasValidDuration = Number.isFinite(video.duration) &&
+        video.duration > 0;
       const videoDuration = hasValidDuration ? Math.round(video.duration) : 0;
       const videoPercent = hasValidDuration
         ? Math.round((video.currentTime / video.duration) * 100)
         : 0;
 
       const videoData = {
-        video_title: video.title || (video.currentSrc?.split("/").pop() ?? "unknown"),
+        video_title: video.title ||
+          (video.currentSrc?.split("/").pop() ?? "unknown"),
         video_url: video.currentSrc,
         video_duration: videoDuration,
         video_current_time: Math.round(video.currentTime),
@@ -214,11 +230,11 @@ export function AnalyticsTracker() {
     // Add event listeners
     window.addEventListener("scroll", handleScroll, { passive: true });
     document.addEventListener("click", handleClick, true);
-    
+
     // Form tracking
     document.addEventListener("focusin", handleFormInteraction, true);
     document.addEventListener("submit", handleFormInteraction, true);
-    
+
     // Video tracking
     document.addEventListener("play", handleVideoEvent, true);
     document.addEventListener("pause", handleVideoEvent, true);
@@ -265,7 +281,7 @@ async function postAnalyticsBody(body: string) {
  */
 export async function trackEvent(
   eventName: string,
-  eventParams?: Record<string, unknown>
+  eventParams?: Record<string, unknown>,
 ) {
   try {
     const clientId = getOrCreateClientId();

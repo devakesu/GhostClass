@@ -6,7 +6,7 @@ import { fetchEzygoData } from "@/lib/ezygo-batch-fetcher";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils.server";
 import { proxyRateLimiter } from "@/lib/ratelimit";
-import { ExamQuestion, ExamAnswer } from "@/types";
+import { ExamAnswer, ExamQuestion } from "@/types";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ interface BatchRequest {
 }
 
 const BatchRequestSchema = z.object({
-  examIds: z.array(z.number()).max(25, "Maximum 25 exams per batch")
+  examIds: z.array(z.number()).max(25, "Maximum 25 exams per batch"),
 });
 
 interface ExamDetails {
@@ -31,11 +31,16 @@ interface ExamDetails {
   error?: string;
 }
 
-const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: BatchRequest }) => {
+const handler = async (
+  req: NextRequest,
+  { decryptedBody }: { decryptedBody?: BatchRequest },
+) => {
   // 1. Rate limiting
   const ip = getClientIp(req.headers);
   if (!ip) {
-    return NextResponse.json({ error: "Unable to determine client IP" }, { status: 400 });
+    return NextResponse.json({ error: "Unable to determine client IP" }, {
+      status: 400,
+    });
   }
   const { success } = await proxyRateLimiter.limit(`scores_batch_${ip}`);
   if (!success) {
@@ -61,13 +66,18 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid JSON payload" }, {
+        status: 400,
+      });
     }
   }
 
   const validation = BatchRequestSchema.safeParse(body);
   if (!validation.success) {
-    return NextResponse.json({ error: "Invalid request format", details: validation.error.format() }, { status: 400 });
+    return NextResponse.json({
+      error: "Invalid request format",
+      details: validation.error.format(),
+    }, { status: 400 });
   }
 
   const { examIds } = validation.data;
@@ -80,20 +90,31 @@ const handler = async (req: NextRequest, { decryptedBody }: { decryptedBody?: Ba
       // Fetch both questions and answers for this exam
       // The ezygo-batch-fetcher handles concurrency limits (max 3)
       const [questions, answers] = await Promise.all([
-        fetchEzygoData<ExamQuestion[]>(`/exams/${id}/examquestions?from_view_score=true`, token),
-        fetchEzygoData<ExamAnswer[]>(`/exams/${id}/institutionuser/examanswers`, token)
+        fetchEzygoData<ExamQuestion[]>(
+          `/exams/${id}/examquestions?from_view_score=true`,
+          token,
+        ),
+        fetchEzygoData<ExamAnswer[]>(
+          `/exams/${id}/institutionuser/examanswers`,
+          token,
+        ),
       ]);
-      
+
       resultsMap.set(id, {
         questions: questions || [],
-        answers: answers || []
+        answers: answers || [],
       });
     } catch (_err) {
-      logger.warn(`[scores-batch] Failed to fetch details for exam ${id}:`, _err);
+      logger.warn(
+        `[scores-batch] Failed to fetch details for exam ${id}:`,
+        _err,
+      );
       resultsMap.set(id, {
         questions: [],
         answers: [],
-        error: _err instanceof Error ? _err.message : "Failed to fetch from EzyGo"
+        error: _err instanceof Error
+          ? _err.message
+          : "Failed to fetch from EzyGo",
       });
     }
   });

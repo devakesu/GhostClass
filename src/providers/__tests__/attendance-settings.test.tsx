@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AttendanceSettingsProvider, useAttendanceSettings } from "../attendance-settings";
+import {
+  AttendanceSettingsProvider,
+  useAttendanceSettings,
+} from "../attendance-settings";
 
 // Mock user settings
 vi.mock("@/providers/user-settings", () => ({
@@ -21,7 +24,7 @@ describe("AttendanceSettingsProvider", () => {
     render(
       <AttendanceSettingsProvider>
         <TestComponent />
-      </AttendanceSettingsProvider>
+      </AttendanceSettingsProvider>,
     );
     expect(screen.getByTestId("target").textContent).toBe("80");
   });
@@ -37,7 +40,7 @@ describe("AttendanceSettingsProvider", () => {
     render(
       <AttendanceSettingsProvider>
         <TestComponent />
-      </AttendanceSettingsProvider>
+      </AttendanceSettingsProvider>,
     );
     expect(screen.getByTestId("target").textContent).toBe("75");
   });
@@ -45,7 +48,7 @@ describe("AttendanceSettingsProvider", () => {
   it("throws error when used outside provider", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<TestComponent />)).toThrow(
-      "useAttendanceSettings must be used within an AttendanceSettingsProvider"
+      "useAttendanceSettings must be used within an AttendanceSettingsProvider",
     );
     consoleSpy.mockRestore();
   });

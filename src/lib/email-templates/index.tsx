@@ -3,7 +3,7 @@ import CourseMismatchEmail from "./course-mismatch";
 import AttendanceConflictEmail from "./attendance-conflict";
 import RevisionClassEmail from "./revision-class";
 
-export { CourseMismatchEmail, AttendanceConflictEmail, RevisionClassEmail };
+export { AttendanceConflictEmail, CourseMismatchEmail, RevisionClassEmail };
 
 export {
   renderContactAdminEmail,
@@ -17,7 +17,7 @@ export type {
 /**
  * Render email templates to HTML strings
  */
-export const renderCourseMismatchEmail = async (props: {
+export const renderCourseMismatchEmail = (props: {
   username: string;
   date: string;
   session: string;
@@ -28,7 +28,7 @@ export const renderCourseMismatchEmail = async (props: {
   return render(<CourseMismatchEmail {...props} />);
 };
 
-export const renderAttendanceConflictEmail = async (props: {
+export const renderAttendanceConflictEmail = (props: {
   username: string;
   courseLabel: string;
   date: string;
@@ -38,7 +38,7 @@ export const renderAttendanceConflictEmail = async (props: {
   return render(<AttendanceConflictEmail {...props} />);
 };
 
-export const renderRevisionClassEmail = async (props: {
+export const renderRevisionClassEmail = (props: {
   username: string;
   courseName: string;
   date: string;

@@ -2,7 +2,7 @@
  * Tests for POST /api/auth/sync
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -34,7 +34,9 @@ vi.mock("@/lib/crypto", () => ({
 
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: {
-    limit: vi.fn(() => Promise.resolve({ success: true, reset: 0, limit: 10, remaining: 9 })),
+    limit: vi.fn(() =>
+      Promise.resolve({ success: true, reset: 0, limit: 10, remaining: 9 })
+    ),
   },
 }));
 
@@ -51,10 +53,12 @@ vi.mock("@/lib/utils.server", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", () => ({
-  withSecurity: vi.fn((handler) => (req: any, context: any) => handler(req, {
-    ...context,
-    authType: isMobileRequest() ? "app-check" : "csrf"
-  })),
+  withSecurity: vi.fn((handler) => (req: any, context: any) =>
+    handler(req, {
+      ...context,
+      authType: isMobileRequest() ? "app-check" : "csrf",
+    })
+  ),
   isMobileRequest,
 }));
 
@@ -80,9 +84,13 @@ describe("POST /api/auth/sync", () => {
         if (table === "users") {
           mockMethods.maybeSingle = mockAdminMaybeSingle;
         } else if (table === "user_settings") {
-          mockMethods.maybeSingle.mockResolvedValue({ 
-            data: { bunk_calculator_enabled: true, target_percentage: 75, disabled_courses: {} }, 
-            error: null 
+          mockMethods.maybeSingle.mockResolvedValue({
+            data: {
+              bunk_calculator_enabled: true,
+              target_percentage: 75,
+              disabled_courses: {},
+            },
+            error: null,
           });
         }
 
@@ -99,31 +107,50 @@ describe("POST /api/auth/sync", () => {
     const { getClientIp } = await import("@/lib/utils.server");
     vi.mocked(getClientIp).mockReturnValueOnce(null);
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
   });
 
   it("returns 429 when rate limited", async () => {
-    vi.mocked(authRateLimiter.limit).mockResolvedValueOnce({ success: false, reset: Date.now() + 1000, limit: 1, remaining: 0, pending: Promise.resolve() });
+    vi.mocked(authRateLimiter.limit).mockResolvedValueOnce({
+      success: false,
+      reset: Date.now() + 1000,
+      limit: 1,
+      remaining: 0,
+      pending: Promise.resolve(),
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(429);
   });
 
   it("handles mobile auth sync successfully", async () => {
     (isMobileRequest as any).mockReturnValue(true);
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: { id: "mobile-user" } }, error: null });
-    mockAdminMaybeSingle.mockResolvedValueOnce({ 
-      data: { id: "123", ezygo_token: "token", ezygo_iv: "iv", terms_version: "1.0", terms_accepted_at: "now" }, 
-      error: null 
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: "mobile-user" } },
+      error: null,
+    });
+    mockAdminMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "123",
+        ezygo_token: "token",
+        ezygo_iv: "iv",
+        terms_version: "1.0",
+        terms_accepted_at: "now",
+      },
+      error: null,
     });
 
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { 
+    const req = new NextRequest("http://localhost/api/auth/sync", {
       method: "POST",
-      headers: { authorization: "Bearer valid-token" }
+      headers: { authorization: "Bearer valid-token" },
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200);
@@ -135,61 +162,91 @@ describe("POST /api/auth/sync", () => {
   it("returns 401 for mobile if Authorization header is missing", async () => {
     (isMobileRequest as any).mockReturnValue(true);
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(401);
   });
 
   it("handles web auth sync successfully", async () => {
     (isMobileRequest as any).mockReturnValue(false);
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: { id: "web-user" } }, error: null });
-    mockAdminMaybeSingle.mockResolvedValueOnce({ 
-      data: { id: "456", ezygo_token: "token", ezygo_iv: "iv" }, 
-      error: null 
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: "web-user" } },
+      error: null,
+    });
+    mockAdminMaybeSingle.mockResolvedValueOnce({
+      data: { id: "456", ezygo_token: "token", ezygo_iv: "iv" },
+      error: null,
     });
 
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, message: "Authentication healed" });
+    expect(await res.json()).toEqual({
+      success: true,
+      message: "Authentication healed",
+    });
   });
 
   it("retries getUser on failure", async () => {
     (isMobileRequest as any).mockReturnValue(false);
     mockAuthGetUser
       .mockRejectedValueOnce(new Error("Network fail"))
-      .mockResolvedValueOnce({ data: { user: { id: "web-user" } }, error: null });
-    
-    mockAdminMaybeSingle.mockResolvedValueOnce({ data: { id: "456" }, error: null });
+      .mockResolvedValueOnce({
+        data: { user: { id: "web-user" } },
+        error: null,
+      });
+
+    mockAdminMaybeSingle.mockResolvedValueOnce({
+      data: { id: "456" },
+      error: null,
+    });
 
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200);
     expect(mockAuthGetUser).toHaveBeenCalledTimes(2);
   });
 
   it("returns 404 when profile is not found", async () => {
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: { id: "no-profile-user" } }, error: null });
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: "no-profile-user" } },
+      error: null,
+    });
     mockAdminMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(404);
   });
 
   it("handles decryption failure gracefully", async () => {
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: { id: "user" } }, error: null });
-    mockAdminMaybeSingle.mockResolvedValueOnce({ 
-      data: { id: "123", ezygo_token: "token", ezygo_iv: "iv" }, 
-      error: null 
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: "user" } },
+      error: null,
     });
-    vi.mocked(decrypt).mockImplementationOnce(() => { throw new Error("Decryption failed"); });
+    mockAdminMaybeSingle.mockResolvedValueOnce({
+      data: { id: "123", ezygo_token: "token", ezygo_iv: "iv" },
+      error: null,
+    });
+    vi.mocked(decrypt).mockImplementationOnce(() => {
+      throw new Error("Decryption failed");
+    });
 
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200); // Decryption failure for ezygo token shouldn't fail the whole sync
   });
@@ -197,7 +254,9 @@ describe("POST /api/auth/sync", () => {
   it("returns 500 on unexpected errors", async () => {
     mockAuthGetUser.mockRejectedValue(new Error("Boom"));
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/sync", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/sync", {
+      method: "POST",
+    });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(500);
   });

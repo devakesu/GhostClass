@@ -1,6 +1,7 @@
 # Edge Case Analysis & Test Scenarios for EzyGo Rate Limiting
 
-This file documents edge cases and provides test scenarios to verify the rate limiting implementation works correctly.
+This file documents edge cases and provides test scenarios to verify the rate
+limiting implementation works correctly.
 
 ## Edge Case 1: User Refreshes Dashboard Rapidly
 
@@ -9,13 +10,16 @@ This file documents edge cases and provides test scenarios to verify the rate li
 **Expected Behavior:**
 
 - First request: Triggers API calls
-- Subsequent requests (within 60s): Share in-flight promises and use cached responses
+- Subsequent requests (within 60s): Share in-flight promises and use cached
+  responses
 - Result: Only 3 API calls total, not 9 (3 per refresh)
 
 **Implementation:**
 
-- LRU cache with 60s TTL deduplicates in-flight requests and caches resolved responses
-- Cache key structure: `${method}:${hashedToken}:${normalizedEndpoint}:${hashedBody}`
+- LRU cache with 60s TTL deduplicates in-flight requests and caches resolved
+  responses
+- Cache key structure:
+  `${method}:${hashedToken}:${normalizedEndpoint}:${hashedBody}`
   - Token and body are SHA-256 hashed for security
   - Endpoint is normalized (leading slashes removed)
   - Body uses sentinel value `__SENTINEL_NO_BODY_VALUE__` when undefined
@@ -66,14 +70,15 @@ This file documents edge cases and provides test scenarios to verify the rate li
 
 **Scenario:** Multiple users need same public data
 
-**Cache Key Structure:** `${method}:${hashedToken}:${normalizedEndpoint}:${hashedBody}`
+**Cache Key Structure:**
+`${method}:${hashedToken}:${normalizedEndpoint}:${hashedBody}`
 
 - Token and body are SHA-256 hashed
 - Endpoint is normalized (leading slashes removed)
 - Body uses sentinel value `__SENTINEL_NO_BODY_VALUE__` when undefined
 
-Different users = Different token hashes = Different cache keys
-Result: NO deduplication across users
+Different users = Different token hashes = Different cache keys Result: NO
+deduplication across users
 
 **Reasoning:**
 
@@ -126,18 +131,23 @@ Result: NO deduplication across users
 
 - EzyGo returns 401 Unauthorized
 - Circuit breaker treats 401 (and most 4xx) as NonBreakerError
-- 401 responses do NOT increment the circuit breaker failure count or OPEN the circuit
-- User gets logged out or re-authenticated via existing auth logic (independent of the circuit breaker)
+- 401 responses do NOT increment the circuit breaker failure count or OPEN the
+  circuit
+- User gets logged out or re-authenticated via existing auth logic (independent
+  of the circuit breaker)
 
 **Risk:**
 
-- Auth failures (401) are handled outside the circuit breaker and won't by themselves OPEN the circuit
-- Breaker state changes remain reserved for true API reliability issues (e.g. 5xx/429)
+- Auth failures (401) are handled outside the circuit breaker and won't by
+  themselves OPEN the circuit
+- Breaker state changes remain reserved for true API reliability issues (e.g.
+  5xx/429)
 
 **Mitigation:**
 
 - Token refresh or re-authentication mechanisms handle expired tokens
-- Auth errors (401/other 4xx) are handled separately from breaker-worthy API errors (5xx/429), and only 5xx/429 increment breaker failure counts
+- Auth errors (401/other 4xx) are handled separately from breaker-worthy API
+  errors (5xx/429), and only 5xx/429 increment breaker failure counts
 
 ## Edge Case 8: Slow Network + Timeout
 
@@ -327,22 +337,12 @@ After 3 timeouts → Circuit OPENS
 - Status 200 when healthy
 - Status 503 when circuit open
 
-> **Note:** Detailed telemetry is only exposed in `NODE_ENV=development` or `NODE_ENV=test` environments for security reasons.
+> **Note:** Detailed telemetry is only exposed in `NODE_ENV=development` or
+> `NODE_ENV=test` environments for security reasons.
 
 ---
 
-## Mobile Edge Case 11: JWE Decryption Failure
-
-**Scenario:** Client receives a payload encrypted with a stale or mismatched RSA key
-
-**Expected Behavior:**
-
-- Client fails to decrypt the payload
-- `JweService` throws a `DecryptionException`
-- `ApiService` interceptor catches the error
-- User sees a "Security mismatch" error and is prompted to refresh or re-login
-
-## Mobile Edge Case 12: Play Integrity / App Check Failure
+## Mobile Edge Case 11: Play Integrity / App Check Failure
 
 **Scenario:** User runs the app on a rooted device or an unauthorized emulator
 
@@ -354,9 +354,10 @@ After 3 timeouts → Circuit OPENS
 - User sees a "Device not supported" or "Security violation" dialog
 - App blocks further access to sensitive attendance data
 
-## Mobile Edge Case 13: Biometric/Credential Storage Timeout
+## Mobile Edge Case 12: Biometric/Credential Storage Timeout
 
-**Scenario:** `flutter_secure_storage` takes too long to respond (common on some Android devices)
+**Scenario:** `flutter_secure_storage` takes too long to respond (common on some
+Android devices)
 
 **Expected Behavior:**
 
@@ -367,19 +368,6 @@ After 3 timeouts → Circuit OPENS
 ---
 
 ## Additional Test Scenarios
-
-### Test 9: Mobile JWE Round-trip
-
-**Setup:**
-
-- Mock the Next.js backend to return a JWE-encrypted response
-- Ensure the mobile app has the corresponding private key
-
-**Assertions:**
-
-- `ApiService` successfully decrypts the response
-- Data is correctly hydrated into the UI
-- No cleartext attendance data is visible in the network logs (only JWE tokens)
 
 ### Test 10: App Check Enforcement
 

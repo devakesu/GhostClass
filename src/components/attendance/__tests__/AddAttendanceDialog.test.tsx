@@ -7,8 +7,14 @@
  */
 
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { AddAttendanceDialog } from "../AddAttendanceDialog";
 
 // ---------------------------------------------------------------------------
@@ -88,8 +94,9 @@ vi.mock("@/components/ui/select", () => ({
   Select: ({ children, onValueChange }: any) => (
     <div>
       {React.Children.map(children, (child: any) =>
-        child ? React.cloneElement(child, { _onValueChange: onValueChange }) : null,
-      )}
+        child
+          ? React.cloneElement(child, { _onValueChange: onValueChange })
+          : null)}
     </div>
   ),
   SelectTrigger: ({ children, ...props }: any) => (
@@ -100,12 +107,16 @@ vi.mock("@/components/ui/select", () => ({
   SelectContent: ({ children, _onValueChange }: any) => (
     <div>
       {React.Children.map(children, (child: any) =>
-        child ? React.cloneElement(child, { _onValueChange }) : null,
-      )}
+        child ? React.cloneElement(child, { _onValueChange }) : null)}
     </div>
   ),
   SelectItem: ({ children, value, _onValueChange, ...props }: any) => (
-    <div role="option" onClick={() => _onValueChange?.(value)} data-value={value} {...props}>
+    <div
+      role="option"
+      onClick={() => _onValueChange?.(value)}
+      data-value={value}
+      {...props}
+    >
       {children}
     </div>
   ),
@@ -155,7 +166,6 @@ vi.mock("@/components/ui/popover", () => ({
   PopoverContent: ({ children }: any) => <div>{children}</div>,
 }));
 
-
 // ---------------------------------------------------------------------------
 // Default props
 // ---------------------------------------------------------------------------
@@ -176,7 +186,7 @@ const defaultProps = {
 // Tests
 // ---------------------------------------------------------------------------
 describe("AddAttendanceDialog", () => {
-    vi.resetModules();
+  vi.resetModules();
   beforeEach(() => {
     vi.clearAllMocks();
     radioGroupCallbackRef.current = null;
@@ -189,7 +199,8 @@ describe("AddAttendanceDialog", () => {
 
   it("does not show DL reason input when Present is selected (default)", () => {
     render(<AddAttendanceDialog {...defaultProps} />);
-    expect(screen.queryByPlaceholderText("Required for Duty Leave")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Required for Duty Leave")).not
+      .toBeInTheDocument();
   });
 
   it("shows DL reason input when Duty Leave is selected via radioGroupCallbackRef", async () => {
@@ -202,7 +213,8 @@ describe("AddAttendanceDialog", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Required for Duty Leave")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Required for Duty Leave"))
+        .toBeInTheDocument();
     });
   });
 
@@ -213,7 +225,9 @@ describe("AddAttendanceDialog", () => {
     act(() => {
       radioGroupCallbackRef.current?.("Duty Leave");
     });
-    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
+    const reasonInput = await screen.findByPlaceholderText(
+      "Required for Duty Leave",
+    );
 
     // Type a reason
     fireEvent.change(reasonInput, { target: { value: "Sports Day" } });
@@ -225,7 +239,8 @@ describe("AddAttendanceDialog", () => {
 
     // Input should disappear
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Required for Duty Leave")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Required for Duty Leave")).not
+        .toBeInTheDocument();
     });
   });
 
@@ -236,7 +251,9 @@ describe("AddAttendanceDialog", () => {
       radioGroupCallbackRef.current?.("Duty Leave");
     });
 
-    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
+    const reasonInput = await screen.findByPlaceholderText(
+      "Required for Duty Leave",
+    );
     fireEvent.change(reasonInput, { target: { value: "NSS Camp" } });
 
     // Input is still visible and has the updated value
@@ -267,7 +284,9 @@ describe("AddAttendanceDialog", () => {
     });
 
     // Type a custom DL reason
-    const reasonInput = await screen.findByPlaceholderText("Required for Duty Leave");
+    const reasonInput = await screen.findByPlaceholderText(
+      "Required for Duty Leave",
+    );
     fireEvent.change(reasonInput, { target: { value: "Annual Sports Meet" } });
 
     // Wait for button to be enabled before clicking
@@ -326,10 +345,12 @@ describe("AddAttendanceDialog", () => {
      *    triggering the "Session occupied" warning.
      */
     it("treats an opaque slot key at index 0 as occupying session 1 (index+1 fallback)", async () => {
-      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.useFakeTimers({ toFake: ["Date"] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
-      const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
+      const todayKey = `${fixedDate.getFullYear()}${
+        String(fixedDate.getMonth() + 1).padStart(2, "0")
+      }${String(fixedDate.getDate()).padStart(2, "0")}`;
 
       try {
         const propsWithAttendance = {
@@ -368,7 +389,9 @@ describe("AddAttendanceDialog", () => {
         fireEvent.click(sessionOneOption!);
 
         await waitFor(() => {
-          expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
+          expect(screen.getByRole("alert")).toHaveTextContent(
+            "Session occupied",
+          );
         });
       } finally {
         vi.useRealTimers();
@@ -376,10 +399,12 @@ describe("AddAttendanceDialog", () => {
     });
 
     it("treats the second opaque slot (index 1) as session 2 when key is non-numeric", async () => {
-      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.useFakeTimers({ toFake: ["Date"] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
-      const todayKey = `${fixedDate.getFullYear()}${String(fixedDate.getMonth() + 1).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
+      const todayKey = `${fixedDate.getFullYear()}${
+        String(fixedDate.getMonth() + 1).padStart(2, "0")
+      }${String(fixedDate.getDate()).padStart(2, "0")}`;
 
       try {
         const propsWithAttendance = {
@@ -414,7 +439,9 @@ describe("AddAttendanceDialog", () => {
         fireEvent.click(sessionTwoOption!);
 
         await waitFor(() => {
-          expect(screen.getByRole("alert")).toHaveTextContent("Session occupied");
+          expect(screen.getByRole("alert")).toHaveTextContent(
+            "Session occupied",
+          );
         });
       } finally {
         vi.useRealTimers();

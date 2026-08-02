@@ -1,7 +1,7 @@
 // Utility functions
 // src/lib/utils.ts
 
-import { clsx, type ClassValue } from "clsx";
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 /**
@@ -28,6 +28,14 @@ export function toTitleCase(str: string): string {
  * Redacts sensitive data (email, ID) for safe client-side logging using a
  * deterministic FNV-1a hash.
  */
+/**
+ * Redacts sensitive data (email, ID) on the client side using a fast, non-cryptographic FNV-1a hash.
+ *
+ * NOTE ON DIVERGENCE: Client-side redact uses FNV-1a (does not require environment secrets),
+ * whereas server-side redact (in utils.server.ts) uses HMAC-SHA256 (requires SENTRY_HASH_SALT).
+ * This means the same identifier will produce different hashes on client vs. server logs.
+ * This is an intentional security design decision to prevent exposing cryptographic salt / secrets to the client.
+ */
 export const redact = (type: "email" | "id", value: string): string => {
   const input = `${type}:${value}`;
   let h1 = 2166136261;
@@ -37,39 +45,68 @@ export const redact = (type: "email" | "id", value: string): string => {
     h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
     h2 = Math.imul(h2 ^ (c + i + 1), 16777619) >>> 0;
   }
-  return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 12);
+  return (
+    h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")
+  ).slice(0, 12);
 };
 
 /**
  * Converts a number to Roman numeral representation (1-12).
  */
 export const toRoman = (num: number | string): string => {
-  const n = typeof num === 'string' ? parseInt(num, 10) : num;
+  const n = typeof num === "string" ? parseInt(num, 10) : num;
   if (isNaN(n) || n < 1) return String(num);
-  const romans = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+  const romans = [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+  ];
   return romans[n - 1] || String(n);
 };
 
 const SESSION_ROMANS = new Map<string, string>([
-  ['viii', '8'], ['vii', '7'], ['vi', '6'], ['v', '5'],
-  ['iv', '4'], ['iii', '3'], ['ii', '2'], ['i', '1'],
-  ['ix', '9'], ['x', '10']
+  ["viii", "8"],
+  ["vii", "7"],
+  ["vi", "6"],
+  ["v", "5"],
+  ["iv", "4"],
+  ["iii", "3"],
+  ["ii", "2"],
+  ["i", "1"],
+  ["ix", "9"],
+  ["x", "10"],
 ]);
 
 /**
  * Normalizes session identifiers to a standard format.
  */
-export const normalizeSession = (session: string | number): string => {
-  if (session === null || session === undefined || String(session).toLowerCase().trim() === 'null' || String(session).trim() === '') {
-    return '1';
+export const normalizeSession = (
+  session: string | number | null | undefined,
+): string => {
+  if (
+    session === null ||
+    session === undefined ||
+    String(session).toLowerCase().trim() === "null" ||
+    String(session).trim() === ""
+  ) {
+    return "UNKNOWN";
   }
   let s = String(session).toLowerCase().trim();
-  
-  s = s.replace(/session|lecture|lec|lab|hour|hr|period/g, '').trim();
-  s = s.replace(/(st|nd|rd|th)$/, '').trim();
 
-  s = s.replace(/\s+/g, ' ').trim();
-  if (s.includes(' ')) s = s.split(' ')[0];
+  s = s.replace(/session|lecture|lec|lab|hour|hr|period/g, "").trim();
+  s = s.replace(/(st|nd|rd|th)$/, "").trim();
+
+  s = s.replace(/\s+/g, " ").trim();
+  if (s.includes(" ")) s = s.split(" ")[0];
 
   if (SESSION_ROMANS.has(s)) return SESSION_ROMANS.get(s)!;
 
@@ -79,32 +116,36 @@ export const normalizeSession = (session: string | number): string => {
   return s.toUpperCase();
 };
 
-function parseDashDate(base: string): { y: string; m: string; d: string } | null {
-  const parts = base.split('-');
+function parseDashDate(
+  base: string,
+): { y: string; m: string; d: string } | null {
+  const parts = base.split("-");
   if (parts.length === 3) {
     const [a, b, c] = parts.map((p) => p.trim());
     if (!/^\d+$/.test(a) || !/^\d+$/.test(b) || !/^\d+$/.test(c)) {
       return null;
     }
     if (a.length === 4) {
-      return { y: a, m: b.padStart(2, '0'), d: c.padStart(2, '0') };
+      return { y: a, m: b.padStart(2, "0"), d: c.padStart(2, "0") };
     }
     if (c.length === 4) {
-      return { y: c, m: b.padStart(2, '0'), d: a.padStart(2, '0') };
+      return { y: c, m: b.padStart(2, "0"), d: a.padStart(2, "0") };
     }
   }
   return null;
 }
 
-function parseSlashDate(base: string): { y: string; m: string; d: string } | null {
-  const parts = base.split('/');
+function parseSlashDate(
+  base: string,
+): { y: string; m: string; d: string } | null {
+  const parts = base.split("/");
   if (parts.length === 3) {
     const [rawD, rawM, rawY] = parts.map((p) => p.trim());
     if (!/^\d+$/.test(rawD) || !/^\d+$/.test(rawM) || !/^\d+$/.test(rawY)) {
       return null;
     }
     if (rawD && rawM && rawY) {
-      return { y: rawY, m: rawM.padStart(2, '0'), d: rawD.padStart(2, '0') };
+      return { y: rawY, m: rawM.padStart(2, "0"), d: rawD.padStart(2, "0") };
     }
   }
   return null;
@@ -113,15 +154,17 @@ function parseSlashDate(base: string): { y: string; m: string; d: string } | nul
 /**
  * Parses a date string into { y, m, d } string parts.
  */
-function parseDateParts(str: string): { y: string; m: string; d: string } | null {
-  const base = str.includes('T') ? str.split('T')[0] : str;
+function parseDateParts(
+  str: string,
+): { y: string; m: string; d: string } | null {
+  const base = str.includes("T") ? str.split("T")[0] : str;
 
   if (/^\d{8}$/.test(base)) {
     return { y: base.slice(0, 4), m: base.slice(4, 6), d: base.slice(6, 8) };
   }
 
-  if (base.includes('-')) return parseDashDate(base);
-  if (base.includes('/')) return parseSlashDate(base);
+  if (base.includes("-")) return parseDashDate(base);
+  if (base.includes("/")) return parseSlashDate(base);
 
   return null;
 }
@@ -130,7 +173,7 @@ function parseDateParts(str: string): { y: string; m: string; d: string } | null
  * Normalizes a date string to ISO date format (YYYY-MM-DD).
  */
 export function normalizeToISODate(str: string): string {
-  if (!str) return '';
+  if (!str) return "";
   const parts = parseDateParts(str);
   if (parts) return `${parts.y}-${parts.m}-${parts.d}`;
   return str;
@@ -144,25 +187,35 @@ export const normalizeDate = (date: string | Date): string => {
 
   if (date instanceof Date) {
     const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
     return `${y}${m}${d}`;
   }
 
   const parts = parseDateParts(String(date).trim());
   if (parts) return `${parts.y}${parts.m}${parts.d}`;
 
-  console.warn(`[normalizeDate] Unrecognised date format "${String(date).trim()}". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Returning "" to avoid incorrect slot keys.`);
+  console.warn(
+    `[normalizeDate] Unrecognised date format "${
+      String(
+        date,
+      ).trim()
+    }". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Returning "" to avoid incorrect slot keys.`,
+  );
   return "";
 };
 
 /**
  * Generates a canonical key for attendance slot identification and deduplication.
  */
-export const generateSlotKey = (courseId: string | number, date: string | Date, session: string | number) => {
+export const generateSlotKey = (
+  courseId: string | number,
+  date: string | Date,
+  session: string | number,
+) => {
   const cId = String(courseId).trim();
   const d = normalizeDate(date);
-  
+
   const normSession = normalizeSession(session);
   const n = parseInt(normSession, 10);
   const finalSession = !isNaN(n) ? toRoman(n) : normSession;
@@ -171,9 +224,18 @@ export const generateSlotKey = (courseId: string | number, date: string | Date, 
 };
 
 const DISPLAY_ROMAN_MAP = new Map<string, string>([
-  ["i", "1st Hour"],  ["ii", "2nd Hour"],  ["iii", "3rd Hour"],  ["iv", "4th Hour"],
-  ["v", "5th Hour"],  ["vi", "6th Hour"],  ["vii", "7th Hour"],  ["viii", "8th Hour"],
-  ["ix", "9th Hour"], ["x", "10th Hour"], ["xi", "11th Hour"], ["xii", "12th Hour"],
+  ["i", "1st Hour"],
+  ["ii", "2nd Hour"],
+  ["iii", "3rd Hour"],
+  ["iv", "4th Hour"],
+  ["v", "5th Hour"],
+  ["vi", "6th Hour"],
+  ["vii", "7th Hour"],
+  ["viii", "8th Hour"],
+  ["ix", "9th Hour"],
+  ["x", "10th Hour"],
+  ["xi", "11th Hour"],
+  ["xii", "12th Hour"],
 ]);
 
 function getOrdinalHour(num: number): string {
@@ -191,8 +253,11 @@ function getOrdinalHour(num: number): string {
  */
 export function formatSessionName(sessionName: string): string {
   if (!sessionName) return "";
-  const clean = sessionName.toString().replace(/Session|Hour/gi, "").trim();
-  
+  const clean = sessionName
+    .toString()
+    .replace(/Session|Hour/gi, "")
+    .trim();
+
   const lower = clean.toLowerCase();
   if (DISPLAY_ROMAN_MAP.has(lower)) return DISPLAY_ROMAN_MAP.get(lower)!;
 
@@ -201,13 +266,24 @@ export function formatSessionName(sessionName: string): string {
     return getOrdinalHour(num);
   }
 
-  return sessionName.toLowerCase().includes("session") ? sessionName : `Session ${sessionName}`;
+  return sessionName.toLowerCase().includes("session")
+    ? sessionName
+    : `Session ${sessionName}`;
 }
 
 const SORT_ROMAN_MAP = new Map<string, number>([
-  ["i", 1], ["ii", 2],  ["iii", 3],  ["iv", 4],
-  ["v", 5], ["vi", 6], ["vii", 7], ["viii", 8],
-  ["ix", 9], ["x", 10], ["xi", 11], ["xii", 12],
+  ["i", 1],
+  ["ii", 2],
+  ["iii", 3],
+  ["iv", 4],
+  ["v", 5],
+  ["vi", 6],
+  ["vii", 7],
+  ["viii", 8],
+  ["ix", 9],
+  ["x", 10],
+  ["xi", 11],
+  ["xii", 12],
 ]);
 
 /**
@@ -215,10 +291,14 @@ const SORT_ROMAN_MAP = new Map<string, number>([
  */
 export function getSessionNumber(name: string): number {
   if (!name) return 999;
-  const clean = name.toString().toLowerCase().replace(/session|hour/g, "").trim();
-  
+  const clean = name
+    .toString()
+    .toLowerCase()
+    .replace(/session|hour/g, "")
+    .trim();
+
   if (SORT_ROMAN_MAP.has(clean)) return SORT_ROMAN_MAP.get(clean)!;
-  
+
   const match = clean.match(/\d+/);
   return match ? parseInt(match[0], 10) : 999;
 }
@@ -234,7 +314,9 @@ export const formatCourseCode = (code: string): string => {
  * Alias for `formatCourseCode` kept for semantic clarity.
  * Use this when normalizing course codes across the codebase.
  */
-export const normalizeCourseCode = (code: string | undefined | null): string => {
+export const normalizeCourseCode = (
+  code: string | undefined | null,
+): string => {
   if (!code) return "";
   return formatCourseCode(String(code));
 };
@@ -260,9 +342,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 /**
  * Compresses an image file to JPEG format with quality control.
  */
-export const compressImage = async (file: File, quality = 0.7): Promise<File> => {
+export const compressImage = async (
+  file: File,
+  quality = 0.7,
+): Promise<File> => {
   if (!Number.isFinite(quality) || quality < 0 || quality > 1) {
-    throw new RangeError(`compressImage: quality must be a finite number in [0, 1], got ${quality}`);
+    throw new RangeError(
+      `compressImage: quality must be a finite number in [0, 1], got ${quality}`,
+    );
   }
 
   const dataUrl = await fileToDataUrl(file);
@@ -305,51 +392,70 @@ export const compressImage = async (file: File, quality = 0.7): Promise<File> =>
   });
 };
 
-const LOCALHOST_VARIANTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+const LOCALHOST_VARIANTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "::1",
+  "0.0.0.0",
+]);
 const IPV4_PATTERN = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
 /**
  * Gets the application domain for email addresses.
  */
-export function getAppDomain(fallbackDomain: string = 'ghostclass.app'): string {
+export function getAppDomain(
+  fallbackDomain: string = "ghostclass.app",
+): string {
   const isProduction = process.env.NODE_ENV === "production";
   let appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-  
+
   if (!appDomain && typeof window !== "undefined" && !isProduction) {
     const hostname = window.location.hostname;
-    
+
     const isLocalhost = LOCALHOST_VARIANTS.has(hostname);
     const isIPv4 = IPV4_PATTERN.test(hostname);
-    const isIPv6 = hostname.includes(":") || (hostname.startsWith("[") && hostname.endsWith("]"));
-    
+    const isIPv6 = hostname.includes(":") ||
+      (hostname.startsWith("[") && hostname.endsWith("]"));
+
     if (hostname && !isLocalhost && !isIPv4 && !isIPv6) {
       appDomain = hostname;
     }
   }
-  
-  const defaultDomain = process.env.NEXT_PUBLIC_DEFAULT_DOMAIN || fallbackDomain;
-  
-  if (isProduction && !process.env.NEXT_PUBLIC_APP_DOMAIN && !process.env.NEXT_PUBLIC_DEFAULT_DOMAIN) {
+
+  const defaultDomain = process.env.NEXT_PUBLIC_DEFAULT_DOMAIN ||
+    fallbackDomain;
+
+  if (
+    isProduction &&
+    !process.env.NEXT_PUBLIC_APP_DOMAIN &&
+    !process.env.NEXT_PUBLIC_DEFAULT_DOMAIN
+  ) {
     console.warn(
-      '[SECURITY] getAppDomain: NEXT_PUBLIC_APP_DOMAIN and NEXT_PUBLIC_DEFAULT_DOMAIN are not set in production. ' +
-      `Using hardcoded fallback domain '${defaultDomain}'. This could be a security risk for error reporting. ` +
-      'Please configure these environment variables.'
+      "[SECURITY] getAppDomain: NEXT_PUBLIC_APP_DOMAIN and NEXT_PUBLIC_DEFAULT_DOMAIN are not set in production. " +
+        `Using hardcoded fallback domain '${defaultDomain}'. This could be a security risk for error reporting. ` +
+        "Please configure these environment variables.",
     );
   }
-  
+
   return appDomain || defaultDomain;
 }
 
 /**
  * Type-guard that narrows a raw avatar_url from the DB to a known-safe string.
  */
-export function isValidAvatarUrl(url: string | null | undefined): url is string {
+export function isValidAvatarUrl(
+  url: string | null | undefined,
+): url is string {
   if (!url) return false;
-  if (url.startsWith('/') || url.startsWith('blob:') || url.startsWith('data:')) return true;
+  if (
+    url.startsWith("/") || url.startsWith("blob:") || url.startsWith("data:")
+  ) {
+    return true;
+  }
 
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:';
+    return parsed.protocol === "https:";
   } catch {
     return false;
   }

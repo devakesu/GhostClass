@@ -6,7 +6,7 @@
  * - A valid request clears all session cookies and returns 200
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 // Mock server-only to allow tests to run in jsdom / Node environments.
@@ -109,8 +109,8 @@ describe("POST /api/logout", () => {
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
-      expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
-      expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+      expect(res.headers.get("X-RateLimit-Limit")).toBeNull();
+      expect(res.headers.get("X-RateLimit-Remaining")).toBeNull();
       const body = await res.json() as { message: string };
       expect(body.message).toMatch(/too many requests/i);
     });
@@ -163,33 +163,33 @@ describe("POST /api/logout", () => {
         { name: "sb-project-auth-token.1" },
         { name: "other-cookie" },
       ]);
-      
+
       const { POST } = await import("../route");
       await POST(makePostReq(), { params: {} });
-      
+
       expect(mockCookieSet).toHaveBeenCalledWith(
         "sb-project-auth-token.0",
         "",
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(mockCookieSet).toHaveBeenCalledWith(
         "sb-project-auth-token.1",
         "",
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
     it("sets secure cookie flag when HTTPS is enabled", async () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
       vi.stubEnv("HTTPS", "true");
-      
+
       const { POST } = await import("../route");
       await POST(makePostReq(), { params: {} });
-      
+
       expect(mockCookieSet).toHaveBeenCalledWith(
         expect.any(String),
         "",
-        expect.objectContaining({ secure: true })
+        expect.objectContaining({ secure: true }),
       );
     });
 

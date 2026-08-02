@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
-import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CopyButton, InlineCopyButton } from '../copy-button';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { CopyButton, InlineCopyButton } from "../copy-button";
 
-describe('CopyButton', () => {
+describe("CopyButton", () => {
   const originalClipboard = { ...navigator.clipboard };
   const originalAlert = window.alert;
 
@@ -20,57 +20,57 @@ describe('CopyButton', () => {
     window.alert = originalAlert;
   });
 
-  it('handles clipboard unavailability', async () => {
+  it("handles clipboard unavailability", async () => {
     // @ts-expect-error mock undefined clipboard
     navigator.clipboard = undefined;
 
     render(<CopyButton text="test" label="Copy Me" />);
-    const btn = screen.getByLabelText('Copy Me');
+    const btn = screen.getByLabelText("Copy Me");
     fireEvent.click(btn);
 
     expect(window.alert).toHaveBeenCalledWith(
-      "Copy to clipboard is not supported in this browser or context."
+      "Copy to clipboard is not supported in this browser or context.",
     );
   });
 
-  it('handles writeText failure', async () => {
+  it("handles writeText failure", async () => {
     // @ts-expect-error mock clipboard writeText failure
     navigator.clipboard = {
-      writeText: vi.fn().mockRejectedValue(new Error('Copy failed')),
+      writeText: vi.fn().mockRejectedValue(new Error("Copy failed")),
     };
 
     render(<CopyButton text="test" label="Copy Me" />);
-    const btn = screen.getByLabelText('Copy Me');
+    const btn = screen.getByLabelText("Copy Me");
     fireEvent.click(btn);
 
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith(
-        "Failed to copy to clipboard. Please copy the text manually."
+        "Failed to copy to clipboard. Please copy the text manually.",
       );
     });
   });
 
-  it('handles success and resets after 2s', async () => {
+  it("handles success and resets after 2s", async () => {
     // @ts-expect-error mock clipboard writeText success
     navigator.clipboard = {
       writeText: vi.fn().mockResolvedValue(undefined),
     };
 
     render(<CopyButton text="test" label="Copy Me" />);
-    const btn = screen.getByLabelText('Copy Me');
+    const btn = screen.getByLabelText("Copy Me");
     fireEvent.click(btn);
 
-    expect(await screen.findByText('Copied')).toBeInTheDocument();
-    
+    expect(await screen.findByText("Copied")).toBeInTheDocument();
+
     // Use a longer timeout for the waitFor to account for the 2s delay
     await waitFor(() => {
-      expect(screen.queryByText('Copied')).not.toBeInTheDocument();
-      expect(screen.getByText('Copy Me')).toBeInTheDocument();
+      expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+      expect(screen.getByText("Copy Me")).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 });
 
-describe('InlineCopyButton', () => {
+describe("InlineCopyButton", () => {
   const originalClipboard = { ...navigator.clipboard };
   const originalAlert = window.alert;
 
@@ -87,32 +87,32 @@ describe('InlineCopyButton', () => {
     window.alert = originalAlert;
   });
 
-  it('handles clipboard unavailability', async () => {
+  it("handles clipboard unavailability", async () => {
     // @ts-expect-error mock undefined clipboard
     navigator.clipboard = undefined;
 
     render(<InlineCopyButton text="test" />);
-    const btn = screen.getByLabelText('Copy digest');
+    const btn = screen.getByLabelText("Copy digest");
     fireEvent.click(btn);
 
     expect(window.alert).toHaveBeenCalledWith(
-      "Copy to clipboard is not supported in this browser or context."
+      "Copy to clipboard is not supported in this browser or context.",
     );
   });
 
-  it('handles writeText failure', async () => {
+  it("handles writeText failure", async () => {
     // @ts-expect-error mock clipboard writeText failure
     navigator.clipboard = {
-      writeText: vi.fn().mockRejectedValue(new Error('Copy failed')),
+      writeText: vi.fn().mockRejectedValue(new Error("Copy failed")),
     };
 
     render(<InlineCopyButton text="test" />);
-    const btn = screen.getByLabelText('Copy digest');
+    const btn = screen.getByLabelText("Copy digest");
     fireEvent.click(btn);
 
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith(
-        "Failed to copy to clipboard. Please copy the text manually."
+        "Failed to copy to clipboard. Please copy the text manually.",
       );
     });
   });

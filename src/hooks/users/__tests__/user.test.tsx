@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.unmock("../user");
 import { useUser } from "../user";
 import axiosInstance from "@/lib/axios";
@@ -62,7 +62,9 @@ describe("useUser", () => {
   });
 
   it("should handle fetch error", async () => {
-    (axiosInstance.get as any).mockRejectedValueOnce(new Error("Network Error"));
+    (axiosInstance.get as any).mockRejectedValueOnce(
+      new Error("Network Error"),
+    );
 
     const { result } = renderHook(() => useUser(), {
       wrapper: createWrapper(),

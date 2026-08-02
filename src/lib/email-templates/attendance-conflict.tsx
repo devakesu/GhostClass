@@ -1,5 +1,6 @@
 import {
   Body,
+  Button,
   Container,
   Head,
   Heading,
@@ -7,9 +8,14 @@ import {
   Img,
   Section,
   Text,
-  Button,
 } from "react-email";
-import { emailStyles, tableStyles, badgeStyles, getLogoUrl, headerLogoStyle } from "./styles";
+import {
+  badgeStyles,
+  emailStyles,
+  getLogoUrl,
+  headerLogoStyle,
+  tableStyles,
+} from "./styles";
 
 interface AttendanceConflictEmailProps {
   username: string;
@@ -31,11 +37,18 @@ export const AttendanceConflictEmail = ({
     <Body style={emailStyles.main}>
       <Container style={emailStyles.container}>
         <Section style={emailStyles.header}>
-          <Img src={getLogoUrl()} alt="GhostClass" width={180} style={headerLogoStyle} />
+          <Img
+            src={getLogoUrl()}
+            alt="GhostClass"
+            width={180}
+            style={headerLogoStyle}
+          />
         </Section>
 
         <Section style={emailStyles.content}>
-          <Heading style={emailStyles.title}>Attendance Conflict Detected</Heading>
+          <Heading style={emailStyles.title}>
+            Attendance Conflict Detected
+          </Heading>
 
           <Text style={emailStyles.paragraph}>
             Hi <strong>{username}</strong>,<br />
@@ -75,8 +88,8 @@ export const AttendanceConflictEmail = ({
 
           <Text style={emailStyles.note}>
             We have automatically flagged this entry as a{" "}
-            <strong>Correction</strong> in your dashboard to keep your stats
-            accurate.
+            <strong>Correction</strong>{" "}
+            in your dashboard to keep your stats accurate.
           </Text>
 
           <Section style={emailStyles.buttonContainer}>

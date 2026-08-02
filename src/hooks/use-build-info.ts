@@ -20,7 +20,8 @@ export function useBuildInfo() {
     branch: process.env.NEXT_PUBLIC_BRANCH || "main",
     commit: process.env.NEXT_PUBLIC_COMMIT || "test-commit",
     is_legacy: process.env.NEXT_PUBLIC_IS_LEGACY === "true",
-    timestamp: process.env.NEXT_PUBLIC_BUILD_TIMESTAMP || new Date().toISOString(),
+    timestamp: process.env.NEXT_PUBLIC_BUILD_TIMESTAMP ||
+      new Date().toISOString(),
   }), []);
 
   return {

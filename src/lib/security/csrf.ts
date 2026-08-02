@@ -1,54 +1,54 @@
 /**
  * CSRF Protection Module
- * 
+ *
  * Implements Synchronizer Token Pattern for CSRF protection.
  * This module provides token generation and validation for protecting
  * against Cross-Site Request Forgery attacks.
- * 
+ *
  * Security Model:
  * - The token is stored in an httpOnly cookie (server-side validation)
  * - Client receives token via API response and stores in sessionStorage
  * - Client includes token in X-CSRF-Token header for state-changing requests
  * - Server validates header token against httpOnly cookie
- * 
+ *
  * ⚠️ CRITICAL SECURITY TRADE-OFF - sessionStorage and XSS:
- * 
+ *
  * This implementation stores the CSRF token in sessionStorage, which is accessible
  * to JavaScript and therefore vulnerable to XSS (Cross-Site Scripting) attacks.
  * If an attacker can execute arbitrary JavaScript in the application context,
  * they can read the token from sessionStorage and bypass CSRF protection.
- * 
+ *
  * WHY THIS APPROACH WAS CHOSEN:
  * - sessionStorage provides token persistence across page navigations within a tab
  * - Allows token sharing across all pages in the same browsing session
  * - Avoids repeated server round-trips for token retrieval
  * - Simpler client-side implementation than alternatives (meta tags, hidden fields)
- * 
+ *
  * ALTERNATIVE APPROACHES CONSIDERED:
  * 1. In-Memory Only: Token lost on page refresh, poor UX
  * 2. Meta Tag Injection: Complex with client-side navigation in Next.js
  * 3. Hidden Form Fields: Only works for forms, not AJAX requests
- * 
+ *
  * MANDATORY SECURITY REQUIREMENTS:
  * This approach is ONLY secure when combined with strict XSS prevention:
- * 
+ *
  * 1. CONTENT SECURITY POLICY (CSP):
  *    - Implemented in src/lib/csp.ts with nonce-based script execution
  *    - Production uses 'strict-dynamic' and blocks 'unsafe-inline'
  *    - Prevents unauthorized JavaScript execution
- * 
+ *
  * 2. INPUT SANITIZATION:
  *    - All user input must be sanitized to prevent script injection
  *    - Use proper encoding when rendering user content
- * 
+ *
  * 3. SECURITY HEADERS:
  *    - X-Content-Type-Options: nosniff
  *    - X-Frame-Options: DENY (or via CSP frame-ancestors)
- * 
+ *
  * ⚠️ WARNING: If CSP is disabled or weakened, or if XSS vulnerabilities exist,
  * this CSRF protection can be bypassed. XSS prevention is the PRIMARY defense;
  * CSRF protection is a secondary layer. Both must be maintained.
- * 
+ *
  * IMPORTANT: Cookie writes must only happen in Route Handlers or Server Actions,
  * not in Server Components. Use getCsrfToken() from Server Components (read-only),
  * Route Handlers, and Server Actions.
@@ -61,11 +61,14 @@ import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { redis } from "@/lib/redis";
 
 // Configuration
-const CSRF_COOKIE_NAME = "csrf_token";
+import { CSRF_TOKEN_NAME as CSRF_COOKIE_NAME } from "./csrf-constants";
 const CSRF_TOKEN_LENGTH = 32;
 const CSRF_COOKIE_MAX_AGE = 60 * 60 * 24; // 24 hours
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const SESSION_COOKIE_NAMES = ["__Secure-authjs.session-token", "authjs.session-token"];
+const SESSION_COOKIE_NAMES = [
+  "__Secure-authjs.session-token",
+  "authjs.session-token",
+];
 
 async function getSessionIdFromCookie(): Promise<string | null> {
   const cookieStore = await cookies();
@@ -125,12 +128,12 @@ export async function getCsrfToken(): Promise<string | null> {
  * WARNING: This function can ONLY be called from Route Handlers or Server Actions,
  * NOT from Server Components. Calling from Server Components will cause:
  * "Error: Cookies can only be modified in a Server Action or Route Handler"
- * 
+ *
  * @param token - The CSRF token to set
  */
 export async function setCsrfCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
-  
+
   cookieStore.set({
     name: CSRF_COOKIE_NAME,
     value: token,
@@ -147,13 +150,15 @@ export async function setCsrfCookie(token: string): Promise<void> {
  * @param requestToken - Token from request header or body
  * @returns true if valid, false otherwise
  */
-export async function validateCsrfToken(requestToken: string | null | undefined): Promise<boolean> {
+export async function validateCsrfToken(
+  requestToken: string | null | undefined,
+): Promise<boolean> {
   if (!requestToken) {
     return false;
   }
 
   const cookieToken = await getCsrfToken();
-  
+
   if (!cookieToken) {
     return false;
   }
@@ -164,7 +169,7 @@ export async function validateCsrfToken(requestToken: string | null | undefined)
   try {
     return crypto.timingSafeEqual(
       Buffer.from(cookieToken),
-      Buffer.from(requestToken)
+      Buffer.from(requestToken),
     );
   } catch (_error) {
     // L-5: timingSafeEqual throws RangeError if buffers have different lengths.
@@ -217,7 +222,7 @@ export async function regenerateCsrfToken(): Promise<string> {
   const newToken = generateCsrfToken();
   await setCsrfCookie(newToken);
   await bindCsrfTokenToCurrentSession(newToken);
-  
+
   return newToken;
 }
 

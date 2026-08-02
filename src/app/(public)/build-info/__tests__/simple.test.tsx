@@ -1,6 +1,6 @@
-import { it, expect } from 'vitest';
+import { expect, it } from "vitest";
 import { Copy } from "lucide-react";
 
-it('imports Copy', () => {
+it("imports Copy", () => {
   expect(Copy).toBeDefined();
 });

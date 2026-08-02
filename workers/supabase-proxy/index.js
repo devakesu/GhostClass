@@ -100,7 +100,9 @@ function getSupabaseOrigin(env) {
   const rawSupabaseUrl = stripTrailingSlashes(env.SUPABASE_URL ?? "");
   if (!rawSupabaseUrl) {
     return {
-      error: new Response("Misconfigured: SUPABASE_URL is not set", { status: 500 }),
+      error: new Response("Misconfigured: SUPABASE_URL is not set", {
+        status: 500,
+      }),
       origin: null,
     };
   }
@@ -109,7 +111,9 @@ function getSupabaseOrigin(env) {
     return { origin: new URL(rawSupabaseUrl).origin, error: null };
   } catch {
     return {
-      error: new Response("Misconfigured: SUPABASE_URL is not a valid URL", { status: 500 }),
+      error: new Response("Misconfigured: SUPABASE_URL is not a valid URL", {
+        status: 500,
+      }),
       origin: null,
     };
   }
@@ -117,8 +121,8 @@ function getSupabaseOrigin(env) {
 
 function isPublicStorageGetRequest(request, pathname) {
   return (
-    (request.method === "GET" || request.method === "HEAD")
-    && pathname.startsWith("/storage/v1/object/public/")
+    (request.method === "GET" || request.method === "HEAD") &&
+    pathname.startsWith("/storage/v1/object/public/")
   );
 }
 
@@ -184,7 +188,9 @@ function buildResponseHeaders(supabaseResponse) {
 export default {
   async fetch(request, env) {
     // ── 1. Config validation ──────────────────────────────────────────────────
-    const { origin: supabaseOrigin, error: supabaseError } = getSupabaseOrigin(env);
+    const { origin: supabaseOrigin, error: supabaseError } = getSupabaseOrigin(
+      env,
+    );
     if (supabaseError) {
       return supabaseError;
     }
@@ -199,7 +205,11 @@ export default {
     // header that exactly matches the allowed origin.
     // Bypass Origin check for GET/HEAD requests to public storage.
     // Next.js server-side Image Optimization and mobile clients do not send an Origin header.
-    const originError = validateOrigin(request, allowedOrigin, incomingPathname);
+    const originError = validateOrigin(
+      request,
+      allowedOrigin,
+      incomingPathname,
+    );
     if (originError) {
       return originError;
     }
@@ -223,10 +233,15 @@ export default {
         }),
       );
     } catch (err) {
-      return new Response(`Proxy fetch failed: ${err instanceof Error ? err.message : String(err)}`, {
-        status: 502,
-        headers: { "Content-Type": "text/plain" },
-      });
+      return new Response(
+        `Proxy fetch failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        {
+          status: 502,
+          headers: { "Content-Type": "text/plain" },
+        },
+      );
     }
 
     // ── 6. Build response — strip hop-by-hop headers ──────────────────────────

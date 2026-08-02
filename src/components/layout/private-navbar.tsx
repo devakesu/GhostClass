@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,14 +41,17 @@ import {
   Layers2,
   LogOut,
   Moon,
-  Percent,
   SquareAsterisk,
   Sun,
+  Target,
   UserRound,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useUserSettings } from "@/providers/user-settings";
 import { AddRecordTrigger } from "@/components/attendance/AddRecordTrigger";
+import { CourseTargetDialog } from "@/components/attendance/course-target-dialog";
+import { useFetchCourses } from "@/hooks/courses/courses";
+import { useFetchClassCourses } from "@/hooks/courses/useFetchClassCourses";
 import UserPlaceholder from "@/assets/user.png";
 import { Bell } from "lucide-react";
 import { useNotifications } from "@/hooks/notifications/useNotifications";
@@ -60,7 +63,7 @@ export const Navbar = () => {
   const router = useRouter();
   const topLoader = useTopLoader();
   const { data: profile } = useProfile();
-  const { settings, updateBunkCalc, updateTarget, isLoading: settingsLoading } =
+  const { settings, updateBunkCalc, isLoading: settingsLoading } =
     useUserSettings();
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -78,6 +81,28 @@ export const Navbar = () => {
   const selectedInstitution = defaultInstitutionUser?.toString() ?? "";
 
   const pathname = usePathname();
+  const [isTargetDialogOpen, setIsTargetDialogOpen] = useState(false);
+  const { data: coursesData } = useFetchCourses();
+  const { data: classCourses } = useFetchClassCourses();
+
+  const navbarCourses = useMemo(() => {
+    const list: Array<{ code: string; name?: string; id?: string | number }> =
+      [];
+    if (coursesData?.courses) {
+      Object.entries(coursesData.courses).forEach(([id, c]) => {
+        list.push({ code: c.code || id, name: c.name, id });
+      });
+    }
+    if (classCourses) {
+      classCourses.forEach((cc) => {
+        if (cc.course_code) {
+          list.push({ code: cc.course_code, name: cc.course_code });
+        }
+      });
+    }
+    return list;
+  }, [coursesData, classCourses]);
+
   // countOnly=true: skips the action-conflict query and infinite feed query (both with
   // 30 s polling) — the navbar only ever needs the badge number.
   const { unreadCount } = useNotifications(true, true);
@@ -142,7 +167,7 @@ export const Navbar = () => {
   // This allows bunk_calculator_enabled to be false (a valid value) while falling back
   // to a default when settings is not yet loaded or is explicitly null
   const currentBunkCalc = settings?.bunk_calculator_enabled !== undefined &&
-    settings?.bunk_calculator_enabled !== null
+      settings?.bunk_calculator_enabled !== null
     ? settings.bunk_calculator_enabled
     : true;
 
@@ -186,11 +211,9 @@ export const Navbar = () => {
         <div className="h-4 w-4 animate-pulse rounded bg-muted-foreground/20" />
       );
     }
-    return theme === "dark" ? (
-      <Moon className="h-4 w-4" aria-hidden="true" />
-    ) : (
-      <Sun className="h-4 w-4" aria-hidden="true" />
-    );
+    return theme === "dark"
+      ? <Moon className="h-4 w-4" aria-hidden="true" />
+      : <Sun className="h-4 w-4" aria-hidden="true" />;
   };
 
   return (
@@ -274,107 +297,76 @@ export const Navbar = () => {
 
           <div className="gap-3 flex items-center">
             {profile && (
-              <AddRecordTrigger user={profile as never} onSuccess={handleAddSuccess} />
+              <AddRecordTrigger
+                user={profile as never}
+                onSuccess={handleAddSuccess}
+              />
             )}
           </div>
 
-          {/* Attendance Target Selector (Desktop Only) */}
+          {/* Attendance Target Selector Trigger (Desktop Only) */}
           <div className="flex max-sm:hidden">
-            <Select
-              value={currentTarget.toString()}
-              onValueChange={(value) => {
-                const val = Number(value);
-                updateTarget(val);
-                toast.success("Attendance Target Updated", {
-                  description: (
-                    <span className="text-white">
-                      Your attendance target is now {value}%.
-                    </span>
-                  ),
-                  style: {
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                    border: "1px solid var(--border)",
-                    backdropFilter: "blur(8px)",
-                  },
-                });
-              }}
+            <Button
+              id="target-percentage-select"
+              variant="outline"
+              className="w-27.5 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20 font-medium"
+              onClick={() => setIsTargetDialogOpen(true)}
+              aria-label="Set attendance target percentage"
             >
-              <SelectTrigger
-                id="target-percentage-select"
-                className="w-27.5 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20"
-                aria-label="Set attendance target percentage"
-              >
-                <SelectValue>
-                  <div className="flex items-center font-medium">
-                    <Percent className="mr-2 h-4 w-4" />
-                    <span>{currentTarget}%</span>
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="custom-dropdown mt-1">
-                {[75, 80, 85, 90, 95].map((percentage) => (
-                  <SelectItem key={percentage} value={percentage.toString()}>
-                    <div className="flex items-center cursor-pointer">
-                      <Percent className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="font-medium">{percentage}%</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Target className="mr-2 h-4 w-4 text-primary" />
+              <span>{currentTarget}%</span>
+            </Button>
           </div>
 
           {/* Institution Selector */}
           {!institutionsLoading && institutions && institutions.length > 0 &&
             pathname !== "/profile" && (
-              <div className="flex max-lg:hidden">
-                <Select
-                  value={selectedInstitution}
-                  onValueChange={handleInstitutionChange}
+            <div className="flex max-lg:hidden">
+              <Select
+                value={selectedInstitution}
+                onValueChange={handleInstitutionChange}
+              >
+                <SelectTrigger
+                  className="w-28 md:w-40 lg:max-w-40 xl:max-w-70 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20"
+                  aria-label="Select institution"
                 >
-                  <SelectTrigger
-                    className="w-28 md:w-40 lg:max-w-40 xl:max-w-70 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20"
-                    aria-label="Select institution"
-                  >
-                    <SelectValue>
-                      {selectedInstitution &&
-                        institutions?.find(
-                          (i) => i.id.toString() === selectedInstitution,
-                        ) && (
-                          <div className="flex items-center font-medium min-w-0">
-                            <Building2
-                              className="mr-2 h-4 w-4 shrink-0"
-                              aria-hidden="true"
-                            />
-                            <span className="truncate">
-                              {institutions.find(
-                                (i) =>
-                                  i.id.toString() === selectedInstitution,
-                              )?.institution.name || ""}
-                            </span>
-                          </div>
-                        )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="custom-dropdown mt-1">
-                    {institutions.map((inst) => (
-                      <SelectItem key={inst.id} value={inst.id.toString()}>
-                        <div className="flex items-center cursor-pointer">
-                          <Building2
-                            className="mr-2 h-4 w-4 shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span className="font-medium">
-                            {inst.institution.name}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                  <SelectValue>
+                    {selectedInstitution &&
+                      institutions?.find(
+                        (i) => i.id.toString() === selectedInstitution,
+                      ) && (
+                      <div className="flex items-center font-medium min-w-0">
+                        <Building2
+                          className="mr-2 h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">
+                          {institutions.find(
+                            (i) => i.id.toString() === selectedInstitution,
+                          )?.institution.name || ""}
+                        </span>
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="custom-dropdown mt-1">
+                  {institutions.map((inst) => (
+                    <SelectItem key={inst.id} value={inst.id.toString()}>
+                      <div className="flex items-center cursor-pointer">
+                        <Building2
+                          className="mr-2 h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="font-medium">
+                          {inst.institution.name}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
@@ -535,79 +527,62 @@ export const Navbar = () => {
               <div className="px-2 py-2 sm:hidden border-t border-border/30 mt-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" aria-hidden="true" />
+                    <Target
+                      className="h-4 w-4 text-primary"
+                      aria-hidden="true"
+                    />
                     <span className="text-sm">Target</span>
                   </div>
-                  <Select
-                    value={currentTarget.toString()}
-                    onValueChange={(value) => {
-                      updateTarget(Number(value));
-                      toast.success("Target Updated", {
-                        description: `Target set to ${value}%`,
-                        style: {
-                          backgroundColor: "var(--primary)",
-                          color: "var(--primary-foreground)",
-                          border: "1px solid var(--border)",
-                          backdropFilter: "blur(8px)",
-                        },
-                      });
-                    }}
+                  <Button
+                    id="target-percentage-select-mobile"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold bg-background border-border/50"
+                    onClick={() => setIsTargetDialogOpen(true)}
                   >
-                    <SelectTrigger
-                      id="target-percentage-select-mobile"
-                      className="w-20 h-8 text-xs bg-background border-border/50"
-                    >
-                      <SelectValue placeholder={`${currentTarget}%`} />
-                    </SelectTrigger>
-                    <SelectContent className="custom-dropdown z-60">
-                      {[75, 80, 85, 90, 95].map((p) => (
-                        <SelectItem key={p} value={p.toString()}>
-                          {p}%
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {currentTarget}%
+                  </Button>
                 </div>
               </div>
 
               {/* Institution Selector (Tablet/Mobile Only) */}
               {!institutionsLoading && institutions &&
                 institutions.length > 0 && (
-                  <div className="px-2 py-2 lg:hidden border-t border-border/30 mt-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Building2 className="h-4 w-4" aria-hidden="true" />
-                        <span className="text-sm">Institution</span>
-                      </div>
-                      <Select
-                        value={selectedInstitution}
-                        onValueChange={handleInstitutionChange}
-                      >
-                        <SelectTrigger
-                          id="institution-select-mobile"
-                          className="w-10 h-9 text-xs bg-background border-border/50 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden"
-                          aria-label="Select institution"
-                        >
-                          <SelectValue>
-                            <Building2
-                              className="h-5 w-5 shrink-0"
-                              aria-hidden="true"
-                            />
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="custom-dropdown z-60">
-                          {institutions.map((inst) => (
-                            <SelectItem key={inst.id} value={inst.id.toString()}>
-                              <span className="font-medium">
-                                {inst.institution.name}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <div className="px-2 py-2 lg:hidden border-t border-border/30 mt-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Building2 className="h-4 w-4" aria-hidden="true" />
+                      <span className="text-sm">Institution</span>
                     </div>
+                    <Select
+                      value={selectedInstitution}
+                      onValueChange={handleInstitutionChange}
+                    >
+                      <SelectTrigger
+                        id="institution-select-mobile"
+                        className="w-10 h-9 text-xs bg-background border-border/50 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden"
+                        aria-label="Select institution"
+                      >
+                        <SelectValue>
+                          <Building2
+                            className="h-5 w-5 shrink-0"
+                            aria-hidden="true"
+                          />
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="custom-dropdown z-60">
+                        {institutions.map((inst) => (
+                          <SelectItem key={inst.id} value={inst.id.toString()}>
+                            <span className="font-medium">
+                              {inst.institution.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+                </div>
+              )}
 
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -623,6 +598,12 @@ export const Navbar = () => {
           </DropdownMenu>
         </div>
       </div>
+
+      <CourseTargetDialog
+        open={isTargetDialogOpen}
+        onOpenChange={setIsTargetDialogOpen}
+        courses={navbarCourses}
+      />
     </header>
   );
 };

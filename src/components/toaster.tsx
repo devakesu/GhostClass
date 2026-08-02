@@ -12,8 +12,8 @@ import { useTheme } from "@/providers/theme";
 export function Toaster() {
   const { theme } = useTheme();
   return (
-    <SonnerToaster 
-      richColors 
+    <SonnerToaster
+      richColors
       invert
       theme={theme}
       position="bottom-right"

@@ -36,10 +36,13 @@ export function getAllowedHosts(): Set<string> | null {
   const currentAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim();
 
   // In development, invalidate cache if NEXT_PUBLIC_APP_DOMAIN changes
-  if (process.env.NODE_ENV === "development" && allowedHostsComputed && cachedAppDomain !== currentAppDomain) {
+  if (
+    process.env.NODE_ENV === "development" && allowedHostsComputed &&
+    cachedAppDomain !== currentAppDomain
+  ) {
     logger.dev(
       "[origin-validation] NEXT_PUBLIC_APP_DOMAIN changed in development. Invalidating cache.",
-      { previous: cachedAppDomain, current: currentAppDomain }
+      { previous: cachedAppDomain, current: currentAppDomain },
     );
     allowedHostsComputed = false;
     cachedAllowedHosts = null;
@@ -53,16 +56,18 @@ export function getAllowedHosts(): Set<string> | null {
       if (currentAppDomain.includes("://")) {
         logger.error(
           "[origin-validation] Invalid NEXT_PUBLIC_APP_DOMAIN configuration: value must not include protocol",
-          { appDomain: currentAppDomain }
+          { appDomain: currentAppDomain },
         );
         throw new Error(
-          "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only (e.g., 'example.com', not 'https://example.com')"
+          "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only (e.g., 'example.com', not 'https://example.com')",
         );
       }
 
       try {
         // Parse as URL to extract hostname (strips port if present)
-        cachedAllowedHosts = new Set([new URL(`https://${currentAppDomain}`).hostname.toLowerCase()]);
+        cachedAllowedHosts = new Set([
+          new URL(`https://${currentAppDomain}`).hostname.toLowerCase(),
+        ]);
       } catch {
         // Fallback: assume it's already a bare hostname
         cachedAllowedHosts = new Set([currentAppDomain.toLowerCase()]);
@@ -71,8 +76,8 @@ export function getAllowedHosts(): Set<string> | null {
       if (process.env.NODE_ENV === "development") {
         logger.dev(
           "[origin-validation] Allowed hosts computed and cached. " +
-          "Cache will be invalidated automatically if NEXT_PUBLIC_APP_DOMAIN changes.",
-          { allowedHosts: Array.from(cachedAllowedHosts) }
+            "Cache will be invalidated automatically if NEXT_PUBLIC_APP_DOMAIN changes.",
+          { allowedHosts: Array.from(cachedAllowedHosts) },
         );
       }
     }
@@ -108,16 +113,17 @@ export function normalizeHost(value: string | null): string | null {
   // contain '::'. Full-form addresses (e.g. "2001:db8:0:0:0:0:0:1") contain multiple
   // colons but no '::'. Guard the latter with a character-set check (hex digits,
   // colons, dots) to avoid a false positive for malformed values like "host:port:extra".
-  const isUnbracketedIPv6 =
-    first.includes("::") ||
-    (/^[\da-fA-F:.]+$/.test(first) && first.indexOf(":") !== first.lastIndexOf(":"));
+  const isUnbracketedIPv6 = first.includes("::") ||
+    (/^[\da-fA-F:.]+$/.test(first) &&
+      first.indexOf(":") !== first.lastIndexOf(":"));
   if (isUnbracketedIPv6) {
     return first.toLowerCase();
   }
 
   // Strip optional :port suffix for consistent hostname comparison (IPv4 / hostname only)
   const portSeparatorIndex = first.indexOf(":");
-  return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first).toLowerCase();
+  return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first)
+    .toLowerCase();
 }
 
 /**
@@ -127,7 +133,7 @@ export function normalizeHost(value: string | null): string | null {
 export function resolveRequestHostname(req: NextRequest): string | null {
   return (
     normalizeHost(req.headers.get("x-forwarded-host")) ??
-    normalizeHost(req.headers.get("host")) ??
-    normalizeHost(req.nextUrl.hostname)
+      normalizeHost(req.headers.get("host")) ??
+      normalizeHost(req.nextUrl.hostname)
   );
 }

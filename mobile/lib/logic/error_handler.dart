@@ -54,12 +54,10 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
           title: 'Security Attestation Failed',
           message: dialogMessage,
           technicalDetails: error.message,
-          retryLabel: isCritical ? 'Close App' : 'Restart App',
+          retryLabel: isCritical ? 'Acknowledge' : 'Restart App',
           onRetry: () async {
             if (Platform.isAndroid) {
               await SystemNavigator.pop();
-            } else {
-              exit(0);
             }
           },
         );
@@ -89,8 +87,6 @@ mixin ErrorHandlerMixin<T extends StatefulWidget> on State<T> {
             onRetry: () async {
               if (Platform.isAndroid) {
                 await SystemNavigator.pop();
-              } else {
-                exit(0);
               }
             },
           );

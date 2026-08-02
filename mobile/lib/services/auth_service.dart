@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -16,9 +15,7 @@ class AuthService {
   final Ref _ref;
   static final String _ghostclassBaseUrl = AppConfig.ghostclassApiUrl;
   static final String _ezygoAuthUrl = AppConfig.ezygoAuthUrl;
-  static const Duration _loginTimeout = kDebugMode
-      ? Duration(seconds: 45)
-      : Duration(seconds: 30);
+  static final Duration _loginTimeout = AppConfig.defaultTimeout;
   static const Duration _provisionRetryBackoff = Duration(milliseconds: 500);
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
@@ -190,6 +187,9 @@ class AuthService {
     );
   }
 
+  static DateTime? _lastContactSubmission;
+  static const Duration _contactCooldown = Duration(seconds: 60);
+
   Future<Response<dynamic>> submitContact({
     required String name,
     required String email,
@@ -197,6 +197,21 @@ class AuthService {
     required String message,
     String? supabaseToken,
   }) async {
+    final now = DateTime.now();
+    if (_lastContactSubmission != null &&
+        now.difference(_lastContactSubmission!) < _contactCooldown) {
+      final remaining =
+          _contactCooldown.inSeconds -
+          now.difference(_lastContactSubmission!).inSeconds;
+      throw AppException(
+        message:
+            'Please wait $remaining seconds before submitting another message.',
+        type: AppExceptionType.rateLimit,
+        statusCode: 429,
+      );
+    }
+    _lastContactSubmission = now;
+
     return _dio.post(
       '$_ghostclassBaseUrl/contact',
       data: {

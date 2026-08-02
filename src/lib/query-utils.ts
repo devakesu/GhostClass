@@ -28,12 +28,14 @@ function shouldAbortRetryForStatus(status: number | undefined): boolean {
 export function makeRetryFn(maxRetries = 1) {
   return (failureCount: number, error: unknown): boolean => {
     if (isGlobalOutageDetected()) return false;
-    
+
     if (isAxiosError(error)) {
       if (error.code === "ERR_NETWORK") return false; // Fail fast when offline
       if (shouldAbortRetryForStatus(error.response?.status)) return false;
     } else if (typeof error === "object" && error !== null) {
-      if (shouldAbortRetryForStatus((error as { status?: number }).status)) return false;
+      if (shouldAbortRetryForStatus((error as { status?: number }).status)) {
+        return false;
+      }
     }
     return failureCount < maxRetries;
   };

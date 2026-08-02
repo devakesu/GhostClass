@@ -1,35 +1,42 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchLeaveData, fetchLeaveAttendanceDetails } from '../ezygo-leave-fetcher';
-import { fetchEzygoData } from '../ezygo-batch-fetcher';
-import { logger } from '../logger';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchLeaveAttendanceDetails,
+  fetchLeaveData,
+} from "../ezygo-leave-fetcher";
+import { fetchEzygoData } from "../ezygo-batch-fetcher";
+import { logger } from "../logger";
 
-vi.mock('../ezygo-batch-fetcher', () => ({
+vi.mock("../ezygo-batch-fetcher", () => ({
   fetchEzygoData: vi.fn(),
 }));
 
-vi.mock('../logger', () => ({
+vi.mock("../logger", () => ({
   logger: {
     error: vi.fn(),
   },
 }));
 
-describe('ezygo-leave-fetcher', () => {
-  const token = 'test-token';
+describe("ezygo-leave-fetcher", () => {
+  const token = "test-token";
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('fetchLeaveData', () => {
-    it('successfully fetches all leave data', async () => {
+  describe("fetchLeaveData", () => {
+    it("successfully fetches all leave data", async () => {
       vi.mocked(fetchEzygoData).mockImplementation(async (url) => {
-        if (url === '/studentleaves') return { student_leaves: [1] };
-        if (url === '/usersubgroups') return [2];
-        if (url === '/attendancetypes') return [3];
-        if (url === '/sessions') return [4];
-        if (url === '/events') return [5];
-        if (url === '/institution/setting/mandatory_event_coordinator') return [6];
-        if (url === '/institution/setting/student_leave_approval_level') return 3;
+        if (url === "/studentleaves") return { student_leaves: [1] };
+        if (url === "/usersubgroups") return [2];
+        if (url === "/attendancetypes") return [3];
+        if (url === "/sessions") return [4];
+        if (url === "/events") return [5];
+        if (url === "/institution/setting/mandatory_event_coordinator") {
+          return [6];
+        }
+        if (url === "/institution/setting/student_leave_approval_level") {
+          return 3;
+        }
         return null;
       });
 
@@ -45,43 +52,53 @@ describe('ezygo-leave-fetcher', () => {
       expect(fetchEzygoData).toHaveBeenCalledTimes(7);
     });
 
-    it('handles total failures and logs all errors', async () => {
-      vi.mocked(fetchEzygoData).mockRejectedValue(new Error('Failed'));
+    it("handles total failures and logs all errors", async () => {
+      vi.mocked(fetchEzygoData).mockRejectedValue(new Error("Failed"));
 
-      await expect(fetchLeaveData(token)).rejects.toThrow('Failed to fetch leave data: Failed');
+      await expect(fetchLeaveData(token)).rejects.toThrow(
+        "Failed to fetch leave data: Failed",
+      );
 
       expect(logger.error).toHaveBeenCalled();
     });
   });
 
-  describe('fetchLeaveAttendanceDetails', () => {
-    it('successfully fetches leave attendance details', async () => {
-      const mockData = { details: 'some-data' };
+  describe("fetchLeaveAttendanceDetails", () => {
+    it("successfully fetches leave attendance details", async () => {
+      const mockData = { details: "some-data" };
       vi.mocked(fetchEzygoData).mockResolvedValue(mockData);
 
-      const result = await fetchLeaveAttendanceDetails(token, '2023-01-01', '2023-01-31');
+      const result = await fetchLeaveAttendanceDetails(
+        token,
+        "2023-01-01",
+        "2023-01-31",
+      );
 
       expect(result).toEqual(mockData);
       expect(fetchEzygoData).toHaveBeenCalledWith(
-        '/attendancereports/student/detailed',
+        "/attendancereports/student/detailed",
         token,
-        'POST',
+        "POST",
         {
-          start_date: '2023-01-01',
-          upto_date: '2023-01-31',
-          from_student_leave_application: true
-        }
+          start_date: "2023-01-01",
+          upto_date: "2023-01-31",
+          from_student_leave_application: true,
+        },
       );
     });
 
-    it('handles fetch failure and logs error', async () => {
-      vi.mocked(fetchEzygoData).mockRejectedValue(new Error('Network Error'));
+    it("handles fetch failure and logs error", async () => {
+      vi.mocked(fetchEzygoData).mockRejectedValue(new Error("Network Error"));
 
-      await expect(fetchLeaveAttendanceDetails(token, '2023-01-01', '2023-01-31')).rejects.toThrow('Failed to fetch leave attendance details: Network Error');
-      
+      await expect(
+        fetchLeaveAttendanceDetails(token, "2023-01-01", "2023-01-31"),
+      ).rejects.toThrow(
+        "Failed to fetch leave attendance details: Network Error",
+      );
+
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to fetch leave attendance details'),
-        expect.objectContaining({ error: 'Error: Network Error' })
+        expect.stringContaining("Failed to fetch leave attendance details"),
+        expect.objectContaining({ error: "Error: Network Error" }),
       );
     });
   });

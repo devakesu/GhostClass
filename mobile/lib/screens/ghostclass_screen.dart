@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/models/institution.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/theme_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -552,6 +554,9 @@ class GhostClassScreen extends ConsumerWidget {
     final primary =
         ghostColors?.brandPrimary ?? Theme.of(context).colorScheme.primary;
 
+    final dashboardData = ref.read(dashboardProvider).value;
+    final courses = dashboardData?.courses ?? [];
+
     ref.read(uiModalOpenProvider.notifier).setOpen(true);
     await showModalBottomSheet<void>(
       context: context,
@@ -563,28 +568,39 @@ class GhostClassScreen extends ConsumerWidget {
       ),
       builder: (context) {
         var localTarget = user.settings.targetPercentage;
+        final localCourseTargets = Map<String, int>.from(
+          user.settings.courseTargets,
+        );
+        var isSaving = false;
+
         return StatefulBuilder(
           builder: (context, setModalState) => Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(2),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Target Percentage',
+                      'Attendance Targets',
                       style: GoogleFonts.manrope(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -592,19 +608,29 @@ class GhostClassScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '$localTarget%',
+                      'Default: $localTarget%',
                       style: GoogleFonts.manrope(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: primary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 40),
-                // Custom labels above slider
+                const SizedBox(height: 16),
+                Text(
+                  'Default Universal Target',
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [75, 80, 85, 90, 95].map((val) {
@@ -621,7 +647,6 @@ class GhostClassScreen extends ConsumerWidget {
                               : Theme.of(
                                   context,
                                 ).colorScheme.onSurface.withValues(alpha: 0.6),
-                          letterSpacing: 1,
                         ),
                       );
                     }).toList(),
@@ -640,10 +665,6 @@ class GhostClassScreen extends ConsumerWidget {
                     thumbColor: primary,
                     overlayColor: primary.withValues(alpha: 0.1),
                     valueIndicatorColor: primary,
-                    valueIndicatorTextStyle: GoogleFonts.manrope(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                   child: Slider(
                     value: localTarget.clamp(75, 95).toDouble(),
@@ -654,38 +675,258 @@ class GhostClassScreen extends ConsumerWidget {
                         setModalState(() => localTarget = val.toInt()),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 16),
+                if (courses.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Course-Specific Targets',
+                        style: GoogleFonts.manrope(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      if (localCourseTargets.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setModalState(localCourseTargets.clear);
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Reset All',
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: courses.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final course = courses[index];
+                        final code = course.code ?? course.safeId;
+                        final stdCode = DashboardStats.standardize(code);
+                        final customVal =
+                            localCourseTargets[stdCode] ??
+                            localCourseTargets[code] ??
+                            localCourseTargets[course.id.toString()];
+                        final activeVal = customVal ?? localTarget;
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: customVal != null
+                                  ? primary.withValues(alpha: 0.4)
+                                  : Theme.of(context).colorScheme.outlineVariant
+                                        .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          code.toUpperCase(),
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: primary,
+                                          ),
+                                        ),
+                                        Text(
+                                          course.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (customVal != null)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.rotate_left,
+                                        size: 18,
+                                      ),
+                                      onPressed: () {
+                                        setModalState(() {
+                                          localCourseTargets
+                                            ..remove(stdCode)
+                                            ..remove(code)
+                                            ..remove(
+                                              course.id.toString(),
+                                            );
+                                        });
+                                      },
+                                      tooltip: 'Reset to default',
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [75, 80, 85, 90, 95].map((val) {
+                                  final isSel = activeVal == val;
+                                  return InkWell(
+                                    onTap: () {
+                                      setModalState(() {
+                                        localCourseTargets[stdCode] = val;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 150,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSel
+                                            ? primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.surface,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isSel
+                                              ? primary
+                                              : Theme.of(context)
+                                                    .colorScheme
+                                                    .outlineVariant
+                                                    .withValues(alpha: 0.4),
+                                        ),
+                                        boxShadow: isSel
+                                            ? [
+                                                BoxShadow(
+                                                  color: primary.withValues(
+                                                    alpha: 0.25,
+                                                  ),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Text(
+                                        '$val%',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 11,
+                                          fontWeight: isSel
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: isSel
+                                              ? Colors.white
+                                              : Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      try {
-                        await ref
-                            .read(authProvider.notifier)
-                            .updateSettings(targetPercentage: localTarget);
-                        if (context.mounted) Navigator.pop(context);
-                      } on Object catch (_) {
-                        if (context.mounted) {
-                          ServiceToast.show(
-                            context,
-                            'Failed to update target',
-                            isError: true,
-                          );
-                        }
-                      }
-                    },
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            try {
+                              await ref
+                                  .read(authProvider.notifier)
+                                  .updateSettings(
+                                    targetPercentage: localTarget,
+                                    courseTargets: localCourseTargets,
+                                  );
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ServiceToast.show(
+                                  context,
+                                  'Attendance targets updated',
+                                );
+                              }
+                            } on Object catch (_) {
+                              if (context.mounted) {
+                                setModalState(() => isSaving = false);
+                                ServiceToast.show(
+                                  context,
+                                  'Failed to update targets',
+                                  isError: true,
+                                );
+                              }
+                            }
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: primary.withValues(alpha: 0.6),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      'Done',
-                      style: GoogleFonts.manrope(fontWeight: FontWeight.bold),
-                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Save Settings',
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                   ),
                 ),
               ],

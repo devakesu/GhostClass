@@ -80,12 +80,18 @@ void main() {
       expect(normalizeDate('15/01/24'), '20240115');
     });
 
-    test('returns empty string for invalid dates', () {
-      expect(normalizeDate('invalid'), '');
-      expect(normalizeDate(null), '');
-      expect(normalizeDate('99-99-9999'), '');
-      expect(normalizeDate('31-02-2024'), ''); // Invalid day for Feb
-    });
+    test(
+      'returns original raw string or empty for invalid dates to avoid key collisions',
+      () {
+        expect(normalizeDate('invalid'), 'invalid');
+        expect(normalizeDate(null), '');
+        expect(normalizeDate('99-99-9999'), '99-99-9999');
+        expect(
+          normalizeDate('31-02-2024'),
+          '31-02-2024',
+        ); // Invalid day for Feb
+      },
+    );
   });
 
   group('Attendance Utils - normalizeSession', () {

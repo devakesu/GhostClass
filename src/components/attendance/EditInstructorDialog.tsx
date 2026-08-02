@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, UserCircle2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2, UserCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Turnstile, { useTurnstile } from "react-turnstile";
 import { upsertInstructorAction } from "@/app/actions/instructors";
@@ -68,7 +68,6 @@ export function EditInstructorDialog({
     return undefined;
   }, [open]);
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -86,9 +85,10 @@ export function EditInstructorDialog({
     try {
       const formData = new FormData();
       formData.append("courseCode", courseCode);
+      formData.append("courseName", courseName);
       formData.append("instructorName", name);
       formData.append("cf-turnstile-response", token);
-      
+
       const csrfToken = getCsrfToken();
       if (csrfToken) formData.append("csrf_token", csrfToken);
 
@@ -102,7 +102,7 @@ export function EditInstructorDialog({
       }
 
       toast.success("Instructor updated for everyone in the class!");
-      
+
       // Invalidate instructors query
       queryClient.invalidateQueries({
         queryKey: ["course_instructors"],
@@ -114,7 +114,12 @@ export function EditInstructorDialog({
       onOpenChange(false);
     } catch (error) {
       logger.error("Failed to update instructor:", error);
-      Sentry.captureException(error, { tags: { type: "instructor_mutation_error", location: "EditInstructorDialog" } });
+      Sentry.captureException(error, {
+        tags: {
+          type: "instructor_mutation_error",
+          location: "EditInstructorDialog",
+        },
+      });
       toast.error("Failed to save instructor name.");
     } finally {
       setIsSubmitting(false);
@@ -147,15 +152,20 @@ export function EditInstructorDialog({
             Edit Instructor
           </DialogTitle>
           <DialogDescription className="text-center">
-            Set the instructor name for <strong>{courseCode}</strong>. This will be shared with your entire class.
+            Set the instructor name for{" "}
+            <strong>{courseCode}</strong>. This will be shared with your entire
+            class.
           </DialogDescription>
         </DialogHeader>
 
         <Alert className="bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400">
           <AlertTriangle className="h-4 w-4 text-blue-500!" />
-          <AlertTitle className="text-sm font-bold text-blue-600 dark:text-blue-400">Communal Responsibility</AlertTitle>
+          <AlertTitle className="text-sm font-bold text-blue-600 dark:text-blue-400">
+            Communal Responsibility
+          </AlertTitle>
           <AlertDescription className="text-xs opacity-90">
-            This name is shared with your entire class. Please ensure it is accurate and respectful.
+            This name is shared with your entire class. Please ensure it is
+            accurate and respectful.
           </AlertDescription>
         </Alert>
 
@@ -167,12 +177,17 @@ export function EditInstructorDialog({
               </Label>
               <div className="px-3 py-2 bg-muted/50 rounded-md border border-border/50">
                 <p className="font-medium text-foreground">{courseName}</p>
-                <p className="text-xs text-muted-foreground font-mono uppercase">{courseCode}</p>
+                <p className="text-xs text-muted-foreground font-mono uppercase">
+                  {courseCode}
+                </p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="instructor-name" className="text-sm font-semibold text-muted-foreground ml-1">
+              <Label
+                htmlFor="instructor-name"
+                className="text-sm font-semibold text-muted-foreground ml-1"
+              >
                 Instructor Name
               </Label>
               <Input
@@ -190,23 +205,23 @@ export function EditInstructorDialog({
           </div>
 
           <div className="flex flex-col items-center justify-center py-2 min-h-15">
-             {shouldRenderWidget && (
-               <Turnstile
-                 sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-                 onVerify={(t) => {
-                   setToken(t);
-                 }}
-                 onError={() => {
-                   toast.error("Security check failed. Please refresh.");
-                 }}
-                 onExpire={() => setToken("")}
-                 theme="auto"
-               />
-             )}
-             {!shouldRenderWidget && (
-               <div className="h-12 w-full animate-pulse bg-muted/20 rounded-md" />
-             )}
-           </div>
+            {shouldRenderWidget && (
+              <Turnstile
+                sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                onVerify={(t) => {
+                  setToken(t);
+                }}
+                onError={() => {
+                  toast.error("Security check failed. Please refresh.");
+                }}
+                onExpire={() => setToken("")}
+                theme="auto"
+              />
+            )}
+            {!shouldRenderWidget && (
+              <div className="h-12 w-full animate-pulse bg-muted/20 rounded-md" />
+            )}
+          </div>
 
           <DialogFooter className="sm:justify-center">
             <Button

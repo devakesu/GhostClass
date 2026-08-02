@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
@@ -10,10 +12,12 @@ class TrendChartSection extends StatefulWidget {
     required this.targetPercentage,
     super.key,
     this.disabledCodes = const {},
+    this.courseTargets = const <String, int>{},
   });
   final DashboardStats stats;
   final double targetPercentage;
   final Set<String> disabledCodes;
+  final Map<String, int> courseTargets;
 
   @override
   State<TrendChartSection> createState() => _TrendChartSectionState();
@@ -37,6 +41,11 @@ class _TrendChartSectionState extends State<TrendChartSection> {
       minRef = absMin < widget.targetPercentage
           ? absMin
           : widget.targetPercentage;
+    }
+
+    // Also account for any custom course-target lines so they are always visible
+    for (final v in widget.courseTargets.values) {
+      if (v < minRef) minRef = v.toDouble();
     }
 
     return ((minRef / 5).floor() * 5.0 - 5.0).clamp(0, 95);
@@ -98,7 +107,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
   void didUpdateWidget(TrendChartSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.stats != widget.stats ||
-        oldWidget.disabledCodes != widget.disabledCodes) {
+        oldWidget.disabledCodes != widget.disabledCodes ||
+        oldWidget.courseTargets != widget.courseTargets) {
       _updateCourses();
     }
   }
@@ -268,6 +278,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                             borderData: FlBorderData(show: false),
                             extraLinesData: ExtraLinesData(
                               horizontalLines: [
+                                // Global target line (amber)
                                 HorizontalLine(
                                   y: widget.targetPercentage,
                                   color: Colors.amber.shade700,
@@ -295,8 +306,17 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                             barGroups: _courses.asMap().entries.map((entry) {
                               final i = entry.key;
                               final s = entry.value;
-                              final isSafe =
-                                  s.percentage >= widget.targetPercentage;
+                              final stdCode = DashboardStats.standardize(
+                                s.code,
+                              );
+                              final targetVal =
+                                  widget.courseTargets[stdCode] ??
+                                  widget.courseTargets[s.code] ??
+                                  widget.courseTargets[s.id];
+                              final effectiveTarget =
+                                  (targetVal ?? widget.targetPercentage)
+                                      .toDouble();
+                              final isSafe = s.percentage >= effectiveTarget;
                               final isLoss =
                                   s.percentage < s.officialPercentage;
                               final displayedBase = isLoss
@@ -347,11 +367,31 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                 hatchStops.addAll([s0, mid, mid, s1]);
                               }
 
+                              // Whether this bar has a custom target distinct from the global one
+                              final hasCustomTarget =
+                                  targetVal != null &&
+                                  effectiveTarget != widget.targetPercentage;
+
+                              // Height of the purple target band in data-units (~0.4 percentage unit)
+                              const targetBandHalf = 0.2;
+                              final targetBandBottom =
+                                  (effectiveTarget - targetBandHalf).clamp(
+                                    0.0,
+                                    double.infinity,
+                                  );
+                              final targetBandTop =
+                                  effectiveTarget + targetBandHalf;
+
+                              // Extend the rod to reach the target band when it's above the bar
+                              final rodToY = hasCustomTarget
+                                  ? math.max(totalVal, targetBandTop)
+                                  : totalVal;
+
                               return BarChartGroupData(
                                 x: i,
                                 barRods: [
                                   BarChartRodData(
-                                    toY: totalVal,
+                                    toY: rodToY,
                                     width: 18,
                                     color: Colors.transparent,
                                     borderRadius: const BorderRadius.vertical(
@@ -364,6 +404,12 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                         displayedBase,
                                         baseColor,
                                       ),
+                                      if (hasCustomTarget)
+                                        BarChartRodStackItem(
+                                          targetBandBottom,
+                                          targetBandTop,
+                                          Colors.amber.shade700,
+                                        ),
                                     ],
                                     backDrawRodData: BackgroundBarChartRodData(
                                       show: totalVal > 0,
@@ -388,7 +434,15 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                 if (_touchedIndex != -1 && _touchedOffset != null)
                   _LocalChartTooltip(
                     stat: _courses[_touchedIndex],
-                    targetPercentage: widget.targetPercentage,
+                    targetPercentage: () {
+                      final s = _courses[_touchedIndex];
+                      final stdCode = DashboardStats.standardize(s.code);
+                      final targetVal =
+                          widget.courseTargets[stdCode] ??
+                          widget.courseTargets[s.code] ??
+                          widget.courseTargets[s.id];
+                      return (targetVal ?? widget.targetPercentage).toDouble();
+                    }(),
                     chartOffset: _touchedOffset!,
                     // Offset of chart inside the card (padding is 12, 12, 20, 12)
                     chartOriginInCard: const Offset(12, 12),

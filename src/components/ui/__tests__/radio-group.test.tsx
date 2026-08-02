@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { RadioGroup, RadioGroupItem } from '../radio-group';
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { RadioGroup, RadioGroupItem } from "../radio-group";
 
-describe('RadioGroup Component', () => {
-  it('renders correctly and allows selection', () => {
+describe("RadioGroup Component", () => {
+  it("renders correctly and allows selection", () => {
     const onValueChange = vi.fn();
     render(
       <RadioGroup defaultValue="option-1" onValueChange={onValueChange}>
@@ -15,13 +15,13 @@ describe('RadioGroup Component', () => {
           <RadioGroupItem value="option-2" id="option-2" />
           <label htmlFor="option-2">Option 2</label>
         </div>
-      </RadioGroup>
+      </RadioGroup>,
     );
 
-    expect(screen.getByLabelText('Option 1')).toBeDefined();
-    expect(screen.getByLabelText('Option 2')).toBeDefined();
+    expect(screen.getByLabelText("Option 1")).toBeDefined();
+    expect(screen.getByLabelText("Option 2")).toBeDefined();
 
-    fireEvent.click(screen.getByLabelText('Option 2'));
-    expect(onValueChange).toHaveBeenCalledWith('option-2');
+    fireEvent.click(screen.getByLabelText("Option 2"));
+    expect(onValueChange).toHaveBeenCalledWith("option-2");
   });
 });

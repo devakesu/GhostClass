@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -53,16 +53,22 @@ describe("POST /api/instructors/upsert", () => {
       single: mockSingle,
     });
 
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
-    mockSingle.mockResolvedValue({ data: { class_id: "class-456" }, error: null });
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+    mockSingle.mockResolvedValue({
+      data: { class_id: "class-456" },
+      error: null,
+    });
     mockUpsert.mockResolvedValue({ error: null });
   });
 
   it("returns 400 when required fields are missing", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/instructors/upsert", { 
+    const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",
-      body: JSON.stringify({ courseCode: "CS101" }) 
+      body: JSON.stringify({ courseCode: "CS101" }),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
@@ -70,11 +76,14 @@ describe("POST /api/instructors/upsert", () => {
   });
 
   it("returns 401 when user is not authenticated", async () => {
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error("Unauthorized") });
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: new Error("Unauthorized"),
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/instructors/upsert", { 
+    const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",
-      body: JSON.stringify(MOCK_INSTRUCTOR)
+      body: JSON.stringify(MOCK_INSTRUCTOR),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(401);
@@ -82,45 +91,58 @@ describe("POST /api/instructors/upsert", () => {
   });
 
   it("returns 400 when no class is associated with profile", async () => {
-    mockSingle.mockResolvedValueOnce({ data: null, error: { message: "No class" } });
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { message: "No class" },
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/instructors/upsert", { 
+    const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",
-      body: JSON.stringify(MOCK_INSTRUCTOR)
+      body: JSON.stringify(MOCK_INSTRUCTOR),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "No class associated with your profile" });
+    expect(await res.json()).toEqual({
+      error: "No class associated with your profile",
+    });
   });
 
   it("returns 200 when instructor is upserted successfully", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/instructors/upsert", { 
+    const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",
-      body: JSON.stringify(MOCK_INSTRUCTOR)
+      body: JSON.stringify(MOCK_INSTRUCTOR),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ message: "Instructor saved successfully" });
+    expect(await res.json()).toEqual({
+      message: "Instructor saved successfully",
+    });
+    expect(mockFrom).toHaveBeenCalledWith("class_courses");
+    expect(mockFrom).toHaveBeenCalledWith("course_instructors");
     expect(mockUpsert).toHaveBeenCalledWith({
       class_id: "class-456",
       course_code: "CS101",
       instructor_name: "Dr. Jane Smith",
-      updated_by: "user-123"
+      updated_by: "user-123",
     }, {
-      onConflict: "class_id, course_code"
+      onConflict: "class_id, course_code",
     });
   });
 
   it("returns 500 when database upsert fails", async () => {
-    mockUpsert.mockResolvedValueOnce({ error: { message: "Upsert failed" } });
+    mockUpsert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: "Upsert failed" } });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/instructors/upsert", { 
+    const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",
-      body: JSON.stringify(MOCK_INSTRUCTOR)
+      body: JSON.stringify(MOCK_INSTRUCTOR),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "Failed to save instructor to database" });
+    expect(await res.json()).toEqual({
+      error: "Failed to save instructor to database",
+    });
   });
 });

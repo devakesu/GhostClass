@@ -7,10 +7,8 @@ import { contactRateLimiter } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { validateCsrfToken } from "@/lib/security/csrf";
-import { 
-  processContactSubmission, 
-  contactSchema 
-} from "@/lib/contact/service";
+import { contactSchema, processContactSubmission } from "@/lib/contact/service";
+import { verifyTurnstile } from "@/lib/security/turnstile";
 
 /**
  * Server action for processing contact form submissions from the web UI.
@@ -19,7 +17,7 @@ import {
  */
 export async function submitContactForm(formData: FormData) {
   // 1. Honeypot check (anti-bot)
-  const honeypot = formData.get("website"); 
+  const honeypot = formData.get("website");
   if (honeypot) {
     logger.warn("Honeypot triggered in contact form");
     return { error: "Invalid submission" };
@@ -61,7 +59,7 @@ export async function submitContactForm(formData: FormData) {
   if (!success) {
     return { error: "Too many requests. Please try again later." };
   }
-  
+
   const rawData = {
     name: formData.get("name"),
     email: formData.get("email"),
@@ -76,27 +74,11 @@ export async function submitContactForm(formData: FormData) {
   if (!result.success) {
     return { error: result.error.issues[0].message };
   }
-  
+
   // 6. CAPTCHA verification (Cloudflare Turnstile)
-  try {
-    const verifyRes = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          secret: process.env.TURNSTILE_SECRET_KEY,
-          response: result.data.token,
-        }),
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-    const verifyData = await verifyRes.json();
-    if (!verifyData.success) {
-      return { error: "CAPTCHA validation failed. Are you a robot?" };
-    }
-  } catch (err) {
-    logger.error("Turnstile verification failed", err);
-    return { error: "Security check failed. Please try again." };
+  const turnstileRes = await verifyTurnstile(result.data.token || "");
+  if (!turnstileRes.success) {
+    return { error: turnstileRes.error };
   }
 
   // 7. Execute Unified Service
@@ -105,14 +87,14 @@ export async function submitContactForm(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const flowResult = await processContactSubmission(
-    supabase,
+    supabase as unknown as import("@supabase/supabase-js").SupabaseClient,
     supabaseAdmin,
     result.data,
     {
       userId: user?.id,
       ip,
       userAgent: headerList.get("user-agent") || undefined,
-    }
+    },
   );
 
   if (!flowResult.success) {

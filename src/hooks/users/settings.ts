@@ -3,7 +3,7 @@
 
 import axios from "@/lib/axios";
 import { isAxiosError } from "axios";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { makeRetryFn } from "@/lib/query-utils";
@@ -27,7 +27,7 @@ const settingsRetryFn = makeRetryFn(2);
 
 function extractClassField<T extends string>(
   uClass: { sem?: string; year?: string } | null | undefined,
-  field: "sem" | "year"
+  field: "sem" | "year",
 ): T | null {
   if (!uClass) return null;
   if (field === "sem" && uClass.sem) return uClass.sem as T;
@@ -38,10 +38,14 @@ function extractClassField<T extends string>(
 async function resolveSettingFromProfileQuery<T extends string>(
   queryClient: ReturnType<typeof useQueryClient>,
   field: "sem" | "year",
-  fallbackApiCall: () => Promise<T | null>
+  fallbackApiCall: () => Promise<T | null>,
 ): Promise<T | null> {
-  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) || queryClient.getQueryData<UserProfile>(["profile", "synced"]);
-  const userClass = cachedProfile?.class as { sem?: string; year?: string } | null | undefined;
+  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
+    queryClient.getQueryData<UserProfile>(["profile", "synced"]);
+  const userClass = cachedProfile?.class as
+    | { sem?: string; year?: string }
+    | null
+    | undefined;
   const cachedValue = extractClassField<T>(userClass, field);
   if (cachedValue) {
     return cachedValue;
@@ -67,7 +71,10 @@ async function resolveSettingFromProfileQuery<T extends string>(
             unsubscribe();
             isSettled = true;
             const profile = event.query.state.data as UserProfile | null;
-            const uClass = profile?.class as { sem?: string; year?: string } | null | undefined;
+            const uClass = profile?.class as
+              | { sem?: string; year?: string }
+              | null
+              | undefined;
             const value = extractClassField<T>(uClass, field);
             if (value) {
               resolve(value);
@@ -105,14 +112,16 @@ export const useFetchSemester = () => {
           const res = await axios.get("/user/setting/default_semester");
           return res.data;
         } catch (error: unknown) {
-          if (isAxiosError(error) && error.response?.status === 404) return null;
+          if (isAxiosError(error) && error.response?.status === 404) {
+            return null;
+          }
           throw error;
         }
       });
     },
     retry: settingsRetryFn,
-    staleTime: 1000 * 60 * 5, 
-    refetchOnWindowFocus: true, 
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -127,13 +136,15 @@ export const useFetchAcademicYear = () => {
           const res = await axios.get("/user/setting/default_academic_year");
           return res.data;
         } catch (error: unknown) {
-          if (isAxiosError(error) && error.response?.status === 404) return null;
+          if (isAxiosError(error) && error.response?.status === 404) {
+            return null;
+          }
           throw error;
         }
       });
     },
     retry: settingsRetryFn,
-    staleTime: 1000 * 60 * 5, 
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: true,
   });
 };
@@ -145,7 +156,7 @@ export const useSetSemester = (options?: { skipInvalidations?: boolean }) => {
     mutationFn: async (semesterData: SemesterData) => {
       const res = await axios.post(
         "/user/setting/default_semester",
-        semesterData
+        semesterData,
       );
       return res.data;
     },
@@ -163,35 +174,42 @@ export const useSetSemester = (options?: { skipInvalidations?: boolean }) => {
       queryClient.invalidateQueries({ queryKey: ["class_courses"] });
       queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] }); // Refetch tracking data
-      queryClient.invalidateQueries({ queryKey: ["count"] });      // Refetch stats
-      queryClient.invalidateQueries({ queryKey: ["profile"] });    // Refetch profile (syncs class)
-      queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
+      queryClient.invalidateQueries({ queryKey: ["count"] }); // Refetch stats
+      queryClient.invalidateQueries({ queryKey: ["profile"] }); // Refetch profile (syncs class)
+      queryClient.invalidateQueries({ queryKey: ["exams"] }); // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
       queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }); // Clear batch scores cache
     },
     onError: (error) => {
       logger.error("Error setting semester:", error);
-      Sentry.captureException(error, { tags: { type: "setting_update_error", location: "useSetSemester/onError" } });
+      Sentry.captureException(error, {
+        tags: {
+          type: "setting_update_error",
+          location: "useSetSemester/onError",
+        },
+      });
     },
   });
 };
 
-export const useSetAcademicYear = (options?: { skipInvalidations?: boolean }) => {
+export const useSetAcademicYear = (
+  options?: { skipInvalidations?: boolean },
+) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (academicYearData: AcademicYearData) => {
       const res = await axios.post(
         "/user/setting/default_academic_year",
-        academicYearData
+        academicYearData,
       );
       return res.data;
     },
     onSuccess: (_data, variables) => {
       queryClient.setQueryData(
         ["academic-year"],
-        variables.default_academic_year
+        variables.default_academic_year,
       );
 
       if (options?.skipInvalidations) return;
@@ -205,14 +223,19 @@ export const useSetAcademicYear = (options?: { skipInvalidations?: boolean }) =>
       queryClient.invalidateQueries({ queryKey: ["track_data"] });
       queryClient.invalidateQueries({ queryKey: ["count"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["exams"] });       // Refetch scores page
+      queryClient.invalidateQueries({ queryKey: ["exams"] }); // Refetch scores page
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] }); // Clear per-exam answer cache
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] }); // Clear per-exam question cache
       queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }); // Clear batch scores cache
     },
     onError: (error) => {
       logger.error("Error setting academic year:", error);
-      Sentry.captureException(error, { tags: { type: "setting_update_error", location: "useSetAcademicYear/onError" } });
+      Sentry.captureException(error, {
+        tags: {
+          type: "setting_update_error",
+          location: "useSetAcademicYear/onError",
+        },
+      });
     },
   });
 };

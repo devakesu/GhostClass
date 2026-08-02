@@ -3,13 +3,13 @@
 
 /**
  * Logger utility that respects NODE_ENV to prevent verbose logging in production
- * 
+ *
  * Usage:
  * - logger.dev(): Development-only logs (suppressed in production)
  * - logger.info(): Important production events (always logged via console.info)
  * - logger.warn(): Warnings (always logged, suppressed in test)
  * - logger.error(): Errors (always logged, suppressed in test)
- * 
+ *
  * NOTE: The isDevelopment check is evaluated once at module load time.
  * If NODE_ENV changes at runtime (uncommon but possible in certain deployment scenarios),
  * the logger behavior will not update until the process restarts. This is intentional
@@ -17,13 +17,16 @@
  * NODE_ENV is set before the application starts and remains constant.
  */
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+const isDevelopment = process.env.NODE_ENV === "development";
 // Detect test environment via the VITEST env var (set automatically by Vitest runner).
 const isTest = process.env.VITEST === "true";
 
 function safeStringify(value: unknown): string {
   try {
-    return JSON.stringify(value, (_key, v) => (typeof v === 'bigint' ? v.toString() : v));
+    return JSON.stringify(
+      value,
+      (_key, v) => (typeof v === "bigint" ? v.toString() : v),
+    );
   } catch {
     return '"[unserializable]"';
   }
@@ -55,34 +58,59 @@ function buildStructuredPayload(level: string, args: unknown[]) {
   return safeStringify(payload);
 }
 
+export type LogEntry = {
+  level: "dev" | "info" | "warn" | "error";
+  args: unknown[];
+};
+export const testLogs: LogEntry[] = [];
+
+/**
+ * Resets captured test logs.
+ */
+export function clearTestLogs(): void {
+  testLogs.length = 0;
+}
+
 export const logger = {
   dev: (...args: unknown[]) => {
+    if (isTest) {
+      testLogs.push({ level: "dev", args });
+    }
     if (isDevelopment) {
       console.log(...args);
     }
   },
 
   warn: (...args: unknown[]) => {
-    if (isTest) return;
-    if (process.env.NODE_ENV === 'production') {
-      console.warn(buildStructuredPayload('warn', args));
+    if (isTest) {
+      testLogs.push({ level: "warn", args });
+      return;
+    }
+    if (process.env.NODE_ENV === "production") {
+      console.warn(buildStructuredPayload("warn", args));
     } else {
       console.warn(...args);
     }
   },
 
   error: (...args: unknown[]) => {
-    if (isTest) return;
-    if (process.env.NODE_ENV === 'production') {
-      console.error(buildStructuredPayload('error', args));
+    if (isTest) {
+      testLogs.push({ level: "error", args });
+      return;
+    }
+    if (process.env.NODE_ENV === "production") {
+      console.error(buildStructuredPayload("error", args));
     } else {
       console.error(...args);
     }
   },
 
   info: (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'production') {
-      console.info(buildStructuredPayload('info', args));
+    if (isTest) {
+      testLogs.push({ level: "info", args });
+    }
+    if (process.env.NODE_ENV === "production") {
+      console.info(buildStructuredPayload("info", args));
     } else {
       console.info(...args);
     }

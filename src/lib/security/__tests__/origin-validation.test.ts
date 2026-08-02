@@ -1,5 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getAllowedHosts, normalizeHost, resolveRequestHostname, __resetAllowedHostsCache } from "../origin-validation";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  __resetAllowedHostsCache,
+  getAllowedHosts,
+  normalizeHost,
+  resolveRequestHostname,
+} from "../origin-validation";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/logger", () => ({
@@ -53,7 +58,9 @@ describe("Origin Validation Security", () => {
 
     it("throws error if APP_DOMAIN contains protocol", () => {
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "https://example.com");
-      expect(() => getAllowedHosts()).toThrow("Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only");
+      expect(() => getAllowedHosts()).toThrow(
+        "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only",
+      );
     });
   });
 
@@ -68,7 +75,9 @@ describe("Origin Validation Security", () => {
 
     it("handles unbracketed IPv6", () => {
       expect(normalizeHost("::1")).toBe("::1");
-      expect(normalizeHost("2001:db8:0:0:0:0:0:1")).toBe("2001:db8:0:0:0:0:0:1");
+      expect(normalizeHost("2001:db8:0:0:0:0:0:1")).toBe(
+        "2001:db8:0:0:0:0:0:1",
+      );
     });
 
     it("handles multiple values in header (uses first)", () => {
@@ -86,9 +95,9 @@ describe("Origin Validation Security", () => {
       const req = {
         headers: new Headers({
           "x-forwarded-host": "proxy.com:443",
-          "host": "direct.com"
+          "host": "direct.com",
         }),
-        nextUrl: { hostname: "internal.com" }
+        nextUrl: { hostname: "internal.com" },
       } as unknown as NextRequest;
       expect(resolveRequestHostname(req)).toBe("proxy.com");
     });
@@ -96,13 +105,13 @@ describe("Origin Validation Security", () => {
     it("falls back to host then nextUrl", () => {
       const reqHost = {
         headers: new Headers({ "host": "direct.com:80" }),
-        nextUrl: { hostname: "internal.com" }
+        nextUrl: { hostname: "internal.com" },
       } as unknown as NextRequest;
       expect(resolveRequestHostname(reqHost)).toBe("direct.com");
 
       const reqUrl = {
         headers: new Headers({}),
-        nextUrl: { hostname: "internal.com" }
+        nextUrl: { hostname: "internal.com" },
       } as unknown as NextRequest;
       expect(resolveRequestHostname(reqUrl)).toBe("internal.com");
     });
@@ -112,7 +121,7 @@ describe("Origin Validation Security", () => {
     it("skips dev logging in production for getAllowedHosts", () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "prod.com");
-      
+
       const hosts = getAllowedHosts();
       expect(hosts?.has("prod.com")).toBe(true);
     });
@@ -125,11 +134,11 @@ describe("Origin Validation Security", () => {
     });
 
     it("handles malformed bracketed IPv6", () => {
-        expect(normalizeHost("[invalid")).toBe("[invalid");
+      expect(normalizeHost("[invalid")).toBe("[invalid");
     });
 
     it("handles empty comma list in normalizeHost", () => {
-        expect(normalizeHost(" , ")).toBeNull();
+      expect(normalizeHost(" , ")).toBeNull();
     });
   });
 });

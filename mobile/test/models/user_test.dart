@@ -107,6 +107,7 @@ void main() {
         'disabled_courses': {
           'sem1': {'C1': 'Course1'},
         },
+        'course_targets': <String, dynamic>{},
       };
 
       final s = UserSettings.fromJson(json);

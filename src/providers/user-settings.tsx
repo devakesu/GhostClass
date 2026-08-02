@@ -2,10 +2,10 @@
 
 /**
  * User Settings Provider
- * 
- * Manages user-specific configuration (bunk calculator toggle, target percentage, 
+ *
+ * Manages user-specific configuration (bunk calculator toggle, target percentage,
  * and disabled courses per semester) with persistence in Supabase.
- * 
+ *
  * Features:
  * - Real-time synchronization between Supabase and application state.
  * - Local storage fallback for "snappy" initial load (Stage 2 hydration).
@@ -14,8 +14,16 @@
  * - Standardized "Ezygo is down" circuit breaker logic for database failures.
  */
 
-import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
@@ -32,6 +40,7 @@ export interface UserSettings {
   bunk_calculator_enabled: boolean;
   target_percentage: number;
   disabled_courses: Record<string, Record<string, string>>; // semesterId -> courseId -> reason
+  course_targets?: Record<string, number>; // courseCode -> target percentage
 }
 
 interface UserSettingsContextType {
@@ -40,9 +49,13 @@ interface UserSettingsContextType {
   updateBunkCalc: (enabled: boolean) => void;
   updateTarget: (percentage: number) => void;
   updateDisabledCourses: (map: Record<string, Record<string, string>>) => void;
+  updateCourseTarget: (courseCode: string, target: number) => void;
+  updateCourseTargets: (map: Record<string, number>) => void;
 }
 
-const UserSettingsContext = createContext<UserSettingsContextType | undefined>(undefined);
+const UserSettingsContext = createContext<UserSettingsContextType | undefined>(
+  undefined,
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,11 +64,12 @@ const UserSettingsContext = createContext<UserSettingsContextType | undefined>(u
 /**
  * Normalizes a target percentage to be between 1 and 100.
  */
-const normalizeTarget = (val: number): number => Math.min(Math.max(val, 1), 100);
+const normalizeTarget = (val: number): number =>
+  Math.min(Math.max(val, 1), 100);
 
 /**
  * Stage 2 Hydration / Migration Helper.
- * 
+ *
  * Logic flow:
  * 1. Checks sessionStorage for "prefetchedSettings" (Stage 1).
  * 2. If missing, checks localStorage for individual user-scoped keys (Stage 2).
@@ -67,12 +81,19 @@ const parsePrefetchedSession = (currentUserId: string): UserSettings | null => {
 
   try {
     const parsed = JSON.parse(prefetchedRaw);
-    if (parsed && typeof parsed === 'object' && parsed.userId === currentUserId && parsed.settings) {
+    if (
+      parsed && typeof parsed === "object" && parsed.userId === currentUserId &&
+      parsed.settings
+    ) {
       const s = parsed.settings;
-      if (typeof s.bunk_calculator_enabled === 'boolean' && 
-          typeof s.target_percentage === 'number' &&
-          s.disabled_courses) {
-        const disabledCourses = disabledCoursesSchema.safeParse(s.disabled_courses);
+      if (
+        typeof s.bunk_calculator_enabled === "boolean" &&
+        typeof s.target_percentage === "number" &&
+        s.disabled_courses
+      ) {
+        const disabledCourses = disabledCoursesSchema.safeParse(
+          s.disabled_courses,
+        );
         return {
           ...s,
           disabled_courses: disabledCourses.success ? disabledCourses.data : {},
@@ -89,7 +110,9 @@ const parsePrefetchedSession = (currentUserId: string): UserSettings | null => {
 /**
  * Stage 2 Hydration / Migration Helper.
  */
-const loadPrefetchedSettings = (currentUserId: string | null): UserSettings | null => {
+const loadPrefetchedSettings = (
+  currentUserId: string | null,
+): UserSettings | null => {
   if (typeof window === "undefined" || !currentUserId) return null;
 
   try {
@@ -97,18 +120,26 @@ const loadPrefetchedSettings = (currentUserId: string | null): UserSettings | nu
     if (fromSession) return fromSession;
 
     const storedBunk = localStorage.getItem(`showBunkCalc_${currentUserId}`);
-    const storedTarget = localStorage.getItem(`targetPercentage_${currentUserId}`);
-    const storedDisabled = localStorage.getItem(`disabledCourses_${currentUserId}`);
+    const storedTarget = localStorage.getItem(
+      `targetPercentage_${currentUserId}`,
+    );
+    const storedDisabled = localStorage.getItem(
+      `disabledCourses_${currentUserId}`,
+    );
 
     if (storedBunk === null && storedTarget === null) return null;
 
     return {
       bunk_calculator_enabled: storedBunk === "true",
-      target_percentage: storedTarget ? parseInt(storedTarget, 10) : DEFAULT_TARGET_PERCENTAGE,
+      target_percentage: storedTarget
+        ? parseInt(storedTarget, 10)
+        : DEFAULT_TARGET_PERCENTAGE,
       disabled_courses: (() => {
         if (!storedDisabled || typeof storedDisabled !== "string") return {};
 
-        const disabledCourses = disabledCoursesSchema.safeParse(JSON.parse(storedDisabled));
+        const disabledCourses = disabledCoursesSchema.safeParse(
+          JSON.parse(storedDisabled),
+        );
         return disabledCourses.success ? disabledCourses.data : {};
       })(),
     };
@@ -129,37 +160,48 @@ function useUserSettingsState() {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
-  
+
   // Use a ref to track the user ID synchronously during events to avoid
   // closure staleness before the next render cycle.
   const currentUserIdRef = useRef<string | null>(null);
 
   // Subscribe to auth state changes to re-fetch settings on login/logout
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      const currentUserId = session?.user?.id ?? null;
-      const previousUserId = currentUserIdRef.current;
-      currentUserIdRef.current = currentUserId;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (
+        event: unknown,
+        session: { user?: { id?: string | null } | null } | null,
+      ) => {
+        const currentUserId = session?.user?.id ?? null;
+        const previousUserId = currentUserIdRef.current;
+        currentUserIdRef.current = currentUserId;
 
-      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED" || event === "PASSWORD_RECOVERY") {
-        setUserId(currentUserId);
-        if (currentUserId) {
-          // Force a fresh fetch for the new user
-          queryClient.invalidateQueries({ queryKey: ["userSettings", currentUserId] });
+        if (
+          event === "SIGNED_IN" || event === "INITIAL_SESSION" ||
+          event === "TOKEN_REFRESHED" || event === "USER_UPDATED" ||
+          event === "PASSWORD_RECOVERY"
+        ) {
+          setUserId(currentUserId);
+          if (currentUserId) {
+            // Force a fresh fetch for the new user
+            queryClient.invalidateQueries({
+              queryKey: ["userSettings", currentUserId],
+            });
+          }
+          // Always remove the null-user cache to ensure clean state
+          queryClient.removeQueries({ queryKey: ["userSettings", null] });
+        } else if (event === "SIGNED_OUT") {
+          // Clear local storage keys for the user who just logged out
+          if (previousUserId) {
+            localStorage.removeItem(`showBunkCalc_${previousUserId}`);
+            localStorage.removeItem(`targetPercentage_${previousUserId}`);
+            localStorage.removeItem(`disabledCourses_${previousUserId}`);
+          }
+          setUserId(null);
+          queryClient.removeQueries({ queryKey: ["userSettings"] });
         }
-        // Always remove the null-user cache to ensure clean state
-        queryClient.removeQueries({ queryKey: ["userSettings", null] });
-      } else if (event === "SIGNED_OUT") {
-        // Clear local storage keys for the user who just logged out
-        if (previousUserId) {
-          localStorage.removeItem(`showBunkCalc_${previousUserId}`);
-          localStorage.removeItem(`targetPercentage_${previousUserId}`);
-          localStorage.removeItem(`disabledCourses_${previousUserId}`);
-        }
-        setUserId(null);
-        queryClient.removeQueries({ queryKey: ["userSettings"] });
-      }
-    });
+      },
+    );
 
     return () => {
       subscription.unsubscribe();
@@ -174,20 +216,22 @@ function useUserSettingsState() {
       }
       return loadPrefetchedSettings(userId);
     },
-    [userId]
+    [userId],
   );
 
   // Supabase Query
   const { data: dbSettings, isLoading, isFetching } = useQuery({
     queryKey: ["userSettings", userId],
     queryFn: async () => {
-      // Security check: only fetch if authenticated. 
+      // Security check: only fetch if authenticated.
       // the userId was already server-validated when onAuthStateChange fired.
       if (!userId) return null;
 
       const { data, error } = await supabase
         .from("user_settings")
-        .select("bunk_calculator_enabled, target_percentage, disabled_courses")
+        .select(
+          "bunk_calculator_enabled, target_percentage, disabled_courses, course_targets",
+        )
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -204,7 +248,10 @@ function useUserSettingsState() {
     refetchInterval: false,
     retry: (failureCount: number, error: unknown) => {
       // Type guard for Supabase/PostgREST errors
-      if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
+      if (
+        error && typeof error === "object" && "code" in error &&
+        error.code === "PGRST116"
+      ) {
         return false; // Not found (no record yet)
       }
       return failureCount < 3;
@@ -222,7 +269,13 @@ function useUserSettingsState() {
         .upsert({
           user_id: userId,
           ...updates,
-          ...(updates.disabled_courses ? { disabled_courses: disabledCoursesSchema.parse(updates.disabled_courses) } : {}),
+          ...(updates.disabled_courses
+            ? {
+              disabled_courses: disabledCoursesSchema.parse(
+                updates.disabled_courses,
+              ),
+            }
+            : {}),
           updated_at: new Date().toISOString(),
         });
 
@@ -233,15 +286,18 @@ function useUserSettingsState() {
     },
     onSuccess: (_, variables) => {
       // Optimistically update the cache
-      queryClient.setQueryData(["userSettings", userId], (old: UserSettings | null) => ({
-        ...old,
-        ...variables,
-      }));
+      queryClient.setQueryData(
+        ["userSettings", userId],
+        (old: UserSettings | null) => ({
+          ...old,
+          ...variables,
+        }),
+      );
     },
     onError: (err) => {
       toast.error("Failed to save settings. Changes might not persist.");
       logger.error("Settings mutation failed:", err);
-    }
+    },
   });
 
   // ---------------------------------------------------------------------------
@@ -249,7 +305,9 @@ function useUserSettingsState() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!userId || isLoading || mutation.isPending || dbSettings === undefined) return;
+    if (
+      !userId || isLoading || mutation.isPending || dbSettings === undefined
+    ) return;
 
     try {
       // 1. If DB has no record for this user, create one using local preferences (migration)
@@ -258,8 +316,13 @@ function useUserSettingsState() {
         const legacyBunk = localStorage.getItem("showBunkCalc");
         const legacyTarget = localStorage.getItem("targetPercentage");
 
-        const initialBunk = legacyBunk !== null ? legacyBunk === "true" : (prefetchedSettings?.bunk_calculator_enabled ?? true);
-        const initialTarget = legacyTarget !== null ? normalizeTarget(parseInt(legacyTarget, 10)) : (prefetchedSettings?.target_percentage ?? DEFAULT_TARGET_PERCENTAGE);
+        const initialBunk = legacyBunk !== null
+          ? legacyBunk === "true"
+          : (prefetchedSettings?.bunk_calculator_enabled ?? true);
+        const initialTarget = legacyTarget !== null
+          ? normalizeTarget(parseInt(legacyTarget, 10))
+          : (prefetchedSettings?.target_percentage ??
+            DEFAULT_TARGET_PERCENTAGE);
         const initialDisabled = prefetchedSettings?.disabled_courses ?? {};
 
         mutation.mutate({
@@ -287,15 +350,26 @@ function useUserSettingsState() {
           localStorage.setItem(key, val);
           // Dispatch a custom event for parts of the app that don't use this context
           if (key.startsWith("showBunkCalc_")) {
-            window.dispatchEvent(new CustomEvent("bunkCalcToggle", { detail: val === "true" }));
+            window.dispatchEvent(
+              new CustomEvent("bunkCalcToggle", { detail: val === "true" }),
+            );
           }
         }
       };
 
-      sync(`showBunkCalc_${userId}`, String(dbSettings.bunk_calculator_enabled));
+      sync(
+        `showBunkCalc_${userId}`,
+        String(dbSettings.bunk_calculator_enabled),
+      );
       sync(`targetPercentage_${userId}`, String(dbSettings.target_percentage));
-      sync(`disabledCourses_${userId}`, JSON.stringify(dbSettings.disabled_courses));
-
+      sync(
+        `disabledCourses_${userId}`,
+        JSON.stringify(dbSettings.disabled_courses),
+      );
+      sync(
+        `courseTargets_${userId}`,
+        JSON.stringify(dbSettings.course_targets || {}),
+      );
     } catch (err) {
       // Non-fatal error; just log to dev console
       logger.dev("Error during storage sync:", err);
@@ -306,24 +380,74 @@ function useUserSettingsState() {
   // Public API
   // ---------------------------------------------------------------------------
 
-  const updateBunkCalc = (enabled: boolean) => mutation.mutate({ bunk_calculator_enabled: enabled });
-  const updateTarget = (percentage: number) => mutation.mutate({ target_percentage: normalizeTarget(percentage) });
-  const updateDisabledCourses = (map: Record<string, Record<string, string>>) => mutation.mutate({ disabled_courses: map });
+  const updateBunkCalc = useCallback(
+    (enabled: boolean) => mutation.mutate({ bunk_calculator_enabled: enabled }),
+    [mutation],
+  );
+  const updateTarget = useCallback(
+    (percentage: number) =>
+      mutation.mutate({ target_percentage: normalizeTarget(percentage) }),
+    [mutation],
+  );
+  const updateDisabledCourses = useCallback(
+    (map: Record<string, Record<string, string>>) =>
+      mutation.mutate({ disabled_courses: map }),
+    [mutation],
+  );
+  const updateCourseTarget = useCallback(
+    (courseCode: string, target: number) => {
+      const currentTargets = dbSettings?.course_targets || {};
+      const updated = {
+        ...currentTargets,
+        [courseCode]: normalizeTarget(target),
+      };
+      mutation.mutate({ course_targets: updated });
+    },
+    [dbSettings?.course_targets, mutation],
+  );
+  const updateCourseTargets = useCallback(
+    (map: Record<string, number>) => {
+      const normalizedMap: Record<string, number> = {};
+      Object.entries(map).forEach(([code, val]) => {
+        /* eslint-disable-next-line security/detect-object-injection */
+        normalizedMap[code] = normalizeTarget(val);
+      });
+      mutation.mutate({ course_targets: normalizedMap });
+    },
+    [mutation],
+  );
 
-  return {
-    settings: dbSettings ?? null,
-    isLoading: isLoading || isFetching,
-    updateBunkCalc,
-    updateTarget,
-    updateDisabledCourses,
-  };
+  const isSettingsLoading = isLoading || isFetching;
+
+  return useMemo(
+    () => ({
+      settings: dbSettings ?? null,
+      isLoading: isSettingsLoading,
+      updateBunkCalc,
+      updateTarget,
+      updateDisabledCourses,
+      updateCourseTarget,
+      updateCourseTargets,
+    }),
+    [
+      dbSettings,
+      isSettingsLoading,
+      updateBunkCalc,
+      updateTarget,
+      updateDisabledCourses,
+      updateCourseTarget,
+      updateCourseTargets,
+    ],
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Provider Component
 // ---------------------------------------------------------------------------
 
-export function UserSettingsProvider({ children }: { children: React.ReactNode }) {
+export function UserSettingsProvider(
+  { children }: { children: React.ReactNode },
+) {
   const state = useUserSettingsState();
 
   return (
@@ -340,7 +464,9 @@ export function UserSettingsProvider({ children }: { children: React.ReactNode }
 export function useUserSettings() {
   const context = useContext(UserSettingsContext);
   if (context === undefined) {
-    throw new Error("useUserSettings must be used inside <UserSettingsProvider>");
+    throw new Error(
+      "useUserSettings must be used inside <UserSettingsProvider>",
+    );
   }
   return context;
 }

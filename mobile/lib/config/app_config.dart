@@ -55,6 +55,10 @@ class AppConfig {
         : AppSecrets.ghostclassApiUrlProd,
   );
 
+  /// Default network timeout duration (45s debug / 30s release).
+  static Duration get defaultTimeout =>
+      kDebugMode ? const Duration(seconds: 45) : const Duration(seconds: 30);
+
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
 
@@ -70,13 +74,14 @@ class AppConfig {
   static String get sentryDsn => _d(AppSecrets.sentryDsn);
 
   /// Firebase Cloud Project Number for Play Integrity
-  static String get firebaseCloudProjectNumber => '424804867878';
+  static String get firebaseCloudProjectNumber =>
+      const String.fromEnvironment('FIREBASE_PROJECT_ID');
 
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.4.9');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.5.0');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
@@ -143,7 +148,6 @@ class AppConfig {
   static String get appStoreUrl {
     const appId = String.fromEnvironment(
       'IOS_APP_ID',
-      defaultValue: '6478952324',
     );
     return 'https://apps.apple.com/app/id$appId';
   }

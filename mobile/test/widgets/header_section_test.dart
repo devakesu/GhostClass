@@ -84,12 +84,12 @@ void main() {
         ),
         trackingRecords: const <TrackingRecord>[],
         selectedSemester: 'odd',
-        selectedYear: '2026-27',
+        selectedYear: '2027-28',
       ),
       selectedSemester: 'odd',
-      selectedYear: '2026-27',
+      selectedYear: '2027-28',
     );
-    const mockAcademic = AcademicState(semester: 'odd', year: '2026-27');
+    const mockAcademic = AcademicState(semester: 'odd', year: '2027-28');
 
     await tester.pumpWidget(
       ProviderScope(

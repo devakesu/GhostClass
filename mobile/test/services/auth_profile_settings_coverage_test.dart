@@ -37,7 +37,7 @@ void main() {
     try {
       await Supabase.initialize(
         url: 'https://example.com',
-        anonKey: 'anon',
+        publishableKey: 'anon',
       );
     } on Object catch (_) {
       // already initialized

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "@/lib/axios";
 import { UserProfile } from "@/types";
 import * as Sentry from "@sentry/nextjs";
@@ -14,14 +14,22 @@ interface UpdateProfileData {
   class_id?: string | null;
 }
 
-export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean; force?: boolean }) => {
-  // Force callers (e.g. dashboard) use a separate query key so they are never
+export const useProfile = (
+  options?: {
+    initialData?: UserProfile | null;
+    sync?: boolean;
+    force?: boolean;
+  },
+) => {
+  // Force/Sync callers (e.g. dashboard) use a separate query key so they are never
   // deduplicated with the navbar's no-force fetch. When both share the same key,
   // React Query merges observers into one in-flight request and the navbar's
   // queryFn (no sync/force params) wins — the EzyGo sync never runs.
-  // staleTime:0 on the force key means it is always considered stale and always
+  // staleTime:0 on the force/sync key means it is always considered stale and always
   // re-fetches on mount, regardless of what the shared ["profile"] cache holds.
-  const queryKey: unknown[] = options?.force ? ["profile", "synced"] : ["profile"];
+  const queryKey: unknown[] = (options?.force || options?.sync)
+    ? ["profile", "synced"]
+    : ["profile"];
 
   return useQuery<UserProfile | null>({
     queryKey,
@@ -40,10 +48,10 @@ export const useProfile = (options?: { initialData?: UserProfile; sync?: boolean
       });
       return res.data;
     },
-    initialData: options?.initialData,
-    // Force variant: staleTime 0 so it always re-fetches on mount.
+    initialData: options?.initialData ?? undefined,
+    // Force/Sync variant: staleTime 0 so it always re-fetches on mount.
     // Normal variant: 5-min cache to avoid hammering the sync logic.
-    staleTime: options?.force ? 0 : 1000 * 60 * 5,
+    staleTime: (options?.force || options?.sync) ? 0 : 1000 * 60 * 5,
     gcTime: 30 * 60 * 1000,
     // Never retry 4xx errors (rate limit, auth, bad request) — retrying a 429
     // would waste a rate-limit slot. Retries once for 5xx / network errors.
@@ -56,41 +64,52 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async ({ data }: { data: UpdateProfileData }) => {
-      const res = await axiosInstance.patch<UpdateProfileData>("/api/profile", data, {
-        baseURL: "", // Override baseURL to hit top-level /api/profile
-      });
+      const res = await axiosInstance.patch<UpdateProfileData>(
+        "/api/profile",
+        data,
+        {
+          baseURL: "", // Override baseURL to hit top-level /api/profile
+        },
+      );
       return res.data as UpdateProfileData;
     },
     // Optimistic Update: Update UI instantly
     // 1. SNAPSHOT & OPTIMISTIC UPDATE
     onMutate: async ({ data }) => {
-        // Stop any background refetches so they don't overwrite our optimistic update
-        await queryClient.cancelQueries({ queryKey: ["profile"] });
-        
-        // SNAPSHOT: Get the current valid data before we mess with it
-        const previousProfile = queryClient.getQueryData<UserProfile>(["profile"]);
+      // Stop any background refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["profile"] });
 
-        // UPDATE: Manually write the new data to the cache immediately
-        if (previousProfile) {
-            queryClient.setQueryData<UserProfile>(["profile"], {
-                ...previousProfile, // Keep existing fields (id, email, etc.)
-                ...data,            // Overwrite with new edits (first_name, etc.)
-            });
-        }
+      // SNAPSHOT: Get the current valid data before we mess with it
+      const previousProfile = queryClient.getQueryData<UserProfile>([
+        "profile",
+      ]);
 
-        // Return the snapshot so 'onError' can access it
-        return { previousProfile };
+      // UPDATE: Manually write the new data to the cache immediately
+      if (previousProfile) {
+        queryClient.setQueryData<UserProfile>(["profile"], {
+          ...previousProfile, // Keep existing fields (id, email, etc.)
+          ...data, // Overwrite with new edits (first_name, etc.)
+        });
+      }
+
+      // Return the snapshot so 'onError' can access it
+      return { previousProfile };
     },
 
     // 2. ROLLBACK ON FAILURE
     onError: (err, _variables, context) => {
       // Check if we have a saved snapshot
       if (context?.previousProfile) {
-          // REVERT: Force the cache back to the old data
-          queryClient.setQueryData(["profile"], context.previousProfile);
+        // REVERT: Force the cache back to the old data
+        queryClient.setQueryData(["profile"], context.previousProfile);
       }
       // Report the crash
-      Sentry.captureException(err, { tags: { type: "profile_update_mutation_error", location: "useUpdateProfile/onError" } });
+      Sentry.captureException(err, {
+        tags: {
+          type: "profile_update_mutation_error",
+          location: "useUpdateProfile/onError",
+        },
+      });
     },
 
     // 3. FINAL VERIFICATION

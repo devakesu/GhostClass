@@ -247,6 +247,10 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
       ref.invalidateSelf();
     }
   }
+
+  void updateState(AcademicState? newState) {
+    state = AsyncValue.data(newState);
+  }
 }
 
 (int, int) _parseAcademicYear(String year) {

@@ -1,5 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import React from "react";
 
 // ---------------------------------------------------------------------------
@@ -24,10 +30,16 @@ const {
     mockEzygoPost: vi.fn(),
     mockAxiosPost: vi.fn(),
     mockRouterPush: push,
-    mockGetUser: vi.fn().mockResolvedValue({ data: { user: { id: "uid-1" } }, error: null }),
+    mockGetUser: vi.fn().mockResolvedValue({
+      data: { user: { id: "uid-1" } },
+      error: null,
+    }),
     mockGetCsrfToken: vi.fn().mockReturnValue("csrf-token-123"),
     mockSetCsrfToken: vi.fn(),
-    mockFetch: vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ token: "new-csrf" }) }),
+    mockFetch: vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ token: "new-csrf" }),
+    }),
     // Shared ref so the RadioGroupItem mock can call the current RadioGroup's onValueChange
     radioGroupCallbackRef: { current: null as ((v: string) => void) | null },
   };
@@ -55,7 +67,10 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(() => ({
     auth: {
       getUser: mockGetUser,
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      }),
     },
   })),
 }));
@@ -74,7 +89,8 @@ vi.mock("axios", () => ({
   default: {
     post: mockAxiosPost,
     isAxiosError: (err: unknown) =>
-      typeof err === "object" && err !== null && (err as Record<string, unknown>).isAxiosError === true,
+      typeof err === "object" && err !== null &&
+      (err as Record<string, unknown>).isAxiosError === true,
   },
   AxiosError: class AxiosError extends Error {
     isAxiosError = true;
@@ -90,8 +106,9 @@ vi.mock("axios", () => ({
 
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, ...rest }: React.PropsWithChildren<Record<string, unknown>>) =>
-      React.createElement("div", rest, children),
+    div: (
+      { children, ...rest }: React.PropsWithChildren<Record<string, unknown>>,
+    ) => React.createElement("div", rest, children),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) =>
     React.createElement(React.Fragment, null, children),
@@ -139,8 +156,13 @@ vi.mock("@/components/ui/radio-group", () => {
       radioGroupCallbackRef.current = onValueChange ?? null;
       return React.createElement(
         "div",
-        { role: "radiogroup", "data-value": value, className, "aria-disabled": disabled },
-        children
+        {
+          role: "radiogroup",
+          "data-value": value,
+          className,
+          "aria-disabled": disabled,
+        },
+        children,
       );
     },
     RadioGroupItem: ({
@@ -195,9 +217,13 @@ async function reachOptionStep() {
 
   renderForm();
   fillUsername("testuser");
-  fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+  fireEvent.submit(
+    screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+  );
 
-  await waitFor(() => expect(screen.getByText("Send Code")).toBeInTheDocument());
+  await waitFor(() =>
+    expect(screen.getByText("Send Code")).toBeInTheDocument()
+  );
   vi.clearAllMocks();
 }
 
@@ -214,10 +240,14 @@ async function reachOtpStep() {
 
   renderForm();
   fillUsername("testuser");
-  fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+  fireEvent.submit(
+    screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+  );
 
   await waitFor(() => screen.getByText("Send Code"));
-  const rInput = screen.getByLabelText("Send reset code to email t***@example.com");
+  const rInput = screen.getByLabelText(
+    "Send reset code to email t***@example.com",
+  );
   fireEvent.change(rInput, { target: { value: "mail:t***@example.com" } });
   fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
@@ -237,7 +267,8 @@ describe("PasswordResetForm – initial render", () => {
 
   it("renders the username step with the correct input", () => {
     renderForm();
-    expect(screen.getByPlaceholderText("academic_weapon_fr")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("academic_weapon_fr"))
+      .toBeInTheDocument();
     expect(screen.getByText("Continue")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
@@ -252,7 +283,8 @@ describe("PasswordResetForm – initial render", () => {
   it("switches to email placeholder when email icon is clicked", () => {
     renderForm();
     fireEvent.click(screen.getByLabelText("Email"));
-    expect(screen.getByPlaceholderText("cooked@attendance.edu")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("cooked@attendance.edu"))
+      .toBeInTheDocument();
   });
 
   it("switches to phone placeholder when phone icon is clicked", () => {
@@ -272,14 +304,21 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
     mockEzygoPost
       .mockResolvedValueOnce({ data: { users: ["testuser"] } })
       .mockResolvedValueOnce({
-        data: { username: "testuser", options: { emails: ["t***@example.com"], mobiles: [] } },
+        data: {
+          username: "testuser",
+          options: { emails: ["t***@example.com"], mobiles: [] },
+        },
       });
 
     renderForm();
     fillUsername("testuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+    fireEvent.submit(
+      screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+    );
 
-    await waitFor(() => expect(screen.getByText("Send Code")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Send Code")).toBeInTheDocument()
+    );
     expect(mockNProgressStart).toHaveBeenCalled();
     expect(mockNProgressDone).toHaveBeenCalled();
   });
@@ -289,10 +328,16 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
 
     renderForm();
     fillUsername("unknownuser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+    fireEvent.submit(
+      screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+    );
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: No user found with this username/email/phone.")).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          "Ezygo: No user found with this username/email/phone.",
+        ),
+      ).toBeInTheDocument()
     );
   });
 
@@ -302,7 +347,9 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
 
     renderForm();
     fillUsername("baduser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+    fireEvent.submit(
+      screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+    );
 
     await waitFor(() =>
       expect(screen.getByText("Ezygo: User not found")).toBeInTheDocument()
@@ -315,10 +362,13 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
 
     renderForm();
     fillUsername("baduser");
-    fireEvent.submit(screen.getByPlaceholderText("academic_weapon_fr").closest("form")!);
+    fireEvent.submit(
+      screen.getByPlaceholderText("academic_weapon_fr").closest("form")!,
+    );
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: Failed to fetch reset options.")).toBeInTheDocument()
+      expect(screen.getByText("Ezygo: Failed to fetch reset options."))
+        .toBeInTheDocument()
     );
   });
 });
@@ -334,22 +384,36 @@ describe("PasswordResetForm – handleOptionSubmit", () => {
     mockEzygoPost.mockResolvedValueOnce({});
 
     // Trigger change on the radio input to set selectedOption
-    const radioInput = screen.getByLabelText("Send reset code to email t***@example.com");
-    fireEvent.change(radioInput, { target: { value: "mail:t***@example.com" } });
+    const radioInput = screen.getByLabelText(
+      "Send reset code to email t***@example.com",
+    );
+    fireEvent.change(radioInput, {
+      target: { value: "mail:t***@example.com" },
+    });
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
-    await waitFor(() => expect(screen.getByLabelText("Reset Code")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Reset Code")).toBeInTheDocument()
+    );
     expect(mockNProgressDone).toHaveBeenCalled();
   });
 
-  it.todo("strips the method prefix when calling reset/request (requires reliable radio state update across renders)");
+  it.todo(
+    "strips the method prefix when calling reset/request (requires reliable radio state update across renders)",
+  );
 
   it("shows error when option request fails", async () => {
     await reachOptionStep();
-    mockEzygoPost.mockRejectedValueOnce({ response: { data: { message: "Rate limited" } } });
+    mockEzygoPost.mockRejectedValueOnce({
+      response: { data: { message: "Rate limited" } },
+    });
 
-    const radioInput = screen.getByLabelText("Send reset code to email t***@example.com");
-    fireEvent.change(radioInput, { target: { value: "mail:t***@example.com" } });
+    const radioInput = screen.getByLabelText(
+      "Send reset code to email t***@example.com",
+    );
+    fireEvent.change(radioInput, {
+      target: { value: "mail:t***@example.com" },
+    });
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() =>
@@ -376,7 +440,8 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByText(/Password must be at least 6 characters/)).toBeInTheDocument()
+      expect(screen.getByText(/Password must be at least 6 characters/))
+        .toBeInTheDocument()
     );
     expect(mockEzygoPost).not.toHaveBeenCalled();
   });
@@ -423,7 +488,7 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
 
     await waitFor(() =>
       expect(
-        screen.getByText("Password must be at most 128 characters long")
+        screen.getByText("Password must be at most 128 characters long"),
       ).toBeInTheDocument()
     );
     expect(mockEzygoPost).not.toHaveBeenCalled();
@@ -441,9 +506,15 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
 
     mockEzygoPost.mockResolvedValueOnce({ data: { access_token: "token123" } });
     mockAxiosPost.mockResolvedValueOnce({
-      data: { success: true, settings: { bunk_calculator_enabled: true, target_percentage: 80 } },
+      data: {
+        success: true,
+        settings: { bunk_calculator_enabled: true, target_percentage: 80 },
+      },
     });
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "uid-1" } }, error: null });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: "uid-1" } },
+      error: null,
+    });
 
     fireEvent.change(screen.getByPlaceholderText("Enter the reset code"), {
       target: { value: "123456" },
@@ -459,7 +530,9 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
       fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
     });
 
-    await waitFor(() => expect(mockRouterPush).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() =>
+      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard")
+    );
   });
 
   it("navigates to dashboard when save-token returns no settings", async () => {
@@ -467,7 +540,10 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
 
     mockEzygoPost.mockResolvedValueOnce({ data: { access_token: "token123" } });
     mockAxiosPost.mockResolvedValueOnce({ data: { success: true } });
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "uid-1" } }, error: null });
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: "uid-1" } },
+      error: null,
+    });
 
     fireEvent.change(screen.getByPlaceholderText("Enter the reset code"), {
       target: { value: "123456" },
@@ -483,7 +559,9 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
       fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
     });
 
-    await waitFor(() => expect(mockRouterPush).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() =>
+      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard")
+    );
   });
 });
 
@@ -521,7 +599,8 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Secure session setup failed. Please try again.")).toBeInTheDocument()
+      expect(screen.getByText("Secure session setup failed. Please try again."))
+        .toBeInTheDocument()
     );
   });
 
@@ -544,7 +623,10 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
 
   it("shows network error message when ERR_NETWORK", async () => {
     await reachOtpStep();
-    mockEzygoPost.mockRejectedValueOnce({ isAxiosError: true, code: "ERR_NETWORK" });
+    mockEzygoPost.mockRejectedValueOnce({
+      isAxiosError: true,
+      code: "ERR_NETWORK",
+    });
 
     fillOtpForm();
     await act(async () => {
@@ -552,7 +634,8 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Network error. Please check your connection.")).toBeInTheDocument()
+      expect(screen.getByText("Network error. Please check your connection."))
+        .toBeInTheDocument()
     );
   });
 
@@ -567,7 +650,11 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("CSRF token unavailable – please reload the page and try again.")).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          "CSRF token unavailable – please reload the page and try again.",
+        ),
+      ).toBeInTheDocument()
     );
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
@@ -575,7 +662,9 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
   it("toggles password visibility", async () => {
     await reachOtpStep();
 
-    const passwordInput = screen.getByPlaceholderText("Enter your new password");
+    const passwordInput = screen.getByPlaceholderText(
+      "Enter your new password",
+    );
     expect(passwordInput).toHaveAttribute("type", "password");
 
     const eyeButtons = screen.getAllByRole("button").filter((btn) => {

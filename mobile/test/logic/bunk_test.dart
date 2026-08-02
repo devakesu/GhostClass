@@ -56,7 +56,7 @@ void main() {
 
     test('target 100% case', () {
       final res = calculateAttendance(9, 10, targetPercentage: 100);
-      expect(res.requiredToAttend, 999);
+      expect(res.requiredToAttend, 0x7FFFFFFF);
     });
 
     test('clamped target', () {

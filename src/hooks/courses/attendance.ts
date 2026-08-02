@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { AttendanceReport, CourseDetail } from "@/types";
 import { normalizeCourseCode } from "@/lib/utils";
 import { retryOnce, retryTwice } from "@/lib/query-utils";
-import { useFetchSemester, useFetchAcademicYear } from "../users/settings";
+import { useFetchAcademicYear, useFetchSemester } from "../users/settings";
 
 /** Normalize the EzyGo API typos (`totel`, `persantage`) into `total` / `percentage`. */
 function normalizeCourseDetail(raw: unknown): CourseDetail {
@@ -28,7 +28,7 @@ function normalizeCourseDetail(raw: unknown): CourseDetail {
   } satisfies CourseDetail;
 }
 
-/** 
+/**
  * Cache the working endpoint typo variant to avoid redundant 404s/retries on load.
  * EzyGo environments usually standardize on one variant across all courses.
  */
@@ -38,14 +38,14 @@ async function fetchCourseSummaryWithFallback(ezygoId: number) {
   // If we already know which endpoint works, use it immediately.
   if (workingSummaryEndpoint) {
     return await axios.get(
-      `/attendancereports/institutionuser/courses/${ezygoId}/${workingSummaryEndpoint}`
+      `/attendancereports/institutionuser/courses/${ezygoId}/${workingSummaryEndpoint}`,
     );
   }
 
   try {
     // Try the common EzyGo typo first
     const res = await axios.get(
-      `/attendancereports/institutionuser/courses/${ezygoId}/summery`
+      `/attendancereports/institutionuser/courses/${ezygoId}/summery`,
     );
     workingSummaryEndpoint = "summery";
     return res;
@@ -53,7 +53,7 @@ async function fetchCourseSummaryWithFallback(ezygoId: number) {
     // If 'summery' failed, log and try 'summary' and cache the result if successful
     logger?.dev?.("/summery attempt failed, falling back to /summary", err);
     const res = await axios.get(
-      `/attendancereports/institutionuser/courses/${ezygoId}/summary`
+      `/attendancereports/institutionuser/courses/${ezygoId}/summary`,
     );
     workingSummaryEndpoint = "summary";
     return res;
@@ -65,7 +65,11 @@ async function fetchCourseSummaryWithFallback(ezygoId: number) {
  * attendance summary. Shared by both `useCourseDetails` and the batch hook
  * so the fetch logic is never duplicated.
  */
-async function fetchCourseDetail(courseId: string, ezygoId: number, courseName?: string): Promise<CourseDetail> {
+async function fetchCourseDetail(
+  courseId: string,
+  ezygoId: number,
+  courseName?: string,
+): Promise<CourseDetail> {
   // If ezygoId is 0, it's a student-added "custom" course not yet official in EzyGo.
   // Return a shell CourseDetail with the provided courseName to avoid 404 spam.
   if (!ezygoId || ezygoId === 0) {
@@ -77,8 +81,8 @@ async function fetchCourseDetail(courseId: string, ezygoId: number, courseName?:
       course: {
         id: 0,
         name: courseName || "Course",
-        code: courseId
-      }
+        code: courseId,
+      },
     };
   }
 
@@ -88,24 +92,32 @@ async function fetchCourseDetail(courseId: string, ezygoId: number, courseName?:
 }
 
 /** Shared query options for a single course — keeps staleTime/gcTime/etc. in sync. */
-function courseDetailQueryOptions(courseId: string, ezygoId: number, courseName?: string) {
+function courseDetailQueryOptions(
+  courseId: string,
+  ezygoId: number,
+  courseName?: string,
+) {
   return {
     // Key on both courseId and ezygoId to ensure attendance details are cached
     // independently across semesters/enrollments.
     queryKey: ["attendance-report", courseId, ezygoId] as const,
     queryFn: () => fetchCourseDetail(courseId, ezygoId, courseName),
     staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000,    // 30 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
   };
 }
 
-export const useAttendanceReport = (semester?: string, year?: string, options?: { enabled?: boolean; initialData?: AttendanceReport }) => {
+export const useAttendanceReport = (
+  semester?: string,
+  year?: string,
+  options?: { enabled?: boolean; initialData?: AttendanceReport },
+) => {
   return useQuery<AttendanceReport>({
     queryKey: ["attendance-report", semester, year],
     queryFn: async () => {
       const res = await axios.post("/attendancereports/student/detailed", {
         semester,
-        year
+        year,
       });
       if (!res) throw new Error("Failed to fetch attendance report data");
       return res.data;
@@ -123,15 +135,16 @@ export const useAttendanceReport = (semester?: string, year?: string, options?: 
 };
 
 export const useCourseDetails = (
-  courseId: string, 
-  ezygoId: number, 
-  courseName?: string, 
-  options: { enabled?: boolean; staleTime?: number } = {}
+  courseId: string,
+  ezygoId: number,
+  courseName?: string,
+  options: { enabled?: boolean; staleTime?: number } = {},
 ) => {
   return useQuery<CourseDetail>({
     ...courseDetailQueryOptions(courseId, ezygoId, courseName),
     enabled: options.enabled !== false && !!courseId,
-    staleTime: options.staleTime ?? courseDetailQueryOptions(courseId, ezygoId, courseName).staleTime,
+    staleTime: options.staleTime ??
+      courseDetailQueryOptions(courseId, ezygoId, courseName).staleTime,
     refetchOnReconnect: true,
     refetchInterval: false,
     retry: retryTwice,
@@ -146,15 +159,17 @@ export const useAllCourseDetails = (
   courses: { code: string; id: number; name: string }[],
   semester?: string | null,
   year?: string | null,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean },
 ) => {
   const queryClient = useQueryClient();
   const { data: defaultSemester } = useFetchSemester();
   const { data: defaultYear } = useFetchAcademicYear();
 
-  const activeSemester = semester !== undefined ? semester : (defaultSemester ?? null);
+  const activeSemester = semester !== undefined
+    ? semester
+    : (defaultSemester ?? null);
   const activeYear = year !== undefined ? year : (defaultYear ?? null);
-  
+
   // Explicitly deduplicate courses by code to prevent redundant batching.
   // This ensures the queryKey remains stable and the API receives a clean list.
   const uniqueCourses = useMemo(() => {
@@ -167,23 +182,32 @@ export const useAllCourseDetails = (
     });
   }, [courses]);
 
-  const sortedCodes = useMemo(() => 
-    uniqueCourses.map(c => normalizeCourseCode(c.code)).sort(),
-    [uniqueCourses]
+  const sortedCodes = useMemo(
+    () => uniqueCourses.map((c) => normalizeCourseCode(c.code)).sort(),
+    [uniqueCourses],
   );
 
   return useQuery<Record<string, CourseDetail>>({
-    queryKey: ["attendance-report-all", sortedCodes, activeSemester, activeYear],
+    queryKey: [
+      "attendance-report-all",
+      sortedCodes,
+      activeSemester,
+      activeYear,
+    ],
     queryFn: async () => {
-      const res = await axios.post("/api/attendance/summary-batch", { courses: uniqueCourses }, { baseURL: "" });
-      if (!res || !res.data) throw new Error("Failed to fetch batch course details");
-      
+      const res = await axios.post("/api/attendance/summary-batch", {
+        courses: uniqueCourses,
+      }, { baseURL: "" });
+      if (!res || !res.data) {
+        throw new Error("Failed to fetch batch course details");
+      }
+
       // Normalize each item and update the individual query cache
       const data: Record<string, CourseDetail> = {};
       // Build a whitelist of expected course codes to avoid object-injection sinks
       const validCodes = new Set(uniqueCourses.map((c) => c.code));
       const resObj = res.data as Record<string, unknown> | null | undefined;
-      
+
       if (resObj && typeof resObj === "object") {
         for (const [code, rawDetail] of Object.entries(resObj)) {
           if (typeof code !== "string" || !validCodes.has(code)) continue;
@@ -192,10 +216,16 @@ export const useAllCourseDetails = (
           const detail = normalizeCourseDetail(rawDetail);
           Reflect.set(data, code, detail);
 
-          const course = uniqueCourses.find((c: { code: string; id: number; name: string }) => c.code === code);
+          const course = uniqueCourses.find((
+            c: { code: string; id: number; name: string },
+          ) => c.code === code);
           if (course) {
             const normalizedCode = normalizeCourseCode(code);
-            queryClient.setQueryData(["attendance-report", normalizedCode, Number(course.id)], detail);
+            queryClient.setQueryData([
+              "attendance-report",
+              normalizedCode,
+              Number(course.id),
+            ], detail);
           }
         }
       }

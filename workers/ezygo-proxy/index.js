@@ -102,10 +102,15 @@ export default {
     // ── 1. Authentication ─────────────────────────────────────────────────────
     // Only the GhostClass Next.js server knows this secret; browsers never see it.
     if (!env.PROXY_SECRET) {
-      return new Response("Misconfigured: PROXY_SECRET is not set", { status: 500 });
+      return new Response("Misconfigured: PROXY_SECRET is not set", {
+        status: 500,
+      });
     }
     const incomingSecret = request.headers.get("x-proxy-secret");
-    if (!incomingSecret || !(await constantTimeEqual(incomingSecret, env.PROXY_SECRET))) {
+    if (
+      !incomingSecret ||
+      !(await constantTimeEqual(incomingSecret, env.PROXY_SECRET))
+    ) {
       return new Response("Forbidden", { status: 403 });
     }
 
@@ -116,13 +121,18 @@ export default {
     // No trailing slash.
     const rawBase = (env.EZYGO_API_URL || "").trim();
     if (!rawBase) {
-      return new Response("Misconfigured: EZYGO_API_URL is empty or only whitespace", { status: 500 });
+      return new Response(
+        "Misconfigured: EZYGO_API_URL is empty or only whitespace",
+        { status: 500 },
+      );
     }
     let upstreamBase;
     try {
       upstreamBase = new URL(rawBase);
     } catch {
-      return new Response("Misconfigured: EZYGO_API_URL is not a valid URL", { status: 500 });
+      return new Response("Misconfigured: EZYGO_API_URL is not a valid URL", {
+        status: 500,
+      });
     }
     const basePath = stripTrailingSlashes(upstreamBase.pathname);
     const incomingPath = url.pathname;
@@ -133,9 +143,12 @@ export default {
     // This prevents dropping the required base path or double-prefixing it.
     let resolvedPathname = incomingPath;
     if (basePath) {
-      const hasBasePrefix = incomingPath === basePath || incomingPath.startsWith(`${basePath}/`);
+      const hasBasePrefix = incomingPath === basePath ||
+        incomingPath.startsWith(`${basePath}/`);
       if (!hasBasePrefix) {
-        resolvedPathname = `${basePath}${incomingPath.startsWith("/") ? "" : "/"}${incomingPath}`;
+        resolvedPathname = `${basePath}${
+          incomingPath.startsWith("/") ? "" : "/"
+        }${incomingPath}`;
       }
     }
 
@@ -156,7 +169,7 @@ export default {
     // These reveal that the request passed through Cloudflare and expose
     // metadata (ray IDs, connecting IP of the server VPS, etc.) that EzyGo
     // should not see.
-    outHeaders.delete("cf-connecting-ip");   // Server VPS IP — hide from EzyGo
+    outHeaders.delete("cf-connecting-ip"); // Server VPS IP — hide from EzyGo
     outHeaders.delete("cf-ipcountry");
     outHeaders.delete("cf-ray");
     outHeaders.delete("cf-visitor");

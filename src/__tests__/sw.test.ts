@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Serwist
-vi.mock('serwist', () => {
+vi.mock("serwist", () => {
   return {
-    Serwist: vi.fn().mockImplementation(function() {
+    Serwist: vi.fn().mockImplementation(function () {
       return { addEventListeners: vi.fn() };
     }),
     CacheFirst: vi.fn(),
@@ -29,7 +29,7 @@ type MockSelf = {
   __SW_MANIFEST: [];
 };
 
-describe('Service Worker', () => {
+describe("Service Worker", () => {
   let fetchHandler: Listener | undefined;
   let activateHandler: Listener | undefined;
   let messageHandler: Listener | undefined;
@@ -48,7 +48,7 @@ describe('Service Worker', () => {
         listeners.set(type, handlers);
       }),
       skipWaiting: vi.fn(),
-      location: { origin: 'https://example.com' },
+      location: { origin: "https://example.com" },
       clients: {
         get: vi.fn(),
       },
@@ -58,25 +58,26 @@ describe('Service Worker', () => {
       __SW_MANIFEST: [],
     };
 
-    vi.stubGlobal('self', mockSelf);
-    vi.stubGlobal('caches', mockSelf.caches);
+    vi.stubGlobal("self", mockSelf);
+    vi.stubGlobal("caches", mockSelf.caches);
 
     // Import the SW file
-    await import('../sw');
+    await import("../sw");
 
-    fetchHandler = listeners.get('fetch')?.[0];
-    activateHandler = listeners.get('activate')?.[1] || listeners.get('activate')?.[0]; // activate listener
-    messageHandler = listeners.get('message')?.[0];
+    fetchHandler = listeners.get("fetch")?.[0];
+    activateHandler = listeners.get("activate")?.[1] ||
+      listeners.get("activate")?.[0]; // activate listener
+    messageHandler = listeners.get("message")?.[0];
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  describe('Fetch Event', () => {
-    it('bypasses SW for navigation requests', () => {
+  describe("Fetch Event", () => {
+    it("bypasses SW for navigation requests", () => {
       const event = {
-        request: { mode: 'navigate', url: 'https://example.com/page' },
+        request: { mode: "navigate", url: "https://example.com/page" },
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
@@ -85,9 +86,9 @@ describe('Service Worker', () => {
       expect(event.respondWith).not.toHaveBeenCalled();
     });
 
-    it('bypasses SW for /monitoring and /api/ routes', () => {
+    it("bypasses SW for /monitoring and /api/ routes", () => {
       const monitoringEvent = {
-        request: { url: 'https://example.com/monitoring/collect' },
+        request: { url: "https://example.com/monitoring/collect" },
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
@@ -95,7 +96,7 @@ describe('Service Worker', () => {
       expect(monitoringEvent.stopImmediatePropagation).toHaveBeenCalled();
 
       const apiEvent = {
-        request: { url: 'https://example.com/api/user' },
+        request: { url: "https://example.com/api/user" },
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
@@ -103,9 +104,12 @@ describe('Service Worker', () => {
       expect(apiEvent.stopImmediatePropagation).toHaveBeenCalled();
     });
 
-    it('lets other requests pass through to Serwist', () => {
+    it("lets other requests pass through to Serwist", () => {
       const staticEvent = {
-        request: { mode: 'no-cors', url: 'https://example.com/static/style.css' },
+        request: {
+          mode: "no-cors",
+          url: "https://example.com/static/style.css",
+        },
         stopImmediatePropagation: vi.fn(),
         respondWith: vi.fn(),
       };
@@ -114,52 +118,52 @@ describe('Service Worker', () => {
     });
   });
 
-  describe('Activate Event', () => {
-    it('purges deprecated caches', async () => {
+  describe("Activate Event", () => {
+    it("purges deprecated caches", async () => {
       const event = {
         waitUntil: vi.fn((p) => p),
       };
       await activateHandler!(event);
-      expect(mockSelf.caches.delete).toHaveBeenCalledWith('attendance-data');
-      expect(mockSelf.caches.delete).toHaveBeenCalledWith('pages');
+      expect(mockSelf.caches.delete).toHaveBeenCalledWith("attendance-data");
+      expect(mockSelf.caches.delete).toHaveBeenCalledWith("pages");
     });
   });
 
-  describe('Message Event', () => {
-    it('handles SKIP_WAITING message correctly', async () => {
+  describe("Message Event", () => {
+    it("handles SKIP_WAITING message correctly", async () => {
       const event = {
-        data: { type: 'SKIP_WAITING' },
-        source: { id: 'client-1' },
+        data: { type: "SKIP_WAITING" },
+        source: { id: "client-1" },
       };
 
       mockSelf.clients.get.mockResolvedValue({
-        url: 'https://example.com/dashboard',
+        url: "https://example.com/dashboard",
       });
 
       await messageHandler!(event);
-      
-      expect(mockSelf.clients.get).toHaveBeenCalledWith('client-1');
+
+      expect(mockSelf.clients.get).toHaveBeenCalledWith("client-1");
       expect(mockSelf.skipWaiting).toHaveBeenCalled();
     });
 
-    it('ignores SKIP_WAITING from cross-origin sources', async () => {
+    it("ignores SKIP_WAITING from cross-origin sources", async () => {
       const event = {
-        data: { type: 'SKIP_WAITING' },
-        source: { id: 'client-1' },
+        data: { type: "SKIP_WAITING" },
+        source: { id: "client-1" },
       };
 
       mockSelf.clients.get.mockResolvedValue({
-        url: 'https://malicious.com/attack',
+        url: "https://malicious.com/attack",
       });
 
       await messageHandler!(event);
-      
+
       expect(mockSelf.skipWaiting).not.toHaveBeenCalled();
     });
 
-    it('ignores other message types', async () => {
+    it("ignores other message types", async () => {
       const event = {
-        data: { type: 'OTHER' },
+        data: { type: "OTHER" },
       };
       await messageHandler!(event);
       expect(mockSelf.skipWaiting).not.toHaveBeenCalled();

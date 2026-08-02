@@ -9,9 +9,13 @@
  */
 export function isStandalonePWA(): boolean {
   if (typeof window === "undefined") return false;
+  const win = window as unknown as {
+    matchMedia?: (query: string) => { matches: boolean };
+    navigator?: { standalone?: boolean };
+  };
   return (
-    (typeof window.matchMedia === "function" &&
-      window.matchMedia("(display-mode: standalone)").matches) ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    (typeof win.matchMedia === "function" &&
+      win.matchMedia("(display-mode: standalone)").matches) ||
+    win.navigator?.standalone === true
   );
 }

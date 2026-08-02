@@ -1,8 +1,7 @@
 # Contributing to GhostClass
 
-Thank you for your interest in contributing to GhostClass! This guide will help you understand our development workflow and contribution process.
-
-> **👋 For External Contributors**: You don't need GPG keys, PAT tokens, or any special setup! Just fork, code, and submit a PR. The version bump workflow will guide you through a simple script. See [Quick Setup](#quick-setup) below.
+Thank you for your interest in contributing to GhostClass! This guide will help
+you understand our development workflow and contribution process.
 
 ## Table of Contents
 
@@ -19,33 +18,12 @@ Thank you for your interest in contributing to GhostClass! This guide will help 
 
 ### Prerequisites
 
-- **Node.js**: 24.14.1+
-- **npm**: 11.11.0+
-- **Flutter SDK**: 3.27+ (for mobile development)
-- **Dart SDK**: ^3.11.4 (bundled with Flutter)
-- **Git**: Latest version
+- **Docker Desktop** (with WSL2 backend enabled)
+- **WSL2** (Linux distribution such as Ubuntu/Debian)
+- **VS Code or Antigravity IDE / any IDE with WSL/Docker Support**
 
-**That's it!** External contributors don't need GPG keys, GitHub PAT tokens, or access to secrets.
-
-### Quick Setup
-
-```bash
-# 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/GhostClass.git
-cd GhostClass
-
-# 2. Install dependencies
-npm install --legacy-peer-deps
-
-# 3. Create feature branch
-git checkout -b feature/your-feature-name
-
-# 4. Start development
-npm run dev      # Web development
-cd mobile && flutter run  # Mobile development
-```
-
-**That's all you need to start developing!** For advanced maintainer setup (GPG, PAT tokens, deployment), see [For Maintainers Only](#for-maintainers-only) at the bottom of this guide.
+Complete step-by-step dev container environment setup:
+**[Getting Started / Dev Container Setup](../README.md#-getting-started)**.
 
 ## Development Workflow
 
@@ -88,11 +66,16 @@ flutter build apk        # Build Android APK
 5. Commit with clear messages (see [Commit Messages](#commit-messages))
 6. Push and create a Pull Request
 
-**Important**: Centralized version values apply automatically! See [Versioning System](#versioning-system) below.
+**Important**: Centralized version values apply automatically! See
+[Versioning System](#versioning-system) below.
 
 ## Versioning System
 
-GhostClass derives its build versions dynamically via centralized Infisical runtime and CI configurations (`NEXT_PUBLIC_APP_VERSION`). Contributors do not need to manually compute or inject git semantic rollover tags when proposing features. Maintainers synchronize version thresholds directly in the project dashboard prior to production releases.
+GhostClass derives its build versions dynamically via centralized Infisical
+runtime and CI configurations (`NEXT_PUBLIC_APP_VERSION`). Contributors do not
+need to manually compute or inject git semantic rollover tags when proposing
+features. Maintainers synchronize version thresholds directly in the project
+dashboard prior to production releases.
 
 ## Pull Request Process
 
@@ -173,11 +156,11 @@ docker build \
 
 ### CI/CD Build Times
 
-| Build Type | Platforms | Time | Use Case |
-| --- | --- | --- | --- |
-| Cached build | AMD64 | ~3-5 min | Incremental changes |
-| Cold build | AMD64 | ~6-8 min | Fresh build |
-| Multi-arch | AMD64 + ARM64 | ~10-15 min | Production releases |
+| Build Type   | Platforms     | Time       | Use Case            |
+| ------------ | ------------- | ---------- | ------------------- |
+| Cached build | AMD64         | ~3-5 min   | Incremental changes |
+| Cold build   | AMD64         | ~6-8 min   | Fresh build         |
+| Multi-arch   | AMD64 + ARM64 | ~10-15 min | Production releases |
 
 ### Performance Features
 
@@ -238,35 +221,42 @@ Closes #123
 
 - **Bug Reports**: Use [bug report template](.github/ISSUE_TEMPLATE)
 - **Feature Requests**: Use [feature request template](.github/ISSUE_TEMPLATE)
-- **Questions**: Open a [Discussion](https://github.com/devakesu/GhostClass/discussions)
+- **Questions**: Open a
+  [Discussion](https://github.com/devakesu/GhostClass/discussions)
 - **Setup Issues**: Check [SECURITY.md](../SECURITY.md) and `.example.env`
 
 ---
 
 ## For Maintainers Only
 
-> **⚠️ This section is for repository maintainers with write access only.**  
+> **⚠️ This section is for repository maintainers with write access only.**\
 > External contributors can skip this section entirely.
 
 ### Maintainer Tools
 
 #### Infisical Secret Orchestration
 
-- Centralized management via Infisical Dashboard acts as the single source of truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
-- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations, Coolify production runtime environments inject `/runtime` secrets dynamically into memory at boot time using the Infisical CLI wrapper.
+- Centralized management via Infisical Dashboard acts as the single source of
+  truth, organized into `/build-time`, `/runtime`, and `/ci` folders.
+- While GitHub Actions (`/build-time` and `/ci`) use Native Integrations,
+  Coolify production runtime environments inject `/runtime` secrets dynamically
+  into memory at boot time using the Infisical CLI wrapper.
 - Eliminates manual script execution and plaintext storage on disk.
 - External contributors don't need access to Infisical to submit code.
 
 ### Version Management
 
-- App Versioning: Controlled directly via `NEXT_PUBLIC_APP_VERSION` injected dynamically at runtime/compile-time.
-- Release Automation: Dynamic multi-arch bundles and attestation manual updates are published synchronously upon successful merges to the primary main trunk.
+- App Versioning: Controlled directly via `NEXT_PUBLIC_APP_VERSION` injected
+  dynamically at runtime/compile-time.
+- Release Automation: Dynamic multi-arch bundles and attestation manual updates
+  are published synchronously upon successful merges to the primary main trunk.
 
 ---
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's GPLv3 license.
+By contributing, you agree that your contributions will be licensed under the
+project's GPLv3 license.
 
 ---
 

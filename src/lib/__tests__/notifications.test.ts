@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchNotifications, createNotification, markNotificationRead } from "../notifications";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createNotification,
+  fetchNotifications,
+  markNotificationRead,
+} from "../notifications";
 import axios from "@/lib/axios";
 
 vi.mock("@/lib/axios", () => ({
@@ -20,10 +24,13 @@ describe("notifications.ts", () => {
     vi.mocked(axios.get).mockResolvedValue({ data: mockData });
 
     const result = await fetchNotifications(2, 20);
-    
-    expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/manage-notifications"), {
-      params: { page: 2, limit: 20 }
-    });
+
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining("/manage-notifications"),
+      {
+        params: { page: 2, limit: 20 },
+      },
+    );
     expect(result).toBe(mockData);
   });
 
@@ -33,8 +40,11 @@ describe("notifications.ts", () => {
     vi.mocked(axios.post).mockResolvedValue({ data: mockResponse });
 
     const result = await createNotification(mockData);
-    
-    expect(axios.post).toHaveBeenCalledWith(expect.stringContaining("/manage-notifications"), mockData);
+
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining("/manage-notifications"),
+      mockData,
+    );
     expect(result).toBe(mockResponse);
   });
 
@@ -43,8 +53,11 @@ describe("notifications.ts", () => {
     vi.mocked(axios.patch).mockResolvedValue({ data: mockResponse });
 
     const result = await markNotificationRead(123, true);
-    
-    expect(axios.patch).toHaveBeenCalledWith(expect.stringContaining("/manage-notifications"), { id: 123, all: true });
+
+    expect(axios.patch).toHaveBeenCalledWith(
+      expect.stringContaining("/manage-notifications"),
+      { id: 123, all: true },
+    );
     expect(result).toBe(mockResponse);
   });
 });

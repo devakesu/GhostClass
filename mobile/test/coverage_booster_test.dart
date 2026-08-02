@@ -206,10 +206,7 @@ void main() {
   });
 
   testWidgets('Coverage Booster: AppRouter & SplashScreen', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'ghostclass_jwks_cache': '{"keys": []}',
-      'ghostclass_jwks_time': DateTime.now().toIso8601String(),
-    });
+    SharedPreferences.setMockInitialValues({});
 
     final mockSupabase = MockSupabaseClient();
     final mockAuth = MockGoTrueClient();

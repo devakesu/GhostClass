@@ -31,7 +31,7 @@ export default function ErrorPage({
   return (
     <div className="flex min-h-screen flex-col">
       <PublicNavbar />
-      
+
       <main className="flex-1">
         <ErrorFallback error={error} reset={reset} homeUrl="/" />
       </main>

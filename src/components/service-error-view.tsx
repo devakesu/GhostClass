@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Home, RefreshCcw, MessageSquare, LogOut } from "lucide-react";
+import {
+  AlertTriangle,
+  Home,
+  LogOut,
+  MessageSquare,
+  RefreshCcw,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { getSupabaseConfig } from "@/lib/supabase/fetch";
@@ -29,10 +35,15 @@ export function ServiceErrorView({
 
   const handleContactUs = () => {
     const errorStr = error ? String(error) : "Unknown Error";
-    const sanitizedError = errorStr.length > 300 ? `${errorStr.substring(0, 300)}...` : errorStr;
+    const sanitizedError = errorStr.length > 300
+      ? `${errorStr.substring(0, 300)}...`
+      : errorStr;
     const subject = encodeURIComponent("Connection Error");
-    const message = encodeURIComponent(`I am experiencing a connection error with the Ezygo API.\n\nContext: ${sanitizedError}`);
-    window.location.href = `mailto:support@ghostclass.app?subject=${subject}&message=${message}`;
+    const message = encodeURIComponent(
+      `I am experiencing a connection error with the Ezygo API.\n\nContext: ${sanitizedError}`,
+    );
+    window.location.href =
+      `mailto:support@ghostclass.app?subject=${subject}&message=${message}`;
   };
 
   const handleLogout = async () => {
@@ -40,7 +51,7 @@ export function ServiceErrorView({
 
     const supabase = createBrowserClient(
       supabaseUrl!,
-      supabaseKey!
+      supabaseKey!,
     );
     await supabase.auth.signOut();
     router.push("/");
@@ -76,7 +87,10 @@ export function ServiceErrorView({
         {/* Messages */}
         <div className="mb-10 space-y-3">
           {(messages || []).map((msg, i) => (
-            <p key={i} className="text-lg font-medium text-muted-foreground/80 leading-relaxed max-w-md mx-auto">
+            <p
+              key={i}
+              className="text-lg font-medium text-muted-foreground/80 leading-relaxed max-w-md mx-auto"
+            >
               {msg}
             </p>
           ))}

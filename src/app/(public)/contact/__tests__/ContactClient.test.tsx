@@ -1,28 +1,30 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ContactClient from '../ContactClient';
-import { createClient } from '@/lib/supabase/server';
+import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import ContactClient from "../ContactClient";
+import { createClient } from "@/lib/supabase/server";
 
 // Mock the supabase server client
-vi.mock('@/lib/supabase/server', () => ({
+vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
 // Mock the ContactForm component
-vi.mock('@/components/contact-form', () => ({
+vi.mock("@/components/contact-form", () => ({
   ContactForm: ({ userDetails }: any) => (
     <div data-testid="contact-form">
-      {userDetails ? `User: ${userDetails.name} (${userDetails.email})` : 'Anonymous'}
+      {userDetails
+        ? `User: ${userDetails.name} (${userDetails.email})`
+        : "Anonymous"}
     </div>
   ),
 }));
 
-describe('ContactClient', () => {
+describe("ContactClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders correctly for anonymous user', async () => {
+  it("renders correctly for anonymous user", async () => {
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
@@ -33,14 +35,18 @@ describe('ContactClient', () => {
     const Result = await ContactClient();
     render(Result);
 
-    expect(screen.getByText('Contact Us')).toBeInTheDocument();
-    expect(screen.getByText('Anonymous')).toBeInTheDocument();
+    expect(screen.getByText("Contact Us")).toBeInTheDocument();
+    expect(screen.getByText("Anonymous")).toBeInTheDocument();
   });
 
-  it('renders correctly for logged-in user with profile', async () => {
-    const mockUser = { id: 'user-1', email: 'test@example.com' };
-    const mockProfile = { first_name: 'John', last_name: 'Doe', email: 'john@example.com' };
-    
+  it("renders correctly for logged-in user with profile", async () => {
+    const mockUser = { id: "user-1", email: "test@example.com" };
+    const mockProfile = {
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+    };
+
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
@@ -55,12 +61,13 @@ describe('ContactClient', () => {
     const Result = await ContactClient();
     render(Result);
 
-    expect(screen.getByText('User: John Doe (john@example.com)')).toBeInTheDocument();
+    expect(screen.getByText("User: John Doe (john@example.com)"))
+      .toBeInTheDocument();
   });
 
-  it('handles profile fetch failure gracefully', async () => {
-    const mockUser = { id: 'user-1', email: 'test@example.com' };
-    
+  it("handles profile fetch failure gracefully", async () => {
+    const mockUser = { id: "user-1", email: "test@example.com" };
+
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
@@ -75,6 +82,6 @@ describe('ContactClient', () => {
     const Result = await ContactClient();
     render(Result);
 
-    expect(screen.getByText('Anonymous')).toBeInTheDocument();
+    expect(screen.getByText("Anonymous")).toBeInTheDocument();
   });
 });

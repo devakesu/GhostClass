@@ -83,6 +83,7 @@ certificates/
 /mobile/ios/Flutter/flutter_export_environment.sh
 /mobile/android/local.properties
 /mobile/android/key.properties
+/mobile/android/.kotlin
 /mobile/android/app/src/main/res/raw/app_config.json
 /mobile/android/app/debug/
 /mobile/android/app/profile/
@@ -109,3 +110,4 @@ certificates/
 
 # App Secrets
 /mobile/lib/config/app_secrets.dart
+/mobile/firebase.json

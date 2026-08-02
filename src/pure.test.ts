@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-describe('Pure Vitest Sanity', () => {
-  it('should work', () => {
-    expect(1 + 1).toBe(2);
+describe("Pure Vitest Sanity", () => {
+  it("should work", () => {
+    expect(Array.isArray([])).toBe(true);
   });
 });

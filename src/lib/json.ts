@@ -11,7 +11,10 @@ export function safeJsonParse<T>(text: string | null | undefined): T | null {
   try {
     return JSON.parse(text) as T;
   } catch (error) {
-    logger.warn("safeJsonParse: failed to parse JSON", { error, preview: text.slice(0, 100) });
+    logger.warn("safeJsonParse: failed to parse JSON", {
+      error,
+      preview: text.slice(0, 100),
+    });
     return null;
   }
 }
@@ -23,7 +26,10 @@ export function safeJsonParse<T>(text: string | null | undefined): T | null {
 export async function safeResponseJson<T>(res: Response): Promise<T | null> {
   try {
     // Support mocks that only provide .json() and not .text()
-    if (typeof res.text !== "function" && "json" in res && typeof (res as unknown as { json: unknown }).json === "function") {
+    if (
+      typeof res.text !== "function" && "json" in res &&
+      typeof (res as unknown as { json: unknown }).json === "function"
+    ) {
       return await (res as unknown as { json: () => Promise<T> }).json();
     }
     const text = await res.text();

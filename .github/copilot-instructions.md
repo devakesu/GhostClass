@@ -1,11 +1,14 @@
 # Copilot Instructions for GhostClass
 
-GhostClass is a full-stack monorepo with two first-class clients sharing the same backend/security model:
+GhostClass is a full-stack monorepo with two first-class clients sharing the
+same backend/security model:
 
 - Web app: Next.js (App Router) + React + TypeScript (strict)
 - Mobile app: Flutter + Dart (Android/iOS)
 
-The product helps students manage attendance using EzyGo data, with bunk calculation, calendar/history, disputed-absence tracking, scores, leave status, and notifications.
+The product helps students manage attendance using EzyGo data, with bunk
+calculation, calendar/history, disputed-absence tracking, scores, leave status,
+and notifications.
 
 ---
 
@@ -34,9 +37,12 @@ docs/                # Developer documentation
 public/openapi/      # OpenAPI 3.1 source (`openapi.yaml`)
 ```
 
-Key web config at root: `next.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `tsconfig.json`.
+Key web config at root: `next.config.ts`, `vitest.config.ts`,
+`playwright.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`,
+`tsconfig.json`.
 
-Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `android/build.gradle.kts`, `ios/Runner.xcodeproj`.
+Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`,
+`android/build.gradle.kts`, `ios/Runner.xcodeproj`.
 
 ---
 
@@ -44,30 +50,30 @@ Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `androi
 
 ### Web
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js (App Router), React, TypeScript (strict) |
-| UI | Tailwind CSS, Radix UI, Shadcn UI, Framer Motion, Lucide |
-| Data / Forms | TanStack Query v5, React Hook Form, Zod v4 |
-| Charts | Recharts |
-| Auth / DB | Supabase (PostgreSQL + RLS), `@supabase/ssr` |
-| Security | AES-256-GCM, CSRF, Upstash Redis rate limiting, Cloudflare Turnstile, CSP |
-| HTTP | Axios + interceptors, LRU Cache |
-| Monitoring | Sentry (`sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation.ts`) |
-| PWA | Serwist (`src/sw.ts`) |
-| Testing | Vitest + Playwright |
+| Layer        | Technology                                                                            |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Framework    | Next.js (App Router), React, TypeScript (strict)                                      |
+| UI           | Tailwind CSS, Radix UI, Shadcn UI, Framer Motion, Lucide                              |
+| Data / Forms | TanStack Query v5, React Hook Form, Zod v4                                            |
+| Charts       | Recharts                                                                              |
+| Auth / DB    | Supabase (PostgreSQL + RLS), `@supabase/ssr`                                          |
+| Security     | AES-256-GCM, CSRF, Upstash Redis rate limiting, Cloudflare Turnstile, CSP             |
+| HTTP         | Axios + interceptors, LRU Cache                                                       |
+| Monitoring   | Sentry (`sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation.ts`) |
+| PWA          | Serwist (`src/sw.ts`)                                                                 |
+| Testing      | Vitest + Playwright                                                                   |
 
 ### Mobile
 
-| Layer | Technology |
-|---|---|
-| Framework | Flutter, Dart |
-| State | Riverpod 3 (`flutter_riverpod`, `riverpod_annotation`, generator) |
-| HTTP / Backend | Dio, Supabase Flutter |
-| Routing | GoRouter |
-| Security | Firebase App Check, Play Integrity (Android), DeviceCheck (iOS), JWE (`jose` + `pointycastle`), `flutter_secure_storage` |
-| UI / Charts | Material 3, `google_fonts`, `flutter_animate`, `fl_chart`, `lucide_icons` |
-| Monitoring | `sentry_flutter`, `sentry_dio` |
+| Layer          | Technology                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Framework      | Flutter, Dart                                                                                                            |
+| State          | Riverpod 3 (`flutter_riverpod`, `riverpod_annotation`, generator)                                                        |
+| HTTP / Backend | Dio, Supabase Flutter                                                                                                    |
+| Routing        | GoRouter                                                                                                                 |
+| Security       | Firebase App Check, Play Integrity (Android), DeviceCheck (iOS), JWE (`jose` + `pointycastle`), `flutter_secure_storage` |
+| UI / Charts    | Material 3, `google_fonts`, `flutter_animate`, `fl_chart`, `lucide_icons`                                                |
+| Monitoring     | `sentry_flutter`, `sentry_dio`                                                                                           |
 
 ---
 
@@ -75,7 +81,8 @@ Key mobile config in `mobile/`: `pubspec.yaml`, `analysis_options.yaml`, `androi
 
 ### Web (repo root)
 
-Recommended: use the package manager the repo is configured for (`npm`, `pnpm`, or `yarn`) — check `package.json`.
+Recommended: use the package manager the repo is configured for (`npm`, `pnpm`,
+or `yarn`) — check `package.json`.
 
 ```bash
 # install dependencies (choose one)
@@ -107,7 +114,8 @@ flutter build appbundle --release
 flutter build ios --release   # macOS + Xcode required
 ```
 
-If you use a different Flutter toolchain (fvm, etc.), prefer that in CI and local docs.
+If you use a different Flutter toolchain (fvm, etc.), prefer that in CI and
+local docs.
 
 ---
 
@@ -115,16 +123,19 @@ If you use a different Flutter toolchain (fvm, etc.), prefer that in CI and loca
 
 ### Web env
 
-GhostClass utilizes **Infisical** as the single source of truth for runtime and CI secrets. Common folders include `/build-time`, `/runtime`, and `/ci`.
+GhostClass utilizes **Infisical** as the single source of truth for runtime and
+CI secrets. Common folders include `/build-time`, `/runtime`, and `/ci`.
 
-Developers should authenticate via `infisical login` and run services using `infisical run -- <cmd>` (for example `infisical run -- npm run dev`).
+Developers should authenticate via `infisical login` and run services using
+`infisical run -- <cmd>` (for example `infisical run -- npm run dev`).
 
 Critical upstream dashboard variables mapped include:
 
 - `ENCRYPTION_KEY` (64 hex chars, AES-256-GCM - stored as masked secret)
 - `REQUEST_SIGNING_SECRET` (64 hex chars; stored as masked secret)
 - `NEXT_PUBLIC_SUPABASE_URL` (synced automatically as GitHub Actions Variable)
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (synced automatically as GitHub Actions Variable)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (synced automatically as GitHub Actions
+  Variable)
 - `SUPABASE_SECRET_KEY` (server-only secret)
 - `NEXT_PUBLIC_BACKEND_URL`
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`
@@ -145,8 +156,8 @@ Critical upstream dashboard variables mapped include:
 Web alias: `@/` resolves to `src/`.
 
 ```typescript
-import { calculateAttendance } from '@/lib/logic/bunk';
-import { createClient } from '@/lib/supabase/client';
+import { calculateAttendance } from "@/lib/logic/bunk";
+import { createClient } from "@/lib/supabase/client";
 ```
 
 ---
@@ -165,7 +176,8 @@ Important mocking patterns:
 
 - Mock spinner libs (`ldrs/react`, `Ring2`) as simple divs
 - React Query mocks must include `useQuery` and `useQueryClient`
-- Framer Motion mocks should include `AnimatePresence`, `LazyMotion`, `domAnimation`, `motion.div`
+- Framer Motion mocks should include `AnimatePresence`, `LazyMotion`,
+  `domAnimation`, `motion.div`
 - Virtualizer mocks should include `measureElement` and `measure`
 - Supabase auth mocks should include `auth.getUser` and `auth.getSession`
 - With fake timers, prefer `fireEvent` over `userEvent`
@@ -189,27 +201,37 @@ Important mocking patterns:
 ### Web-specific
 
 - Do not use `window.open()` for link navigation
-- For links inside labels: `preventDefault()` + `stopPropagation()`, then create/click anchor with `rel="noopener noreferrer"`
+- For links inside labels: `preventDefault()` + `stopPropagation()`, then
+  create/click anchor with `rel="noopener noreferrer"`
 - External `target="_blank"` links must include `rel="noopener noreferrer"`
 - Check `res.ok` before `res.json()` on fetch
-- Server-side EzyGo calls must go through `egressFetch()` / `egressAxios` in `src/lib/utils.server.ts`
+- Server-side EzyGo calls must go through `egressFetch()` / `egressAxios` in
+  `src/lib/utils.server.ts`
 
 ### Mobile-specific
 
-- Keep EzyGo/Supabase/session material in `flutter_secure_storage`, not plain preferences
-- Maintain App Check and integrity validation paths (Play Integrity / DeviceCheck)
-- Preserve JWE request wrapping in networking layer (`api_service`, `jwe_interceptor`, `jwe_service`)
+- Keep EzyGo/Supabase/session material in `flutter_secure_storage`, not plain
+  preferences
+- Maintain App Check and integrity validation paths (Play Integrity /
+  DeviceCheck)
+- Preserve JWE request wrapping in networking layer (`api_service`,
+  `jwe_interceptor`, `jwe_service`)
 - Maintain Android anti-tapjacking/secure-screen protections in `MainActivity`
 
 ---
 
 ## App-Specific Architecture Notes
 
-- Attendance calculation remains centered on `calculateAttendance` in web `src/lib/logic/bunk.ts` and mirrored logic in mobile `mobile/lib/logic/bunk.dart`
-- Attendance code `225` (Duty Leave) is capped at 5/course/semester by DB trigger `check_225_attendance_limit()`
-- Disabled courses are stored in `user_settings.disabled_courses` JSONB keyed by academic period
+- Attendance calculation remains centered on `calculateAttendance` in web
+  `src/lib/logic/bunk.ts` and mirrored logic in mobile
+  `mobile/lib/logic/bunk.dart`
+- Attendance code `225` (Duty Leave) is capped at 5/course/semester by DB
+  trigger `check_225_attendance_limit()`
+- Disabled courses are stored in `user_settings.disabled_courses` JSONB keyed by
+  academic period
 - EzyGo `/summery` typo fields are normalized by data hooks/types
-- Cron sync normalizes date keys (`YYYYMMDD` and `YYYY-MM-DD`) before reconciliation
+- Cron sync normalizes date keys (`YYYYMMDD` and `YYYY-MM-DD`) before
+  reconciliation
 
 ---
 
@@ -232,7 +254,8 @@ Important mocking patterns:
 ### Commits
 
 - Conventional commits: `<type>(<scope>): <description>`
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`,
+  `ci`
 
 ---
 
@@ -240,7 +263,8 @@ Important mocking patterns:
 
 ### Version bumping
 
-Version bumping is automated via workflows (see `.github/workflows/auto-version-bump.yml`).
+Version bumping is automated via workflows (see
+`.github/workflows/auto-version-bump.yml`).
 
 - Same-repo PRs: workflow handles bump
 - Fork PRs: run bump script manually, then commit versioned artifacts
@@ -252,22 +276,24 @@ Files that must stay in sync for version bumps:
 - `.example.env` (`NEXT_PUBLIC_APP_VERSION`)
 - `public/openapi/openapi.yaml`
 
-When updating core dependency versions, update `package.json` and run the install command for the chosen package manager.
+When updating core dependency versions, update `package.json` and run the
+install command for the chosen package manager.
 
 ### Main workflows
 
-| Workflow | Purpose |
-|---|---|
-| `test.yml` | Web unit coverage + web Playwright E2E |
-| `pipeline.yml` | Guard + auto-tag on merge to main |
-| `auto-version-bump.yml` | PR version bump automation |
-| `release.yml` | Signed release build + deploy pipeline |
-| `deploy-egress-proxies.yml` | Deploy CF/AWS proxies |
-| `deploy-supabase.yaml` | Supabase migration deployment |
-| `provenance.yml` | Build provenance attestations |
-| `scorecard.yml` | OpenSSF scorecard checks |
+| Workflow                    | Purpose                                |
+| --------------------------- | -------------------------------------- |
+| `test.yml`                  | Web unit coverage + web Playwright E2E |
+| `pipeline.yml`              | Guard + auto-tag on merge to main      |
+| `auto-version-bump.yml`     | PR version bump automation             |
+| `release.yml`               | Signed release build + deploy pipeline |
+| `deploy-egress-proxies.yml` | Deploy CF/AWS proxies                  |
+| `deploy-supabase.yaml`      | Supabase migration deployment          |
+| `provenance.yml`            | Build provenance attestations          |
+| `scorecard.yml`             | OpenSSF scorecard checks               |
 
-Dependabot PRs do not have repository secrets; secret-dependent jobs must stay guarded.
+Dependabot PRs do not have repository secrets; secret-dependent jobs must stay
+guarded.
 
 ---
 
@@ -277,13 +303,17 @@ Dependabot PRs do not have repository secrets; secret-dependent jobs must stay g
 - `npm run dev` uses webpack by default for PWA compatibility
 - Use RSA 4096 GPG keys for CI signing (avoid ECC key issues in CI)
 - Fake timers + `userEvent` can conflict in Vitest; use `fireEvent`
-- Recharts `ResponsiveContainer` can be noisy in tests; prefer direct dimension control
+- Recharts `ResponsiveContainer` can be noisy in tests; prefer direct dimension
+  control
 
 ## Recommended local setup
 
-- Check which package manager the repo uses (`package.json` may include `packageManager`).
-- Use `infisical login` then `infisical run -- npm run dev` to ensure runtime secrets are loaded locally.
-- Run `npm run format` before committing; run `npm run lint` to catch style/typing issues.
+- Check which package manager the repo uses (`package.json` may include
+  `packageManager`).
+- Use `infisical login` then `infisical run -- npm run dev` to ensure runtime
+  secrets are loaded locally.
+- Run `npm run format` before committing; run `npm run lint` to catch
+  style/typing issues.
 
 ## PR checklist
 
@@ -297,7 +327,8 @@ Dependabot PRs do not have repository secrets; secret-dependent jobs must stay g
 
 - Web: update `package.json` and `tsconfig.json` as needed
 - Mobile: update `mobile/pubspec.yaml`
-- OpenAPI: update `public/openapi/openapi.yaml` and run any generation scripts in `scripts/`
+- OpenAPI: update `public/openapi/openapi.yaml` and run any generation scripts
+  in `scripts/`
 
 ---
 
@@ -310,4 +341,5 @@ npx supabase link --project-ref <your-project-id>
 npx supabase db push
 ```
 
-RLS policies are required for user-scoped data access; preserve policy intent when editing migrations.
+RLS policies are required for user-scoped data access; preserve policy intent
+when editing migrations.

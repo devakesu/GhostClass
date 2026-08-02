@@ -42,10 +42,24 @@ class EzygoBatchFetcher {
   final List<Completer<void>> _queue = [];
 
   // Local result cache
+  static const int _maxCacheSize = 50;
   final Map<String, _CacheEntry> _cache = {};
+
+  void _putCache(String key, _CacheEntry entry) {
+    if (_cache.length >= _maxCacheSize) {
+      final now = DateTime.now();
+      _cache.removeWhere((_, value) => now.isAfter(value.expiry));
+      if (_cache.length >= _maxCacheSize) {
+        _cache.remove(_cache.keys.first);
+      }
+    }
+    _cache[key] = entry;
+  }
 
   // Tracker for log throttling
   DateTime? _lastCircuitBreakerLog;
+  final Map<String, DateTime> _lastEndpointCall = {};
+  static const Duration _perEndpointThrottle = Duration(milliseconds: 100);
 
   int _generation = 0;
 
@@ -165,6 +179,16 @@ class EzygoBatchFetcher {
         return postSlotInFlight;
       }
 
+      // 3.6 Per-endpoint Throttling
+      final lastCall = _lastEndpointCall[path];
+      if (lastCall != null) {
+        final elapsed = DateTime.now().difference(lastCall);
+        if (elapsed < _perEndpointThrottle) {
+          await Future<void>.delayed(_perEndpointThrottle - elapsed);
+        }
+      }
+      _lastEndpointCall[path] = DateTime.now();
+
       // 4. Execute the network request
       final requestFuture = _executeRequest(
         path: path,
@@ -183,18 +207,24 @@ class EzygoBatchFetcher {
         if (_generation == startGeneration) {
           if (response.statusCode == 200) {
             // Success cache (Longer)
-            _cache[cacheKey] = _CacheEntry(
-              response: response,
-              expiry: DateTime.now().add(_cacheTtl),
+            _putCache(
+              cacheKey,
+              _CacheEntry(
+                response: response,
+                expiry: DateTime.now().add(_cacheTtl),
+              ),
             );
           } else if (response.statusCode != null &&
               response.statusCode! >= 500) {
             // NEGATIVE CACHE (Circuit Breaker):
             // Remember 5xx failures briefly to prevent Request Storms.
             _setOutage(true);
-            _cache[cacheKey] = _CacheEntry(
-              response: response,
-              expiry: DateTime.now().add(const Duration(seconds: 15)),
+            _putCache(
+              cacheKey,
+              _CacheEntry(
+                response: response,
+                expiry: DateTime.now().add(const Duration(seconds: 15)),
+              ),
             );
           }
         } else {
@@ -212,9 +242,12 @@ class EzygoBatchFetcher {
           _setOutage(true);
           // Short error TTL for transient network issues to recover faster
           if (e.response != null && _generation == startGeneration) {
-            _cache[cacheKey] = _CacheEntry(
-              response: e.response!,
-              expiry: DateTime.now().add(const Duration(seconds: 5)),
+            _putCache(
+              cacheKey,
+              _CacheEntry(
+                response: e.response!,
+                expiry: DateTime.now().add(const Duration(seconds: 5)),
+              ),
             );
           }
         }

@@ -4,23 +4,26 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Lock as LockIcon, Mail, Phone, User } from "lucide-react"; 
+import { Eye, EyeOff, Lock as LockIcon, Mail, Phone, User } from "lucide-react";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 import axios from "@/lib/axios";
-import { AxiosError } from "axios"; 
-import { useCSRFToken } from "@/hooks/use-csrf-token"; 
+import { AxiosError } from "axios";
+import { useCSRFToken } from "@/hooks/use-csrf-token";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { PasswordResetForm } from "./password-reset-form";
-import { motion, HTMLMotionProps, Variants } from "framer-motion";
+import { HTMLMotionProps, motion, Variants } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
 import { logger } from "@/lib/logger";
-import { isAuthSessionMissingError, isSupabaseLockTimeoutError } from "@/lib/security/auth";
+import {
+  isAuthSessionMissingError,
+  isSupabaseLockTimeoutError,
+} from "@/lib/security/auth";
 import { DEFAULT_TARGET_PERCENTAGE } from "@/providers/user-settings";
 import NProgress from "nprogress";
 
@@ -80,7 +83,7 @@ function getLoginMethodAriaLabel(method: LoginMethod): string {
 }
 
 const PASSWORD_VALIDATION = {
-  MIN_LENGTH: 6,  // Conservative (most systems use 6-8)
+  MIN_LENGTH: 6, // Conservative (most systems use 6-8)
   MAX_LENGTH: 128, // Prevent DOS attacks
 } as const;
 
@@ -116,7 +119,7 @@ function clearLocalUserStorage(): void {
 async function verifyActiveSessionAndCleanup(
   supabase: ReturnType<typeof createClient>,
   router: ReturnType<typeof useRouter>,
-  isMounted: boolean
+  isMounted: boolean,
 ): Promise<void> {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
@@ -156,7 +159,10 @@ async function ensureCsrfTokenPreloaded(): Promise<void> {
         setCsrfToken(token);
       }
     } catch (csrfErr) {
-      logger.dev("CSRF pre-fetch failed during login submission; proceeding with default interceptor logic", csrfErr);
+      logger.dev(
+        "CSRF pre-fetch failed during login submission; proceeding with default interceptor logic",
+        csrfErr,
+      );
     }
   }
 }
@@ -164,9 +170,11 @@ async function ensureCsrfTokenPreloaded(): Promise<void> {
 function writeCustomSettingsToStorage(
   supabaseUserId: string,
   settings: NonNullable<SaveTokenData["settings"]>,
-  queryClient: ReturnType<typeof useQueryClient>
+  queryClient: ReturnType<typeof useQueryClient>,
 ): void {
-  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean" ? settings.bunk_calculator_enabled : true;
+  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean"
+    ? settings.bunk_calculator_enabled
+    : true;
   const rawTarget = settings.target_percentage;
 
   let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
@@ -181,13 +189,16 @@ function writeCustomSettingsToStorage(
   const targetValue = targetPercentage.toString();
 
   try {
-    sessionStorage.setItem("prefetchedSettings", JSON.stringify({
-      userId: supabaseUserId,
-      settings: {
-        bunk_calculator_enabled: bunkEnabled,
-        target_percentage: targetPercentage
-      }
-    }));
+    sessionStorage.setItem(
+      "prefetchedSettings",
+      JSON.stringify({
+        userId: supabaseUserId,
+        settings: {
+          bunk_calculator_enabled: bunkEnabled,
+          target_percentage: targetPercentage,
+        },
+      }),
+    );
 
     localStorage.setItem(`showBunkCalc_${supabaseUserId}`, bunkValue);
     localStorage.setItem(`targetPercentage_${supabaseUserId}`, targetValue);
@@ -195,10 +206,12 @@ function writeCustomSettingsToStorage(
     queryClient.setQueryData(["userSettings", supabaseUserId], {
       bunk_calculator_enabled: bunkEnabled,
       target_percentage: targetPercentage,
-      disabled_courses: settings.disabled_courses || []
+      disabled_courses: settings.disabled_courses || [],
     });
   } catch (storageError) {
-    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    const msg = storageError instanceof Error
+      ? storageError.message
+      : String(storageError);
     logger.dev("Failed to write returned settings to storage after login", {
       context: "LoginForm/handleSubmit",
       error: msg,
@@ -211,28 +224,36 @@ function writeDefaultSettingsToStorage(supabaseUserId: string): void {
     localStorage.setItem(`showBunkCalc_${supabaseUserId}`, "true");
     localStorage.setItem(`targetPercentage_${supabaseUserId}`, "75");
   } catch (storageError) {
-    const msg = storageError instanceof Error ? storageError.message : String(storageError);
+    const msg = storageError instanceof Error
+      ? storageError.message
+      : String(storageError);
     logger.dev("Failed to write default settings to storage after login", {
       context: "LoginForm/handleSubmit",
       error: msg,
     });
   }
-  logger.dev("No settings returned from /api/auth/save-token; applied default settings for new user.", {
-    context: "LoginForm/handleSubmit",
-  });
+  logger.dev(
+    "No settings returned from /api/auth/save-token; applied default settings for new user.",
+    {
+      context: "LoginForm/handleSubmit",
+    },
+  );
 }
 
 function persistPrefetchedSettings(
   data: SaveTokenData | undefined,
-  queryClient: ReturnType<typeof useQueryClient>
+  queryClient: ReturnType<typeof useQueryClient>,
 ): void {
   const settings = data?.settings;
   const supabaseUserId = data?.userId ?? null;
 
   if (!supabaseUserId) {
-    logger.error("User ID not returned from save-token; skipping settings prefetch", {
-      context: "LoginForm/handleSubmit",
-    });
+    logger.error(
+      "User ID not returned from save-token; skipping settings prefetch",
+      {
+        context: "LoginForm/handleSubmit",
+      },
+    );
     return;
   }
 
@@ -244,11 +265,11 @@ function persistPrefetchedSettings(
 }
 
 function announceToScreenReader(errorMsg: string): void {
-  if (typeof window !== 'undefined' && document.body) {
-    const announcement = document.createElement('div');
-    announcement.setAttribute('role', 'alert');
-    announcement.setAttribute('aria-live', 'assertive');
-    announcement.className = 'sr-only';
+  if (typeof window !== "undefined" && document.body) {
+    const announcement = document.createElement("div");
+    announcement.setAttribute("role", "alert");
+    announcement.setAttribute("aria-live", "assertive");
+    announcement.className = "sr-only";
     announcement.textContent = errorMsg;
     document.body.appendChild(announcement);
     setTimeout(() => {
@@ -278,21 +299,27 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
   // Initialize CSRF token
   useCSRFToken();
-  
+
   // Create stable Supabase client reference to avoid unnecessary re-renders
   const supabase = useMemo(() => createClient(), []);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const password = e.target.value;
-    
+
     // Update form data
     setFormData({ ...formData, password });
-    
+
     // Real-time validation
-    if (password.length > 0 && password.length < PASSWORD_VALIDATION.MIN_LENGTH) {
-      setPasswordError(`At least ${PASSWORD_VALIDATION.MIN_LENGTH} characters required`);
+    if (
+      password.length > 0 && password.length < PASSWORD_VALIDATION.MIN_LENGTH
+    ) {
+      setPasswordError(
+        `At least ${PASSWORD_VALIDATION.MIN_LENGTH} characters required`,
+      );
     } else if (password.length > PASSWORD_VALIDATION.MAX_LENGTH) {
-      setPasswordError(`No more than ${PASSWORD_VALIDATION.MAX_LENGTH} characters allowed`);
+      setPasswordError(
+        `No more than ${PASSWORD_VALIDATION.MAX_LENGTH} characters allowed`,
+      );
     } else {
       setPasswordError(null);
     }
@@ -317,12 +344,12 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const checkUser = () => {
       void verifyActiveSessionAndCleanup(supabase, router, isMounted);
     };
     checkUser();
-    
+
     return () => {
       isMounted = false;
     };
@@ -344,14 +371,18 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       const response = await axios.post("login", {
         username: formData.username.trim(),
         password: formData.password,
-        stay_logged_in: true
+        stay_logged_in: true,
       });
-      
+
       const token = response.data.access_token || response.data.token;
-      if (!token) throw new Error("Invalid response from server: Access token missing");
+      if (!token) {
+        throw new Error("Invalid response from server: Access token missing");
+      }
 
       // 2. Securely Save Token (Bridge to GhostClass)
-      const saveTokenResponse = await axios.post("/api/auth/save-token", { token }, { baseURL: "/" });
+      const saveTokenResponse = await axios.post("/api/auth/save-token", {
+        token,
+      }, { baseURL: "/" });
 
       // 3. Persist returned user preferences cleanly
       persistPrefetchedSettings(saveTokenResponse.data, queryClient);
@@ -367,27 +398,35 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       } else {
         router.push("/dashboard");
       }
-
     } catch (error) {
       const err = error as AxiosError<ErrorResponse>;
       NProgress.done();
       setIsLoading(false);
-      
+
       let errorMsg = "An unexpected error occurred. Please try again later.";
 
       if (err.config?.url?.includes("save-token")) {
-         errorMsg = "Secure session setup failed. Please try again later. If the issue persists, contact us via the link in the footer.";
-         Sentry.captureException(error, { tags: { type: "auth_bridge_client_error", location: "LoginForm/handleSubmit" } });
+        errorMsg =
+          "Secure session setup failed. Please try again later. If the issue persists, contact us via the link in the footer.";
+        Sentry.captureException(error, {
+          tags: {
+            type: "auth_bridge_client_error",
+            location: "LoginForm/handleSubmit",
+          },
+        });
       } else if (err.response?.status === 401) {
-         errorMsg = "Invalid credentials. Please check your password.";
+        errorMsg = "Invalid credentials. Please check your password.";
       } else if (err.response?.data?.message) {
-         const msg = err.response.data.message;
-         errorMsg = msg === "These credentials do not match our records."
-           ? "These credentials do not match EzyGo records."
-           : msg;
+        const msg = err.response.data.message;
+        errorMsg = msg === "These credentials do not match our records."
+          ? "These credentials do not match EzyGo records."
+          : msg;
       } else if (err.code === "ERR_NETWORK") {
-         errorMsg = "Network error. Please check your connection. If this persists even after some time, kindly contact us using the link in the footer.";
-         Sentry.captureException(error, { tags: { type: "network_error", location: "LoginForm/handleSubmit" } });
+        errorMsg =
+          "Network error. Please check your connection. If this persists even after some time, kindly contact us using the link in the footer.";
+        Sentry.captureException(error, {
+          tags: { type: "network_error", location: "LoginForm/handleSubmit" },
+        });
       }
       setError(errorMsg);
       // Avoid double-announcing password validation/auth errors to screen readers.
@@ -406,7 +445,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: { when: "beforeChildren", staggerChildren: 0.1, duration: 0.3 },
+      transition: {
+        when: "beforeChildren",
+        staggerChildren: 0.1,
+        duration: 0.3,
+      },
     },
   };
 
@@ -415,12 +458,17 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     visible: { y: 0, opacity: 1, transition: { duration: 0.3 } },
   };
 
-  const logoVariants : Variants = {
+  const logoVariants: Variants = {
     hidden: { scale: 0.8, opacity: 0 },
     visible: {
       scale: 1,
       opacity: 1,
-      transition: { type: "spring", stiffness: 400, damping: 10, duration: 0.6 },
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 10,
+        duration: 0.6,
+      },
     },
   };
 
@@ -445,19 +493,18 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     >
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-2">
-          
           {/* Logo Section */}
           <motion.div
-            className="flex flex-col items-center gap-1.5 -mt-8 sm:-mt-10" 
+            className="flex flex-col items-center gap-1.5 -mt-8 sm:-mt-10"
             variants={logoVariants}
           >
             <div className="flex justify-center items-center flex-col">
               <div className="relative w-85 h-30 sm:w-130 sm:h-45 overflow-hidden">
-                <Image 
-                  src="/logo.png" 
+                <Image
+                  src="/logo.png"
                   alt="GhostClass Logo"
                   fill
-                  className="object-contain object-bottom transition-transform group-hover:scale-105" 
+                  className="object-contain object-bottom transition-transform group-hover:scale-105"
                   priority
                   placeholder="blur"
                   blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAC4klEQVR4nO2T3U9SYRzHj5lNXV3IhVFic+vCaTdNL1ytorZmta66OK3sguUFqa14OxxejvCggBw4HOAIIgd8wUilo6IiCgoJCALlarrZvO8foR0Tx5xrXbW1+dk+F8/z3Z7fnu37g6Azzvj/4PPB+dbWvovNzd2X2tuFVVARqigWixUQKwSxlnOYFU/PTqXi0SvDFYFo9H6vyv9AbWAaAADnWCFWiH2o5MkBJz1loIDPr1Zphu+S3iWCDibJ6UjmoSUyyQULXh5gXFyaBrXsMIZhKhmGrCEZkqNm/A1gIcADPh+HpumqIlSs+G3ZAPbACvoQrs8zK1yM5bPx/MFWOLOrVM5EXr71r4hEvvAbhA53qp3RNqUr0oG6Q0/QiZBAMrUsFvuXJDJ66YXCFb6jtkXb1PbITWBfbAJ0uPbwmwwMV+ZIuMZvs91g5mNYonDwNffj5+e5xHdSQcXGRGRqR2xJ51FTmsGM26PKoeyYHE+GFGQio6TW9xS29T2FObmhNub9/frCKDBkHXo8LTDZo02QAExWS/UTjXYTcS9gt3YzHxnncvzL6lpun5oMbr3T6qJOlWZzR6VJ7Wq0qW2dNpPSaTJprD9Z0GjjuwO62L5Ou76vxZLfBrFCVo/lt4a0uTVCl1bZByMtEDDPXDUSgecW44hz2GCb9TrcwfHxT57x6fBrl32ug1AsPDXLl0Q4EkbM8hUZodiQmeUxGY6EpWbZvMwmXUBISUhuka6iFmkCtSKbqB2Nv3dh8ccuEOFClJ6+Tg15xfiAO2jQUAETcOA2wtNjxenbBHDX+wDJoQDFG8GsjV6A80ak1kYvSvG8KM6jUIpnlY40OhSOa6z0kWzuk5AcAMAF6IOMqKcxWyehdAoQifOZCPHc6senWlTGmcsATFazFSxV9VjoyJP3ZflxTWmhsMrdpawjekB9b5eyDobJGhgGF2CYqSwtUKnrx5aqePK+LP/T4v31Vp5xxr/hF2eVnXJoHTJgAAAAAElFTkSuQmCC"
@@ -465,14 +512,14 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                 />
               </div>
             </div>
-            
+
             <p className="text-center text-sm font-medium max-w-80.5 text-muted-foreground/80 -mt-2">
               {"Drop your ezygo credentials - we're just the aesthetic upgrade you deserved."}
             </p>
           </motion.div>
 
           {/* Input Section */}
-          <div className="flex flex-col gap-4 mt-2"> 
+          <div className="flex flex-col gap-4 mt-2">
             <motion.div className="grid gap-2" variants={itemVariants}>
               <div className="flex items-center justify-between">
                 <Label htmlFor="login">
@@ -489,13 +536,21 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                       onClick={() => {
                         setLoginMethod(method);
                         manuallySelectedLoginMethodRef.current =
-                          method === "email" || method === "phone" ? method : null;
+                          method === "email" || method === "phone"
+                            ? method
+                            : null;
                       }}
                       aria-label={getLoginMethodAriaLabel(method)}
                     >
-                      {method === "username" && <User className="h-4 w-4" aria-hidden="true" />}
-                      {method === "email" && <Mail className="h-4 w-4" aria-hidden="true" />}
-                      {method === "phone" && <Phone className="h-4 w-4" aria-hidden="true" />}
+                      {method === "username" && (
+                        <User className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      {method === "email" && (
+                        <Mail className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      {method === "phone" && (
+                        <Phone className="h-4 w-4" aria-hidden="true" />
+                      )}
                     </Button>
                   ))}
                 </div>
@@ -535,11 +590,13 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   value={formData.password}
                   className={cn(
                     "custom-input dark:bg-secondary/10 dark:border-white/10 focus:border-primary/50 transition-colors",
-                    passwordError && "border-red-500/50 focus:border-red-500"
+                    passwordError && "border-red-500/50 focus:border-red-500",
                   )}
                   onChange={handlePasswordChange}
                   aria-invalid={!!passwordError}
-                  aria-describedby={passwordError ? "password-error" : undefined}
+                  aria-describedby={passwordError
+                    ? "password-error"
+                    : undefined}
                 />
 
                 <Button
@@ -550,19 +607,25 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 opacity-70" aria-hidden="true" />
-                  ) : (
-                    <Eye className="h-5 w-5 opacity-70" aria-hidden="true" />
-                  )}
+                  {showPassword
+                    ? (
+                      <EyeOff
+                        className="h-5 w-5 opacity-70"
+                        aria-hidden="true"
+                      />
+                    )
+                    : <Eye className="h-5 w-5 opacity-70" aria-hidden="true" />}
                 </Button>
               </div>
             </motion.div>
 
             {passwordError && (
-                  <p id="password-error" className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    {passwordError}
-                  </p>
+              <p
+                id="password-error"
+                className="text-xs text-red-600 dark:text-red-400 mt-1"
+              >
+                {passwordError}
+              </p>
             )}
 
             <motion.div variants={itemVariants}>
@@ -595,11 +658,14 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
               Ghosts don&apos;t snoop 😁
             </span>
           </div>
-          
+
           <p className="text-xs text-muted-foreground/80 max-w-[320px] leading-relaxed text-center italic">
-            Your <span className="text-foreground font-medium">EzyGo</span> password is safe. 
-            We strictly <span className="text-foreground font-medium">do not read, store, or share</span> your login password. 
-            GhostClass is just here to help you skip. 👻
+            Your <span className="text-foreground font-medium">EzyGo</span>{" "}
+            password is safe. We strictly{" "}
+            <span className="text-foreground font-medium">
+              do not read, store, or share
+            </span>{" "}
+            your login password. GhostClass is just here to help you skip. 👻
           </p>
         </div>
       </form>

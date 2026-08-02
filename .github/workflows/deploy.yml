@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Fetch CI secrets from Infisical
         if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
@@ -37,9 +37,9 @@ jobs:
         continue-on-error: true
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520
         with:
-          version: 2.98.2
+          version: 2.111.0
 
       - name: Link Project
         env:
@@ -69,12 +69,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: "24.14.1"
+          node-version: "24.18.1"
 
       - name: Fetch build-time variables from Infisical (Unmasked)
         if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''

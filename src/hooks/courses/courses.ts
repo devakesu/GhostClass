@@ -9,18 +9,18 @@ import { retryOnce } from "@/lib/query-utils";
 /**
  * React Query hook for fetching user's enrolled courses with student data.
  * Returns courses in a normalized object format keyed by course ID.
- * 
+ *
  * @param options - Optional configuration object
  * @param options.enabled - Whether the query should run (default: true)
  * @param options.initialData - Initial data to hydrate the query (from SSR)
  * @returns Query result with courses object
- * 
+ *
  * Query Configuration:
  * - Auto-refetch: Every 60 seconds
  * - Window focus refetch: Enabled
  * - Stale time: 30 seconds
  * - Cache time: 5 minutes
- * 
+ *
  * @example
  * ```tsx
  * const { data, isLoading } = useFetchCourses();
@@ -47,7 +47,7 @@ export const useFetchCourses = (options?: {
             acc[course.id.toString()] = course;
             return acc;
           },
-          {}
+          {},
         ),
       };
 

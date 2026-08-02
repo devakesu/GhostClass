@@ -5,22 +5,24 @@
  * the protected layout is fetching data. We verify it mounts without
  * errors and delegates rendering to the underlying component.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 
-vi.mock('@/components/loading', () => ({
-  Loading: () => <div role="status" aria-label="Loading content">Loading...</div>,
+vi.mock("@/components/loading", () => ({
+  Loading: () => (
+    <div role="status" aria-label="Loading content">Loading...</div>
+  ),
 }));
 
-import ProtectedLoading from '../loading';
+import ProtectedLoading from "../loading";
 
-describe('ProtectedLoading', () => {
-  it('renders the Loading component', () => {
+describe("ProtectedLoading", () => {
+  it("renders the Loading component", () => {
     render(<ProtectedLoading />);
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it('renders without crashing', () => {
+  it("renders without crashing", () => {
     expect(() => render(<ProtectedLoading />)).not.toThrow();
   });
 });

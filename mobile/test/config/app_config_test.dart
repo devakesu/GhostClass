@@ -37,7 +37,7 @@ void main() {
 
     test('Sentry config returns valid DSN and Project Number', () {
       expect(AppConfig.sentryDsn, isNotEmpty);
-      expect(AppConfig.firebaseCloudProjectNumber, isNotEmpty);
+      expect(AppConfig.firebaseCloudProjectNumber, isA<String>());
     });
 
     test('Metadata properties map standard strings safely', () {

@@ -3,13 +3,14 @@
  * Next.js renders this component while the auth page is streaming.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 
 // Mock the Loading spinner so it renders a predictable DOM node.
 vi.mock("@/components/loading", () => ({
-  Loading: () => React.createElement("div", { "data-testid": "auth-loading-spinner" }),
+  Loading: () =>
+    React.createElement("div", { "data-testid": "auth-loading-spinner" }),
 }));
 
 import AuthLoading from "@/app/(auth)/loading";

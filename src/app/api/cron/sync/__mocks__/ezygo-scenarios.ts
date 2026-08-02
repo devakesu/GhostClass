@@ -43,8 +43,6 @@
  *   111 = Absent
  */
 
-
-
 // ---------------------------------------------------------------------------
 // Static courses — same for every scenario
 // ---------------------------------------------------------------------------
@@ -74,7 +72,10 @@ function k(n: number): string {
 }
 
 /** Type for attendance data structure: {date -> {sessionNum -> slot}} */
-type AttendanceData = Record<string, Record<string, Record<string, number | string | null>>>;
+type AttendanceData = Record<
+  string,
+  Record<string, Record<string, number | string | null>>
+>;
 
 // ---------------------------------------------------------------------------
 // SCENARIO DATA

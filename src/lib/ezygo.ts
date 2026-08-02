@@ -3,7 +3,7 @@ import { logger } from "./logger";
 /**
  * Helper to safely parse EzyGo responses as JSON.
  * Standardizes strict parsing logic across sync.ts and ezygo-batch-fetcher.ts.
- * 
+ *
  * @param res - The Response object to parse
  * @returns Parsed JSON value, raw text fallback, or null on failure
  */
@@ -17,7 +17,10 @@ export async function safeEzygoJson<T>(res: Response): Promise<T | null> {
     } catch (parseError) {
       // EzyGo occasionally returns naked (non-JSON) strings.
       // Preserve this legacy behavior for callers that can handle text payloads.
-      logger.dev("[ezygo] safeEzygoJson fallback to raw text payload", parseError);
+      logger.dev(
+        "[ezygo] safeEzygoJson fallback to raw text payload",
+        parseError,
+      );
       return text as unknown as T;
     }
   } catch (err) {

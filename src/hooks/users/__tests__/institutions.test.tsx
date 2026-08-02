@@ -1,6 +1,11 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useInstitutions, useDefaultInstitute, useDefaultInstitutionUser, useUpdateDefaultInstitutionUser } from "../institutions";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  useDefaultInstitute,
+  useDefaultInstitutionUser,
+  useInstitutions,
+  useUpdateDefaultInstitutionUser,
+} from "../institutions";
 import axiosInstance from "@/lib/axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -60,16 +65,22 @@ describe("institutions hooks", () => {
         wrapper: createWrapper(queryClient),
       });
       await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error?.message).toBe("Failed to fetch institutions");
+      expect(result.current.error?.message).toBe(
+        "Failed to fetch institutions",
+      );
     });
 
     it("should throw if no student institutions found", async () => {
-      (axiosInstance.get as any).mockResolvedValueOnce({ data: [{ id: 2, institution_role: { name: "staff" } }] });
+      (axiosInstance.get as any).mockResolvedValueOnce({
+        data: [{ id: 2, institution_role: { name: "staff" } }],
+      });
       const { result } = renderHook(() => useInstitutions(), {
         wrapper: createWrapper(queryClient),
       });
       await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error?.message).toBe("No student institutions found");
+      expect(result.current.error?.message).toBe(
+        "No student institutions found",
+      );
     });
   });
 
@@ -95,13 +106,15 @@ describe("institutions hooks", () => {
   describe("useDefaultInstitutionUser", () => {
     it("should fetch and auto-correct if default is not a student institution", async () => {
       const studentInst = { id: 10, institution_role: { name: "student" } };
-      
+
       // First, useInstitutions is called (internally)
       // We need to mock useQuery behavior or pre-populate cache
       queryClient.setQueryData(["institutions"], [studentInst]);
-      
+
       (axiosInstance.get as any).mockResolvedValueOnce({ data: 20 }); // Current default is 20
-      (axiosInstance.post as any).mockResolvedValueOnce({ data: { success: true } }); // Update called
+      (axiosInstance.post as any).mockResolvedValueOnce({
+        data: { success: true },
+      }); // Update called
 
       const { result } = renderHook(() => useDefaultInstitutionUser(), {
         wrapper: createWrapper(queryClient),
@@ -127,83 +140,90 @@ describe("institutions hooks", () => {
     });
 
     it("should throw if fetch fails", async () => {
-        queryClient.setQueryData(["institutions"], [{ id: 1 }]);
-        (axiosInstance.get as any).mockResolvedValueOnce(null);
+      queryClient.setQueryData(["institutions"], [{ id: 1 }]);
+      (axiosInstance.get as any).mockResolvedValueOnce(null);
 
-        const { result } = renderHook(() => useDefaultInstitutionUser(), {
-            wrapper: createWrapper(queryClient),
-        });
+      const { result } = renderHook(() => useDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
+      });
 
-        await waitFor(() => expect(result.current.isError).toBe(true));
+      await waitFor(() => expect(result.current.isError).toBe(true));
     });
   });
 
   describe("useUpdateDefaultInstitutionUser", () => {
-      it("should update and invalidate queries", async () => {
-          (axiosInstance.post as any).mockResolvedValueOnce({ data: { success: true } });
-          const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    it("should update and invalidate queries", async () => {
+      (axiosInstance.post as any).mockResolvedValueOnce({
+        data: { success: true },
+      });
+      const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-          const { result } = renderHook(() => useUpdateDefaultInstitutionUser(), {
-              wrapper: createWrapper(queryClient),
-          });
-
-          await act(async () => {
-              await result.current.mutateAsync(123);
-          });
-
-          expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["defaultInstitutionUser"] });
-          expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user"] });
+      const { result } = renderHook(() => useUpdateDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
       });
 
-      it("should throw if response is null", async () => {
-          (axiosInstance.post as any).mockResolvedValueOnce(null);
-          const { result } = renderHook(() => useUpdateDefaultInstitutionUser(), {
-              wrapper: createWrapper(queryClient),
-          });
-          await act(async () => {
-              try {
-                  await result.current.mutateAsync(123);
-              } catch {
-                  // expected to throw
-              }
-          });
-          await waitFor(() => expect(result.current.isError).toBe(true));
+      await act(async () => {
+        await result.current.mutateAsync(123);
       });
 
-      it("should handle case where no institutions are found for auto-correction", async () => {
-          queryClient.setQueryData(["institutions"], []);
-          (axiosInstance.get as any).mockResolvedValueOnce({ data: 20 });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ["defaultInstitutionUser"],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user"] });
+    });
 
-          const { result } = renderHook(() => useDefaultInstitutionUser(), {
-              wrapper: createWrapper(queryClient),
-          });
+    it("should throw if response is null", async () => {
+      (axiosInstance.post as any).mockResolvedValueOnce(null);
+      const { result } = renderHook(() => useUpdateDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
+      });
+      await act(async () => {
+        try {
+          await result.current.mutateAsync(123);
+        } catch {
+          // expected to throw
+        }
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+    });
 
-          await waitFor(() => expect(result.current.isSuccess).toBe(true));
-          expect(result.current.data).toBe(20);
+    it("should handle case where no institutions are found for auto-correction", async () => {
+      queryClient.setQueryData(["institutions"], []);
+      (axiosInstance.get as any).mockResolvedValueOnce({ data: 20 });
+
+      const { result } = renderHook(() => useDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
       });
 
-      it("should handle case where default institution user is null", async () => {
-          queryClient.setQueryData(["institutions"], [{ id: 10, institution_role: { name: "student" } }]);
-          (axiosInstance.get as any).mockResolvedValueOnce({ data: null });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toBe(20);
+    });
 
-          const { result } = renderHook(() => useDefaultInstitutionUser(), {
-              wrapper: createWrapper(queryClient),
-          });
+    it("should handle case where default institution user is null", async () => {
+      queryClient.setQueryData(["institutions"], [{
+        id: 10,
+        institution_role: { name: "student" },
+      }]);
+      (axiosInstance.get as any).mockResolvedValueOnce({ data: null });
 
-          await waitFor(() => expect(result.current.isSuccess).toBe(true));
-          expect(result.current.data).toBeNull();
+      const { result } = renderHook(() => useDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
       });
 
-      it("should handle case where institutions array contains a null element", async () => {
-          queryClient.setQueryData(["institutions"], [null]);
-          (axiosInstance.get as any).mockResolvedValueOnce({ data: 20 });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toBeNull();
+    });
 
-          const { result } = renderHook(() => useDefaultInstitutionUser(), {
-              wrapper: createWrapper(queryClient),
-          });
+    it("should handle case where institutions array contains a null element", async () => {
+      queryClient.setQueryData(["institutions"], [null]);
+      (axiosInstance.get as any).mockResolvedValueOnce({ data: 20 });
 
-          await waitFor(() => expect(result.current.isSuccess).toBe(true));
-          expect(result.current.data).toBe(20);
+      const { result } = renderHook(() => useDefaultInstitutionUser(), {
+        wrapper: createWrapper(queryClient),
       });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toBe(20);
+    });
   });
 });

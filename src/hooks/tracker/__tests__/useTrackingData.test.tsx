@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
-vi.unmock('@/hooks/tracker/useTrackingData')
-import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.unmock("@/hooks/tracker/useTrackingData");
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useTrackingData } from "../useTrackingData";
 import { createClient } from "@/lib/supabase/client";
 import { useFetchAcademicYear, useFetchSemester } from "../../users/settings";
@@ -58,7 +58,9 @@ describe("useTrackingData", () => {
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
-              order: vi.fn(() => Promise.resolve({ data: [{ id: 1 }], error: null })),
+              order: vi.fn(() =>
+                Promise.resolve({ data: [{ id: 1 }], error: null })
+              ),
             })),
           })),
         })),
@@ -74,8 +76,10 @@ describe("useTrackingData", () => {
   });
 
   it("should fetch tracking data successfully", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
-    
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
+
     const { result } = renderHook(() => useTrackingData(mockUser), {
       wrapper: createWrapper(),
     });
@@ -86,19 +90,26 @@ describe("useTrackingData", () => {
   });
 
   it("should respect options override", async () => {
-     mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
-     
-     const { result } = renderHook(() => useTrackingData(mockUser, { semester: "2", year: "2024" }), {
-       wrapper: createWrapper(),
-     });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
 
-     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-     // We can't easily check the nested calls without more complex spies, 
-     // but the key will change and triggers a re-fetch.
+    const { result } = renderHook(
+      () => useTrackingData(mockUser, { semester: "2", year: "2024" }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // We can't easily check the nested calls without more complex spies,
+    // but the key will change and triggers a re-fetch.
   });
 
   it("should return [] if no session", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: null },
+    });
 
     const { result } = renderHook(() => useTrackingData(mockUser), {
       wrapper: createWrapper(),
@@ -109,7 +120,9 @@ describe("useTrackingData", () => {
   });
 
   it("should be disabled if semester or year missing", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
     (useFetchSemester as any).mockReturnValue({ data: null });
 
     const { result } = renderHook(() => useTrackingData(mockUser), {
@@ -120,15 +133,19 @@ describe("useTrackingData", () => {
   });
 
   it("should handle error and capture exception", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
     const mockError = { message: "DB Error" };
-    
+
     mockSupabase.from.mockReturnValueOnce({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
-              order: vi.fn(() => Promise.resolve({ data: null, error: mockError })),
+              order: vi.fn(() =>
+                Promise.resolve({ data: null, error: mockError })
+              ),
             })),
           })),
         })),
@@ -146,22 +163,29 @@ describe("useTrackingData", () => {
   });
 
   it("should handle error without user id", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
     mockSupabase.from.mockReturnValueOnce({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
-              order: vi.fn(() => Promise.resolve({ data: null, error: { message: "err" } })),
+              order: vi.fn(() =>
+                Promise.resolve({ data: null, error: { message: "err" } })
+              ),
             })),
           })),
         })),
       })),
     } as any);
 
-    const { result } = renderHook(() => useTrackingData({ username: "u" } as any), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useTrackingData({ username: "u" } as any),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
@@ -172,9 +196,12 @@ describe("useTrackingData", () => {
     });
     expect(result.current.fetchStatus).toBe("idle");
 
-    const { result: result2 } = renderHook(() => useTrackingData(mockUser, { enabled: false }), {
-      wrapper: createWrapper(),
-    });
+    const { result: result2 } = renderHook(
+      () => useTrackingData(mockUser, { enabled: false }),
+      {
+        wrapper: createWrapper(),
+      },
+    );
     expect(result2.current.fetchStatus).toBe("idle");
   });
 });

@@ -1,26 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  ArrowRight,
   Calendar,
+  CheckCircle2,
   Clock,
   FileText,
-  CheckCircle2,
-  XCircle,
-  ArrowRight,
   User,
+  XCircle,
 } from "lucide-react";
-import {
-  useFetchSemester,
-  useFetchAcademicYear,
-} from "@/hooks/users/settings";
+import { useFetchAcademicYear, useFetchSemester } from "@/hooks/users/settings";
 import { ServiceErrorView } from "@/components/service-error-view";
 import { cn } from "@/lib/utils";
 
@@ -73,8 +65,7 @@ const STATUS_MAP: Record<string, StatusInfo> = {
   },
   recommend: {
     label: "Recommended",
-    color:
-      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
     icon: ArrowRight,
   },
 };
@@ -90,7 +81,7 @@ const normalizeActionType = (type?: string | null): string => {
   return t;
 };
 
-const isActed = (a: LeaveApprover) => 
+const isActed = (a: LeaveApprover) =>
   (a.action_at !== null && a.action_at !== undefined && a.action_at !== "") ||
   (a.action_by !== null && a.action_by !== undefined && a.action_by !== "") ||
   (a.action_by_user !== null && a.action_by_user !== undefined);
@@ -113,7 +104,7 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
 
   // If any level has rejected, the entire leave is immediately Rejected
   const hasRejected = approvers.some(
-    (a) => normalizeActionType(a.action_type) === "reject" && isActed(a)
+    (a) => normalizeActionType(a.action_type) === "reject" && isActed(a),
   );
   if (hasRejected) {
     return STATUS_MAP.reject;
@@ -126,7 +117,8 @@ const getLeaveStatus = (approvers?: LeaveApprover[] | null): StatusInfo => {
     })
     .sort(
       (a, b) =>
-        new Date(b.updated_at || "").getTime() - new Date(a.updated_at || "").getTime()
+        new Date(b.updated_at || "").getTime() -
+        new Date(a.updated_at || "").getTime(),
     );
 
   if (actedApprovers.length === 0) return defaultStatus;
@@ -210,17 +202,26 @@ function WorkflowHistoryItem({ approver }: { approver: LeaveApprover }) {
   return (
     <div className="flex items-center gap-3 border-b border-border/20 pb-1.5 last:border-0 last:pb-0">
       <span className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground/80 dark:text-white/70 font-medium">
-        <span className={cn("h-5 w-5 rounded-full flex items-center justify-center shrink-0", styles.bg)}>
+        <span
+          className={cn(
+            "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
+            styles.bg,
+          )}
+        >
           <User className={cn("h-3 w-3", styles.text)} />
         </span>
         <span className="min-w-0 truncate leading-tight">
-          {approver.action_by_user?.first_name} {approver.action_by_user?.last_name}
+          {approver.action_by_user?.first_name}{" "}
+          {approver.action_by_user?.last_name}
         </span>
       </span>
       <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
         <Badge
           variant="outline"
-          className={cn("text-[9px] uppercase tracking-tighter px-1.5 py-0 h-4 border-none font-bold", statusInfo.color)}
+          className={cn(
+            "text-[9px] uppercase tracking-tighter px-1.5 py-0 h-4 border-none font-bold",
+            statusInfo.color,
+          )}
         >
           {statusInfo.label}
         </Badge>
@@ -233,7 +234,9 @@ function WorkflowHistoryItem({ approver }: { approver: LeaveApprover }) {
   );
 }
 
-function WorkflowHistory({ approvers }: { approvers?: LeaveApprover[] | null }) {
+function WorkflowHistory(
+  { approvers }: { approvers?: LeaveApprover[] | null },
+) {
   const validApprovers = useMemo(() => {
     if (!approvers) return [];
     return [...approvers]
@@ -243,7 +246,7 @@ function WorkflowHistory({ approvers }: { approvers?: LeaveApprover[] | null }) 
           (item) =>
             item.action_by === current.action_by &&
             item.action_type === current.action_type &&
-            item.action_at === current.action_at
+            item.action_at === current.action_at,
         );
         if (!isDuplicate) acc.push(current);
         return acc;
@@ -251,7 +254,7 @@ function WorkflowHistory({ approvers }: { approvers?: LeaveApprover[] | null }) 
       .sort(
         (a, b) =>
           new Date(b.updated_at || "").getTime() -
-          new Date(a.updated_at || "").getTime()
+          new Date(a.updated_at || "").getTime(),
       );
   }, [approvers]);
 
@@ -310,26 +313,35 @@ interface LeaveInitialData {
   [key: string]: unknown;
 }
 
-function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSession[] }) {
+function LeaveCard(
+  { leave, sessions }: { leave: LeaveItem; sessions: LeaveSession[] },
+) {
   const status = getLeaveStatus(leave.approvers);
   const StatusIcon = status.icon;
 
   const dateRangeStr = useMemo(() => {
-    const uniqueDates = [...new Set(sessions.map((s) => s.date).filter(Boolean))];
+    const uniqueDates = [
+      ...new Set(sessions.map((s) => s.date).filter(Boolean)),
+    ];
     if (uniqueDates.length === 0) return "N/A";
     if (uniqueDates.length === 1) return formatDate(uniqueDates[0] as string);
-    return `${formatDate(uniqueDates[0] as string)} - ${formatDate(
-      uniqueDates[uniqueDates.length - 1] as string
-    )}`;
+    return `${formatDate(uniqueDates[0] as string)} - ${
+      formatDate(
+        uniqueDates[uniqueDates.length - 1] as string,
+      )
+    }`;
   }, [sessions]);
 
-    return (
-      <Card className="custom-container w-full min-w-0 overflow-hidden hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
-        <CardHeader className="px-4 sm:px-6 pb-3 border-b border-border/30 dark:border-white/5">
+  return (
+    <Card className="custom-container w-full min-w-0 overflow-hidden hover:border-border dark:hover:border-white/20 transition-all duration-300 flex flex-col">
+      <CardHeader className="px-4 sm:px-6 pb-3 border-b border-border/30 dark:border-white/5">
         <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-start sm:justify-between">
           <Badge
             variant="outline"
-            className={cn("flex w-fit max-w-full gap-1.5 items-center whitespace-normal break-words", status.color)}
+            className={cn(
+              "flex w-fit max-w-full gap-1.5 items-center whitespace-normal break-words",
+              status.color,
+            )}
           >
             <StatusIcon className="h-3.5 w-3.5" />
             {status.label}
@@ -349,7 +361,7 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
         )}
       </CardHeader>
 
-        <CardContent className="px-4 sm:px-6 py-4 space-y-5 text-sm min-w-0">
+      <CardContent className="px-4 sm:px-6 py-4 space-y-5 text-sm min-w-0">
         <div className="grid grid-cols-1 gap-4 text-muted-foreground sm:grid-cols-2">
           <div className="min-w-0">
             <span className="block text-[11px] sm:text-xs uppercase tracking-wider opacity-80 dark:opacity-60 mb-1 font-semibold dark:font-normal">
@@ -368,7 +380,10 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
             </span>
             <div className="flex items-start gap-1.5 text-foreground/80 dark:text-white/80 min-w-0">
               <Clock className="h-3.5 w-3.5" />
-              <span className="min-w-0 break-words leading-tight" title={dateRangeStr}>
+              <span
+                className="min-w-0 break-words leading-tight"
+                title={dateRangeStr}
+              >
                 {dateRangeStr}
               </span>
             </div>
@@ -415,7 +430,10 @@ function LeaveCard({ leave, sessions }: { leave: LeaveItem; sessions: LeaveSessi
                   className="flex min-w-0 flex-wrap items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 max-w-full"
                 >
                   <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="min-w-0 flex-1 break-words text-xs text-indigo-700 dark:text-indigo-200 font-medium dark:font-normal" title={file.file_name}>
+                  <span
+                    className="min-w-0 flex-1 break-words text-xs text-indigo-700 dark:text-indigo-200 font-medium dark:font-normal"
+                    title={file.file_name}
+                  >
                     {file.file_name}
                   </span>
                   <span className="text-[10px] text-indigo-500/80 dark:text-indigo-400/60 shrink-0 font-medium dark:font-normal whitespace-nowrap sm:ml-auto">
@@ -448,7 +466,7 @@ export default function LeaveClient({
     return rawLeaves.filter(
       (leave) =>
         leave.usersubgroup?.academic_semester === semesterData &&
-        leave.usersubgroup?.academic_year === academicYearData
+        leave.usersubgroup?.academic_year === academicYearData,
     );
   }, [initialData, semesterData, academicYearData]);
 
@@ -458,12 +476,15 @@ export default function LeaveClient({
     () =>
       leaves.filter((l) => getLeaveStatus(l.approvers).label === "Approved")
         .length,
-    [leaves]
+    [leaves],
   );
 
   if (!initialData) {
     return (
-      <ServiceErrorView title="Leave Data Sync Unavailable" onRetry={() => {}} />
+      <ServiceErrorView
+        title="Leave Data Sync Unavailable"
+        onRetry={() => {}}
+      />
     );
   }
 
@@ -497,27 +518,29 @@ export default function LeaveClient({
         </Card>
       </div>
 
-      {leaves.length === 0 ? (
-        <Card className="bg-muted/30 dark:bg-black/20 border border-border/50 dark:border-white/5 rounded-xl p-12 text-center border-dashed">
-          <div className="flex flex-col items-center justify-center space-y-3 text-muted-foreground">
-            <FileText className="h-12 w-12 opacity-20" />
-            <p className="text-lg">No leave applications found.</p>
-            <p className="text-sm opacity-70">
-              You haven&apos;t applied for any leaves through EzyGo yet.
-            </p>
+      {leaves.length === 0
+        ? (
+          <Card className="bg-muted/30 dark:bg-black/20 border border-border/50 dark:border-white/5 rounded-xl p-12 text-center border-dashed">
+            <div className="flex flex-col items-center justify-center space-y-3 text-muted-foreground">
+              <FileText className="h-12 w-12 opacity-20" />
+              <p className="text-lg">No leave applications found.</p>
+              <p className="text-sm opacity-70">
+                You haven&apos;t applied for any leaves through EzyGo yet.
+              </p>
+            </div>
+          </Card>
+        )
+        : (
+          <div className="grid gap-6 md:grid-cols-2">
+            {leaves.map((leave) => (
+              <LeaveCard
+                key={leave.id}
+                leave={leave}
+                sessions={allSessions[leave.id] || []}
+              />
+            ))}
           </div>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {leaves.map((leave) => (
-            <LeaveCard
-              key={leave.id}
-              leave={leave}
-              sessions={allSessions[leave.id] || []}
-            />
-          ))}
-        </div>
-      )}
+        )}
     </div>
   );
 }

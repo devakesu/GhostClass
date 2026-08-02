@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { decrypt, encrypt } from "@/lib/crypto";
 import { normalizeSession, toRoman } from "@/lib/utils";
 import { egressFetch, redact } from "@/lib/utils.server";
 import { z } from "zod";
@@ -101,7 +101,7 @@ interface RevisionClassProps {
   dashboardUrl: string;
 }
 
-type EmailTask = 
+type EmailTask =
   | { type: "conflict"; props: AttendanceConflictProps }
   | { type: "mismatch"; props: CourseMismatchProps }
   | { type: "revision"; props: RevisionClassProps };
@@ -110,36 +110,57 @@ function createEmptyStats(): SyncStats {
   return { processed: 0, deletions: 0, conflicts: 0, updates: 0, errors: 0 };
 }
 
-async function handleAuthentication(req: Request, authType: string): Promise<{ isCron: boolean; errorResponse?: NextResponse }> {
+function handleAuthentication(
+  req: Request,
+  authType: string,
+): { isCron: boolean; errorResponse?: NextResponse } {
   const authHeader = req.headers.get("authorization");
   const isMobile = authType === "app-check";
 
   if (authHeader !== null && !isMobile) {
     if (!authHeader.startsWith("Bearer ")) {
-      return { isCron: false, errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 403 }) };
+      return {
+        isCron: false,
+        errorResponse: NextResponse.json({ error: "Unauthorized" }, {
+          status: 403,
+        }),
+      };
     }
     const providedSecret = authHeader.slice("Bearer ".length);
     const cronSecret = process.env.CRON_SECRET ?? "";
     const providedBuf = Buffer.from(providedSecret, "utf8");
     const cronBuf = Buffer.from(cronSecret, "utf8");
 
-    if (cronBuf.length > 0 && providedBuf.length === cronBuf.length && crypto.timingSafeEqual(providedBuf, cronBuf)) {
+    if (
+      cronBuf.length > 0 && providedBuf.length === cronBuf.length &&
+      crypto.timingSafeEqual(providedBuf, cronBuf)
+    ) {
       return { isCron: true };
     }
-    return { isCron: false, errorResponse: NextResponse.json({ error: "Unauthorized" }, { status: 403 }) };
+    return {
+      isCron: false,
+      errorResponse: NextResponse.json({ error: "Unauthorized" }, {
+        status: 403,
+      }),
+    };
   }
   return { isCron: false };
 }
 
-async function fetchEzygoResource(path: string, token: string, method: string = "GET", body?: unknown): Promise<Response> {
+async function fetchEzygoResource(
+  path: string,
+  token: string,
+  method: string = "GET",
+  body?: unknown,
+): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     return await egressFetch(path, {
       method,
-      headers: { 
+      headers: {
         Authorization: `Bearer ${token}`,
-        ...(body ? { "content-type": "application/json" } : {})
+        ...(body ? { "content-type": "application/json" } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
@@ -152,21 +173,37 @@ async function fetchEzygoResource(path: string, token: string, method: string = 
 async function getValidTokenAndAttendance(
   user: UserSyncData,
   isCron: boolean,
-  supabaseAdmin: ReturnType<typeof getAdminClient>
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<{ token: string; officialData: OfficialAttendanceData }> {
-  let decryptedToken = decrypt({ iv: user.ezygo_iv, content: user.ezygo_token });
+  let decryptedToken = decrypt({
+    iv: user.ezygo_iv,
+    content: user.ezygo_token,
+  });
   if (!decryptedToken) throw new Error("Decryption failed");
 
-  let attRes = await fetchEzygoResource("attendancereports/student/detailed", decryptedToken, "POST", {});
-  
+  let attRes = await fetchEzygoResource(
+    "attendancereports/student/detailed",
+    decryptedToken,
+    "POST",
+    {},
+  );
+
   if (attRes.status === 401 && !isCron) {
     const cookieToken = await getAuthTokenServer();
     if (cookieToken && cookieToken !== decryptedToken) {
-      attRes = await fetchEzygoResource("attendancereports/student/detailed", cookieToken, "POST", {});
+      attRes = await fetchEzygoResource(
+        "attendancereports/student/detailed",
+        cookieToken,
+        "POST",
+        {},
+      );
       if (attRes.ok) {
         decryptedToken = cookieToken;
         const { iv, content } = encrypt(decryptedToken);
-        await supabaseAdmin.from("users").update({ ezygo_token: content, ezygo_iv: iv }).eq("auth_id", user.auth_id);
+        await supabaseAdmin.from("users").update({
+          ezygo_token: content,
+          ezygo_iv: iv,
+        }).eq("auth_id", user.auth_id);
       }
     }
   }
@@ -175,28 +212,38 @@ async function getValidTokenAndAttendance(
 
   const attData = await attRes.json();
   const officialDataRaw = attData?.studentAttendanceData;
-  const normalizedOfficial = Array.isArray(officialDataRaw) && officialDataRaw.length === 0 ? {} : officialDataRaw;
-  const officialParse = OfficialAttendanceDataSchema.safeParse(normalizedOfficial);
+  const normalizedOfficial =
+    Array.isArray(officialDataRaw) && officialDataRaw.length === 0
+      ? {}
+      : officialDataRaw;
+  const officialParse = OfficialAttendanceDataSchema.safeParse(
+    normalizedOfficial,
+  );
   if (!officialParse.success) throw new Error("Invalid attendance data shape");
 
   return { token: decryptedToken, officialData: officialParse.data };
 }
 
-function buildOfficialMap(officialData: OfficialAttendanceData): Map<string, OfficialSlotInfo> {
+function buildOfficialMap(
+  officialData: OfficialAttendanceData,
+): Map<string, OfficialSlotInfo> {
   const officialMap = new Map<string, OfficialSlotInfo>();
   Object.entries(officialData).forEach(([dateStr, sessionsObj]) => {
     const normDate = dateStr.replace(/-/g, "");
     Object.entries(sessionsObj).forEach(([slotKey, slot], idx) => {
       if (slot.attendance == null || slot.course == null) return;
-      
+
       let rawSession: string | number = slot.session ?? "";
-      const isNumericId = (s: unknown) => !isNaN(parseInt(String(s))) && parseInt(String(s)) > 20;
+      const isNumericId = (s: unknown) =>
+        !isNaN(parseInt(String(s))) && parseInt(String(s)) > 20;
       if (!rawSession || rawSession === "null" || isNumericId(rawSession)) {
         const skNum = parseInt(String(slotKey), 10);
         rawSession = (!isNaN(skNum) && skNum < 20) ? slotKey : String(idx + 1);
       }
-      
-      const romanSession = toRoman(parseInt(normalizeSession(rawSession)) || String(rawSession));
+
+      const romanSession = toRoman(
+        parseInt(normalizeSession(rawSession)) || String(rawSession),
+      );
       officialMap.set(`${normDate}|${romanSession}`, {
         attendance: Number(slot.attendance),
         course: String(slot.course),
@@ -215,15 +262,17 @@ function handleRevisionClass(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
-  dashboardUrl: string
+  dashboardUrl: string,
 ): void {
   toDelete.add(item.id);
   if (item.status === "extra") {
-    const courseName = courseMap.get(String(item.course)) || String(item.course);
+    const courseName = courseMap.get(String(item.course)) ||
+      String(item.course);
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Revision Class — Not Counted 📚",
-      description: `Manual entry for ${courseName} on ${item.date} (Session ${item.session}) removed as official slot is a Revision class.`,
+      description:
+        `Manual entry for ${courseName} on ${item.date} (Session ${item.session}) removed as official slot is a Revision class.`,
       topic: `revision-${key}`,
     });
     emails.push({
@@ -248,16 +297,22 @@ function handleCourseMismatch(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
-  dashboardUrl: string
+  dashboardUrl: string,
 ): boolean {
-  if (item.status === "extra" && String(item.course) !== String(officialEntry.course)) {
+  if (
+    item.status === "extra" &&
+    String(item.course) !== String(officialEntry.course)
+  ) {
     toDelete.add(item.id);
-    const manualCourse = courseMap.get(String(item.course)) || String(item.course);
-    const officialCourse = courseMap.get(officialEntry.course) || officialEntry.course;
+    const manualCourse = courseMap.get(String(item.course)) ||
+      String(item.course);
+    const officialCourse = courseMap.get(officialEntry.course) ||
+      officialEntry.course;
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Course Mismatch 💀",
-      description: `Course mismatch on ${item.date} (Session ${item.session}). Manual: ${manualCourse}, Official: ${officialCourse}.`,
+      description:
+        `Course mismatch on ${item.date} (Session ${item.session}). Manual: ${manualCourse}, Official: ${officialCourse}.`,
       topic: `conflict-course-${key}`,
     });
     emails.push({
@@ -293,12 +348,14 @@ function handleAttendanceStatus(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
-  dashboardUrl: string
+  dashboardUrl: string,
 ): void {
   const officialCode = officialEntry.attendance;
   const trackerCode = Number(item.attendance);
-  const isOfficialPositive = officialCode === 110 || officialCode === 225 || officialCode === 112;
-  const isTrackerPositive = trackerCode === 110 || trackerCode === 225 || trackerCode === 112;
+  const isOfficialPositive = officialCode === 110 || officialCode === 225 ||
+    officialCode === 112;
+  const isTrackerPositive = trackerCode === 110 || trackerCode === 225 ||
+    trackerCode === 112;
   const courseName = courseMap.get(String(item.course)) || String(item.course);
 
   if (isOfficialPositive) {
@@ -306,23 +363,25 @@ function handleAttendanceStatus(
     notifications.push({
       auth_user_id: user.auth_id,
       title: getResolvedTitle(officialCode, trackerCode),
-      description: `Attendance for ${courseName} on ${item.date} (Session ${item.session}) resolved to official status.`,
+      description:
+        `Attendance for ${courseName} on ${item.date} (Session ${item.session}) resolved to official status.`,
       topic: `sync-surprise-${key}`,
     });
     return;
   }
-  
+
   if (officialCode === trackerCode) {
     toDelete.add(item.id);
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Attendance Updated 🥳",
-      description: `Official record for ${courseName} on ${item.date} (Session ${item.session}) matches manual entry.`,
+      description:
+        `Official record for ${courseName} on ${item.date} (Session ${item.session}) matches manual entry.`,
       topic: `sync-surprise-${key}`,
     });
     return;
   }
-  
+
   if (officialCode === 111 && isTrackerPositive) {
     stats.conflicts++;
     if (item.status === "extra") {
@@ -330,7 +389,8 @@ function handleAttendanceStatus(
       notifications.push({
         auth_user_id: user.auth_id,
         title: "Attendance Conflict 💀",
-        description: `Conflict: Marked present for ${courseName} on ${item.date} (Session ${item.session}) but official record is absent.`,
+        description:
+          `Conflict: Marked present for ${courseName} on ${item.date} (Session ${item.session}) but official record is absent.`,
         topic: `conflict-${key}`,
       });
       emails.push({
@@ -357,22 +417,57 @@ function processTrackerItem(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
-  dashboardUrl: string
+  dashboardUrl: string,
 ): void {
   const trackerDateKey = item.date.replace(/-/g, "");
-  const romanSession = toRoman(parseInt(normalizeSession(item.session)) || String(item.session));
+  const romanSession = toRoman(
+    parseInt(normalizeSession(item.session)) || String(item.session),
+  );
   const key = `${trackerDateKey}|${romanSession}`;
 
   if (officialEntry.classType === "Revision") {
-    handleRevisionClass(item, key, user, toDelete, notifications, emails, courseMap, dashboardUrl);
+    handleRevisionClass(
+      item,
+      key,
+      user,
+      toDelete,
+      notifications,
+      emails,
+      courseMap,
+      dashboardUrl,
+    );
     return;
   }
 
-  if (handleCourseMismatch(item, officialEntry, key, user, toDelete, notifications, emails, courseMap, dashboardUrl)) {
+  if (
+    handleCourseMismatch(
+      item,
+      officialEntry,
+      key,
+      user,
+      toDelete,
+      notifications,
+      emails,
+      courseMap,
+      dashboardUrl,
+    )
+  ) {
     return;
   }
 
-  handleAttendanceStatus(item, officialEntry, key, user, stats, toDelete, toUpdateStatus, notifications, emails, courseMap, dashboardUrl);
+  handleAttendanceStatus(
+    item,
+    officialEntry,
+    key,
+    user,
+    stats,
+    toDelete,
+    toUpdateStatus,
+    notifications,
+    emails,
+    courseMap,
+    dashboardUrl,
+  );
 }
 
 async function executeSyncMutations(
@@ -381,14 +476,21 @@ async function executeSyncMutations(
   toUpdateStatus: number[],
   notifications: NotificationInsert[],
   emails: EmailTask[],
-  supabaseAdmin: ReturnType<typeof getAdminClient>
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<void> {
   const promises: PromiseLike<unknown>[] = [];
   if (toDelete.size > 0) {
-    promises.push(supabaseAdmin.from("tracker").delete().in("id", Array.from(toDelete)));
+    promises.push(
+      supabaseAdmin.from("tracker").delete().in("id", Array.from(toDelete)),
+    );
   }
   if (toUpdateStatus.length > 0) {
-    promises.push(supabaseAdmin.from("tracker").update({ status: "correction" }).in("id", toUpdateStatus));
+    promises.push(
+      supabaseAdmin.from("tracker").update({ status: "correction" }).in(
+        "id",
+        toUpdateStatus,
+      ),
+    );
   }
   let notifIndex = -1;
   if (notifications.length > 0) {
@@ -401,9 +503,18 @@ async function executeSyncMutations(
 
   dbResults.forEach((res, idx) => {
     if (res.status === "rejected") {
-      logger.error(`DB error for ${redact("username", user.username)}:`, res.reason);
-    } else if (res.value && typeof res.value === "object" && "error" in res.value && (res.value as Record<string, unknown>).error) {
-      logger.error(`Supabase error for ${redact("username", user.username)}:`, (res.value as Record<string, unknown>).error);
+      logger.error(
+        `DB error for ${redact("username", user.username)}:`,
+        res.reason,
+      );
+    } else if (
+      res.value && typeof res.value === "object" && "error" in res.value &&
+      (res.value as Record<string, unknown>).error
+    ) {
+      logger.error(
+        `Supabase error for ${redact("username", user.username)}:`,
+        (res.value as Record<string, unknown>).error,
+      );
     } else if (idx === notifIndex) {
       notificationsInserted = true;
     }
@@ -419,12 +530,12 @@ async function executeSyncMutations(
           token: user.fcm_token!,
           title: n.title,
           body: n.description,
-          data: { 
+          data: {
             topic: n.topic,
             title: n.title,
             body: n.description,
           },
-        })
+        }),
       )
     );
   }
@@ -449,17 +560,20 @@ async function executeSyncMutations(
               subject = "Revision Class Detected 📚";
               break;
           }
-          await sendEmail({ 
-            to: user.email, 
-            subject, 
+          await sendEmail({
+            to: user.email,
+            subject,
             html,
             fromName: "GhostClass Alerts",
-            toName: user.first_name && user.last_name 
-              ? `${user.first_name} ${user.last_name}` 
+            toName: user.first_name && user.last_name
+              ? `${user.first_name} ${user.last_name}`
               : undefined,
           });
         } catch (err) {
-          logger.error(`Failed to send sync email to ${redact("email", user.email)}:`, err);
+          logger.error(
+            `Failed to send sync email to ${redact("email", user.email)}:`,
+            err,
+          );
         }
       })();
       notificationPromises.push(emailPromise);
@@ -475,7 +589,7 @@ async function syncUser(
   user: UserSyncData,
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-  courseMap: Map<string, string>
+  courseMap: Map<string, string>,
 ): Promise<SyncStats> {
   const stats = createEmptyStats();
   // L-2: NEXT_PUBLIC_APP_URL is required by validate-env.ts; the hardcoded
@@ -483,20 +597,26 @@ async function syncUser(
   // emails linking to the wrong environment.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   if (!appUrl) {
-    logger.warn("[cron/sync] NEXT_PUBLIC_APP_URL is not set — dashboard links in notifications will be broken");
+    logger.warn(
+      "[cron/sync] NEXT_PUBLIC_APP_URL is not set — dashboard links in notifications will be broken",
+    );
   }
   const dashboardUrl = `${appUrl}/dashboard`;
 
   try {
-    const { officialData } = await getValidTokenAndAttendance(user, isCron, supabaseAdmin);
-    
+    const { officialData } = await getValidTokenAndAttendance(
+      user,
+      isCron,
+      supabaseAdmin,
+    );
+
     stats.processed = 1;
 
     const { data: trackerData } = await supabaseAdmin
       .from("tracker")
       .select("*")
       .eq("auth_user_id", user.auth_id);
-    
+
     if (!trackerData || trackerData.length === 0) return stats;
 
     const officialMap = buildOfficialMap(officialData);
@@ -508,21 +628,48 @@ async function syncUser(
     const items = trackerData as TrackerItem[];
     items.forEach((item) => {
       const trackerDateKey = item.date.replace(/-/g, "");
-      const romanSession = toRoman(parseInt(normalizeSession(item.session)) || String(item.session));
-      const officialEntry = officialMap.get(`${trackerDateKey}|${romanSession}`);
+      const romanSession = toRoman(
+        parseInt(normalizeSession(item.session)) || String(item.session),
+      );
+      const officialEntry = officialMap.get(
+        `${trackerDateKey}|${romanSession}`,
+      );
 
       if (officialEntry) {
-        processTrackerItem(item, officialEntry, user, stats, toDelete, toUpdateStatus, notifications, emails, courseMap, dashboardUrl);
+        processTrackerItem(
+          item,
+          officialEntry,
+          user,
+          stats,
+          toDelete,
+          toUpdateStatus,
+          notifications,
+          emails,
+          courseMap,
+          dashboardUrl,
+        );
       }
     });
 
-    await executeSyncMutations(user, toDelete, toUpdateStatus, notifications, emails, supabaseAdmin);
+    await executeSyncMutations(
+      user,
+      toDelete,
+      toUpdateStatus,
+      notifications,
+      emails,
+      supabaseAdmin,
+    );
 
     stats.deletions = toDelete.size;
     stats.updates = toUpdateStatus.length;
     return stats;
   } catch (err) {
-    logger.error(`Sync failed for ${redact("username", user.username)} (${redact("id", user.auth_id)})`, err);
+    logger.error(
+      `Sync failed for ${redact("username", user.username)} (${
+        redact("id", user.auth_id)
+      })`,
+      err,
+    );
     stats.errors = 1;
     return stats;
   } finally {
@@ -541,8 +688,8 @@ async function syncUser(
 
 export const GET = withSecurity(async (req, { authType }) => {
   const supabaseAdmin = getAdminClient();
-  
-  const auth = await handleAuthentication(req, authType!);
+
+  const auth = handleAuthentication(req, authType!);
   if (auth.errorResponse) return auth.errorResponse;
 
   const { searchParams } = new URL(req.url);
@@ -553,7 +700,9 @@ export const GET = withSecurity(async (req, { authType }) => {
     // H-2: Explicit column list — avoids loading sensitive password fields
     // (auth_password, auth_password_iv) into cron memory.
     let q = supabaseAdmin.from("users")
-      .select("username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name")
+      .select(
+        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
+      )
       .not("ezygo_token", "is", null);
     if (target) q = q.eq("username", target);
     else q = q.order("last_synced_at", { ascending: true }).limit(BATCH_SIZE);
@@ -562,24 +711,32 @@ export const GET = withSecurity(async (req, { authType }) => {
   } else {
     const supabase = await createClient();
     const authHeader = req.headers.get("authorization");
-    const supabaseToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
+    const supabaseToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
 
     const { data: { user } } = supabaseToken
       ? await supabase.auth.getUser(supabaseToken)
       : await supabase.auth.getUser();
 
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     // H-2: Explicit column list here too.
     const { data } = await supabaseAdmin.from("users")
-      .select("username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name")
+      .select(
+        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
+      )
       .eq("auth_id", user.id);
     users = data || [];
   }
 
-  const { data: mappings } = await supabaseAdmin.from("course_mappings").select("ezygo_id, course_name");
+  const { data: mappings } = await supabaseAdmin.from("course_mappings").select(
+    "ezygo_id, course_name",
+  );
   const courseMap = new Map<string, string>();
   if (mappings) {
-    mappings.forEach(m => courseMap.set(String(m.ezygo_id), m.course_name));
+    mappings.forEach((m) => courseMap.set(String(m.ezygo_id), m.course_name));
   }
 
   const overallStats = createEmptyStats();
@@ -588,7 +745,7 @@ export const GET = withSecurity(async (req, { authType }) => {
   // sequential processing takes 30-60 s per cron run. Parallel execution
   // keeps this well within serverless and Docker health-check timeouts.
   const userResults = await Promise.all(
-    users.map((user) => syncUser(user, auth.isCron, supabaseAdmin, courseMap))
+    users.map((user) => syncUser(user, auth.isCron, supabaseAdmin, courseMap)),
   );
   for (const userStats of userResults) {
     overallStats.processed += userStats.processed;
@@ -599,5 +756,7 @@ export const GET = withSecurity(async (req, { authType }) => {
   }
 
   const successFlag = overallStats.errors === 0;
-  return NextResponse.json({ success: successFlag, ...overallStats }, { status: successFlag ? 200 : 500 });
+  return NextResponse.json({ success: successFlag, ...overallStats }, {
+    status: successFlag ? 200 : 500,
+  });
 });

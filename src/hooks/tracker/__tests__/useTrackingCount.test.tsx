@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
-vi.unmock('@/hooks/tracker/useTrackingCount')
-import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.unmock("@/hooks/tracker/useTrackingCount");
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useTrackingCount } from "../useTrackingCount";
 import { createClient } from "@/lib/supabase/client";
 import { useFetchAcademicYear, useFetchSemester } from "../../users/settings";
@@ -70,8 +70,10 @@ describe("useTrackingCount", () => {
   });
 
   it("should fetch count successfully", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
-    
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
+
     const { result } = renderHook(() => useTrackingCount(mockUser), {
       wrapper: createWrapper(),
     });
@@ -82,7 +84,9 @@ describe("useTrackingCount", () => {
   });
 
   it("should return 0 if no session", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: null },
+    });
 
     const { result } = renderHook(() => useTrackingCount(mockUser), {
       wrapper: createWrapper(),
@@ -93,7 +97,9 @@ describe("useTrackingCount", () => {
   });
 
   it("should be disabled if semester or year missing", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
     (useFetchSemester as any).mockReturnValue({ data: null });
 
     const { result } = renderHook(() => useTrackingCount(mockUser), {
@@ -104,9 +110,11 @@ describe("useTrackingCount", () => {
   });
 
   it("should handle error and capture exception", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
     const mockError = { message: "DB Error" };
-    
+
     mockSupabase.from.mockReturnValueOnce({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
@@ -122,12 +130,17 @@ describe("useTrackingCount", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBe(0);
     expect(logger.error).toHaveBeenCalled();
-    expect(Sentry.captureException).toHaveBeenCalledWith(mockError, expect.any(Object));
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      mockError,
+      expect.any(Object),
+    );
   });
 
   it("should return 0 if count is null", async () => {
-    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: { user: {} } } });
-    
+    mockSupabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: {} } },
+    });
+
     mockSupabase.from.mockReturnValueOnce({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({

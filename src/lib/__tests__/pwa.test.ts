@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isStandalonePWA } from "../pwa";
 
 describe("isStandalonePWA", () => {
@@ -30,11 +30,13 @@ describe("isStandalonePWA", () => {
       writable: true,
       value: {
         matchMedia: vi.fn().mockReturnValue({ matches: true }),
-        navigator: {}
-      }
+        navigator: {},
+      },
     });
     expect(isStandalonePWA()).toBe(true);
-    expect(global.window.matchMedia).toHaveBeenCalledWith("(display-mode: standalone)");
+    expect(global.window.matchMedia).toHaveBeenCalledWith(
+      "(display-mode: standalone)",
+    );
   });
 
   it("returns true if navigator.standalone is true (iOS)", () => {
@@ -42,8 +44,8 @@ describe("isStandalonePWA", () => {
       writable: true,
       value: {
         matchMedia: vi.fn().mockReturnValue({ matches: false }),
-        navigator: { standalone: true }
-      }
+        navigator: { standalone: true },
+      },
     });
     expect(isStandalonePWA()).toBe(true);
   });
@@ -53,8 +55,8 @@ describe("isStandalonePWA", () => {
       writable: true,
       value: {
         matchMedia: vi.fn().mockReturnValue({ matches: false }),
-        navigator: { standalone: false }
-      }
+        navigator: { standalone: false },
+      },
     });
     expect(isStandalonePWA()).toBe(false);
   });
@@ -63,8 +65,8 @@ describe("isStandalonePWA", () => {
     Object.defineProperty(global, "window", {
       writable: true,
       value: {
-        navigator: { standalone: true }
-      }
+        navigator: { standalone: true },
+      },
     });
     expect(isStandalonePWA()).toBe(true);
   });

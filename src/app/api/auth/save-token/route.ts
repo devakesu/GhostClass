@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { decrypt, encrypt } from "@/lib/crypto";
 import { authRateLimiter } from "@/lib/ratelimit";
-import { headers, cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { z } from "zod";
-import { getClientIp, egressFetch } from "@/lib/utils.server";
+import { egressFetch, getClientIp } from "@/lib/utils.server";
 import { logger } from "@/lib/logger";
 import { setAuthCookie } from "@/lib/security/auth-cookie";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -13,8 +13,14 @@ import { getSupabaseConfig } from "@/lib/supabase/fetch";
 import { performProfileSync } from "@/lib/user/sync";
 import { withSecurity } from "@/lib/security/app-check";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
-import { getAuthLock, releaseAuthLock as releaseAuthLockUtil } from "@/lib/security/auth-lock";
-import { getAllowedHosts, resolveRequestHostname } from "@/lib/security/origin-validation";
+import {
+  getAuthLock,
+  releaseAuthLock as releaseAuthLockUtil,
+} from "@/lib/security/auth-lock";
+import {
+  getAllowedHosts,
+  resolveRequestHostname,
+} from "@/lib/security/origin-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +48,7 @@ const AUTH_LOCK_TTL = (() => {
   return Math.max(15, Math.min(parsed, 60));
 })();
 
-async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
+function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (isMobileApp || process.env.NODE_ENV === "development") return null;
 
   let allowedHosts: Set<string> | null;
@@ -60,7 +66,10 @@ async function validateOrigin(headerList: Headers, isMobileApp: boolean) {
       headers: headerList,
       nextUrl: { hostname: headerList.get("host") ?? "" },
     } as NextRequest);
-    if (!(secFetchSite === "same-origin" && !!requestHostname && allowedHosts.has(requestHostname))) {
+    if (
+      !(secFetchSite === "same-origin" && !!requestHostname &&
+        allowedHosts.has(requestHostname))
+    ) {
       return "Invalid origin";
     }
     return null;
@@ -83,7 +92,9 @@ async function verifyEzygoToken(token: string) {
       headers: { Authorization: `Bearer ${token}` },
       signal: abortCtrl.signal,
     });
-    if (res.status === 401) throw { status: 401, message: "Invalid or expired token" };
+    if (res.status === 401) {
+      throw { status: 401, message: "Invalid or expired token" };
+    }
     if (res.status !== 200) throw { status: 502, message: "Service error" };
 
     const data = await res.json().catch(() => null);
@@ -98,7 +109,7 @@ async function verifyEzygoToken(token: string) {
 
 async function handleOrphanUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-  email: string
+  email: string,
 ) {
   const { url, key } = getSupabaseConfig("admin");
   const endpoint = new URL("/auth/v1/admin/users", url);
@@ -118,7 +129,9 @@ async function handleOrphanUser(
     throw new Error("Orphan user lookup failed");
   }
 
-  const payload = await response.json().catch(() => null) as { users?: Array<{ email?: string; id: string }> } | null;
+  const payload = await response.json().catch(() => null) as {
+    users?: Array<{ email?: string; id: string }>;
+  } | null;
   const found = payload?.users?.find((u) => u.email === email);
   if (found) {
     await supabaseAdmin.auth.admin.deleteUser(found.id);
@@ -127,10 +140,14 @@ async function handleOrphanUser(
   throw new Error("Orphan user not found");
 }
 
-async function validateClientIpAndRateLimit(headerList: Headers): Promise<NextResponse | null> {
+async function validateClientIpAndRateLimit(
+  headerList: Headers,
+): Promise<NextResponse | null> {
   const ip = getClientIp(headerList);
   if (!ip) {
-    return NextResponse.json({ message: "Unable to determine client IP" }, { status: 400 });
+    return NextResponse.json({ message: "Unable to determine client IP" }, {
+      status: 400,
+    });
   }
 
   const { success } = await authRateLimiter.limit(ip);
@@ -144,8 +161,10 @@ async function validateClientIpAndRateLimit(headerList: Headers): Promise<NextRe
 async function provisionSupabaseAuthUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   email: string,
-  verifiedId: string
-): Promise<{ authUserId: string; passwordToUse: string; isFirstLogin: boolean }> {
+  verifiedId: string,
+): Promise<
+  { authUserId: string; passwordToUse: string; isFirstLogin: boolean }
+> {
   const { data: existing } = await supabaseAdmin
     .from("users")
     .select("*")
@@ -155,7 +174,9 @@ async function provisionSupabaseAuthUser(
   if (existing?.auth_id) {
     if (!existing.auth_password) {
       const canonicalPass = crypto.randomBytes(32).toString("hex");
-      await supabaseAdmin.auth.admin.updateUserById(existing.auth_id, { password: canonicalPass });
+      await supabaseAdmin.auth.admin.updateUserById(existing.auth_id, {
+        password: canonicalPass,
+      });
       const { iv: pIv, content: pContent } = encrypt(canonicalPass);
       await supabaseAdmin
         .from("users")
@@ -173,36 +194,49 @@ async function provisionSupabaseAuthUser(
 
     return {
       authUserId: existing.auth_id,
-      passwordToUse: decrypt({ iv: existing.auth_password_iv!, content: existing.auth_password! }),
+      passwordToUse: decrypt({
+        iv: existing.auth_password_iv!,
+        content: existing.auth_password!,
+      }),
       isFirstLogin: false,
     };
   }
 
   const canonicalPass = crypto.randomBytes(32).toString("hex");
-  const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: canonicalPass,
-    email_confirm: true,
-    user_metadata: { ezygo_id: verifiedId },
-  });
+  const { data: createData, error: createError } = await supabaseAdmin.auth
+    .admin.createUser({
+      email,
+      password: canonicalPass,
+      email_confirm: true,
+      user_metadata: { ezygo_id: verifiedId },
+    });
 
   if (!createError) {
-    return { authUserId: createData.user.id, passwordToUse: canonicalPass, isFirstLogin: true };
+    return {
+      authUserId: createData.user.id,
+      passwordToUse: canonicalPass,
+      isFirstLogin: true,
+    };
   }
 
   await handleOrphanUser(supabaseAdmin, email);
-  const { data: retry, error: retryError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: canonicalPass,
-    email_confirm: true,
-    user_metadata: { ezygo_id: verifiedId },
-  });
+  const { data: retry, error: retryError } = await supabaseAdmin.auth.admin
+    .createUser({
+      email,
+      password: canonicalPass,
+      email_confirm: true,
+      user_metadata: { ezygo_id: verifiedId },
+    });
 
   if (retryError || !retry.user) {
     throw new Error("Retry creation failed");
   }
 
-  return { authUserId: retry.user.id, passwordToUse: canonicalPass, isFirstLogin: true };
+  return {
+    authUserId: retry.user.id,
+    passwordToUse: canonicalPass,
+    isFirstLogin: true,
+  };
 }
 
 async function signInToSupabase(
@@ -210,7 +244,7 @@ async function signInToSupabase(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   authUserId: string,
   email: string,
-  passwordToUse: string
+  passwordToUse: string,
 ) {
   let signInEmail = email;
   let signInRes = await supabase.auth.signInWithPassword({
@@ -220,9 +254,13 @@ async function signInToSupabase(
   if (signInRes.error) {
     // First attempt failed — try to resolve the canonical email and retry.
     try {
-      const { data: adminUserData } = await supabaseAdmin.auth.admin.getUserById(authUserId);
+      const { data: adminUserData } = await supabaseAdmin.auth.admin
+        .getUserById(authUserId);
       const fetchedEmail = adminUserData?.user?.email;
-      if (fetchedEmail && typeof fetchedEmail === "string" && fetchedEmail.trim().length > 0) {
+      if (
+        fetchedEmail && typeof fetchedEmail === "string" &&
+        fetchedEmail.trim().length > 0
+      ) {
         signInEmail = fetchedEmail;
         signInRes = await supabase.auth.signInWithPassword({
           email: signInEmail,
@@ -251,9 +289,17 @@ async function upsertUserData(
     fcm_token?: string;
     isFirstLogin: boolean;
     passwordToUse: string;
-  }
+  },
 ) {
-  const { verifiedId, username, token, authUserId, fcm_token, isFirstLogin, passwordToUse } = payload;
+  const {
+    verifiedId,
+    username,
+    token,
+    authUserId,
+    fcm_token,
+    isFirstLogin,
+    passwordToUse,
+  } = payload;
   const { iv: tIv, content: tContent } = encrypt(token);
   const updateData: Record<string, unknown> = {
     id: verifiedId,
@@ -271,12 +317,17 @@ async function upsertUserData(
     updateData.auth_password_iv = pIv;
   }
 
-  const { error: upsertErr } = await supabaseAdmin.from("users").upsert(updateData);
+  const { error: upsertErr } = await supabaseAdmin.from("users").upsert(
+    updateData,
+  );
   if (upsertErr) throw new Error("Upsert failed");
 }
 
-async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean): Promise<NextResponse | null> {
-  const originError = await validateOrigin(headerList, isAppCheck);
+async function validateRequestHeaders(
+  headerList: Headers,
+  isAppCheck: boolean,
+): Promise<NextResponse | null> {
+  const originError = validateOrigin(headerList, isAppCheck);
   if (originError) {
     const status = originError === "Server configuration error" ? 500 : 403;
     return NextResponse.json({ message: originError }, { status });
@@ -290,15 +341,21 @@ async function validateRequestHeaders(headerList: Headers, isAppCheck: boolean):
 
 function handleAuthError(error: unknown) {
   logger.error("Auth Failed:", error);
-  const errObj = error as { status?: number; message?: string; name?: string } | undefined;
+  const errObj = error as
+    | { status?: number; message?: string; name?: string }
+    | undefined;
   if (errObj?.status) {
-    return NextResponse.json({ message: errObj.message || "Auth error" }, { status: errObj.status });
+    return NextResponse.json({ message: errObj.message || "Auth error" }, {
+      status: errObj.status,
+    });
   }
   if (errObj?.name === "AbortError" || errObj?.message === "AbortError") {
     return NextResponse.json({ message: "Gateway Timeout" }, { status: 504 });
   }
   if (errObj?.message?.includes("Redis")) {
-    return NextResponse.json({ message: "Service Unavailable" }, { status: 503 });
+    return NextResponse.json({ message: "Service Unavailable" }, {
+      status: 503,
+    });
   }
   // L-1: Standardised to {message} to match all other error responses in this handler.
   return NextResponse.json({ message: "Auth failed" }, { status: 500 });
@@ -306,11 +363,14 @@ function handleAuthError(error: unknown) {
 
 const handler = async (
   req: Request,
-  { decryptedBody, authType }: { decryptedBody?: unknown; authType?: string }
+  { decryptedBody, authType }: { decryptedBody?: unknown; authType?: string },
 ) => {
   const headerList = await headers();
   const cookieStore = await cookies();
-  const headerErr = await validateRequestHeaders(headerList, authType === "app-check");
+  const headerErr = await validateRequestHeaders(
+    headerList,
+    authType === "app-check",
+  );
   if (headerErr) return headerErr;
 
   let lockValue: string | null = null;
@@ -320,7 +380,9 @@ const handler = async (
     const body = decryptedBody || (await req.json());
     const validation = SaveTokenRequestSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ message: "Invalid request format" }, { status: 400 });
+      return NextResponse.json({ message: "Invalid request format" }, {
+        status: 400,
+      });
     }
 
     const { token, fcm_token } = validation.data;
@@ -328,7 +390,9 @@ const handler = async (
     verifiedId = ezyUser.id;
 
     if (!/^[a-zA-Z0-9-_]+$/.test(verifiedId)) {
-      return NextResponse.json({ message: "Invalid user identifier" }, { status: 400 });
+      return NextResponse.json({ message: "Invalid user identifier" }, {
+        status: 400,
+      });
     }
 
     // C-3: Use canonical auth-lock module (removes duplicated Lua script).
@@ -341,11 +405,12 @@ const handler = async (
     const ghostDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
     const email = `ezygo_${verifiedId}@${ghostDomain}`;
 
-    const { authUserId, passwordToUse, isFirstLogin } = await provisionSupabaseAuthUser(
-      supabaseAdmin,
-      email,
-      verifiedId
-    );
+    const { authUserId, passwordToUse, isFirstLogin } =
+      await provisionSupabaseAuthUser(
+        supabaseAdmin,
+        email,
+        verifiedId,
+      );
 
     // C-1: Mirror the isProd guard from proxy.ts so dev/staging sessions are set
     // against the correct Supabase project and match the middleware's session cookies.
@@ -363,11 +428,14 @@ const handler = async (
                 cookieStore.set(name, value, options)
               );
             } catch (error) {
-              logger.warn("Non-critical: Failed to set Supabase session cookies in save-token route", error);
+              logger.warn(
+                "Non-critical: Failed to set Supabase session cookies in save-token route",
+                error,
+              );
             }
           },
         },
-      }
+      },
     );
 
     const signInData = await signInToSupabase(
@@ -375,7 +443,7 @@ const handler = async (
       supabaseAdmin,
       authUserId,
       email,
-      passwordToUse
+      passwordToUse,
     );
 
     await upsertUserData(supabaseAdmin, {
@@ -394,7 +462,8 @@ const handler = async (
     const response = {
       success: true,
       userId: authUserId,
-      current_semester: syncRes?.academic?.current_semester ?? info.current_semester,
+      current_semester: syncRes?.academic?.current_semester ??
+        info.current_semester,
       current_year: syncRes?.academic?.current_year ?? info.current_year,
     };
 
@@ -408,7 +477,6 @@ const handler = async (
       ...response,
       session: signInData.session,
     });
-
   } catch (error: unknown) {
     return handleAuthError(error);
   } finally {
@@ -418,4 +486,6 @@ const handler = async (
   }
 };
 
-export const POST = withSecurity(handler as unknown as Parameters<typeof withSecurity>[0]);
+export const POST = withSecurity(
+  handler as unknown as Parameters<typeof withSecurity>[0],
+);

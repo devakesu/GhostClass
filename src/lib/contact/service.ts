@@ -1,14 +1,20 @@
 import { z } from "zod";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
-import { 
-  renderContactAdminEmail, 
-  renderContactConfirmationEmail 
+import {
+  renderContactAdminEmail,
+  renderContactConfirmationEmail,
 } from "@/lib/email-templates";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { redact } from "@/lib/utils.server";
-import { emailSchema, longTextSchema, personNameSchema, shortTextSchema } from "@/lib/validation/text";
+import {
+  emailSchema,
+  longTextSchema,
+  personNameSchema,
+  shortTextSchema,
+} from "@/lib/validation/text";
 
 // VALIDATION SCHEMA
 export const contactSchema = z.object({
@@ -16,7 +22,7 @@ export const contactSchema = z.object({
   email: emailSchema,
   subject: shortTextSchema.optional().nullable(),
   message: longTextSchema,
-  
+
   token: z.string().optional(),
   csrf_token: z.string().optional(),
 });
@@ -40,7 +46,7 @@ interface ContactInsertResult {
 const sanitizeForEmail = (text: string): string => {
   const normalizedText = text.replace(/\r\n?/g, "\n");
   const withBreaks = normalizedText.replace(/\n/g, "<br>");
-  
+
   return sanitizeHtml(withBreaks, {
     allowedTags: ["br", "strong", "em", "b", "i"],
     allowedAttributes: {},
@@ -60,9 +66,9 @@ const escapeHtml = (text: string) => {
 const getContactEmail = () => {
   const appEmail = process.env.NEXT_PUBLIC_APP_EMAIL;
   if (!appEmail) {
-    throw new Error('NEXT_PUBLIC_APP_EMAIL is not configured');
+    throw new Error("NEXT_PUBLIC_APP_EMAIL is not configured");
   }
-  return 'contact@' + appEmail.replace(/^@/, '');
+  return "contact@" + appEmail.replace(/^@/, "");
 };
 
 // ---------------------------------------------------------------------------
@@ -77,10 +83,8 @@ const getContactEmail = () => {
  * 4. Transactional Rollback (Delete from DB if emails fail)
  */
 export async function processContactSubmission(
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _supabase: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabaseAdmin: any, // Required for rollback if RLS is strict
+  _supabase: SupabaseClient,
+  supabaseAdmin: SupabaseClient, // Required for rollback if RLS is strict
   payload: z.infer<typeof contactSchema>,
   ctx: ContactContext = {},
 ): Promise<ContactInsertResult> {
@@ -101,7 +105,9 @@ export async function processContactSubmission(
       .select("id")
       .single();
 
-    if (dbError) throw new Error(dbError.message || "Failed to save contact message");
+    if (dbError) {
+      throw new Error(dbError.message || "Failed to save contact message");
+    }
     insertedId = data.id as string;
 
     // 2. Prepare Email Content
@@ -129,7 +135,9 @@ export async function processContactSubmission(
     });
 
     if (!adminEmailResult || !adminEmailResult.success) {
-      throw new Error(`Admin email failed: ${adminEmailResult?.error || "Unknown error"}`);
+      throw new Error(
+        `Admin email failed: ${adminEmailResult?.error || "Unknown error"}`,
+      );
     }
 
     // 4. Send Confirmation to USER (Non-fatal)
@@ -145,50 +153,57 @@ export async function processContactSubmission(
         }),
       });
     } catch (confirmationError) {
-      logger.warn("[ContactService] Failed to send user confirmation email:", confirmationError);
+      logger.warn(
+        "[ContactService] Failed to send user confirmation email:",
+        confirmationError,
+      );
       Sentry.captureException(confirmationError, {
         level: "warning",
         tags: { type: "email_confirmation_failed", location: "ContactService" },
-        extra: { email: redact("email", payload.email), insertedId }
+        extra: { email: redact("email", payload.email), insertedId },
       });
     }
 
     return { success: true, id: insertedId };
-
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error("[ContactService] Contact flow failed:", errorMsg);
 
     Sentry.captureException(error, {
-        tags: { type: "contact_flow_failure", location: "ContactService" },
-        extra: { 
-            email: redact("email", payload.email),
-            has_inserted_db: !!insertedId,
-            user_ip: ctx.ip ? redact("id", ctx.ip) : "unknown",
-        }
+      tags: { type: "contact_flow_failure", location: "ContactService" },
+      extra: {
+        email: redact("email", payload.email),
+        has_inserted_db: !!insertedId,
+        user_ip: ctx.ip ? redact("id", ctx.ip) : "unknown",
+      },
     });
 
     // ROLLBACK: Delete from DB if emails failed
     if (insertedId) {
-      logger.warn(`[ContactService] Rolling back: Deleting message ${insertedId}...`);
-      
+      logger.warn(
+        `[ContactService] Rolling back: Deleting message ${insertedId}...`,
+      );
+
       const { error: deleteError } = await supabaseAdmin
         .from("contact_messages")
         .delete()
         .eq("id", insertedId);
 
       if (deleteError) {
-        logger.error("[ContactService] CRITICAL: Rollback failed!", deleteError);
+        logger.error(
+          "[ContactService] CRITICAL: Rollback failed!",
+          deleteError,
+        );
         Sentry.captureException(deleteError, {
-             tags: { type: "rollback_failed", location: "ContactService" },
-             extra: { insertedId }
+          tags: { type: "rollback_failed", location: "ContactService" },
+          extra: { insertedId },
         });
       }
     }
 
-    return { 
-      success: false, 
-      error: errorMsg || "Failed to process message. Please try again later." 
+    return {
+      success: false,
+      error: errorMsg || "Failed to process message. Please try again later.",
     };
   }
 }

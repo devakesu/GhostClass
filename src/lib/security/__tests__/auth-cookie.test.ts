@@ -8,48 +8,55 @@
  * change to the cookie flags is caught by CI.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setAuthCookie, clearAuthCookie, getAuthTokenServer, getAuthTokenWithFallback } from "../auth-cookie";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearAuthCookie,
+  getAuthTokenServer,
+  getAuthTokenWithFallback,
+  setAuthCookie,
+} from "../auth-cookie";
 
 // Mock the Next.js cookies module (same pattern as csrf.test.ts)
 let mockSet: ReturnType<typeof vi.fn>;
 let mockDelete: ReturnType<typeof vi.fn>;
 let mockGet: ReturnType<typeof vi.fn>;
 vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({ 
+  cookies: vi.fn(async () => ({
     set: mockSet,
     delete: mockDelete,
-    get: mockGet
+    get: mockGet,
   })),
 }));
 
 // Mock Supabase
 const mockSupabaseUser = { id: "user-123" };
 const mockGetUser = vi.fn(async () => ({ data: { user: mockSupabaseUser } }));
-const mockMaybeSingle = vi.fn(async () => ({ data: { ezygo_token: "enc-token", ezygo_iv: "iv" } }));
+const mockMaybeSingle = vi.fn(async () => ({
+  data: { ezygo_token: "enc-token", ezygo_iv: "iv" },
+}));
 const mockFrom = vi.fn(() => ({
   select: vi.fn(() => ({
     eq: vi.fn(() => ({
-      maybeSingle: mockMaybeSingle
-    }))
-  }))
+      maybeSingle: mockMaybeSingle,
+    })),
+  })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
-    auth: { getUser: mockGetUser }
-  }))
+    auth: { getUser: mockGetUser },
+  })),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   getAdminClient: vi.fn(() => ({
-    from: mockFrom
-  }))
+    from: mockFrom,
+  })),
 }));
 
 // Mock crypto
 vi.mock("@/lib/crypto", () => ({
-  decrypt: vi.fn(() => "decrypted-token")
+  decrypt: vi.fn(() => "decrypted-token"),
 }));
 
 // Mock redis
@@ -57,7 +64,7 @@ vi.mock("@/lib/redis", () => ({
   redis: {
     get: vi.fn(async () => null),
     set: vi.fn(async () => null),
-  }
+  },
 }));
 
 // Mock logger
@@ -67,7 +74,7 @@ vi.mock("@/lib/logger", () => ({
     warn: vi.fn(),
     dev: vi.fn(),
     error: vi.fn(),
-  }
+  },
 }));
 
 // Mock server-only to prevent import errors in Vitest
@@ -136,8 +143,12 @@ describe("auth-cookie security attributes (SEC-02)", () => {
       const after = Date.now();
       const [, , opts] = mockSet.mock.calls[0];
       const expectedMs = 31 * 24 * 60 * 60 * 1000;
-      expect(opts.expires.getTime()).toBeGreaterThanOrEqual(before + expectedMs - 1000);
-      expect(opts.expires.getTime()).toBeLessThanOrEqual(after + expectedMs + 1000);
+      expect(opts.expires.getTime()).toBeGreaterThanOrEqual(
+        before + expectedMs - 1000,
+      );
+      expect(opts.expires.getTime()).toBeLessThanOrEqual(
+        after + expectedMs + 1000,
+      );
     });
   });
 
@@ -178,7 +189,11 @@ describe("auth-cookie security attributes (SEC-02)", () => {
       expect(mockGetUser).toHaveBeenCalled();
       expect(mockMaybeSingle).toHaveBeenCalled();
       // Should also attempt to restore cookie
-      expect(mockSet).toHaveBeenCalledWith("ezygo_access_token", "decrypted-token", expect.any(Object));
+      expect(mockSet).toHaveBeenCalledWith(
+        "ezygo_access_token",
+        "decrypted-token",
+        expect.any(Object),
+      );
     });
 
     it("returns undefined if no user is found in fallback", async () => {

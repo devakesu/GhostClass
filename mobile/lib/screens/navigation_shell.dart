@@ -838,8 +838,6 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                     if (isCriticalSecurityFailure) {
                                       if (Platform.isAndroid) {
                                         await SystemNavigator.pop();
-                                      } else {
-                                        exit(0);
                                       }
                                       return;
                                     }

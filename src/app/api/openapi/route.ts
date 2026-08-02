@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * This route reads the file once at module scope (cached) and substitutes
  * env tokens per-request via the shared resolveOpenApiSpec() helper.
  */
-export async function GET() {
+export function GET() {
   const yaml = resolveOpenApiSpec();
 
   return new Response(yaml, {

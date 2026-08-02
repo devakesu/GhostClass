@@ -28,6 +28,7 @@ assignees: []
 
 ## Checklist
 
-- [ ] I have searched existing issues and this feature has not been requested before
+- [ ] I have searched existing issues and this feature has not been requested
+      before
 - [ ] This feature would benefit the majority of GhostClass users
 - [ ] I am willing to help implement this feature (optional)

@@ -2,7 +2,7 @@
  * Tests for POST /api/courses/add
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,16 +54,22 @@ describe("POST /api/courses/add", () => {
       single: mockSingle,
     });
 
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
-    mockSingle.mockResolvedValue({ data: { class_id: "class-456" }, error: null });
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+    mockSingle.mockResolvedValue({
+      data: { class_id: "class-456" },
+      error: null,
+    });
     mockInsert.mockResolvedValue({ error: null });
   });
 
   it("returns 400 when required fields are missing", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify({ courseCode: "CS101" }) 
+      body: JSON.stringify({ courseCode: "CS101" }),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
@@ -71,11 +77,14 @@ describe("POST /api/courses/add", () => {
   });
 
   it("returns 401 when user is not authenticated", async () => {
-    mockAuthGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error("Unauthorized") });
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: new Error("Unauthorized"),
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(401);
@@ -83,22 +92,27 @@ describe("POST /api/courses/add", () => {
   });
 
   it("returns 400 when no class is associated with profile", async () => {
-    mockSingle.mockResolvedValueOnce({ data: null, error: { message: "No class" } });
+    mockSingle.mockResolvedValueOnce({
+      data: null,
+      error: { message: "No class" },
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "No class associated with your profile" });
+    expect(await res.json()).toEqual({
+      error: "No class associated with your profile",
+    });
   });
 
   it("returns 201 when course is added successfully", async () => {
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(201);
@@ -107,40 +121,46 @@ describe("POST /api/courses/add", () => {
       class_id: "class-456",
       course_code: "CS101",
       course_name: "Intro to Computer Science",
-      created_by: "user-123"
+      created_by: "user-123",
     });
   });
 
   it("returns 409 when course already exists", async () => {
     mockInsert.mockResolvedValueOnce({ error: { code: "23505" } });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "This course is already in your class lineup." });
+    expect(await res.json()).toEqual({
+      error: "This course is already in your class lineup.",
+    });
   });
 
   it("returns 500 when database insert fails", async () => {
     mockInsert.mockResolvedValueOnce({ error: { message: "Insert failed" } });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "Failed to add course to lineup" });
+    expect(await res.json()).toEqual({
+      error: "Failed to add course to lineup",
+    });
   });
 
   it("handles unexpected errors", async () => {
-    mockFrom.mockImplementationOnce(() => { throw new Error("Boom"); });
+    mockFrom.mockImplementationOnce(() => {
+      throw new Error("Boom");
+    });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/courses/add", { 
+    const req = new NextRequest("http://localhost/api/courses/add", {
       method: "POST",
-      body: JSON.stringify(MOCK_COURSE)
+      body: JSON.stringify(MOCK_COURSE),
     });
     const res = await POST(req, { params: {} });
     expect(res.status).toBe(500);

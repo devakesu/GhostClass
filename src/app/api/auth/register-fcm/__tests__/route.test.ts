@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("server-only", () => ({}));
@@ -19,7 +19,10 @@ vi.mock("@/lib/utils.server", () => ({
 
 const mockSupabaseAdminUpdate = vi.fn().mockReturnThis();
 const mockSupabaseAdminEq = vi.fn().mockResolvedValue({ error: null });
-const mockSupabaseAdminAuthGetUser = vi.fn().mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
+const mockSupabaseAdminAuthGetUser = vi.fn().mockResolvedValue({
+  data: { user: { id: "user-123" } },
+  error: null,
+});
 
 vi.mock("@/lib/supabase/admin", () => ({
   getAdminClient: () => ({
@@ -31,7 +34,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-const mockSupabaseAuthGetUser = vi.fn().mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
+const mockSupabaseAuthGetUser = vi.fn().mockResolvedValue({
+  data: { user: { id: "user-123" } },
+  error: null,
+});
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: { getUser: mockSupabaseAuthGetUser },
@@ -56,15 +62,23 @@ describe("POST /api/auth/register-fcm", () => {
       limit: 5,
       remaining: 4,
     });
-    mockSupabaseAdminAuthGetUser.mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
-    mockSupabaseAuthGetUser.mockResolvedValue({ data: { user: { id: "user-123" } }, error: null });
+    mockSupabaseAdminAuthGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+    mockSupabaseAuthGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
     mockSupabaseAdminEq.mockResolvedValue({ error: null } as any);
   });
 
   it("returns 400 if client IP cannot be determined", async () => {
     mockGetClientIp.mockReturnValueOnce(null);
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/register-fcm", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/register-fcm", {
+      method: "POST",
+    });
     const res = await POST(req, {} as any);
     expect(res.status).toBe(400);
   });
@@ -77,13 +91,18 @@ describe("POST /api/auth/register-fcm", () => {
       remaining: 0,
     });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/register-fcm", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/register-fcm", {
+      method: "POST",
+    });
     const res = await POST(req, {} as any);
     expect(res.status).toBe(429);
   });
 
   it("returns 401 if unauthorized via Bearer token", async () => {
-    mockSupabaseAdminAuthGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error("Unauthorized") });
+    mockSupabaseAdminAuthGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: new Error("Unauthorized"),
+    });
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/auth/register-fcm", {
       method: "POST",
@@ -96,7 +115,9 @@ describe("POST /api/auth/register-fcm", () => {
   it("returns 401 if unauthorized via session cookies", async () => {
     mockSupabaseAuthGetUser.mockResolvedValueOnce({ data: { user: null } });
     const { POST } = await import("../route");
-    const req = new NextRequest("http://localhost/api/auth/register-fcm", { method: "POST" });
+    const req = new NextRequest("http://localhost/api/auth/register-fcm", {
+      method: "POST",
+    });
     const res = await POST(req, {} as any);
     expect(res.status).toBe(401);
   });
@@ -123,7 +144,9 @@ describe("POST /api/auth/register-fcm", () => {
   });
 
   it("returns 500 if database update fails", async () => {
-    mockSupabaseAdminEq.mockResolvedValueOnce({ error: new Error("DB failure") } as any);
+    mockSupabaseAdminEq.mockResolvedValueOnce(
+      { error: new Error("DB failure") } as any,
+    );
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/auth/register-fcm", {
       method: "POST",
@@ -140,10 +163,16 @@ describe("POST /api/auth/register-fcm", () => {
       method: "POST",
       headers: { authorization: "Bearer valid-token" },
     });
-    const res = await POST(req, { decryptedBody: { fcm_token: "decrypted-token-123" } } as any);
+    const res = await POST(
+      req,
+      { decryptedBody: { fcm_token: "decrypted-token-123" } } as any,
+    );
     expect(res.status).toBe(200);
     expect(mockSupabaseAdminUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ fcm_token: "decrypted-token-123", has_mobile_app: true }),
+      expect.objectContaining({
+        fcm_token: "decrypted-token-123",
+        has_mobile_app: true,
+      }),
     );
   });
 });

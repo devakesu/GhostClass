@@ -1,27 +1,27 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { ScrollArea } from '../scroll-area';
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { ScrollArea } from "../scroll-area";
 
-describe('ScrollArea Component', () => {
-  it('renders correctly with children', () => {
+describe("ScrollArea Component", () => {
+  it("renders correctly with children", () => {
     render(
       <ScrollArea className="h-40 w-40">
         <div>Scrollable content</div>
-      </ScrollArea>
+      </ScrollArea>,
     );
 
-    expect(screen.getByText('Scrollable content')).toBeDefined();
+    expect(screen.getByText("Scrollable content")).toBeDefined();
   });
 
-  it('applies custom className', () => {
+  it("applies custom className", () => {
     render(
       <ScrollArea className="custom-class">
         <div>Content</div>
-      </ScrollArea>
+      </ScrollArea>,
     );
 
     // The root element should have the custom class
     const root = document.querySelector('[data-slot="scroll-area"]');
-    expect(root?.className).toContain('custom-class');
+    expect(root?.className).toContain("custom-class");
   });
 });

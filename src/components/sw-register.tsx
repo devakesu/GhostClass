@@ -32,7 +32,10 @@ function triggerSwUpdateReload(registration: ServiceWorkerRegistration): void {
   }
 }
 
-function handleWorkerStateChange(newWorker: ServiceWorker, registration: ServiceWorkerRegistration): void {
+function handleWorkerStateChange(
+  newWorker: ServiceWorker,
+  registration: ServiceWorkerRegistration,
+): void {
   if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
     logger.dev("New service worker available", {
       context: "ServiceWorkerRegister",
@@ -46,7 +49,7 @@ function handleWorkerStateChange(newWorker: ServiceWorker, registration: Service
           window.location.reload();
         }
       },
-      { once: true }
+      { once: true },
     );
 
     toast("App updated — tap to refresh", {
@@ -72,7 +75,7 @@ function setupUpdateListener(registration: ServiceWorkerRegistration): void {
 
 async function performRegistration(
   getIsMounted: () => boolean,
-  updateIntervalIdRef: React.MutableRefObject<NodeJS.Timeout | null>
+  updateIntervalIdRef: React.MutableRefObject<NodeJS.Timeout | null>,
 ) {
   try {
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -109,11 +112,11 @@ async function performRegistration(
 
 /**
  * Service Worker Registration Component
- * 
+ *
  * Handles registration and lifecycle management of the service worker
  * for Progressive Web App (PWA) functionality including offline support,
  * caching strategies, and background sync.
- * 
+ *
  * This component should be included in the root layout to ensure the
  * service worker is registered on all pages.
  */
@@ -127,7 +130,7 @@ export function ServiceWorkerRegister() {
   // across component remounts (e.g., during SPA navigation)
   const registrationInProgressRef = useRef(false);
   const updateIntervalIdRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   useEffect(() => {
     refreshing = false;
     // Only register service worker in browser environment

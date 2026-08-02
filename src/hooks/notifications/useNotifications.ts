@@ -1,7 +1,12 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useMemo } from "react";
 import * as Sentry from "@sentry/nextjs";
 
@@ -24,21 +29,21 @@ interface FetchResponse {
  * React Query hook for fetching user notifications with action-based prioritization.
  * Separates urgent conflict notifications from general feed.
  * Implements infinite scroll pagination for the general feed.
- * 
+ *
  * @param enabled - Whether queries should run (default: true)
  * @param countOnly - When true, only the lightweight unread-count query runs; the action
  *   conflict query and infinite feed query (both with 30 s polling) are skipped. Use this
  *   in contexts that only need the badge number (e.g. the navbar) to avoid firing two
  *   unnecessary Supabase requests on every protected page.
  * @returns Object containing action notifications, paginated feed, and utility functions
- * 
+ *
  * Features:
  * - Priority query for unread conflicts (auto-refresh every 30s)
  * - Lightweight head-only unread count (accurate total; refreshed on explicit invalidation)
  * - Infinite scroll pagination for general feed (15 items per page)
  * - Mark as read with cache invalidation after server confirmation
  * - Automatic cache invalidation
- * 
+ *
  * @example
  * ```tsx
  * // Full notifications page
@@ -64,12 +69,14 @@ export function useNotifications(enabled = true, countOnly = false) {
         .from("notification")
         .select("*")
         .eq("auth_user_id", session.user.id)
-        .eq("is_read", false)        // ALL unread
+        .eq("is_read", false) // ALL unread
         .order("created_at", { ascending: false });
 
       if (error) {
-         Sentry.captureException(error, { tags: { type: "notification_fetch_unread" } });
-         throw error;
+        Sentry.captureException(error, {
+          tags: { type: "notification_fetch_unread" },
+        });
+        throw error;
       }
       return data as Notification[];
     },
@@ -103,12 +110,16 @@ export function useNotifications(enabled = true, countOnly = false) {
         .range(from, to);
 
       if (error) {
-          Sentry.captureException(error, { tags: { type: "notification_fetch_feed" } });
-          throw error;
+        Sentry.captureException(error, {
+          tags: { type: "notification_fetch_feed" },
+        });
+        throw error;
       }
 
       const notifications = data as Notification[];
-      const nextPage = notifications.length === PAGE_SIZE ? (pageParam as number) + 1 : null;
+      const nextPage = notifications.length === PAGE_SIZE
+        ? (pageParam as number) + 1
+        : null;
 
       return { data: notifications, nextPage };
     },
@@ -120,32 +131,36 @@ export function useNotifications(enabled = true, countOnly = false) {
 
   // 3. COMBINE & DEDUPLICATE (Memoized)
   const { actionNotifications, regularNotifications } = useMemo(() => {
-      const allUnread = allUnreadData || [];
-      const rawFeed = feedData?.pages.flatMap((page) => page.data) || [];
-      
-      // Separate unread into Actions (Conflicts) and Regular
-      const actions = allUnread.filter(n => n.topic?.toLowerCase().includes("conflict"));
-      const unreadRegular = allUnread.filter(n => !n.topic?.toLowerCase().includes("conflict"));
+    const allUnread = allUnreadData || [];
+    const rawFeed = feedData?.pages.flatMap((page) => page.data) || [];
 
-      // Deduplicate feed: items in feed might also be in allUnread
-      const unreadIds = new Set(allUnread.map(n => String(n.id)));
-      
-      // Find read items from the feed to show in "EARLIER" section
-      const readFromFeed: Notification[] = [];
-      const seenIds = new Set<string>();
-      
-      for (const n of rawFeed) {
-          const sid = String(n.id);
-          if (!seenIds.has(sid) && !unreadIds.has(sid)) {
-              seenIds.add(sid);
-              readFromFeed.push(n);
-          }
+    // Separate unread into Actions (Conflicts) and Regular
+    const actions = allUnread.filter((n) =>
+      n.topic?.toLowerCase().includes("conflict")
+    );
+    const unreadRegular = allUnread.filter((n) =>
+      !n.topic?.toLowerCase().includes("conflict")
+    );
+
+    // Deduplicate feed: items in feed might also be in allUnread
+    const unreadIds = new Set(allUnread.map((n) => String(n.id)));
+
+    // Find read items from the feed to show in "EARLIER" section
+    const readFromFeed: Notification[] = [];
+    const seenIds = new Set<string>();
+
+    for (const n of rawFeed) {
+      const sid = String(n.id);
+      if (!seenIds.has(sid) && !unreadIds.has(sid)) {
+        seenIds.add(sid);
+        readFromFeed.push(n);
       }
+    }
 
-      // regularNotifications contains all unread regular + read items from feed
-      const regular = [...unreadRegular, ...readFromFeed];
+    // regularNotifications contains all unread regular + read items from feed
+    const regular = [...unreadRegular, ...readFromFeed];
 
-      return { actionNotifications: actions, regularNotifications: regular };
+    return { actionNotifications: actions, regularNotifications: regular };
   }, [allUnreadData, feedData]);
 
   // 3b. TOTAL UNREAD COUNT — head-only query (no refetchInterval; refreshed on
@@ -166,7 +181,10 @@ export function useNotifications(enabled = true, countOnly = false) {
 
       if (error) {
         Sentry.captureException(error, {
-          tags: { type: "notification_unread_count_failure", location: "useNotifications/unreadCountQuery" },
+          tags: {
+            type: "notification_unread_count_failure",
+            location: "useNotifications/unreadCountQuery",
+          },
         });
         return 0;
       }
@@ -198,55 +216,80 @@ export function useNotifications(enabled = true, countOnly = false) {
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
 
       // Snapshot the previous values
-      const previousUnread = queryClient.getQueryData<Notification[]>(["notifications", "unread"]);
-      const previousFeed = queryClient.getQueryData<{ pages: FetchResponse[]; pageParams: Array<unknown> }>(["notifications", "feed"]);
-      const previousUnreadCount = queryClient.getQueryData<number>(["notifications", "unreadCount"]);
+      const previousUnread = queryClient.getQueryData<Notification[]>([
+        "notifications",
+        "unread",
+      ]);
+      const previousFeed = queryClient.getQueryData<
+        { pages: FetchResponse[]; pageParams: Array<unknown> }
+      >(["notifications", "feed"]);
+      const previousUnreadCount = queryClient.getQueryData<number>([
+        "notifications",
+        "unreadCount",
+      ]);
 
       // 1. Optimistically update unread count
       if (id) {
         // Individual item toggle
-        queryClient.setQueryData<number>(["notifications", "unreadCount"], (old = 0) => {
-          return isRead ? Math.max(0, old - 1) : old + 1;
-        });
+        queryClient.setQueryData<number>(
+          ["notifications", "unreadCount"],
+          (old = 0) => {
+            return isRead ? Math.max(0, old - 1) : old + 1;
+          },
+        );
       } else {
         // Mark all as read
-        if (isRead) queryClient.setQueryData(["notifications", "unreadCount"], 0);
+        if (isRead) {
+          queryClient.setQueryData(["notifications", "unreadCount"], 0);
+        }
       }
 
       // 2. Optimistically update feed (all notifications)
       if (previousFeed) {
         queryClient.setQueryData(["notifications", "feed"], {
           ...previousFeed,
-          pages: previousFeed.pages.map(page => ({
+          pages: previousFeed.pages.map((page) => ({
             ...page,
-            data: page.data.map(n => {
+            data: page.data.map((n) => {
               if (id) {
                 return n.id === id ? { ...n, is_read: isRead } : n;
               } else {
                 return n.is_read !== isRead ? { ...n, is_read: isRead } : n;
               }
-            })
-          }))
+            }),
+          })),
         });
       }
 
       // 3. Optimistically update unread query (Actions + Regular Unread)
       if (id) {
-        const itemInUnread = previousUnread?.find(n => n.id === id);
-        const itemInFeed = previousFeed?.pages.flatMap(p => p.data).find(n => n.id === id);
+        const itemInUnread = previousUnread?.find((n) => n.id === id);
+        const itemInFeed = previousFeed?.pages.flatMap((p) => p.data).find(
+          (n) => n.id === id,
+        );
         const notification = itemInUnread || itemInFeed;
 
         if (isRead) {
           // Marking as read -> remove from unread list
-          queryClient.setQueryData<Notification[]>(["notifications", "unread"], (old = []) => 
-            old.filter(n => n.id !== id)
+          queryClient.setQueryData<Notification[]>(
+            ["notifications", "unread"],
+            (old = []) => old.filter((n) => n.id !== id),
           );
         } else if (notification) {
           // Marking as unread -> add to unread list
-          queryClient.setQueryData<Notification[]>(["notifications", "unread"], (old = []) => {
-            const updated = [{ ...notification, is_read: false }, ...old.filter(n => n.id !== id)];
-            return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          });
+          queryClient.setQueryData<Notification[]>(
+            ["notifications", "unread"],
+            (old = []) => {
+              const updated = [
+                { ...notification, is_read: false },
+                ...old.filter((n) => n.id !== id),
+              ];
+              return updated.sort((a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+              );
+            },
+          );
         }
       } else if (isRead) {
         // Mark all as read -> clear unread
@@ -257,13 +300,31 @@ export function useNotifications(enabled = true, countOnly = false) {
     },
     onError: (err, variables, context: Record<string, unknown> | undefined) => {
       // Rollback on error
-      if (context?.previousUnread) queryClient.setQueryData(["notifications", "unread"], context.previousUnread);
-      if (context?.previousFeed) queryClient.setQueryData(["notifications", "feed"], context.previousFeed);
-      if (context?.previousUnreadCount !== undefined) queryClient.setQueryData(["notifications", "unreadCount"], context.previousUnreadCount);
+      if (context?.previousUnread) {
+        queryClient.setQueryData(
+          ["notifications", "unread"],
+          context.previousUnread,
+        );
+      }
+      if (context?.previousFeed) {
+        queryClient.setQueryData(
+          ["notifications", "feed"],
+          context.previousFeed,
+        );
+      }
+      if (context?.previousUnreadCount !== undefined) {
+        queryClient.setQueryData(
+          ["notifications", "unreadCount"],
+          context.previousUnreadCount,
+        );
+      }
 
-      Sentry.captureException(err, { 
-        tags: { type: "notification_mark_read_failure", location: "useNotifications/markReadMutation" },
-        extra: { notificationId: variables.id, isRead: variables.isRead }
+      Sentry.captureException(err, {
+        tags: {
+          type: "notification_mark_read_failure",
+          location: "useNotifications/markReadMutation",
+        },
+        extra: { notificationId: variables.id, isRead: variables.isRead },
       });
     },
     onSettled: () => {
@@ -273,17 +334,19 @@ export function useNotifications(enabled = true, countOnly = false) {
   });
 
   return {
-    actionNotifications,   // Always Unread Conflicts
-    regularNotifications,  // Everything else
+    actionNotifications, // Always Unread Conflicts
+    regularNotifications, // Everything else
     unreadCount,
     isLoading: isUnreadLoading || isFeedLoading,
     error,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    markAsRead: (id: number) => updateStatusMutation.mutate({ id, isRead: true }),
-    toggleRead: (id: number, currentStatus: boolean) => updateStatusMutation.mutate({ id, isRead: !currentStatus }),
+    markAsRead: (id: number) =>
+      updateStatusMutation.mutate({ id, isRead: true }),
+    toggleRead: (id: number, currentStatus: boolean) =>
+      updateStatusMutation.mutate({ id, isRead: !currentStatus }),
     markAllAsRead: () => updateStatusMutation.mutate({ isRead: true }),
-    isMarkingRead: updateStatusMutation.isPending
+    isMarkingRead: updateStatusMutation.isPending,
   };
 }
