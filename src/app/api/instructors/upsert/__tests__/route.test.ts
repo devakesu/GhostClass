@@ -118,6 +118,8 @@ describe("POST /api/instructors/upsert", () => {
     expect(await res.json()).toEqual({
       message: "Instructor saved successfully",
     });
+    expect(mockFrom).toHaveBeenCalledWith("class_courses");
+    expect(mockFrom).toHaveBeenCalledWith("course_instructors");
     expect(mockUpsert).toHaveBeenCalledWith({
       class_id: "class-456",
       course_code: "CS101",
@@ -129,7 +131,9 @@ describe("POST /api/instructors/upsert", () => {
   });
 
   it("returns 500 when database upsert fails", async () => {
-    mockUpsert.mockResolvedValueOnce({ error: { message: "Upsert failed" } });
+    mockUpsert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: "Upsert failed" } });
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/instructors/upsert", {
       method: "POST",

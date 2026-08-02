@@ -5,6 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import { courseCodeSchema, personNameSchema } from "@/lib/validation/text";
+import { normalizeCourseCode } from "@/lib/utils";
 
 async function authenticateRequest(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -78,11 +79,22 @@ async function handler(
     const { user, supabase } = auth;
 
     // Get user's class context
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("class_id")
-      .eq("auth_id", user.id)
-      .single();
+    const { data: profile, error: profileError } =
+      await (supabase as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            eq: (k: string, v: string) => {
+              single: () => Promise<
+                { data: { class_id: string } | null; error: unknown }
+              >;
+            };
+          };
+        };
+      })
+        .from("users")
+        .select("class_id")
+        .eq("auth_id", user.id)
+        .single();
 
     if (profileError || !profile?.class_id) {
       logger.error(
@@ -94,12 +106,51 @@ async function handler(
       }, { status: 400 });
     }
 
+    const normalizedCode = normalizeCourseCode(courseCode);
+    const optionalCourseName = typeof rawBody.courseName === "string"
+      ? rawBody.courseName.trim()
+      : "";
+
+    // Ensure class_courses record exists (satisfying foreign key course_instructors_class_course_fkey)
+    const { error: courseError } = await (supabase as unknown as {
+      from: (t: string) => {
+        upsert: (
+          d: Record<string, unknown>,
+          opt?: { onConflict?: string; ignoreDuplicates?: boolean },
+        ) => Promise<{ error: { code: string; message: string } | null }>;
+      };
+    })
+      .from("class_courses")
+      .upsert({
+        class_id: profile.class_id,
+        course_code: normalizedCode,
+        course_name: optionalCourseName || normalizedCode,
+        created_by: user.id,
+      }, {
+        onConflict: "class_id, course_code",
+        ignoreDuplicates: true,
+      });
+
+    if (courseError) {
+      logger.error(
+        "API Instructor Upsert: Database upsert failed for class_courses pre-requisite",
+        courseError,
+      );
+    }
+
     // Upsert into course_instructors (communal mapping shared by the class)
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await (supabase as unknown as {
+      from: (t: string) => {
+        upsert: (
+          d: Record<string, unknown>,
+          opt?: { onConflict?: string },
+        ) => Promise<{ error: { code: string; message: string } | null }>;
+      };
+    })
       .from("course_instructors")
       .upsert({
         class_id: profile.class_id,
-        course_code: courseCode,
+        course_code: normalizedCode,
         instructor_name: instructorName,
         updated_by: user.id,
       }, {

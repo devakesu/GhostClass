@@ -56,6 +56,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCourseLookup } from "@/hooks/courses/useCourseLookup";
 import { AttendanceReport, Course, TrackAttendance } from "@/types";
@@ -772,6 +773,84 @@ function useActiveCourseScrollSync(
   };
 }
 
+function renderBadgeContent(
+  selectedCourseFilter: string,
+  onlyDutyLeave: boolean,
+  totalFilteredCount: number,
+  count: number | undefined,
+  groupedAllData: Map<string, TrackAttendance[]>,
+): React.ReactNode {
+  if (selectedCourseFilter === "all") {
+    if (onlyDutyLeave) {
+      return (
+        <>
+          Showing <strong>{totalFilteredCount}</strong> duty leave{" "}
+          {totalFilteredCount === 1 ? "record" : "records"}.
+        </>
+      );
+    }
+    return (
+      <>
+        You have added <strong>{count}</strong>{" "}
+        {count === 1 ? "class" : "classes"}.
+      </>
+    );
+  }
+
+  const subjectCount = groupedAllData.get(selectedCourseFilter)?.length || 0;
+  return (
+    <>
+      <strong>{subjectCount}</strong>{" "}
+      {onlyDutyLeave ? "duty leave " : ""}recorded for this subject.
+    </>
+  );
+}
+
+function CourseFilterSelectItem({
+  courseKey,
+  getCourseNameById,
+  getCourseCodeById,
+  isCourseDisabled,
+  groupedAllData,
+}: {
+  courseKey: string;
+  getCourseNameById: (id: string) => string;
+  getCourseCodeById: (id: string) => string;
+  isCourseDisabled: (code: string) => boolean;
+  groupedAllData: Map<string, TrackAttendance[]>;
+}) {
+  const displayCourseName = getCourseNameById(courseKey);
+  const courseCount = groupedAllData.get(courseKey)?.length || 0;
+  const courseCode = getCourseCodeById(courseKey).toUpperCase();
+  const isDisabled = isCourseDisabled(courseCode);
+
+  return (
+    <SelectItem
+      value={courseKey}
+      className="whitespace-normal py-2"
+      textValue={`${displayCourseName}${isDisabled ? " (Disabled)" : ""}`}
+    >
+      <div className="flex items-center justify-between gap-4 w-full py-0.5">
+        <span
+          className={cn(
+            "flex-1 leading-tight text-left capitalize whitespace-normal wrap-break-word",
+            isDisabled && "opacity-60 italic",
+          )}
+        >
+          {displayCourseName.toLowerCase()}
+          {isDisabled && " (Disabled)"}
+        </span>
+        <Badge
+          variant="secondary"
+          className="h-4 px-1 text-[10px] shrink-0 bg-primary/10 text-primary border-none"
+        >
+          {courseCount}
+        </Badge>
+      </div>
+    </SelectItem>
+  );
+}
+
 function CourseFilterControls({
   selectedCourseFilter,
   setSelectedCourseFilter,
@@ -783,6 +862,8 @@ function CourseFilterControls({
   groupedAllData,
   count,
   setDeleteAllConfirmOpen,
+  onlyDutyLeave,
+  setOnlyDutyLeave,
 }: {
   selectedCourseFilter: string;
   setSelectedCourseFilter: (val: string) => void;
@@ -794,6 +875,8 @@ function CourseFilterControls({
   groupedAllData: Map<string, TrackAttendance[]>;
   count: number | undefined;
   setDeleteAllConfirmOpen: (open: boolean) => void;
+  onlyDutyLeave: boolean;
+  setOnlyDutyLeave: (val: boolean) => void;
 }) {
   const isAll = selectedCourseFilter === "all";
   const labelSuffix = count === 1 ? "" : "es";
@@ -801,92 +884,90 @@ function CourseFilterControls({
     ? `Delete all ${count} tracked class${labelSuffix}`
     : `Clear all records for this subject`;
 
+  const totalFilteredCount = useMemo(() => {
+    let sum = 0;
+    groupedAllData.forEach((items) => {
+      sum += items.length;
+    });
+    return sum;
+  }, [groupedAllData]);
+
+  const badgeContent = renderBadgeContent(
+    selectedCourseFilter,
+    onlyDutyLeave,
+    totalFilteredCount,
+    count,
+    groupedAllData,
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="w-full max-w-md mx-auto px-1">
-        <Select
-          value={selectedCourseFilter}
-          onValueChange={(val) => {
-            setSelectedCourseFilter(val);
-            setCurrentPage(0);
-          }}
-        >
-          <SelectTrigger className="bg-background/40 hover:bg-background/60 border-border/50 h-auto min-h-11 py-2 w-full backdrop-blur-md shadow-sm transition-all duration-300 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-normal text-left [&>span]:line-clamp-none">
-            <div className="flex items-center gap-2.5 w-full">
-              <Filter
-                size={15}
-                className={cn(
-                  "shrink-0 transition-colors",
-                  selectedCourseFilter !== "all"
-                    ? "text-primary"
-                    : "text-muted-foreground",
-                )}
-              />
-              <SelectValue placeholder="All Subjects" />
-            </div>
-          </SelectTrigger>
-          <SelectContent className="max-h-75 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-40px)]">
-            <SelectItem value="all">
-              <span className="font-medium text-primary">
-                All Subjects
-              </span>
-            </SelectItem>
-            {allCourseKeys.map((courseKey) => {
-              const displayCourseName = getCourseNameById(courseKey);
-              const courseCount = groupedAllData.get(courseKey)?.length || 0;
-              const courseCode = getCourseCodeById(courseKey).toUpperCase();
-              const isDisabled = isCourseDisabled(courseCode);
-
-              return (
-                <SelectItem
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-center w-full max-w-lg mx-auto px-1">
+        <div className="w-full sm:flex-1">
+          <Select
+            value={selectedCourseFilter}
+            onValueChange={(val) => {
+              setSelectedCourseFilter(val);
+              setCurrentPage(0);
+            }}
+          >
+            <SelectTrigger className="bg-background/40 hover:bg-background/60 border-border/50 h-auto min-h-11 py-2 w-full backdrop-blur-md shadow-sm transition-all duration-300 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-normal text-left [&>span]:line-clamp-none">
+              <div className="flex items-center gap-2.5 w-full">
+                <Filter
+                  size={15}
+                  className={cn(
+                    "shrink-0 transition-colors",
+                    selectedCourseFilter !== "all"
+                      ? "text-primary"
+                      : "text-muted-foreground",
+                  )}
+                />
+                <SelectValue placeholder="All Subjects" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="max-h-75 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-40px)]">
+              <SelectItem value="all">
+                <span className="font-medium text-primary">
+                  All Subjects
+                </span>
+              </SelectItem>
+              {allCourseKeys.map((courseKey) => (
+                <CourseFilterSelectItem
                   key={courseKey}
-                  value={courseKey}
-                  className="whitespace-normal py-2"
-                  textValue={`${displayCourseName}${
-                    isDisabled ? " (Disabled)" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4 w-full py-0.5">
-                    <span
-                      className={cn(
-                        "flex-1 leading-tight text-left capitalize whitespace-normal wrap-break-word",
-                        isDisabled && "opacity-60 italic",
-                      )}
-                    >
-                      {displayCourseName.toLowerCase()}
-                      {isDisabled && " (Disabled)"}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className="h-4 px-1 text-[10px] shrink-0 bg-primary/10 text-primary border-none"
-                    >
-                      {courseCount}
-                    </Badge>
-                  </div>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+                  courseKey={courseKey}
+                  getCourseNameById={getCourseNameById}
+                  getCourseCodeById={getCourseCodeById}
+                  isCourseDisabled={isCourseDisabled}
+                  groupedAllData={groupedAllData}
+                />
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 w-full sm:w-auto shrink-0 bg-background/40 hover:bg-background/60 border border-border/50 h-11 px-3.5 rounded-md backdrop-blur-md shadow-sm transition-all duration-300">
+          <label
+            htmlFor="duty-leave-toggle"
+            className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400 cursor-pointer select-none flex items-center gap-1.5"
+          >
+            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+            Duty Leave
+          </label>
+          <Switch
+            id="duty-leave-toggle"
+            checked={onlyDutyLeave}
+            onCheckedChange={(checked) => {
+              setOnlyDutyLeave(checked);
+              setCurrentPage(0);
+            }}
+            aria-label="Toggle duty leave filter"
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center justify-center">
         <Badge className="text-sm py-1 px-3 bg-yellow-500/12 text-yellow-600 dark:text-yellow-400 border border-yellow-500/40 dark:border-yellow-500/20">
-          {selectedCourseFilter === "all"
-            ? (
-              <>
-                You have added <strong>{count}</strong>{" "}
-                {count === 1 ? "class" : "classes"}.
-              </>
-            )
-            : (
-              <>
-                <strong>
-                  {groupedAllData.get(selectedCourseFilter)?.length}
-                </strong>{" "}
-                recorded for this subject.
-              </>
-            )}
+          {badgeContent}
         </Badge>
         <button
           onClick={() => setDeleteAllConfirmOpen(true)}
@@ -1072,26 +1153,41 @@ function CourseListContainer({
         key={currentPage}
         className="flex flex-col gap-6 overflow-visible"
       >
-        {currentCourseKeys.map((courseName) => (
-          <CourseSectionCard
-            key={courseName}
-            courseName={courseName}
-            groupedAllData={groupedAllData}
-            getCourseNameById={getCourseNameById}
-            getCourseCodeById={getCourseCodeById}
-            isCourseDisabled={isCourseDisabled}
-            expandedCourses={expandedCourses}
-            recordsPerCourseInitial={recordsPerCourseInitial}
-            getStatusKey={getStatusKey}
-            attendanceData={attendanceData}
-            officialSessionsMap={officialSessionsMap}
-            deleteId={deleteId}
-            setDeleteConfirmOpen={setDeleteConfirmOpen}
-            getResolvedSessionName={getResolvedSessionName}
-            toggleCourseExpansion={toggleCourseExpansion}
-            courseHeaderRefs={courseHeaderRefs}
-          />
-        ))}
+        {currentCourseKeys.length === 0
+          ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-xl border border-dashed border-border/60 bg-background/20">
+              <Filter className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <h3 className="font-semibold text-foreground/80">
+                No matching records found
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                No tracking records match your active filters. Try adjusting
+                your subject or Duty Leave filter.
+              </p>
+            </div>
+          )
+          : (
+            currentCourseKeys.map((courseName) => (
+              <CourseSectionCard
+                key={courseName}
+                courseName={courseName}
+                groupedAllData={groupedAllData}
+                getCourseNameById={getCourseNameById}
+                getCourseCodeById={getCourseCodeById}
+                isCourseDisabled={isCourseDisabled}
+                expandedCourses={expandedCourses}
+                recordsPerCourseInitial={recordsPerCourseInitial}
+                getStatusKey={getStatusKey}
+                attendanceData={attendanceData}
+                officialSessionsMap={officialSessionsMap}
+                deleteId={deleteId}
+                setDeleteConfirmOpen={setDeleteConfirmOpen}
+                getResolvedSessionName={getResolvedSessionName}
+                toggleCourseExpansion={toggleCourseExpansion}
+                courseHeaderRefs={courseHeaderRefs}
+              />
+            ))
+          )}
       </div>
 
       {totalPages > 1 && (
@@ -1302,6 +1398,7 @@ export default function TrackingClient() {
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>(
     "all",
   );
+  const [onlyDutyLeave, setOnlyDutyLeave] = useState<boolean>(false);
 
   // Reset to first page when filter changes is handled by the Select onValueChange.
 
@@ -1420,7 +1517,7 @@ export default function TrackingClient() {
   });
 
   // --- 1. GROUP AND SORT DATA ---
-  const groupedAllData = useMemo(
+  const unfilteredGroupedData = useMemo(
     () =>
       groupAndSortTrackingData(
         trackingData,
@@ -1430,31 +1527,60 @@ export default function TrackingClient() {
     [trackingData, semesterData, academicYearData],
   );
 
+  const filteredTrackingData = useMemo(() => {
+    if (!trackingData) return [];
+    if (!onlyDutyLeave) return trackingData;
+    return trackingData.filter((item) => Number(item.attendance) === 225);
+  }, [trackingData, onlyDutyLeave]);
+
+  const groupedAllData = useMemo(
+    () =>
+      groupAndSortTrackingData(
+        filteredTrackingData,
+        semesterData ?? undefined,
+        academicYearData ?? undefined,
+      ),
+    [filteredTrackingData, semesterData, academicYearData],
+  );
+
   const allCourseKeys = useMemo(
     () =>
       sortAllCourseKeys(
-        groupedAllData.keys(),
+        unfilteredGroupedData.keys(),
         getCourseCodeById,
         getCourseNameById,
         isCourseDisabled,
       ),
-    [groupedAllData, isCourseDisabled, getCourseCodeById, getCourseNameById],
+    [
+      unfilteredGroupedData,
+      isCourseDisabled,
+      getCourseCodeById,
+      getCourseNameById,
+    ],
   );
 
   const effectiveCourseFilter = selectedCourseFilter !== "all" &&
-      (!groupedAllData.get(selectedCourseFilter)?.length)
+      (!unfilteredGroupedData.get(selectedCourseFilter)?.length)
     ? "all"
     : selectedCourseFilter;
 
   const filteredCourseKeys = useMemo(
-    () =>
-      filterCourseKeys(
+    () => {
+      const keys = filterCourseKeys(
         allCourseKeys,
         effectiveCourseFilter,
         getCourseCodeById,
         isCourseDisabled,
-      ),
-    [allCourseKeys, effectiveCourseFilter, isCourseDisabled, getCourseCodeById],
+      );
+      return keys.filter((k) => (groupedAllData.get(k)?.length ?? 0) > 0);
+    },
+    [
+      allCourseKeys,
+      effectiveCourseFilter,
+      groupedAllData,
+      isCourseDisabled,
+      getCourseCodeById,
+    ],
   );
 
   const totalPages = Math.ceil(filteredCourseKeys.length / coursesPerPage);
@@ -1662,6 +1788,8 @@ export default function TrackingClient() {
               groupedAllData={groupedAllData}
               count={count}
               setDeleteAllConfirmOpen={setDeleteAllConfirmOpen}
+              onlyDutyLeave={onlyDutyLeave}
+              setOnlyDutyLeave={setOnlyDutyLeave}
             />
           )}
 

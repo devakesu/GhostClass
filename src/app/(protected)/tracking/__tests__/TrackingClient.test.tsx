@@ -655,5 +655,59 @@ describe("TrackingClient", () => {
       // formatDisplayDate('invalid') → normalizeDate → '' → length !== 8 → returns 'invalid'
       expect(await screen.findByText("invalid")).toBeInTheDocument();
     });
+
+    it("filters records when Duty Leave toggle is toggled", async () => {
+      const records = [
+        {
+          auth_user_id: "user-1",
+          course: "CS101",
+          session: "I",
+          date: "2024-09-01",
+          attendance: 225, // Duty Leave
+          status: "extra",
+          semester: "even",
+          year: "2024-25",
+        },
+        {
+          auth_user_id: "user-1",
+          course: "CS101",
+          session: "II",
+          date: "2024-09-02",
+          attendance: 110, // Present
+          status: "extra",
+          semester: "even",
+          year: "2024-25",
+        },
+      ];
+
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: records as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 2,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 2, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // Initially shows 2 classes in badge
+      expect(await screen.findByText(/You have added/)).toBeInTheDocument();
+
+      // Find the duty leave switch
+      const toggle = screen.getByLabelText("Toggle duty leave filter");
+      expect(toggle).toBeInTheDocument();
+
+      fireEvent.click(toggle);
+
+      // Verify Duty Leave filter active badge text
+      await waitFor(() => {
+        expect(screen.getByText(/Showing/)).toBeInTheDocument();
+        expect(screen.getByText(/duty leave record/)).toBeInTheDocument();
+      });
+    });
   });
 });

@@ -38,6 +38,7 @@ class TrackingScreen extends ConsumerStatefulWidget {
 class _TrackingScreenState extends ConsumerState<TrackingScreen>
     with ErrorHandlerMixin {
   String _selectedCourse = 'all';
+  bool _onlyDutyLeave = false;
 
   @override
   Widget build(BuildContext context) {
@@ -107,8 +108,24 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             .toSet() ??
         {};
 
+    final processedGroupedByCourse = <String, List<TrackingRecord>>{};
+    if (_onlyDutyLeave) {
+      data.groupedByCourse.forEach((key, list) {
+        final filtered = list.where((r) {
+          final att = r.attendance;
+          return att == 225 || att == '225';
+        }).toList();
+        if (filtered.isNotEmpty) {
+          processedGroupedByCourse[key] = filtered;
+        }
+      });
+    } else {
+      processedGroupedByCourse.addAll(data.groupedByCourse);
+    }
+
     final filteredCourseKeys = _selectedCourse == 'all'
         ? sortedCourseKeys.where((k) {
+            if (!processedGroupedByCourse.containsKey(k)) return false;
             final mergedCourse = (dashboard?.courses ?? [])
                 .cast<CourseDetails?>()
                 .firstWhere((c) => c?.safeId == k, orElse: () => null);
@@ -119,7 +136,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             );
             return !disabledCodes.contains((displayCode ?? '').toUpperCase());
           }).toList()
-        : sortedCourseKeys.where((k) => k == _selectedCourse).toList();
+        : sortedCourseKeys
+              .where(
+                (k) =>
+                    k == _selectedCourse &&
+                    processedGroupedByCourse.containsKey(k),
+              )
+              .toList();
 
     return ServiceRefreshIndicator(
       onRefresh: () async {
@@ -218,21 +241,32 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Flexible(
-                        child: TrackingFilterChip(
-                          selectedCourse: _selectedCourse,
-                          officialReport: data.officialReport,
-                          allCourses: dashboard?.courses,
-                          onTap: () => _showSubjectPicker(
-                            data.groupedByCourse,
-                            data.officialReport,
-                            dashboard?.courses,
-                            sortedCourseKeys,
-                          ),
-                          onClear: () =>
-                              setState(() => _selectedCourse = 'all'),
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            TrackingFilterChip(
+                              selectedCourse: _selectedCourse,
+                              officialReport: data.officialReport,
+                              allCourses: dashboard?.courses,
+                              onTap: () => _showSubjectPicker(
+                                data.groupedByCourse,
+                                data.officialReport,
+                                dashboard?.courses,
+                                sortedCourseKeys,
+                              ),
+                              onClear: () =>
+                                  setState(() => _selectedCourse = 'all'),
+                            ),
+                            _DutyLeaveFilterChip(
+                              isActive: _onlyDutyLeave,
+                              onTap: () => setState(
+                                () => _onlyDutyLeave = !_onlyDutyLeave,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -246,6 +280,49 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             const SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyTrackingState(),
+            )
+          else if (filteredCourseKeys.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        LucideIcons.filter,
+                        size: 48,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No matching records',
+                        style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No tracking records match your selected filters.',
+                        style: GoogleFonts.manrope(
+                          fontSize: 13,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
 
           // --- Sync Indicator ---
@@ -314,7 +391,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           for (final courseKey in filteredCourseKeys)
             TrackingCourseSection(
               courseKey: courseKey,
-              records: data.groupedByCourse[courseKey] ?? [],
+              records: processedGroupedByCourse[courseKey] ?? [],
               officialReport: data.officialReport,
               allCourses: dashboard?.courses,
               onDelete: _showDeleteRecordConfirm,
@@ -709,5 +786,74 @@ class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_ModalHeaderDelegate oldDelegate) {
     return oldDelegate.onClose != onClose;
+  }
+}
+
+class _DutyLeaveFilterChip extends StatelessWidget {
+  const _DutyLeaveFilterChip({
+    required this.isActive,
+    required this.onTap,
+  });
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ghostColors = Theme.of(context).extension<GhostColors>();
+    final dutyColor = ghostColors?.accentOrange ?? Colors.orange;
+
+    return Semantics(
+      button: true,
+      label: 'Filter by Duty Leave ${isActive ? "active" : "inactive"}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive
+                ? dutyColor.withValues(alpha: 0.1)
+                : Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActive
+                  ? dutyColor.withValues(alpha: 0.45)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isActive ? LucideIcons.check : LucideIcons.circle,
+                size: 14,
+                color: isActive
+                    ? dutyColor
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Duty Leave Only',
+                style: GoogleFonts.manrope(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isActive
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

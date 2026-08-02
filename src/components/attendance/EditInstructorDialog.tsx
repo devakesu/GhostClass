@@ -85,6 +85,7 @@ export function EditInstructorDialog({
     try {
       const formData = new FormData();
       formData.append("courseCode", courseCode);
+      formData.append("courseName", courseName);
       formData.append("instructorName", name);
       formData.append("cf-turnstile-response", token);
 

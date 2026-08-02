@@ -247,12 +247,15 @@ class ApiService {
     required String courseCode,
     required String instructorName,
     required String supabaseToken,
+    String? courseName,
   }) async {
     return client.post(
       '${AppConfig.ghostclassApiUrl}/instructors/upsert',
       data: {
         'courseCode': courseCode,
         'instructorName': instructorName,
+        if (courseName != null && courseName.isNotEmpty)
+          'courseName': courseName,
       },
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );

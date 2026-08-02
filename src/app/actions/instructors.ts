@@ -73,6 +73,39 @@ export async function upsertInstructorAction(
     }
     const { user, classId, supabase } = contextRes;
 
+    const normalizedCode = normalizeCourseCode(courseCode);
+    const courseNameValue = formData.get("courseName");
+    const optionalCourseName = typeof courseNameValue === "string"
+      ? courseNameValue.trim()
+      : "";
+
+    // Ensure class_courses record exists (satisfying foreign key course_instructors_class_course_fkey)
+    const { error: courseError } = await (supabase as {
+      from: (t: string) => {
+        upsert: (
+          d: Record<string, unknown>,
+          opt?: { onConflict?: string; ignoreDuplicates?: boolean },
+        ) => Promise<{ error: { code: string; message: string } | null }>;
+      };
+    })
+      .from("class_courses")
+      .upsert({
+        class_id: classId,
+        course_code: normalizedCode,
+        course_name: optionalCourseName || normalizedCode,
+        created_by: user.id,
+      }, {
+        onConflict: "class_id, course_code",
+        ignoreDuplicates: true,
+      });
+
+    if (courseError) {
+      logger.error(
+        "Database upsert failed for class_courses pre-requisite",
+        courseError,
+      );
+    }
+
     // Upsert into course_instructors (communal mapping shared by the class)
     const { error: upsertError } = await (supabase as {
       from: (t: string) => {
@@ -85,7 +118,7 @@ export async function upsertInstructorAction(
       .from("course_instructors")
       .upsert({
         class_id: classId,
-        course_code: normalizeCourseCode(courseCode),
+        course_code: normalizedCode,
         instructor_name: instructorName,
         updated_by: user.id,
       }, {
