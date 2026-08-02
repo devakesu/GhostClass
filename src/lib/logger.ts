@@ -58,15 +58,34 @@ function buildStructuredPayload(level: string, args: unknown[]) {
   return safeStringify(payload);
 }
 
+export type LogEntry = {
+  level: "dev" | "info" | "warn" | "error";
+  args: unknown[];
+};
+export const testLogs: LogEntry[] = [];
+
+/**
+ * Resets captured test logs.
+ */
+export function clearTestLogs(): void {
+  testLogs.length = 0;
+}
+
 export const logger = {
   dev: (...args: unknown[]) => {
+    if (isTest) {
+      testLogs.push({ level: "dev", args });
+    }
     if (isDevelopment) {
       console.log(...args);
     }
   },
 
   warn: (...args: unknown[]) => {
-    if (isTest) return;
+    if (isTest) {
+      testLogs.push({ level: "warn", args });
+      return;
+    }
     if (process.env.NODE_ENV === "production") {
       console.warn(buildStructuredPayload("warn", args));
     } else {
@@ -75,7 +94,10 @@ export const logger = {
   },
 
   error: (...args: unknown[]) => {
-    if (isTest) return;
+    if (isTest) {
+      testLogs.push({ level: "error", args });
+      return;
+    }
     if (process.env.NODE_ENV === "production") {
       console.error(buildStructuredPayload("error", args));
     } else {
@@ -84,6 +106,9 @@ export const logger = {
   },
 
   info: (...args: unknown[]) => {
+    if (isTest) {
+      testLogs.push({ level: "info", args });
+    }
     if (process.env.NODE_ENV === "production") {
       console.info(buildStructuredPayload("info", args));
     } else {

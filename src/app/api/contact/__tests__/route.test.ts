@@ -32,9 +32,14 @@ vi.mock("@/lib/contact/service", () => ({
   },
 }));
 
-vi.mock("@/lib/utils.server", () => ({
-  getClientIp: vi.fn(),
-}));
+vi.mock("@/lib/utils.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/utils.server")>();
+  return {
+    ...actual,
+    getClientIp: vi.fn(),
+    redact: vi.fn((_, val) => val),
+  };
+});
 
 vi.mock("@/lib/ratelimit", () => ({
   contactRateLimiter: {

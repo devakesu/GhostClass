@@ -109,8 +109,8 @@ describe("POST /api/logout", () => {
       expect(res.status).toBe(429);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
-      expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
-      expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+      expect(res.headers.get("X-RateLimit-Limit")).toBeNull();
+      expect(res.headers.get("X-RateLimit-Remaining")).toBeNull();
       const body = await res.json() as { message: string };
       expect(body.message).toMatch(/too many requests/i);
     });

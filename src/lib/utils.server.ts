@@ -6,8 +6,10 @@
  * The 'server-only' guard causes a build-time error if any client bundle
  * transitively imports from this module.
  */
+import { buildEgressTargets, type EgressTarget } from "@/lib/proxy/proxy-utils";
+import crypto from "node:crypto";
 import "server-only";
-import crypto from "crypto";
+export { stripTrailingSlashes } from "./utils";
 
 // ---------------------------------------------------------------------------
 // redact — HMAC-SHA256 implementation (server only)
@@ -41,7 +43,8 @@ function getSecret(): string {
   }
 
   if (
-    process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test"
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
   ) {
     if (process.env.NODE_ENV === "development" && !secretWarningShown) {
       console.warn(
@@ -59,17 +62,24 @@ function getSecret(): string {
 }
 
 /**
- * Redacts sensitive data (email, ID) for safe server-side logging using HMAC-SHA256.
+ * Redacts sensitive data (email, ID, username) on the server side using HMAC-SHA256 and a secret salt.
+ *
+ * NOTE ON DIVERGENCE: Server-side redact uses HMAC-SHA256 (requires SENTRY_HASH_SALT),
+ * whereas client-side redact (in utils.ts) uses a fast, non-cryptographic FNV-1a hash.
+ * This means the same identifier will produce different hashes on server vs. client logs.
+ * This is an intentional security design decision to prevent exposing cryptographic salt / secrets to the client.
  */
 export const redact = (
   type: "email" | "id" | "username",
   value: string,
-): string =>
-  crypto
+): string => {
+  if (!value) return "";
+  return crypto
     .createHmac("sha256", getSecret())
     .update(`${type}:${value}`)
     .digest("hex")
     .slice(0, 12);
+};
 
 // ---------------------------------------------------------------------------
 // getClientIp — server only (reads request headers)
@@ -126,52 +136,6 @@ export function getClientIp(headerList: Headers): string | null {
 
 const RETRYABLE_EGRESS_STATUSES = new Set([429, 500, 502, 503, 504]);
 const PER_TIER_TIMEOUT_MS = 10_000;
-
-interface EgressTarget {
-  readonly baseUrl: string;
-  readonly proxyHeaders: Record<string, string>;
-  readonly name: string;
-}
-
-function stripTrailingSlashes(str: string | undefined): string | undefined {
-  if (!str) return str;
-  let s = str.trim();
-  while (s.endsWith("/")) {
-    s = s.slice(0, -1);
-  }
-  return s;
-}
-
-function buildEgressTargets(): EgressTarget[] {
-  const targets: EgressTarget[] = [];
-
-  const cfUrl = stripTrailingSlashes(process.env.CF_PROXY_URL);
-  if (cfUrl) {
-    const secret = process.env.CF_PROXY_SECRET?.trim();
-    targets.push({
-      baseUrl: cfUrl,
-      proxyHeaders: secret ? { "x-proxy-secret": secret } : {},
-      name: "primary (CF Worker)",
-    });
-  }
-
-  const awsUrl = stripTrailingSlashes(process.env.AWS_SECONDARY_URL);
-  if (awsUrl) {
-    const secret = process.env.AWS_SECONDARY_SECRET?.trim();
-    targets.push({
-      baseUrl: awsUrl,
-      proxyHeaders: secret ? { "x-proxy-secret": secret } : {},
-      name: "secondary (AWS)",
-    });
-  }
-
-  const directUrl = stripTrailingSlashes(process.env.NEXT_PUBLIC_BACKEND_URL);
-  if (directUrl) {
-    targets.push({ baseUrl: directUrl, proxyHeaders: {}, name: "direct" });
-  }
-
-  return targets;
-}
 
 // H-4: Cache the egress target list for the process lifetime.
 // Env vars do not change at runtime; rebuilding the list on every fetch is
@@ -244,7 +208,8 @@ async function attemptEgressTier(
   callerSignal: AbortSignal | null,
   isLast: boolean,
 ): Promise<
-  { success: true; res: Response } | {
+  | { success: true; res: Response }
+  | {
     success: false;
     shouldThrow: boolean;
     error?: unknown;
@@ -260,9 +225,11 @@ async function attemptEgressTier(
     PER_TIER_TIMEOUT_MS,
   );
   const tierSignal: AbortSignal = callerSignal !== null
-    ? (AbortSignal as unknown as {
-      any: (signals: AbortSignal[]) => AbortSignal;
-    }).any([callerSignal, tierController.signal])
+    ? (
+      AbortSignal as unknown as {
+        any: (signals: AbortSignal[]) => AbortSignal;
+      }
+    ).any([callerSignal, tierController.signal])
     : tierController.signal;
 
   try {
@@ -281,7 +248,9 @@ async function attemptEgressTier(
   } catch (err) {
     clearTimeout(tierTimeout);
     if (
-      callerSignal?.aborted && err instanceof Error && err.name === "AbortError"
+      callerSignal?.aborted &&
+      err instanceof Error &&
+      err.name === "AbortError"
     ) {
       return { success: false, shouldThrow: true, error: err };
     }

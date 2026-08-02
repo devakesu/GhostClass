@@ -1,7 +1,11 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { isCookieSecure } from "@/lib/security/cookie-utils";
+import {
+  COOKIE_MAX_AGE_1_YEAR,
+  isCookieSecure,
+} from "@/lib/security/cookie-utils";
+import { validateCsrfToken } from "@/lib/security/csrf";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
@@ -44,7 +48,12 @@ import { revalidatePath } from "next/cache";
  * @param version - The terms version being accepted (must match current TERMS_VERSION)
  * @throws {Error} If database update fails
  */
-export async function acceptTermsAction(version: string) {
+export async function acceptTermsAction(version: string, csrfToken?: string) {
+  if (csrfToken) {
+    const isValid = await validateCsrfToken(csrfToken);
+    if (!isValid) throw new Error("Invalid security token");
+  }
+
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -83,7 +92,7 @@ export async function setTermsVersionCookie(version: string): Promise<void> {
     name: "terms_version",
     value: version,
     path: "/",
-    maxAge: 31536000, // 1 year
+    maxAge: COOKIE_MAX_AGE_1_YEAR,
     sameSite: "lax",
     secure: isCookieSecure(),
     httpOnly: true, // Secure cookie - checked server-side in proxy.ts
@@ -144,7 +153,15 @@ export async function getAvailableClassesAction(
   return data || [];
 }
 
-export async function selectUserClassAction(classId: string | null) {
+export async function selectUserClassAction(
+  classId: string | null,
+  csrfToken?: string,
+) {
+  if (csrfToken) {
+    const isValid = await validateCsrfToken(csrfToken);
+    if (!isValid) throw new Error("Invalid security token");
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");

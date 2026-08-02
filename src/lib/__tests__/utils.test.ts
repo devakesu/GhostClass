@@ -73,6 +73,9 @@ describe("utils.ts", () => {
       expect(normalizeSession("Lecture 5")).toBe("5");
       expect(normalizeSession("vii extra")).toBe("7");
       expect(normalizeSession("8th Period")).toBe("8");
+      expect(normalizeSession("")).toBe("UNKNOWN");
+      expect(normalizeSession(null as any)).toBe("UNKNOWN");
+      expect(normalizeSession(undefined as any)).toBe("UNKNOWN");
     });
   });
 

@@ -2,8 +2,29 @@
  * Error handling utilities for database constraint violations and other errors
  */
 
-import { PostgrestError } from "@supabase/supabase-js";
 import { Course } from "@/types";
+import { PostgrestError } from "@supabase/supabase-js";
+
+/**
+ * Normalizes any caught error value into a standard Error instance.
+ */
+export function toError(err: unknown): Error {
+  if (err instanceof Error) {
+    return err;
+  }
+  if (typeof err === "string") {
+    return new Error(err);
+  }
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return new Error((err as { message: string }).message);
+  }
+  return new Error(String(err ?? "Unknown error"));
+}
 
 /**
  * Centrally managed database constraint hints.
@@ -23,9 +44,11 @@ export interface DatabaseError {
   message?: string;
 }
 
-function normalizeError(
-  error: unknown,
-): { code: string; message: string; status?: number } {
+function normalizeError(error: unknown): {
+  code: string;
+  message: string;
+  status?: number;
+} {
   if (!error || typeof error !== "object") {
     return { code: "", message: "" };
   }
@@ -116,7 +139,8 @@ export function getHumanReadableError(
 
   // Network / timeout
   if (
-    message.includes("fetch") || lower.includes("network") ||
+    message.includes("fetch") ||
+    lower.includes("network") ||
     code === "ERR_NETWORK"
   ) {
     return "Connection failed. Please check your internet and try again.";
@@ -165,9 +189,11 @@ export function isDutyLeaveConstraintError(error: unknown): boolean {
 
   // Check error message as fallback
   if (errorObj.message && typeof errorObj.message === "string") {
-    return errorObj.message.includes("Maximum") &&
+    return (
+      errorObj.message.includes("Maximum") &&
       errorObj.message.includes("Duty Leaves exceeded") &&
-      errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE;
+      errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE
+    );
   }
 
   return false;
@@ -184,10 +210,11 @@ export function getDutyLeaveErrorMessage(
   courseId: string,
   coursesData?: { courses: Record<string, Course> },
 ): string {
-  const courseEntries = coursesData?.courses
-    ? Object.entries(coursesData.courses)
-    : [];
-  const foundCourse = courseEntries.find(([k]) => k === courseId);
-  const courseName = foundCourse?.[1]?.name || `course ${courseId}`;
+  const courses = coursesData?.courses;
+  const course =
+    courses && Object.prototype.hasOwnProperty.call(courses, courseId)
+      ? (Reflect.get(courses, courseId) as Course)
+      : undefined;
+  const courseName = course?.name || `course ${courseId}`;
   return `Cannot add Duty Leave: Maximum of 5 duty leaves per semester exceeded for ${courseName}`;
 }

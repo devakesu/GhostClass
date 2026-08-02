@@ -31,9 +31,15 @@ function createRedisClient(): Redis {
       },
       decr: (key: string): Promise<number> => {
         const cur = parseInt(store.get(key) ?? "0", 10) || 0;
-        const next = Math.max(0, cur - 1);
+        const next = cur - 1;
         store.set(key, String(next));
         return Promise.resolve(next);
+      },
+      mset: (kvMap: Record<string, unknown>): Promise<"OK"> => {
+        for (const [key, value] of Object.entries(kvMap)) {
+          store.set(key, String(value));
+        }
+        return Promise.resolve("OK");
       },
     };
     return mock as unknown as Redis;

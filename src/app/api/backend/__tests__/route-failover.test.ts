@@ -23,6 +23,7 @@ vi.mock("server-only", () => ({}));
 // so that EGRESS_TARGETS is built with all three tiers (CF → AWS → direct).
 vi.hoisted(() => {
   vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("DEBUG_EGRESS", "true");
   vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://direct.ezygo.example.com");
   vi.stubEnv("CF_PROXY_URL", "https://cf.proxy.example.com");
   vi.stubEnv("CF_PROXY_SECRET", "cf-secret-key");

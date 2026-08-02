@@ -28,6 +28,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "./logger";
 import { redis } from "./redis";
+import { toError } from "@/lib/error-handling";
 
 type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
@@ -95,6 +96,9 @@ class CircuitBreaker {
       if (typeof val === "number") return parseFn(String(val));
     } catch (e) {
       logger.dev(`Redis error in circuit breaker for key ${key}`, e);
+      Sentry.captureException(toError(e), {
+        tags: { location: "circuit-breaker/getRedisValue", key },
+      });
     }
     return fallback;
   }
@@ -107,6 +111,9 @@ class CircuitBreaker {
       await redis.set(key, String(value));
     } catch (e) {
       logger.dev(`Redis error in circuit breaker set for key ${key}`, e);
+      Sentry.captureException(toError(e), {
+        tags: { location: "circuit-breaker/setRedisValue", key },
+      });
     }
   }
 
@@ -219,6 +226,20 @@ class CircuitBreaker {
   }
 
   private async resetBreakerStateInRedis(): Promise<void> {
+    try {
+      if (typeof redis.mset === "function") {
+        await redis.mset({
+          "circuit:state": "CLOSED",
+          "circuit:failures": "0",
+          "circuit:last_fail_time": "0",
+          "circuit:success_count": "0",
+          "circuit:half_open_in_flight": "0",
+        });
+        return;
+      }
+    } catch (e) {
+      logger.dev("Redis mset error in circuit breaker reset", e);
+    }
     await Promise.all([
       redis.set("circuit:state", "CLOSED"),
       redis.set("circuit:failures", "0"),

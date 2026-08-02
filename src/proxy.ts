@@ -7,6 +7,7 @@ import { isAuthSessionMissingError } from "./lib/security/auth.ts";
 import { decrypt } from "./lib/crypto.ts";
 import { redact } from "./lib/utils.server.ts";
 import { getSupabaseConfig } from "./lib/supabase/fetch.ts";
+import { COOKIE_MAX_AGE_5_MINUTES } from "./lib/security/cookie-utils.ts";
 
 /**
  * Clears all session-related cookies on a redirect response.
@@ -354,7 +355,7 @@ async function enforceRoutingScenarios({
       secure: isProd,
       sameSite: "strict",
       path: "/",
-      maxAge: 300,
+      maxAge: COOKIE_MAX_AGE_5_MINUTES,
     });
     return redirectRes;
   }
@@ -475,7 +476,7 @@ export async function proxy(request: NextRequest) {
     user,
     isUnauthenticatedCertain,
     supabase,
-    cspHeader,
+    cspHeader: effectiveCspHeader,
     nonce,
     redirectStatus,
     isProd,

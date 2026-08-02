@@ -25,7 +25,7 @@ const handler = async (req: NextRequest) => {
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
-  const { success, reset, limit, remaining } = await authRateLimiter.limit(
+  const { success, reset } = await authRateLimiter.limit(
     `logout_${ip}`,
   );
   if (!success) {
@@ -37,9 +37,6 @@ const handler = async (req: NextRequest) => {
           "Cache-Control": "no-store",
           "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000))
             .toString(),
-          "X-RateLimit-Limit": limit.toString(),
-          "X-RateLimit-Remaining": remaining.toString(),
-          "X-RateLimit-Reset": reset.toString(),
         },
       },
     );

@@ -4,6 +4,7 @@ import { egressFetch, redact } from "@/lib/utils.server";
 import { normalizeCourseCode } from "@/lib/utils";
 import { decrypt, encrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
+import { toError } from "@/lib/error-handling";
 import { safeResponseJson } from "@/lib/json";
 import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
 import { ezygoProfileSchema, shortTextSchema } from "@/lib/validation/text";
@@ -188,7 +189,9 @@ function triggerAcademicSelfHeal(
   if (!needsSemesterUpdate && !needsYearUpdate) return;
 
   logger.info(
-    `[sync] Self-healing academic context for ${authId}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
+    `[sync] Self-healing academic context for ${
+      redact("id", authId)
+    }: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
   );
 
   const pushPromises: Promise<unknown>[] = [];
@@ -266,14 +269,23 @@ async function upsertManualClass(
         "[sync] detectAndSyncClass: Failed to clone/manual-upsert class",
         upsertErr,
       );
+      Sentry.captureException(
+        toError(upsertErr || "Failed to clone/manual-upsert class"),
+        {
+          tags: { location: "sync/upsertManualClass" },
+        },
+      );
       return null;
     }
     return newClass;
   } catch (err) {
     logger.error(
       "[sync] detectAndSyncClass: Exception cloning manual class",
-      err instanceof Error ? err : new Error(String(err)),
+      toError(err),
     );
+    Sentry.captureException(toError(err), {
+      tags: { location: "sync/upsertManualClassException" },
+    });
     return null;
   }
 }
@@ -300,6 +312,9 @@ async function detectClassWithoutCourses(
       "[sync] detectAndSyncClass: Failed to fetch existing user class",
       error,
     );
+    Sentry.captureException(toError(error), {
+      tags: { location: "sync/detectClassWithoutCourses" },
+    });
   }
 
   if (!currentClass) {
@@ -600,7 +615,9 @@ async function detectAndSyncClass(
       const name = shortTextSchema.parse(nameRaw);
 
       logger.info(
-        `[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${nameRaw}`,
+        `[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${
+          redact("username", nameRaw)
+        }`,
       );
 
       return await syncCohortClass(
@@ -645,15 +662,18 @@ async function populateCourseCatalogAndMigrateTrackers(
       currentTrackers?.map((t) => String(t.course)) || [],
     );
 
-    for (const m of mappings) {
-      const ezygoIdStr = m.ezygo_id;
-      if (coursesWithTrackers.has(ezygoIdStr)) {
-        await supabaseAdmin
+    const trackerUpdates = mappings
+      .filter((m) => coursesWithTrackers.has(m.ezygo_id))
+      .map((m) =>
+        supabaseAdmin
           .from("tracker")
           .update({ course: m.university_code })
           .eq("auth_user_id", authId)
-          .eq("course", ezygoIdStr);
-      }
+          .eq("course", m.ezygo_id)
+      );
+
+    if (trackerUpdates.length > 0) {
+      await Promise.all(trackerUpdates);
     }
   }
 }
@@ -945,35 +965,29 @@ export async function performProfileSync(
       .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
       .maybeSingle()).data;
 
-    let classId: string | null = null;
-    let classInfo: { id: string; name: string } | null = null;
-    let coursesMap: Record<string, unknown> = {};
+    // Step 3: Now fetch courses and roles (which depend on the healed semester)
+    const [coursesRes, rolesData] = await Promise.all([
+      egressFetch("institutionuser/courses/withusers", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }),
+      egressFetch("institutionuser/myroles", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      }).then(safeResponseJson),
+    ]);
 
-    if (fullSync) {
-      // Step 3: Now fetch courses and roles (which depend on the healed semester)
-      const [coursesRes, rolesData] = await Promise.all([
-        egressFetch("institutionuser/courses/withusers", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }),
-        egressFetch("institutionuser/myroles", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }).then(safeResponseJson),
-      ]);
-
-      const processed = await processCoursesData(coursesRes);
-      coursesMap = processed.coursesMap;
-      const detection = await detectClassAndPopulateCatalog(
-        processed.coursesList,
-        rolesData,
-        authId,
-        currentAcademic,
-        existingUser?.class_id,
-      );
-      classId = detection.classId;
-      classInfo = detection.classInfo;
-    }
+    const processed = await processCoursesData(coursesRes);
+    const coursesMap = processed.coursesMap;
+    const detection = await detectClassAndPopulateCatalog(
+      processed.coursesList,
+      rolesData,
+      authId,
+      currentAcademic,
+      existingUser?.class_id,
+    );
+    const classId = detection.classId;
+    const classInfo = detection.classInfo;
 
     const {
       mergedFirst,

@@ -66,6 +66,9 @@ export class QueueTimeoutError extends NonBreakerError {
   }
 }
 
+// Secondary index for O(1) user-level cache invalidation
+const tokenCacheKeysIndex = new Map<string, Set<string>>();
+
 // 1. LONG-LIVED CACHE (60 seconds) - Handles burst traffic and queuing delays
 // Stores in-flight request promises from the moment they are enqueued
 // TTL starts when the promise enters the cache (before queue wait + fetch)
@@ -240,6 +243,20 @@ export function fetchEzygoData<T>(
     : "__SENTINEL_NO_BODY_VALUE__";
   const cacheKey = `${method}:${tokenHash}:${normalizedEndpoint}:${bodyHash}`;
 
+  // Prune expired keys for this user
+  let keysSet = tokenCacheKeysIndex.get(tokenHash);
+  if (keysSet) {
+    for (const key of keysSet) {
+      if (requestCache.get(key) === undefined) {
+        keysSet.delete(key);
+      }
+    }
+    if (keysSet.size === 0) {
+      tokenCacheKeysIndex.delete(tokenHash);
+      keysSet = undefined;
+    }
+  }
+
   // Check if request is already in-flight
   const existingRequest = requestCache.get(cacheKey);
   if (existingRequest) {
@@ -262,6 +279,13 @@ export function fetchEzygoData<T>(
     options?: { ttl?: number },
   ) => LRUCache<string, Promise<unknown>>;
   cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
+
+  // Add to secondary index
+  if (!keysSet) {
+    keysSet = new Set<string>();
+    tokenCacheKeysIndex.set(tokenHash, keysSet);
+  }
+  keysSet.add(cacheKey);
 
   // Execute the actual request asynchronously
   (async () => {
@@ -427,12 +451,12 @@ export function getRateLimiterStats() {
  */
 export function invalidateEzygoCacheForUser(token: string) {
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  const entries = Array.from(requestCache.entries());
-
-  for (const [key] of entries) {
-    if (key.includes(`:${tokenHash}:`)) {
+  const keysSet = tokenCacheKeysIndex.get(tokenHash);
+  if (keysSet) {
+    for (const key of keysSet) {
       requestCache.delete(key);
     }
+    tokenCacheKeysIndex.delete(tokenHash);
   }
 }
 
@@ -462,4 +486,6 @@ export function resetRateLimiterState() {
 
   // Clear LRU cache
   requestCache.clear();
+  // Clear secondary index
+  tokenCacheKeysIndex.clear();
 }

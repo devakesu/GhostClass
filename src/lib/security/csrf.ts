@@ -61,7 +61,7 @@ import { isCookieSecure } from "@/lib/security/cookie-utils";
 import { redis } from "@/lib/redis";
 
 // Configuration
-const CSRF_COOKIE_NAME = "csrf_token";
+import { CSRF_TOKEN_NAME as CSRF_COOKIE_NAME } from "./csrf-constants";
 const CSRF_TOKEN_LENGTH = 32;
 const CSRF_COOKIE_MAX_AGE = 60 * 60 * 24; // 24 hours
 const IS_PRODUCTION = process.env.NODE_ENV === "production";

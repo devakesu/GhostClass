@@ -28,6 +28,14 @@ export function toTitleCase(str: string): string {
  * Redacts sensitive data (email, ID) for safe client-side logging using a
  * deterministic FNV-1a hash.
  */
+/**
+ * Redacts sensitive data (email, ID) on the client side using a fast, non-cryptographic FNV-1a hash.
+ *
+ * NOTE ON DIVERGENCE: Client-side redact uses FNV-1a (does not require environment secrets),
+ * whereas server-side redact (in utils.server.ts) uses HMAC-SHA256 (requires SENTRY_HASH_SALT).
+ * This means the same identifier will produce different hashes on client vs. server logs.
+ * This is an intentional security design decision to prevent exposing cryptographic salt / secrets to the client.
+ */
 export const redact = (type: "email" | "id", value: string): string => {
   const input = `${type}:${value}`;
   let h1 = 2166136261;
@@ -37,8 +45,9 @@ export const redact = (type: "email" | "id", value: string): string => {
     h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
     h2 = Math.imul(h2 ^ (c + i + 1), 16777619) >>> 0;
   }
-  return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0"))
-    .slice(0, 12);
+  return (
+    h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")
+  ).slice(0, 12);
 };
 
 /**
@@ -80,13 +89,16 @@ const SESSION_ROMANS = new Map<string, string>([
 /**
  * Normalizes session identifiers to a standard format.
  */
-export const normalizeSession = (session: string | number): string => {
+export const normalizeSession = (
+  session: string | number | null | undefined,
+): string => {
   if (
-    session === null || session === undefined ||
+    session === null ||
+    session === undefined ||
     String(session).toLowerCase().trim() === "null" ||
     String(session).trim() === ""
   ) {
-    return "1";
+    return "UNKNOWN";
   }
   let s = String(session).toLowerCase().trim();
 
@@ -185,7 +197,9 @@ export const normalizeDate = (date: string | Date): string => {
 
   console.warn(
     `[normalizeDate] Unrecognised date format "${
-      String(date).trim()
+      String(
+        date,
+      ).trim()
     }". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Returning "" to avoid incorrect slot keys.`,
   );
   return "";
@@ -239,7 +253,10 @@ function getOrdinalHour(num: number): string {
  */
 export function formatSessionName(sessionName: string): string {
   if (!sessionName) return "";
-  const clean = sessionName.toString().replace(/Session|Hour/gi, "").trim();
+  const clean = sessionName
+    .toString()
+    .replace(/Session|Hour/gi, "")
+    .trim();
 
   const lower = clean.toLowerCase();
   if (DISPLAY_ROMAN_MAP.has(lower)) return DISPLAY_ROMAN_MAP.get(lower)!;
@@ -274,7 +291,10 @@ const SORT_ROMAN_MAP = new Map<string, number>([
  */
 export function getSessionNumber(name: string): number {
   if (!name) return 999;
-  const clean = name.toString().toLowerCase().replace(/session|hour/g, "")
+  const clean = name
+    .toString()
+    .toLowerCase()
+    .replace(/session|hour/g, "")
     .trim();
 
   if (SORT_ROMAN_MAP.has(clean)) return SORT_ROMAN_MAP.get(clean)!;
@@ -406,7 +426,8 @@ export function getAppDomain(
     fallbackDomain;
 
   if (
-    isProduction && !process.env.NEXT_PUBLIC_APP_DOMAIN &&
+    isProduction &&
+    !process.env.NEXT_PUBLIC_APP_DOMAIN &&
     !process.env.NEXT_PUBLIC_DEFAULT_DOMAIN
   ) {
     console.warn(
@@ -428,7 +449,9 @@ export function isValidAvatarUrl(
   if (!url) return false;
   if (
     url.startsWith("/") || url.startsWith("blob:") || url.startsWith("data:")
-  ) return true;
+  ) {
+    return true;
+  }
 
   try {
     const parsed = new URL(url);

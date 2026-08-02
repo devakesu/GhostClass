@@ -1,7 +1,9 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTurnstile } from "@/lib/security/turnstile";
+import { getAuthenticatedUserContext } from "@/lib/security/auth-server";
+import { validateCsrfToken } from "@/lib/security/csrf";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
@@ -38,71 +40,50 @@ export async function addCourseAction(
 
   const { courseCode: code, courseName: name } = parsed.data;
   const turnstileToken = String(formData.get("cf-turnstile-response") ?? "");
+  const csrfToken = String(
+    formData.get("csrf_token") ?? formData.get("csrfToken") ?? "",
+  );
 
-  // 1. Verify Turnstile Security Token
-  if (!turnstileToken) {
-    return { error: "Security verification failed. Please refresh." };
+  // 1. Validate CSRF Token if present in form payload
+  if (csrfToken) {
+    const csrfValid = await validateCsrfToken(csrfToken);
+    if (!csrfValid) {
+      logger.warn("Invalid CSRF token in add course submission");
+      return { error: "Invalid security token. Please refresh and try again." };
+    }
   }
 
-  try {
-    const verifyResponse = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body:
-          `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${turnstileToken}`,
-      },
-    );
-    const verifyData = await verifyResponse.json();
-    if (!verifyData.success) {
-      logger.warn("Turnstile verification failed for add course", {
-        verifyData,
-        code,
-      });
-      return { error: "Security verification failed. Please try again." };
-    }
-  } catch (err) {
-    logger.error("Turnstile verification exception in add course", err);
-    Sentry.captureException(err, {
-      tags: {
-        type: "turnstile_verification_error",
-        location: "actions/courses",
-      },
-    });
-    return { error: "Security check failed. Please check your connection." };
+  // 2. Verify Turnstile Security Token
+  const turnstileRes = await verifyTurnstile(
+    turnstileToken,
+    "Security verification failed. Please try again.",
+  );
+  if (!turnstileRes.success) {
+    return { error: turnstileRes.error };
   }
 
   // 2. Perform Database Insert
   try {
-    const supabase = await createClient();
-
-    // Get current authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { error: "You must be logged in to add courses" };
+    const contextRes = await getAuthenticatedUserContext(
+      "You must be logged in to add courses",
+      "Failed to fetch user class for course addition",
+    );
+    if (!contextRes.success) {
+      return { error: contextRes.error };
     }
-
-    // Get user's class context
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("class_id")
-      .eq("auth_id", user.id)
-      .single();
-
-    if (profileError || !profile?.class_id) {
-      logger.error(
-        "Failed to fetch user class for course addition",
-        profileError,
-      );
-      return { error: "No class associated with your profile" };
-    }
+    const { user, classId, supabase } = contextRes;
 
     // Insert into class_courses (shared curriculum for the class)
-    const { error: insertError } = await supabase
+    const { error: insertError } = await (supabase as {
+      from: (t: string) => {
+        insert: (d: Record<string, unknown>) => Promise<{
+          error: { code: string; message: string } | null;
+        }>;
+      };
+    })
       .from("class_courses")
       .insert({
-        class_id: profile.class_id,
+        class_id: classId,
         course_code: normalizeCourseCode(code),
         course_name: name,
         created_by: user.id,

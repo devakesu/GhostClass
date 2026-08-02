@@ -37,6 +37,21 @@ if (_rawBaseApiUrl) {
 }
 const EGRESS_TARGETS = buildEgressTargets();
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SHOULD_EXPOSE_EGRESS_HEADERS = !IS_PRODUCTION ||
+  process.env.DEBUG_EGRESS === "true";
+
+function getEgressHeaders(
+  headersObj: Record<string, string>,
+  targetName?: string,
+  modeName?: string,
+): Record<string, string> {
+  if (!SHOULD_EXPOSE_EGRESS_HEADERS) return headersObj;
+  return {
+    ...headersObj,
+    ...(targetName ? { "x-egress-target": targetName } : {}),
+    ...(modeName ? { "x-egress-mode": modeName } : {}),
+  };
+}
 
 const MISCONFIGURED_EGRESS_TARGET = EGRESS_TARGETS.find(
   (target) => target.name !== "direct" && !target.secret,
@@ -218,7 +233,7 @@ function handleProxyUpstreamError(
   err: unknown,
   lastAttemptedEgressName: string,
 ): NextResponse {
-  const egressHeader = { "x-egress-target": lastAttemptedEgressName };
+  const egressHeader = getEgressHeaders({}, lastAttemptedEgressName);
   const errObj = err as {
     name?: string;
     status?: number;
@@ -293,7 +308,7 @@ async function handleBatchedEgress(
     );
     return NextResponse.json(data, {
       status: 200,
-      headers: { "x-egress-mode": "batched" },
+      headers: getEgressHeaders({}, undefined, "batched"),
     });
   } catch (err) {
     logger.warn(`Batch failed for ${fullPath}`, err);
@@ -489,13 +504,13 @@ async function forward(
         : resolveSafeUpstreamErrorMessage(result.text, result.res.status);
       return NextResponse.json({ message: msg, status: result.res.status }, {
         status: result.res.status,
-        headers: { ...sanitizedHeaders, "x-egress-target": result.egressName },
+        headers: getEgressHeaders(sanitizedHeaders, result.egressName),
       });
     }
 
     return new NextResponse(result.text, {
       status: result.res.status,
-      headers: { ...sanitizedHeaders, "x-egress-target": result.egressName },
+      headers: getEgressHeaders(sanitizedHeaders, result.egressName),
     });
   } catch (err: unknown) {
     return handleProxyUpstreamError(err, lastAttemptedEgressName);

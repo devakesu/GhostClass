@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { cookies as nextCookies, headers as nextHeaders } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
@@ -232,6 +233,18 @@ async function verifyCsrfAuth(
   return { isValid: true, authType: "csrf", isWebRequest: true };
 }
 
+function verifyCronSecret(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return false;
+  const providedBuf = Buffer.from(authHeader.slice(7), "utf8");
+  const cronBuf = Buffer.from(cronSecret, "utf8");
+  return (
+    providedBuf.length === cronBuf.length &&
+    crypto.timingSafeEqual(providedBuf, cronBuf)
+  );
+}
+
 async function verifyAuthentication(
   req: Request,
   options: AppCheckOptions = {},
@@ -241,12 +254,8 @@ async function verifyAuthentication(
   const csrfToken = headerList.get("x-csrf-token");
   const authHeader = headerList.get("authorization");
 
-  if (authHeader?.startsWith("Bearer ")) {
-    if (
-      process.env.CRON_SECRET && authHeader.slice(7) === process.env.CRON_SECRET
-    ) {
-      return { isValid: true, authType: "none" };
-    }
+  if (verifyCronSecret(authHeader)) {
+    return { isValid: true, authType: "none" };
   }
 
   if (

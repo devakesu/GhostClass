@@ -19,9 +19,13 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-vi.mock("@/lib/utils", () => ({
-  redact: vi.fn((_, val) => val),
-}));
+vi.mock("@/lib/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/utils")>();
+  return {
+    ...actual,
+    redact: vi.fn((_, val) => val),
+  };
+});
 
 describe("uploadUserAvatar", () => {
   const mockUser = { id: "user123" };
