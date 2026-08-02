@@ -118,6 +118,8 @@ class SimpleBunkPanel extends StatelessWidget {
 
     final message = result.canBunk > 0
         ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class' : 'classes'}'
+        : result.requiredToAttend >= 999
+        ? 'Cannot reach target — classes have been missed'
         : result.requiredToAttend > 0
         ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class' : 'classes'}'
         : "You are on the edge. Skipping now's risky";
@@ -135,6 +137,8 @@ class SimpleBunkPanel extends StatelessWidget {
         child: Text(
           result.canBunk > 0
               ? 'You can safely bunk ${result.canBunk} ${result.canBunk == 1 ? 'class 🥳' : 'classes 🥳🥳'}'
+              : result.requiredToAttend >= 999
+              ? 'Cannot reach target 💀'
               : result.requiredToAttend > 0
               ? 'You need to attend ${result.requiredToAttend} more ${result.requiredToAttend == 1 ? 'class 💀' : 'classes 💀💀'}'
               : "You are on the edge. Skipping now's risky 💀💀",

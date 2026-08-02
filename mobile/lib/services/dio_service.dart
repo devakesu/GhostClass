@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/stealth_headers_service.dart';
 import 'package:sentry_dio/sentry_dio.dart';
@@ -15,7 +17,7 @@ import 'package:sentry_dio/sentry_dio.dart';
 /// Configures interceptors for Sentry and authentication headers.
 class DioService {
   DioService(this._ref) {
-    const timeout = kDebugMode ? Duration(seconds: 45) : Duration(seconds: 30);
+    final timeout = AppConfig.defaultTimeout;
 
     dio = Dio(
       BaseOptions(
@@ -129,18 +131,8 @@ class DioService {
     _unauthorizedController.add(null);
   }
 
-  bool _isTransientAppCheckFailure(Object error) {
-    final msg = error.toString().toLowerCase();
-    return msg.contains('too_many_attempts') ||
-        msg.contains('timeout') ||
-        msg.contains('network') ||
-        msg.contains('connection') ||
-        msg.contains('unavailable') ||
-        msg.contains('rate limit') ||
-        msg.contains('internal google server error') ||
-        msg.contains('google_server_unavailable') ||
-        msg.contains('-12');
-  }
+  bool _isTransientAppCheckFailure(Object error) =>
+      isTransientAppCheckFailure(error);
 
   Duration _retryDelayForAttempt(int attempt) {
     switch (attempt) {
@@ -288,7 +280,11 @@ class DioService {
   }
 }
 
-final dioServiceProvider = Provider<DioService>(DioService.new);
+final dioServiceProvider = Provider<DioService>((ref) {
+  final service = DioService(ref);
+  ref.onDispose(service.close);
+  return service;
+});
 
 final appCheckProvider = Provider<FirebaseAppCheck>(
   (ref) => FirebaseAppCheck.instance,

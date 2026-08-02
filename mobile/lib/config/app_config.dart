@@ -55,6 +55,10 @@ class AppConfig {
         : AppSecrets.ghostclassApiUrlProd,
   );
 
+  /// Default network timeout duration (45s debug / 30s release).
+  static Duration get defaultTimeout =>
+      kDebugMode ? const Duration(seconds: 45) : const Duration(seconds: 30);
+
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
 

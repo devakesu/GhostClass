@@ -43,10 +43,10 @@ class SecurityUtils {
     await showGeneralDialog(
       context: context,
       barrierLabel: 'Security Error',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.75),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
         child: FadeTransition(
           opacity: anim1,
           child: SecurityErrorDialog(

@@ -256,12 +256,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // 2. Critical Security Check First
     try {
-      if (firebaseInitFuture != null) {
+      if (FirebaseInitializer.initFuture != null) {
         AppLogger.i(
           'SplashScreen: Awaiting Firebase & App Check initialization...',
         );
         try {
-          await firebaseInitFuture!;
+          await FirebaseInitializer.initFuture!;
           AppLogger.i(
             'SplashScreen: Firebase & App Check initialization completed.',
           );

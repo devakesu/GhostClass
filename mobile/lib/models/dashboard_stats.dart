@@ -339,9 +339,7 @@ class DashboardStats {
   }
 
   static String standardize(String input) {
-    // Note: the '-' is placed last in the character class to avoid forming an
-    // ambiguous or reversed range (\u00A0 > '-' in code-point order).
-    return input.trim().toUpperCase().replaceAll(RegExp(r'[\s\u00A0\-]'), '');
+    return utils.standardizeCourseCode(input);
   }
 }
 

@@ -3,9 +3,11 @@ import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SettingsService {
-  SettingsService(this.storage);
+  SettingsService(this.storage, [SupabaseClient? client])
+    : _client = client ?? Supabase.instance.client;
+
   final SecureStorageService storage;
-  final SupabaseClient _client = Supabase.instance.client;
+  final SupabaseClient _client;
 
   Future<void> updateSettings(
     String userId, {

@@ -12,16 +12,31 @@ import 'package:ghostclass/services/logger.dart';
 /// being easily identifiable in RAM dumps.
 @immutable
 class EncryptedValue {
-  const EncryptedValue._(this._encryptedBase64);
+  const EncryptedValue._(
+    this._encryptedBase64,
+    this._entropyA,
+    this._entropyB,
+    this._generation,
+  );
 
   @visibleForTesting
-  factory EncryptedValue.forTesting(String base64) => EncryptedValue._(base64);
+  factory EncryptedValue.forTesting(String base64) =>
+      EncryptedValue._(base64, Uint8List(0), Uint8List(0), _globalGeneration);
 
   /// Creates an encrypted wrapper for a plaintext string.
   factory EncryptedValue.fromPlaintext(String plaintext) {
-    if (plaintext.isEmpty) return const EncryptedValue._('');
+    if (plaintext.isEmpty) {
+      return EncryptedValue._(
+        '',
+        Uint8List(0),
+        Uint8List(0),
+        _globalGeneration,
+      );
+    }
 
-    final key = _reconstructKey();
+    final entropyA = _generateRandomBytes(32);
+    final entropyB = _generateRandomBytes(32);
+    final key = _reconstructKey(entropyA, entropyB);
     final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
 
     // Generate a fresh random IV for each encryption (prevents GCM nonce-reuse)
@@ -32,13 +47,20 @@ class EncryptedValue {
     final combined = Uint8List.fromList([...iv.bytes, ...encrypted.bytes]);
     final combinedBase64 = base64.encode(combined);
 
-    return EncryptedValue._(combinedBase64);
+    return EncryptedValue._(
+      combinedBase64,
+      entropyA,
+      entropyB,
+      _globalGeneration,
+    );
   }
-  // We store entropy in two separate buffers. XORing them reconstructs the key.
-  static final Uint8List _entropyA = _generateRandomBytes(32);
-  static final Uint8List _entropyB = _generateRandomBytes(32);
+
+  static int _globalGeneration = 0;
 
   final String _encryptedBase64;
+  final Uint8List _entropyA;
+  final Uint8List _entropyB;
+  final int _generation;
 
   static Uint8List _generateRandomBytes(int length) {
     final random = Random.secure();
@@ -49,32 +71,29 @@ class EncryptedValue {
 
   /// Reconstructs the 32-byte AES key from masked entropy.
   /// The full key only exists in this local scope during execution.
-  static Key _reconstructKey() {
+  static Key _reconstructKey(Uint8List entropyA, Uint8List entropyB) {
+    if (entropyA.length != 32 || entropyB.length != 32) {
+      return Key(Uint8List(32));
+    }
     final keyBytes = Uint8List(32);
     for (var i = 0; i < 32; i++) {
-      keyBytes[i] = _entropyA[i] ^ _entropyB[i];
+      keyBytes[i] = entropyA[i] ^ entropyB[i];
     }
     return Key(keyBytes);
   }
 
-  /// Overwrite entropy buffers to reduce risk of key reconstruction after logout.
-  /// Call this when the app is performing a full logout or memory wipe.
+  /// Invalidate session entropy generation counter when performing a logout or memory wipe.
   static void clearEntropy() {
-    final random = Random.secure();
-    for (var i = 0; i < _entropyA.length; i++) {
-      _entropyA[i] = random.nextInt(256);
-    }
-    for (var i = 0; i < _entropyB.length; i++) {
-      _entropyB[i] = random.nextInt(256);
-    }
+    _globalGeneration++;
   }
 
   /// Decrypts and returns the plaintext value.
   String get value {
     if (_encryptedBase64.isEmpty) return '';
+    if (_generation != _globalGeneration) return '';
 
     try {
-      final key = _reconstructKey();
+      final key = _reconstructKey(_entropyA, _entropyB);
       final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
 
       // Decode the base64 to get IV + ciphertext

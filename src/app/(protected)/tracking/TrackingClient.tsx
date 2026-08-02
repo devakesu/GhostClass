@@ -1698,7 +1698,7 @@ export default function TrackingClient() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="flex flex-col items-center justify-center flex-1 min-h-[50vh]"
+            className="flex flex-col items-center justify-center flex-1 min-h-[50vh] text-center"
           >
             <div className="relative mb-6">
               <div className="absolute inset-0 bg-linear-to-tr from-amber-500/20 to-orange-500/20 rounded-full blur-2xl transform scale-150 opacity-60" />

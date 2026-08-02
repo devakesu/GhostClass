@@ -27,9 +27,7 @@ class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context)
-      ..connectionTimeout = kDebugMode
-          ? const Duration(seconds: 45)
-          : const Duration(seconds: 30);
+      ..connectionTimeout = AppConfig.defaultTimeout;
 
     // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.
     // In release mode, standard certificate validation is enforced.
@@ -59,7 +57,11 @@ Future<void> _initializeFirebase() async {
   }
 }
 
-Future<void>? firebaseInitFuture;
+class FirebaseInitializer {
+  FirebaseInitializer._();
+  static Future<void>? _initFuture;
+  static Future<void>? get initFuture => _initFuture;
+}
 
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
@@ -90,7 +92,7 @@ void main() async {
   };
 
   // Initialize Firebase & App Check asynchronously in the background
-  firebaseInitFuture = () async {
+  FirebaseInitializer._initFuture = () async {
     try {
       await _initializeFirebase();
 
@@ -146,11 +148,9 @@ void main() async {
       message: 'Supabase Config',
       category: 'auth.config',
       data: {
-        'url': sUrl,
-        'origin': sOrigin,
-        'key_masked': sKey.length > 8
-            ? '${sKey.substring(0, 4)}...${sKey.substring(sKey.length - 4)}'
-            : '[TOO SHORT]',
+        'url_configured': sUrl.isNotEmpty,
+        'key_length': sKey.length,
+        'has_origin': sOrigin.isNotEmpty,
       },
     ),
   );
@@ -182,7 +182,10 @@ class _MyAppState extends ConsumerState<MyApp> {
         routerConfig: router,
         debugShowCheckedModeBanner: false,
         builder: (context, child) {
-          return child!;
+          return Semantics(
+            label: 'GhostClass',
+            child: child,
+          );
         },
       ),
     );

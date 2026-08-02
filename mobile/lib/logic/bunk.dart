@@ -58,7 +58,7 @@ AttendanceResult calculateAttendance(
       // Impossible to reach 100% if missed any class
       return AttendanceResult(
         canBunk: 0,
-        requiredToAttend: 999,
+        requiredToAttend: 0x7FFFFFFF, // int.maxValue / unreachable
         targetPercentage: safeTarget,
         isExact: false,
         isBorderline: false,

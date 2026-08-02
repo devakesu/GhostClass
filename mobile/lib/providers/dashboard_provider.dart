@@ -215,15 +215,21 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       var sharedCourses = <CourseDetails>[];
       var sharedInstructors = <CourseInstructor>[];
 
-      await Future.wait([
+      Future<AttendanceReportDetailed?> resolveAttendance() async {
+        final existing =
+            attendanceToUse ??
+            _cachedAttendance ??
+            ref.read(trackingProvider).value?.officialReport;
+        if (existing != null) return existing;
+        return _fetchAttendanceOnce(api: api, storage: storage);
+      }
+
+      await Future.wait<dynamic>([
         api.fetchCourses(storage).then((res) => coursesResponse = res),
-        (attendanceToUse != null
-                ? Future.value(attendanceToUse)
-                : _fetchAttendanceOnce(api: api, storage: storage))
-            .then((res) {
-              if (res == null) throw Exception('No attendance data');
-              attendance = res;
-            }),
+        resolveAttendance().then((res) {
+          if (res == null) throw Exception('No attendance data');
+          attendance = res;
+        }),
         if (classId != null) ...[
           // Fetch Class Courses
           api.fetchClassCourses(classId).then((coursesRes) {

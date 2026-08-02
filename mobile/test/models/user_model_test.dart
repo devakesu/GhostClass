@@ -203,6 +203,23 @@ void main() {
         expect(updated.phone, '+1234567890');
         expect(updated.email, 'john@example.com');
       });
+
+      test('allows explicitly clearing nullable fields to null', () {
+        const profile = UserProfile(
+          firstName: 'John',
+          avatarUrl: 'https://example.com/avatar.png',
+          phone: '+1234567890',
+        );
+
+        final updated = profile.copyWith(
+          avatarUrl: () => null,
+          phone: () => null,
+        );
+
+        expect(updated.avatarUrl, isNull);
+        expect(updated.phone, isNull);
+        expect(updated.firstName, 'John');
+      });
     });
 
     group('equality', () {

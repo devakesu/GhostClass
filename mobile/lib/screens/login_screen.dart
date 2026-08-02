@@ -43,7 +43,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late final SecurityGuard _securityGuard;
 
   void _startCooldown() {
-    _cooldownSecondsRemaining = 30;
+    // Exponential backoff cooldown: 30s -> 60s -> 120s -> 300s (max 5 minutes)
+    final attemptCount = (_consecutiveFailures - 2).clamp(1, 10);
+    var cooldown = 30 * (1 << (attemptCount - 1));
+    if (cooldown > 300) cooldown = 300;
+
+    _cooldownSecondsRemaining = cooldown;
     _cooldownTimer?.cancel();
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -55,7 +60,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           _cooldownSecondsRemaining--;
         } else {
           _cooldownSecondsRemaining = 0;
-          _consecutiveFailures = 0;
           _cooldownTimer?.cancel();
           _cooldownTimer = null;
         }

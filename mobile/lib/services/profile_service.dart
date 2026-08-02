@@ -2,7 +2,10 @@ import 'package:ghostclass/models/user.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileService {
-  final SupabaseClient _client = Supabase.instance.client;
+  ProfileService([SupabaseClient? client])
+    : _client = client ?? Supabase.instance.client;
+
+  final SupabaseClient _client;
 
   bool hasRenderableLocalProfile(UserProfile? profile) {
     return profile?.fullName != null || profile?.avatarUrl != null;

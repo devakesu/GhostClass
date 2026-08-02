@@ -1,6 +1,7 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:ghostclass/services/logger.dart';
 
 /// AnalyticsService
 /// Centralized wrapper around `FirebaseAnalytics` that exposes common
@@ -15,6 +16,14 @@ class AnalyticsService {
   FirebaseAnalyticsObserver? _observer;
 
   bool get isInitialized => _analytics != null && _observer != null;
+  static bool _hasLoggedFailure = false;
+
+  void _handleAnalyticsError(Object e, String context) {
+    if (!_hasLoggedFailure) {
+      _hasLoggedFailure = true;
+      AppLogger.w('AnalyticsService failure ($context): $e');
+    }
+  }
 
   static Future<void> initialize({FirebaseAnalytics? analyticsInstance}) async {
     final svc = AnalyticsService.instance;
@@ -24,12 +33,16 @@ class AnalyticsService {
       .._env = kDebugMode ? 'development' : 'production';
     try {
       await svc.analytics.setUserProperty(name: 'env', value: svc._env);
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      svc._handleAnalyticsError(e, 'setUserProperty');
+    }
 
     // Log an app_open event on cold start (includes env param)
     try {
       await svc.analytics.logAppOpen(parameters: svc._withEnvParams());
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      svc._handleAnalyticsError(e, 'logAppOpen');
+    }
   }
 
   Future<void> logScreenView(String screenName) async {
@@ -38,7 +51,9 @@ class AnalyticsService {
         screenName: screenName,
         parameters: _withEnvParams(),
       );
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      _handleAnalyticsError(e, 'logScreenView');
+    }
   }
 
   Future<void> logLogin({String method = 'unknown'}) async {
@@ -47,7 +62,9 @@ class AnalyticsService {
         name: 'login',
         parameters: _withEnvParams({'method': method}),
       );
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      _handleAnalyticsError(e, 'logLogin');
+    }
   }
 
   Future<void> logLogout() async {

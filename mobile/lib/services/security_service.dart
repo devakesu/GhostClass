@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
@@ -72,20 +73,8 @@ class SecurityService {
     return false;
   }
 
-  static bool isTransientAppCheckFailureText(String? text) {
-    if (text == null) return false;
-    final msg = text.toLowerCase();
-    return msg.contains('quota') ||
-        msg.contains('connection') ||
-        msg.contains('timeout') ||
-        msg.contains('too_many_attempts') ||
-        msg.contains('network') ||
-        msg.contains('rate limit') ||
-        msg.contains('server') ||
-        msg.contains('internal error') ||
-        msg.contains('-12') ||
-        msg.contains('unavailable');
-  }
+  static bool isTransientAppCheckFailureText(String? text) =>
+      isTransientAppCheckFailure(text);
 
   bool _isTransientErrorForFallback(Object e) {
     if (e is DioException) {

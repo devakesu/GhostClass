@@ -37,5 +37,22 @@ void main() {
       );
       expect(corrupted.value, '');
     });
+
+    test(
+      'clearEntropy invalidates prior instances but supports new instances',
+      () {
+        final oldVal = EncryptedValue.fromPlaintext('session1');
+        expect(oldVal.value, 'session1');
+
+        EncryptedValue.clearEntropy();
+
+        // Old instance is invalidated
+        expect(oldVal.value, '');
+
+        // New instance in new generation decrypts successfully
+        final newVal = EncryptedValue.fromPlaintext('session2');
+        expect(newVal.value, 'session2');
+      },
+    );
   });
 }

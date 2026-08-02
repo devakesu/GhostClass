@@ -2,6 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Error Utility & Catch Pattern Guidance
+/// ---------------------------------------
+/// Note on exception handling across the codebase:
+/// Errors are intentionally caught using `on Object catch (e, st)` rather than
+/// `on Exception catch (e)`. In Dart, asynchronous operations, Riverpod provider
+/// builds, and third-party native bridge calls can throw non-Exception objects
+/// or standard `Error` types (e.g. `TypeError`, `ArgumentError`, `StateError`).
+/// Catching `Object` ensures no unhandled runtime faults bypass defensive fallback
+/// blocks or loggers.
+
 String formatApiError(dynamic response, String context) {
   if (response == null) {
     if (context == 'ApiService.Dio') {
@@ -160,4 +170,34 @@ String sanitizeTechnicalDetails(String error) {
   );
 
   return sanitized;
+}
+
+/// Consolidated detector for transient App Check network / quota / server failures.
+bool isTransientAppCheckFailure(dynamic input) {
+  if (input == null) return false;
+  final msg = input.toString().toLowerCase();
+  if (msg.isEmpty) return false;
+  return msg.contains('quota') ||
+      msg.contains('connection') ||
+      msg.contains('timeout') ||
+      msg.contains('too_many_attempts') ||
+      msg.contains('network') ||
+      msg.contains('rate limit') ||
+      msg.contains('server') ||
+      msg.contains('internal error') ||
+      msg.contains('internal google server error') ||
+      msg.contains('google_server_unavailable') ||
+      msg.contains('-12') ||
+      msg.contains('unavailable');
+}
+
+/// Evaluates if a structured security error payload represents a transient failure.
+bool isTransientSecurityPayload(Map<String, dynamic>? data) {
+  if (data == null) return false;
+  final reason = data['reason'] as String?;
+  final error = data['error'] as String?;
+  final appCheckError = data['appCheckError'] as String?;
+  return isTransientAppCheckFailure(reason) ||
+      isTransientAppCheckFailure(error) ||
+      isTransientAppCheckFailure(appCheckError);
 }
