@@ -570,6 +570,21 @@ export function AddAttendanceDialog({
   });
   const startDay = getDay(startOfMonth(currentMonth));
 
+  const renderSubmitButtonText = () => {
+    if (isSubmitting) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          Saving
+        </>
+      );
+    }
+    if (isSessionBlocked) {
+      return "Session occupied";
+    }
+    return "Save Record";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-106.25 custom-container border-border/50 bg-card/90 backdrop-blur-xl shadow-2xl">
@@ -746,167 +761,190 @@ export function AddAttendanceDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {isSessionBlocked && (
-                <p
-                  id="session-blocked-warning"
-                  className="text-[10px] text-red-600 dark:text-red-400 mt-1.5 ml-1 flex items-center gap-1"
-                  role="alert"
-                  aria-live="polite"
-                >
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                    aria-hidden="true"
-                  />
-                  Session occupied
-                </p>
-              )}
             </div>
           </div>
 
-          {/* COURSE */}
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label
-              htmlFor="course-select"
-              className="text-right text-muted-foreground pt-3"
+          {/* BLURRED & BLOCKED FORM CONTAINER WHEN SESSION IS BLOCKED */}
+          <div className="relative rounded-lg overflow-hidden transition-all duration-200">
+            <div
+              className={cn(
+                "space-y-4 transition-all duration-200",
+                isSessionBlocked &&
+                  "blur-[2px] opacity-40 pointer-events-none select-none",
+              )}
             >
-              Subject
-            </Label>
-            <div className="col-span-3 space-y-3">
-              <Select
-                value={courseId}
-                onValueChange={setCourseId}
-                disabled={!profile?.class?.id || sortedCourses.length === 0}
-              >
-                <SelectTrigger
-                  id="course-select"
-                  className="bg-accent/20 hover:bg-accent/30 border-border/50 h-11 w-full backdrop-blur-md transition-all duration-300 text-left ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap overflow-hidden"
-                  aria-label="Select course or subject"
+              {/* COURSE */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label
+                  htmlFor="course-select"
+                  className="text-right text-muted-foreground pt-3"
                 >
-                  <div className="flex items-center gap-2.5 w-full min-w-0 overflow-hidden">
-                    <BookOpen
-                      size={15}
-                      className={cn(
-                        "shrink-0 transition-colors",
-                        courseId ? "text-primary" : "text-muted-foreground",
-                      )}
+                  Subject
+                </Label>
+                <div className="col-span-3 space-y-3">
+                  <Select
+                    value={courseId}
+                    onValueChange={setCourseId}
+                    disabled={!profile?.class?.id ||
+                      sortedCourses.length === 0 || isSessionBlocked}
+                  >
+                    <SelectTrigger
+                      id="course-select"
+                      className="bg-accent/20 hover:bg-accent/30 border-border/50 h-11 w-full backdrop-blur-md transition-all duration-300 text-left ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap overflow-hidden"
+                      aria-label="Select course or subject"
+                    >
+                      <div className="flex items-center gap-2.5 w-full min-w-0 overflow-hidden">
+                        <BookOpen
+                          size={15}
+                          className={cn(
+                            "shrink-0 transition-colors",
+                            courseId ? "text-primary" : "text-muted-foreground",
+                          )}
+                        />
+                        <SelectValue
+                          placeholder={!profile?.class?.id ||
+                              sortedCourses.length === 0
+                            ? "No courses available"
+                            : "Select Subject"}
+                        />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
+                      {sortedCourses.map((c: { key: string; name: string }) => {
+                        const code = getCourseCodeById(c.key);
+                        const isCourseDisabled = isDisabled(code);
+                        return (
+                          <SelectItem
+                            key={c.key}
+                            value={c.key}
+                            className={cn(
+                              "whitespace-normal py-2",
+                              isCourseDisabled && "opacity-60 italic",
+                            )}
+                          >
+                            <span className="leading-tight text-left capitalize truncate block">
+                              {c.name.toLowerCase()}
+                              {isCourseDisabled && " (Disabled)"}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* STATUS */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-muted-foreground">
+                  Status
+                </Label>
+                <RadioGroup
+                  value={statusType}
+                  onValueChange={(v: AttendanceStatusType) => {
+                    setStatusType(v);
+                  }}
+                  className="col-span-3 flex gap-4"
+                  aria-label="Select attendance status"
+                  disabled={isSessionBlocked}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Present"
+                      id="r1"
+                      className="text-green-500 border-green-500/50"
                     />
-                    <SelectValue
-                      placeholder={!profile?.class?.id ||
-                          sortedCourses.length === 0
-                        ? "No courses available"
-                        : "Select Subject"}
-                    />
+                    <Label
+                      htmlFor="r1"
+                      className="cursor-pointer text-green-500 font-normal"
+                    >
+                      Present
+                    </Label>
                   </div>
-                </SelectTrigger>
-                <SelectContent className="custom-dropdown border-border/50 max-h-60 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]">
-                  {sortedCourses.map((c: { key: string; name: string }) => {
-                    const code = getCourseCodeById(c.key);
-                    const isCourseDisabled = isDisabled(code);
-                    return (
-                      <SelectItem
-                        key={c.key}
-                        value={c.key}
-                        className={cn(
-                          "whitespace-normal py-2",
-                          isCourseDisabled && "opacity-60 italic",
-                        )}
-                      >
-                        <span className="leading-tight text-left capitalize truncate block">
-                          {c.name.toLowerCase()}
-                          {isCourseDisabled && " (Disabled)"}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Absent"
+                      id="r2"
+                      className="text-red-500 border-red-500/50"
+                    />
+                    <Label
+                      htmlFor="r2"
+                      className="cursor-pointer text-red-500 font-normal"
+                    >
+                      Absent
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="Duty Leave"
+                      id="r3"
+                      className="text-yellow-500 border-yellow-500/50"
+                    />
+                    <Label
+                      htmlFor="r3"
+                      className="cursor-pointer text-yellow-500 font-normal"
+                    >
+                      DL
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-          {/* STATUS */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right text-muted-foreground">Status</Label>
-            <RadioGroup
-              value={statusType}
-              onValueChange={(v: AttendanceStatusType) => {
-                setStatusType(v);
-              }}
-              className="col-span-3 flex gap-4"
-              aria-label="Select attendance status"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Present"
-                  id="r1"
-                  className="text-green-500 border-green-500/50"
-                />
+              {/* REMARKS / REASON */}
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label
-                  htmlFor="r1"
-                  className="cursor-pointer text-green-500 font-normal"
+                  htmlFor="remarks-dialog"
+                  className="text-right text-muted-foreground"
                 >
-                  Present
+                  {statusType === "Duty Leave" ? "Reason" : "Remarks"}
                 </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="remarks-dialog"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder={statusType === "Duty Leave"
+                      ? "Required for Duty Leave"
+                      : "Optional notes"}
+                    className={cn(
+                      "bg-accent/20 border-border/50",
+                      statusType === "Duty Leave" &&
+                        remarks.length === 0 &&
+                        "border-red-500/50 focus-visible:ring-red-500",
+                    )}
+                    required={statusType === "Duty Leave"}
+                    maxLength={255}
+                    disabled={isSessionBlocked}
+                  />
+                  {statusType === "Duty Leave" && remarks.length === 0 && (
+                    <p className="text-[10px] text-red-500 mt-1.5 ml-1 flex items-center gap-1">
+                      Reason is required to add Duty Leave
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Absent"
-                  id="r2"
-                  className="text-red-500 border-red-500/50"
-                />
-                <Label
-                  htmlFor="r2"
-                  className="cursor-pointer text-red-500 font-normal"
-                >
-                  Absent
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="Duty Leave"
-                  id="r3"
-                  className="text-yellow-500 border-yellow-500/50"
-                />
-                <Label
-                  htmlFor="r3"
-                  className="cursor-pointer text-yellow-500 font-normal"
-                >
-                  DL
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* REMARKS / REASON */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label
-              htmlFor="remarks-dialog"
-              className="text-right text-muted-foreground"
-            >
-              {statusType === "Duty Leave" ? "Reason" : "Remarks"}
-            </Label>
-            <div className="col-span-3">
-              <Input
-                id="remarks-dialog"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder={statusType === "Duty Leave"
-                  ? "Required for Duty Leave"
-                  : "Optional notes"}
-                className={cn(
-                  "bg-accent/20 border-border/50",
-                  statusType === "Duty Leave" &&
-                    remarks.length === 0 &&
-                    "border-red-500/50 focus-visible:ring-red-500",
-                )}
-                required={statusType === "Duty Leave"}
-                maxLength={255}
-              />
-              {statusType === "Duty Leave" && remarks.length === 0 && (
-                <p className="text-[10px] text-red-500 mt-1.5 ml-1 flex items-center gap-1">
-                  Reason is required to add Duty Leave
-                </p>
-              )}
             </div>
+
+            {isSessionBlocked && (
+              <div
+                id="session-blocked-warning"
+                className="absolute inset-0 z-20 flex items-center justify-center bg-background/40 backdrop-blur-xs rounded-lg border border-red-500/20 p-4 text-center"
+                role="alert"
+                aria-live="polite"
+              >
+                <div className="flex flex-col items-center justify-center text-center gap-1.5 p-4 text-red-600 dark:text-red-400">
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  </div>
+                  <div className="font-bold text-sm text-center">
+                    Session occupied
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium text-center">
+                    Please select another period/hour
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -937,19 +975,7 @@ export function AddAttendanceDialog({
               "disabled:opacity-100 disabled:bg-muted! disabled:text-muted-foreground! disabled:border-border/70",
             )}
           >
-            {isSubmitting
-              ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Saving
-                </>
-              )
-              : (
-                "Save Record"
-              )}
+            {renderSubmitButtonText()}
           </Button>
         </DialogFooter>
       </DialogContent>

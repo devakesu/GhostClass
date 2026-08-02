@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -283,31 +284,82 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
               const SizedBox(height: 16),
               const AttendanceDialogLabel(text: 'Session'),
               _buildSessionSelector(primary),
-              if (_isBlocked)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, left: 4),
-                  child: Text(
-                    'Session occupied',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AbsorbPointer(
+                      absorbing: _isBlocked,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: _isBlocked ? 3 : 0,
+                          sigmaY: _isBlocked ? 3 : 0,
+                        ),
+                        child: Opacity(
+                          opacity: _isBlocked ? 0.4 : 1.0,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const AttendanceDialogLabel(text: 'Subject'),
+                              _buildSubjectSelectorButton(data, primary),
+                              const SizedBox(height: 20),
+                              const AttendanceDialogLabel(text: 'Status'),
+                              _buildStatusButtons(ghostColors),
+                              const SizedBox(height: 16),
+                              AttendanceDialogLabel(
+                                text: _status == AttendanceStatus.dutyLeave
+                                    ? 'Reason (Optional)'
+                                    : 'Remarks (Optional)',
+                              ),
+                              _buildRemarksField(primary),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (_isBlocked)
+                      Positioned.fill(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                LucideIcons.alertCircle,
+                                size: 24,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Session occupied',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Please select another period/hour',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              const SizedBox(height: 16),
-              const AttendanceDialogLabel(text: 'Subject'),
-              _buildSubjectSelectorButton(data, primary),
-              const SizedBox(height: 20),
-              const AttendanceDialogLabel(text: 'Status'),
-              _buildStatusButtons(ghostColors),
-              const SizedBox(height: 16),
-              AttendanceDialogLabel(
-                text: _status == AttendanceStatus.dutyLeave
-                    ? 'Reason (Optional)'
-                    : 'Remarks (Optional)',
               ),
-              _buildRemarksField(primary),
               const SizedBox(height: 24),
               _buildSubmitButton(primary),
             ],
@@ -854,9 +906,9 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
         ),
         child: _isSubmitting
             ? const CircularProgressIndicator(color: Colors.white)
-            : const Text(
-                'Add Record',
-                style: TextStyle(fontWeight: FontWeight.bold),
+            : Text(
+                _isBlocked ? 'Session occupied' : 'Add Record',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
       ),
     );
