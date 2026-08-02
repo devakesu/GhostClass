@@ -39,6 +39,10 @@ const SUPABASE_ORIGIN = "https://test.supabase.co";
 const CF_PROXY = "https://cf-proxy.workers.dev";
 const AWS_PROXY = "https://aws-proxy.execute-api.amazonaws.com";
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** Creates a mock fetch that throws a network error on the first call. */
 function mockFetchNetworkError(thenStatus = 200): ReturnType<typeof vi.fn> {
   return vi.fn()
@@ -142,7 +146,7 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
     await tieredFetch(`${SUPABASE_ORIGIN}/auth/v1/user`, {});
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
+    expect(calledUrl).toMatch(new RegExp(`^${escapeRegExp(SUPABASE_ORIGIN)}`));
     expect(calledUrl).toContain("/auth/v1/user");
   });
 
@@ -187,7 +191,7 @@ describe("buildSupabaseTieredFetch — successful first tier", () => {
       string,
       RequestInit,
     ];
-    expect(calledInput).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
+    expect(calledInput).toMatch(new RegExp(`^${escapeRegExp(SUPABASE_ORIGIN)}`));
     expect(calledInput).toContain("/auth/v1/user");
 
     // Method and Authorization header from the original Request must be preserved.
@@ -225,7 +229,7 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     // Second call should go to the CF proxy origin.
     const secondUrl = mockFetch.mock.calls[1][0] as string;
-    expect(secondUrl).toMatch(new RegExp(`^${CF_PROXY}`));
+    expect(secondUrl).toMatch(new RegExp(`^${escapeRegExp(CF_PROXY)}`));
   });
 
   it("fails over direct → CF → AWS on 503 for GET when all three tiers configured", async () => {
@@ -245,9 +249,9 @@ describe("buildSupabaseTieredFetch — GET 5xx failover", () => {
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(3);
-    expect(mockFetch.mock.calls[0][0]).toMatch(new RegExp(`^${SUPABASE_ORIGIN}`));
-    expect(mockFetch.mock.calls[1][0]).toMatch(new RegExp(`^${CF_PROXY}`));
-    expect(mockFetch.mock.calls[2][0]).toMatch(new RegExp(`^${AWS_PROXY}`));
+    expect(mockFetch.mock.calls[0][0]).toMatch(new RegExp(`^${escapeRegExp(SUPABASE_ORIGIN)}`));
+    expect(mockFetch.mock.calls[1][0]).toMatch(new RegExp(`^${escapeRegExp(CF_PROXY)}`));
+    expect(mockFetch.mock.calls[2][0]).toMatch(new RegExp(`^${escapeRegExp(AWS_PROXY)}`));
   });
 
   it("does NOT fail over on 502 for AWS-only config when direct returns 502 — fails over to AWS and returns 502 as-is on last tier", async () => {
