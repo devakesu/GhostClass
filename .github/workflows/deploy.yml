@@ -206,7 +206,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: steps.validate-aws.outputs.skip != 'true'
-        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
+        uses: aws-actions/configure-aws-credentials@91d3095422abed2108cfda1e48f4d113d737598b
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
@@ -278,7 +278,7 @@ jobs:
 
       - name: Configure AWS credentials (Supabase AWS Lambda)
         if: steps.validate-supabase-aws.outputs.skip != 'true' && steps.validate-aws.outputs.skip == 'true'
-        uses: aws-actions/configure-aws-credentials@713aaabfecea015b1ad8d37dc2b819ee41c00eb0
+        uses: aws-actions/configure-aws-credentials@91d3095422abed2108cfda1e48f4d113d737598b
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID || secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}

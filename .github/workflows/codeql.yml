@@ -54,7 +54,7 @@ jobs:
           echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
       - name: Set up JDK
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: "temurin"
           java-version: "25"
