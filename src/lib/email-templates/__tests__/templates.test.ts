@@ -124,6 +124,7 @@ describe("Email Render Functions (index.tsx)", () => {
       manualCourseName: "Physics",
       courseLabel: "PHYS101",
       dashboardUrl: "https://example.com",
+      attendance: "Present",
     });
     expect(html).toContain("Jane");
     expect(html).toContain("Course Mismatch Detected");

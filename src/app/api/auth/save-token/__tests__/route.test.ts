@@ -631,4 +631,65 @@ describe("POST /api/auth/save-token", () => {
     const response = await POST(req, {} as any);
     expect(response.status).toBe(500);
   });
+
+  it("upserts has_mobile_app and fcm_token when provided or for app-check callers", async () => {
+    vi.mocked(egressFetch).mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        username: "testuser",
+        id: "12345",
+        email: "test@example.com",
+      }),
+    } as any);
+
+    const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+    const mockSupabaseAdmin = {
+      auth: {
+        admin: {
+          createUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "new-auth-id" } },
+            error: null,
+          }),
+          getUserById: vi.fn().mockResolvedValue({
+            data: { user: { email: "test@example.com" } },
+            error: null,
+          }),
+        },
+      },
+      from: vi.fn((table) => {
+        if (table === "users") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+              single: vi.fn().mockResolvedValue({ data: null }),
+              is: vi.fn().mockReturnThis(),
+            })),
+            upsert: mockUpsert,
+          };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+        };
+      }),
+    };
+    vi.mocked(getAdminClient).mockReturnValue(mockSupabaseAdmin as any);
+
+    const req = {
+      json: async () => ({
+        token: "a-very-long-token-that-is-valid-length",
+        fcm_token: "my-fcm-token-123",
+      }),
+    } as any;
+    const response = await POST(req, { authType: "app-check" } as any);
+    expect(response.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fcm_token: "my-fcm-token-123",
+        has_mobile_app: true,
+      }),
+    );
+  });
 });

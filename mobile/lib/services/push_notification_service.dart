@@ -30,15 +30,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Initializes Firebase Cloud Messaging (FCM), requests native permissions,
 /// manages foreground/background dispatchers, and synchronises device tokens
 /// with the secure GhostClass backend app-check guarded routes.
-final firebaseMessagingProvider = Provider<FirebaseMessaging>(
-  (ref) => FirebaseMessaging.instance,
+final firebaseMessagingProvider = Provider<FirebaseMessaging?>(
+  (ref) {
+    try {
+      return FirebaseMessaging.instance;
+    } on Object catch (_) {
+      return null;
+    }
+  },
 );
 
 class PushNotificationService {
   PushNotificationService(this._ref)
     : _messaging = _ref.read(firebaseMessagingProvider);
   final Ref _ref;
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? _messaging;
   StreamSubscription<String>? _tokenSub;
   StreamSubscription<RemoteMessage>? _messageSub;
   StreamSubscription<RemoteMessage>? _messageOpenedSub;
@@ -55,6 +61,7 @@ class PushNotificationService {
     Stream<RemoteMessage>? onMessageStream,
     Stream<RemoteMessage>? onMessageOpenedAppStream,
   }) async {
+    if (_messaging == null) return;
     try {
       await _tokenSub?.cancel();
       await _messageSub?.cancel();
@@ -189,15 +196,17 @@ class PushNotificationService {
         // Retrieve token and execute initial synchronization
         final token = await _messaging.getToken();
         if (token != null) {
+          final hasSession =
+              _ref.read(supabaseClientProvider).auth.currentSession != null;
           // Defer backend sync slightly to avoid competing with critical
           // startup/login security handshakes.
           AppLogger.safeUnawait(
             Future<void>.delayed(
               Platform.environment.containsKey('FLUTTER_TEST')
                   ? Duration.zero
-                  : const Duration(seconds: 8),
+                  : const Duration(seconds: 2),
               () async {
-                await _syncTokenWithBackend(token);
+                await _syncTokenWithBackend(token, force: hasSession);
               },
             ).catchError((Object e, StackTrace st) {
               AppLogger.e(
@@ -230,7 +239,7 @@ class PushNotificationService {
         _tokenSub = _messaging.onTokenRefresh.listen((newToken) {
           AppLogger.i('FCM device token refreshed');
           AppLogger.safeUnawait(
-            _syncTokenWithBackend(newToken),
+            _syncTokenWithBackend(newToken, force: true),
             'FCM token refresh',
           );
         });
@@ -244,13 +253,26 @@ class PushNotificationService {
     }
   }
 
+  /// Public entrypoint to sync current FCM token with backend.
+  Future<void> syncToken({bool force = false}) async {
+    try {
+      if (_messaging == null) return;
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await _syncTokenWithBackend(token, force: force);
+      }
+    } on Object catch (e, st) {
+      AppLogger.e('PushNotificationService: syncToken failed', e, st);
+    }
+  }
+
   /// Synchronises the secure push token with the backend storage route.
-  Future<void> _syncTokenWithBackend(String token) async {
+  Future<void> _syncTokenWithBackend(String token, {bool force = false}) async {
     try {
       if (!_ref.mounted) return;
       final cachedToken = await _storage.getNormalizedFcmToken();
 
-      if (cachedToken == token) {
+      if (!force && cachedToken == token) {
         return;
       }
 

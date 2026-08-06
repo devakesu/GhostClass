@@ -471,3 +471,21 @@ export function stripTrailingSlashes(str: string | undefined): string {
   }
   return s;
 }
+
+/**
+ * Formats a user's display name from first_name, last_name, or username.
+ */
+export function getUserDisplayName(user: {
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+}): string {
+  const fullName = [user.first_name, user.last_name]
+    .filter(Boolean)
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+    .join(" ");
+  if (fullName) return fullName;
+  if (user.username && user.username !== "User") return user.username;
+  return "User";
+}

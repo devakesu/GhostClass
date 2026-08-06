@@ -24,6 +24,8 @@ export const renderCourseMismatchEmail = (props: {
   manualCourseName: string;
   courseLabel: string;
   dashboardUrl: string;
+  attendance: string;
+  remarks?: string | null;
 }): Promise<string> => {
   return render(<CourseMismatchEmail {...props} />);
 };

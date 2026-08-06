@@ -637,4 +637,35 @@ void main() {
 
     await foregroundMessages.close();
   });
+
+  test('syncToken forces registration even if cached token matches', () async {
+    when(() => mockMessaging.getToken()).thenAnswer((_) async => 'same-token');
+    when(
+      () => mockStorage.getNormalizedFcmToken(),
+    ).thenAnswer((_) async => 'same-token');
+    when(
+      () => mockDio.post<dynamic>(
+        any(),
+        data: any(named: 'data'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => Response<dynamic>(
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      ),
+    );
+
+    final service = container.read(pushNotificationServiceProvider);
+    await service.syncToken(force: true);
+
+    verify(
+      () => mockDio.post<dynamic>(
+        any(that: contains('/auth/register-fcm')),
+        data: {'fcm_token': 'same-token'},
+        options: any(named: 'options'),
+      ),
+    ).called(1);
+    verify(() => mockStorage.saveFcmToken('same-token')).called(1);
+  });
 }

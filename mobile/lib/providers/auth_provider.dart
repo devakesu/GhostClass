@@ -19,6 +19,7 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/cache_manager.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/profile_service.dart';
+import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
 import 'package:ghostclass/services/startup_flow_service.dart';
@@ -460,6 +461,16 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             termsVersionOverride: termsVersion,
             settingsFallback: settingsWithAcademic,
           );
+
+      AppLogger.safeUnawait(
+        ref
+            .read(pushNotificationServiceProvider)
+            .syncToken(force: true)
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e('AuthNotifier: Post-login FCM sync failed', e, st);
+            }),
+        'AuthNotifier: post-login FCM sync',
+      );
 
       final profileService = ref.read(profileServiceProvider);
       if (profileService.hasRenderableLocalProfile(cachedUser.profile)) {
