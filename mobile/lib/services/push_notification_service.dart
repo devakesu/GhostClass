@@ -52,6 +52,7 @@ class PushNotificationService {
   Timer? _deferredAuthTimer;
   bool _initialized = false;
   bool get isInitialized => _initialized;
+  bool _isRegistering = false;
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
   SecureStorageService get _storage => _ref.read(secureStorageProvider);
@@ -273,6 +274,8 @@ class PushNotificationService {
 
   /// Synchronises the secure push token with the backend storage route.
   Future<void> _syncTokenWithBackend(String token, {bool force = false}) async {
+    if (_isRegistering) return;
+    _isRegistering = true;
     try {
       if (!_ref.mounted) return;
       final cachedToken = await _storage.getNormalizedFcmToken();
@@ -298,6 +301,8 @@ class PushNotificationService {
           final session = data.session;
           if (session != null) {
             try {
+              final latestCached = await _storage.getNormalizedFcmToken();
+              if (latestCached == token) return;
               final accessToken = session.accessToken;
               final response = await _registerTokenHttp(token, accessToken);
               if (response.statusCode == 200) {
@@ -421,6 +426,8 @@ class PushNotificationService {
           'PushNotificationService: analytics fcm_registered (exception)',
         );
       } on Object catch (_) {}
+    } finally {
+      _isRegistering = false;
     }
   }
 

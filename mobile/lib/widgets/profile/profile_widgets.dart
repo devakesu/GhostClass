@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -48,7 +49,7 @@ class ProfileHeader extends StatelessWidget {
                       ),
                       image: avatarUrl != null
                           ? DecorationImage(
-                              image: NetworkImage(
+                              image: CachedNetworkImageProvider(
                                 avatarUrl!,
                                 headers: {
                                   'Origin': AppConfig.supabaseOrigin,

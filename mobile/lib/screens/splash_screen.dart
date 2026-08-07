@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -220,10 +221,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     prewarm(dashboardFuture, 'dashboard');
-    prewarm(trackingFuture, 'tracking');
-    prewarm(leaveFuture, 'leave');
-    prewarm(scoreFuture, 'scores');
-    prewarm(notificationsFuture, 'notifications');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      prewarm(trackingFuture, 'tracking');
+      prewarm(leaveFuture, 'leave');
+      Future.delayed(const Duration(milliseconds: 150), () {
+        prewarm(scoreFuture, 'scores');
+        prewarm(notificationsFuture, 'notifications');
+      });
+    });
   }
 
   @override
@@ -315,7 +320,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           finalUser.profile?.avatarUrl != null) {
         try {
           final _ = precacheImage(
-            NetworkImage(
+            CachedNetworkImageProvider(
               finalUser.profile!.avatarUrl!,
               headers: {
                 'Origin': AppConfig.supabaseOrigin,
