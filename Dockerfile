@@ -1,13 +1,12 @@
 # ===============================
 # 0. Global deterministic settings
 # ===============================
-ARG NODE_IMAGE=node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3
 ARG SOURCE_DATE_EPOCH=1767225600
 
 # ===============================
 # 0.1. Base layer with npm upgrade (pinned by hash)
 # ===============================
-FROM ${NODE_IMAGE} AS base
+FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS base
 
 # Update npm to version 12 without using `npm install -g` (avoids scorecard "npmCommand not pinned" flag).
 # /usr/local/bin/npm already symlinks to /usr/local/lib/node_modules/npm/bin/npm-cli.js,
@@ -207,7 +206,7 @@ RUN sed -i 's|/app/|/|g' .next/standalone/server.js
 # ===============================
 # 3. Runtime layer
 # ===============================
-FROM ${NODE_IMAGE} AS runner
+FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS runner
 
 ARG SOURCE_DATE_EPOCH
 ARG APP_COMMIT_SHA

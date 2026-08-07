@@ -27,5 +27,5 @@ jobs:
 
       - name: Validate Dependabot config
         run: |
-          python3 -m pip install check-jsonschema
+          python3 -m pip install --require-hashes -r .github/requirements.txt
           check-jsonschema --schemafile https://json.schemastore.org/dependabot-2.0.json .github/dependabot.yml

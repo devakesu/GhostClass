@@ -1,22 +1,30 @@
 {
   "npm": {
     "url": "https://registry.npmjs.org/npm/-/npm-12.0.2.tgz",
-    "shasum": "788d93dc8869000b1078e0395c60748a0aadc4f1"
+    "sha256": "5dbb86c71d07a1957f2e90734092dd6a58bdcd9ebc2d8d41ca1c6e6a21d364e1"
   },
   "playwright": {
     "url": "https://registry.npmjs.org/playwright/-/playwright-1.62.1.tgz",
-    "shasum": "8447b6755e8aec85a3cb7207c823e3ed2fc66700"
+    "sha256": "1982556a882b246ccb7c16337fab5e4e790292b69f835a2db1011dddc440ed98"
+  },
+  "playwright_core": {
+    "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.62.1.tgz",
+    "sha256": "954be1e183d0ddb9748fe0d2d08b0b66a9210c74dd75c397aeb70303b9f08a00"
   },
   "firebase": {
     "url": "https://registry.npmjs.org/firebase-tools/-/firebase-tools-15.25.1.tgz",
-    "shasum": "56f46b47cafdf89dbb3f9c14e039a3095da9c50c"
+    "sha256": "3517effab3f6c869934da9836a43db6683213e7431c9ef6f3f4b7b349f058bd4"
   },
   "supabase": {
     "url": "https://github.com/supabase/cli/releases/download/v2.111.0/supabase_2.111.0_linux_amd64.tar.gz",
     "sha256": "31ee8a152e9c8c8eddae072c6bc7c9119748a96c8cdaf21a6d31c9ce7e62cc18"
   },
+  "gh": {
+    "url": "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz",
+    "sha256": "a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112"
+  },
   "infisical": {
     "url": "https://registry.npmjs.org/@infisical/cli/-/cli-0.43.114.tgz",
-    "shasum": "f6c8ec4b7c0efcb568694653455f96fb947e4993"
+    "sha256": "7450bc5a7e5bc56436bf5705292234f28b5dbb185b04cb6606ff7b002c5d84b1"
   }
 }
