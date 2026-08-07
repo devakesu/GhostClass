@@ -38,6 +38,7 @@ export default function GlobalError({
   };
 
   const handleGoHome = () => {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/";
   };
 

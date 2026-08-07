@@ -394,6 +394,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       // render the protected layout before cookies are available which
       // caused an immediate logout previously.
       if (typeof window !== "undefined") {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/dashboard";
       } else {
         router.push("/dashboard");

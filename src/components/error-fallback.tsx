@@ -86,6 +86,7 @@ export function ErrorFallback(
     } catch (error) {
       // handleLogout already handles errors, but just in case
       logger.error("Logout error:", error);
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/";
     }
   };
