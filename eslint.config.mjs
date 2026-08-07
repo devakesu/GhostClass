@@ -33,6 +33,7 @@ export default [
   ...tseslint.configs.recommended,
   security.configs.recommended, // Injects security rules
   sonarjs.configs.recommended, // Injects complexity/quality rules
+  pluginNext.configs.recommended,
   {
     ...pluginReact.configs.flat.recommended,
     languageOptions: {
@@ -45,12 +46,10 @@ export default [
   },
   {
     plugins: {
-      "@next/next": pluginNext,
       "react-hooks": pluginReactHooks,
       "unused-imports": unusedImports, // Registers unused-imports plugin
     },
     rules: {
-      ...pluginNext.configs.recommended.rules,
       ...pluginReactHooks.configs.recommended.rules,
 
       // QUALITY & SECURITY LOCKDOWN

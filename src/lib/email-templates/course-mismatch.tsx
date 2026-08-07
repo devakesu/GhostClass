@@ -23,6 +23,10 @@ interface CourseMismatchEmailProps {
   manualCourseName: string;
   courseLabel: string;
   dashboardUrl: string;
+  /** Human-readable attendance label, e.g. "Present", "Absent", "Duty Leave" */
+  attendance: string;
+  /** Optional remark/note the user added when recording the entry */
+  remarks?: string | null;
 }
 
 export const CourseMismatchEmail = ({
@@ -32,6 +36,8 @@ export const CourseMismatchEmail = ({
   manualCourseName,
   courseLabel,
   dashboardUrl,
+  attendance,
+  remarks,
 }: CourseMismatchEmailProps) => (
   <Html>
     <Head />
@@ -56,7 +62,6 @@ export const CourseMismatchEmail = ({
           </Text>
 
           <Section style={emailStyles.conflictBox}>
-            {/* eslint-disable-next-line sonarjs/table-header -- Email uses label/value with <td> */}
             <table style={tableStyles.table}>
               <tbody>
                 <tr>
@@ -70,6 +75,18 @@ export const CourseMismatchEmail = ({
                   <td style={tableStyles.cellValueBold}>{manualCourseName}</td>
                 </tr>
                 <tr>
+                  <td style={tableStyles.cellLabel}>✅ Your Status</td>
+                  <td style={tableStyles.cellValueBold}>{attendance}</td>
+                </tr>
+                {remarks
+                  ? (
+                    <tr>
+                      <td style={tableStyles.cellLabel}>📝 Your Remarks</td>
+                      <td style={tableStyles.cellValueBold}>{remarks}</td>
+                    </tr>
+                  )
+                  : null}
+                <tr>
                   <td style={tableStyles.cellLabelLast}>🏫 Official Record</td>
                   <td style={tableStyles.cellValueBoldLast}>{courseLabel}</td>
                 </tr>
@@ -79,8 +96,9 @@ export const CourseMismatchEmail = ({
 
           <Text style={emailStyles.note}>
             To prevent confusion, we have{" "}
-            <strong>removed your manual entry</strong>. Please check your
-            dashboard for the correct status.
+            <strong>removed your manual entry</strong>. The details above are
+            kept here for your reference. Please check your dashboard for the
+            correct status.
           </Text>
 
           <Section style={emailStyles.buttonContainer}>

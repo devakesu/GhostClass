@@ -24,3 +24,4 @@ linter:
     use_key_in_widget_constructors: true
     public_member_api_docs: false
     lines_longer_than_80_chars: false
+    unreachable_from_main: false

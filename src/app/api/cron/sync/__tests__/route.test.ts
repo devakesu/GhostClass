@@ -246,11 +246,18 @@ function buildAdminMock(opts: {
     session: string;
     attendance: string;
     status: string;
+    remarks?: string | null;
   }>;
   usersData?: any[];
+  courseMappings?: Array<{
+    ezygo_id: number;
+    course_name: string;
+    university_code: string;
+  }>;
 } = {}) {
   const trackerData = opts.trackerData || [];
   const users = opts.usersData || [MOCK_USER_ROW];
+  const mappingsData = opts.courseMappings ?? [];
   const deleteInSpy = vi.fn().mockReturnValue(Promise.resolve({ error: null }));
   const updateTrackerSpy = vi.fn().mockReturnValue({
     in: vi.fn().mockResolvedValue({ error: null }),
@@ -306,7 +313,7 @@ function buildAdminMock(opts: {
 
     if (table === "course_mappings") {
       return {
-        select: vi.fn().mockResolvedValue({ data: [], error: null }),
+        select: vi.fn().mockResolvedValue({ data: mappingsData, error: null }),
       };
     }
 
@@ -601,11 +608,103 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     expect(notifications[0].title).toBe("Course Mismatch 💀");
     expect(notifications[0].topic).toContain("conflict-course");
 
-    // Verify email was sent
+    // Verify email was sent with full name
     expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: MOCK_USER_ROW.email,
+      toName: "John Doe",
       subject: "Course Mismatch 💀",
     }));
+
+    const { renderCourseMismatchEmail } = await import("@/lib/email-templates");
+    expect(renderCourseMismatchEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "John Doe",
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("getUserDisplayName", () => {
+  it("formats first and last name when both are present", async () => {
+    const { getUserDisplayName } = await import("@/lib/utils");
+    expect(
+      getUserDisplayName({ first_name: "John", last_name: "Doe", username: "johnd" }),
+    ).toBe("John Doe");
+  });
+
+  it("handles only first_name", async () => {
+    const { getUserDisplayName } = await import("@/lib/utils");
+    expect(
+      getUserDisplayName({ first_name: "John", last_name: null, username: "johnd" }),
+    ).toBe("John");
+  });
+
+  it("falls back to username when names are missing", async () => {
+    const { getUserDisplayName } = await import("@/lib/utils");
+    expect(
+      getUserDisplayName({ first_name: null, last_name: null, username: "johnd" }),
+    ).toBe("johnd");
+  });
+
+  it("falls back to 'User' when names are missing and username is 'User'", async () => {
+    const { getUserDisplayName } = await import("@/lib/utils");
+    expect(
+      getUserDisplayName({ first_name: null, last_name: null, username: "User" }),
+    ).toBe("User");
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — university course code matches official EzyGo ID → no mismatch (regression)", () => {
+  it("does NOT delete the extra or emit a Course Mismatch when the university code resolves to the same EzyGo course", async () => {
+    // Regression for: manually-added courses store a university course code (e.g. "GAMAT301")
+    // while official EzyGo data uses a numeric ID (e.g. 1001). The reverse lookup via
+    // universityCodeToEzygoId must prevent false positives.
+    const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 200,
+          course: "GAMAT301", // university course code stored by AddAttendanceDialog
+          date: "2025-12-31",
+          session: "II",
+          attendance: "110",
+          status: "extra",
+          remarks: "Extra lecture attended",
+        },
+      ],
+      // course_mappings maps EzyGo 1001 ↔ university code "GAMAT301"
+      courseMappings: [
+        {
+          ezygo_id: 1001,
+          course_name: "MATHEMATICS FOR COMPUTER AND INFORMATION SCIENCE-3",
+          university_code: "GAMAT301",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      // Official also says course 1001 — same course, just different representation
+      "2025-12-31": { "2": ezygoSession(2, 111, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    await res.json();
+
+    expect(res.status).toBe(200);
+
+    // Should NOT be deleted as a "Course Mismatch" — attendance is 111 (absent) vs 110 (present),
+    // so it becomes a conflict (status update to correction), not a deletion.
+    expect(deleteInSpy).not.toHaveBeenCalled();
+
+    // Notification should be "Attendance Conflict 💀", NOT "Course Mismatch 💀"
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Attendance Conflict 💀");
+    expect(notifications[0].title).not.toBe("Course Mismatch 💀");
   });
 });
 

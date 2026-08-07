@@ -13,8 +13,10 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 
 const mockGetClientIp = vi.fn().mockReturnValue("127.0.0.1");
+const mockIsUpstreamAuthNetworkError = vi.fn().mockReturnValue(false);
 vi.mock("@/lib/utils.server", () => ({
   getClientIp: () => mockGetClientIp(),
+  isUpstreamAuthNetworkError: (err: any) => mockIsUpstreamAuthNetworkError(err),
 }));
 
 const mockSupabaseAdminUpdate = vi.fn().mockReturnThis();
@@ -174,5 +176,21 @@ describe("POST /api/auth/register-fcm", () => {
         has_mobile_app: true,
       }),
     );
+  });
+
+  it("returns 503 when Supabase auth throws upstream network error", async () => {
+    mockSupabaseAdminAuthGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { name: "AuthRetryableFetchError", message: "fetch failed", status: 0 },
+    });
+    mockIsUpstreamAuthNetworkError.mockReturnValueOnce(true);
+    const { POST } = await import("../route");
+    const req = new NextRequest("http://localhost/api/auth/register-fcm", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+      body: JSON.stringify({ fcm_token: "test-token-123" }),
+    });
+    const res = await POST(req, {} as any);
+    expect(res.status).toBe(503);
   });
 });

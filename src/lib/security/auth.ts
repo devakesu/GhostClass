@@ -75,6 +75,7 @@ function clearClientState() {
   if (typeof window !== "undefined") {
     localStorage.clear();
     sessionStorage.clear();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/";
   }
 }

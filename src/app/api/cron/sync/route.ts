@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { decrypt, encrypt } from "@/lib/crypto";
-import { normalizeSession, toRoman } from "@/lib/utils";
+import { getUserDisplayName, normalizeSession, toRoman } from "@/lib/utils";
 import { egressFetch, redact } from "@/lib/utils.server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -61,6 +61,7 @@ interface TrackerItem {
   session: string | number;
   attendance: string | number;
   status: string;
+  remarks?: string | null;
 }
 
 interface NotificationInsert {
@@ -91,6 +92,8 @@ interface CourseMismatchProps {
   manualCourseName: string;
   courseLabel: string;
   dashboardUrl: string;
+  attendance: string;
+  remarks?: string | null;
 }
 
 interface RevisionClassProps {
@@ -278,7 +281,7 @@ function handleRevisionClass(
     emails.push({
       type: "revision",
       props: {
-        username: user.username,
+        username: getUserDisplayName(user),
         courseName,
         date: item.date,
         session: String(item.session),
@@ -297,38 +300,61 @@ function handleCourseMismatch(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
+  universityCodeToEzygoId: Map<string, string>,
   dashboardUrl: string,
 ): boolean {
-  if (
-    item.status === "extra" &&
-    String(item.course) !== String(officialEntry.course)
-  ) {
-    toDelete.add(item.id);
-    const manualCourse = courseMap.get(String(item.course)) ||
-      String(item.course);
-    const officialCourse = courseMap.get(officialEntry.course) ||
-      officialEntry.course;
-    notifications.push({
-      auth_user_id: user.auth_id,
-      title: "Course Mismatch 💀",
-      description:
-        `Course mismatch on ${item.date} (Session ${item.session}). Manual: ${manualCourse}, Official: ${officialCourse}.`,
-      topic: `conflict-course-${key}`,
-    });
-    emails.push({
-      type: "mismatch",
-      props: {
-        username: user.username,
-        date: item.date,
-        session: String(item.session),
-        manualCourseName: manualCourse,
-        courseLabel: officialCourse,
-        dashboardUrl,
-      },
-    });
-    return true;
+  if (item.status !== "extra") return false;
+
+  // Resolve the tracker's course value to an EzyGo ID for comparison.
+  // Manually-added courses store a university code (e.g. "GAMAT301") while
+  // the official EzyGo record uses a numeric ID (e.g. "72323"). We use the
+  // reverse lookup map so that matching codes are never flagged as a mismatch.
+  const trackerCourseRaw = String(item.course);
+  const resolvedTrackerId =
+    universityCodeToEzygoId.get(trackerCourseRaw.toUpperCase()) ??
+      trackerCourseRaw;
+
+  if (resolvedTrackerId === String(officialEntry.course)) return false;
+
+  toDelete.add(item.id);
+  const manualCourse = courseMap.get(String(item.course)) ||
+    String(item.course);
+  const officialCourse = courseMap.get(officialEntry.course) ||
+    officialEntry.course;
+
+  const attCodeNum = Number(item.attendance);
+  let attendanceLabel = String(item.attendance);
+  if (attCodeNum === 110) {
+    attendanceLabel = "Present";
+  } else if (attCodeNum === 111) {
+    attendanceLabel = "Absent";
+  } else if (attCodeNum === 225) {
+    attendanceLabel = "Duty Leave";
+  } else if (attCodeNum === 112) {
+    attendanceLabel = "Medically Excused";
   }
-  return false;
+
+  notifications.push({
+    auth_user_id: user.auth_id,
+    title: "Course Mismatch 💀",
+    description:
+      `Course mismatch on ${item.date} (Session ${item.session}). Manual: ${manualCourse}, Official: ${officialCourse}.`,
+    topic: `conflict-course-${key}`,
+  });
+  emails.push({
+    type: "mismatch",
+    props: {
+      username: getUserDisplayName(user),
+      date: item.date,
+      session: String(item.session),
+      manualCourseName: manualCourse,
+      courseLabel: officialCourse,
+      dashboardUrl,
+      attendance: attendanceLabel,
+      remarks: item.remarks,
+    },
+  });
+  return true;
 }
 
 function getResolvedTitle(officialCode: number, trackerCode: number): string {
@@ -396,7 +422,7 @@ function handleAttendanceStatus(
       emails.push({
         type: "conflict",
         props: {
-          username: user.username,
+          username: getUserDisplayName(user),
           courseLabel: courseName,
           date: item.date,
           session: String(item.session),
@@ -417,6 +443,7 @@ function processTrackerItem(
   notifications: NotificationInsert[],
   emails: EmailTask[],
   courseMap: Map<string, string>,
+  universityCodeToEzygoId: Map<string, string>,
   dashboardUrl: string,
 ): void {
   const trackerDateKey = item.date.replace(/-/g, "");
@@ -449,6 +476,7 @@ function processTrackerItem(
       notifications,
       emails,
       courseMap,
+      universityCodeToEzygoId,
       dashboardUrl,
     )
   ) {
@@ -565,9 +593,7 @@ async function executeSyncMutations(
             subject,
             html,
             fromName: "GhostClass Alerts",
-            toName: user.first_name && user.last_name
-              ? `${user.first_name} ${user.last_name}`
-              : undefined,
+            toName: getUserDisplayName(user),
           });
         } catch (err) {
           logger.error(
@@ -590,6 +616,7 @@ async function syncUser(
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   courseMap: Map<string, string>,
+  universityCodeToEzygoId: Map<string, string>,
 ): Promise<SyncStats> {
   const stats = createEmptyStats();
   // L-2: NEXT_PUBLIC_APP_URL is required by validate-env.ts; the hardcoded
@@ -646,6 +673,7 @@ async function syncUser(
           notifications,
           emails,
           courseMap,
+          universityCodeToEzygoId,
           dashboardUrl,
         );
       }
@@ -732,11 +760,23 @@ export const GET = withSecurity(async (req, { authType }) => {
   }
 
   const { data: mappings } = await supabaseAdmin.from("course_mappings").select(
-    "ezygo_id, course_name",
+    "ezygo_id, course_name, university_code",
   );
   const courseMap = new Map<string, string>();
+  // Reverse map: university_code (upper-cased) → ezygo_id (string)
+  // Used to resolve manually-entered course codes to EzyGo numeric IDs
+  // so the mismatch check isn't triggered for the same course.
+  const universityCodeToEzygoId = new Map<string, string>();
   if (mappings) {
-    mappings.forEach((m) => courseMap.set(String(m.ezygo_id), m.course_name));
+    mappings.forEach((m) => {
+      courseMap.set(String(m.ezygo_id), m.course_name);
+      if (m.university_code) {
+        universityCodeToEzygoId.set(
+          String(m.university_code).toUpperCase(),
+          String(m.ezygo_id),
+        );
+      }
+    });
   }
 
   const overallStats = createEmptyStats();
@@ -745,7 +785,15 @@ export const GET = withSecurity(async (req, { authType }) => {
   // sequential processing takes 30-60 s per cron run. Parallel execution
   // keeps this well within serverless and Docker health-check timeouts.
   const userResults = await Promise.all(
-    users.map((user) => syncUser(user, auth.isCron, supabaseAdmin, courseMap)),
+    users.map((user) =>
+      syncUser(
+        user,
+        auth.isCron,
+        supabaseAdmin,
+        courseMap,
+        universityCodeToEzygoId,
+      )
+    ),
   );
   for (const userStats of userResults) {
     overallStats.processed += userStats.processed;

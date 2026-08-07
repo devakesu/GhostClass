@@ -13,7 +13,7 @@ import {
 } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
-import { getClientIp } from "@/lib/utils.server";
+import { getClientIp, isUpstreamAuthNetworkError } from "@/lib/utils.server";
 import { profileRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
@@ -66,16 +66,21 @@ function validateRequestOrigin(req: NextRequest): NextResponse | null {
   return null;
 }
 
+interface AuthUserResult {
+  user: { id: string } | null;
+  isUpstreamError: boolean;
+}
+
 async function authenticateUser(
   req: NextRequest,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-): Promise<{ id: string } | null> {
+): Promise<AuthUserResult> {
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
     if (!token) {
       logger.error("[authenticateUser] Bearer token is missing");
-      return null;
+      return { user: null, isUpstreamError: false };
     }
     const { data: { user: authUser }, error } = await supabaseAdmin.auth
       .getUser(token);
@@ -84,9 +89,12 @@ async function authenticateUser(
         "[authenticateUser] Supabase auth.getUser error:",
         error || "No user returned",
       );
-      return null;
+      return {
+        user: null,
+        isUpstreamError: isUpstreamAuthNetworkError(error),
+      };
     }
-    return authUser;
+    return { user: authUser, isUpstreamError: false };
   }
   const supabase = await createClient();
   const { data: { user: authUser }, error } = await supabase.auth.getUser();
@@ -95,9 +103,12 @@ async function authenticateUser(
       "[authenticateUser] Supabase client auth.getUser error:",
       error || "No user returned",
     );
-    return null;
+    return {
+      user: null,
+      isUpstreamError: isUpstreamAuthNetworkError(error),
+    };
   }
-  return authUser;
+  return { user: authUser, isUpstreamError: false };
 }
 
 async function ingestNewProfile(
@@ -327,8 +338,14 @@ const getHandler = async (req: NextRequest) => {
   if (originErr) return originErr;
 
   const supabaseAdmin = getAdminClient();
-  const user = await authenticateUser(req, supabaseAdmin);
+  const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
   if (!user) {
+    if (isUpstreamError) {
+      return NextResponse.json({ error: "Upstream auth service unavailable" }, {
+        status: 503,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     return NextResponse.json({ error: "Unauthorized" }, {
       status: 401,
       headers: { "Cache-Control": "no-store" },
@@ -442,8 +459,14 @@ const patchHandler = async (
   }
 
   const supabaseAdmin = getAdminClient();
-  const user = await authenticateUser(req, supabaseAdmin);
+  const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
   if (!user) {
+    if (isUpstreamError) {
+      return NextResponse.json({ error: "Upstream auth service unavailable" }, {
+        status: 503,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     return NextResponse.json({ error: "Unauthorized" }, {
       status: 401,
       headers: { "Cache-Control": "no-store" },

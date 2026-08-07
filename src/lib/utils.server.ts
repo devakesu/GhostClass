@@ -306,3 +306,28 @@ export async function egressFetch(
     "[egress-failover] unreachable: exhausted all egress tiers without returning",
   );
 }
+
+/**
+ * Checks if a Supabase auth error is a transient upstream network/fetch failure
+ * (e.g. status: 0, AuthRetryableFetchError, fetch failed, timeout) rather than a 401 credential failure.
+ */
+export function isUpstreamAuthNetworkError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "object") {
+    const errObj = error as Record<string, unknown>;
+    if (errObj.status === 0) return true;
+    if (errObj.name === "AuthRetryableFetchError") return true;
+    if (
+      typeof errObj.message === "string" && (
+        errObj.message.includes("fetch failed") ||
+        errObj.message.includes("network") ||
+        errObj.message.includes("timeout") ||
+        errObj.message.includes("ECONNRESET") ||
+        errObj.message.includes("ENOTFOUND")
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}

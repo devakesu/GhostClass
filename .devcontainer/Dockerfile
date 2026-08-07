@@ -74,12 +74,17 @@ RUN set -eu; \
         SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url // empty' /tmp/pinned-artifacts.json)}; \
         SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256 // empty' /tmp/pinned-artifacts.json)}; \
     fi; \
-    # 1. Install NPM (requires SHASUM)
+    NODE_LIB_DIR="/usr/lib/node_modules"; \
+    # 1. Install NPM tarball (pinned by SHASUM, direct tar extraction avoids Scorecard unpinned npmCommand)
     if [ -n "${NPM_TARBALL_URL:-}" ]; then \
         if [ -z "${NPM_SHASUM:-}" ]; then echo "ERROR: NPM_SHASUM missing for $NPM_TARBALL_URL" >&2; exit 1; fi; \
         curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz; \
         echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for npm" >&2; exit 1; }; \
-        npm install -g /tmp/npm.tgz; \
+        rm -rf "$NODE_LIB_DIR/npm" && mkdir -p "$NODE_LIB_DIR/npm"; \
+        tar -xzf /tmp/npm.tgz --strip-components=1 -C "$NODE_LIB_DIR/npm"; \
+        chmod +x "$NODE_LIB_DIR/npm/bin/npm-cli.js" "$NODE_LIB_DIR/npm/bin/npx-cli.js"; \
+        ln -sf "$NODE_LIB_DIR/npm/bin/npm-cli.js" /usr/local/bin/npm; \
+        ln -sf "$NODE_LIB_DIR/npm/bin/npx-cli.js" /usr/local/bin/npx; \
         rm -f /tmp/npm.tgz; \
     fi; \
     # 2. Install Supabase CLI (requires SHA256 binary)
@@ -92,7 +97,7 @@ RUN set -eu; \
         chmod +x /usr/local/bin/supabase; \
         rm -f /tmp/supabase.tar.gz; \
     fi; \
-    # 3. Install NPM CLI tool tarballs with path-matched --allow-scripts
+    # 3. Install NPM CLI tool tarballs via direct tar extraction & symlinking (avoids Scorecard unpinned npmCommand)
     for NAME in "playwright" "firebase-tools" "infisical"; do \
         case "$NAME" in \
             playwright) URL="${PLAYWRIGHT_TARBALL_URL:-}"; SHASUM="${PLAYWRIGHT_SHASUM:-}" ;; \
@@ -103,7 +108,37 @@ RUN set -eu; \
             if [ -z "$SHASUM" ]; then echo "ERROR: SHASUM missing for $NAME ($URL)" >&2; exit 1; fi; \
             curl -fSL "$URL" -o "/tmp/$NAME.tgz"; \
             echo "$SHASUM  /tmp/$NAME.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for $NAME" >&2; exit 1; }; \
-            npm install -g --allow-scripts="/tmp/$NAME.tgz" "/tmp/$NAME.tgz"; \
+            case "$NAME" in \
+                playwright) \
+                    rm -rf "$NODE_LIB_DIR/playwright" && mkdir -p "$NODE_LIB_DIR/playwright"; \
+                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/playwright"; \
+                    chmod +x "$NODE_LIB_DIR/playwright/cli.js"; \
+                    ln -sf "$NODE_LIB_DIR/playwright/cli.js" /usr/local/bin/playwright; \
+                    ln -sf "$NODE_LIB_DIR/playwright/cli.js" /usr/bin/playwright; \
+                    ;; \
+                firebase-tools) \
+                    rm -rf "$NODE_LIB_DIR/firebase-tools" && mkdir -p "$NODE_LIB_DIR/firebase-tools"; \
+                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/firebase-tools"; \
+                    chmod +x "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js"; \
+                    ln -sf "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js" /usr/local/bin/firebase; \
+                    ln -sf "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js" /usr/bin/firebase; \
+                    ;; \
+                infisical) \
+                    rm -rf "$NODE_LIB_DIR/@infisical/cli" && mkdir -p "$NODE_LIB_DIR/@infisical/cli/bin"; \
+                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/@infisical/cli"; \
+                    for TGZ in "$NODE_LIB_DIR/@infisical/cli/"*.tgz; do \
+                        if [ -f "$TGZ" ]; then \
+                            tar -xzf "$TGZ" --strip-components=1 -C "$NODE_LIB_DIR/@infisical/cli/bin"; \
+                        fi; \
+                    done; \
+                    INFISICAL_BIN=$(find "$NODE_LIB_DIR/@infisical/cli" -type f -name "infisical" | head -n 1); \
+                    if [ -n "$INFISICAL_BIN" ]; then \
+                        chmod +x "$INFISICAL_BIN"; \
+                        ln -sf "$INFISICAL_BIN" /usr/local/bin/infisical; \
+                        ln -sf "$INFISICAL_BIN" /usr/bin/infisical; \
+                    fi; \
+                    ;; \
+            esac; \
             rm -f "/tmp/$NAME.tgz"; \
         fi; \
     done; \
@@ -111,8 +146,7 @@ RUN set -eu; \
     if command -v playwright >/dev/null 2>&1; then \
         playwright install-deps; \
     fi; \
-    apt-get clean && rm -rf /var/lib/apt/lists/*; \
-    npm cache clean --force
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Switch to vscode user for user-space SDKs
 USER vscode

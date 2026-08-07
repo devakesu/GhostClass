@@ -4,6 +4,7 @@ import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/services/dio_service.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 /// AuthService
@@ -45,9 +46,18 @@ class AuthService {
       );
     }
 
+    String? fcmToken;
+    try {
+      fcmToken = await _ref
+          .read(firebaseMessagingProvider)
+          ?.getToken()
+          .timeout(const Duration(seconds: 2));
+    } on Object catch (_) {}
+
     final provisionStartMs = flowWatch.elapsedMilliseconds;
     final bridgeResponse = await _provisionGhostClassSessionWithRetry(
       ezygoToken,
+      fcmToken: fcmToken,
     );
     final provisionDurationMs =
         flowWatch.elapsedMilliseconds - provisionStartMs;
@@ -77,10 +87,11 @@ class AuthService {
   }
 
   Future<Response<dynamic>> _provisionGhostClassSessionWithRetry(
-    String ezygoToken,
-  ) async {
+    String ezygoToken, {
+    String? fcmToken,
+  }) async {
     try {
-      return await provisionGhostClassSession(ezygoToken);
+      return await provisionGhostClassSession(ezygoToken, fcmToken: fcmToken);
     } on Object catch (e, st) {
       if (!_isTransientProvisionFailure(e)) rethrow;
 
@@ -90,7 +101,7 @@ class AuthService {
         st,
       );
       await Future<void>.delayed(_provisionRetryBackoff);
-      return provisionGhostClassSession(ezygoToken);
+      return provisionGhostClassSession(ezygoToken, fcmToken: fcmToken);
     }
   }
 
@@ -113,11 +124,17 @@ class AuthService {
   }
 
   Future<Response<dynamic>> provisionGhostClassSession(
-    String ezygoToken,
-  ) async {
+    String ezygoToken, {
+    String? fcmToken,
+  }) async {
+    final payload = <String, dynamic>{
+      'token': ezygoToken.trim(),
+      if (fcmToken != null && fcmToken.trim().isNotEmpty)
+        'fcm_token': fcmToken.trim(),
+    };
     return _dio.post(
       '$_ghostclassBaseUrl/auth/save-token',
-      data: {'token': ezygoToken.trim()},
+      data: payload,
       options: Options(
         connectTimeout: _loginTimeout,
         receiveTimeout: _loginTimeout,

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { withSecurity } from "@/lib/security/app-check";
-import { getClientIp } from "@/lib/utils.server";
+import { getClientIp, isUpstreamAuthNetworkError } from "@/lib/utils.server";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -13,6 +13,48 @@ export const dynamic = "force-dynamic";
 const FcmTokenSchema = z.object({
   fcm_token: z.string().trim().min(1),
 });
+
+interface AuthUserResult {
+  user: { id: string } | null;
+  isUpstreamError: boolean;
+}
+
+async function authenticateUser(
+  req: Request,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<AuthUserResult> {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const { data: { user: authUser }, error } = await supabaseAdmin.auth
+      .getUser(token);
+    if (error || !authUser) {
+      logger.error(
+        "[register-fcm] Supabase auth.getUser error:",
+        error || "No user returned",
+      );
+      return {
+        user: null,
+        isUpstreamError: isUpstreamAuthNetworkError(error),
+      };
+    }
+    return { user: authUser, isUpstreamError: false };
+  }
+
+  const supabase = await createClient();
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
+  if (error || !authUser) {
+    logger.error(
+      "[register-fcm] Supabase client auth.getUser error:",
+      error || "No user returned",
+    );
+    return {
+      user: null,
+      isUpstreamError: isUpstreamAuthNetworkError(error),
+    };
+  }
+  return { user: authUser, isUpstreamError: false };
+}
 
 const postHandler = async (
   req: Request,
@@ -43,38 +85,21 @@ const postHandler = async (
   }
 
   const supabaseAdmin = getAdminClient();
-  const authHeader = req.headers.get("authorization");
-  let user: { id: string };
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth
-      .getUser(token);
-    if (error || !authUser) {
-      logger.error(
-        "[register-fcm] Supabase auth.getUser error:",
-        error || "No user returned",
+  const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
+  if (!user) {
+    if (isUpstreamError) {
+      return NextResponse.json(
+        { error: "Upstream auth service unavailable" },
+        {
+          status: 503,
+          headers: { "Cache-Control": "no-store" },
+        },
       );
-      return NextResponse.json({ error: "Unauthorized" }, {
-        status: 401,
-        headers: { "Cache-Control": "no-store" },
-      });
     }
-    user = authUser;
-  } else {
-    const supabase = await createClient();
-    const { data: { user: authUser }, error } = await supabase.auth.getUser();
-    if (error || !authUser) {
-      logger.error(
-        "[register-fcm] Supabase client auth.getUser error:",
-        error || "No user returned",
-      );
-      return NextResponse.json({ error: "Unauthorized" }, {
-        status: 401,
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-    user = authUser;
+    return NextResponse.json({ error: "Unauthorized" }, {
+      status: 401,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   let body = decryptedBody;

@@ -486,7 +486,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         );
       }
     } else {
-      _startPushInitInBackgroundAfterSplash(pushService);
       context.go('/login');
       AppLogger.safeUnawait(
         Future<void>.microtask(() async {

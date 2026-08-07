@@ -289,6 +289,7 @@ async function upsertUserData(
     fcm_token?: string;
     isFirstLogin: boolean;
     passwordToUse: string;
+    isMobileApp?: boolean;
   },
 ) {
   const {
@@ -299,6 +300,7 @@ async function upsertUserData(
     fcm_token,
     isFirstLogin,
     passwordToUse,
+    isMobileApp,
   } = payload;
   const { iv: tIv, content: tContent } = encrypt(token);
   const updateData: Record<string, unknown> = {
@@ -309,6 +311,7 @@ async function upsertUserData(
     auth_id: authUserId,
     updated_at: new Date().toISOString(),
     ...(fcm_token && { fcm_token }),
+    ...(isMobileApp && { has_mobile_app: true }),
   };
 
   if (isFirstLogin) {
@@ -367,9 +370,10 @@ const handler = async (
 ) => {
   const headerList = await headers();
   const cookieStore = await cookies();
+  const isAppCheck = authType === "app-check";
   const headerErr = await validateRequestHeaders(
     headerList,
-    authType === "app-check",
+    isAppCheck,
   );
   if (headerErr) return headerErr;
 
@@ -454,6 +458,7 @@ const handler = async (
       fcm_token,
       isFirstLogin,
       passwordToUse,
+      isMobileApp: isAppCheck || !!fcm_token,
     });
 
     const syncRes = await performProfileSync(token, verifiedId, authUserId);
