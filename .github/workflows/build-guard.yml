@@ -24,3 +24,9 @@ jobs:
       - name: Verify commit is signed
         run: |
           git log -1 --show-signature
+
+      - name: Validate Dependabot config
+        run: |
+          python3 -m pip install check-jsonschema
+          check-jsonschema --schemafile https://json.schemastore.org/dependabot-2.0.json .github/dependabot.yml
+
