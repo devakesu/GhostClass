@@ -397,6 +397,26 @@ function validateServiceAccountJson(errors: string[], warnings: string[]) {
   }
 }
 
+function validateAndroidFingerprints(errors: string[]) {
+  const raw = (
+    process.env.NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS ||
+    process.env.ANDROID_SHA256_FINGERPRINTS
+  )?.trim();
+  if (!raw) return;
+
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const fp of parts) {
+    const segments = fp.split(":");
+    const isValid = segments.length === 32 &&
+      segments.every((b) => b.length === 2 && !Number.isNaN(parseInt(b, 16)));
+    if (!isValid) {
+      errors.push(
+        `❌ Invalid Android SHA-256 cert fingerprint format: "${fp}". Must be 32 colon-separated hex bytes.`,
+      );
+    }
+  }
+}
+
 function validateAppCheck(errors: string[]) {
   const enforceAppCheck = process.env.ENFORCE_APP_CHECK;
   if (
@@ -410,6 +430,7 @@ function validateAppCheck(errors: string[]) {
     if (!process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME) {
       errors.push("❌ NEXT_PUBLIC_ANDROID_PACKAGE_NAME is required");
     }
+    validateAndroidFingerprints(errors);
     if (!process.env.FIREBASE_APP_ID_ANDROID) {
       errors.push("❌ FIREBASE_APP_ID_ANDROID is required");
     }
