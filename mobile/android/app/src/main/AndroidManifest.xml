@@ -13,7 +13,7 @@
     android:icon="@mipmap/ic_launcher"
     android:allowBackup="false"
     android:debuggable="false"
-    android:enableOnBackInvokedCallback="false"
+    android:enableOnBackInvokedCallback="true"
     tools:ignore="HardcodedDebugMode">
     <activity
       android:name=".MainActivity"

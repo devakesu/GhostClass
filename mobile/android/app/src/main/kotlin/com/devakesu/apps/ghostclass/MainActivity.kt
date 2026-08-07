@@ -1,15 +1,22 @@
 package com.devakesu.apps.ghostclass
 
+import android.os.Bundle
 import android.os.Debug
+import android.view.MotionEvent
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import androidx.activity.enableEdgeToEdge
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import android.view.MotionEvent
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.devakesu.apps.ghostclass/security"
     private var isCurrentWindowObscured = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+    }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
@@ -56,4 +63,3 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
-

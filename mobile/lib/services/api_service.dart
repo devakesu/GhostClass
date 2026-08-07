@@ -189,20 +189,54 @@ class ApiService {
 
     _syncInFlight = () async {
       try {
-        final response = await client.get<dynamic>(
-          '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
-          options: Options(
-            headers: {'Authorization': 'Bearer $supabaseToken'},
-            sendTimeout: kDebugMode
-                ? const Duration(seconds: 45)
-                : const Duration(seconds: 30),
-            receiveTimeout: kDebugMode
-                ? const Duration(seconds: 45)
-                : const Duration(seconds: 30),
-          ),
-        );
-        _lastSyncAt = DateTime.now();
-        return response;
+        final currentToken =
+            (supabaseToken.isNotEmpty
+                ? supabaseToken
+                : Supabase.instance.client.auth.currentSession?.accessToken) ??
+            '';
+
+        Future<Response<dynamic>> makeSyncCall(String token) {
+          return client.get<dynamic>(
+            '${AppConfig.ghostclassApiUrl}/cron/sync?t=${now.millisecondsSinceEpoch}',
+            options: Options(
+              headers: {'Authorization': 'Bearer $token'},
+              sendTimeout: kDebugMode
+                  ? const Duration(seconds: 45)
+                  : const Duration(seconds: 30),
+              receiveTimeout: kDebugMode
+                  ? const Duration(seconds: 45)
+                  : const Duration(seconds: 30),
+            ),
+          );
+        }
+
+        try {
+          final response = await makeSyncCall(currentToken);
+          _lastSyncAt = DateTime.now();
+          return response;
+        } on DioException catch (dioErr) {
+          if (dioErr.response?.statusCode == 401) {
+            AppLogger.i(
+              'ApiService: Sync returned 401, attempting token refresh...',
+            );
+            try {
+              final refreshed = await Supabase.instance.client.auth
+                  .refreshSession();
+              final freshToken = refreshed.session?.accessToken;
+              if (freshToken != null && freshToken.isNotEmpty) {
+                final response = await makeSyncCall(freshToken);
+                _lastSyncAt = DateTime.now();
+                return response;
+              }
+            } on Object catch (refreshErr) {
+              AppLogger.e(
+                'ApiService: Session refresh during 401 sync retry failed',
+                refreshErr,
+              );
+            }
+          }
+          rethrow;
+        }
       } on Object catch (e) {
         AppLogger.e('ApiService: Background sync failed', e);
         rethrow;

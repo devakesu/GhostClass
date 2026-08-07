@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -534,7 +535,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                       ).colorScheme.surfaceContainer,
                                       backgroundImage:
                                           user?.profile?.avatarUrl != null
-                                          ? NetworkImage(
+                                          ? CachedNetworkImageProvider(
                                               user!.profile!.avatarUrl!,
                                               headers: {
                                                 'Origin':
