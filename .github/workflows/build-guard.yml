@@ -21,6 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          trivy-config: "trivy.yaml"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
       - name: Verify commit is signed
         run: |
           git log -1 --show-signature
