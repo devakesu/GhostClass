@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { authRateLimiter } from "@/lib/ratelimit";
 import { logger } from "@/lib/logger";
-import { getClientIp, redact } from "@/lib/utils.server";
+import {
+  getClientIp,
+  isUpstreamAuthNetworkError,
+  redact,
+} from "@/lib/utils.server";
 import { withSecurity } from "@/lib/security/app-check";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
@@ -65,6 +69,9 @@ async function resolveUser(authType: string, headers: Headers) {
       error,
     } = await getUserWithRetry(() => supabaseAdmin.auth.getUser(token));
     if (error || !user) {
+      if (isUpstreamAuthNetworkError(error)) {
+        return { error: "Upstream auth service unavailable", status: 503 };
+      }
       return { error: "Invalid session", status: 401 };
     }
     return { user };
@@ -76,6 +83,9 @@ async function resolveUser(authType: string, headers: Headers) {
     error,
   } = await getUserWithRetry(() => supabase.auth.getUser());
   if (error || !user) {
+    if (isUpstreamAuthNetworkError(error)) {
+      return { error: "Upstream auth service unavailable", status: 503 };
+    }
     return { error: "Unauthorized", status: 401 };
   }
   return { user };

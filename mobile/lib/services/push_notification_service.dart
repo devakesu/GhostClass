@@ -50,6 +50,8 @@ class PushNotificationService {
   StreamSubscription<RemoteMessage>? _messageOpenedSub;
   StreamSubscription<AuthState>? _deferredAuthSub;
   Timer? _deferredAuthTimer;
+  bool _initialized = false;
+  bool get isInitialized => _initialized;
 
   Dio get _dio => _ref.read(dioServiceProvider).dio;
   SecureStorageService get _storage => _ref.read(secureStorageProvider);
@@ -60,8 +62,11 @@ class PushNotificationService {
     bool registerHandlers = true,
     Stream<RemoteMessage>? onMessageStream,
     Stream<RemoteMessage>? onMessageOpenedAppStream,
+    bool force = false,
   }) async {
     if (_messaging == null) return;
+    if (_initialized && !force) return;
+    _initialized = true;
     try {
       await _tokenSub?.cancel();
       await _messageSub?.cancel();
@@ -435,6 +440,7 @@ class PushNotificationService {
   }
 
   void dispose() {
+    _initialized = false;
     unawaited(_tokenSub?.cancel());
     unawaited(_messageSub?.cancel());
     unawaited(_messageOpenedSub?.cancel());

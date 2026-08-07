@@ -206,6 +206,18 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
           .read(profileHydrationServiceProvider.notifier)
           .buildFromCurrentSession();
       AppLogger.i('AuthNotifier: Core hydration complete');
+      if (user != null) {
+        AppLogger.safeUnawait(
+          Future.microtask(() async {
+            await ref
+                .read(pushNotificationServiceProvider)
+                .syncToken(force: true);
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e('AuthNotifier: Post-hydration FCM sync failed', e, st);
+          }),
+          'AuthNotifier: post-hydration FCM sync',
+        );
+      }
       return user;
     } finally {
       _isInitializing = false;

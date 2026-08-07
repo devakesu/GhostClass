@@ -228,9 +228,82 @@ void main() {
     verifyNever(() => mockStorage.saveFcmToken(any()));
   });
 
-  test('dispose cancels token subscription safely', () {
+  test(
+    'dispose cancels token subscription safely and resets initialized state',
+    () async {
+      final service = container.read(pushNotificationServiceProvider);
+      when(
+        () => mockSettings.authorizationStatus,
+      ).thenReturn(AuthorizationStatus.denied);
+      when(
+        () => mockMessaging.requestPermission(
+          alert: any(named: 'alert'),
+          badge: any(named: 'badge'),
+          sound: any(named: 'sound'),
+        ),
+      ).thenAnswer((_) async => mockSettings);
+
+      await service.initialize(registerHandlers: false);
+      expect(service.isInitialized, true);
+
+      expect(service.dispose, returnsNormally);
+      expect(service.isInitialized, false);
+    },
+  );
+
+  test('initialize skips subsequent calls unless force is true', () async {
+    when(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        announcement: any(named: 'announcement'),
+        badge: any(named: 'badge'),
+        carPlay: any(named: 'carPlay'),
+        criticalAlert: any(named: 'criticalAlert'),
+        provisional: any(named: 'provisional'),
+        sound: any(named: 'sound'),
+      ),
+    ).thenAnswer((_) async => mockSettings);
+    when(
+      () => mockSettings.authorizationStatus,
+    ).thenReturn(AuthorizationStatus.authorized);
+    when(
+      () => mockMessaging.getToken(),
+    ).thenAnswer((_) async => 'fcm-token');
+    when(
+      () => mockMessaging.onTokenRefresh,
+    ).thenAnswer((_) => const Stream.empty());
+
     final service = container.read(pushNotificationServiceProvider);
-    expect(service.dispose, returnsNormally);
+    await service.initialize(registerHandlers: false);
+    expect(service.isInitialized, true);
+
+    // Call initialize again without force (should be skipped)
+    await service.initialize(registerHandlers: false);
+    verify(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        announcement: any(named: 'announcement'),
+        badge: any(named: 'badge'),
+        carPlay: any(named: 'carPlay'),
+        criticalAlert: any(named: 'criticalAlert'),
+        provisional: any(named: 'provisional'),
+        sound: any(named: 'sound'),
+      ),
+    ).called(1);
+
+    // Call initialize with force: true (should execute)
+    await service.initialize(registerHandlers: false, force: true);
+    verify(
+      () => mockMessaging.requestPermission(
+        alert: any(named: 'alert'),
+        announcement: any(named: 'announcement'),
+        badge: any(named: 'badge'),
+        carPlay: any(named: 'carPlay'),
+        criticalAlert: any(named: 'criticalAlert'),
+        provisional: any(named: 'provisional'),
+        sound: any(named: 'sound'),
+      ),
+    ).called(1);
   });
 
   test('handles analytics exceptions gracefully in FCM listeners', () async {
