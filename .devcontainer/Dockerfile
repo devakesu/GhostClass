@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc
 
 # Main Base Image (Ubuntu 24.04 GLIBC compatible)
 FROM mcr.microsoft.com/devcontainers/base:2.1.7-ubuntu24.04@sha256:4bcb1b466771b1ba1ea110e2a27daea2f6093f9527fb75ee59703ec89b5561cb
@@ -48,84 +48,105 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY .devcontainer/pinned-artifacts.json* pinned-artifacts.json* /tmp/
+# Pre-downloaded tarballs (committed to repo) — avoids CDN non-deterministic gzip re-encoding
+COPY .devcontainer/tarballs/npm.tgz* /tmp/tarballs/
+COPY .devcontainer/tarballs/playwright.tgz* /tmp/tarballs/
+COPY .devcontainer/tarballs/playwright-core.tgz* /tmp/tarballs/
+COPY .devcontainer/tarballs/firebase-tools.tgz* /tmp/tarballs/
+COPY .devcontainer/tarballs/infisical.tgz* /tmp/tarballs/
 
-# 2. CLI Tools (Npm, Supabase, Firebase, Infisical, Playwright)
-ARG NPM_TARBALL_URL
-ARG NPM_SHASUM
-ARG PLAYWRIGHT_TARBALL_URL
-ARG PLAYWRIGHT_SHASUM
-ARG FIREBASE_TARBALL_URL
-ARG FIREBASE_SHASUM
-ARG INFISICAL_TARBALL_URL
-ARG INFISICAL_SHASUM
+# 2. CLI Tools (Npm, Supabase, gh CLI, Firebase, Infisical, Playwright)
 ARG SUPABASE_TARBALL_URL
 ARG SUPABASE_SHA256
+ARG GH_TARBALL_URL
+ARG GH_SHA256
 
 RUN set -eu; \
+    # Read pinned-artifact hashes for verification
+    NPM_SHA256=""; PLAYWRIGHT_SHA256=""; PLAYWRIGHT_CORE_SHA256=""; \
+    FIREBASE_SHA256=""; INFISICAL_SHA256=""; \
+    SUPABASE_TARBALL_URL=""; SUPABASE_SHA256=""; \
+    GH_TARBALL_URL=""; GH_SHA256=""; \
     if [ -f /tmp/pinned-artifacts.json ]; then \
-        NPM_TARBALL_URL=${NPM_TARBALL_URL:-$(jq -r '.npm.url // empty' /tmp/pinned-artifacts.json)}; \
-        NPM_SHASUM=${NPM_SHASUM:-$(jq -r '.npm.shasum // empty' /tmp/pinned-artifacts.json)}; \
-        PLAYWRIGHT_TARBALL_URL=${PLAYWRIGHT_TARBALL_URL:-$(jq -r '.playwright.url // empty' /tmp/pinned-artifacts.json)}; \
-        PLAYWRIGHT_SHASUM=${PLAYWRIGHT_SHASUM:-$(jq -r '.playwright.shasum // empty' /tmp/pinned-artifacts.json)}; \
-        FIREBASE_TARBALL_URL=${FIREBASE_TARBALL_URL:-$(jq -r '.firebase.url // empty' /tmp/pinned-artifacts.json)}; \
-        FIREBASE_SHASUM=${FIREBASE_SHASUM:-$(jq -r '.firebase.shasum // empty' /tmp/pinned-artifacts.json)}; \
-        INFISICAL_TARBALL_URL=${INFISICAL_TARBALL_URL:-$(jq -r '.infisical.url // empty' /tmp/pinned-artifacts.json)}; \
-        INFISICAL_SHASUM=${INFISICAL_SHASUM:-$(jq -r '.infisical.shasum // empty' /tmp/pinned-artifacts.json)}; \
-        SUPABASE_TARBALL_URL=${SUPABASE_TARBALL_URL:-$(jq -r '.supabase.url // empty' /tmp/pinned-artifacts.json)}; \
-        SUPABASE_SHA256=${SUPABASE_SHA256:-$(jq -r '.supabase.sha256 // empty' /tmp/pinned-artifacts.json)}; \
+        NPM_SHA256=$(jq -r '.npm.sha256 // empty' /tmp/pinned-artifacts.json); \
+        PLAYWRIGHT_SHA256=$(jq -r '.playwright.sha256 // empty' /tmp/pinned-artifacts.json); \
+        PLAYWRIGHT_CORE_SHA256=$(jq -r '.playwright_core.sha256 // empty' /tmp/pinned-artifacts.json); \
+        FIREBASE_SHA256=$(jq -r '.firebase.sha256 // empty' /tmp/pinned-artifacts.json); \
+        INFISICAL_SHA256=$(jq -r '.infisical.sha256 // empty' /tmp/pinned-artifacts.json); \
+        SUPABASE_TARBALL_URL=$(jq -r '.supabase.url // empty' /tmp/pinned-artifacts.json); \
+        SUPABASE_SHA256=$(jq -r '.supabase.sha256 // empty' /tmp/pinned-artifacts.json); \
+        GH_TARBALL_URL=${GH_TARBALL_URL:-$(jq -r '.gh.url // empty' /tmp/pinned-artifacts.json)}; \
+        GH_SHA256=${GH_SHA256:-$(jq -r '.gh.sha256 // empty' /tmp/pinned-artifacts.json)}; \
     fi; \
     NODE_LIB_DIR="/usr/lib/node_modules"; \
-    # 1. Install NPM tarball (pinned by SHASUM, direct tar extraction avoids Scorecard unpinned npmCommand)
-    if [ -n "${NPM_TARBALL_URL:-}" ]; then \
-        if [ -z "${NPM_SHASUM:-}" ]; then echo "ERROR: NPM_SHASUM missing for $NPM_TARBALL_URL" >&2; exit 1; fi; \
-        curl -fSL "$NPM_TARBALL_URL" -o /tmp/npm.tgz; \
-        echo "$NPM_SHASUM  /tmp/npm.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for npm" >&2; exit 1; }; \
+    # 1. Install NPM tarball from pre-downloaded copy (sha256-verified, no CDN download)
+    if [ -f /tmp/tarballs/npm.tgz ]; then \
+        if [ -n "${NPM_SHA256:-}" ]; then \
+            echo "$NPM_SHA256  /tmp/tarballs/npm.tgz" | sha256sum -c - || { echo "ERROR: Checksum verification failed for npm" >&2; exit 1; }; \
+        fi; \
         rm -rf "$NODE_LIB_DIR/npm" && mkdir -p "$NODE_LIB_DIR/npm"; \
-        tar -xzf /tmp/npm.tgz --strip-components=1 -C "$NODE_LIB_DIR/npm"; \
+        tar -xzf /tmp/tarballs/npm.tgz --strip-components=1 -C "$NODE_LIB_DIR/npm"; \
         chmod +x "$NODE_LIB_DIR/npm/bin/npm-cli.js" "$NODE_LIB_DIR/npm/bin/npx-cli.js"; \
         ln -sf "$NODE_LIB_DIR/npm/bin/npm-cli.js" /usr/local/bin/npm; \
         ln -sf "$NODE_LIB_DIR/npm/bin/npx-cli.js" /usr/local/bin/npx; \
-        rm -f /tmp/npm.tgz; \
     fi; \
-    # 2. Install Supabase CLI (requires SHA256 binary)
+    # 2. Install Supabase CLI (GitHub release binary, SHA256-verified)
     if [ -n "${SUPABASE_TARBALL_URL:-}" ]; then \
         if [ -z "${SUPABASE_SHA256:-}" ]; then echo "ERROR: SUPABASE_SHA256 missing for $SUPABASE_TARBALL_URL" >&2; exit 1; fi; \
         curl -fSL "$SUPABASE_TARBALL_URL" -o /tmp/supabase.tar.gz; \
         echo "$SUPABASE_SHA256  /tmp/supabase.tar.gz" | sha256sum -c - || { echo "ERROR: Checksum verification failed for supabase" >&2; exit 1; }; \
         tar -xzf /tmp/supabase.tar.gz -C /tmp; \
-        find /tmp -type f -name "supabase" -exec mv {} /usr/local/bin/ \; ; \
+        find /tmp -maxdepth 2 -type f -name "supabase" -exec mv {} /usr/local/bin/ \; ; \
         chmod +x /usr/local/bin/supabase; \
         rm -f /tmp/supabase.tar.gz; \
     fi; \
-    # 3. Install NPM CLI tool tarballs via direct tar extraction & symlinking (avoids Scorecard unpinned npmCommand)
+    # 2b. Install gh CLI (GitHub release binary, SHA256-verified)
+    if [ -n "${GH_TARBALL_URL:-}" ]; then \
+        if [ -z "${GH_SHA256:-}" ]; then echo "ERROR: GH_SHA256 missing for $GH_TARBALL_URL" >&2; exit 1; fi; \
+        curl -fSL "$GH_TARBALL_URL" -o /tmp/gh.tar.gz; \
+        echo "$GH_SHA256  /tmp/gh.tar.gz" | sha256sum -c - || { echo "ERROR: Checksum verification failed for gh" >&2; exit 1; }; \
+        tar -xzf /tmp/gh.tar.gz -C /tmp; \
+        find /tmp -maxdepth 3 -type f -name "gh" -exec mv {} /usr/local/bin/ \; ; \
+        chmod +x /usr/local/bin/gh; \
+        rm -f /tmp/gh.tar.gz; \
+        rm -rf /tmp/gh_*; \
+    fi; \
+    # 3. Install NPM CLI tool tarballs from pre-downloaded copies (sha256-verified, no CDN download)
     for NAME in "playwright" "firebase-tools" "infisical"; do \
         case "$NAME" in \
-            playwright) URL="${PLAYWRIGHT_TARBALL_URL:-}"; SHASUM="${PLAYWRIGHT_SHASUM:-}" ;; \
-            firebase-tools) URL="${FIREBASE_TARBALL_URL:-}"; SHASUM="${FIREBASE_SHASUM:-}" ;; \
-            infisical) URL="${INFISICAL_TARBALL_URL:-}"; SHASUM="${INFISICAL_SHASUM:-}" ;; \
+            playwright) TARBALL="/tmp/tarballs/playwright.tgz"; SHA256="${PLAYWRIGHT_SHA256:-}" ;; \
+            firebase-tools) TARBALL="/tmp/tarballs/firebase-tools.tgz"; SHA256="${FIREBASE_SHA256:-}" ;; \
+            infisical) TARBALL="/tmp/tarballs/infisical.tgz"; SHA256="${INFISICAL_SHA256:-}" ;; \
         esac; \
-        if [ -n "$URL" ]; then \
-            if [ -z "$SHASUM" ]; then echo "ERROR: SHASUM missing for $NAME ($URL)" >&2; exit 1; fi; \
-            curl -fSL "$URL" -o "/tmp/$NAME.tgz"; \
-            echo "$SHASUM  /tmp/$NAME.tgz" | sha1sum -c - || { echo "ERROR: Checksum verification failed for $NAME" >&2; exit 1; }; \
+        if [ -f "$TARBALL" ]; then \
+            if [ -n "$SHA256" ]; then \
+                echo "$SHA256  $TARBALL" | sha256sum -c - || { echo "ERROR: Checksum verification failed for $NAME" >&2; exit 1; }; \
+            fi; \
             case "$NAME" in \
                 playwright) \
+                    if [ -f /tmp/tarballs/playwright-core.tgz ]; then \
+                        if [ -n "${PLAYWRIGHT_CORE_SHA256:-}" ]; then \
+                            echo "$PLAYWRIGHT_CORE_SHA256  /tmp/tarballs/playwright-core.tgz" | sha256sum -c - || { echo "ERROR: Checksum verification failed for playwright-core" >&2; exit 1; }; \
+                        fi; \
+                        rm -rf "$NODE_LIB_DIR/playwright-core" && mkdir -p "$NODE_LIB_DIR/playwright-core"; \
+                        tar -xzf /tmp/tarballs/playwright-core.tgz --strip-components=1 -C "$NODE_LIB_DIR/playwright-core"; \
+                    fi; \
                     rm -rf "$NODE_LIB_DIR/playwright" && mkdir -p "$NODE_LIB_DIR/playwright"; \
-                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/playwright"; \
+                    tar -xzf "$TARBALL" --strip-components=1 -C "$NODE_LIB_DIR/playwright"; \
                     chmod +x "$NODE_LIB_DIR/playwright/cli.js"; \
                     ln -sf "$NODE_LIB_DIR/playwright/cli.js" /usr/local/bin/playwright; \
                     ln -sf "$NODE_LIB_DIR/playwright/cli.js" /usr/bin/playwright; \
                     ;; \
                 firebase-tools) \
                     rm -rf "$NODE_LIB_DIR/firebase-tools" && mkdir -p "$NODE_LIB_DIR/firebase-tools"; \
-                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/firebase-tools"; \
+                    tar -xzf "$TARBALL" --strip-components=1 -C "$NODE_LIB_DIR/firebase-tools"; \
                     chmod +x "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js"; \
                     ln -sf "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js" /usr/local/bin/firebase; \
                     ln -sf "$NODE_LIB_DIR/firebase-tools/lib/bin/firebase.js" /usr/bin/firebase; \
                     ;; \
                 infisical) \
                     rm -rf "$NODE_LIB_DIR/@infisical/cli" && mkdir -p "$NODE_LIB_DIR/@infisical/cli/bin"; \
-                    tar -xzf "/tmp/$NAME.tgz" --strip-components=1 -C "$NODE_LIB_DIR/@infisical/cli"; \
+                    tar -xzf "$TARBALL" --strip-components=1 -C "$NODE_LIB_DIR/@infisical/cli"; \
                     for TGZ in "$NODE_LIB_DIR/@infisical/cli/"*.tgz; do \
                         if [ -f "$TGZ" ]; then \
                             tar -xzf "$TGZ" --strip-components=1 -C "$NODE_LIB_DIR/@infisical/cli/bin"; \
@@ -139,7 +160,6 @@ RUN set -eu; \
                     fi; \
                     ;; \
             esac; \
-            rm -f "/tmp/$NAME.tgz"; \
         fi; \
     done; \
     # 4. Playwright dependencies & cleanup

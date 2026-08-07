@@ -1,13 +1,12 @@
 # ===============================
 # 0. Global deterministic settings
 # ===============================
-ARG NODE_IMAGE=node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3
 ARG SOURCE_DATE_EPOCH=1767225600
 
 # ===============================
 # 0.1. Base layer with npm upgrade (pinned by hash)
 # ===============================
-FROM ${NODE_IMAGE} AS base
+FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS base
 
 # Update npm to version 12 without using `npm install -g` (avoids scorecard "npmCommand not pinned" flag).
 # /usr/local/bin/npm already symlinks to /usr/local/lib/node_modules/npm/bin/npm-cli.js,
@@ -119,6 +118,7 @@ ARG NEXT_PUBLIC_LEGAL_EMAIL
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ARG NEXT_PUBLIC_GA_ID
 ARG NEXT_PUBLIC_ANDROID_PACKAGE_NAME
+ARG NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS
 # Optional compile-time overrides
 ARG NEXT_PUBLIC_DONATE_URL
 ARG NEXT_PUBLIC_DEFAULT_DOMAIN
@@ -146,6 +146,7 @@ ENV NEXT_PUBLIC_LEGAL_EMAIL=${NEXT_PUBLIC_LEGAL_EMAIL}
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 ENV NEXT_PUBLIC_GA_ID=${NEXT_PUBLIC_GA_ID}
 ENV NEXT_PUBLIC_ANDROID_PACKAGE_NAME=${NEXT_PUBLIC_ANDROID_PACKAGE_NAME}
+ENV NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS=${NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS}
 ENV NEXT_PUBLIC_DONATE_URL=${NEXT_PUBLIC_DONATE_URL}
 ENV NEXT_PUBLIC_DEFAULT_DOMAIN=${NEXT_PUBLIC_DEFAULT_DOMAIN}
 ENV NEXT_PUBLIC_ATTENDANCE_TARGET_MIN=${NEXT_PUBLIC_ATTENDANCE_TARGET_MIN}
@@ -207,7 +208,7 @@ RUN sed -i 's|/app/|/|g' .next/standalone/server.js
 # ===============================
 # 3. Runtime layer
 # ===============================
-FROM ${NODE_IMAGE} AS runner
+FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS runner
 
 ARG SOURCE_DATE_EPOCH
 ARG APP_COMMIT_SHA
