@@ -102,6 +102,29 @@ GhostClass implements multiple layers of security:
   with `403`. Secrets are never embedded in the client bundle (`CF_PROXY_SECRET`
   and `AWS_SECONDARY_SECRET` are server-only runtime variables).
 
+### Database Backup & Disaster Recovery Security
+
+- **Post-Quantum Asymmetric Age Encryption (`age`)** - Dumps are compressed
+  with `zstd` (level 19) and encrypted with `age` public-key cryptography
+  (`AGE_RECIPIENT`). Supports both classical X25519 (`age1...`) and NIST
+  FIPS 203 standardized Post-Quantum Hybrid encryption (`ML-KEM-768 + X25519`,
+  `age1pq1...`), providing mathematical resilience against future cryptographically
+  relevant quantum computers (CRQCs) and "Harvest Now, Decrypt Later" (HNDL) attacks.
+  The private decryption key (`AGE-SECRET-KEY-PQ-1...`) is stored strictly offline
+  in secure vault storage and never touches the backup container. Even in the
+  event of an infrastructure or Cloudflare R2 breach, backups cannot be decrypted.
+- **Zero Plaintext on Disk** - The backup pipeline streams `pg_dump` directly
+  through `zstd` and `age` into the encrypted file. Raw unencrypted database
+  data is never written to disk or container storage.
+- **Cloudflare R2 Bucket Isolation** - Backups are uploaded to a dedicated
+  Cloudflare R2 bucket with scoped S3 API credentials restricted strictly to
+  read/write on the backup prefix.
+- **Integrity Verification** - SHA-256 checksums are generated and uploaded
+  alongside every encrypted archive; remote object size and presence are
+  strictly verified before job completion.
+- **Automated Retention Pruning** - Daily backups are pruned after a configurable
+  window (default: 14 days) to uphold data minimization principles.
+
 ## Dependency Security Overrides
 
 GhostClass uses npm overrides to enforce minimum secure versions of transitive
