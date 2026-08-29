@@ -186,7 +186,7 @@ pseudocode, see **[ALGORITHM.md](docs/ALGORITHM.md)**.
 ## 🐳 Dev Container Environment Setup (Recommended)
 
 GhostClass provides an isolated, reproducible Dev Container
-(`.devcontainer/Dockerfile`) equipped with Node 24, Flutter SDK 3.44, Deno,
+(`.devcontainer/Dockerfile`) equipped with Node 24, Flutter SDK,
 Playwright, Supabase, Firebase, Infisical CLI tools, and automatic IDE extension
 syncing.
 
@@ -289,30 +289,21 @@ git clone https://github.com/devakesu/GhostClass.git
 cd GhostClass
 ```
 
-### 5. Build & Run Sandbox Container
+### 5. Launch Dev Environment via Setup Launcher
 
-Build the dev container image and launch the sandbox container with mapped ports
-and volume mounts:
+Run the automated launcher script from the repository root in WSL:
 
 ```bash
-# 1. Verify SSH agent connection (must return your keys, not an error)
-ssh-add -l
-
-# 2. Build dev container image
-docker build -t ghostclass-sandbox -f .devcontainer/Dockerfile .
-
-# 3. Launch sandbox container
-docker run -d --name GhostClass_Sandbox \
-  --restart unless-stopped \
-  -v "$(pwd):/ghostclass" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$HOME/.ssh/agent.sock:/run/host-services/ssh-auth.sock" \
-  -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
-  -p 3000:3000 -p 8000:8000 -p 8080:8080 -p 4000:4000 -p 5001:5001 \
-  -p 8081:8081 -p 8085:8085 -p 9099:9099 \
-  -p 54321:54321 -p 54322:54322 -p 54323:54323 \
-  ghostclass-sandbox
+chmod +x .devcontainer/setup-dev-hub.sh
+./.devcontainer/setup-dev-hub.sh
 ```
+
+This single command will:
+
+1. Validate your Docker environment and socket permissions.
+2. Initialize the shared Global Dev Hub (`~/dev-hub`) with CLI tools (Supabase, Infisical, Firebase, GitHub CLI) and SDKs (Android, Flutter).
+3. Build the `ghostclass-sandbox` Docker image.
+4. Clean up any existing container and launch `GhostClass_Sandbox` with all required port mappings and shared volume mounts.
 
 ### 6. Attach IDE & Initialize Workspace
 
