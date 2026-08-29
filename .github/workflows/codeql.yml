@@ -77,9 +77,13 @@ jobs:
 
       - name: Prepare google-services.json
         working-directory: mobile
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ env.GOOGLE_SERVICES_JSON_BASE64 || secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
+          set +x
           if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            echo "::add-mask::$GOOGLE_SERVICES_JSON_BASE64"
             printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
             echo "✓ Recreated android/app/google-services.json from secret"
           elif [ -f android/app/google-services.json ]; then

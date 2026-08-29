@@ -78,20 +78,28 @@ jobs:
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
+        env:
+          TARGET_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}
         run: |
-          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
+          node scripts/sync-version.js "${TARGET_VERSION}"
 
       - name: Prepare derived values
         id: prep
         env:
           REPO: ${{ github.repository }}
           REPO_OWNER: ${{ github.repository_owner }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
+          ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK: ${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          BUILD_ARM64: ${{ github.event.inputs.build_arm64 }}
+          HEAD_COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
           # Set APP_DOMAIN with validation; avoid silent localhost fallback for real releases
-          APP_DOMAIN="${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          APP_DOMAIN="${NEXT_PUBLIC_APP_DOMAIN:-}"
           if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
             # For non-push events, allow localhost fallback only with explicit opt-in
-            if [ "${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
+            if [ "${ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK:-}" != "true" ]; then
               echo "::warning::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured. Falling back to APP_DOMAIN=localhost."
               echo "::warning::To explicitly allow this fallback without warnings, set vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK=true."
             fi
@@ -100,7 +108,7 @@ jobs:
           echo "APP_DOMAIN=${APP_DOMAIN}" >> $GITHUB_ENV
 
           # Derive BACKEND_URL if not set
-          BACKEND_URL="${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}"
+          BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-}"
           if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" = "null" ]; then
              if [ "$APP_DOMAIN" = "localhost" ]; then
                BACKEND_URL="http://localhost:3000"
@@ -119,11 +127,11 @@ jobs:
           # Determine build platforms
           # Default to amd64 for faster, more reliable release builds.
           # ARM64 remains available as an explicit manual opt-in.
-          if [ "${{ github.event_name }}" == "push" ]; then
+          if [ "${EVENT_NAME}" == "push" ]; then
             PLATFORMS="linux/amd64"
             echo "📦 Main push detected - building amd64 only"
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.build_arm64 }}" == "true" ]; then
+          elif [ "${EVENT_NAME}" == "workflow_dispatch" ]; then
+            if [ "${BUILD_ARM64}" == "true" ]; then
               PLATFORMS="linux/amd64,linux/arm64"
               echo "📦 Manual dispatch with ARM64 enabled"
             else
@@ -142,7 +150,7 @@ jobs:
           echo "app_email=@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           echo "legal_email=legal@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           # Use a consistent timestamp for reproducibility
-          TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          TIMESTAMP="${HEAD_COMMIT_TIMESTAMP:-}"
           if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" == "null" ]; then
             TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           fi
@@ -294,8 +302,12 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
 
       - name: Authenticate cosign with registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u ${{ github.actor }} --password-stdin
+          set -euo pipefail
+          set +x
+          echo "${GH_TOKEN}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Sign image (keyless)
         env:
@@ -398,8 +410,8 @@ jobs:
       - name: Download Gradle Wrapper
         run: |
           mkdir -p mobile/android/gradle/wrapper
-          curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar
-          echo "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+          curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v9.6.1/gradle/wrapper/gradle-wrapper.jar
+          echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
       - name: Set up Java
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
@@ -425,8 +437,10 @@ jobs:
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
+        env:
+          TARGET_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}
         run: |
-          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
+          node scripts/sync-version.js "${TARGET_VERSION}"
 
       - name: Prepare mobile release paths
         id: mobile-prep
@@ -474,12 +488,14 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          set +x
 
           : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 secret is required}"
           : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD secret is required}"
           : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
           : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
 
+          [ -n "$ANDROID_KEYSTORE_BASE64" ] && echo "::add-mask::$ANDROID_KEYSTORE_BASE64"
           [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
           [ -n "$ANDROID_KEY_ALIAS" ] && echo "::add-mask::$ANDROID_KEY_ALIAS"
           [ -n "$ANDROID_KEY_PASSWORD" ] && echo "::add-mask::$ANDROID_KEY_PASSWORD"
@@ -502,8 +518,11 @@ jobs:
           GOOGLE_SERVICES_JSON_BASE64: ${{ env.GOOGLE_SERVICES_JSON_BASE64 || secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
+          set +x
 
           : "${GOOGLE_SERVICES_JSON_BASE64:?GOOGLE_SERVICES_JSON_BASE64 environment variable or secret is required}"
+
+          [ -n "$GOOGLE_SERVICES_JSON_BASE64" ] && echo "::add-mask::$GOOGLE_SERVICES_JSON_BASE64"
 
           mkdir -p app
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
@@ -815,8 +834,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
           AWS_S3_PRIVATE_BUCKET: ${{ secrets.AWS_S3_PRIVATE_BUCKET || vars.AWS_S3_PRIVATE_BUCKET }}
+          BUILD_NAME: ${{ steps.mobile-prep.outputs.build_name }}
         run: |
           set -euo pipefail
+          set +x
+
+          [ -n "$AWS_SECRET_ACCESS_KEY" ] && echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
+          [ -n "$AWS_ACCESS_KEY_ID" ] && echo "::add-mask::$AWS_ACCESS_KEY_ID"
 
           if [ -z "${AWS_S3_PRIVATE_BUCKET:-}" ]; then
             echo "::warning::AWS_S3_PRIVATE_BUCKET is not configured. Internal artifacts (.aab, mapping.txt) will not be archived to cloud storage."
@@ -824,9 +848,9 @@ jobs:
             exit 0
           fi
 
-          echo "Uploading private internal release assets to s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/"
+          echo "Uploading private internal release assets to s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${BUILD_NAME}/"
 
-          aws s3 cp . "s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/" --recursive
+          aws s3 cp . "s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${BUILD_NAME}/" --recursive
 
           echo "✓ Internal artifacts securely archived to private S3 bucket"
 
@@ -860,8 +884,10 @@ jobs:
 
       - name: Determine release version
         id: version
+        env:
+          APP_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
         run: |
-          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          VERSION="${APP_VERSION}"
           if [[ "${VERSION}" != v* ]]; then
             VERSION_TAG="v${VERSION}"
           else
@@ -1009,6 +1035,7 @@ jobs:
         env:
           DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
+          VERSION_RAW: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           SERVER_URL: ${{ github.server_url }}
@@ -1017,7 +1044,9 @@ jobs:
           ANDROID_PACKAGE_NAME: ${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || 'com.devakesu.apps.ghostclass' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
+          set -euo pipefail
+
+          IMAGE_NAME=$(echo "$REPOSITORY" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
           PLAY_STORE_URL="https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}"
 
@@ -1027,10 +1056,8 @@ jobs:
             PLATFORM_DESC="Docker image (${PLATFORM_LIST})"
           fi
 
-          gh release create "${VERSION_TAG}" \
-            --title "Release ${VERSION_TAG}" \
-            --latest \
-            --notes "## Release ${VERSION_TAG}
+          cat > ./artifacts/RELEASE_NOTES.md << EOF
+          ## Release ${VERSION_TAG}
 
           This release includes:
           - 🐳 ${PLATFORM_DESC}
@@ -1065,8 +1092,8 @@ jobs:
           \`\`\`bash
           # Verify image signature
           cosign verify \\
-            --certificate-identity-regexp=\"^https://github.com/${REPOSITORY}\" \\
-            --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
             ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
 
           # Verify attestation
@@ -1075,13 +1102,22 @@ jobs:
 
           ---
 
-          **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}" \
+          **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}
+          EOF
+
+          # Remove leading indentation from here-doc
+          sed -i 's/^[[:space:]]\{10\}//' ./artifacts/RELEASE_NOTES.md
+
+          gh release create "${VERSION_TAG}" \
+            --title "Release ${VERSION_TAG}" \
+            --latest \
+            --notes-file ./artifacts/RELEASE_NOTES.md \
             ./artifacts/web/sbom.json \
             ./artifacts/web/sbom.json.bundle \
             ./artifacts/web/checksums.txt \
             ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \
-            ./artifacts/mobile/ghostclass-android-v${{ steps.version.outputs.version }}.apk \
+            ./artifacts/mobile/ghostclass-android-v${VERSION_RAW}.apk \
             ./artifacts/mobile/mobile-sbom.json \
             ./artifacts/mobile/mobile-checksums.txt \
             ./artifacts/mobile/mobile-provenance.intoto.jsonl \

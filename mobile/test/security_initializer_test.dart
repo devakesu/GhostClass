@@ -2,6 +2,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/security_initializer.dart';
 import 'package:mocktail/mocktail.dart';
+
 // test utils were consolidated into the library under test.
 // Ignore redundant-argument lint in tests that explicitly set `isDebug`
 // to exercise both branches regardless of analyzer environment.

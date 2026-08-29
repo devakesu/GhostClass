@@ -44,14 +44,21 @@ jobs:
       - name: Link Project
         env:
           SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
-        run: supabase link --project-ref $SUPABASE_PROJECT_ID
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Deploy Database Changes (Migrations)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ env.SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ env.SUPABASE_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
-        run: supabase db push
+        run: |
+          set -euo pipefail
+          set +x
+
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] && echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+          [ -n "${SUPABASE_DB_PASSWORD:-}" ] && echo "::add-mask::$SUPABASE_DB_PASSWORD"
+
+          supabase db push
 
   # ────────────────────────────────────────────────────────────────────────────
   # Job 2: Deploy Proxies (Cloudflare Workers & AWS Lambdas)
@@ -370,6 +377,7 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
         run: |
           set -euo pipefail
+          set +x
 
           # Validate required Coolify configuration
           : "${COOLIFY_BASE_URL:?COOLIFY_BASE_URL secret is required}"
